@@ -1,0 +1,165 @@
+{
+  "serverId": "Too-Far/aave-mcp/aave-mcp",
+  "version": "b6c05049b04f1116c595196bcda3b7f3a4b7c759",
+  "manifest": {
+    "id": "aave-mcp",
+    "fullId": "Too-Far/aave-mcp/aave-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "Too-Far",
+      "repo": "aave-mcp",
+      "branch": "main",
+      "url": "https://github.com/Too-Far/aave-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "tsconfig.json",
+          "description": null,
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "file",
+              "key": "tsconfig.json"
+            }
+          ]
+        },
+        {
+          "title": "ethereum-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ETHEREUM_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "arbitrum-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ARBITRUM_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "optimism-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OPTIMISM_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "polygon-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "POLYGON_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "avalanche-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AVALANCHE_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "base-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "BASE_RPC_URL"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Aave MCP Server",
+    "description": "A containerized version of \"Aave MCP Server\""
+  },
+  "manifestHash": "3e3e2a5764df1e3fc644698edfeebdbf",
+  "createdAt": "2025-05-13T19:44:02.177Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "yarn run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "yarn install --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/usr/local/share/.cache/yarn/v6"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "yarn-1_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "yarn run start"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "serverId": "Too-Far/aave-mcp/bin",
+  "version": "d5eda94cfe43916d320884ac05a5d6ecc324745d",
+  "manifest": {
+    "id": "bin",
+    "fullId": "Too-Far/aave-mcp/bin",
+    "repo": {
+      "provider": "github.com",
+      "owner": "Too-Far",
+      "repo": "aave-mcp",
+      "branch": "main",
+      "url": "https://github.com/Too-Far/aave-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "ethereum-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ETHEREUM_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "arbitrum-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ARBITRUM_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "optimism-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OPTIMISM_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "polygon-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "POLYGON_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "avalanche-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AVALANCHE_RPC_URL"
+            }
+          ]
+        },
+        {
+          "title": "base-rpc-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "BASE_RPC_URL"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/bin",
+    "title": "Aave MCP Server",
+    "description": "A containerized version of \"Aave MCP Server\""
+  },
+  "manifestHash": "ffb567d2df231dd0d1381813eddd383b",
+  "createdAt": "2025-05-13T19:34:32.271Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "phases": {}
+      }
+    }
+  ]
+}

@@ -312,9 +312,6 @@ We have provided a list of available servers below, along with their respective 
 - <img src="https://github.com/Bankless.png?size=120" width="12px" height="12px" /> **[Bankless Onchain MCP Server
 ](catalog/Bankless/onchain-mcp/onchain-mcp/README.md)** - MCP (Model Context Protocol) server for blockchain data interaction through the Bankless API.
 
-- <img src="https://github.com/Bankless.png?size=120" width="12px" height="12px" /> **[Bankless Onchain MCP Server
-](catalog/Bankless/onchain-mcp/onchain-mcp/README.md)** - MCP (Model Context Protocol) server for blockchain data interaction through the Bankless API.
-
 - <img src="https://github.com/bart6114.png?size=120" width="12px" height="12px" /> **[Bear MCP Server
 ](catalog/bart6114/my-bear-mcp-server/my-bear-mcp-server/README.md)** - A Model Context Protocol (MCP) server that allows AI assistants like Claude to read notes from the [Bear](https://bear.app/) note-taking app. This implementation connects directly to the Bear SQLite database in a read-only mode, ensuring your notes remain safe and unmodified.
 
@@ -1274,6 +1271,15 @@ We have provided a list of available servers below, along with their respective 
 
 - <img src="https://github.com/tomekkorbak.png?size=120" width="12px" height="12px" /> **[Oura MCP Server
 ](catalog/tomekkorbak/oura-mcp-server/oura-mcp-server/README.md)** - A [Model Context Protocol](https://modelcontextprotocol.io/introduction) (MCP) server that provides access to the Oura API. It allows language models to query sleep, readiness, and resilience data from Oura API.
+
+- <img src="https://github.com/Too-Far.png?size=120" width="12px" height="12px" /> **[Aave MCP Server
+](catalog/Too-Far/aave-mcp/aave-mcp/README.md)** - A containerized version of "Aave MCP Server"
+
+- <img src="https://github.com/Too-Far.png?size=120" width="12px" height="12px" /> **[Aave MCP Server
+](catalog/Too-Far/aave-mcp/bin/README.md)** - A containerized version of "Aave MCP Server"
+
+- <img src="https://github.com/Too-Far.png?size=120" width="12px" height="12px" /> **[Aave MCP Server
+](catalog/Too-Far/aave-mcp/src/README.md)** - A containerized version of "Aave MCP Server"
 
 - <img src="https://github.com/translated.png?size=120" width="12px" height="12px" /> **[Lara Translate MCP Server
 ](catalog/translated/lara-mcp/lara-mcp/README.md)** - A Model Context Protocol (MCP) Server for [Lara Translate](https://laratranslate.com/translate) API, enabling powerful translation capabilities with support for language detection and context-aware translations.

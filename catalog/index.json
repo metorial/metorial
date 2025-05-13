@@ -270,12 +270,6 @@
     "repoUrl": "https://github.com/Bankless/onchain-mcp/"
   },
   {
-    "id": "onchain-mcp",
-    "owner": "Bankless",
-    "repo": "onchain-mcp",
-    "repoUrl": "https://github.com/Bankless/onchain-mcp/"
-  },
-  {
     "id": "my-bear-mcp-server",
     "owner": "bart6114",
     "repo": "my-bear-mcp-server",
@@ -2194,6 +2188,24 @@
     "owner": "tomekkorbak",
     "repo": "oura-mcp-server",
     "repoUrl": "https://github.com/tomekkorbak/oura-mcp-server"
+  },
+  {
+    "id": "aave-mcp",
+    "owner": "Too-Far",
+    "repo": "aave-mcp",
+    "repoUrl": "https://github.com/Too-Far/aave-mcp"
+  },
+  {
+    "id": "bin",
+    "owner": "Too-Far",
+    "repo": "aave-mcp",
+    "repoUrl": "https://github.com/Too-Far/aave-mcp"
+  },
+  {
+    "id": "src",
+    "owner": "Too-Far",
+    "repo": "aave-mcp",
+    "repoUrl": "https://github.com/Too-Far/aave-mcp"
   },
   {
     "id": "lara-mcp",

@@ -1,0 +1,91 @@
+{
+  "id": "bin",
+  "fullId": "Too-Far/aave-mcp/bin",
+  "repo": {
+    "provider": "github.com",
+    "owner": "Too-Far",
+    "repo": "aave-mcp",
+    "branch": "main",
+    "url": "https://github.com/Too-Far/aave-mcp"
+  },
+  "config": {
+    "argumentsTemplate": null,
+    "configValues": [
+      {
+        "title": "ethereum-rpc-url",
+        "description": null,
+        "default": null,
+        "required": false,
+        "fields": [
+          {
+            "type": "environment",
+            "key": "ETHEREUM_RPC_URL"
+          }
+        ]
+      },
+      {
+        "title": "arbitrum-rpc-url",
+        "description": null,
+        "default": null,
+        "required": false,
+        "fields": [
+          {
+            "type": "environment",
+            "key": "ARBITRUM_RPC_URL"
+          }
+        ]
+      },
+      {
+        "title": "optimism-rpc-url",
+        "description": null,
+        "default": null,
+        "required": false,
+        "fields": [
+          {
+            "type": "environment",
+            "key": "OPTIMISM_RPC_URL"
+          }
+        ]
+      },
+      {
+        "title": "polygon-rpc-url",
+        "description": null,
+        "default": null,
+        "required": false,
+        "fields": [
+          {
+            "type": "environment",
+            "key": "POLYGON_RPC_URL"
+          }
+        ]
+      },
+      {
+        "title": "avalanche-rpc-url",
+        "description": null,
+        "default": null,
+        "required": false,
+        "fields": [
+          {
+            "type": "environment",
+            "key": "AVALANCHE_RPC_URL"
+          }
+        ]
+      },
+      {
+        "title": "base-rpc-url",
+        "description": null,
+        "default": null,
+        "required": false,
+        "fields": [
+          {
+            "type": "environment",
+            "key": "BASE_RPC_URL"
+          }
+        ]
+      }
+    ]
+  },
+  "subdirectory": "/bin",
+  "title": "Aave MCP Server",
+  "description": "A containerized version of \"Aave MCP Server\""
+}
