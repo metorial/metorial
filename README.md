@@ -141,6 +141,9 @@ We have provided a list of available servers below, along with their respective 
 - <img src="https://github.com/ramp-public.png?size=120" width="12px" height="12px" /> **[Ramp MCP server
 ](catalog/ramp-public/ramp-mcp/ramp-mcp/README.md)** - A Model Context Protocol server for retrieving and analyzing data or running tasks for Ramp using Developer API. In order to get around token and input size limitations, this server implements a simple ETL pipeline + ephemeral sqlite database in memory for analysis by an LLM.
 
+- <img src="https://avatars.githubusercontent.com/u/189844671?s=200&v=4" width="12px" height="12px" /> [**Scrapeless MCP Server**](https://github.com/scrapeless-ai/scrapeless-mcp-server) - Get real-time Google SERP ([Google Search](https://www.scrapeless.com/en/solutions/google-search), Google Flights, Google Maps, Google Jobs…) data and integrate the results seamlessly into your LLM applications, with high stability and data accuracy.
+
+
 - <img src="https://github.com/screenshotone.png?size=120" width="12px" height="12px" /> **[ScreenshotOne MCP Server
 ](catalog/screenshotone/mcp/mcp/README.md)** - A simple implementation of an MCP server for the ScreenshotOne API
 
