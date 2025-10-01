@@ -226,8 +226,6 @@ func (c *ConnectionSSE) SendControl(msg string) error {
 func (c *ConnectionSSE) SendString(msg string) error {
 	c.wg.Wait()
 
-	fmt.Printf("Sending message to %s: %s\n", c.sendEndpoint, msg)
-
 	if c.conn == nil {
 		return fmt.Errorf("connection has ended")
 	}
@@ -302,8 +300,6 @@ func (c *ConnectionSSE) Subscribe(cb MessageReceiver) {
 			c.sendEndpoint = c.getEndpointUrl(e.Data)
 			return
 		}
-
-		fmt.Printf("Received message from %s: %s\n", c.sendEndpoint, e.Data)
 
 		msg, err := mcp.ParseMCPMessage(util.Must(uuid.NewV7()).String(), e.Data)
 		if err != nil {
