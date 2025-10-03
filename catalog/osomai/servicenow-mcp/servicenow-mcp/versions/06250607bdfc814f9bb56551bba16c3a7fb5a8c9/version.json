@@ -1,0 +1,125 @@
+{
+  "serverId": "osomai/servicenow-mcp/servicenow-mcp",
+  "version": "06250607bdfc814f9bb56551bba16c3a7fb5a8c9",
+  "manifest": {
+    "id": "servicenow-mcp",
+    "fullId": "osomai/servicenow-mcp/servicenow-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "osomai",
+      "repo": "servicenow-mcp",
+      "branch": "main",
+      "url": "https://github.com/osomai/servicenow-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "servicenow-instance-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SERVICENOW_INSTANCE_URL"
+            }
+          ]
+        },
+        {
+          "title": "servicenow-username",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SERVICENOW_USERNAME"
+            }
+          ]
+        },
+        {
+          "title": "servicenow-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SERVICENOW_PASSWORD"
+            }
+          ]
+        },
+        {
+          "title": "servicenow-auth-type",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SERVICENOW_AUTH_TYPE"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "ServiceNow MCP Server",
+    "description": "A Model Completion Protocol (MCP) server implementation for ServiceNow, allowing Claude to interact with ServiceNow instances."
+  },
+  "manifestHash": "4babbc3477a09b1d8a3acd0fdea3a18f",
+  "createdAt": "2025-10-03T20:15:44.971Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "servicenow-mcp"
+        }
+      }
+    }
+  ]
+}
