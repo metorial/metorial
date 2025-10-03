@@ -1,0 +1,116 @@
+{
+  "serverId": "EduBase/MCP/mcp",
+  "version": "3f38bc103f192cc3578b53211a9385ae56b5296b",
+  "manifest": {
+    "id": "mcp",
+    "fullId": "EduBase/MCP/mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "EduBase",
+      "repo": "MCP",
+      "branch": "main",
+      "url": "https://github.com/EduBase/MCP"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "edubase-api-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "EDUBASE_API_URL"
+            }
+          ]
+        },
+        {
+          "title": "edubase-api-app",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "EDUBASE_API_APP"
+            }
+          ]
+        },
+        {
+          "title": "edubase-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "EDUBASE_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "EduBase MCP server",
+    "description": "Model Context Protocol server **for the EduBase platform**. It allows MCP clients (for example Claude Desktop) and LLMs to interact with your EduBase account and perform tasks on your behalf."
+  },
+  "manifestHash": "d856725ed761dd84da49c7d38e96ed8a",
+  "createdAt": "2025-10-03T22:12:46.909Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}
