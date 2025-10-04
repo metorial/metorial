@@ -1,0 +1,92 @@
+{
+  "serverId": "apify/actors-mcp-server/actors-mcp-server",
+  "version": "e47910305ef0f3938c80cac3435c43d637ec93e7",
+  "manifest": {
+    "id": "actors-mcp-server",
+    "fullId": "apify/actors-mcp-server/actors-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "apify",
+      "repo": "actors-mcp-server",
+      "branch": "master",
+      "url": "https://github.com/apify/actors-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "apify-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "APIFY_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Apify MCP Server",
+    "description": "Implementation of an MCP server for all [Apify Actors](https://apify.com/store)."
+  },
+  "manifestHash": "174e58fd9519d91046116c2bb6f63cdc",
+  "createdAt": "2025-10-04T09:12:54.175Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}
