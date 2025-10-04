@@ -3,12 +3,12 @@
 
 <h1 align="center">Metorial MCP Containers</h1>
 
-<p align="center">Containerized versions of hundreds of <a href="https://modelcontextprotocol.io">MCP servers</a> curated by <a href="https://metorial.com">Metorial (YC F25)</a> 📡 🧠</p>
+<p align="center">Containerized versions of hundreds of <a href="https://modelcontextprotocol.io">MCP servers</a> curated by <a href="https://metorial.com">Metorial</a> 📡 🧠</p>
 
 > [!TIP]
 > *Hosted MCP Containers:* Skip the local setup and go hosted. [Metorial's](https://metorial.com) serverless MCP enables you to integrate the MCP servers listed in this repo in a single line of code. Built for devs; with logging, monitoring and SDKs included.
 > 
-> ➡️ **[Get Started (with free tier)](https://metorial.com)**
+> ➡️ **[Get Early Access (with free tier)](https://metorial.com/early-access)**
 
 ## Features
 
