@@ -317,6 +317,9 @@ We have provided a list of available servers below, along with their respective 
 - <img src="https://github.com/Bankless.png?size=120" width="12px" height="12px" /> **[Bankless Onchain MCP Server
 ](catalog/Bankless/onchain-mcp/onchain-mcp/README.md)** - MCP (Model Context Protocol) server for blockchain data interaction through the Bankless API.
 
+- <img src="https://github.com/Bankless.png?size=120" width="12px" height="12px" /> **[Bankless Onchain MCP Server
+](catalog/Bankless/onchain-mcp/onchain-mcp/README.md)** - MCP (Model Context Protocol) server for blockchain data interaction through the Bankless API.
+
 - <img src="https://github.com/bart6114.png?size=120" width="12px" height="12px" /> **[Bear MCP Server
 ](catalog/bart6114/my-bear-mcp-server/my-bear-mcp-server/README.md)** - A Model Context Protocol (MCP) server that allows AI assistants like Claude to read notes from the [Bear](https://bear.app/) note-taking app. This implementation connects directly to the Bear SQLite database in a read-only mode, ensuring your notes remain safe and unmodified.
 

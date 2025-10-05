@@ -270,6 +270,12 @@
     "repoUrl": "https://github.com/Bankless/onchain-mcp/"
   },
   {
+    "id": "onchain-mcp",
+    "owner": "Bankless",
+    "repo": "onchain-mcp",
+    "repoUrl": "https://github.com/Bankless/onchain-mcp/"
+  },
+  {
     "id": "my-bear-mcp-server",
     "owner": "bart6114",
     "repo": "my-bear-mcp-server",

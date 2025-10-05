@@ -1,0 +1,79 @@
+{
+  "serverId": "wonderwhy-er/DesktopCommanderMCP/desktop-commander-mcp",
+  "version": "d85d750e49a8c3b656e991967ca4db7d6515cd0e",
+  "manifest": {
+    "id": "desktop-commander-mcp",
+    "fullId": "wonderwhy-er/DesktopCommanderMCP/desktop-commander-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "wonderwhy-er",
+      "repo": "DesktopCommanderMCP",
+      "branch": "main",
+      "url": "https://github.com/wonderwhy-er/DesktopCommanderMCP"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Desktop Commander MCP",
+    "description": "### Search, update, manage files and run terminal commands with AI"
+  },
+  "manifestHash": "d9ec38ba6ba0cb96e09207f12112051d",
+  "createdAt": "2025-10-05T19:10:41.220Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}
