@@ -1,0 +1,79 @@
+{
+  "serverId": "softeria/ms-365-mcp-server/ms-365-mcp-server",
+  "version": "7bc3853a082dd395349eac60cd114801084e2f0a",
+  "manifest": {
+    "id": "ms-365-mcp-server",
+    "fullId": "softeria/ms-365-mcp-server/ms-365-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "softeria",
+      "repo": "ms-365-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/softeria/ms-365-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "ms-365-mcp-server",
+    "description": "Microsoft 365 MCP Server"
+  },
+  "manifestHash": "bf8a20e4b6ee852001603b0ca80f6a3c",
+  "createdAt": "2025-10-05T22:13:01.808Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}
