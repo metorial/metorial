@@ -1,0 +1,96 @@
+{
+  "serverId": "GLips/Figma-Context-MCP/figma-context-mcp",
+  "version": "f2ed979f7514df4c58cd90ff33e1142aff50d5ec",
+  "manifest": {
+    "id": "figma-context-mcp",
+    "fullId": "GLips/Figma-Context-MCP/figma-context-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "GLips",
+      "repo": "Figma-Context-MCP",
+      "branch": "main",
+      "url": "https://github.com/GLips/Figma-Context-MCP"
+    },
+    "config": {
+      "argumentsTemplate": "--figma-api-key={{FIGMA_API_KEY}}} --stdio",
+      "configValues": [
+        {
+          "title": "figma-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "FIGMA_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Framelink Figma MCP Server",
+    "description": "Give your coding agent access to your Figma data. Implement designs in any framework in one-shot."
+  },
+  "manifestHash": "db214d105df271de57bcab70352438d7",
+  "createdAt": "2025-10-06T23:13:16.841Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "pnpm-9_x"
+            ],
+            "nixLibs": [
+              "gcc-unwrapped"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "pnpm run start"
+        }
+      }
+    }
+  ]
+}
