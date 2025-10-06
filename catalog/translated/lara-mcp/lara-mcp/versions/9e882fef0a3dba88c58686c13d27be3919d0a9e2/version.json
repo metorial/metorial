@@ -1,0 +1,104 @@
+{
+  "serverId": "translated/lara-mcp/lara-mcp",
+  "version": "9e882fef0a3dba88c58686c13d27be3919d0a9e2",
+  "manifest": {
+    "id": "lara-mcp",
+    "fullId": "translated/lara-mcp/lara-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "translated",
+      "repo": "lara-mcp",
+      "branch": "main",
+      "url": "https://github.com/translated/lara-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "lara-access-key-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "LARA_ACCESS_KEY_ID"
+            }
+          ]
+        },
+        {
+          "title": "lara-access-key-secret",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "LARA_ACCESS_KEY_SECRET"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Lara Translate MCP Server",
+    "description": "A Model Context Protocol (MCP) Server for [Lara Translate](https://laratranslate.com/translate) API, enabling powerful translation capabilities with support for language detection and context-aware translations."
+  },
+  "manifestHash": "ab393883a7afb88077791735dc2dcec1",
+  "createdAt": "2025-10-06T16:18:15.509Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "pnpm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "pnpm run start"
+        }
+      }
+    }
+  ]
+}
