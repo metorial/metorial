@@ -1,0 +1,92 @@
+{
+  "serverId": "supabase-community/supabase-mcp/mcp-server-supabase",
+  "version": "5417461bc207a496019b3169749fde98b0c83eea",
+  "manifest": {
+    "id": "mcp-server-supabase",
+    "fullId": "supabase-community/supabase-mcp/mcp-server-supabase",
+    "repo": {
+      "provider": "github.com",
+      "owner": "supabase-community",
+      "repo": "supabase-mcp",
+      "branch": "main",
+      "url": "https://github.com/supabase-community/supabase-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "access-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--access-token"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/packages/mcp-server-supabase",
+    "title": "Supabase MCP Server",
+    "description": "> Connect your Supabase projects to Cursor, Claude, Windsurf, and other AI assistants."
+  },
+  "manifestHash": "d1205cf9599a1c901c265b4b4852bd59",
+  "createdAt": "2025-10-06T21:12:47.911Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./dist/transports/stdio.js"
+        }
+      }
+    }
+  ]
+}
