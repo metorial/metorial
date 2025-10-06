@@ -1,0 +1,61 @@
+{
+  "serverId": "wanaku-ai/wanaku/wanaku",
+  "version": "449ef1f3f9e2af11e82fb1b0e6f81513014b8cb7",
+  "manifest": {
+    "id": "wanaku",
+    "fullId": "wanaku-ai/wanaku/wanaku",
+    "repo": {
+      "provider": "github.com",
+      "owner": "wanaku-ai",
+      "repo": "wanaku",
+      "branch": "main",
+      "url": "https://github.com/wanaku-ai/wanaku"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Wanaku - A MCP Router that connects everything",
+    "description": "The Wanaku MCP Router is a router for AI-enabled applications powered by the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/)."
+  },
+  "manifestHash": "90de2cb05849969b5786598b7c0c55f5",
+  "createdAt": "2025-10-06T10:16:24.068Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "java"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "mvn -DoutputFile=target/mvn-dependency-list.log -B -DskipTests clean dependency:list install"
+            ],
+            "cacheDirectories": [
+              ".m2/repository"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "jdk17",
+              "maven"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "59dc10b5a6f2a592af36375c68fda41246794b86"
+          }
+        },
+        "start": {
+          "cmd": "java  $JAVA_OPTS -jar target/*jar"
+        }
+      }
+    }
+  ]
+}
