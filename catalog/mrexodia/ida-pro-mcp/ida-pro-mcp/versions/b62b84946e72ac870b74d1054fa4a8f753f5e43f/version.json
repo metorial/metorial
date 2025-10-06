@@ -1,0 +1,75 @@
+{
+  "serverId": "mrexodia/ida-pro-mcp/ida-pro-mcp",
+  "version": "b62b84946e72ac870b74d1054fa4a8f753f5e43f",
+  "manifest": {
+    "id": "ida-pro-mcp",
+    "fullId": "mrexodia/ida-pro-mcp/ida-pro-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "mrexodia",
+      "repo": "ida-pro-mcp",
+      "branch": "main",
+      "url": "https://github.com/mrexodia/ida-pro-mcp"
+    },
+    "config": {
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "IDA Pro MCP",
+    "description": "Simple [MCP Server](https://modelcontextprotocol.io/introduction) to allow vibe reversing in IDA Pro."
+  },
+  "manifestHash": "2df99876956e49ed84492a896c0147c3",
+  "createdAt": "2025-10-06T14:14:56.918Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python311",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "ida-pro-mcp"
+        }
+      }
+    }
+  ]
+}
