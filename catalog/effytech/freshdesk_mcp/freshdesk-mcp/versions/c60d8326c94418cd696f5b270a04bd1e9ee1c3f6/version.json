@@ -1,0 +1,101 @@
+{
+  "serverId": "effytech/freshdesk_mcp/freshdesk-mcp",
+  "version": "c60d8326c94418cd696f5b270a04bd1e9ee1c3f6",
+  "manifest": {
+    "id": "freshdesk-mcp",
+    "fullId": "effytech/freshdesk_mcp/freshdesk-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "effytech",
+      "repo": "freshdesk_mcp",
+      "branch": "main",
+      "url": "https://github.com/effytech/freshdesk_mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "freshdesk-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "FRESHDESK_API_KEY"
+            }
+          ]
+        },
+        {
+          "title": "freshdesk-domain",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "FRESHDESK_DOMAIN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Freshdesk MCP Server",
+    "description": "An MCP server implementation that integrates with Freshdesk, enabling AI models to interact with Freshdesk modules and perform various support operations."
+  },
+  "manifestHash": "41f1836a09660eb450df0986777d8349",
+  "createdAt": "2025-10-06T12:30:50.994Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python312",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "freshdesk-mcp"
+        }
+      }
+    }
+  ]
+}
