@@ -1,0 +1,84 @@
+{
+  "serverId": "modelcontextprotocol/servers/everything",
+  "version": "7505699bf4d5eb6375972c922efc5b3b6c41818e",
+  "manifest": {
+    "id": "everything",
+    "fullId": "modelcontextprotocol/servers/everything",
+    "repo": {
+      "provider": "github.com",
+      "owner": "modelcontextprotocol",
+      "repo": "servers",
+      "branch": "main",
+      "url": "https://github.com/modelcontextprotocol/servers"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "src/everything",
+    "title": "Everything MCP Server",
+    "description": "This MCP server attempts to exercise all the features of the MCP protocol. It is not intended to be a useful server, but rather a test server for builders of MCP clients. It implements prompts, tools, resources, sampling, and more to showcase MCP capabilities.",
+    "build": {
+      "startCommand": "cd ./src/everything && node ./dist/index.js",
+      "buildCommand": "cd ./src/everything && npm run build",
+      "buildDir": "../../"
+    }
+  },
+  "manifestHash": "b51380d2cf4a3e5d4d7404e63c3c8c77",
+  "createdAt": "2025-10-07T15:16:25.871Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "cd ./src/everything && npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "cd ./src/everything && node ./dist/index.js"
+        }
+      }
+    }
+  ]
+}
