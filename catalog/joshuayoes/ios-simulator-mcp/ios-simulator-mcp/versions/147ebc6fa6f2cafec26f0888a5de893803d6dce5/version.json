@@ -1,0 +1,79 @@
+{
+  "serverId": "joshuayoes/ios-simulator-mcp/ios-simulator-mcp",
+  "version": "147ebc6fa6f2cafec26f0888a5de893803d6dce5",
+  "manifest": {
+    "id": "ios-simulator-mcp",
+    "fullId": "joshuayoes/ios-simulator-mcp/ios-simulator-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "joshuayoes",
+      "repo": "ios-simulator-mcp",
+      "branch": "main",
+      "url": "https://github.com/joshuayoes/ios-simulator-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "iOS Simulator MCP Server",
+    "description": "A Model Context Protocol (MCP) server for interacting with iOS simulators. This server allows you to interact with iOS simulators by getting information about them, controlling UI interactions, and inspecting UI elements."
+  },
+  "manifestHash": "f569989a51d5454f6b88f471a36ccd95",
+  "createdAt": "2025-10-07T18:21:42.363Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}
