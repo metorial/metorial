@@ -1,0 +1,86 @@
+{
+  "serverId": "github/github-mcp-server/github-mcp-server",
+  "version": "94b3d7278e18c9903560b6d03a0c427f682ca272",
+  "manifest": {
+    "id": "github-mcp-server",
+    "fullId": "github/github-mcp-server/github-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "github",
+      "repo": "github-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/github/github-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": "stdio",
+      "configValues": [
+        {
+          "title": "github-personal-access-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GITHUB_PERSONAL_ACCESS_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "GitHub MCP Server",
+    "description": "The GitHub MCP Server is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction)"
+  },
+  "manifestHash": "00bff7d44f2133743cc0dde5c5dce374",
+  "createdAt": "2025-10-07T09:16:01.460Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out ./cmd/mcpcurl"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}

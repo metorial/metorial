@@ -1,0 +1,92 @@
+{
+  "serverId": "yepcode/mcp-server-js/mcp-server-js",
+  "version": "3cd60dd10479e1ba3b7d4ee95a2a25503bb9cb51",
+  "manifest": {
+    "id": "mcp-server-js",
+    "fullId": "yepcode/mcp-server-js/mcp-server-js",
+    "repo": {
+      "provider": "github.com",
+      "owner": "yepcode",
+      "repo": "mcp-server-js",
+      "branch": "main",
+      "url": "https://github.com/yepcode/mcp-server-js"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "yepcode-api-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "YEPCODE_API_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "# What is YepCode MCP Server?",
+    "description": "An MCP ([Model Context Protocol](https://modelcontextprotocol.io/introduction)) server that enables AI platforms to interact with [YepCode](https://yepcode.io)'s infrastructure. Run LLM generated scripts and turn your YepCode processes into powerful tools that AI assistants can use directly."
+  },
+  "manifestHash": "b30b82de78918e7009cee42d48ae4489",
+  "createdAt": "2025-10-07T09:16:12.772Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}
