@@ -1,0 +1,117 @@
+{
+  "serverId": "graphlit/graphlit-mcp-server/graphlit-mcp-server",
+  "version": "b34cc73155ab206d552ef1c40be2983171c13256",
+  "manifest": {
+    "id": "graphlit-mcp-server",
+    "fullId": "graphlit/graphlit-mcp-server/graphlit-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "graphlit",
+      "repo": "graphlit-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/graphlit/graphlit-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "graphlit-organization-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GRAPHLIT_ORGANIZATION_ID"
+            }
+          ]
+        },
+        {
+          "title": "graphlit-environment-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GRAPHLIT_ENVIRONMENT_ID"
+            }
+          ]
+        },
+        {
+          "title": "graphlit-jwt-secret",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GRAPHLIT_JWT_SECRET"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Graphlit MCP Server",
+    "description": "Model Context Protocol (MCP) Server for Graphlit Platform"
+  },
+  "manifestHash": "3cab8eb35243cfdee5ac16152457eb46",
+  "createdAt": "2025-10-07T10:15:20.652Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x",
+              "openssl"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}
