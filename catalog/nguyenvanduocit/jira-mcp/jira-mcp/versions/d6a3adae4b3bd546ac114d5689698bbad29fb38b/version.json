@@ -1,0 +1,110 @@
+{
+  "serverId": "nguyenvanduocit/jira-mcp/jira-mcp",
+  "version": "d6a3adae4b3bd546ac114d5689698bbad29fb38b",
+  "manifest": {
+    "id": "jira-mcp",
+    "fullId": "nguyenvanduocit/jira-mcp/jira-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "nguyenvanduocit",
+      "repo": "jira-mcp",
+      "branch": "main",
+      "url": "https://github.com/nguyenvanduocit/jira-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "atlassian-host",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ATLASSIAN_HOST"
+            }
+          ]
+        },
+        {
+          "title": "atlassian-email",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ATLASSIAN_EMAIL"
+            }
+          ]
+        },
+        {
+          "title": "atlassian-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ATLASSIAN_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Jira MCP",
+    "description": "A Go-based MCP (Model Control Protocol) connector for Jira that enables AI assistants like Claude to interact with Atlassian Jira. This tool provides a seamless interface for AI models to perform common Jira operations."
+  },
+  "manifestHash": "8a3f0ec3656e40806a670b3b61464c80",
+  "createdAt": "2025-10-07T17:13:04.847Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}
