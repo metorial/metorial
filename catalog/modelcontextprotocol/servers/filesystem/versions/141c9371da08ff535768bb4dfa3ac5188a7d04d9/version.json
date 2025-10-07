@@ -1,0 +1,97 @@
+{
+  "serverId": "modelcontextprotocol/servers/filesystem",
+  "version": "141c9371da08ff535768bb4dfa3ac5188a7d04d9",
+  "manifest": {
+    "id": "filesystem",
+    "fullId": "modelcontextprotocol/servers/filesystem",
+    "repo": {
+      "provider": "github.com",
+      "owner": "modelcontextprotocol",
+      "repo": "servers",
+      "branch": "main",
+      "url": "https://github.com/modelcontextprotocol/servers"
+    },
+    "config": {
+      "argumentsTemplate": "{{DIR}}",
+      "configValues": [
+        {
+          "title": "dir",
+          "description": null,
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "{{DIR}}"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "src/filesystem",
+    "title": "Filesystem MCP Server",
+    "description": "Node.js server implementing Model Context Protocol (MCP) for filesystem operations.",
+    "build": {
+      "startCommand": "cd ./src/filesystem && node ./dist/index.js",
+      "buildCommand": "cd ./src/filesystem && npm run build",
+      "buildDir": "../../"
+    }
+  },
+  "manifestHash": "6e231a75bbb464a568eb9fe76712f11c",
+  "createdAt": "2025-10-07T14:15:23.156Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "cd ./src/filesystem && npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "cd ./src/filesystem && node ./dist/index.js"
+        }
+      }
+    }
+  ]
+}

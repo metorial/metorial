@@ -1,0 +1,79 @@
+{
+  "serverId": "yamadashy/repomix/repomix",
+  "version": "c46e885cace51028261cb2518ec82847780340a7",
+  "manifest": {
+    "id": "repomix",
+    "fullId": "yamadashy/repomix/repomix",
+    "repo": {
+      "provider": "github.com",
+      "owner": "yamadashy",
+      "repo": "repomix",
+      "branch": "main",
+      "url": "https://github.com/yamadashy/repomix"
+    },
+    "config": {
+      "argumentsTemplate": "--mcp",
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Repomix MCP Server",
+    "description": "Pack your codebase into AI-friendly formats"
+  },
+  "manifestHash": "16c70195e06696262911d506156c94bb",
+  "createdAt": "2025-10-07T14:15:28.274Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./bin/repomix.cjs"
+        }
+      }
+    }
+  ]
+}

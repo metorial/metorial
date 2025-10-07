@@ -1,0 +1,98 @@
+{
+  "serverId": "signoz/signoz-mcp-server/signoz-mcp-server",
+  "version": "2553283cd7dddee04c852ec75029696dfae07f0a",
+  "manifest": {
+    "id": "signoz-mcp-server",
+    "fullId": "signoz/signoz-mcp-server/signoz-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "signoz",
+      "repo": "signoz-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/signoz/signoz-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "signoz-url",
+          "description": "URL of the SigNoz instance",
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SIGNOZ_URL"
+            }
+          ]
+        },
+        {
+          "title": "signoz-api-key",
+          "description": "API key to connect to SigNoz",
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SIGNOZ_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "SigNoz MCP Server",
+    "description": "Connect to SigNoz trough MCP. This server enables natural language queries for metrics, alerts, dashboards, and service performance data."
+  },
+  "manifestHash": "60df3db2b3536949788962f9e9b7fd67",
+  "createdAt": "2025-10-07T14:15:25.471Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out ./cmd/server"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}
