@@ -1,0 +1,79 @@
+{
+  "serverId": "mobile-next/mobile-mcp/mobile-mcp",
+  "version": "d68a014beac94075e1fb04220bc2693193a83c60",
+  "manifest": {
+    "id": "mobile-mcp",
+    "fullId": "mobile-next/mobile-mcp/mobile-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "mobile-next",
+      "repo": "mobile-mcp",
+      "branch": "main",
+      "url": "https://github.com/mobile-next/mobile-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "# Mobile Next - MCP server for Mobile Automation",
+    "description": "This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that enables scalable mobile automation through a platform-agnostic interface, eliminating the need for distinct iOS or Android knowledge."
+  },
+  "manifestHash": "28a830de6db889e21459756f64656b82",
+  "createdAt": "2025-10-07T13:25:33.725Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node lib/index.js"
+        }
+      }
+    }
+  ]
+}
