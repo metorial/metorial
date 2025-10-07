@@ -1,0 +1,84 @@
+{
+  "serverId": "modelcontextprotocol/servers/memory",
+  "version": "48d9c5531ec1d099cc7dca32740945af165e5314",
+  "manifest": {
+    "id": "memory",
+    "fullId": "modelcontextprotocol/servers/memory",
+    "repo": {
+      "provider": "github.com",
+      "owner": "modelcontextprotocol",
+      "repo": "servers",
+      "branch": "main",
+      "url": "https://github.com/modelcontextprotocol/servers"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "src/memory",
+    "title": "Knowledge Graph Memory Server",
+    "description": "A basic implementation of persistent memory using a local knowledge graph. This lets Claude remember information about the user across chats.",
+    "build": {
+      "startCommand": "cd ./src/memory && node ./dist/index.js",
+      "buildCommand": "cd ./src/memory && npm run build",
+      "buildDir": "../../"
+    }
+  },
+  "manifestHash": "b8cf85f3a44ce5fec2374af5730ab91d",
+  "createdAt": "2025-10-07T07:14:45.964Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "cd ./src/memory && npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "cd ./src/memory && node ./dist/index.js"
+        }
+      }
+    }
+  ]
+}
