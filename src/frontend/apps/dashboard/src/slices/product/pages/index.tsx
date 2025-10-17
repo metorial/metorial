@@ -5,6 +5,7 @@ import { useBoot, useCurrentInstance, useServerDeployments, useUser } from '@met
 import { Button, Spacer } from '@metorial/ui';
 import { SideBox } from '@metorial/ui-product';
 import { Link } from 'react-router-dom';
+import { Explainer } from '../../../components/explainer';
 import { ApiKeySecret } from '../scenes/apiKeys';
 import { useApiKeysWithAutoInit } from '../scenes/apiKeys/useApiKeysWithAutoInit';
 import { ServersGrid } from '../scenes/servers/grid';
@@ -233,6 +234,13 @@ export let ProjectHomePage = () => {
           <SessionsTable limit={15} />
         </>
       ))}
+
+      <Explainer
+        title="Welcome to Metorial"
+        description="Let us show you around the dashboard and help you get started with your first MCP server."
+        youtubeId="_hAvxzTCLyQ"
+        id="home"
+      />
     </ContentLayout>
   );
 };
