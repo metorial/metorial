@@ -29,6 +29,8 @@ jobs:
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.2.20'
 
       - name: Get changed files
         id: changed-files
