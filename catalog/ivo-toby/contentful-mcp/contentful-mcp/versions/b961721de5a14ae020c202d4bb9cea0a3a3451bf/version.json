@@ -1,0 +1,92 @@
+{
+  "serverId": "ivo-toby/contentful-mcp/contentful-mcp",
+  "version": "b961721de5a14ae020c202d4bb9cea0a3a3451bf",
+  "manifest": {
+    "id": "contentful-mcp",
+    "fullId": "ivo-toby/contentful-mcp/contentful-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "ivo-toby",
+      "repo": "contentful-mcp",
+      "branch": "main",
+      "url": "https://github.com/ivo-toby/contentful-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "contentful-management-access-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "CONTENTFUL_MANAGEMENT_ACCESS_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Contentful MCP Server",
+    "description": "An MCP server implementation that integrates with Contentful's Content Management API, providing comprehensive content management capabilities."
+  },
+  "manifestHash": "21f8cc47137e6adf641fb3781f6cdddd",
+  "createdAt": "2025-10-20T01:36:30.577Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./bin/mcp-server.js"
+        }
+      }
+    }
+  ]
+}

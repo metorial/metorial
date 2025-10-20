@@ -1,0 +1,104 @@
+{
+  "serverId": "horizondatawave/hdw-mcp-server/hdw-mcp-server",
+  "version": "5fd9bcf78ffcb2a5b8944eef7e6d9b3ebaa4ed59",
+  "manifest": {
+    "id": "hdw-mcp-server",
+    "fullId": "horizondatawave/hdw-mcp-server/hdw-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "horizondatawave",
+      "repo": "hdw-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/horizondatawave/hdw-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "hdw-access-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "HDW_ACCESS_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "hdw-account-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "HDW_ACCOUNT_ID"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "HDW MCP Server",
+    "description": "A Model Context Protocol (MCP) server that provides comprehensive access to LinkedIn data and functionalities using the HorizonDataWave API, enabling not only data retrieval but also robust management of user accounts."
+  },
+  "manifestHash": "0cef0d4ec6fbc497569e68e571dd54cd",
+  "createdAt": "2025-10-20T01:36:29.475Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node build/server.js"
+        }
+      }
+    }
+  ]
+}

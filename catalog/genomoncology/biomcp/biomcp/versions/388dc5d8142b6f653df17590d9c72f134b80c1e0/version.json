@@ -1,0 +1,78 @@
+{
+  "serverId": "genomoncology/biomcp/biomcp",
+  "version": "388dc5d8142b6f653df17590d9c72f134b80c1e0",
+  "manifest": {
+    "id": "biomcp",
+    "fullId": "genomoncology/biomcp/biomcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "genomoncology",
+      "repo": "biomcp",
+      "branch": "main",
+      "url": "https://github.com/genomoncology/biomcp"
+    },
+    "config": {
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "BioMCP: Biomedical Model Context Protocol",
+    "description": "BioMCP is an open source (MIT License) toolkit for biomedical research AI"
+  },
+  "manifestHash": "3b7ee24252f21db226c00476030ee0da",
+  "createdAt": "2025-10-20T01:36:29.485Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixLibs": [
+              "gcc-unwrapped"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "biomcp"
+        }
+      }
+    }
+  ]
+}

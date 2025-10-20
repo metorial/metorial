@@ -1,0 +1,83 @@
+{
+  "serverId": "jae-jae/fetcher-mcp/fetcher-mcp",
+  "version": "b0a632e9ead63b440bfb1c5c844e7a3d7d03919e",
+  "manifest": {
+    "id": "fetcher-mcp",
+    "fullId": "jae-jae/fetcher-mcp/fetcher-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "jae-jae",
+      "repo": "fetcher-mcp",
+      "branch": "main",
+      "url": "https://github.com/jae-jae/fetcher-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Fetcher MCP",
+    "description": "MCP server for fetch web page content using Playwright headless browser."
+  },
+  "manifestHash": "0b82b4ff87cbb94573567cf1e2b8dea5",
+  "createdAt": "2025-10-20T01:36:30.387Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixLibs": [
+              "libuuid",
+              "libGL"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node build/index.js"
+        }
+      }
+    }
+  ]
+}

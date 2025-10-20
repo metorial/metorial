@@ -1,0 +1,92 @@
+{
+  "serverId": "ihor-sokoliuk/mcp-searxng/mcp-searxng",
+  "version": "3b876f8abec6bdf7fed9d1c217db1cd0004a2788",
+  "manifest": {
+    "id": "mcp-searxng",
+    "fullId": "ihor-sokoliuk/mcp-searxng/mcp-searxng",
+    "repo": {
+      "provider": "github.com",
+      "owner": "ihor-sokoliuk",
+      "repo": "mcp-searxng",
+      "branch": "main",
+      "url": "https://github.com/ihor-sokoliuk/mcp-searxng"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "searxng-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SEARXNG_URL"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "SearXNG MCP Server",
+    "description": "An [MCP server](https://modelcontextprotocol.io/introduction) implementation that integrates the SearxNG API, providing web search capabilities."
+  },
+  "manifestHash": "0d2604362c3876eaa57fdeedd884e0ff",
+  "createdAt": "2025-10-20T01:36:30.039Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}

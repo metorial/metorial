@@ -1,0 +1,95 @@
+{
+  "serverId": "yWorks/mcp-typescribe/mcp-typescribe",
+  "version": "7b3385f46e4772ba948fc3ea09d4f5dfc271613e",
+  "manifest": {
+    "id": "mcp-typescribe",
+    "fullId": "yWorks/mcp-typescribe/mcp-typescribe",
+    "repo": {
+      "provider": "github.com",
+      "owner": "yWorks",
+      "repo": "mcp-typescribe",
+      "branch": "master",
+      "url": "https://github.com/yWorks/mcp-typescribe"
+    },
+    "config": {
+      "argumentsTemplate": "INFO_PATH",
+      "configValues": [
+        {
+          "title": "path-to-api-dot-json",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "INFO_PATH"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "MCP-Typescribe - an MCP Server providing LLMs API information",
+    "description": "An MCP server implementation enabling LLMs to work with new APIs and frameworks"
+  },
+  "manifestHash": "07a361c6ec043ae3f1c6a7dd7f98f204",
+  "createdAt": "2025-10-20T01:36:46.240Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "npm-8_x"
+            ],
+            "nixLibs": [
+              "gcc-unwrapped"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

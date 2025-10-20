@@ -1,0 +1,113 @@
+{
+  "serverId": "chigwell/telegram-mcp/telegram-mcp",
+  "version": "97884fd1c1482f4072fe6782b5dcc239ed0e201e",
+  "manifest": {
+    "id": "telegram-mcp",
+    "fullId": "chigwell/telegram-mcp/telegram-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "chigwell",
+      "repo": "telegram-mcp",
+      "branch": "main",
+      "url": "https://github.com/chigwell/telegram-mcp"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "telegram-api-id",
+          "description": "Your Telegram API ID.",
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TELEGRAM_API_ID"
+            }
+          ]
+        },
+        {
+          "title": "telegram-api-hash",
+          "description": "Your Telegram API Hash.",
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TELEGRAM_API_HASH"
+            }
+          ]
+        },
+        {
+          "title": "telegram-session-name",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TELEGRAM_SESSION_NAME"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Telegram MCP Server",
+    "description": "A Telegram MCP (Model Context Protocol) server built using Python, Telethon, and MCP Python SDK. This MCP server provides simple tools for interacting with Telegram chats directly through MCP-compatible hosts, such as Claude for Desktop."
+  },
+  "manifestHash": "84798a05e28da8c608eda3a753846ebd",
+  "createdAt": "2025-10-20T01:36:25.764Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python,poetry",
+          "NIXPACKS_POETRY_VERSION": "1.3.1",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/pip"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python313",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "python main.py"
+        }
+      }
+    }
+  ]
+}

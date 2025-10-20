@@ -1,0 +1,113 @@
+{
+  "serverId": "yangkyeongmo/mcp-server-apache-airflow/mcp-server-apache-airflow",
+  "version": "691bd7cdc7816bb8c822ec5c180a466524b80a0f",
+  "manifest": {
+    "id": "mcp-server-apache-airflow",
+    "fullId": "yangkyeongmo/mcp-server-apache-airflow/mcp-server-apache-airflow",
+    "repo": {
+      "provider": "github.com",
+      "owner": "yangkyeongmo",
+      "repo": "mcp-server-apache-airflow",
+      "branch": "main",
+      "url": "https://github.com/yangkyeongmo/mcp-server-apache-airflow"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "airflow-host",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AIRFLOW_HOST"
+            }
+          ]
+        },
+        {
+          "title": "airflow-username",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AIRFLOW_USERNAME"
+            }
+          ]
+        },
+        {
+          "title": "airflow-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AIRFLOW_PASSWORD"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "mcp-server-apache-airflow",
+    "description": "A Model Context Protocol (MCP) server implementation for Apache Airflow, enabling seamless integration with MCP clients. This project provides a standardized way to interact with Apache Airflow through the Model Context Protocol."
+  },
+  "manifestHash": "6ef55dc67481bd6341e28174f707418a",
+  "createdAt": "2025-10-20T01:36:45.556Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python312",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "mcp-server-apache-airflow"
+        }
+      }
+    }
+  ]
+}
