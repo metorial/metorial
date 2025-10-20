@@ -1,0 +1,116 @@
+{
+  "serverId": "devflowinc/trieve/mcp-server",
+  "version": "b496426e4238a57f238b67938d85ed34c603705e",
+  "manifest": {
+    "id": "mcp-server",
+    "fullId": "devflowinc/trieve/mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "devflowinc",
+      "repo": "trieve",
+      "branch": "main",
+      "url": "https://github.com/devflowinc/trieve"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "trieve-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TRIEVE_API_KEY"
+            }
+          ]
+        },
+        {
+          "title": "trieve-organization-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TRIEVE_ORGANIZATION_ID"
+            }
+          ]
+        },
+        {
+          "title": "trieve-dataset-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TRIEVE_DATASET_ID"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "clients/mcp-server",
+    "title": "trieve-mcp-server",
+    "description": "A Model Context Protocol (MCP) server that provides agentic tools for interacting with the Trieve API. This server enables AI agents to search and interact with Trieve datasets through a standardized interface."
+  },
+  "manifestHash": "af4914b5ef6289d7bf522e6103468b6d",
+  "createdAt": "2025-10-20T01:36:44.895Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node build/index.js"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,116 @@
+{
+  "serverId": "arpitbatra123/mcp-googletasks/mcp-googletasks",
+  "version": "14851bd5ec96bc092205ae245fe5e9ae61afae8c",
+  "manifest": {
+    "id": "mcp-googletasks",
+    "fullId": "arpitbatra123/mcp-googletasks/mcp-googletasks",
+    "repo": {
+      "provider": "github.com",
+      "owner": "arpitbatra123",
+      "repo": "mcp-googletasks",
+      "branch": "main",
+      "url": "https://github.com/arpitbatra123/mcp-googletasks"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "google-client-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GOOGLE_CLIENT_ID"
+            }
+          ]
+        },
+        {
+          "title": "google-client-secret",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GOOGLE_CLIENT_SECRET"
+            }
+          ]
+        },
+        {
+          "title": "google-redirect-uri",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GOOGLE_REDIRECT_URI"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Google Tasks MCP Server",
+    "description": "This Model Context Protocol (MCP) server provides a bridge between Claude and Google Tasks, allowing you to manage your task lists and tasks directly through Claude."
+  },
+  "manifestHash": "a017c8c9a6bf97ef64e58aaa792da9c8",
+  "createdAt": "2025-10-20T01:36:24.360Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node build/index.js"
+        }
+      }
+    }
+  ]
+}

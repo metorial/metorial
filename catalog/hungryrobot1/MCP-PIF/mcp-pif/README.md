@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--hungryrobot1--mcp-pif--mcp-pif
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--hungryrobot1--mcp-pif--mcp-pif  "npm run start"
+ghcr.io/metorial/mcp-container--hungryrobot1--mcp-pif--mcp-pif  
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -44,8 +44,7 @@ ghcr.io/metorial/mcp-container--hungryrobot1--mcp-pif--mcp-pif  "npm run start"
         "run",
         "-i",
         "--rm",
-        "ghcr.io/metorial/mcp-container--hungryrobot1--mcp-pif--mcp-pif",
-        "npm run start"
+        "ghcr.io/metorial/mcp-container--hungryrobot1--mcp-pif--mcp-pif"
       ],
       "env": {}
     }

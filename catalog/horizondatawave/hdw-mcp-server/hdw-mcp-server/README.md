@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--horizondatawave--hdw-mcp-server--hdw
 ```bash
 docker run -i --rm \ 
 -e HDW_ACCESS_TOKEN=hdw-access-token -e HDW_ACCOUNT_ID=hdw-account-id \
-ghcr.io/metorial/mcp-container--horizondatawave--hdw-mcp-server--hdw-mcp-server  "node build/index.js"
+ghcr.io/metorial/mcp-container--horizondatawave--hdw-mcp-server--hdw-mcp-server  "node build/server.js"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -60,7 +60,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--horizondatawave--hdw-mcp-server--hdw-mcp-server",
-        "node build/index.js"
+        "node build/server.js"
       ],
       "env": {
         "HDW_ACCESS_TOKEN": "hdw-access-token",

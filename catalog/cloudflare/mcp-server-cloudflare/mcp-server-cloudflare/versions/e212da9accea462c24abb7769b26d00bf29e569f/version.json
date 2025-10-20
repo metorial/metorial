@@ -1,0 +1,90 @@
+{
+  "serverId": "cloudflare/mcp-server-cloudflare/mcp-server-cloudflare",
+  "version": "e212da9accea462c24abb7769b26d00bf29e569f",
+  "manifest": {
+    "id": "mcp-server-cloudflare",
+    "fullId": "cloudflare/mcp-server-cloudflare/mcp-server-cloudflare",
+    "repo": {
+      "provider": "github.com",
+      "owner": "cloudflare",
+      "repo": "mcp-server-cloudflare",
+      "branch": "main",
+      "url": "https://github.com/cloudflare/mcp-server-cloudflare"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Cloudflare MCP Server",
+    "description": "Model Context Protocol (MCP) is a [new, standardized protocol](https://modelcontextprotocol.io/introduction) for managing context between large language models (LLMs) and external systems. In this repository, we provide an installer as well as an MCP Server for [Cloudflare's API](https://api.cloudflare.com)."
+  },
+  "manifestHash": "b69c0323dd08ce8abd1ffc28be103926",
+  "createdAt": "2025-10-20T01:36:26.536Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "pnpm-9_x"
+            ],
+            "nixLibs": [
+              "gcc-unwrapped"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        }
+      }
+    }
+  ]
+}

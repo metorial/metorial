@@ -1,0 +1,113 @@
+{
+  "serverId": "cr7258/elasticsearch-mcp-server/elasticsearch-mcp-server",
+  "version": "559010710fdd25d2141ead6800ebdad1d8b02ba1",
+  "manifest": {
+    "id": "elasticsearch-mcp-server",
+    "fullId": "cr7258/elasticsearch-mcp-server/elasticsearch-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "cr7258",
+      "repo": "elasticsearch-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/cr7258/elasticsearch-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "elasticsearch-hosts",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ELASTICSEARCH_HOSTS"
+            }
+          ]
+        },
+        {
+          "title": "elasticsearch-username",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ELASTICSEARCH_USERNAME"
+            }
+          ]
+        },
+        {
+          "title": "elasticsearch-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ELASTICSEARCH_PASSWORD"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Elasticsearch/OpenSearch MCP Server",
+    "description": "A Model Context Protocol (MCP) server implementation that provides Elasticsearch and OpenSearch interaction."
+  },
+  "manifestHash": "95c1cbf81fbbc0bf83e3d79ac428a511",
+  "createdAt": "2025-10-20T01:36:26.014Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python310",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "elasticsearch-mcp-server"
+        }
+      }
+    }
+  ]
+}

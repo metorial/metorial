@@ -1,0 +1,136 @@
+{
+  "serverId": "kenliao94/mcp-server-rabbitmq/mcp-server-rabbitmq",
+  "version": "3728b537f790561d2253db391466ddf49d998e3b",
+  "manifest": {
+    "id": "mcp-server-rabbitmq",
+    "fullId": "kenliao94/mcp-server-rabbitmq/mcp-server-rabbitmq",
+    "repo": {
+      "provider": "github.com",
+      "owner": "kenliao94",
+      "repo": "mcp-server-rabbitmq",
+      "branch": "main",
+      "url": "https://github.com/kenliao94/mcp-server-rabbitmq"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "rabbitmq-host",
+          "description": null,
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--rabbitmq-host"
+            }
+          ]
+        },
+        {
+          "title": "port",
+          "description": null,
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--port"
+            }
+          ]
+        },
+        {
+          "title": "username",
+          "description": null,
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--username"
+            }
+          ]
+        },
+        {
+          "title": "password",
+          "description": null,
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--password"
+            }
+          ]
+        },
+        {
+          "title": "use-tls",
+          "description": null,
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--use-tls"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "RabbitMQ MCP Server",
+    "description": "A [Model Context Protocol](https://www.anthropic.com/news/model-context-protocol) server implementation for RabbitMQ. Enabling MCP client to interact with queues and topics hosted in a RabbitMQ instance."
+  },
+  "manifestHash": "dec145c0b76dc5ebbd6fa0d97dd2aed5",
+  "createdAt": "2025-10-20T01:36:31.722Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "mcp-server-rabbitmq"
+        }
+      }
+    }
+  ]
+}
