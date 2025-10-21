@@ -1,0 +1,117 @@
+{
+  "serverId": "sapientpants/sonarqube-mcp-server/sonarqube-mcp-server",
+  "version": "161452dab6e19f6a1fd621e5fd0f891008e709a7",
+  "manifest": {
+    "id": "sonarqube-mcp-server",
+    "fullId": "sapientpants/sonarqube-mcp-server/sonarqube-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "sapientpants",
+      "repo": "sonarqube-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/sapientpants/sonarqube-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "sonarqube-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SONARQUBE_URL"
+            }
+          ]
+        },
+        {
+          "title": "sonarqube-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SONARQUBE_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "sonarqube-organization",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SONARQUBE_ORGANIZATION"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "SonarQube MCP Server",
+    "description": "A Model Context Protocol (MCP) server that integrates with SonarQube to provide AI assistants with access to code quality metrics, issues, and analysis results."
+  },
+  "manifestHash": "41f605e7f5a72acbbb316a3f30316c92",
+  "createdAt": "2025-10-21T01:11:26.501Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "pnpm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "pnpm run start"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "serverId": "hungryrobot1/MCP-PIF/mcp-pif",
+  "version": "6d6f449ebbaa10b91c8346acc217751dd1ee12e3",
+  "manifest": {
+    "id": "mcp-pif",
+    "fullId": "hungryrobot1/MCP-PIF/mcp-pif",
+    "repo": {
+      "provider": "github.com",
+      "owner": "hungryrobot1",
+      "repo": "MCP-PIF",
+      "branch": "main",
+      "url": "https://github.com/hungryrobot1/MCP-PIF"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Personal intelligence framework",
+    "description": "A MCP implementation of the personal intelligence framework (PIF)"
+  },
+  "manifestHash": "3f8940404b0bf5810635f0f029873453",
+  "createdAt": "2025-10-21T01:11:11.572Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "phases": {}
+      }
+    }
+  ]
+}
