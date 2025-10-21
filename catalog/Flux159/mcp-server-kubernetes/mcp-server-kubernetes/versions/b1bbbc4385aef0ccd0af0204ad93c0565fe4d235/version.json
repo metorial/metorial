@@ -1,0 +1,79 @@
+{
+  "serverId": "Flux159/mcp-server-kubernetes/mcp-server-kubernetes",
+  "version": "b1bbbc4385aef0ccd0af0204ad93c0565fe4d235",
+  "manifest": {
+    "id": "mcp-server-kubernetes",
+    "fullId": "Flux159/mcp-server-kubernetes/mcp-server-kubernetes",
+    "repo": {
+      "provider": "github.com",
+      "owner": "Flux159",
+      "repo": "mcp-server-kubernetes",
+      "branch": "main",
+      "url": "https://github.com/Flux159/mcp-server-kubernetes"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "MCP Server Kubernetes",
+    "description": "MCP Server that can connect to a Kubernetes cluster and manage it."
+  },
+  "manifestHash": "c974ec60e9005a88314d7a5d18ec1566",
+  "createdAt": "2025-10-21T23:14:21.463Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "bun run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "bun i --no-save"
+            ],
+            "cacheDirectories": [
+              "/root/.bun"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "bun"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "5a0711127cd8b916c3d3128f473388c8c79df0da"
+          }
+        },
+        "start": {
+          "cmd": "bun run start"
+        }
+      }
+    }
+  ]
+}
