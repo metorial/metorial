@@ -5,7 +5,7 @@
 <h1 align="center">Metorial (YC F25)</h1>
 
 <p align="center">
-The integration platform for agentic AI. <br />
+The open source integration platform for agentic AI. <br />
 Connect any AI model to thousands of APIs, data sources, and tools with a single function call.
 </p>
 
@@ -35,6 +35,10 @@ Metorial currently provides SDKs for the following languages:
 * <img src="assets/python.svg" width="12px" height="12px" /> [**Python**](https://github.com/metorial/metorial-python)
 
 If you want to build a custom integration, check out our [API documentation](https://metorial.com/api) for details on how to use the Metorial API directly.
+
+## Metorial Platform
+
+The [Metorial Platform](https://github.com/metorial/metorial-platform) is the code that powers the engine behind Metorial. It is open source and can be self-hosted. You can use it to run your own Metorial instance, powered by the MCP servers in this repo.
 
 ## Quick Start
 
