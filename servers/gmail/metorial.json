@@ -1,0 +1,4 @@
+{
+  "name": "Gmail MCP Server",
+  "runtime": "typescript.deno"
+}

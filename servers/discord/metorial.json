@@ -1,0 +1,4 @@
+{
+  "name": "Discord MCP Server",
+  "runtime": "typescript.deno"
+}

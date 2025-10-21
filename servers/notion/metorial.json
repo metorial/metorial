@@ -1,0 +1,4 @@
+{
+  "name": "Notion MCP Server",
+  "runtime": "typescript.deno"
+}

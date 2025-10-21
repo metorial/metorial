@@ -1,0 +1,4 @@
+{
+  "name": "ArXiv MCP Server",
+  "runtime": "typescript.deno"
+}

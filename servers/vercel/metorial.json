@@ -1,0 +1,4 @@
+{
+  "name": "Vercel MCP Server",
+  "runtime": "typescript.deno"
+}

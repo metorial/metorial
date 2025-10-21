@@ -28,7 +28,10 @@ export let checkVersions = async (opts: { force?: boolean; only?: string[] }) =>
     JSON.stringify(normalizedServers, null, 2)
   );
 
-  await fs.writeFile(path.join(rootDir, 'README.md'), await generateRepoReadme(servers));
+  await fs.writeFile(
+    path.join(rootDir, 'DOCKER_SERVERS.md'),
+    await generateRepoReadme(servers)
+  );
 
   let queue = new PQueue({ concurrency: 10 });
 
