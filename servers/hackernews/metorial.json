@@ -1,0 +1,4 @@
+{
+  "name": "Hackernews MCP Server",
+  "runtime": "typescript.deno"
+}

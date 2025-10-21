@@ -1,0 +1,4 @@
+{
+  "name": "Exa MCP Server",
+  "runtime": "typescript.deno"
+}

@@ -1,0 +1,4 @@
+{
+  "name": "Tavily MCP Server",
+  "runtime": "typescript.deno"
+}

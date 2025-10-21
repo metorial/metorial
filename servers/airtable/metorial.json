@@ -1,0 +1,4 @@
+{
+  "name": "Airtable MCP Server",
+  "runtime": "typescript.deno"
+}

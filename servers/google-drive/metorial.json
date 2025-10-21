@@ -1,0 +1,4 @@
+{
+  "name": "Google Drive MCP Server",
+  "runtime": "typescript.deno"
+}

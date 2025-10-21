@@ -1,0 +1,4 @@
+{
+  "name": "Firecrawl MCP Server",
+  "runtime": "typescript.deno"
+}

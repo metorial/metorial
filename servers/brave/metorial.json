@@ -1,0 +1,4 @@
+{
+  "name": "Brave MCP Server",
+  "runtime": "typescript.deno"
+}

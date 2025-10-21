@@ -1,0 +1,4 @@
+{
+  "name": "Resend MCP Server",
+  "runtime": "typescript.deno"
+}

@@ -1,0 +1,4 @@
+{
+  "name": "GitLab MCP Server",
+  "runtime": "typescript.deno"
+}

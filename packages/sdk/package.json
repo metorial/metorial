@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mcp-server-sdk",
+  "module": "src/index.ts",
+  "main": "src/index.ts",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.2",
+    "zod": "3"
+  }
+}
