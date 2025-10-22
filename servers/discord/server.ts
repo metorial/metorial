@@ -6,27 +6,8 @@ import { metorial, z } from '@metorial/mcp-server-sdk';
  */
 
 interface Config {
-  token: {
-    access_token: string;
-    token_type: string;
-    expires_in: number;
-    refresh_token: string;
-    scope: string;
-    webhook?: {
-      id: string;
-      token: string;
-      type: number;
-      channel_id: string;
-      guild_id?: string;
-      name: string;
-      avatar?: string;
-      application_id: string;
-    };
-    guild?: {
-      id: string;
-      name: string;
-    };
-  };
+  token: string;
+  guild?: { id: string; name: string };
 }
 
 metorial.setOauthHandler({
@@ -153,7 +134,7 @@ metorial.createServer<Config>(
       body?: unknown
     ): Promise<any> {
       const headers: Record<string, string> = {
-        Authorization: `Bearer ${cfg.token.access_token}`,
+        Authorization: `Bearer ${cfg.token}`,
         'Content-Type': 'application/json'
       };
 
@@ -183,8 +164,8 @@ metorial.createServer<Config>(
 
     // Get the guild ID from the OAuth response
     const getGuildId = () => {
-      if (cfg.token.guild?.id) {
-        return cfg.token.guild.id;
+      if (cfg.guild?.id) {
+        return cfg.guild.id;
       }
       throw new Error('No guild ID available. Please reconnect the integration.');
     };
