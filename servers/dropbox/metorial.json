@@ -1,0 +1,4 @@
+{
+  "name": "Dropbox MCP Server",
+  "runtime": "typescript.deno"
+}
