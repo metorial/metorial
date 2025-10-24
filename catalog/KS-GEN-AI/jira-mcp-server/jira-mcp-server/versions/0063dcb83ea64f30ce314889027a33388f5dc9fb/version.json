@@ -1,0 +1,116 @@
+{
+  "serverId": "KS-GEN-AI/jira-mcp-server/jira-mcp-server",
+  "version": "0063dcb83ea64f30ce314889027a33388f5dc9fb",
+  "manifest": {
+    "id": "jira-mcp-server",
+    "fullId": "KS-GEN-AI/jira-mcp-server/jira-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "KS-GEN-AI",
+      "repo": "jira-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/KS-GEN-AI/jira-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "jira-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "JIRA_URL"
+            }
+          ]
+        },
+        {
+          "title": "jira-api-mail",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "JIRA_API_MAIL"
+            }
+          ]
+        },
+        {
+          "title": "jira-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "JIRA_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Jira communication server MCP Server",
+    "description": "Talk to Jira"
+  },
+  "manifestHash": "645b667b09c6a8ad0b9574466e37aee9",
+  "createdAt": "2025-10-24T15:16:04.741Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./build/index.js"
+        }
+      }
+    }
+  ]
+}

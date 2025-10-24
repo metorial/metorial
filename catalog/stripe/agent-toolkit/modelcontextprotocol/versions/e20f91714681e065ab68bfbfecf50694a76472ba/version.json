@@ -1,0 +1,107 @@
+{
+  "serverId": "stripe/agent-toolkit/modelcontextprotocol",
+  "version": "e20f91714681e065ab68bfbfecf50694a76472ba",
+  "manifest": {
+    "id": "modelcontextprotocol",
+    "fullId": "stripe/agent-toolkit/modelcontextprotocol",
+    "repo": {
+      "provider": "github.com",
+      "owner": "stripe",
+      "repo": "agent-toolkit",
+      "branch": "main",
+      "url": "https://github.com/stripe/agent-toolkit"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "tools",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--tools"
+            }
+          ]
+        },
+        {
+          "title": "api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--api-key"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/modelcontextprotocol",
+    "title": "Stripe MCP Server",
+    "description": "The Stripe [Model Context Protocol](https://modelcontextprotocol.com/) server allows you to integrate with Stripe APIs through function calling. This protocol supports various tools to interact with different Stripe services.",
+    "build": {
+      "installCommand": "pnpm i --frozen-lockfile && pnpm i typescript"
+    }
+  },
+  "manifestHash": "0c19aa9514c743fea5993861a5cab19c",
+  "createdAt": "2025-10-24T15:16:17.633Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "pnpm i --frozen-lockfile && pnpm i typescript"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_22",
+              "pnpm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}
