@@ -1,0 +1,79 @@
+{
+  "serverId": "nspady/google-calendar-mcp/google-calendar-mcp",
+  "version": "3d780a9d0ca657a73a07ab05addc4bc37b707abf",
+  "manifest": {
+    "id": "google-calendar-mcp",
+    "fullId": "nspady/google-calendar-mcp/google-calendar-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "nspady",
+      "repo": "google-calendar-mcp",
+      "branch": "main",
+      "url": "https://github.com/nspady/google-calendar-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Google Calendar MCP Server",
+    "description": "This is a Model Context Protocol (MCP) server that provides integration with Google Calendar. It allows LLMs to read, create, update and search for calendar events through a standardized interface."
+  },
+  "manifestHash": "3890173299ea52cada1416cee0563dd5",
+  "createdAt": "2025-10-24T15:16:13.781Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}
