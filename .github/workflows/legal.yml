@@ -1,0 +1,47 @@
+name: Check Legal Boilerplate
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-legal-boilerplate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Check for legal boilerplate
+        id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let staffContributors = ['herber', 'RahmeKarim'];
+            let prAuthor = context.payload.pull_request.user.login;
+
+            if (staffContributors.includes(prAuthor)) {
+              console.log(`Skipping legal check: ${prAuthor} is in staff list.`);
+              return;
+            }
+
+            let requiredText = `By submitting this pull request, I'm saying I wrote these changes (or have the right to submit them), and that Metorial can use them however they like - including in their open source projects or any proprietary versions they offer. I still keep the rights to my code, but Metorial can use, modify, and relicense it however they like.`;
+
+            let body = context.payload.pull_request.body || "";
+
+            if (body.includes(requiredText)) {
+              core.setOutput("legal_check_passed", "true");
+            } else {
+              let issue_number = context.payload.pull_request.number;
+              let repo = context.repo.repo;
+              let owner = context.repo.owner;
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body: `👋 Hi! Your pull request is missing the required legal boilerplate.\nPlease copy and paste the following text into the PR description:\n\n\`\`\`\n${requiredText}\n\`\`\`\n\nThanks for contributing to Metorial!`
+              });
+
+              core.setFailed("Missing required legal boilerplate in PR description.");
+            }
