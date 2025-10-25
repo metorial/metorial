@@ -1,0 +1,112 @@
+{
+  "serverId": "pab1it0/prometheus-mcp-server/prometheus-mcp-server",
+  "version": "b2acf078a1701f9637aee30a9430137b132e2bfe",
+  "manifest": {
+    "id": "prometheus-mcp-server",
+    "fullId": "pab1it0/prometheus-mcp-server/prometheus-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "pab1it0",
+      "repo": "prometheus-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/pab1it0/prometheus-mcp-server"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "prometheus-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PROMETHEUS_URL"
+            }
+          ]
+        },
+        {
+          "title": "prometheus-username",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PROMETHEUS_USERNAME"
+            }
+          ]
+        },
+        {
+          "title": "prometheus-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PROMETHEUS_PASSWORD"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Prometheus MCP Server",
+    "description": "An MCP server for Prometheus."
+  },
+  "manifestHash": "3abb457e2290b60f66fd9977e36f3770",
+  "createdAt": "2025-10-25T20:15:26.830Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "prometheus-mcp-server"
+        }
+      }
+    }
+  ]
+}
