@@ -45,7 +45,7 @@ metorial.setOauthHandler({
       'content',
       'automation',
       'oauth'
-    ].join('%20');
+    ].join(' ');
 
     const params = new URLSearchParams({
       client_id: input.clientId,
