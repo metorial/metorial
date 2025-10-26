@@ -992,6 +992,9 @@ We have provided a list of available servers below, along with their respective 
 - <img src="https://github.com/ognis1205.png?size=120" width="12px" height="12px" /> **[mcp-server-unitycatalog: An Unity Catalog MCP server
 ](catalog/ognis1205/mcp-server-unitycatalog/mcp-server-unitycatalog/README.md)** - Unity Catalog AI Model Context Protocol Server
 
+- <img src="https://github.com/olostep.png?size=120" width="12px" height="12px" /> **[Olostep
+](catalog/olostep/olostep-mcp-server/olostep-mcp-server/README.md)** - Professional service to search the web, extract data from websites as markdown and discover URLs for site structure analysis.
+
 - <img src="https://github.com/openags.png?size=120" width="12px" height="12px" /> **[Paper Search MCP
 ](catalog/openags/paper-search-mcp/paper-search-mcp/README.md)** - A Model Context Protocol (MCP) server for searching and downloading academic papers from multiple sources, including arXiv, PubMed, bioRxiv, and Sci-Hub (optional). Designed for seamless integration with large language models like Claude Desktop.
 
