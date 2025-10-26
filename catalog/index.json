@@ -1620,6 +1620,12 @@
     "repoUrl": "https://github.com/ognis1205/mcp-server-unitycatalog"
   },
   {
+    "id": "olostep-mcp-server",
+    "owner": "olostep",
+    "repo": "olostep-mcp-server",
+    "repoUrl": "https://github.com/olostep/olostep-mcp-server"
+  },
+  {
     "id": "paper-search-mcp",
     "owner": "openags",
     "repo": "paper-search-mcp",
