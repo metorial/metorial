@@ -1,0 +1,30 @@
+{
+  "id": "olostep-mcp-server",
+  "fullId": "olostep/olostep-mcp-server/olostep-mcp-server",
+  "repo": {
+    "provider": "github.com",
+    "owner": "olostep",
+    "repo": "olostep-mcp-server",
+    "branch": "main",
+    "url": "https://github.com/olostep/olostep-mcp-server"
+  },
+  "config": {
+    "configValues": [
+      {
+        "title": "OLOSTEP_API_KEY",
+        "description": "Your Olostep API key from olostep.com/auth",
+        "default": null,
+        "required": true,
+        "fields": [
+          {
+            "type": "env",
+            "key": "OLOSTEP_API_KEY"
+          }
+        ]
+      }
+    ]
+  },
+  "subdirectory": "/",
+  "title": "Olostep",
+  "description": "Professional service to search the web, extract data from websites as markdown and discover URLs for site structure analysis."
+}
