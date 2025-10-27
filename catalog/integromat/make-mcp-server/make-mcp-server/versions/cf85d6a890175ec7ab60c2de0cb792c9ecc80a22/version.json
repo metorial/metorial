@@ -1,0 +1,116 @@
+{
+  "serverId": "integromat/make-mcp-server/make-mcp-server",
+  "version": "cf85d6a890175ec7ab60c2de0cb792c9ecc80a22",
+  "manifest": {
+    "id": "make-mcp-server",
+    "fullId": "integromat/make-mcp-server/make-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "integromat",
+      "repo": "make-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/integromat/make-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "make-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MAKE_API_KEY"
+            }
+          ]
+        },
+        {
+          "title": "make-zone",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MAKE_ZONE"
+            }
+          ]
+        },
+        {
+          "title": "make-team",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MAKE_TEAM"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Make MCP Server",
+    "description": "A Model Context Protocol server that enables Make scenarios to be utilized as tools by AI assistants. This integration allows AI systems to trigger and interact with your Make automation workflows."
+  },
+  "manifestHash": "4d092609e7075ab62bb29a7c8c1202c7",
+  "createdAt": "2025-10-27T17:13:23.898Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node build/index.js"
+        }
+      }
+    }
+  ]
+}
