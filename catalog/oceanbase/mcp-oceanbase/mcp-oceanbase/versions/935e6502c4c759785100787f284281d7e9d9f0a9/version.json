@@ -1,0 +1,113 @@
+{
+  "serverId": "oceanbase/mcp-oceanbase/mcp-oceanbase",
+  "version": "935e6502c4c759785100787f284281d7e9d9f0a9",
+  "manifest": {
+    "id": "mcp-oceanbase",
+    "fullId": "oceanbase/mcp-oceanbase/mcp-oceanbase",
+    "repo": {
+      "provider": "github.com",
+      "owner": "oceanbase",
+      "repo": "mcp-oceanbase",
+      "branch": "main",
+      "url": "https://github.com/oceanbase/mcp-oceanbase"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "AK",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AK"
+            }
+          ]
+        },
+        {
+          "title": "SK",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SK"
+            }
+          ]
+        },
+        {
+          "title": "ADDRESS",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ADDRESS"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Oceanbase MCP Server",
+    "description": "MCP Server for OceanBase database and its tools"
+  },
+  "manifestHash": "965d55f33fc271d5f4a0967bf574df18",
+  "createdAt": "2025-10-27T17:13:35.917Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install -r requirements.txt"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/pip"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "ocp_mcp_server"
+        }
+      }
+    }
+  ]
+}

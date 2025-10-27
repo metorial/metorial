@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--brightdata--brightdata-mcp--brightda
 ```bash
 docker run -i --rm \ 
 -e API_TOKEN=api-token -e RATE_LIMIT=rate-limit -e WEB_UNLOCKER_ZONE=web-unlocker-zone -e BROWSER_ZONE=browser-zone \
-ghcr.io/metorial/mcp-container--brightdata--brightdata-mcp--brightdata-mcp  "node ./server.js"
+ghcr.io/metorial/mcp-container--brightdata--brightdata-mcp--brightdata-mcp  "npm run start"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -62,7 +62,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--brightdata--brightdata-mcp--brightdata-mcp",
-        "node ./server.js"
+        "npm run start"
       ],
       "env": {
         "API_TOKEN": "api-token",
