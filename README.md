@@ -274,7 +274,7 @@ Metorial is built from the ground up for developers. Here are some of the key fe
 
 ## License
 
-Metorial is licensed under the [FSL-1.1](LICENSE) license.
+The Metorial Catalog is licensed under the [Apache License 2.0](LICENSE).
 
 <div align="center">
   <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
