@@ -5,6 +5,31 @@ import { metorial, ResourceTemplate, z } from '@metorial/mcp-server-sdk';
  * Provides tools and resources for interacting with the Stripe API
  */
 
+metorial.setCallbackHandler({
+  handle: async (data: {
+    payload: {
+      url: string;
+      method: string;
+      body?: string;
+      headers: Record<string, string>;
+    };
+  }) => {
+    let res: {
+      type: string;
+      data: any;
+    } = JSON.parse(data.payload.body || '{}');
+    let result = res.data;
+    if (result && typeof result.object == 'object') {
+      result = result.object;
+    }
+
+    return {
+      result,
+      type: res.type
+    };
+  }
+});
+
 metorial.createServer<{ token: string }>(
   {
     name: 'stripe-mcp-server',

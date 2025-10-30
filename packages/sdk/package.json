@@ -1,10 +1,13 @@
 {
   "name": "@metorial/mcp-server-sdk",
-  "module": "src/index.ts",
-  "main": "src/index.ts",
-  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "source": "src/index.ts",
+  "version": "1.0.1",
   "type": "module",
-  "private": true,
+  "scripts": {
+    "build": "tsup"
+  },
   "devDependencies": {
     "@types/bun": "latest"
   },
@@ -13,6 +16,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.2",
+    "tsup": "^8.5.0",
     "zod": "3"
   }
 }
