@@ -1,0 +1,101 @@
+{
+  "serverId": "Vortiago/mcp-azure-devops/mcp-azure-devops",
+  "version": "1ce53765c79587f85c58941ed61c3fa73e65a55e",
+  "manifest": {
+    "id": "mcp-azure-devops",
+    "fullId": "Vortiago/mcp-azure-devops/mcp-azure-devops",
+    "repo": {
+      "provider": "github.com",
+      "owner": "Vortiago",
+      "repo": "mcp-azure-devops",
+      "branch": "main",
+      "url": "https://github.com/Vortiago/mcp-azure-devops"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "azure-devops-pat",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AZURE_DEVOPS_PAT"
+            }
+          ]
+        },
+        {
+          "title": "azure-devops-organization-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AZURE_DEVOPS_ORGANIZATION_URL"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "MCP Azure DevOps Server",
+    "description": "A Model Context Protocol (MCP) server enabling AI assistants to interact with Azure DevOps services."
+  },
+  "manifestHash": "8f4bd29b851580caf8cbe6231f41b058",
+  "createdAt": "2025-11-01T15:03:44.780Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "mcp-azure-devops"
+        }
+      }
+    }
+  ]
+}

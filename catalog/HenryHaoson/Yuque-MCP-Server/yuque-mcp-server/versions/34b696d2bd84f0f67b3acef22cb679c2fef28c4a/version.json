@@ -1,0 +1,104 @@
+{
+  "serverId": "HenryHaoson/Yuque-MCP-Server/yuque-mcp-server",
+  "version": "34b696d2bd84f0f67b3acef22cb679c2fef28c4a",
+  "manifest": {
+    "id": "yuque-mcp-server",
+    "fullId": "HenryHaoson/Yuque-MCP-Server/yuque-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "HenryHaoson",
+      "repo": "Yuque-MCP-Server",
+      "branch": "master",
+      "url": "https://github.com/HenryHaoson/Yuque-MCP-Server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "yuque-api-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "YUQUE_API_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "yuque-api-base-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "YUQUE_API_BASE_URL"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "语雀 MCP 服务器",
+    "description": "一个用于与语雀 API 集成的 Model-Context-Protocol (MCP) 服务器。此实现受 [Figma-Context-MCP](https://github.com/GLips/Figma-Context-MCP) 的启发，并使用 [语雀开放 API](https://app.swaggerhub.com/apis-docs/Jeff-Tian/yuque-open_api/2.0.1)。"
+  },
+  "manifestHash": "1bea495d08bb8b4b4f4c4c54ea0d2569",
+  "createdAt": "2025-11-01T15:03:31.425Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

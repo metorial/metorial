@@ -1,0 +1,101 @@
+{
+  "serverId": "oxylabs/oxylabs-mcp/oxylabs-mcp",
+  "version": "12a822a4bf218566deb0d36527c7f3a6ec194cf5",
+  "manifest": {
+    "id": "oxylabs-mcp",
+    "fullId": "oxylabs/oxylabs-mcp/oxylabs-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "oxylabs",
+      "repo": "oxylabs-mcp",
+      "branch": "main",
+      "url": "https://github.com/oxylabs/oxylabs-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "oxylabs-username",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OXYLABS_USERNAME"
+            }
+          ]
+        },
+        {
+          "title": "oxylabs-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OXYLABS_PASSWORD"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Oxylabs MCP Server",
+    "description": "The Oxylabs MCP server provides a bridge between AI models and the web. It enables them to scrape any URL, render JavaScript-heavy pages, extract and format content for AI use, bypass anti-scraping measures, and access geo-restricted web data from 195+ countries."
+  },
+  "manifestHash": "5f851da99af64dccf8380587a2f54ca7",
+  "createdAt": "2025-11-01T15:03:42.368Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "oxylabs-mcp"
+        }
+      }
+    }
+  ]
+}
