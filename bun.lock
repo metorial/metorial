@@ -63,7 +63,7 @@
     },
     "packages/sdk": {
       "name": "@metorial/mcp-server-sdk",
-      "version": "1.0.0",
+      "version": "1.0.2",
       "dependencies": {
         "@modelcontextprotocol/sdk": "^1.18.2",
         "tsup": "^8.5.0",
@@ -1368,65 +1368,127 @@
 
     "@isaacs/cliui/wrap-ansi": ["wrap-ansi@8.1.0", "", { "dependencies": { "ansi-styles": "^6.1.0", "string-width": "^5.0.1", "strip-ansi": "^7.0.1" } }, "sha512-si7QWI6zUMq56bESFvagtmzMdGOtoxfR+Sez11Mobfc7tm+VkUckk9bW2UeffTGVUbOksxmSw0AA2gs8g71NCQ=="],
 
+    "@metorial-server/airtable/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/airtable/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/arxiv/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/arxiv/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/brave/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/brave/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/calendly/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/calendly/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/confluence/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/confluence/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/context7/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/context7/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/discord/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/discord/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/dropbox/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/dropbox/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/exa/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/exa/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/firecrawl/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/firecrawl/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/github/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/github/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/gitlab/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/gitlab/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/gmail/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/gmail/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/google-calendar/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/google-calendar/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/google-drive/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/google-drive/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/hackernews/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/hackernews/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/hubspot/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/hubspot/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/jira/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/jira/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/loops/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/loops/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/microsoft365/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/microsoft365/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/notion/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/notion/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/perplexity/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/perplexity/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/quickbooks/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/quickbooks/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/resend/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/resend/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/salesforce/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/salesforce/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/slack/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/slack/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/stripe/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/stripe/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/supabase/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/supabase/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/tavily/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/tavily/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/vercel/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
     "@metorial-server/vercel/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/whatsapp/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/whatsapp/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 

@@ -1,0 +1,79 @@
+{
+  "serverId": "34892002/bilibili-mcp-js/bilibili-mcp-js",
+  "version": "3574a43f3b44b2cf726f3931ce753fa4e0ff4f25",
+  "manifest": {
+    "id": "bilibili-mcp-js",
+    "fullId": "34892002/bilibili-mcp-js/bilibili-mcp-js",
+    "repo": {
+      "provider": "github.com",
+      "owner": "34892002",
+      "repo": "bilibili-mcp-js",
+      "branch": "main",
+      "url": "https://github.com/34892002/bilibili-mcp-js"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Bilibili MCP",
+    "description": "MCP server for Bilibili search."
+  },
+  "manifestHash": "5f75ec84a1ffd7bd270a02e7d58116f6",
+  "createdAt": "2025-11-01T15:03:27.033Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "bun run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.bun"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "bun"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "31fb21469e34b6b5c7be77b9a35bae43d0c598e9"
+          }
+        },
+        "start": {
+          "cmd": "bun run start"
+        }
+      }
+    }
+  ]
+}
