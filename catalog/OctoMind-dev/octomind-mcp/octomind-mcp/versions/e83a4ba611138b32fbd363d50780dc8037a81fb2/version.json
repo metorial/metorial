@@ -1,0 +1,93 @@
+{
+  "serverId": "OctoMind-dev/octomind-mcp/octomind-mcp",
+  "version": "e83a4ba611138b32fbd363d50780dc8037a81fb2",
+  "manifest": {
+    "id": "octomind-mcp",
+    "fullId": "OctoMind-dev/octomind-mcp/octomind-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "OctoMind-dev",
+      "repo": "octomind-mcp",
+      "branch": "main",
+      "url": "https://github.com/OctoMind-dev/octomind-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "apikey",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "APIKEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "octomind mcp server: let agents create and manage e2e tests",
+    "description": "An MCP server for octomind tools, resources and prompts"
+  },
+  "manifestHash": "702c996dcb31f48fc6e603dbf7955a73",
+  "createdAt": "2025-11-03T18:05:30.870Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "pnpm-10_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "node ./dist/index.js"
+        }
+      }
+    }
+  ]
+}
