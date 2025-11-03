@@ -1,36 +1,138 @@
 import { metorial, ResourceTemplate, z } from '@metorial/mcp-server-sdk';
 
 /**
- * Stripe MCP Server
+ * Stripe MCP Server with OAuth
  * Provides tools and resources for interacting with the Stripe API
  */
 
-metorial.setCallbackHandler({
-  handle: async (data: {
-    payload: {
-      url: string;
-      method: string;
-      body?: string;
-      headers: Record<string, string>;
-    };
-  }) => {
-    let res: {
-      type: string;
-      data: any;
-    } = JSON.parse(data.payload.body || '{}');
-    let result = res.data;
-    if (result && typeof result.object == 'object') {
-      result = result.object;
-    }
+// Helper to generate PKCE code verifier and challenge
+function generateCodeVerifier() {
+  const array = new Uint8Array(32);
+  // @ts-ignore
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function generateCodeChallenge(verifier: string) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(verifier);
+  // @ts-ignore
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  const base64 = btoa(String.fromCharCode(...new Uint8Array(hash)));
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+metorial.setOauthHandler({
+  getAuthForm: () => ({
+    fields: []
+  }),
+  getAuthorizationUrl: async input => {
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+    const params = new URLSearchParams({
+      client_id: input.clientId,
+      redirect_uri: input.redirectUri,
+      response_type: 'code',
+      scope: 'read_write',
+      state: input.state,
+      code_challenge: codeChallenge,
+      code_challenge_method: 'S256'
+    });
 
     return {
-      result,
-      type: res.type
+      authorizationUrl: `https://connect.stripe.com/oauth/authorize?${params.toString()}`,
+      codeVerifier: codeVerifier
     };
+  },
+  handleCallback: async input => {
+    try {
+      const url = new URL(input.fullUrl);
+      const code = url.searchParams.get('code');
+
+      if (!code) {
+        throw new Error('No authorization code received');
+      }
+
+      const tokenParams = new URLSearchParams({
+        code: code,
+        client_id: input.clientId,
+        client_secret: input.clientSecret,
+        grant_type: 'authorization_code',
+        code_verifier: input.codeVerifier!
+      });
+
+      const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: tokenParams.toString()
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        throw new Error(`Token exchange failed: ${errorText}`);
+      }
+
+      const tokenData = (await tokenResponse.json()) as any;
+
+      return {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_in: tokenData.expires_in,
+        token_type: tokenData.token_type,
+        scope: tokenData.scope,
+        stripe_user_id: tokenData.stripe_user_id
+      };
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  },
+  refreshAccessToken: async input => {
+    try {
+      const tokenParams = new URLSearchParams({
+        client_id: input.clientId,
+        client_secret: input.clientSecret,
+        refresh_token: input.refreshToken,
+        grant_type: 'refresh_token'
+      });
+
+      const tokenResponse = await fetch('https://connect.stripe.com/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: tokenParams.toString()
+      });
+
+      if (!tokenResponse.ok) {
+        const errorText = await tokenResponse.text();
+        throw new Error(`Token refresh failed: ${errorText}`);
+      }
+
+      const tokenData = (await tokenResponse.json()) as any;
+
+      return {
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token || input.refreshToken,
+        expires_in: tokenData.expires_in,
+        token_type: tokenData.token_type,
+        scope: tokenData.scope
+      };
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
   }
 });
 
-metorial.createServer<{ token: string }>(
+interface Config {
+  token: string;
+}
+
+metorial.createServer<Config>(
   {
     name: 'stripe-mcp-server',
     version: '1.0.0'
@@ -147,30 +249,6 @@ metorial.createServer<{ token: string }>(
               uri: uri.href,
               mimeType: 'application/json',
               text: JSON.stringify(paymentIntent, null, 2)
-            }
-          ]
-        };
-      }
-    );
-
-    /**
-     * Charge Resource
-     */
-    server.registerResource(
-      'charge',
-      new ResourceTemplate('stripe://charges/{charge_id}', { list: undefined }),
-      {
-        title: 'Stripe Charge',
-        description: 'Access detailed information about a specific charge'
-      },
-      async (uri, { charge_id }) => {
-        const charge = await stripeRequest(`/charges/${charge_id}`);
-        return {
-          contents: [
-            {
-              uri: uri.href,
-              mimeType: 'application/json',
-              text: JSON.stringify(charge, null, 2)
             }
           ]
         };
@@ -561,173 +639,6 @@ metorial.createServer<{ token: string }>(
       }
     );
 
-    server.registerTool(
-      'confirm_payment_intent',
-      {
-        title: 'Confirm Payment Intent',
-        description: 'Confirm a payment intent',
-        inputSchema: {
-          payment_intent_id: z.string().describe('The ID of the payment intent to confirm'),
-          payment_method: z.string().optional().describe('Payment method ID')
-        }
-      },
-      async ({ payment_intent_id, payment_method }) => {
-        const body: Record<string, any> = {};
-        if (payment_method) body.payment_method = payment_method;
-
-        const paymentIntent = await stripeRequest(
-          `/payment_intents/${payment_intent_id}/confirm`,
-          'POST',
-          body
-        );
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Payment intent confirmed\n\n${JSON.stringify(paymentIntent, null, 2)}`
-            }
-          ]
-        };
-      }
-    );
-
-    server.registerTool(
-      'cancel_payment_intent',
-      {
-        title: 'Cancel Payment Intent',
-        description: 'Cancel a payment intent',
-        inputSchema: {
-          payment_intent_id: z.string().describe('The ID of the payment intent to cancel')
-        }
-      },
-      async ({ payment_intent_id }) => {
-        const paymentIntent = await stripeRequest(
-          `/payment_intents/${payment_intent_id}/cancel`,
-          'POST'
-        );
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Payment intent cancelled\n\n${JSON.stringify(paymentIntent, null, 2)}`
-            }
-          ]
-        };
-      }
-    );
-
-    server.registerTool(
-      'capture_payment_intent',
-      {
-        title: 'Capture Payment Intent',
-        description: 'Capture a payment intent that was created with capture_method=manual',
-        inputSchema: {
-          payment_intent_id: z.string().describe('The ID of the payment intent to capture'),
-          amount_to_capture: z
-            .number()
-            .optional()
-            .describe('Amount to capture in cents (defaults to full amount)')
-        }
-      },
-      async ({ payment_intent_id, amount_to_capture }) => {
-        const body: Record<string, any> = {};
-        if (amount_to_capture) body.amount_to_capture = amount_to_capture;
-
-        const paymentIntent = await stripeRequest(
-          `/payment_intents/${payment_intent_id}/capture`,
-          'POST',
-          body
-        );
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Payment intent captured\n\n${JSON.stringify(paymentIntent, null, 2)}`
-            }
-          ]
-        };
-      }
-    );
-
-    // ============================================================================
-    // CHARGE MANAGEMENT TOOLS
-    // ============================================================================
-
-    server.registerTool(
-      'list_charges',
-      {
-        title: 'List Charges',
-        description: 'List charges with optional filters',
-        inputSchema: {
-          customer: z.string().optional().describe('Filter by customer ID'),
-          payment_intent: z.string().optional().describe('Filter by payment intent ID'),
-          limit: z
-            .number()
-            .optional()
-            .default(10)
-            .describe('Number of charges to return (1-100)'),
-          starting_after: z.string().optional().describe('Charge ID for pagination')
-        }
-      },
-      async ({ customer, payment_intent, limit, starting_after }) => {
-        const params: Record<string, any> = { limit };
-        if (customer) params.customer = customer;
-        if (payment_intent) params.payment_intent = payment_intent;
-        if (starting_after) params.starting_after = starting_after;
-
-        const result = await stripeRequest('/charges', 'GET', params);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(result, null, 2)
-            }
-          ]
-        };
-      }
-    );
-
-    server.registerTool(
-      'create_charge',
-      {
-        title: 'Create Charge',
-        description:
-          'Create a direct charge (legacy API, prefer Payment Intents for new integrations)',
-        inputSchema: {
-          amount: z.number().describe('Amount in cents (e.g., 1000 for $10.00)'),
-          currency: z.string().describe('Three-letter ISO currency code (e.g., usd, eur)'),
-          customer: z.string().optional().describe('Customer ID'),
-          source: z.string().optional().describe('Payment source (token or card ID)'),
-          description: z.string().optional().describe('Description of the charge'),
-          metadata: z
-            .record(z.string())
-            .optional()
-            .describe('Set of key-value pairs for custom metadata')
-        }
-      },
-      async ({ amount, currency, customer, source, description, metadata }) => {
-        const body: Record<string, any> = { amount, currency };
-        if (customer) body.customer = customer;
-        if (source) body.source = source;
-        if (description) body.description = description;
-        if (metadata) body.metadata = metadata;
-
-        const charge = await stripeRequest('/charges', 'POST', body);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Charge created successfully: ${charge.id}\n\n${JSON.stringify(
-                charge,
-                null,
-                2
-              )}`
-            }
-          ]
-        };
-      }
-    );
-
     // ============================================================================
     // SUBSCRIPTION MANAGEMENT TOOLS
     // ============================================================================
@@ -905,40 +816,6 @@ metorial.createServer<{ token: string }>(
             {
               type: 'text',
               text: `Subscription cancelled successfully\n\n${JSON.stringify(
-                subscription,
-                null,
-                2
-              )}`
-            }
-          ]
-        };
-      }
-    );
-
-    server.registerTool(
-      'resume_subscription',
-      {
-        title: 'Resume Subscription',
-        description: 'Resume a paused subscription',
-        inputSchema: {
-          subscription_id: z.string().describe('The ID of the subscription to resume')
-        }
-      },
-      async ({ subscription_id }) => {
-        const body = {
-          pause_collection: ''
-        };
-
-        const subscription = await stripeRequest(
-          `/subscriptions/${subscription_id}`,
-          'POST',
-          body
-        );
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Subscription resumed successfully\n\n${JSON.stringify(
                 subscription,
                 null,
                 2
@@ -1414,65 +1291,6 @@ metorial.createServer<{ token: string }>(
                 null,
                 2
               )}`
-            }
-          ]
-        };
-      }
-    );
-
-    // ============================================================================
-    // BALANCE & PAYOUT TOOLS
-    // ============================================================================
-
-    server.registerTool(
-      'get_balance',
-      {
-        title: 'Get Balance',
-        description: 'Get the current account balance',
-        inputSchema: {}
-      },
-      async () => {
-        const balance = await stripeRequest('/balance');
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(balance, null, 2)
-            }
-          ]
-        };
-      }
-    );
-
-    server.registerTool(
-      'list_balance_transactions',
-      {
-        title: 'List Balance Transactions',
-        description: 'List balance transactions',
-        inputSchema: {
-          limit: z
-            .number()
-            .optional()
-            .default(10)
-            .describe('Number of transactions to return (1-100)'),
-          starting_after: z.string().optional().describe('Transaction ID for pagination'),
-          type: z
-            .string()
-            .optional()
-            .describe('Filter by transaction type (e.g., charge, refund, payout)')
-        }
-      },
-      async ({ limit, starting_after, type }) => {
-        const params: Record<string, any> = { limit };
-        if (starting_after) params.starting_after = starting_after;
-        if (type) params.type = type;
-
-        const result = await stripeRequest('/balance_transactions', 'GET', params);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(result, null, 2)
             }
           ]
         };
