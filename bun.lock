@@ -347,8 +347,30 @@
         "typescript": "latest",
       },
     },
+    "servers/google-docs": {
+      "name": "@metorial-server/google-docs",
+      "version": "1.0.0",
+      "dependencies": {
+        "@metorial/mcp-server-sdk": "1.0.0",
+        "metorial": "latest",
+      },
+      "devDependencies": {
+        "typescript": "latest",
+      },
+    },
     "servers/google-drive": {
       "name": "@metorial-server/google-drive",
+      "version": "1.0.0",
+      "dependencies": {
+        "@metorial/mcp-server-sdk": "1.0.0",
+        "metorial": "latest",
+      },
+      "devDependencies": {
+        "typescript": "latest",
+      },
+    },
+    "servers/google-sheets": {
+      "name": "@metorial-server/google-sheets",
       "version": "1.0.0",
       "dependencies": {
         "@metorial/mcp-server-sdk": "1.0.0",
@@ -698,7 +720,11 @@
 
     "@metorial-server/google-calendar": ["@metorial-server/google-calendar@workspace:servers/google-calendar"],
 
+    "@metorial-server/google-docs": ["@metorial-server/google-docs@workspace:servers/google-docs"],
+
     "@metorial-server/google-drive": ["@metorial-server/google-drive@workspace:servers/google-drive"],
+
+    "@metorial-server/google-sheets": ["@metorial-server/google-sheets@workspace:servers/google-sheets"],
 
     "@metorial-server/hackernews": ["@metorial-server/hackernews@workspace:servers/hackernews"],
 
@@ -1424,9 +1450,17 @@
 
     "@metorial-server/google-calendar/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
+    "@metorial-server/google-docs/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
+    "@metorial-server/google-docs/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
     "@metorial-server/google-drive/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
     "@metorial-server/google-drive/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
+
+    "@metorial-server/google-sheets/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
+
+    "@metorial-server/google-sheets/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@metorial-server/hackernews/@metorial/mcp-server-sdk": ["@metorial/mcp-server-sdk@1.0.0", "", { "dependencies": { "@modelcontextprotocol/sdk": "^1.18.2", "zod": "3" }, "peerDependencies": { "typescript": "^5" } }, "sha512-eGM7n4f54rNFJaxlt5PjaHGEbNaeWGGDKUR62UsvBp1n6vchyDxtbky84wkuyKDaCM2fQKUUfGVo9rn4LohKyA=="],
 
