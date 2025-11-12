@@ -1,12 +1,11 @@
 FROM oven/bun:1 AS base
 WORKDIR /app
 
-# Install dependencies
-COPY package.json bun.lock* yarn.lock* ./
-RUN bun install
-
-# Copy source
+# Copy everything (simpler approach for workspace projects)
 COPY . .
+
+# Install dependencies
+RUN bun install
 
 # Build
 RUN bun ./scripts/build/src/index.ts
