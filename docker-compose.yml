@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  metorial:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://metorial:metorial_password@postgres:5432/metorial
+      - DATABASE_DIRECT_URL=postgresql://metorial:metorial_password@postgres:5432/metorial
+      - REDIS_URL=redis://redis:6379
+      - MONGODB_URL=mongodb://mongodb:27017/metorial
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NODE_ENV=production
+      - PORT=3000
+    depends_on:
+      - postgres
+      - redis
+      - mongodb
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=metorial
+      - POSTGRES_USER=metorial
+      - POSTGRES_PASSWORD=metorial_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  mongodb_data:
