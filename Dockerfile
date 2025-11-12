@@ -7,8 +7,8 @@ COPY . .
 # Install dependencies
 RUN bun install
 
-# Build
-RUN bun ./scripts/build/src/index.ts
+# Build - use yarn/bun script instead of direct execution
+RUN bun run build
 
 # Expose port
 EXPOSE 3000
