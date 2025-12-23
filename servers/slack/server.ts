@@ -109,8 +109,6 @@ metorial.createServer<Config>(
       method: string = 'GET',
       body?: Record<string, any>
     ): Promise<any> {
-      console.log(config);
-
       const url = `${SLACK_API_BASE}/${endpoint}`;
       const headers: Record<string, string> = {
         Authorization: `Bearer ${config.token}`,

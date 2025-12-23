@@ -162,8 +162,6 @@ metorial.createServer<{
   async (server, config) => {
     // Helper function to make Salesforce API calls
     async function makeSFRequest(endpoint: string, method: string = 'GET', body?: any) {
-      console.log(config);
-
       const apiVersion = 'v60.0';
       const url = `${config.instance_url}/services/data/${apiVersion}${endpoint}`;
 
