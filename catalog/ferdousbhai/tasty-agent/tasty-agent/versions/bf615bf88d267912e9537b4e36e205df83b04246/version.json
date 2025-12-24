@@ -1,0 +1,76 @@
+{
+  "serverId": "ferdousbhai/tasty-agent/tasty-agent",
+  "version": "bf615bf88d267912e9537b4e36e205df83b04246",
+  "manifest": {
+    "id": "tasty-agent",
+    "fullId": "ferdousbhai/tasty-agent/tasty-agent",
+    "repo": {
+      "provider": "github.com",
+      "owner": "ferdousbhai",
+      "repo": "tasty-agent",
+      "branch": "main",
+      "url": "https://github.com/ferdousbhai/tasty-agent"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "tasty-agent: A TastyTrade MCP Server",
+    "description": "Let Claude manage your tastytrade portfolio."
+  },
+  "manifestHash": "ae3cf8a6b6c22ed06eeb880563ee7015",
+  "createdAt": "2025-12-24T02:36:04.552Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python312",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "tasty-agent"
+        }
+      }
+    }
+  ]
+}

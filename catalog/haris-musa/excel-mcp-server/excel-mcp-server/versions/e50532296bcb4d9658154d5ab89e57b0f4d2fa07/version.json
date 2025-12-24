@@ -1,0 +1,101 @@
+{
+  "serverId": "haris-musa/excel-mcp-server/excel-mcp-server",
+  "version": "e50532296bcb4d9658154d5ab89e57b0f4d2fa07",
+  "manifest": {
+    "id": "excel-mcp-server",
+    "fullId": "haris-musa/excel-mcp-server/excel-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "haris-musa",
+      "repo": "excel-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/haris-musa/excel-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "fastmcp-port",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "FASTMCP_PORT"
+            }
+          ]
+        },
+        {
+          "title": "excel-files-path",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "EXCEL_FILES_PATH"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Excel MCP Server",
+    "description": "A Model Context Protocol (MCP) server that lets you manipulate Excel files without needing Microsoft Excel installed. Create, read, and modify Excel workbooks with your AI agent."
+  },
+  "manifestHash": "dd067e82da44b9bb234df11e7cb314da",
+  "createdAt": "2025-12-24T02:36:06.491Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python310",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "excel-mcp-server"
+        }
+      }
+    }
+  ]
+}

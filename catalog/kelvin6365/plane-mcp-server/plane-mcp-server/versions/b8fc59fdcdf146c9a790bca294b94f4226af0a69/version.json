@@ -1,0 +1,104 @@
+{
+  "serverId": "kelvin6365/plane-mcp-server/plane-mcp-server",
+  "version": "b8fc59fdcdf146c9a790bca294b94f4226af0a69",
+  "manifest": {
+    "id": "plane-mcp-server",
+    "fullId": "kelvin6365/plane-mcp-server/plane-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "kelvin6365",
+      "repo": "plane-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/kelvin6365/plane-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "plane-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PLANE_API_KEY"
+            }
+          ]
+        },
+        {
+          "title": "plane-workspace-slug",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PLANE_WORKSPACE_SLUG"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Plane MCP Server",
+    "description": "A Model Context Protocol (MCP) server that enables LLMs to interact with [Plane.so](https://plane.so), allowing them to manage projects and issues through Plane's API. Using this server, LLMs like Claude can directly interact with your project management workflows while maintaining user control and security."
+  },
+  "manifestHash": "c8f0cc9439230f66fcbce7816c642db8",
+  "createdAt": "2025-12-24T02:36:09.683Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}

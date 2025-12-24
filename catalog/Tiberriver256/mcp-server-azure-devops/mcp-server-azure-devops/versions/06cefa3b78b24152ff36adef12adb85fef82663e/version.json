@@ -1,0 +1,116 @@
+{
+  "serverId": "Tiberriver256/mcp-server-azure-devops/mcp-server-azure-devops",
+  "version": "06cefa3b78b24152ff36adef12adb85fef82663e",
+  "manifest": {
+    "id": "mcp-server-azure-devops",
+    "fullId": "Tiberriver256/mcp-server-azure-devops/mcp-server-azure-devops",
+    "repo": {
+      "provider": "github.com",
+      "owner": "Tiberriver256",
+      "repo": "mcp-server-azure-devops",
+      "branch": "main",
+      "url": "https://github.com/Tiberriver256/mcp-server-azure-devops"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "azure-devops-org-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AZURE_DEVOPS_ORG_URL"
+            }
+          ]
+        },
+        {
+          "title": "azure-devops-auth-method",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AZURE_DEVOPS_AUTH_METHOD"
+            }
+          ]
+        },
+        {
+          "title": "azure-devops-default-project",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "AZURE_DEVOPS_DEFAULT_PROJECT"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Azure DevOps MCP Server",
+    "description": "A Model Context Protocol (MCP) server implementation for Azure DevOps, allowing AI assistants to interact with Azure DevOps APIs through a standardized protocol."
+  },
+  "manifestHash": "7828d3cebd453e60f2a94fc54a9e015d",
+  "createdAt": "2025-12-24T02:36:25.939Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

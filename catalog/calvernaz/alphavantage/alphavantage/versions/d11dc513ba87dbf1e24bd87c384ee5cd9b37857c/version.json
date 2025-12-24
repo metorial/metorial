@@ -1,0 +1,88 @@
+{
+  "serverId": "calvernaz/alphavantage/alphavantage",
+  "version": "d11dc513ba87dbf1e24bd87c384ee5cd9b37857c",
+  "manifest": {
+    "id": "alphavantage",
+    "fullId": "calvernaz/alphavantage/alphavantage",
+    "repo": {
+      "provider": "github.com",
+      "owner": "calvernaz",
+      "repo": "alphavantage",
+      "branch": "main",
+      "url": "https://github.com/calvernaz/alphavantage"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "alphavantage-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ALPHAVANTAGE_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Alphavantage MCP Server",
+    "description": "A MCP server for the stock market data API, Alphavantage API."
+  },
+  "manifestHash": "c93940fa2a974e5fcb1015e5ed4e13bc",
+  "createdAt": "2025-12-24T02:36:00.680Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python312",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "alphavantage-mcp"
+        }
+      }
+    }
+  ]
+}

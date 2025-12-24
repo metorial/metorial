@@ -1,0 +1,113 @@
+{
+  "serverId": "idoru/influxdb-mcp-server/influxdb-mcp-server",
+  "version": "2695298d91cb9fcafa5fd7804e8981298a38b026",
+  "manifest": {
+    "id": "influxdb-mcp-server",
+    "fullId": "idoru/influxdb-mcp-server/influxdb-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "idoru",
+      "repo": "influxdb-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/idoru/influxdb-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "influxdb-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "INFLUXDB_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "influxdb-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "INFLUXDB_URL"
+            }
+          ]
+        },
+        {
+          "title": "influxdb-org",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "INFLUXDB_ORG"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "InfluxDB MCP Server",
+    "description": "A Model Context Protocol (MCP) server that exposes access to an InfluxDB instance using the InfluxDB OSS API v2. Mostly built with Claude Code."
+  },
+  "manifestHash": "f8a2a783a64dfc4d3d9c6ad09c684358",
+  "createdAt": "2025-12-24T02:36:07.895Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

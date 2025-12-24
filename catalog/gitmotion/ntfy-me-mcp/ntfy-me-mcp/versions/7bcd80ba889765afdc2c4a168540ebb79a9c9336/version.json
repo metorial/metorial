@@ -1,0 +1,128 @@
+{
+  "serverId": "gitmotion/ntfy-me-mcp/ntfy-me-mcp",
+  "version": "7bcd80ba889765afdc2c4a168540ebb79a9c9336",
+  "manifest": {
+    "id": "ntfy-me-mcp",
+    "fullId": "gitmotion/ntfy-me-mcp/ntfy-me-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "gitmotion",
+      "repo": "ntfy-me-mcp",
+      "branch": "main",
+      "url": "https://github.com/gitmotion/ntfy-me-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "ntfy-topic",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "NTFY_TOPIC"
+            },
+            {
+              "type": "cli",
+              "key": "-e NTFY_TOPIC"
+            }
+          ]
+        },
+        {
+          "title": "ntfy-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "NTFY_URL"
+            },
+            {
+              "type": "cli",
+              "key": "-e NTFY_URL"
+            }
+          ]
+        },
+        {
+          "title": "ntfy-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "NTFY_TOKEN"
+            },
+            {
+              "type": "cli",
+              "key": "-e NTFY_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "📤 ntfy-me-mcp",
+    "description": "An ntfy MCP server for sending/fetching ntfy notifications to your self-hosted ntfy server from AI Agents 📤 (supports secure token auth & more - use with npx or docker!)"
+  },
+  "manifestHash": "ffffeb3b12c85df386ff1e705f8737e5",
+  "createdAt": "2025-12-24T02:36:05.469Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

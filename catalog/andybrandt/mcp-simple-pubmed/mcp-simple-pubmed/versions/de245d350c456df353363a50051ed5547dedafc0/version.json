@@ -1,0 +1,102 @@
+{
+  "serverId": "andybrandt/mcp-simple-pubmed/mcp-simple-pubmed",
+  "version": "de245d350c456df353363a50051ed5547dedafc0",
+  "manifest": {
+    "id": "mcp-simple-pubmed",
+    "fullId": "andybrandt/mcp-simple-pubmed/mcp-simple-pubmed",
+    "repo": {
+      "provider": "github.com",
+      "owner": "andybrandt",
+      "repo": "mcp-simple-pubmed",
+      "branch": "master",
+      "url": "https://github.com/andybrandt/mcp-simple-pubmed"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "pubmed-email",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PUBMED_EMAIL"
+            }
+          ]
+        },
+        {
+          "title": "pubmed-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PUBMED_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "MCP Simple PubMed",
+    "description": "An MCP server that provides access to PubMed articles through the Entrez API."
+  },
+  "manifestHash": "3cf95c867774f3075bd1cc7669a9028a",
+  "createdAt": "2025-12-24T02:35:58.840Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install --upgrade build setuptools && pip install ."
+            ],
+            "onlyIncludeFiles": [
+              "pyproject.toml"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/pip"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "mcp-simple-pubmed"
+        }
+      }
+    }
+  ]
+}

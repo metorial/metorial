@@ -1,0 +1,128 @@
+{
+  "serverId": "ravenwits/mcp-server-arangodb/mcp-server-arangodb",
+  "version": "bc061e172c830b5498e1a0163b4284b7dd9a87f1",
+  "manifest": {
+    "id": "mcp-server-arangodb",
+    "fullId": "ravenwits/mcp-server-arangodb/mcp-server-arangodb",
+    "repo": {
+      "provider": "github.com",
+      "owner": "ravenwits",
+      "repo": "mcp-server-arangodb",
+      "branch": "main",
+      "url": "https://github.com/ravenwits/mcp-server-arangodb"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "arango-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ARANGO_URL"
+            }
+          ]
+        },
+        {
+          "title": "arango-db",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ARANGO_DB"
+            }
+          ]
+        },
+        {
+          "title": "arango-username",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ARANGO_USERNAME"
+            }
+          ]
+        },
+        {
+          "title": "arango-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ARANGO_PASSWORD"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "MCP Server for ArangoDB",
+    "description": "A Model Context Protocol server for ArangoDB"
+  },
+  "manifestHash": "224b6ffaff32f7aeddc82f9fb6ee4b0c",
+  "createdAt": "2025-12-24T02:36:22.877Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

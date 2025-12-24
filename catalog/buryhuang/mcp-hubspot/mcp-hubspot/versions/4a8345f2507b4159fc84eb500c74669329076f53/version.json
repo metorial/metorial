@@ -1,0 +1,90 @@
+{
+  "serverId": "buryhuang/mcp-hubspot/mcp-hubspot",
+  "version": "4a8345f2507b4159fc84eb500c74669329076f53",
+  "manifest": {
+    "id": "mcp-hubspot",
+    "fullId": "buryhuang/mcp-hubspot/mcp-hubspot",
+    "repo": {
+      "provider": "github.com",
+      "owner": "buryhuang",
+      "repo": "mcp-hubspot",
+      "branch": "main",
+      "url": "https://github.com/buryhuang/mcp-hubspot"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "hubspot-access-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "HUBSPOT_ACCESS_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "HubSpot MCP Server",
+    "description": "A Model Context Protocol (MCP) server implementation that provides integration with HubSpot CRM. This server enables AI models to interact with HubSpot data and operations through a standardized interface."
+  },
+  "manifestHash": "767432ffdfe990d24dbdf523f3b72747",
+  "createdAt": "2025-12-24T02:36:00.527Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python,poetry",
+          "NIXPACKS_POETRY_VERSION": "1.3.1",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install poetry==$NIXPACKS_POETRY_VERSION && poetry install --no-dev --no-interaction --no-ansi"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/pip"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "mcp-server-hubspot"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "serverId": "executeautomation/mcp-playwright/mcp-playwright",
+  "version": "2349c2891e7c499c8c07b7d78c7f3fb4c797a1da",
+  "manifest": {
+    "id": "mcp-playwright",
+    "fullId": "executeautomation/mcp-playwright/mcp-playwright",
+    "repo": {
+      "provider": "github.com",
+      "owner": "executeautomation",
+      "repo": "mcp-playwright",
+      "branch": "main",
+      "url": "https://github.com/executeautomation/mcp-playwright"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Playwright MCP Server 🎭",
+    "description": "A Model Context Protocol server that provides browser automation capabilities using Playwright. This server enables LLMs to interact with web pages, take screenshots, generate test code, web scraps the page and execute JavaScript in a real browser environment."
+  },
+  "manifestHash": "2d6af416ac8d154b9dbce1e1ec56c877",
+  "createdAt": "2025-12-24T02:36:05.145Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "serverId": "pab1it0/chess-mcp/chess-mcp",
+  "version": "e935261145496dc16f8b597c9b300eef9e76c77c",
+  "manifest": {
+    "id": "chess-mcp",
+    "fullId": "pab1it0/chess-mcp/chess-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "pab1it0",
+      "repo": "chess-mcp",
+      "branch": "main",
+      "url": "https://github.com/pab1it0/chess-mcp"
+    },
+    "config": {
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Chess.com MCP Server",
+    "description": "An MCP server for Chess.com's Published Data API."
+  },
+  "manifestHash": "c6b5318aa352de8a6ac1280ed958e2b5",
+  "createdAt": "2025-12-24T02:36:21.457Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python310",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "chess-mcp"
+        }
+      }
+    }
+  ]
+}

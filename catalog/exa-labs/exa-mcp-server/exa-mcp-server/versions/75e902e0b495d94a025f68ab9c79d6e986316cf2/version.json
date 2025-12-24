@@ -1,0 +1,92 @@
+{
+  "serverId": "exa-labs/exa-mcp-server/exa-mcp-server",
+  "version": "75e902e0b495d94a025f68ab9c79d6e986316cf2",
+  "manifest": {
+    "id": "exa-mcp-server",
+    "fullId": "exa-labs/exa-mcp-server/exa-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "exa-labs",
+      "repo": "exa-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/exa-labs/exa-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "exa-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "EXA_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Exa MCP Server",
+    "description": "A Model Context Protocol (MCP) server lets AI assistants like Claude use the Exa AI Search API for web searches. This setup allows AI models to get real-time web information in a safe and controlled way."
+  },
+  "manifestHash": "a741804bcc883c73fc324ded5256ac83",
+  "createdAt": "2025-12-24T02:36:04.136Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "node .smithery/stdio/index.cjs"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "serverId": "heroku/heroku-mcp-server/heroku-mcp-server",
+  "version": "1abde73795c9a4052164bf11bda4f3c10a0bc869",
+  "manifest": {
+    "id": "heroku-mcp-server",
+    "fullId": "heroku/heroku-mcp-server/heroku-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "heroku",
+      "repo": "heroku-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/heroku/heroku-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "heroku-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "HEROKU_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Heroku MCP Server",
+    "description": "> The Heroku Platform MCP Server works on Common Runtime, Cedar Private and Shield Spaces, and Fir Private Spaces."
+  },
+  "manifestHash": "9be158f48d113b593da6743d09cd5976",
+  "createdAt": "2025-12-24T02:36:06.982Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "heroku mcp:start"
+        }
+      }
+    }
+  ]
+}

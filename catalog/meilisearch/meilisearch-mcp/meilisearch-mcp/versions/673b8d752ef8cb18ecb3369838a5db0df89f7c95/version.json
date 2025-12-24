@@ -1,0 +1,110 @@
+{
+  "serverId": "meilisearch/meilisearch-mcp/meilisearch-mcp",
+  "version": "673b8d752ef8cb18ecb3369838a5db0df89f7c95",
+  "manifest": {
+    "id": "meilisearch-mcp",
+    "fullId": "meilisearch/meilisearch-mcp/meilisearch-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "meilisearch",
+      "repo": "meilisearch-mcp",
+      "branch": "main",
+      "url": "https://github.com/meilisearch/meilisearch-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "Meilisearch HTTP Address",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MEILI_HTTP_ADDR"
+            }
+          ]
+        },
+        {
+          "title": "Meilisearch Master Key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MEILI_MASTER_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Meilisearch MCP Server",
+    "description": "A Model Context Protocol (MCP) server for interacting with Meilisearch through LLM interfaces like Claude.",
+    "build": {
+      "startCommand": "python -m src.meilisearch_mcp",
+      "installCommand": "uv venv && uv pip install -e .",
+      "nixPackages": [
+        "uv"
+      ]
+    }
+  },
+  "manifestHash": "ed504219d16596b84885335486feed76",
+  "createdAt": "2025-12-24T02:36:11.581Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "uv venv && uv pip install -e ."
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "uv",
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87",
+            "aptPkgs": []
+          }
+        },
+        "start": {
+          "cmd": "python -m src.meilisearch_mcp"
+        }
+      }
+    }
+  ]
+}

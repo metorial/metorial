@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--mem0ai--mem0-mcp--mem-0-mcp
 ```bash
 docker run -i --rm \ 
 -e MEM0_API_KEY=mem-0-api-key \
-ghcr.io/metorial/mcp-container--mem0ai--mem0-mcp--mem-0-mcp  "python main.py"
+ghcr.io/metorial/mcp-container--mem0ai--mem0-mcp--mem-0-mcp  "mem0-mcp-server"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -59,7 +59,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--mem0ai--mem0-mcp--mem-0-mcp",
-        "python main.py"
+        "mem0-mcp-server"
       ],
       "env": {
         "MEM0_API_KEY": "mem-0-api-key"

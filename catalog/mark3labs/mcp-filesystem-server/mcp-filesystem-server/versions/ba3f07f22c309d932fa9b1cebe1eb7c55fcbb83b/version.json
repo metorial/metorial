@@ -1,0 +1,73 @@
+{
+  "serverId": "mark3labs/mcp-filesystem-server/mcp-filesystem-server",
+  "version": "ba3f07f22c309d932fa9b1cebe1eb7c55fcbb83b",
+  "manifest": {
+    "id": "mcp-filesystem-server",
+    "fullId": "mark3labs/mcp-filesystem-server/mcp-filesystem-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "mark3labs",
+      "repo": "mcp-filesystem-server",
+      "branch": "main",
+      "url": "https://github.com/mark3labs/mcp-filesystem-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Filesystem MCP Server",
+    "description": "Go server implementing Model Context Protocol (MCP) for filesystem operations."
+  },
+  "manifestHash": "e951e465332b39096614f3825aceb78e",
+  "createdAt": "2025-12-24T02:36:11.500Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}

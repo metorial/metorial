@@ -1,0 +1,98 @@
+{
+  "serverId": "oschina/mcp-gitee/mcp-gitee",
+  "version": "d5d73c227eae4779848d78673e02cb7591e38680",
+  "manifest": {
+    "id": "mcp-gitee",
+    "fullId": "oschina/mcp-gitee/mcp-gitee",
+    "repo": {
+      "provider": "github.com",
+      "owner": "oschina",
+      "repo": "mcp-gitee",
+      "branch": "master",
+      "url": "https://github.com/oschina/mcp-gitee"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "gitee-api-base",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GITEE_API_BASE"
+            }
+          ]
+        },
+        {
+          "title": "gitee-access-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GITEE_ACCESS_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Gitee MCP Server",
+    "description": "Gitee MCP Server is a Model Context Protocol (MCP) server implementation for Gitee. It provides a set of tools for interacting with Gitee's API, allowing AI assistants to manage repositories, issues, pull requests, and more."
+  },
+  "manifestHash": "03e8864a125861aca886fc8afbd5a017",
+  "createdAt": "2025-12-24T02:36:21.035Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}

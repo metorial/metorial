@@ -1,0 +1,122 @@
+{
+  "serverId": "silenceper/mcp-k8s/mcp-k-8-s",
+  "version": "af58d10a936b1cb4e0250fa0433c99d06b692d77",
+  "manifest": {
+    "id": "mcp-k-8-s",
+    "fullId": "silenceper/mcp-k8s/mcp-k-8-s",
+    "repo": {
+      "provider": "github.com",
+      "owner": "silenceper",
+      "repo": "mcp-k8s",
+      "branch": "main",
+      "url": "https://github.com/silenceper/mcp-k8s"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "kubeconfig",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--kubeconfig"
+            }
+          ]
+        },
+        {
+          "title": "enable-create",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--enable-create"
+            }
+          ]
+        },
+        {
+          "title": "enable-update",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--enable-update"
+            }
+          ]
+        },
+        {
+          "title": "enable-delete",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--enable-delete"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "mcp-k8s",
+    "description": "A Kubernetes MCP (Model Control Protocol) server that enables interaction with Kubernetes clusters through MCP tools."
+  },
+  "manifestHash": "04624c2a352bddff5781d1b5c33fa82e",
+  "createdAt": "2025-12-24T02:36:24.194Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out ./cmd/mcp-k8s"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}
