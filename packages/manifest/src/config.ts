@@ -16,27 +16,27 @@ export interface ConfigValueField {
 
 export let buildConfig = (d: {
   cliArguments:
-    | {
-        template: string;
-        keys: {
-          key: string;
-          required?: boolean;
-        }[];
-      }
-    | {
-        arguments: {
-          key: string;
-          required?: boolean;
-        }[];
-      }
-    | null;
+  | {
+    template: string;
+    keys: {
+      key: string;
+      required?: boolean;
+    }[];
+  }
+  | {
+    arguments: {
+      key: string;
+      required?: boolean;
+    }[];
+  }
+  | null;
   environmentVariables:
-    | {
-        key: string;
-        required?: boolean;
-        environmentVariable?: string;
-      }[]
-    | null;
+  | {
+    key: string;
+    required?: boolean;
+    environmentVariable?: string;
+  }[]
+  | null;
   files: string[];
 }) => {
   let configs = new Map<string, ConfigValue>();
@@ -60,26 +60,12 @@ export let buildConfig = (d: {
   let getConfigValue = (key: string, opts?: { required?: boolean }) => {
     let normalizedKey = Cases.toKebabCase(key);
 
-    for (let k of configs.keys()) {
-      if (k.includes(normalizedKey) || normalizedKey.includes(k)) {
-        normalizedKey = k;
-        break;
-      }
+    let configValue = configs.get(normalizedKey);
+    if (!configValue) {
+      throw new Error(`Unknown config key: ${key}`);
     }
 
-    let configValue = configs.get(normalizedKey);
-    if (configValue) return [normalizedKey, configValue] as const;
-
-    return [
-      normalizedKey,
-      {
-        title: normalizedKey,
-        description: null,
-        default: null,
-        required: !!opts?.required,
-        fields: []
-      } satisfies ConfigValue
-    ] as const;
+    return [normalizedKey, configValue] as const;
   };
 
   if (d.environmentVariables) {
