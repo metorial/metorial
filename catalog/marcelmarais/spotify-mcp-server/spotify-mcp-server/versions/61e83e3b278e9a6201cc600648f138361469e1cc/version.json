@@ -1,0 +1,79 @@
+{
+  "serverId": "marcelmarais/spotify-mcp-server/spotify-mcp-server",
+  "version": "61e83e3b278e9a6201cc600648f138361469e1cc",
+  "manifest": {
+    "id": "spotify-mcp-server",
+    "fullId": "marcelmarais/spotify-mcp-server/spotify-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "marcelmarais",
+      "repo": "spotify-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/marcelmarais/spotify-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Spotify MCP Server",
+    "description": "A lightweight Model Context Protocol (MCP) server that enables AI assistants like Cursor & Claude to control Spotify playback and manage playlists."
+  },
+  "manifestHash": "ac8473ed83c51f1abc6697c4f40935fe",
+  "createdAt": "2025-12-27T23:04:04.092Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./build/index.js"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "serverId": "nwiizo/tfmcp/tfmcp",
+  "version": "bc04ab797fb7154dbf2707f76404bc565ad2cbcc",
+  "manifest": {
+    "id": "tfmcp",
+    "fullId": "nwiizo/tfmcp/tfmcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "nwiizo",
+      "repo": "tfmcp",
+      "branch": "main",
+      "url": "https://github.com/nwiizo/tfmcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "terraform-dir",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TERRAFORM_DIR"
+            },
+            {
+              "type": "cli",
+              "key": "--dir"
+            }
+          ]
+        },
+        {
+          "title": "tfmcp-log-level",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TFMCP_LOG_LEVEL"
+            }
+          ]
+        },
+        {
+          "title": "tfmcp-demo-mode",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TFMCP_DEMO_MODE"
+            }
+          ]
+        },
+        {
+          "title": "path",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--path"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "tfmcp: Terraform Model Context Protocol Tool",
+    "description": "🌍 Terraform Model Context Protocol (MCP) Tool - An experimental CLI tool that enables AI assistants to manage and operate Terraform environments."
+  },
+  "manifestHash": "3f88783b30a11a4cc58fdc87934aedc4",
+  "createdAt": "2025-12-27T23:04:13.656Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "rust",
+          "ROCKET_ADDRESS": "0.0.0.0"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "mkdir -p bin",
+              "cargo build --release",
+              "cp target/release/tfmcp bin"
+            ],
+            "cacheDirectories": [
+              "/root/.cargo/git",
+              "/root/.cargo/registry",
+              "target"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "binutils",
+              "gcc",
+              "(rust-bin.fromRustupToolchainFile ../rust-toolchain.toml)"
+            ],
+            "nixOverlays": [
+              "https://github.com/oxalica/rust-overlay/archive/master.tar.gz"
+            ],
+            "nixpkgsArchive": "ef56e777fedaa4da8c66a150081523c5de1e0171",
+            "onlyIncludeFiles": [
+              "rust-toolchain.toml"
+            ]
+          }
+        },
+        "start": {
+          "cmd": "./bin/tfmcp"
+        }
+      }
+    }
+  ]
+}

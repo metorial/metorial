@@ -1,0 +1,104 @@
+{
+  "serverId": "XeroAPI/xero-mcp-server/xero-mcp-server",
+  "version": "52668c04af58a42caf2cc1587168bf1867d365cd",
+  "manifest": {
+    "id": "xero-mcp-server",
+    "fullId": "XeroAPI/xero-mcp-server/xero-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "XeroAPI",
+      "repo": "xero-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/XeroAPI/xero-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "xero-client-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "XERO_CLIENT_ID"
+            }
+          ]
+        },
+        {
+          "title": "xero-client-secret",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "XERO_CLIENT_SECRET"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Xero MCP Server",
+    "description": "This is a Model Context Protocol (MCP) server implementation for Xero. It provides a bridge between the MCP protocol and Xero's API, allowing for standardized access to Xero's accounting and business features."
+  },
+  "manifestHash": "844158e364a74e5b28ec7cfd12aa6ded",
+  "createdAt": "2025-12-27T23:04:21.378Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./dist/index.js"
+        }
+      }
+    }
+  ]
+}

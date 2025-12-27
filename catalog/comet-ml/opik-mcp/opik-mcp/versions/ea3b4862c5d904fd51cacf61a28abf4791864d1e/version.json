@@ -1,0 +1,119 @@
+{
+  "serverId": "comet-ml/opik-mcp/opik-mcp",
+  "version": "ea3b4862c5d904fd51cacf61a28abf4791864d1e",
+  "manifest": {
+    "id": "opik-mcp",
+    "fullId": "comet-ml/opik-mcp/opik-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "comet-ml",
+      "repo": "opik-mcp",
+      "branch": "main",
+      "url": "https://github.com/comet-ml/opik-mcp"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "opik-api-base-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OPIK_API_BASE_URL"
+            }
+          ]
+        },
+        {
+          "title": "opik-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OPIK_API_KEY"
+            }
+          ]
+        },
+        {
+          "title": "opik-workspace-name",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OPIK_WORKSPACE_NAME"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Opik MCP Server",
+    "description": "Opik MCP Server is an open-source implementation of the Model Context Protocol for the Opik platform. It provides a unified interface for interacting with Opik's capabilities, supporting multiple transport mechanisms for flexible integration into various environments."
+  },
+  "manifestHash": "6b9f1866fdde5cf750b694757cbabfe0",
+  "createdAt": "2025-12-27T23:03:54.355Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-8_x"
+            ],
+            "nixLibs": [
+              "libuuid",
+              "libGL"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

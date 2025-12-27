@@ -1,0 +1,101 @@
+{
+  "serverId": "kagisearch/kagimcp/kagimcp",
+  "version": "ccda73ef9344a85d4ea3476fd3802539ba5fe832",
+  "manifest": {
+    "id": "kagimcp",
+    "fullId": "kagisearch/kagimcp/kagimcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "kagisearch",
+      "repo": "kagimcp",
+      "branch": "main",
+      "url": "https://github.com/kagisearch/kagimcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "kagi-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "KAGI_API_KEY"
+            }
+          ]
+        },
+        {
+          "title": "kagi-summarizer-engine",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "KAGI_SUMMARIZER_ENGINE"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Kagi MCP server",
+    "description": "A Model Context Protocol (MCP) server for Kagi search & other tools."
+  },
+  "manifestHash": "8c1b240c86b0d78b828df2afe0f48f1b",
+  "createdAt": "2025-12-27T23:04:02.245Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "kagimcp"
+        }
+      }
+    }
+  ]
+}

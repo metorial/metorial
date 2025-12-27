@@ -1,0 +1,128 @@
+{
+  "serverId": "r-huijts/strava-mcp/strava-mcp",
+  "version": "b6590f4ec82b5d95bf72b293e24d13a8662a25f5",
+  "manifest": {
+    "id": "strava-mcp",
+    "fullId": "r-huijts/strava-mcp/strava-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "r-huijts",
+      "repo": "strava-mcp",
+      "branch": "main",
+      "url": "https://github.com/r-huijts/strava-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "STRAVA_CLIENT_ID",
+          "description": "Your Strava client ID.",
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "STRAVA_CLIENT_ID"
+            }
+          ]
+        },
+        {
+          "title": "STRAVA_CLIENT_SECRET",
+          "description": "Your Strava client secret.",
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "STRAVA_CLIENT_SECRET"
+            }
+          ]
+        },
+        {
+          "title": "STRAVA_ACCESS_TOKEN",
+          "description": "Your generated access token.",
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "STRAVA_ACCESS_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "STRAVA_REFRESH_TOKEN",
+          "description": "Your generated refresh token.",
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "STRAVA_REFRESH_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Strava MCP Server",
+    "description": "This project implements a Model Context Protocol (MCP) server in TypeScript that acts as a bridge to the Strava API. It exposes Strava data and functionalities as \"tools\" that Large Language Models (LLMs) can utilize through the MCP standard."
+  },
+  "manifestHash": "6d2a2ba168d737ae23581fa7d07d3b51",
+  "createdAt": "2025-12-27T23:04:16.091Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

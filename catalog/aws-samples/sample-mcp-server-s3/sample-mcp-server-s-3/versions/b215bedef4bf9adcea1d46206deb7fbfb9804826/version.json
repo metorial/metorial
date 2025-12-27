@@ -1,0 +1,75 @@
+{
+  "serverId": "aws-samples/sample-mcp-server-s3/sample-mcp-server-s-3",
+  "version": "b215bedef4bf9adcea1d46206deb7fbfb9804826",
+  "manifest": {
+    "id": "sample-mcp-server-s-3",
+    "fullId": "aws-samples/sample-mcp-server-s3/sample-mcp-server-s-3",
+    "repo": {
+      "provider": "github.com",
+      "owner": "aws-samples",
+      "repo": "sample-mcp-server-s3",
+      "branch": "main",
+      "url": "https://github.com/aws-samples/sample-mcp-server-s3"
+    },
+    "config": {
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "S3 Model Context Protocol Server",
+    "description": "An MCP server implementation for retrieving  data such as PDF's from S3."
+  },
+  "manifestHash": "8366b51db797b5692aa6f8f1c6b6ab58",
+  "createdAt": "2025-12-27T23:03:51.728Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python312",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "s3-mcp-server"
+        }
+      }
+    }
+  ]
+}
