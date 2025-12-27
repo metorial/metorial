@@ -1,0 +1,103 @@
+{
+  "serverId": "PaddleHQ/paddle-mcp-server/paddle-mcp-server",
+  "version": "c24af5f6454a7545bd485fc71022ac4cbb050830",
+  "manifest": {
+    "id": "paddle-mcp-server",
+    "fullId": "PaddleHQ/paddle-mcp-server/paddle-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "PaddleHQ",
+      "repo": "paddle-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/PaddleHQ/paddle-mcp-server"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "paddle-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--api-key"
+            }
+          ]
+        },
+        {
+          "title": "paddle-environment",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--environment"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Paddle MCP Server",
+    "description": "This is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server that provides tools for interacting with the Paddle API."
+  },
+  "manifestHash": "63f1c184c3c97932d841efe3422502b7",
+  "createdAt": "2025-12-27T23:04:14.626Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "pnpm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./build/index.js"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "serverId": "yuna0x0/anilist-mcp/anilist-mcp",
+  "version": "2365b16793c573fc6c3443982846f8cb34aedde6",
+  "manifest": {
+    "id": "anilist-mcp",
+    "fullId": "yuna0x0/anilist-mcp/anilist-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "yuna0x0",
+      "repo": "anilist-mcp",
+      "branch": "main",
+      "url": "https://github.com/yuna0x0/anilist-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "anilist-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ANILIST_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "AniList MCP Server",
+    "description": "A Model Context Protocol (MCP) server that interfaces with the AniList API, allowing LLM clients to access and interact with anime, manga, character, staff, and user data from AniList."
+  },
+  "manifestHash": "5f816f28ebb9b263841090d1e651a8de",
+  "createdAt": "2025-12-27T23:04:22.065Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "pnpm-10_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "pnpm run start"
+        }
+      }
+    }
+  ]
+}

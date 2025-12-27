@@ -1,0 +1,76 @@
+{
+  "serverId": "microsoft/playwright-mcp/playwright-mcp",
+  "version": "c806df7b13a667f57385c0dd245eda73c64ef2bd",
+  "manifest": {
+    "id": "playwright-mcp",
+    "fullId": "microsoft/playwright-mcp/playwright-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "microsoft",
+      "repo": "playwright-mcp",
+      "branch": "main",
+      "url": "https://github.com/microsoft/playwright-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Playwright MCP Server",
+    "description": "A Model Context Protocol (MCP) server that provides browser automation capabilities using [Playwright](https://playwright.dev). This server enables LLMs to interact with web pages through structured accessibility snapshots, bypassing the need for screenshots or visually-tuned models."
+  },
+  "manifestHash": "67486d52de380e0c8ecf0da82cb7d332",
+  "createdAt": "2025-12-27T23:04:05.142Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "node cli.js"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,128 @@
+{
+  "serverId": "f4ww4z/mcp-mysql-server/mcp-mysql-server",
+  "version": "9e0a7df0cb5d1edaa0017ae555ae10aa4e69ce0c",
+  "manifest": {
+    "id": "mcp-mysql-server",
+    "fullId": "f4ww4z/mcp-mysql-server/mcp-mysql-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "f4ww4z",
+      "repo": "mcp-mysql-server",
+      "branch": "main",
+      "url": "https://github.com/f4ww4z/mcp-mysql-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "mysql-host",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MYSQL_HOST"
+            }
+          ]
+        },
+        {
+          "title": "mysql-user",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MYSQL_USER"
+            }
+          ]
+        },
+        {
+          "title": "mysql-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MYSQL_PASSWORD"
+            }
+          ]
+        },
+        {
+          "title": "mysql-database",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MYSQL_DATABASE"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "@f4ww4z/mcp-mysql-server",
+    "description": "A Model Context Protocol server that provides MySQL database operations. This server enables AI models to interact with MySQL databases through a standardized interface."
+  },
+  "manifestHash": "b222a5559d0d2322936c80c41e9dfcd7",
+  "createdAt": "2025-12-27T23:03:56.108Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./build/index.js"
+        }
+      }
+    }
+  ]
+}

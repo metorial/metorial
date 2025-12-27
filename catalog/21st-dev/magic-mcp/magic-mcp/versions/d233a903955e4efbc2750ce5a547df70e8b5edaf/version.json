@@ -1,0 +1,91 @@
+{
+  "serverId": "21st-dev/magic-mcp/magic-mcp",
+  "version": "d233a903955e4efbc2750ce5a547df70e8b5edaf",
+  "manifest": {
+    "id": "magic-mcp",
+    "fullId": "21st-dev/magic-mcp/magic-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "21st-dev",
+      "repo": "magic-mcp",
+      "branch": "main",
+      "url": "https://github.com/21st-dev/magic-mcp"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--api-key"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "21st.dev Magic AI Agent MCP Server",
+    "description": "Magic Component Platform (MCP) is a powerful AI-driven tool that helps developers create beautiful, modern UI components instantly through natural language descriptions. It integrates seamlessly with popular IDEs and provides a streamlined workflow for UI development."
+  },
+  "manifestHash": "8cfe781f17dc53eda64621b5e1efc55f",
+  "createdAt": "2025-12-27T23:03:50.431Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

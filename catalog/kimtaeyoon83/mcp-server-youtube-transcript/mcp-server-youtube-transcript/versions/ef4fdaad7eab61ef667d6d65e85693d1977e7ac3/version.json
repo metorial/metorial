@@ -1,0 +1,79 @@
+{
+  "serverId": "kimtaeyoon83/mcp-server-youtube-transcript/mcp-server-youtube-transcript",
+  "version": "ef4fdaad7eab61ef667d6d65e85693d1977e7ac3",
+  "manifest": {
+    "id": "mcp-server-youtube-transcript",
+    "fullId": "kimtaeyoon83/mcp-server-youtube-transcript/mcp-server-youtube-transcript",
+    "repo": {
+      "provider": "github.com",
+      "owner": "kimtaeyoon83",
+      "repo": "mcp-server-youtube-transcript",
+      "branch": "main",
+      "url": "https://github.com/kimtaeyoon83/mcp-server-youtube-transcript"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "YouTube Transcript Server",
+    "description": "A Model Context Protocol server that enables retrieval of transcripts from YouTube videos. This server provides direct access to video captions and subtitles through a simple interface."
+  },
+  "manifestHash": "3a1188ff64fb815af53be38f35679ff9",
+  "createdAt": "2025-12-27T23:04:02.603Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}

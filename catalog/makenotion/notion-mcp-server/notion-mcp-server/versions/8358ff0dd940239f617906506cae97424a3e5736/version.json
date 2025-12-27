@@ -1,0 +1,92 @@
+{
+  "serverId": "makenotion/notion-mcp-server/notion-mcp-server",
+  "version": "8358ff0dd940239f617906506cae97424a3e5736",
+  "manifest": {
+    "id": "notion-mcp-server",
+    "fullId": "makenotion/notion-mcp-server/notion-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "makenotion",
+      "repo": "notion-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/makenotion/notion-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "openapi-mcp-headers",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OPENAPI_MCP_HEADERS"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Notion MCP Server",
+    "description": "This project implements an [MCP server](https://spec.modelcontextprotocol.io/) for the [Notion API](https://developers.notion.com/reference/intro)."
+  },
+  "manifestHash": "65e4834fe48c34a390e5629b987dee7f",
+  "createdAt": "2025-12-27T23:04:04.362Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node bin/cli.mjs"
+        }
+      }
+    }
+  ]
+}

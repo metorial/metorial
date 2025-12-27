@@ -1,0 +1,98 @@
+{
+  "serverId": "neondatabase/mcp-server-neon/mcp-server-neon",
+  "version": "7c8b29898a0f149b66338c50efb3de8dac30d9e7",
+  "manifest": {
+    "id": "mcp-server-neon",
+    "fullId": "neondatabase/mcp-server-neon/mcp-server-neon",
+    "repo": {
+      "provider": "github.com",
+      "owner": "neondatabase",
+      "repo": "mcp-server-neon",
+      "branch": "main",
+      "url": "https://github.com/neondatabase/mcp-server-neon"
+    },
+    "config": {
+      "argumentsTemplate": "{{NEON_API_KEY}}",
+      "configValues": [
+        {
+          "title": "neon-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "{{NEON_API_KEY}}"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Neon MCP Server",
+    "description": "**Neon MCP Server** is an open-source tool that lets you interact with your Neon Postgres databases in **natural language**."
+  },
+  "manifestHash": "36557d97f408e3397f69b5efb033dbdc",
+  "createdAt": "2025-12-27T23:04:13.628Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "bun run build"
+            ],
+            "cacheDirectories": [
+              ".next/cache",
+              "landing/.next/cache",
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.bun"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "bun",
+              "openssl"
+            ],
+            "nixLibs": [
+              "gcc-unwrapped"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "31fb21469e34b6b5c7be77b9a35bae43d0c598e9"
+          }
+        },
+        "start": {
+          "cmd": "bun run start"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "serverId": "confluentinc/mcp-confluent/mcp-confluent",
+  "version": "953f0275407de54f82e4b372a6aa6f8663dacc41",
+  "manifest": {
+    "id": "mcp-confluent",
+    "fullId": "confluentinc/mcp-confluent/mcp-confluent",
+    "repo": {
+      "provider": "github.com",
+      "owner": "confluentinc",
+      "repo": "mcp-confluent",
+      "branch": "main",
+      "url": "https://github.com/confluentinc/mcp-confluent"
+    },
+    "config": {
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "mcp-confluent",
+    "description": "An MCP server implementation that enables AI assistants to interact with Confluent Kafka and Confluent Cloud REST APIs. This server allows AI tools like Claude Desktop and Goose CLI to manage Kafka topics, connectors, and Flink SQL statements through natural language interactions."
+  },
+  "manifestHash": "011d5a5cbdfa4771ea846f197afd7f0c",
+  "createdAt": "2025-12-27T23:03:57.836Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

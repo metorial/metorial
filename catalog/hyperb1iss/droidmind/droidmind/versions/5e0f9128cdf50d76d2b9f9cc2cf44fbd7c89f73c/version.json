@@ -1,0 +1,76 @@
+{
+  "serverId": "hyperb1iss/droidmind/droidmind",
+  "version": "5e0f9128cdf50d76d2b9f9cc2cf44fbd7c89f73c",
+  "manifest": {
+    "id": "droidmind",
+    "fullId": "hyperb1iss/droidmind/droidmind",
+    "repo": {
+      "provider": "github.com",
+      "owner": "hyperb1iss",
+      "repo": "droidmind",
+      "branch": "main",
+      "url": "https://github.com/hyperb1iss/droidmind"
+    },
+    "config": {
+      "argumentsTemplate": "--transport stdio",
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "✨ DroidMind 🤖",
+    "description": "Control your Android devices with AI using Model Context Protocol"
+  },
+  "manifestHash": "0bca3efbfa8b191ba3fa36c7d81427c2",
+  "createdAt": "2025-12-27T23:04:00.431Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "droidmind"
+        }
+      }
+    }
+  ]
+}

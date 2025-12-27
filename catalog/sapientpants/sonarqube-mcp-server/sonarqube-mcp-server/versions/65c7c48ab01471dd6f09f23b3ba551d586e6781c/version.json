@@ -1,0 +1,71 @@
+{
+  "serverId": "sapientpants/sonarqube-mcp-server/sonarqube-mcp-server",
+  "version": "65c7c48ab01471dd6f09f23b3ba551d586e6781c",
+  "manifest": {
+    "id": "sonarqube-mcp-server",
+    "fullId": "sapientpants/sonarqube-mcp-server/sonarqube-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "sapientpants",
+      "repo": "sonarqube-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/sapientpants/sonarqube-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "sonarqube-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SONARQUBE_URL"
+            }
+          ]
+        },
+        {
+          "title": "sonarqube-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SONARQUBE_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "sonarqube-organization",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SONARQUBE_ORGANIZATION"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "SonarQube MCP Server",
+    "description": "A Model Context Protocol (MCP) server that integrates with SonarQube to provide AI assistants with access to code quality metrics, issues, and analysis results."
+  },
+  "manifestHash": "41f605e7f5a72acbbb316a3f30316c92",
+  "createdAt": "2025-12-27T23:04:17.863Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "phases": {}
+      }
+    }
+  ]
+}

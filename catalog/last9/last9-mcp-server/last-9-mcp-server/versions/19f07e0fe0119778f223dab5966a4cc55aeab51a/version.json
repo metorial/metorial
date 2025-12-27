@@ -1,0 +1,110 @@
+{
+  "serverId": "last9/last9-mcp-server/last-9-mcp-server",
+  "version": "19f07e0fe0119778f223dab5966a4cc55aeab51a",
+  "manifest": {
+    "id": "last-9-mcp-server",
+    "fullId": "last9/last9-mcp-server/last-9-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "last9",
+      "repo": "last9-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/last9/last9-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "last-9-auth-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "LAST9_AUTH_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "last-9-base-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "LAST9_BASE_URL"
+            }
+          ]
+        },
+        {
+          "title": "last-9-refresh-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "LAST9_REFRESH_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Last9 MCP Server",
+    "description": "A [Model Context Protocol](https://modelcontextprotocol.io/) server implementation for [Last9](https://last9.io/mcp/) that enables AI agents to seamlessly bring real-time production context — logs, metrics, and traces — into your local environment to auto-fix code faster."
+  },
+  "manifestHash": "97eada335c82d48e080561de04b10eb5",
+  "createdAt": "2025-12-27T23:04:04.141Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "node ./bin/cli.js",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}
