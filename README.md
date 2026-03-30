@@ -27,6 +27,10 @@ Metorial abstracts away the complexities of MCP and offers a simple, unified int
 * **🕊️ Self-hosting**: Metorial's source code is hosted on GitHub and you can self-host it.
 * **👩‍💻 Built for developers**: Metorial isn't built for end users, but for developers who need high quality tooling, monitoring, and customization options to build agentic AI applications.
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/metorial-metorial).
+
 ## SDKs
 
 Metorial currently provides SDKs for the following languages:
