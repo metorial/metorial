@@ -1,0 +1,116 @@
+{
+  "serverId": "KS-GEN-AI/confluence-mcp-server/confluence-mcp-server",
+  "version": "6d3bd59db4c3683ff69d9accc3d8df6163f48186",
+  "manifest": {
+    "id": "confluence-mcp-server",
+    "fullId": "KS-GEN-AI/confluence-mcp-server/confluence-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "KS-GEN-AI",
+      "repo": "confluence-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/KS-GEN-AI/confluence-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "confluence-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "CONFLUENCE_URL"
+            }
+          ]
+        },
+        {
+          "title": "confluence-api-mail",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "CONFLUENCE_API_MAIL"
+            }
+          ]
+        },
+        {
+          "title": "confluence-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "CONFLUENCE_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Confluence Communication Server MCP Server",
+    "description": "Interact with Confluence"
+  },
+  "manifestHash": "1211a8b4595b6865c2ebb6ad60c88c45",
+  "createdAt": "2026-05-19T22:27:31.184Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./build/index.js"
+        }
+      }
+    }
+  ]
+}

@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--tavily-ai--tavily-mcp--tavily-mcp
 ```bash
 docker run -i --rm \ 
 -e TAVILY_API_KEY=tavily-api-key \
-ghcr.io/metorial/mcp-container--tavily-ai--tavily-mcp--tavily-mcp  "node ./build/index.js"
+ghcr.io/metorial/mcp-container--tavily-ai--tavily-mcp--tavily-mcp  "node build/index.js"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -59,7 +59,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--tavily-ai--tavily-mcp--tavily-mcp",
-        "node ./build/index.js"
+        "node build/index.js"
       ],
       "env": {
         "TAVILY_API_KEY": "tavily-api-key"

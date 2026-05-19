@@ -1,0 +1,104 @@
+{
+  "serverId": "Hypersequent/qasphere-mcp/qasphere-mcp",
+  "version": "a577f7a1b7f3e7088590dbd722f118f231731068",
+  "manifest": {
+    "id": "qasphere-mcp",
+    "fullId": "Hypersequent/qasphere-mcp/qasphere-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "Hypersequent",
+      "repo": "qasphere-mcp",
+      "branch": "main",
+      "url": "https://github.com/Hypersequent/qasphere-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "qasphere-tenant-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "QASPHERE_TENANT_URL"
+            }
+          ]
+        },
+        {
+          "title": "qasphere-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "QASPHERE_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "QA Sphere MCP Server",
+    "description": "A [Model Context Protocol](https://github.com/modelcontextprotocol) server for the [QA Sphere](https://qasphere.com/) test management system."
+  },
+  "manifestHash": "e9577e41f95c4a968e3708637734bbf3",
+  "createdAt": "2026-05-19T22:27:25.473Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "node ./dist/index.js"
+        }
+      }
+    }
+  ]
+}

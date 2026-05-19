@@ -1,0 +1,78 @@
+{
+  "serverId": "lamemind/mcp-server-multiverse/mcp-server-multiverse",
+  "version": "0bb3cfab4579b149231caf53b711fbc68889947d",
+  "manifest": {
+    "id": "mcp-server-multiverse",
+    "fullId": "lamemind/mcp-server-multiverse/mcp-server-multiverse",
+    "repo": {
+      "provider": "github.com",
+      "owner": "lamemind",
+      "repo": "mcp-server-multiverse",
+      "branch": "master",
+      "url": "https://github.com/lamemind/mcp-server-multiverse"
+    },
+    "config": {
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Multiverse MCP Server",
+    "description": "A middleware server that enables multiple isolated instances of the same MCP servers to coexist independently with unique namespaces and configurations."
+  },
+  "manifestHash": "9f1733af94b3317bfe28fbe097330ed2",
+  "createdAt": "2026-05-19T22:27:31.943Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

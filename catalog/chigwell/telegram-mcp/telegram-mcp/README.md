@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--chigwell--telegram-mcp--telegram-mcp
 ```bash
 docker run -i --rm \ 
 -e TELEGRAM_API_ID=telegram-api-id -e TELEGRAM_API_HASH=telegram-api-hash -e TELEGRAM_SESSION_NAME=telegram-session-name \
-ghcr.io/metorial/mcp-container--chigwell--telegram-mcp--telegram-mcp  "python main.py"
+ghcr.io/metorial/mcp-container--chigwell--telegram-mcp--telegram-mcp  "telegram-mcp"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -61,7 +61,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--chigwell--telegram-mcp--telegram-mcp",
-        "python main.py"
+        "telegram-mcp"
       ],
       "env": {
         "TELEGRAM_API_ID": "telegram-api-id",

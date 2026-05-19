@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--sapientpants--sonarqube-mcp-server--
 ```bash
 docker run -i --rm \ 
 -e SONARQUBE_URL=sonarqube-url -e SONARQUBE_TOKEN=sonarqube-token -e SONARQUBE_ORGANIZATION=sonarqube-organization \
-ghcr.io/metorial/mcp-container--sapientpants--sonarqube-mcp-server--sonarqube-mcp-server  "pnpm run start"
+ghcr.io/metorial/mcp-container--sapientpants--sonarqube-mcp-server--sonarqube-mcp-server  
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -60,8 +60,7 @@ The container supports the following configuration options:
         "run",
         "-i",
         "--rm",
-        "ghcr.io/metorial/mcp-container--sapientpants--sonarqube-mcp-server--sonarqube-mcp-server",
-        "pnpm run start"
+        "ghcr.io/metorial/mcp-container--sapientpants--sonarqube-mcp-server--sonarqube-mcp-server"
       ],
       "env": {
         "SONARQUBE_URL": "sonarqube-url",

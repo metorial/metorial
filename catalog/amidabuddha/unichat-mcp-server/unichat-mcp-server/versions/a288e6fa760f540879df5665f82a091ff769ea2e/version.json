@@ -1,0 +1,100 @@
+{
+  "serverId": "amidabuddha/unichat-mcp-server/unichat-mcp-server",
+  "version": "a288e6fa760f540879df5665f82a091ff769ea2e",
+  "manifest": {
+    "id": "unichat-mcp-server",
+    "fullId": "amidabuddha/unichat-mcp-server/unichat-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "amidabuddha",
+      "repo": "unichat-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/amidabuddha/unichat-mcp-server"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "unichat-model",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "UNICHAT_MODEL"
+            }
+          ]
+        },
+        {
+          "title": "unichat-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "UNICHAT_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Unichat MCP Server in Python",
+    "description": "ASend requests to OpenAI, MistralAI, Anthropic, xAI, Google AI, DeepSeek, Alibaba, Inception using MCP protocol via tool or predefined prompts."
+  },
+  "manifestHash": "4e9b9e1c57f7fe852dea2c262058674f",
+  "createdAt": "2026-05-19T22:27:11.711Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python311",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "unichat-mcp-server"
+        }
+      }
+    }
+  ]
+}

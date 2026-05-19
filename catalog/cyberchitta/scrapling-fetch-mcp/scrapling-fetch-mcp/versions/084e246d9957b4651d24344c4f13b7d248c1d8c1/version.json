@@ -1,0 +1,76 @@
+{
+  "serverId": "cyberchitta/scrapling-fetch-mcp/scrapling-fetch-mcp",
+  "version": "084e246d9957b4651d24344c4f13b7d248c1d8c1",
+  "manifest": {
+    "id": "scrapling-fetch-mcp",
+    "fullId": "cyberchitta/scrapling-fetch-mcp/scrapling-fetch-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "cyberchitta",
+      "repo": "scrapling-fetch-mcp",
+      "branch": "main",
+      "url": "https://github.com/cyberchitta/scrapling-fetch-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "Scrapling Fetch MCP",
+    "description": "An MCP server that helps AI assistants access text content from websites that implement bot detection, bridging the gap between what you can see in your browser and what the AI can access."
+  },
+  "manifestHash": "ea1f3223bcc993a415aa6690b6e55fc7",
+  "createdAt": "2026-05-19T22:27:16.678Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "scrapling-fetch-mcp"
+        }
+      }
+    }
+  ]
+}

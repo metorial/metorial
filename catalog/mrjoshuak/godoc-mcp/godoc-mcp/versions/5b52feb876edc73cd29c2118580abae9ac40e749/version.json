@@ -1,0 +1,73 @@
+{
+  "serverId": "mrjoshuak/godoc-mcp/godoc-mcp",
+  "version": "5b52feb876edc73cd29c2118580abae9ac40e749",
+  "manifest": {
+    "id": "godoc-mcp",
+    "fullId": "mrjoshuak/godoc-mcp/godoc-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "mrjoshuak",
+      "repo": "godoc-mcp",
+      "branch": "main",
+      "url": "https://github.com/mrjoshuak/godoc-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "godoc-mcp",
+    "description": "godoc-mcp is a Model Context Protocol (MCP) server that provides efficient access to Go documentation."
+  },
+  "manifestHash": "5fbd35cf97d16b982c12e2c63fdb7f09",
+  "createdAt": "2026-05-19T22:27:41.954Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}

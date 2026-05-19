@@ -1,0 +1,146 @@
+{
+  "serverId": "macrat/mcp-server-kintone/mcp-server-kintone",
+  "version": "28882eb7578010158bfe64af91cce921bda41890",
+  "manifest": {
+    "id": "mcp-server-kintone",
+    "fullId": "macrat/mcp-server-kintone/mcp-server-kintone",
+    "repo": {
+      "provider": "github.com",
+      "owner": "macrat",
+      "repo": "mcp-server-kintone",
+      "branch": "main",
+      "url": "https://github.com/macrat/mcp-server-kintone"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "kintone-base-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "KINTONE_BASE_URL"
+            }
+          ]
+        },
+        {
+          "title": "kintone-username",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "KINTONE_USERNAME"
+            }
+          ]
+        },
+        {
+          "title": "kintone-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "KINTONE_PASSWORD"
+            }
+          ]
+        },
+        {
+          "title": "kintone-api-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "KINTONE_API_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "kintone-allow-apps",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "KINTONE_ALLOW_APPS"
+            }
+          ]
+        },
+        {
+          "title": "kintone-deny-apps",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "KINTONE_DENY_APPS"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "MCP server for kintone",
+    "description": "This server allows you to explore and manipulate kintone data using AI tools such as [Claude Desktop](https://claude.ai/download)!"
+  },
+  "manifestHash": "dc9c3947e916097a5c6b3c11c0d2d973",
+  "createdAt": "2026-05-19T22:27:32.141Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}

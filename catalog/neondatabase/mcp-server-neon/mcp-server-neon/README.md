@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--neondatabase--mcp-server-neon--mcp-s
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--neondatabase--mcp-server-neon--mcp-server-neon {{NEON_API_KEY}} "bun run start {{NEON_API_KEY}}"
+ghcr.io/metorial/mcp-container--neondatabase--mcp-server-neon--mcp-server-neon {{NEON_API_KEY}} "{{NEON_API_KEY}}"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -58,7 +58,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--neondatabase--mcp-server-neon--mcp-server-neon",
-        "bun run start {{NEON_API_KEY}}"
+        "{{NEON_API_KEY}}"
       ],
       "env": {}
     }

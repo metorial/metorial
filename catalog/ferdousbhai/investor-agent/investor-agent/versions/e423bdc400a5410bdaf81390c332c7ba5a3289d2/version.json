@@ -1,0 +1,83 @@
+{
+  "serverId": "ferdousbhai/investor-agent/investor-agent",
+  "version": "e423bdc400a5410bdaf81390c332c7ba5a3289d2",
+  "manifest": {
+    "id": "investor-agent",
+    "fullId": "ferdousbhai/investor-agent/investor-agent",
+    "repo": {
+      "provider": "github.com",
+      "owner": "ferdousbhai",
+      "repo": "investor-agent",
+      "branch": "main",
+      "url": "https://github.com/ferdousbhai/investor-agent"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "investor-agent: A Financial Analysis MCP Server",
+    "description": "A Model Context Protocol server for building an investor agent"
+  },
+  "manifestHash": "0ffdb842be80904c3c2c0e200413d97d",
+  "createdAt": "2026-05-19T22:27:20.312Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "pnpm-10_x"
+            ],
+            "nixLibs": [
+              "gcc-unwrapped"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}

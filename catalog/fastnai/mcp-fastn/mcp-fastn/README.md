@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--fastnai--mcp-fastn--mcp-fastn
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--fastnai--mcp-fastn--mcp-fastn  "fastn --api_key api-key --space_id workspace-id"
+ghcr.io/metorial/mcp-container--fastnai--mcp-fastn--mcp-fastn  "fastn-mcp --api_key api-key --space_id workspace-id"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -59,7 +59,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--fastnai--mcp-fastn--mcp-fastn",
-        "fastn --api_key api-key --space_id workspace-id"
+        "fastn-mcp --api_key api-key --space_id workspace-id"
       ],
       "env": {}
     }

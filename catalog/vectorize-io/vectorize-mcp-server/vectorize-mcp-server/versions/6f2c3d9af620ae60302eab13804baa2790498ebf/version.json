@@ -1,0 +1,116 @@
+{
+  "serverId": "vectorize-io/vectorize-mcp-server/vectorize-mcp-server",
+  "version": "6f2c3d9af620ae60302eab13804baa2790498ebf",
+  "manifest": {
+    "id": "vectorize-mcp-server",
+    "fullId": "vectorize-io/vectorize-mcp-server/vectorize-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "vectorize-io",
+      "repo": "vectorize-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/vectorize-io/vectorize-mcp-server/"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "vectorize-org-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "VECTORIZE_ORG_ID"
+            }
+          ]
+        },
+        {
+          "title": "vectorize-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "VECTORIZE_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "vectorize-pipeline-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "VECTORIZE_PIPELINE_ID"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Vectorize MCP Server",
+    "description": "A Model Context Protocol (MCP) server implementation that integrates with [Vectorize](https://vectorize.io/) for advanced Vector retrieval and text extraction."
+  },
+  "manifestHash": "00a17f091b59ee783b9de0648d57d8a5",
+  "createdAt": "2026-05-19T22:27:49.385Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}

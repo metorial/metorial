@@ -1,0 +1,92 @@
+{
+  "serverId": "BurtTheCoder/mcp-maigret/mcp-maigret",
+  "version": "1a7c9a4b1e4e8ffd12ac03058aee3e90161f1846",
+  "manifest": {
+    "id": "mcp-maigret",
+    "fullId": "BurtTheCoder/mcp-maigret/mcp-maigret",
+    "repo": {
+      "provider": "github.com",
+      "owner": "BurtTheCoder",
+      "repo": "mcp-maigret",
+      "branch": "main",
+      "url": "https://github.com/BurtTheCoder/mcp-maigret"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "maigret-reports-dir",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "MAIGRET_REPORTS_DIR"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Maigret MCP Server",
+    "description": "A Model Context Protocol (MCP) server for [maigret](https://github.com/soxoj/maigret), a powerful OSINT tool that collects user account information from various public sources. This server provides tools for searching usernames across social networks and analyzing URLs. It is designed to integrate seamlessly with MCP-compatible applications like [Claude Desktop](https://claude.ai)."
+  },
+  "manifestHash": "2f5490d9b465de2c87379fc000cbaacc",
+  "createdAt": "2026-05-19T22:27:13.712Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "node build/index.js"
+        }
+      }
+    }
+  ]
+}

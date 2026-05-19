@@ -1,0 +1,92 @@
+{
+  "serverId": "OctagonAI/octagon-mcp-server/octagon-mcp-server",
+  "version": "d7e0bff5646ef88c88f1a4403c28f20d93af68f8",
+  "manifest": {
+    "id": "octagon-mcp-server",
+    "fullId": "OctagonAI/octagon-mcp-server/octagon-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "OctagonAI",
+      "repo": "octagon-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/OctagonAI/octagon-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "octagon-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "OCTAGON_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Octagon MCP Server",
+    "description": "A free Model Context Protocol (MCP) server that integrates with Octagon Market Intelligence API"
+  },
+  "manifestHash": "19808b12efa03801062ac3405b2d9dbf",
+  "createdAt": "2026-05-19T22:27:42.482Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

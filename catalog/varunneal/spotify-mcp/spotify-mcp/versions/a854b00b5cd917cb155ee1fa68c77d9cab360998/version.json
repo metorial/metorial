@@ -1,0 +1,113 @@
+{
+  "serverId": "varunneal/spotify-mcp/spotify-mcp",
+  "version": "a854b00b5cd917cb155ee1fa68c77d9cab360998",
+  "manifest": {
+    "id": "spotify-mcp",
+    "fullId": "varunneal/spotify-mcp/spotify-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "varunneal",
+      "repo": "spotify-mcp",
+      "branch": "main",
+      "url": "https://github.com/varunneal/spotify-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "spotify-client-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SPOTIFY_CLIENT_ID"
+            }
+          ]
+        },
+        {
+          "title": "spotify-client-secret",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SPOTIFY_CLIENT_SECRET"
+            }
+          ]
+        },
+        {
+          "title": "spotify-redirect-uri",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SPOTIFY_REDIRECT_URI"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "spotify-mcp MCP server",
+    "description": "MCP project to connect Claude with Spotify. Built on top of [spotipy-dev's API](https://github.com/spotipy-dev/spotipy/tree/2.24.0)."
+  },
+  "manifestHash": "7c6d8371418cf58d30841bffa72b4a9f",
+  "createdAt": "2026-05-19T22:27:49.626Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python312",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "spotify-mcp"
+        }
+      }
+    }
+  ]
+}
