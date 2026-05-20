@@ -1,0 +1,96 @@
+{
+  "serverId": "roychri/mcp-server-asana/mcp-server-asana",
+  "version": "c4508aac54e210d49dbc9d7d8ad1fa98b9090a82",
+  "manifest": {
+    "id": "mcp-server-asana",
+    "fullId": "roychri/mcp-server-asana/mcp-server-asana",
+    "repo": {
+      "provider": "github.com",
+      "owner": "roychri",
+      "repo": "mcp-server-asana",
+      "branch": "main",
+      "url": "https://github.com/roychri/mcp-server-asana"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "asana-access-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "ASANA_ACCESS_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "MCP Server for Asana",
+    "description": "This Model Context Protocol server implementation of Asana allows you"
+  },
+  "manifestHash": "f411701c398279f00ae3766c81ee6094",
+  "createdAt": "2026-05-20T07:13:55.448Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixLibs": [
+              "libuuid",
+              "libGL"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

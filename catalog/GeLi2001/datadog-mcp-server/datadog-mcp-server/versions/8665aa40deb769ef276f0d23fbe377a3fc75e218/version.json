@@ -1,0 +1,115 @@
+{
+  "serverId": "GeLi2001/datadog-mcp-server/datadog-mcp-server",
+  "version": "8665aa40deb769ef276f0d23fbe377a3fc75e218",
+  "manifest": {
+    "id": "datadog-mcp-server",
+    "fullId": "GeLi2001/datadog-mcp-server/datadog-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "GeLi2001",
+      "repo": "datadog-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/GeLi2001/datadog-mcp-server"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "--apiKey",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--apiKey"
+            }
+          ]
+        },
+        {
+          "title": "--appKey",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "appKey"
+            }
+          ]
+        },
+        {
+          "title": "--site",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--site"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Datadog MCP Server",
+    "description": "A Model Context Protocol (MCP) server for interacting with the Datadog API."
+  },
+  "manifestHash": "235da10b0ed72ef7bcfca1dab8240c44",
+  "createdAt": "2026-05-20T07:13:27.662Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

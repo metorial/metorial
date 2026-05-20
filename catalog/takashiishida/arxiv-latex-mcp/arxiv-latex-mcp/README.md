@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--takashiishida--arxiv-latex-mcp--arxi
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--takashiishida--arxiv-latex-mcp--arxiv-latex-mcp  "python -m arxiv-latex-mcp"
+ghcr.io/metorial/mcp-container--takashiishida--arxiv-latex-mcp--arxiv-latex-mcp  "arxiv-latex-mcp"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -45,7 +45,7 @@ ghcr.io/metorial/mcp-container--takashiishida--arxiv-latex-mcp--arxiv-latex-mcp 
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--takashiishida--arxiv-latex-mcp--arxiv-latex-mcp",
-        "python -m arxiv-latex-mcp"
+        "arxiv-latex-mcp"
       ],
       "env": {}
     }

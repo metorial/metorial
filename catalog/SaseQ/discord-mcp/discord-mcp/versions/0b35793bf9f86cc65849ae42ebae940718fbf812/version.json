@@ -1,0 +1,74 @@
+{
+  "serverId": "SaseQ/discord-mcp/discord-mcp",
+  "version": "0b35793bf9f86cc65849ae42ebae940718fbf812",
+  "manifest": {
+    "id": "discord-mcp",
+    "fullId": "SaseQ/discord-mcp/discord-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "SaseQ",
+      "repo": "discord-mcp",
+      "branch": "main",
+      "url": "https://github.com/SaseQ/discord-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "discord-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "DISCORD_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Discord MCP",
+    "description": "A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server for the Discord API [(JDA)](https://jda.wiki/),"
+  },
+  "manifestHash": "78ccf567ddd4f030f5bea04d457a5c18",
+  "createdAt": "2026-05-20T07:13:56.104Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "java"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "mvn -DoutputFile=target/mvn-dependency-list.log -B -DskipTests clean dependency:list install"
+            ],
+            "cacheDirectories": [
+              ".m2/repository"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "jdk17",
+              "maven"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "59dc10b5a6f2a592af36375c68fda41246794b86"
+          }
+        },
+        "start": {
+          "cmd": "java -Dserver.port=$PORT $JAVA_OPTS -jar target/*jar"
+        }
+      }
+    }
+  ]
+}

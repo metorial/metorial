@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--apeyroux--mcp-xmind--mcp-xmind
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--apeyroux--mcp-xmind--mcp-xmind  "node dist/index.js"
+ghcr.io/metorial/mcp-container--apeyroux--mcp-xmind--mcp-xmind  
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -44,8 +44,7 @@ ghcr.io/metorial/mcp-container--apeyroux--mcp-xmind--mcp-xmind  "node dist/index
         "run",
         "-i",
         "--rm",
-        "ghcr.io/metorial/mcp-container--apeyroux--mcp-xmind--mcp-xmind",
-        "node dist/index.js"
+        "ghcr.io/metorial/mcp-container--apeyroux--mcp-xmind--mcp-xmind"
       ],
       "env": {}
     }

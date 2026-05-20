@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--tinyfish-io--agentql-mcp--agentql-mc
 ```bash
 docker run -i --rm \ 
 -e AGENTQL_API_KEY=agentql-api-key \
-ghcr.io/metorial/mcp-container--tinyfish-io--agentql-mcp--agentql-mcp  "node ./dist/index.js"
+ghcr.io/metorial/mcp-container--tinyfish-io--agentql-mcp--agentql-mcp  "node dist/index.js"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -59,7 +59,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--tinyfish-io--agentql-mcp--agentql-mcp",
-        "node ./dist/index.js"
+        "node dist/index.js"
       ],
       "env": {
         "AGENTQL_API_KEY": "agentql-api-key"
