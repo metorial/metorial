@@ -1,0 +1,75 @@
+{
+  "serverId": "AI-Agent-Hub/ai-agent-marketplace-index-mcp/ai-agent-marketplace-index-mcp",
+  "version": "d2d6b7552abf689b0c1778bb6d903a42d8a74926",
+  "manifest": {
+    "id": "ai-agent-marketplace-index-mcp",
+    "fullId": "AI-Agent-Hub/ai-agent-marketplace-index-mcp/ai-agent-marketplace-index-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "AI-Agent-Hub",
+      "repo": "ai-agent-marketplace-index-mcp",
+      "branch": "main",
+      "url": "https://github.com/AI-Agent-Hub/ai-agent-marketplace-index-mcp"
+    },
+    "config": {
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "AI Agent Marketplace Index Search MCP Server",
+    "description": "MCP Server for AI Agent Marketplace Index from DeepNLP, , allowing AI assistants to searches available AI agents Navigation Page function, tools or use cases by \"keywords\" or \"category\". such as find all the \"AI coding agents\", \"GUI AI Agents\", \"Mobile Use Agent\", \"Desktop Use Agent\", etc."
+  },
+  "manifestHash": "5038c41a8fc7fb202abec59e13ac1697",
+  "createdAt": "2026-05-20T07:13:16.307Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "python main.py"
+        }
+      }
+    }
+  ]
+}

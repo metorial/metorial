@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--base--base-mcp--base-mcp
 ```bash
 docker run -i --rm \ 
 -e COINBASE_API_KEY_NAME=coinbase-api-key-name -e COINBASE_API_PRIVATE_KEY=coinbase-api-private-key -e SEED_PHRASE=seed-phrase -e COINBASE_PROJECT_ID=coinbase-project-id -e ALCHEMY_API_KEY=alchemy-api-key -e PINATA_JWT=pinata-jwt -e OPENROUTER_API_KEY=openrouter-api-key -e CHAIN_ID=chain-id \
-ghcr.io/metorial/mcp-container--base--base-mcp--base-mcp  "yarn run start"
+ghcr.io/metorial/mcp-container--base--base-mcp--base-mcp  "node deprecated.js"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -66,7 +66,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--base--base-mcp--base-mcp",
-        "yarn run start"
+        "node deprecated.js"
       ],
       "env": {
         "COINBASE_API_KEY_NAME": "coinbase-api-key-name",

@@ -1,0 +1,89 @@
+{
+  "serverId": "Unstructured-IO/UNS-MCP/uns-mcp",
+  "version": "8a22525848cbf81d3e93e2d6be9acddd0aa9bcd6",
+  "manifest": {
+    "id": "uns-mcp",
+    "fullId": "Unstructured-IO/UNS-MCP/uns-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "Unstructured-IO",
+      "repo": "UNS-MCP",
+      "branch": "main",
+      "url": "https://github.com/Unstructured-IO/UNS-MCP"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "unstructured-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "UNSTRUCTURED_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Unstructured API MCP Server",
+    "description": "An MCP server implementation for interacting with the Unstructured API. This server provides tools to list sources and workflows."
+  },
+  "manifestHash": "0c66e24c5ec515b64d0ddf9f78d00962",
+  "createdAt": "2026-05-20T07:14:00.712Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "uns_mcp"
+        }
+      }
+    }
+  ]
+}

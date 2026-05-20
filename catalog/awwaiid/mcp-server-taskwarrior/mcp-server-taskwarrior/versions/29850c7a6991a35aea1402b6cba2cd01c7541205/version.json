@@ -1,0 +1,79 @@
+{
+  "serverId": "awwaiid/mcp-server-taskwarrior/mcp-server-taskwarrior",
+  "version": "29850c7a6991a35aea1402b6cba2cd01c7541205",
+  "manifest": {
+    "id": "mcp-server-taskwarrior",
+    "fullId": "awwaiid/mcp-server-taskwarrior/mcp-server-taskwarrior",
+    "repo": {
+      "provider": "github.com",
+      "owner": "awwaiid",
+      "repo": "mcp-server-taskwarrior",
+      "branch": "main",
+      "url": "https://github.com/awwaiid/mcp-server-taskwarrior"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "TaskWarrior MCP Server",
+    "description": "Node.js server implementing Model Context Protocol (MCP) for [TaskWarrior](https://taskwarrior.org/) operations."
+  },
+  "manifestHash": "3289fb633b9ceeb4c80d95ad9afc2446",
+  "createdAt": "2026-05-20T07:13:17.834Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}

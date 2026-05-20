@@ -1,0 +1,105 @@
+{
+  "serverId": "CircleCI-Public/mcp-server-circleci/mcp-server-circleci",
+  "version": "a27722d9682759eda890ee80efdc7c0ca016763e",
+  "manifest": {
+    "id": "mcp-server-circleci",
+    "fullId": "CircleCI-Public/mcp-server-circleci/mcp-server-circleci",
+    "repo": {
+      "provider": "github.com",
+      "owner": "CircleCI-Public",
+      "repo": "mcp-server-circleci",
+      "branch": "main",
+      "url": "https://github.com/CircleCI-Public/mcp-server-circleci"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "circleci-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "CIRCLECI_TOKEN"
+            }
+          ]
+        },
+        {
+          "title": "circleci-base-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "CIRCLECI_BASE_URL"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "CircleCI MCP Server",
+    "description": "Model Context Protocol (MCP) is a [new, standardized protocol](https://modelcontextprotocol.io/introduction) for managing context between large language models (LLMs) and external systems. In this repository, we provide an MCP Server for [CircleCI](https://circleci.com)."
+  },
+  "manifestHash": "a8c12855464aa3adeb8b613acb1fa6a7",
+  "createdAt": "2026-05-20T07:13:22.194Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "pnpm-10_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "node ./dist/index.js"
+        }
+      }
+    }
+  ]
+}
