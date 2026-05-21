@@ -1028,6 +1028,9 @@ We have provided a list of available servers below, along with their respective 
 - <img src="https://github.com/PaddleHQ.png?size=120" width="12px" height="12px" /> **[Paddle MCP Server
 ](catalog/PaddleHQ/paddle-mcp-server/paddle-mcp-server/README.md)** - This is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io/introduction) server that provides tools for interacting with the Paddle API.
 
+- <img src="https://github.com/PagerDuty.png?size=120" width="12px" height="12px" /> **[PagerDuty's official MCP Server
+](catalog/PagerDuty/pagerduty-mcp-server/pagerduty-mcp-server/README.md)** - PagerDuty's official local MCP server for managing incidents, services, schedules, and event orchestrations directly from your MCP-enabled client.
+
 - <img src="https://github.com/PostHog.png?size=120" width="12px" height="12px" /> **[PostHog MCP Server 📊
 ](catalog/PostHog/posthog-mcp/posthog-mcp/README.md)** - A Model Context Protocol (MCP) server for interacting with PostHog. Create annotations and manage projects directly through Claude Desktop!
 
