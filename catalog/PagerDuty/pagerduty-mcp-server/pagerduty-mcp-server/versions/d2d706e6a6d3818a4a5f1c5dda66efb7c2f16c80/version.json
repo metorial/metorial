@@ -1,0 +1,112 @@
+{
+  "serverId": "PagerDuty/pagerduty-mcp-server/pagerduty-mcp-server",
+  "version": "d2d706e6a6d3818a4a5f1c5dda66efb7c2f16c80",
+  "manifest": {
+    "id": "pagerduty-mcp-server",
+    "fullId": "PagerDuty/pagerduty-mcp-server/pagerduty-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "PagerDuty",
+      "repo": "pagerduty-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/PagerDuty/pagerduty-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "pagerduty-user-api-key",
+          "description": null,
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PAGERDUTY_USER_API_KEY"
+            }
+          ]
+        },
+        {
+          "title": "pagerduty-api-host",
+          "description": null,
+          "default": "https://api.pagerduty.com",
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "PAGERDUTY_API_HOST"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "PagerDuty's official MCP Server",
+    "description": "PagerDuty's official local MCP server for managing incidents, services, schedules, and event orchestrations directly from your MCP-enabled client.",
+    "build": {
+      "startCommand": "uv run pagerduty-mcp",
+      "installCommand": "uv sync --no-dev --frozen",
+      "pythonVersion": "3.12",
+      "nixPackages": [
+        "uv"
+      ]
+    }
+  },
+  "manifestHash": "371cb7f1d865df8cde196414a6399bee",
+  "createdAt": "2026-05-21T13:34:25.863Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python,poetry",
+          "NIXPACKS_POETRY_VERSION": "1.3.1",
+          "NIXPACKS_UV_VERSION": "0.7.3",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/pip"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "uv",
+              "python313",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87",
+            "aptPkgs": []
+          }
+        },
+        "start": {
+          "cmd": "uv run pagerduty-mcp"
+        }
+      }
+    }
+  ]
+}

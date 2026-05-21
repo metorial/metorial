@@ -1692,6 +1692,12 @@
     "repoUrl": "https://github.com/PaddleHQ/paddle-mcp-server"
   },
   {
+    "id": "pagerduty-mcp-server",
+    "owner": "PagerDuty",
+    "repo": "pagerduty-mcp-server",
+    "repoUrl": "https://github.com/PagerDuty/pagerduty-mcp-server"
+  },
+  {
     "id": "posthog-mcp",
     "owner": "PostHog",
     "repo": "posthog-mcp",

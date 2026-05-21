@@ -1,0 +1,49 @@
+{
+  "id": "pagerduty-mcp-server",
+  "fullId": "PagerDuty/pagerduty-mcp-server/pagerduty-mcp-server",
+  "repo": {
+    "provider": "github.com",
+    "owner": "PagerDuty",
+    "repo": "pagerduty-mcp-server",
+    "branch": "main",
+    "url": "https://github.com/PagerDuty/pagerduty-mcp-server"
+  },
+  "config": {
+    "argumentsTemplate": null,
+    "configValues": [
+      {
+        "title": "pagerduty-user-api-key",
+        "description": null,
+        "default": null,
+        "required": true,
+        "fields": [
+          {
+            "type": "environment",
+            "key": "PAGERDUTY_USER_API_KEY"
+          }
+        ]
+      },
+      {
+        "title": "pagerduty-api-host",
+        "description": null,
+        "default": "https://api.pagerduty.com",
+        "required": false,
+        "fields": [
+          {
+            "type": "environment",
+            "key": "PAGERDUTY_API_HOST"
+          }
+        ]
+      }
+    ]
+  },
+  "build": {
+    "pythonVersion": "3.12",
+    "nixPackages": ["uv"],
+    "installCommand": "uv sync --no-dev --frozen",
+    "startCommand": "uv run pagerduty-mcp"
+  },
+  "subdirectory": "/",
+  "title": "PagerDuty's official MCP Server",
+  "description": "PagerDuty's official local MCP server for managing incidents, services, schedules, and event orchestrations directly from your MCP-enabled client."
+}
