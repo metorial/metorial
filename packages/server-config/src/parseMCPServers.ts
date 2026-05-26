@@ -26,7 +26,7 @@ export let parseMCPServers = (config: string) => {
     return {
       cliArguments: {
         template: args.join(' '),
-        keys: args.filter(a => a.toUpperCase() === a).map(key => ({ key }))
+        keys: args.filter(looksLikeConfigKey).map(key => ({ key }))
       },
       environmentVariables: Object.entries(server.env || {}).map(([key, value]) => ({
         key
@@ -40,25 +40,120 @@ export let parseMCPServers = (config: string) => {
 
 let pathCommand = (a: string) => (b: string) => a === b || b.endsWith(`/${a}`);
 
+let looksLikeConfigKey = (arg: string) => /^[A-Z][A-Z0-9_]*$/.test(arg);
+
+let optionTakesValue = (arg: string, valueOptions: Set<string>) => {
+  if (!arg.startsWith('-')) return false;
+  if (arg.includes('=')) return false;
+
+  return valueOptions.has(arg);
+};
+
+let argsAfterEntrypoint = (
+  args: string[],
+  opts?: {
+    valueOptions?: string[];
+    stopAtDoubleDash?: boolean;
+  }
+) => {
+  let valueOptions = new Set(opts?.valueOptions ?? []);
+
+  for (let i = 0; i < args.length; i++) {
+    let arg = args[i];
+
+    if (opts?.stopAtDoubleDash && arg == '--') {
+      return args.slice(i + 1);
+    }
+
+    if (arg.startsWith('-')) {
+      if (optionTakesValue(arg, valueOptions)) i++;
+      continue;
+    }
+
+    return args.slice(i + 1);
+  }
+};
+
+let NODE_RUNNER_VALUE_OPTIONS = [
+  '--cache',
+  '--cache-dir',
+  '--cwd',
+  '--directory',
+  '--env-file',
+  '--loader',
+  '--prefix',
+  '--require',
+  '--title',
+  '-C',
+  '-e',
+  '-r'
+];
+
+let PACKAGE_RUNNER_VALUE_OPTIONS = [
+  ...NODE_RUNNER_VALUE_OPTIONS,
+  '--from',
+  '--package',
+  '--registry',
+  '--tag',
+  '--with',
+  '--with-editable',
+  '--with-requirements',
+  '--python',
+  '--index-url',
+  '--extra-index-url',
+  '--find-links',
+  '--resolution',
+  '--prerelease',
+  '--fork-strategy',
+  '--link-mode',
+  '--exclude-newer',
+  '--refresh-package',
+  '-p'
+];
+
+let UV_RUN_VALUE_OPTIONS = [
+  ...PACKAGE_RUNNER_VALUE_OPTIONS,
+  '--active',
+  '--directory',
+  '--env-file',
+  '--extra',
+  '--group',
+  '--isolated',
+  '--module',
+  '--project',
+  '--script',
+  '--with-requirements',
+  '-m'
+];
+
 let argParsers = [
   {
     commands: [
       pathCommand('uvx'),
       pathCommand('npx'),
+      pathCommand('bunx')
+    ],
+    parser: (args: string[]) => {
+      return argsAfterEntrypoint(args, {
+        valueOptions: PACKAGE_RUNNER_VALUE_OPTIONS,
+        stopAtDoubleDash: true
+      });
+    }
+  },
+
+  {
+    commands: [
       pathCommand('python'),
       pathCommand('python3'),
       pathCommand('node'),
       pathCommand('ts-node'),
-      pathCommand('bun'),
-      pathCommand('bunx')
+      pathCommand('bun')
     ],
     parser: (args: string[]) => {
-      for (let i = 0; i < args.length; i++) {
-        let arg = args[i];
-        if (arg.startsWith('-')) continue;
-
-        return args.slice(i + 1);
-      }
+      return argsAfterEntrypoint(args, {
+        valueOptions: NODE_RUNNER_VALUE_OPTIONS,
+        stopAtDoubleDash: true
+      });
     }
   },
 
@@ -75,7 +170,10 @@ let argParsers = [
       for (let i = 0; i < args.length; i++) {
         let arg = args[i];
         if (arg == 'run') {
-          return args.slice(i + 1);
+          return argsAfterEntrypoint(args.slice(i + 1), {
+            valueOptions: UV_RUN_VALUE_OPTIONS,
+            stopAtDoubleDash: true
+          });
         }
       }
     }
