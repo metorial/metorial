@@ -34,7 +34,7 @@ export let listOrgMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listOrgMembers(ctx.input.orgName, {
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
@@ -77,12 +77,50 @@ export let removeOrgMember = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.removeOrgMember(ctx.input.orgName, ctx.input.username);
 
     return {
       output: { removed: true },
       message: `Removed **${ctx.input.username}** from organization **${ctx.input.orgName}**.`
+    };
+  })
+  .build();
+
+export let updateOrgMemberRole = SlateTool.create(spec, {
+  name: 'Update Organization Member Role',
+  key: 'update_org_member_role',
+  description: `Update a Docker Hub organization member's role. Use this for organization member lifecycle management without removing and re-inviting the user.`
+})
+  .input(
+    z.object({
+      orgName: z.string().describe('Name of the Docker Hub organization.'),
+      username: z.string().describe('Docker Hub username of the member to update.'),
+      role: z
+        .enum(['owner', 'editor', 'member'])
+        .describe('Organization role to assign to the member.')
+    })
+  )
+  .output(
+    z.object({
+      username: z.string().describe('Docker Hub username of the updated member.'),
+      role: z.string().describe('Updated role in the organization.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client(ctx.auth);
+    let member = await client.updateOrgMemberRole(
+      ctx.input.orgName,
+      ctx.input.username,
+      ctx.input.role
+    );
+
+    return {
+      output: {
+        username: member.username || ctx.input.username,
+        role: member.role || ctx.input.role
+      },
+      message: `Updated **${ctx.input.username}** to **${ctx.input.role}** in organization **${ctx.input.orgName}**.`
     };
   })
   .build();

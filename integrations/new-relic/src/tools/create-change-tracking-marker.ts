@@ -9,7 +9,7 @@ export let createChangeTrackingMarker = SlateTool.create(spec, {
   description: `Record a deployment or change event for an entity. Change tracking markers appear on New Relic charts, allowing you to correlate deployments with performance changes.`,
   instructions: [
     'Provide the `entityGuid` of the application or service being deployed.',
-    'Include a `version` to identify the deployment, and optionally a `commit`, `changelog`, and `description`.'
+    'Include a required `version` to identify the deployment, and optionally a `commit`, `changelog`, `description`, and `timestamp`.'
   ],
   tags: {
     destructive: false
@@ -20,7 +20,7 @@ export let createChangeTrackingMarker = SlateTool.create(spec, {
       entityGuid: z
         .string()
         .describe('Entity GUID of the application or service being deployed'),
-      version: z.string().optional().describe('Version or release identifier, e.g. "v1.2.3"'),
+      version: z.string().describe('Version or release identifier, e.g. "v1.2.3"'),
       changelog: z.string().optional().describe('Changelog or release notes'),
       commit: z.string().optional().describe('Git commit SHA'),
       description: z.string().optional().describe('Description of the change'),
@@ -33,7 +33,11 @@ export let createChangeTrackingMarker = SlateTool.create(spec, {
         .optional()
         .describe('URL link to the deployment system (e.g. CI/CD pipeline)'),
       groupId: z.string().optional().describe('Group ID to correlate related deployments'),
-      user: z.string().optional().describe('User who initiated the deployment')
+      user: z.string().optional().describe('User who initiated the deployment'),
+      timestamp: z
+        .number()
+        .optional()
+        .describe('Deployment timestamp in milliseconds since the Unix epoch')
     })
   )
   .output(
@@ -61,7 +65,8 @@ export let createChangeTrackingMarker = SlateTool.create(spec, {
       deploymentType: ctx.input.deploymentType,
       deepLink: ctx.input.deepLink,
       groupId: ctx.input.groupId,
-      user: ctx.input.user
+      user: ctx.input.user,
+      timestamp: ctx.input.timestamp
     });
 
     return {

@@ -1,14 +1,14 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ConnectClient } from '../lib/client';
+import { createConnectClient } from '../lib/connect-tool';
 import { spec } from '../spec';
 
 export let getFileContent = SlateTool.create(spec, {
   name: 'Get File Content',
   key: 'get_file_content',
-  description: `Retrieve the content of a file attachment stored on a 1Password item. Use the Get Item tool first to discover file IDs and names attached to an item. Returns the file content as text.`,
+  description: `Download the content of a file attachment stored on a 1Password item. The file bytes are returned as a Slate attachment, with structured output limited to metadata.`,
   instructions: [
-    'Use Get Item first to find the fileId of the attachment you want to retrieve.'
+    'Use Get Item or List Files first to find the fileId of the attachment you want to retrieve.'
   ],
   tags: {
     readOnly: true
@@ -24,21 +24,16 @@ export let getFileContent = SlateTool.create(spec, {
   .output(
     z.object({
       fileId: z.string().describe('ID of the file'),
-      content: z.string().describe('Content of the file as text')
+      byteLength: z.number().describe('Decoded byte length of the returned attachment'),
+      mimeType: z.string().describe('MIME type of the returned attachment'),
+      attachmentCount: z.number().describe('Number of attachments returned')
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.config.connectServerUrl) {
-      throw new Error('Connect server URL is required. Set it in the configuration.');
-    }
-
-    let client = new ConnectClient({
-      token: ctx.auth.token,
-      serverUrl: ctx.config.connectServerUrl
-    });
+    let client = createConnectClient(ctx);
 
     ctx.progress('Retrieving file content...');
-    let content = await client.getFileContent(
+    let file = await client.getFileContent(
       ctx.input.vaultId,
       ctx.input.itemId,
       ctx.input.fileId
@@ -47,9 +42,12 @@ export let getFileContent = SlateTool.create(spec, {
     return {
       output: {
         fileId: ctx.input.fileId,
-        content
+        byteLength: file.byteLength,
+        mimeType: file.contentType,
+        attachmentCount: 1
       },
-      message: `Retrieved content for file \`${ctx.input.fileId}\` (${content.length} characters).`
+      attachments: [createBase64Attachment(file.contentBase64, file.contentType)],
+      message: `Retrieved file \`${ctx.input.fileId}\` as an attachment (${file.byteLength} bytes).`
     };
   })
   .build();

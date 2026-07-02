@@ -17,7 +17,7 @@ export let getDocument = SlateTool.create(spec, {
         .string()
         .describe('Unique identifier of the document to retrieve.'),
       format: z
-        .enum(['json', 'xml'])
+        .enum(['json', 'xml', 'hr-xml'])
         .optional()
         .describe('Response format for the extracted data.'),
       compact: z
@@ -31,8 +31,14 @@ export let getDocument = SlateTool.create(spec, {
       documentIdentifier: z.string().describe('Unique identifier of the document.'),
       fileName: z.string().optional().describe('Name of the processed file.'),
       state: z.string().optional().describe('Current processing state of the document.'),
+      customIdentifier: z.string().optional().describe('Custom document identifier.'),
       ready: z.boolean().optional().describe('Whether the document has finished processing.'),
       failed: z.boolean().optional().describe('Whether parsing has failed.'),
+      reviewUrl: z.string().optional().describe('Affinda validation/review URL.'),
+      pdfUrl: z
+        .string()
+        .optional()
+        .describe('Temporary URL for the source PDF, if available.'),
       workspaceIdentifier: z
         .string()
         .optional()
@@ -41,6 +47,8 @@ export let getDocument = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Collection the document belongs to.'),
+      documentTypeIdentifier: z.string().optional().describe('Document type identifier.'),
+      tags: z.array(z.any()).optional().describe('Tags attached to the document.'),
       extractedData: z
         .any()
         .optional()
@@ -65,10 +73,15 @@ export let getDocument = SlateTool.create(spec, {
         documentIdentifier: meta.identifier ?? ctx.input.documentIdentifier,
         fileName: meta.fileName,
         state: meta.state,
+        customIdentifier: meta.customIdentifier,
         ready: meta.ready,
         failed: meta.failed,
+        reviewUrl: meta.reviewUrl,
+        pdfUrl: meta.pdf,
         workspaceIdentifier: meta.workspace?.identifier,
         collectionIdentifier: meta.collection?.identifier,
+        documentTypeIdentifier: meta.documentType,
+        tags: meta.tags,
         extractedData: result.data
       },
       message: `Retrieved document **${meta.fileName ?? ctx.input.documentIdentifier}** (state: ${meta.state ?? 'unknown'}).`

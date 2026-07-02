@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { kibanaServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -174,7 +175,7 @@ Supports KQL, metric custom, and histogram indicator types with occurrences or t
     } = ctx.input;
 
     if (action === 'get') {
-      if (!sloId) throw new Error('sloId is required for get action');
+      if (!sloId) throw kibanaServiceError('sloId is required for get action');
       let s = await client.getSLO(sloId);
       return {
         output: {
@@ -195,11 +196,12 @@ Supports KQL, metric custom, and histogram indicator types with occurrences or t
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
-      if (!indicator) throw new Error('indicator is required for create action');
-      if (!timeWindow) throw new Error('timeWindow is required for create action');
-      if (!budgetingMethod) throw new Error('budgetingMethod is required for create action');
-      if (!objective) throw new Error('objective is required for create action');
+      if (!name) throw kibanaServiceError('name is required for create action');
+      if (!indicator) throw kibanaServiceError('indicator is required for create action');
+      if (!timeWindow) throw kibanaServiceError('timeWindow is required for create action');
+      if (!budgetingMethod)
+        throw kibanaServiceError('budgetingMethod is required for create action');
+      if (!objective) throw kibanaServiceError('objective is required for create action');
 
       let s = await client.createSLO({
         name,
@@ -230,7 +232,7 @@ Supports KQL, metric custom, and histogram indicator types with occurrences or t
     }
 
     if (action === 'update') {
-      if (!sloId) throw new Error('sloId is required for update action');
+      if (!sloId) throw kibanaServiceError('sloId is required for update action');
       let updateParams: Record<string, any> = {};
       if (name !== undefined) updateParams.name = name;
       if (description !== undefined) updateParams.description = description;
@@ -261,7 +263,7 @@ Supports KQL, metric custom, and histogram indicator types with occurrences or t
     }
 
     if (action === 'delete') {
-      if (!sloId) throw new Error('sloId is required for delete action');
+      if (!sloId) throw kibanaServiceError('sloId is required for delete action');
       await client.deleteSLO(sloId);
       return {
         output: {
@@ -273,6 +275,6 @@ Supports KQL, metric custom, and histogram indicator types with occurrences or t
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw kibanaServiceError(`Unknown action: ${action}`);
   })
   .build();

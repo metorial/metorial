@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let roleSchema = z.object({
@@ -98,7 +99,7 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required');
+    if (!projectId) throw mongodbServiceError('projectId is required');
 
     let client = new AtlasClient(ctx.auth);
 
@@ -118,7 +119,7 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.username) throw new Error('username is required');
+      if (!ctx.input.username) throw mongodbServiceError('username is required');
       let authDb = ctx.input.databaseName || 'admin';
       let user = await client.getDatabaseUser(projectId, authDb, ctx.input.username);
       return {
@@ -136,9 +137,9 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.username) throw new Error('username is required');
+      if (!ctx.input.username) throw mongodbServiceError('username is required');
       if (!ctx.input.roles || ctx.input.roles.length === 0)
-        throw new Error('At least one role is required');
+        throw mongodbServiceError('At least one role is required');
       let authDb = ctx.input.databaseName || 'admin';
 
       let payload: any = {
@@ -169,7 +170,7 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.username) throw new Error('username is required');
+      if (!ctx.input.username) throw mongodbServiceError('username is required');
       let authDb = ctx.input.databaseName || 'admin';
       let payload: any = {};
       if (ctx.input.roles) payload.roles = ctx.input.roles;
@@ -198,7 +199,7 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.username) throw new Error('username is required');
+      if (!ctx.input.username) throw mongodbServiceError('username is required');
       let authDb = ctx.input.databaseName || 'admin';
       await client.deleteDatabaseUser(projectId, authDb, ctx.input.username);
       return {
@@ -214,6 +215,6 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { woocommerceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -74,7 +75,8 @@ export let createRefund = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.amount) throw new Error('amount is required for create action');
+    if (!ctx.input.amount)
+      throw woocommerceServiceError('amount is required for create action');
 
     let data: Record<string, any> = {
       amount: ctx.input.amount,

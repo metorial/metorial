@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ConnectClient } from '../lib/client';
+import { createConnectClient } from '../lib/connect-tool';
 import { spec } from '../spec';
 
 export let searchItems = SlateTool.create(spec, {
@@ -44,14 +44,7 @@ export let searchItems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.config.connectServerUrl) {
-      throw new Error('Connect server URL is required. Set it in the configuration.');
-    }
-
-    let client = new ConnectClient({
-      token: ctx.auth.token,
-      serverUrl: ctx.config.connectServerUrl
-    });
+    let client = createConnectClient(ctx);
 
     let filterParts: string[] = [];
     if (ctx.input.title) filterParts.push(`title co "${ctx.input.title}"`);

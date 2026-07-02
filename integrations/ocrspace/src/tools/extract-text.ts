@@ -2,37 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
-
-let languageEnum = z.enum([
-  'ara',
-  'bul',
-  'chs',
-  'cht',
-  'hrv',
-  'cze',
-  'dan',
-  'dut',
-  'eng',
-  'fin',
-  'fre',
-  'ger',
-  'gre',
-  'hun',
-  'kor',
-  'ita',
-  'jpn',
-  'pol',
-  'por',
-  'rus',
-  'slv',
-  'spa',
-  'swe',
-  'tha',
-  'tur',
-  'ukr',
-  'vnm',
-  'auto'
-]);
+import { languageEnum, validateLanguageForEngine, validateSingleSource } from './shared';
 
 export let extractText = SlateTool.create(spec, {
   name: 'Extract Text',
@@ -48,11 +18,11 @@ Enable table mode for structured documents like receipts and invoices.`,
   instructions: [
     'Provide exactly one of "sourceUrl" or "base64Image" as the input source.',
     'For Base64 input, include the content-type prefix, e.g. "data:image/png;base64,iVBOR...".',
-    'Use engine 3 with language "auto" for handwriting recognition or when language is unknown.'
+    'Use language "auto" with Engine 2 or Engine 3 when the language is unknown.'
   ],
   constraints: [
     'Free tier: max 1 MB file size, max 3 PDF pages, 25,000 requests/month.',
-    'Engine 3 is slower and still in development with no uptime guarantee.'
+    'Engine 3 has lower monthly conversion quotas, is slower for larger files and PDFs, and does not support searchable PDF output.'
   ],
   tags: {
     readOnly: true,
@@ -72,7 +42,7 @@ Enable table mode for structured documents like receipts and invoices.`,
         .optional()
         .default('eng')
         .describe(
-          'Language code for OCR recognition. Use "auto" for automatic detection (Engine 3 only).'
+          'Language code for OCR recognition. Use "auto" for automatic detection with Engine 2 or Engine 3.'
         ),
       ocrEngine: z
         .enum(['1', '2', '3'])
@@ -124,9 +94,8 @@ Enable table mode for structured documents like receipts and invoices.`,
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.input.sourceUrl && !ctx.input.base64Image) {
-      throw new Error('Either "sourceUrl" or "base64Image" must be provided.');
-    }
+    validateSingleSource(ctx.input);
+    validateLanguageForEngine(ctx.input.language, ctx.input.ocrEngine);
 
     let client = new Client({ token: ctx.auth.token });
 

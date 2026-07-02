@@ -1,18 +1,20 @@
 {
   "name": "@metorial/drift",
-  "description": "Manage contacts, conversations, and messaging for conversational marketing and sales. Create, retrieve, update, and delete contacts with custom attributes. Start conversations, send bot messages, retrieve message history, and export transcripts. Manage accounts for account-based marketing and retrieve active playbooks. Schedule and track meetings booked by visitors. List teams and manage user availability. Handle GDPR data retrieval and deletion requests. Provision users via SCIM 2.0. Receive real-time webhooks for new conversations, messages, contact updates, meeting bookings, playbook goals, and user availability changes.",
+  "description": "Manage contacts, conversations, and messaging for conversational marketing and sales. Create, retrieve, update, and delete contacts with custom attributes, list custom fields, post timeline events, start conversations, send bot messages, retrieve message history, export transcripts through attachments, inspect conversation status counts, manage accounts, retrieve playbooks, track booked meetings, list teams, inspect token metadata, and update user availability.",
   "categories": ["crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "manage contacts",
     "send bot messages",
     "retrieve conversation history",
     "export chat transcripts",
+    "post contact timeline events",
+    "list custom contact attributes",
+    "inspect conversation status counts",
     "schedule and track meetings",
     "manage accounts for ABM",
     "retrieve active playbooks",
     "manage user availability",
-    "handle GDPR requests",
-    "provision users via SCIM"
+    "inspect token metadata"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/drift.png"
 }

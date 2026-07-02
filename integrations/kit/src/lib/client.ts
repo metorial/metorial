@@ -1,24 +1,66 @@
-import { createAxios } from 'slates';
+import { createAxios, pickDefined } from 'slates';
+import { kitApiError, kitServiceError } from './errors';
 import type {
   KitAccount,
+  KitAccountEmailStats,
+  KitAccountGrowthStats,
   KitBroadcast,
-  KitBroadcastStats,
+  KitBroadcastClick,
+  KitBroadcastStatsSummary,
   KitCustomField,
   KitEmailTemplate,
   KitForm,
   KitPaginatedResponse,
+  KitPagination,
+  KitPost,
   KitPurchase,
   KitSegment,
   KitSequence,
+  KitSequenceEmail,
+  KitSnippet,
   KitSubscriber,
+  KitSubscriberStats,
   KitTag,
   KitWebhook
 } from './types';
+
+type PaginationParams = {
+  after?: string;
+  before?: string;
+  perPage?: number;
+  includeTotalCount?: boolean;
+};
+
+let defaultPagination: KitPagination = {
+  has_previous_page: false,
+  has_next_page: false,
+  start_cursor: null,
+  end_cursor: null,
+  per_page: 0
+};
+
+let paginated = <T>(body: Record<string, any>, key: string): KitPaginatedResponse<T> => ({
+  data: Array.isArray(body[key]) ? body[key] : Array.isArray(body.data) ? body.data : [],
+  pagination: body.pagination ?? defaultPagination
+});
+
+let applyPagination = (query: Record<string, any>, params?: PaginationParams) => {
+  if (params?.after) query.after = params.after;
+  if (params?.before) query.before = params.before;
+  if (params?.perPage) query.per_page = params.perPage;
+  if (params?.includeTotalCount !== undefined) {
+    query.include_total_count = params.includeTotalCount;
+  }
+};
 
 export class Client {
   private http: ReturnType<typeof createAxios>;
 
   constructor(private config: { token: string }) {
+    if (!config.token) {
+      throw kitServiceError('Kit authentication token is required.');
+    }
+
     this.http = createAxios({
       baseURL: 'https://api.kit.com/v4',
       headers: {
@@ -28,47 +70,60 @@ export class Client {
     });
 
     this.http.interceptors.request.use(reqConfig => {
-      // OAuth tokens are longer; API keys are shorter. Both work via different headers.
-      // We try Bearer first; if the token looks like an API key, also set that header.
-      // Kit accepts both simultaneously without issue.
       let headers = (reqConfig.headers ?? {}) as Record<string, string>;
       headers.Authorization = `Bearer ${this.config.token}`;
       headers['X-Kit-Api-Key'] = this.config.token;
       reqConfig.headers = headers as any;
       return reqConfig;
     });
-  }
 
-  // ──────────────────────────────────────────────
-  // Account
-  // ──────────────────────────────────────────────
+    this.http.interceptors.response.use(
+      response => response,
+      error => {
+        throw kitApiError(error);
+      }
+    );
+  }
 
   async getAccount(): Promise<KitAccount> {
     let response = await this.http.get('/account');
     return response.data;
   }
 
-  // ──────────────────────────────────────────────
-  // Subscribers
-  // ──────────────────────────────────────────────
+  async getEmailStats(): Promise<{ stats: KitAccountEmailStats }> {
+    let response = await this.http.get('/account/email_stats');
+    return response.data;
+  }
 
-  async listSubscribers(params?: {
-    after?: string;
-    before?: string;
-    perPage?: number;
-    status?: string;
-    sortField?: string;
-    sortOrder?: string;
-    createdAfter?: string;
-    createdBefore?: string;
-    updatedAfter?: string;
-    updatedBefore?: string;
-    emailAddress?: string;
-  }): Promise<KitPaginatedResponse<KitSubscriber>> {
+  async getGrowthStats(params?: {
+    starting?: string;
+    ending?: string;
+  }): Promise<{ stats: KitAccountGrowthStats }> {
+    let response = await this.http.get('/account/growth_stats', {
+      params: pickDefined({
+        starting: params?.starting,
+        ending: params?.ending
+      })
+    });
+    return response.data;
+  }
+
+  async listSubscribers(
+    params?: PaginationParams & {
+      status?: string;
+      sortField?: string;
+      sortOrder?: string;
+      createdAfter?: string;
+      createdBefore?: string;
+      updatedAfter?: string;
+      updatedBefore?: string;
+      emailAddress?: string;
+      include?: string[];
+      slim?: boolean;
+    }
+  ): Promise<KitPaginatedResponse<KitSubscriber>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
     if (params?.status) query.status = params.status;
     if (params?.sortField) query.sort_field = params.sortField;
     if (params?.sortOrder) query.sort_order = params.sortOrder;
@@ -77,9 +132,11 @@ export class Client {
     if (params?.updatedAfter) query.updated_after = params.updatedAfter;
     if (params?.updatedBefore) query.updated_before = params.updatedBefore;
     if (params?.emailAddress) query.email_address = params.emailAddress;
+    if (params?.include?.length) query.include = params.include.join(',');
+    if (params?.slim !== undefined) query.slim = params.slim;
 
     let response = await this.http.get('/subscribers', { params: query });
-    return response.data;
+    return paginated<KitSubscriber>(response.data, 'subscribers');
   }
 
   async getSubscriber(subscriberId: number): Promise<{ subscriber: KitSubscriber }> {
@@ -93,14 +150,15 @@ export class Client {
     state?: string;
     fields?: Record<string, string>;
   }): Promise<{ subscriber: KitSubscriber }> {
-    let body: Record<string, any> = {
-      email_address: data.emailAddress
-    };
-    if (data.firstName) body.first_name = data.firstName;
-    if (data.state) body.state = data.state;
-    if (data.fields) body.fields = data.fields;
-
-    let response = await this.http.post('/subscribers', body);
+    let response = await this.http.post(
+      '/subscribers',
+      pickDefined({
+        email_address: data.emailAddress,
+        first_name: data.firstName,
+        state: data.state,
+        fields: data.fields
+      })
+    );
     return response.data;
   }
 
@@ -112,12 +170,14 @@ export class Client {
       fields?: Record<string, string>;
     }
   ): Promise<{ subscriber: KitSubscriber }> {
-    let body: Record<string, any> = {};
-    if (data.emailAddress) body.email_address = data.emailAddress;
-    if (data.firstName) body.first_name = data.firstName;
-    if (data.fields) body.fields = data.fields;
-
-    let response = await this.http.put(`/subscribers/${subscriberId}`, body);
+    let response = await this.http.put(
+      `/subscribers/${subscriberId}`,
+      pickDefined({
+        email_address: data.emailAddress,
+        first_name: data.firstName,
+        fields: data.fields
+      })
+    );
     return response.data;
   }
 
@@ -126,39 +186,41 @@ export class Client {
     return response.data;
   }
 
-  async listTagsForSubscriber(
+  async getSubscriberStats(
     subscriberId: number,
     params?: {
-      after?: string;
-      before?: string;
-      perPage?: number;
+      emailSentAfter?: string;
+      emailSentBefore?: string;
     }
-  ): Promise<KitPaginatedResponse<KitTag>> {
-    let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
-
-    let response = await this.http.get(`/subscribers/${subscriberId}/tags`, { params: query });
+  ): Promise<{ subscriber: { id: number; stats: KitSubscriberStats } }> {
+    let response = await this.http.get(`/subscribers/${subscriberId}/stats`, {
+      params: pickDefined({
+        email_sent_after: params?.emailSentAfter,
+        email_sent_before: params?.emailSentBefore
+      })
+    });
     return response.data;
   }
 
-  // ──────────────────────────────────────────────
-  // Tags
-  // ──────────────────────────────────────────────
-
-  async listTags(params?: {
-    after?: string;
-    before?: string;
-    perPage?: number;
-  }): Promise<KitPaginatedResponse<KitTag>> {
+  async listTagsForSubscriber(
+    subscriberId: number,
+    params?: PaginationParams
+  ): Promise<KitPaginatedResponse<KitTag>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
+
+    let response = await this.http.get(`/subscribers/${subscriberId}/tags`, {
+      params: query
+    });
+    return paginated<KitTag>(response.data, 'tags');
+  }
+
+  async listTags(params?: PaginationParams): Promise<KitPaginatedResponse<KitTag>> {
+    let query: Record<string, any> = {};
+    applyPagination(query, params);
 
     let response = await this.http.get('/tags', { params: query });
-    return response.data;
+    return paginated<KitTag>(response.data, 'tags');
   }
 
   async createTag(name: string): Promise<{ tag: KitTag }> {
@@ -188,35 +250,28 @@ export class Client {
   }
 
   async removeTagFromSubscriberByEmail(tagId: number, emailAddress: string): Promise<void> {
-    await this.http.post(`/tags/${tagId}/subscribers/remove`, { email_address: emailAddress });
+    await this.http.delete(`/tags/${tagId}/subscribers`, {
+      data: { email_address: emailAddress }
+    });
   }
 
   async listSubscribersForTag(
     tagId: number,
-    params?: {
-      after?: string;
-      before?: string;
-      perPage?: number;
+    params?: PaginationParams & {
       status?: string;
     }
   ): Promise<KitPaginatedResponse<KitSubscriber>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
     if (params?.status) query.status = params.status;
 
     let response = await this.http.get(`/tags/${tagId}/subscribers`, { params: query });
-    return response.data;
+    return paginated<KitSubscriber>(response.data, 'subscribers');
   }
-
-  // ──────────────────────────────────────────────
-  // Custom Fields
-  // ──────────────────────────────────────────────
 
   async listCustomFields(): Promise<KitPaginatedResponse<KitCustomField>> {
     let response = await this.http.get('/custom_fields');
-    return response.data;
+    return paginated<KitCustomField>(response.data, 'custom_fields');
   }
 
   async createCustomField(label: string): Promise<{ custom_field: KitCustomField }> {
@@ -236,26 +291,19 @@ export class Client {
     await this.http.delete(`/custom_fields/${customFieldId}`);
   }
 
-  // ──────────────────────────────────────────────
-  // Forms
-  // ──────────────────────────────────────────────
-
-  async listForms(params?: {
-    type?: string;
-    status?: string;
-    after?: string;
-    before?: string;
-    perPage?: number;
-  }): Promise<KitPaginatedResponse<KitForm>> {
+  async listForms(
+    params?: PaginationParams & {
+      type?: string;
+      status?: string;
+    }
+  ): Promise<KitPaginatedResponse<KitForm>> {
     let query: Record<string, any> = {};
+    applyPagination(query, params);
     if (params?.type) query.type = params.type;
     if (params?.status) query.status = params.status;
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
 
     let response = await this.http.get('/forms', { params: query });
-    return response.data;
+    return paginated<KitForm>(response.data, 'forms');
   }
 
   async addSubscriberToForm(
@@ -278,39 +326,26 @@ export class Client {
 
   async listSubscribersForForm(
     formId: number,
-    params?: {
-      after?: string;
-      before?: string;
-      perPage?: number;
+    params?: PaginationParams & {
       status?: string;
     }
   ): Promise<KitPaginatedResponse<KitSubscriber>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
     if (params?.status) query.status = params.status;
 
     let response = await this.http.get(`/forms/${formId}/subscribers`, { params: query });
-    return response.data;
+    return paginated<KitSubscriber>(response.data, 'subscribers');
   }
 
-  // ──────────────────────────────────────────────
-  // Broadcasts
-  // ──────────────────────────────────────────────
-
-  async listBroadcasts(params?: {
-    after?: string;
-    before?: string;
-    perPage?: number;
-  }): Promise<KitPaginatedResponse<KitBroadcast>> {
+  async listBroadcasts(
+    params?: PaginationParams
+  ): Promise<KitPaginatedResponse<KitBroadcast>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
 
     let response = await this.http.get('/broadcasts', { params: query });
-    return response.data;
+    return paginated<KitBroadcast>(response.data, 'broadcasts');
   }
 
   async getBroadcast(broadcastId: number): Promise<{ broadcast: KitBroadcast }> {
@@ -327,29 +362,30 @@ export class Client {
     emailLayoutTemplate?: string;
     public?: boolean;
     publishedAt?: string;
-    sendAt?: string;
+    sendAt?: string | null;
     thumbnailAlt?: string;
     thumbnailUrl?: string;
     previewText?: string;
-    subscriberFilter?: Record<string, any>[];
+    subscriberFilter?: Record<string, unknown>[];
   }): Promise<{ broadcast: KitBroadcast }> {
-    let body: Record<string, any> = {};
-    if (data.subject !== undefined) body.subject = data.subject;
-    if (data.content !== undefined) body.content = data.content;
-    if (data.description !== undefined) body.description = data.description;
-    if (data.emailAddress !== undefined) body.email_address = data.emailAddress;
-    if (data.emailTemplateId !== undefined) body.email_template_id = data.emailTemplateId;
-    if (data.emailLayoutTemplate !== undefined)
-      body.email_layout_template = data.emailLayoutTemplate;
-    if (data.public !== undefined) body.public = data.public;
-    if (data.publishedAt !== undefined) body.published_at = data.publishedAt;
-    if (data.sendAt !== undefined) body.send_at = data.sendAt;
-    if (data.thumbnailAlt !== undefined) body.thumbnail_alt = data.thumbnailAlt;
-    if (data.thumbnailUrl !== undefined) body.thumbnail_url = data.thumbnailUrl;
-    if (data.previewText !== undefined) body.preview_text = data.previewText;
-    if (data.subscriberFilter !== undefined) body.subscriber_filter = data.subscriberFilter;
-
-    let response = await this.http.post('/broadcasts', body);
+    let response = await this.http.post(
+      '/broadcasts',
+      pickDefined({
+        subject: data.subject,
+        content: data.content,
+        description: data.description,
+        email_address: data.emailAddress,
+        email_template_id: data.emailTemplateId,
+        email_layout_template: data.emailLayoutTemplate,
+        public: data.public,
+        published_at: data.publishedAt,
+        send_at: data.sendAt,
+        thumbnail_alt: data.thumbnailAlt,
+        thumbnail_url: data.thumbnailUrl,
+        preview_text: data.previewText,
+        subscriber_filter: data.subscriberFilter
+      })
+    );
     return response.data;
   }
 
@@ -364,30 +400,31 @@ export class Client {
       emailLayoutTemplate?: string;
       public?: boolean;
       publishedAt?: string;
-      sendAt?: string;
+      sendAt?: string | null;
       thumbnailAlt?: string;
       thumbnailUrl?: string;
       previewText?: string;
-      subscriberFilter?: Record<string, any>[];
+      subscriberFilter?: Record<string, unknown>[];
     }
   ): Promise<{ broadcast: KitBroadcast }> {
-    let body: Record<string, any> = {};
-    if (data.subject !== undefined) body.subject = data.subject;
-    if (data.content !== undefined) body.content = data.content;
-    if (data.description !== undefined) body.description = data.description;
-    if (data.emailAddress !== undefined) body.email_address = data.emailAddress;
-    if (data.emailTemplateId !== undefined) body.email_template_id = data.emailTemplateId;
-    if (data.emailLayoutTemplate !== undefined)
-      body.email_layout_template = data.emailLayoutTemplate;
-    if (data.public !== undefined) body.public = data.public;
-    if (data.publishedAt !== undefined) body.published_at = data.publishedAt;
-    if (data.sendAt !== undefined) body.send_at = data.sendAt;
-    if (data.thumbnailAlt !== undefined) body.thumbnail_alt = data.thumbnailAlt;
-    if (data.thumbnailUrl !== undefined) body.thumbnail_url = data.thumbnailUrl;
-    if (data.previewText !== undefined) body.preview_text = data.previewText;
-    if (data.subscriberFilter !== undefined) body.subscriber_filter = data.subscriberFilter;
-
-    let response = await this.http.put(`/broadcasts/${broadcastId}`, body);
+    let response = await this.http.put(
+      `/broadcasts/${broadcastId}`,
+      pickDefined({
+        subject: data.subject,
+        content: data.content,
+        description: data.description,
+        email_address: data.emailAddress,
+        email_template_id: data.emailTemplateId,
+        email_layout_template: data.emailLayoutTemplate,
+        public: data.public,
+        published_at: data.publishedAt,
+        send_at: data.sendAt,
+        thumbnail_alt: data.thumbnailAlt,
+        thumbnail_url: data.thumbnailUrl,
+        preview_text: data.previewText,
+        subscriber_filter: data.subscriberFilter
+      })
+    );
     return response.data;
   }
 
@@ -395,27 +432,123 @@ export class Client {
     await this.http.delete(`/broadcasts/${broadcastId}`);
   }
 
-  async getBroadcastStats(broadcastId: number): Promise<{ broadcast: KitBroadcastStats }> {
+  async getBroadcastStats(
+    broadcastId: number
+  ): Promise<{ broadcast: { id: number; stats: KitBroadcastStatsSummary['stats'] } }> {
     let response = await this.http.get(`/broadcasts/${broadcastId}/stats`);
     return response.data;
   }
 
-  // ──────────────────────────────────────────────
-  // Sequences
-  // ──────────────────────────────────────────────
-
-  async listSequences(params?: {
-    after?: string;
-    before?: string;
-    perPage?: number;
-  }): Promise<KitPaginatedResponse<KitSequence>> {
+  async listBroadcastStats(
+    params?: PaginationParams & {
+      sentAfter?: string;
+      sentBefore?: string;
+    }
+  ): Promise<KitPaginatedResponse<KitBroadcastStatsSummary>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
+    if (params?.sentAfter) query.sent_after = params.sentAfter;
+    if (params?.sentBefore) query.sent_before = params.sentBefore;
+
+    let response = await this.http.get('/broadcasts/stats', { params: query });
+    return paginated<KitBroadcastStatsSummary>(response.data, 'broadcasts');
+  }
+
+  async getBroadcastLinkClicks(
+    broadcastId: number,
+    params?: PaginationParams
+  ): Promise<{ broadcastId: number; clicks: KitBroadcastClick[]; pagination: KitPagination }> {
+    let query: Record<string, any> = {};
+    applyPagination(query, params);
+
+    let response = await this.http.get(`/broadcasts/${broadcastId}/clicks`, {
+      params: query
+    });
+    return {
+      broadcastId: response.data.broadcast?.id ?? broadcastId,
+      clicks: response.data.broadcast?.clicks ?? [],
+      pagination: response.data.pagination ?? defaultPagination
+    };
+  }
+
+  async listSequences(params?: PaginationParams): Promise<KitPaginatedResponse<KitSequence>> {
+    let query: Record<string, any> = {};
+    applyPagination(query, params);
 
     let response = await this.http.get('/sequences', { params: query });
+    return paginated<KitSequence>(response.data, 'sequences');
+  }
+
+  async getSequence(sequenceId: number): Promise<{ sequence: KitSequence }> {
+    let response = await this.http.get(`/sequences/${sequenceId}`);
     return response.data;
+  }
+
+  async createSequence(data: {
+    name: string;
+    emailAddress?: string;
+    emailTemplateId?: number;
+    sendDays?: string[];
+    sendHour?: number;
+    timeZone?: string;
+    active?: boolean;
+    repeat?: boolean;
+    hold?: boolean;
+    excludeSubscriberSources?: Record<string, unknown>[];
+  }): Promise<{ sequence: KitSequence }> {
+    let response = await this.http.post(
+      '/sequences',
+      pickDefined({
+        name: data.name,
+        email_address: data.emailAddress,
+        email_template_id: data.emailTemplateId,
+        send_days: data.sendDays,
+        send_hour: data.sendHour,
+        time_zone: data.timeZone,
+        active: data.active,
+        repeat: data.repeat,
+        hold: data.hold,
+        exclude_subscriber_sources: data.excludeSubscriberSources
+      })
+    );
+    return response.data;
+  }
+
+  async updateSequence(
+    sequenceId: number,
+    data: {
+      name?: string;
+      emailAddress?: string;
+      emailTemplateId?: number | null;
+      sendDays?: string[];
+      sendHour?: number;
+      timeZone?: string;
+      active?: boolean;
+      repeat?: boolean;
+      hold?: boolean;
+      excludeSubscriberSources?: Record<string, unknown>[];
+    }
+  ): Promise<{ sequence: KitSequence }> {
+    let response = await this.http.put(
+      `/sequences/${sequenceId}`,
+      pickDefined({
+        name: data.name,
+        email_address: data.emailAddress,
+        email_template_id: data.emailTemplateId,
+        send_days: data.sendDays,
+        send_hour: data.sendHour,
+        time_zone: data.timeZone,
+        active: data.active,
+        repeat: data.repeat,
+        hold: data.hold,
+        exclude_subscriber_sources: data.excludeSubscriberSources
+      })
+    );
+    return response.data;
+  }
+
+  async deleteSequence(sequenceId: number): Promise<void> {
+    await this.http.delete(`/sequences/${sequenceId}`);
   }
 
   async addSubscriberToSequence(
@@ -440,59 +573,125 @@ export class Client {
 
   async listSubscribersForSequence(
     sequenceId: number,
-    params?: {
-      after?: string;
-      before?: string;
-      perPage?: number;
+    params?: PaginationParams & {
       status?: string;
     }
   ): Promise<KitPaginatedResponse<KitSubscriber>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
     if (params?.status) query.status = params.status;
 
     let response = await this.http.get(`/sequences/${sequenceId}/subscribers`, {
       params: query
     });
+    return paginated<KitSubscriber>(response.data, 'subscribers');
+  }
+
+  async listSequenceEmails(
+    sequenceId: number,
+    params?: PaginationParams & {
+      includeContent?: boolean;
+    }
+  ): Promise<KitPaginatedResponse<KitSequenceEmail>> {
+    let query: Record<string, any> = {};
+    applyPagination(query, params);
+    if (params?.includeContent !== undefined) query.include_content = params.includeContent;
+
+    let response = await this.http.get(`/sequences/${sequenceId}/emails`, {
+      params: query
+    });
+    return paginated<KitSequenceEmail>(response.data, 'emails');
+  }
+
+  async getSequenceEmail(
+    sequenceId: number,
+    emailId: number
+  ): Promise<{ email: KitSequenceEmail }> {
+    let response = await this.http.get(`/sequences/${sequenceId}/emails/${emailId}`);
     return response.data;
   }
 
-  // ──────────────────────────────────────────────
-  // Segments
-  // ──────────────────────────────────────────────
+  async createSequenceEmail(
+    sequenceId: number,
+    data: {
+      subject: string;
+      delayValue: number;
+      delayUnit: string;
+      previewText?: string | null;
+      content?: string | null;
+      emailTemplateId?: number | null;
+      published?: boolean;
+      sendDays?: string[] | null;
+      position?: number | null;
+    }
+  ): Promise<{ email: KitSequenceEmail }> {
+    let response = await this.http.post(
+      `/sequences/${sequenceId}/emails`,
+      pickDefined({
+        subject: data.subject,
+        delay_value: data.delayValue,
+        delay_unit: data.delayUnit,
+        preview_text: data.previewText,
+        content: data.content,
+        email_template_id: data.emailTemplateId,
+        published: data.published,
+        send_days: data.sendDays,
+        position: data.position
+      })
+    );
+    return response.data;
+  }
 
-  async listSegments(params?: {
-    after?: string;
-    before?: string;
-    perPage?: number;
-  }): Promise<KitPaginatedResponse<KitSegment>> {
+  async updateSequenceEmail(
+    sequenceId: number,
+    emailId: number,
+    data: {
+      subject?: string;
+      delayValue?: number;
+      delayUnit?: string;
+      previewText?: string | null;
+      content?: string | null;
+      emailTemplateId?: number | null;
+      published?: boolean;
+      sendDays?: string[] | null;
+      position?: number | null;
+    }
+  ): Promise<{ email: KitSequenceEmail }> {
+    let response = await this.http.put(
+      `/sequences/${sequenceId}/emails/${emailId}`,
+      pickDefined({
+        subject: data.subject,
+        delay_value: data.delayValue,
+        delay_unit: data.delayUnit,
+        preview_text: data.previewText,
+        content: data.content,
+        email_template_id: data.emailTemplateId,
+        published: data.published,
+        send_days: data.sendDays,
+        position: data.position
+      })
+    );
+    return response.data;
+  }
+
+  async deleteSequenceEmail(sequenceId: number, emailId: number): Promise<void> {
+    await this.http.delete(`/sequences/${sequenceId}/emails/${emailId}`);
+  }
+
+  async listSegments(params?: PaginationParams): Promise<KitPaginatedResponse<KitSegment>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
 
     let response = await this.http.get('/segments', { params: query });
-    return response.data;
+    return paginated<KitSegment>(response.data, 'segments');
   }
 
-  // ──────────────────────────────────────────────
-  // Purchases
-  // ──────────────────────────────────────────────
-
-  async listPurchases(params?: {
-    after?: string;
-    before?: string;
-    perPage?: number;
-  }): Promise<KitPaginatedResponse<KitPurchase>> {
+  async listPurchases(params?: PaginationParams): Promise<KitPaginatedResponse<KitPurchase>> {
     let query: Record<string, any> = {};
-    if (params?.after) query.after = params.after;
-    if (params?.before) query.before = params.before;
-    if (params?.perPage) query.per_page = params.perPage;
+    applyPagination(query, params);
 
     let response = await this.http.get('/purchases', { params: query });
-    return response.data;
+    return paginated<KitPurchase>(response.data, 'purchases');
   }
 
   async getPurchase(purchaseId: number): Promise<{ purchase: KitPurchase }> {
@@ -519,42 +718,125 @@ export class Client {
       quantity: number;
     }>;
   }): Promise<{ purchase: KitPurchase }> {
-    let body: Record<string, any> = {
-      email_address: data.emailAddress,
-      transaction_id: data.transactionId,
-      products: data.products.map(p => ({
-        name: p.name,
-        sku: p.sku,
-        pid: p.pid,
-        lid: p.lid,
-        unit_price: p.unitPrice,
-        quantity: p.quantity
-      }))
-    };
-    if (data.currency !== undefined) body.currency = data.currency;
-    if (data.transactionTime !== undefined) body.transaction_time = data.transactionTime;
-    if (data.subtotal !== undefined) body.subtotal = data.subtotal;
-    if (data.tax !== undefined) body.tax = data.tax;
-    if (data.discount !== undefined) body.discount = data.discount;
-    if (data.total !== undefined) body.total = data.total;
-    if (data.status !== undefined) body.status = data.status;
-
-    let response = await this.http.post('/purchases', body);
+    let response = await this.http.post(
+      '/purchases',
+      pickDefined({
+        email_address: data.emailAddress,
+        transaction_id: data.transactionId,
+        currency: data.currency,
+        transaction_time: data.transactionTime,
+        subtotal: data.subtotal,
+        tax: data.tax,
+        discount: data.discount,
+        total: data.total,
+        status: data.status,
+        products: data.products.map(p =>
+          pickDefined({
+            name: p.name,
+            sku: p.sku,
+            pid: p.pid,
+            lid: p.lid,
+            unit_price: p.unitPrice,
+            quantity: p.quantity
+          })
+        )
+      })
+    );
     return response.data;
   }
 
-  // ──────────────────────────────────────────────
-  // Email Templates
-  // ──────────────────────────────────────────────
+  async listEmailTemplates(
+    params?: PaginationParams
+  ): Promise<KitPaginatedResponse<KitEmailTemplate>> {
+    let query: Record<string, any> = {};
+    applyPagination(query, params);
 
-  async listEmailTemplates(): Promise<KitPaginatedResponse<KitEmailTemplate>> {
-    let response = await this.http.get('/email_templates');
+    let response = await this.http.get('/email_templates', { params: query });
+    return paginated<KitEmailTemplate>(response.data, 'email_templates');
+  }
+
+  async listPosts(
+    params?: PaginationParams & {
+      includeContent?: boolean;
+    }
+  ): Promise<KitPaginatedResponse<KitPost>> {
+    let query: Record<string, any> = {};
+    applyPagination(query, params);
+    if (params?.includeContent !== undefined) query.include_content = params.includeContent;
+
+    let response = await this.http.get('/posts', { params: query });
+    return paginated<KitPost>(response.data, 'posts');
+  }
+
+  async getPost(postId: number): Promise<{ post: KitPost }> {
+    let response = await this.http.get(`/posts/${postId}`);
     return response.data;
   }
 
-  // ──────────────────────────────────────────────
-  // Webhooks
-  // ──────────────────────────────────────────────
+  async listSnippets(
+    params?: PaginationParams & {
+      snippetType?: string;
+      archived?: boolean;
+      includeContent?: boolean;
+    }
+  ): Promise<KitPaginatedResponse<KitSnippet>> {
+    let query: Record<string, any> = {};
+    applyPagination(query, params);
+    if (params?.snippetType) query.snippet_type = params.snippetType;
+    if (params?.archived !== undefined) query.archived = params.archived;
+    if (params?.includeContent !== undefined) query.include_content = params.includeContent;
+
+    let response = await this.http.get('/snippets', { params: query });
+    return paginated<KitSnippet>(response.data, 'snippets');
+  }
+
+  async getSnippet(snippetId: number): Promise<{ snippet: KitSnippet }> {
+    let response = await this.http.get(`/snippets/${snippetId}`);
+    return response.data;
+  }
+
+  async createSnippet(data: {
+    name: string;
+    snippetType: 'inline' | 'block';
+    content?: string;
+    documentHtml?: string;
+  }): Promise<{ snippet: KitSnippet }> {
+    let response = await this.http.post(
+      '/snippets',
+      pickDefined({
+        name: data.name,
+        snippet_type: data.snippetType,
+        content: data.content,
+        document_attributes:
+          data.documentHtml !== undefined ? { value_html: data.documentHtml } : undefined
+      })
+    );
+    return response.data;
+  }
+
+  async updateSnippet(
+    snippetId: number,
+    data: {
+      name?: string;
+      snippetType?: 'inline' | 'block';
+      archived?: boolean;
+      content?: string;
+      documentHtml?: string;
+    }
+  ): Promise<{ snippet: KitSnippet }> {
+    let response = await this.http.put(
+      `/snippets/${snippetId}`,
+      pickDefined({
+        name: data.name,
+        snippet_type: data.snippetType,
+        archived: data.archived,
+        content: data.content,
+        document_attributes:
+          data.documentHtml !== undefined ? { value_html: data.documentHtml } : undefined
+      })
+    );
+    return response.data;
+  }
 
   async createWebhook(
     targetUrl: string,
@@ -567,24 +849,23 @@ export class Client {
       initiatorValue?: string;
     }
   ): Promise<{ webhook: KitWebhook }> {
-    let eventPayload: Record<string, any> = { name: event.name };
-    if (event.formId !== undefined) eventPayload.form_id = event.formId;
-    if (event.sequenceId !== undefined) eventPayload.sequence_id = event.sequenceId;
-    if (event.tagId !== undefined) eventPayload.tag_id = event.tagId;
-    if (event.productId !== undefined) eventPayload.product_id = event.productId;
-    if (event.initiatorValue !== undefined)
-      eventPayload.initiator_value = event.initiatorValue;
-
     let response = await this.http.post('/webhooks', {
       target_url: targetUrl,
-      event: eventPayload
+      event: pickDefined({
+        name: event.name,
+        form_id: event.formId,
+        sequence_id: event.sequenceId,
+        tag_id: event.tagId,
+        product_id: event.productId,
+        initiator_value: event.initiatorValue
+      })
     });
     return response.data;
   }
 
   async listWebhooks(): Promise<KitPaginatedResponse<KitWebhook>> {
     let response = await this.http.get('/webhooks');
-    return response.data;
+    return paginated<KitWebhook>(response.data, 'webhooks');
   }
 
   async deleteWebhook(webhookId: number): Promise<void> {

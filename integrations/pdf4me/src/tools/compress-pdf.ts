@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let compressPdf = SlateTool.create(spec, {
   name: 'Compress PDF',
@@ -33,12 +34,7 @@ export let compressPdf = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded compressed PDF content'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -49,7 +45,8 @@ export let compressPdf = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully compressed PDF using **${ctx.input.profile}** profile: **${result.fileName}**`
     };
   })

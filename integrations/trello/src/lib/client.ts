@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { trelloApiError } from './errors';
 
 export class TrelloClient {
   private http: ReturnType<typeof createAxios>;
@@ -14,6 +15,10 @@ export class TrelloClient {
         'Content-Type': 'application/json'
       }
     });
+    this.http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(trelloApiError(error))
+    );
   }
 
   private params(extra?: Record<string, any>): Record<string, any> {
@@ -539,6 +544,43 @@ export class TrelloClient {
     return response.data;
   }
 
+  async createCustomField(data: {
+    boardId: string;
+    name: string;
+    type: string;
+    pos?: string;
+    display_cardFront?: boolean;
+  }): Promise<any> {
+    let response = await this.http.post(
+      '/customFields',
+      {
+        idModel: data.boardId,
+        modelType: 'board',
+        name: data.name,
+        type: data.type,
+        pos: data.pos || 'bottom',
+        display_cardFront: data.display_cardFront
+      },
+      {
+        params: this.params()
+      }
+    );
+    return response.data;
+  }
+
+  async updateCustomField(customFieldId: string, data: Record<string, any>): Promise<any> {
+    let response = await this.http.put(`/customFields/${customFieldId}`, data, {
+      params: this.params()
+    });
+    return response.data;
+  }
+
+  async deleteCustomField(customFieldId: string): Promise<void> {
+    await this.http.delete(`/customFields/${customFieldId}`, {
+      params: this.params()
+    });
+  }
+
   async getCardCustomFieldItems(cardId: string): Promise<any[]> {
     let response = await this.http.get(`/cards/${cardId}/customFieldItems`, {
       params: this.params()
@@ -549,11 +591,11 @@ export class TrelloClient {
   async setCardCustomFieldValue(
     cardId: string,
     customFieldId: string,
-    value: Record<string, any>
+    value: { value?: Record<string, any>; idValue?: string }
   ): Promise<any> {
     let response = await this.http.put(
       `/cards/${cardId}/customField/${customFieldId}/item`,
-      { value },
+      value,
       { params: this.params() }
     );
     return response.data;

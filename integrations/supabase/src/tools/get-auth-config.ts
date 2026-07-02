@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { requireProjectRef } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getAuthConfig = SlateTool.create(spec, {
@@ -32,18 +33,13 @@ export let getAuthConfig = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectRef = ctx.input.projectRef ?? ctx.config.projectRef;
-    if (!projectRef) {
-      throw new Error(
-        'projectRef is required — provide it as input or set it in the configuration'
-      );
-    }
+    let projectRef = requireProjectRef(ctx.input.projectRef ?? ctx.config.projectRef);
 
     let client = new ManagementClient(ctx.auth.token);
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.settings) {
-        throw new Error('settings are required for update action');
+        throw createApiServiceError('settings are required for update action');
       }
       let result = await client.updateAuthConfig(projectRef, ctx.input.settings);
       return {

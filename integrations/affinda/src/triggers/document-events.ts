@@ -1,6 +1,7 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { affindaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let documentEvents = SlateTrigger.create(spec, {
@@ -53,7 +54,7 @@ export let documentEvents = SlateTrigger.create(spec, {
       let orgIdentifier = orgList[0]?.identifier;
 
       if (!orgIdentifier) {
-        throw new Error(
+        throw affindaServiceError(
           'No organization found. An organization is required to register webhooks.'
         );
       }

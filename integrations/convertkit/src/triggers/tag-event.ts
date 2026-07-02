@@ -1,6 +1,6 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let tagEvent = SlateTrigger.create(spec, {
@@ -34,7 +34,7 @@ export let tagEvent = SlateTrigger.create(spec, {
   )
   .webhook({
     autoRegisterWebhook: async ctx => {
-      let client = new Client({ token: ctx.auth.token });
+      let client = createClient(ctx.auth);
 
       // We need to register for all tags. Since the API requires a specific tag_id,
       // we list all tags and register webhooks for each.
@@ -63,7 +63,7 @@ export let tagEvent = SlateTrigger.create(spec, {
     },
 
     autoUnregisterWebhook: async ctx => {
-      let client = new Client({ token: ctx.auth.token });
+      let client = createClient(ctx.auth);
       let details = ctx.input.registrationDetails as { webhookIds: number[] };
 
       for (let webhookId of details.webhookIds) {

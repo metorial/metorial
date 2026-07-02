@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FreshdeskClient } from '../lib/client';
+import { freshdeskServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listTimeEntries = SlateTool.create(spec, {
@@ -124,6 +125,102 @@ export let createTimeEntry = SlateTool.create(spec, {
         createdAt: entry.created_at
       },
       message: `Logged **${entry.time_spent}** on ticket **#${ctx.input.ticketId}**`
+    };
+  })
+  .build();
+
+export let updateTimeEntry = SlateTool.create(spec, {
+  name: 'Update Time Entry',
+  key: 'update_time_entry',
+  description: `Updates a Freshdesk time entry. Use this to correct the time spent, billable flag, agent attribution, or work note on an existing ticket time log.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      timeEntryId: z.number().describe('ID of the time entry to update'),
+      timeSpent: z.string().optional().describe('Time spent in HH:MM format'),
+      agentId: z.number().optional().describe('Updated agent ID'),
+      billable: z.boolean().optional().describe('Whether the time entry is billable'),
+      note: z.string().optional().describe('Updated work note')
+    })
+  )
+  .output(
+    z.object({
+      timeEntryId: z.number().describe('ID of the updated time entry'),
+      ticketId: z.number().nullable().describe('Parent ticket ID'),
+      timeSpent: z.string().nullable().describe('Time spent in HH:MM format'),
+      billable: z.boolean().describe('Whether the time is billable'),
+      updatedAt: z.string().nullable().describe('Last update timestamp')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let updateData: Record<string, any> = {};
+    if (ctx.input.timeSpent !== undefined) updateData.time_spent = ctx.input.timeSpent;
+    if (ctx.input.agentId !== undefined) updateData.agent_id = ctx.input.agentId;
+    if (ctx.input.billable !== undefined) updateData.billable = ctx.input.billable;
+    if (ctx.input.note !== undefined) updateData.note = ctx.input.note;
+
+    if (Object.keys(updateData).length === 0) {
+      throw freshdeskServiceError('Provide at least one field to update on the time entry.');
+    }
+
+    let client = new FreshdeskClient({
+      subdomain: ctx.config.subdomain,
+      token: ctx.auth.token
+    });
+
+    let entry = await client.updateTimeEntry(ctx.input.timeEntryId, updateData);
+
+    return {
+      output: {
+        timeEntryId: entry.id,
+        ticketId: entry.ticket_id ?? null,
+        timeSpent: entry.time_spent ?? null,
+        billable: entry.billable ?? false,
+        updatedAt: entry.updated_at ?? null
+      },
+      message: `Updated time entry **#${entry.id}**`
+    };
+  })
+  .build();
+
+export let deleteTimeEntry = SlateTool.create(spec, {
+  name: 'Delete Time Entry',
+  key: 'delete_time_entry',
+  description: `Deletes a Freshdesk time entry from a ticket.`,
+  tags: {
+    destructive: true,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      timeEntryId: z.number().describe('ID of the time entry to delete')
+    })
+  )
+  .output(
+    z.object({
+      timeEntryId: z.number().describe('ID of the deleted time entry'),
+      deleted: z.boolean().describe('Whether deletion succeeded')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new FreshdeskClient({
+      subdomain: ctx.config.subdomain,
+      token: ctx.auth.token
+    });
+
+    await client.deleteTimeEntry(ctx.input.timeEntryId);
+
+    return {
+      output: {
+        timeEntryId: ctx.input.timeEntryId,
+        deleted: true
+      },
+      message: `Deleted time entry **#${ctx.input.timeEntryId}**`
     };
   })
   .build();

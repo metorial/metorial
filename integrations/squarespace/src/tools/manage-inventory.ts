@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { squarespaceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageInventory = SlateTool.create(spec, {
@@ -106,7 +107,7 @@ export let manageInventory = SlateTool.create(spec, {
 
     if (ctx.input.action === 'adjust') {
       if (!ctx.input.idempotencyKey) {
-        throw new Error('idempotencyKey is required for inventory adjustments');
+        throw squarespaceServiceError('idempotencyKey is required for inventory adjustments');
       }
 
       let hasOperations =
@@ -116,7 +117,7 @@ export let manageInventory = SlateTool.create(spec, {
         (ctx.input.setUnlimitedOperations?.length || 0);
 
       if (!hasOperations) {
-        throw new Error('At least one adjustment operation is required');
+        throw squarespaceServiceError('At least one adjustment operation is required');
       }
 
       await client.adjustInventory(
@@ -138,6 +139,6 @@ export let manageInventory = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw squarespaceServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

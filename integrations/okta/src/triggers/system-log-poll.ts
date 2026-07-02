@@ -58,7 +58,8 @@ export let systemLogPollTrigger = SlateTrigger.create(spec, {
     pollEvents: async ctx => {
       let client = new OktaClient({
         domain: ctx.config.domain,
-        token: ctx.auth.token
+        token: ctx.auth.token,
+        authMethod: ctx.auth.authMethod
       });
 
       // Use the last polled timestamp or default to 10 minutes ago

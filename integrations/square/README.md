@@ -40,6 +40,14 @@ Retrieve a specific catalog object by its ID. Returns full object data including
 
 Retrieve full details of a specific customer profile by ID. Returns contact information, address, notes, preferences, and group memberships.
 
+### Get Location
+
+Retrieve details for a single Square business location. Use "main" as the location ID to retrieve the main location.
+
+### Get Merchant
+
+Retrieve the authenticated Square merchant profile, or a specific merchant profile by merchant ID.
+
 ### Get Inventory Counts
 
 Retrieve inventory counts for one or more catalog item variations. Can look up counts for a single item variation or batch retrieve counts for multiple items across locations.
@@ -55,6 +63,10 @@ Retrieve full details of a specific order by its ID. Returns line items, taxes, 
 ### Get Payment
 
 Retrieve full details of a specific payment by its ID. Returns comprehensive payment information including amount, status, card details, and receipt URL.
+
+### Get Refund
+
+Retrieve full details for a Square payment refund by refund ID.
 
 ### List Customers
 
@@ -72,6 +84,10 @@ Retrieve all business locations associated with the Square account. Returns loca
 
 Retrieve a list of payments taken by the Square account. Supports filtering by time range, location, and pagination. Returns payment details including amounts, status, and source type.
 
+### List Refunds
+
+Retrieve Square payment refunds with pagination and filters for created time, updated time, location, status, and source type.
+
 ### Manage Invoice
 
 Publish, cancel, or delete an invoice. Publishing sends the invoice to the customer. Canceling stops a published invoice. Deleting permanently removes a draft invoice.
@@ -79,6 +95,10 @@ Publish, cancel, or delete an invoice. Publishing sends the invoice to the custo
 ### Manage Payment
 
 Complete or cancel an existing payment. Use "complete" to capture a previously authorized (delayed) payment, or "cancel" to void it.
+
+### Pay Order
+
+Mark a Square order as paid using approved delayed-capture payment IDs, or settle a zero-total order with an empty payment IDs array.
 
 ### Refund Payment
 
@@ -88,6 +108,14 @@ Issue a full or partial refund for a Square payment. Specify the payment ID and 
 
 Search the Square catalog for items, variations, categories, taxes, discounts, and other catalog objects. Supports text search, category filtering, and object type filtering.
 
+### Search Customers
+
+Search Square customer profiles using common filters or an advanced Square customer query object.
+
+### Search Invoices
+
+Search Square invoices for a location, optionally narrowed to one customer.
+
 ### Search Orders
 
 Search for orders across one or more locations. Supports filtering by date range, fulfillment state, customer, and other criteria. Use this to find and list orders.
@@ -95,6 +123,14 @@ Search for orders across one or more locations. Supports filtering by date range
 ### Update Customer
 
 Update an existing customer profile. Only provided fields will be updated; omitted fields remain unchanged.
+
+### Update Invoice
+
+Update a Square invoice using sparse invoice fields and the current invoice version.
+
+### Update Order
+
+Update an open Square order using sparse order fields and the current order version.
 
 ### Upsert Catalog Object
 

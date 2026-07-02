@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient, extractPaginationCursor } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -68,7 +69,7 @@ export let manageCoupons = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!externalId) throw new Error('externalId is required');
+      if (!externalId) throw klaviyoServiceError('externalId is required');
       let result = await client.createCoupon({ external_id: externalId, description });
       let c = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -78,8 +79,8 @@ export let manageCoupons = SlateTool.create(spec, {
     }
 
     if (action === 'create_codes') {
-      if (!couponId) throw new Error('couponId is required');
-      if (!codes?.length) throw new Error('codes are required');
+      if (!couponId) throw klaviyoServiceError('couponId is required');
+      if (!codes?.length) throw klaviyoServiceError('codes are required');
       await client.createCouponCodes(couponId, codes);
       return {
         output: { couponId, success: true },
@@ -87,6 +88,6 @@ export let manageCoupons = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw klaviyoServiceError(`Unknown action: ${action}`);
   })
   .build();

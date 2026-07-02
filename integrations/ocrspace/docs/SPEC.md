@@ -31,12 +31,12 @@ Extracts text from images (JPG, PNG, GIF, BMP, TIFF) and PDF documents. Input ca
 Three OCR engines are available, selectable via the `OCREngine` parameter:
 
 - **Engine 1:** Fastest engine, supports the widest range of languages including Asian languages, and multi-page TIFF.
-- **Engine 2:** Better for text on complex backgrounds (road signs, license plates, memes), special characters, rotated text, and single character/number recognition. Supports automatic language detection.
-- **Engine 3:** Best text recognition quality with markdown-formatted output, supports 200+ languages, handwriting recognition, automatic table/layout recognition, and checkbox detection. Slower for larger files and still in development with no uptime guarantee.
+- **Engine 2:** Recommended all-round choice for complex backgrounds (road signs, license plates, memes), special characters, rotated text, and single character/number recognition. Supports automatic language detection.
+- **Engine 3:** Best text recognition quality with markdown-formatted output, supports 200+ languages, handwriting recognition, automatic table/layout recognition, and checkbox detection. It has lower monthly conversion quotas, is slower for larger files, and does not support searchable PDF output.
 
 ### Language Support
 
-Supports over 25 explicitly listed languages (including Arabic, Chinese, Japanese, Korean, and major European languages) on Engines 1 and 2. Engine 3 supports 200+ languages with automatic language detection using the `language=auto` parameter.
+Supports over 25 explicitly listed languages (including Arabic, Chinese, Japanese, Korean, and major European languages) on Engines 1 and 2. Engines 2 and 3 support automatic language detection using the `language=auto` parameter.
 
 ### Searchable PDF Generation
 
@@ -45,16 +45,13 @@ Converts scanned images and PDFs into searchable (sandwich) PDFs with a text lay
 ### Text Overlay / Word Coordinates
 
 When `isOverlayRequired` is set to true, the API returns bounding box coordinates (position, height, width) for each recognized word, organized by lines. Useful for overlaying recognized text on top of the original image.
+Engine 3 can return overlay data, but the current OCR.space documentation notes that Engine 3 coordinates are less precise than Engine 1/2 and requesting overlay data makes Engine 3 calls slower.
 
 ### Image Preprocessing Options
 
 - **Auto-rotation:** The `detectOrientation` parameter auto-rotates images and reports the rotation angle.
 - **Upscaling:** The `scale` parameter enables internal upscaling to improve OCR results on low-resolution scans.
 - **Table mode:** The `isTable` parameter optimizes recognition for table-structured documents like receipts and invoices, ensuring line-by-line output.
-
-### Usage Tracking (PRO only)
-
-PRO and PRO PDF users can query their conversion counts via the `https://myapi.ocr.space/conversions` endpoint, broken down by OCR engine and time period.
 
 ## Events
 

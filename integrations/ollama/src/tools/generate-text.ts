@@ -1,7 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { modelOptionsSchema } from '../lib/schemas';
+import {
+  keepAliveSchema,
+  logprobSchema,
+  modelOptionsSchema,
+  thinkSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 export let generateText = SlateTool.create(spec, {
@@ -39,18 +44,22 @@ export let generateText = SlateTool.create(spec, {
         .describe(
           'Output format: "json" for JSON mode, or a JSON schema object for structured output.'
         ),
-      think: z
+      think: thinkSchema,
+      logprobs: z
         .boolean()
         .optional()
-        .describe('Enable reasoning/thinking output from the model.'),
+        .describe('Return log probabilities for generated tokens.'),
+      topLogprobs: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Number of likely alternative tokens to return when logprobs is enabled.'),
       raw: z
         .boolean()
         .optional()
         .describe('Skip prompt templating and pass the prompt directly.'),
-      keepAlive: z
-        .string()
-        .optional()
-        .describe('How long to keep the model loaded (e.g., "5m", "1h").'),
+      keepAlive: keepAliveSchema,
       options: modelOptionsSchema
     })
   )
@@ -67,7 +76,11 @@ export let generateText = SlateTool.create(spec, {
       doneReason: z.string().optional().describe('Reason generation stopped.'),
       totalDuration: z.number().optional().describe('Total time in nanoseconds.'),
       promptEvalCount: z.number().optional().describe('Number of prompt tokens evaluated.'),
-      evalCount: z.number().optional().describe('Number of tokens generated.')
+      evalCount: z.number().optional().describe('Number of tokens generated.'),
+      logprobs: z
+        .array(logprobSchema)
+        .optional()
+        .describe('Log probability information when logprobs was requested.')
     })
   )
   .handleInvocation(async ctx => {
@@ -84,6 +97,8 @@ export let generateText = SlateTool.create(spec, {
       images: ctx.input.images,
       format: ctx.input.format,
       think: ctx.input.think,
+      logprobs: ctx.input.logprobs,
+      topLogprobs: ctx.input.topLogprobs,
       raw: ctx.input.raw,
       keepAlive: ctx.input.keepAlive,
       options: ctx.input.options
@@ -101,7 +116,8 @@ export let generateText = SlateTool.create(spec, {
         doneReason: result.doneReason,
         totalDuration: result.totalDuration,
         promptEvalCount: result.promptEvalCount,
-        evalCount: result.evalCount
+        evalCount: result.evalCount,
+        logprobs: result.logprobs
       },
       message: `Generated text using **${result.model}**.${tokenInfo}`
     };

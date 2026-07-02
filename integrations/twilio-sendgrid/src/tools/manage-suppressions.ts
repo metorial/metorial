@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { twilioSendGridServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getSuppressions = SlateTool.create(spec, {
@@ -96,7 +97,9 @@ export let getSuppressions = SlateTool.create(spec, {
         );
         break;
       case 'group_unsubscribes':
-        if (!ctx.input.groupId) throw new Error('groupId is required for group_unsubscribes');
+        if (!ctx.input.groupId) {
+          throw twilioSendGridServiceError('groupId is required for group_unsubscribes.');
+        }
         results = await client.getGroupSuppressions(ctx.input.groupId);
         break;
       default:
@@ -153,7 +156,9 @@ export let addSuppression = SlateTool.create(spec, {
         message: `Added **${ctx.input.emails.length}** email(s) to global suppressions.`
       };
     } else {
-      if (!ctx.input.groupId) throw new Error('groupId is required for group suppressions');
+      if (!ctx.input.groupId) {
+        throw twilioSendGridServiceError('groupId is required for group suppressions.');
+      }
       let result = await client.addGroupSuppression(ctx.input.groupId, ctx.input.emails);
       return {
         output: { emails: result.recipient_emails || ctx.input.emails },
@@ -195,7 +200,9 @@ export let removeSuppression = SlateTool.create(spec, {
     if (ctx.input.scope === 'global') {
       await client.removeGlobalSuppression(ctx.input.email);
     } else {
-      if (!ctx.input.groupId) throw new Error('groupId is required for group suppressions');
+      if (!ctx.input.groupId) {
+        throw twilioSendGridServiceError('groupId is required for group suppressions.');
+      }
       await client.removeGroupSuppression(ctx.input.groupId, ctx.input.email);
     }
 

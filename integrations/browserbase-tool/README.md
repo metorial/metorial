@@ -1,6 +1,6 @@
 # <img src="logo.jpeg" height="20"> Browserbase
 
-Create and manage cloud-hosted headless browser sessions for web automation. Configure sessions with proxy settings, regional selection, timeouts, and stealth mode for anti-detection. Persist browser state (cookies, localStorage, authentication tokens) across sessions using contexts. Upload Chrome extensions and files to sessions, and retrieve downloaded files. Monitor and debug sessions via CDP logs, session recordings, and live debugger URLs. Retrieve project usage data including browser minutes and proxy bytes consumed.
+Create and manage cloud-hosted headless browser sessions for web automation. Configure sessions with proxy settings, regional selection, timeouts, and stealth mode for anti-detection. Persist browser state across sessions using contexts. Upload Chrome extensions and files to sessions, list and retrieve session downloads through Slate attachments, search and fetch web pages through Browserbase, inspect live sessions, and retrieve project usage data.
 
 ## License
 

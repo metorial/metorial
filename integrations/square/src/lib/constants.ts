@@ -1,0 +1,1 @@
+export let SQUARE_API_VERSION = '2026-05-20';

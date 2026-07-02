@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { driftApiError, driftServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -20,6 +21,11 @@ export let auth = SlateAuth.create()
         title: 'Contact Read',
         description: 'Listen to changes to contacts and query contacts',
         scope: 'contact_read'
+      },
+      {
+        title: 'All Contact Read',
+        description: 'Read contact metadata such as custom attributes',
+        scope: 'all_contact_read'
       },
       {
         title: 'Contact Write',
@@ -78,20 +84,25 @@ export let auth = SlateAuth.create()
     handleCallback: async ctx => {
       let axios = createAxios({ baseURL: 'https://driftapi.com' });
 
-      let response = await axios.post(
-        '/oauth2/token',
-        new URLSearchParams({
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          code: ctx.code,
-          grant_type: 'authorization_code'
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+      let response: any;
+      try {
+        response = await axios.post(
+          '/oauth2/token',
+          new URLSearchParams({
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            code: ctx.code,
+            grant_type: 'authorization_code'
+          }).toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw driftApiError(error, 'exchange OAuth code');
+      }
 
       let data = response.data;
 
@@ -108,22 +119,31 @@ export let auth = SlateAuth.create()
     },
 
     handleTokenRefresh: async (ctx: any) => {
+      if (!ctx.output.refreshToken) {
+        throw driftServiceError('Cannot refresh Drift OAuth token without a refresh token.');
+      }
+
       let axios = createAxios({ baseURL: 'https://driftapi.com' });
 
-      let response = await axios.post(
-        '/oauth2/token',
-        new URLSearchParams({
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken || '',
-          grant_type: 'refresh_token'
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+      let response: any;
+      try {
+        response = await axios.post(
+          '/oauth2/token',
+          new URLSearchParams({
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            refresh_token: ctx.output.refreshToken,
+            grant_type: 'refresh_token'
+          }).toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw driftApiError(error, 'refresh OAuth token');
+      }
 
       let data = response.data;
 
@@ -142,18 +162,25 @@ export let auth = SlateAuth.create()
     getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
       let axios = createAxios({ baseURL: 'https://driftapi.com' });
 
-      let response = await axios.get('/app/token', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+      try {
+        response = await axios.post('/app/token_info', {
+          access_token: ctx.output.token
+        });
+      } catch (error) {
+        throw driftApiError(error, 'get OAuth profile');
+      }
 
       let tokenInfo = response.data;
+      let orgId =
+        typeof tokenInfo.authenticated_userid === 'string'
+          ? tokenInfo.authenticated_userid.replace(/^orgId:/, '')
+          : undefined;
 
       return {
         profile: {
-          id: tokenInfo.orgId ? String(tokenInfo.orgId) : undefined,
-          name: tokenInfo.org?.name
+          id: orgId,
+          name: tokenInfo.credential_id
         }
       };
     }
@@ -178,18 +205,25 @@ export let auth = SlateAuth.create()
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
       let axios = createAxios({ baseURL: 'https://driftapi.com' });
 
-      let response = await axios.get('/app/token', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+      try {
+        response = await axios.post('/app/token_info', {
+          access_token: ctx.output.token
+        });
+      } catch (error) {
+        throw driftApiError(error, 'get token profile');
+      }
 
       let tokenInfo = response.data;
+      let orgId =
+        typeof tokenInfo.authenticated_userid === 'string'
+          ? tokenInfo.authenticated_userid.replace(/^orgId:/, '')
+          : undefined;
 
       return {
         profile: {
-          id: tokenInfo.orgId ? String(tokenInfo.orgId) : undefined,
-          name: tokenInfo.org?.name
+          id: orgId,
+          name: tokenInfo.credential_id
         }
       };
     }

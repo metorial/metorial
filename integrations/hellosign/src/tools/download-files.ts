@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let downloadFiles = SlateTool.create(spec, {
   name: 'Download Files',
   key: 'download_files',
-  description: `Get a download URL for the documents associated with a signature request or template. Returns a temporary URL that can be used to download the files as PDF or ZIP.`,
+  description: `Download the documents associated with a signature request or template. Returns the PDF or ZIP file as a Slate attachment and keeps structured output limited to metadata.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -26,9 +26,12 @@ export let downloadFiles = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      fileUrl: z.string().describe('Temporary URL to download the files'),
       resourceType: z.string().describe('Type of the resource'),
-      resourceId: z.string().describe('ID of the resource')
+      resourceId: z.string().describe('ID of the resource'),
+      fileType: z.string().describe('Downloaded file format'),
+      mimeType: z.string().describe('MIME type of the returned attachment'),
+      byteLength: z.number().describe('Decoded byte length of the returned attachment'),
+      attachmentCount: z.number().describe('Number of attachments returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -37,26 +40,25 @@ export let downloadFiles = SlateTool.create(spec, {
       authMethod: ctx.auth.authMethod
     });
 
-    let fileUrl: string;
+    let result: { contentBase64: string; mimeType: string; byteLength: number };
 
     if (ctx.input.resourceType === 'signature_request') {
-      let result = await client.getSignatureRequestFiles(
-        ctx.input.resourceId,
-        ctx.input.fileType
-      );
-      fileUrl = result.fileUrl;
+      result = await client.getSignatureRequestFiles(ctx.input.resourceId, ctx.input.fileType);
     } else {
-      let result = await client.getTemplateFiles(ctx.input.resourceId, ctx.input.fileType);
-      fileUrl = result.fileUrl;
+      result = await client.getTemplateFiles(ctx.input.resourceId, ctx.input.fileType);
     }
 
     return {
       output: {
-        fileUrl,
         resourceType: ctx.input.resourceType,
-        resourceId: ctx.input.resourceId
+        resourceId: ctx.input.resourceId,
+        fileType: ctx.input.fileType || 'pdf',
+        mimeType: result.mimeType,
+        byteLength: result.byteLength,
+        attachmentCount: 1
       },
-      message: `Download URL generated for ${ctx.input.resourceType} **${ctx.input.resourceId}** (${ctx.input.fileType || 'pdf'}).`
+      attachments: [createBase64Attachment(result.contentBase64, result.mimeType)],
+      message: `Downloaded ${ctx.input.resourceType} **${ctx.input.resourceId}** as a ${ctx.input.fileType || 'pdf'} attachment.`
     };
   })
   .build();

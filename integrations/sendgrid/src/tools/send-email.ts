@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -100,6 +100,29 @@ export let sendEmail = SlateTool.create(spec, {
       region: ctx.config.region
     });
 
+    let hasInlineContent = Boolean(ctx.input.textContent || ctx.input.htmlContent);
+    if (hasInlineContent && ctx.input.templateId) {
+      throw createApiServiceError(
+        'Provide either inline content or templateId when sending email, not both.'
+      );
+    }
+
+    if (!hasInlineContent && !ctx.input.templateId) {
+      throw createApiServiceError(
+        'Provide textContent, htmlContent, or templateId when sending email.'
+      );
+    }
+
+    if (
+      !ctx.input.templateId &&
+      !ctx.input.subject &&
+      ctx.input.personalizations.some(personalization => !personalization.subject)
+    ) {
+      throw createApiServiceError(
+        'subject is required unless every personalization has its own subject or a templateId is used.'
+      );
+    }
+
     let content: Array<{ type: string; value: string }> | undefined;
     if (ctx.input.textContent || ctx.input.htmlContent) {
       content = [];
@@ -157,7 +180,7 @@ export let sendEmail = SlateTool.create(spec, {
 
     return {
       output: {
-        accepted: response.status === 202,
+        accepted: response.status === 202 || response.status === 200,
         messageId
       },
       message: `Email ${ctx.input.sandboxMode ? 'validated (sandbox mode)' : 'accepted for delivery'} to **${recipientCount}** recipient(s)${messageId ? ` with message ID \`${messageId}\`` : ''}.`

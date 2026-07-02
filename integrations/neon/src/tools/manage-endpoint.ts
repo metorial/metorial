@@ -1,18 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NeonClient } from '../lib/client';
+import { neonValidationError } from '../lib/errors';
 import { spec } from '../spec';
 
 let endpointSchema = z.object({
   endpointId: z.string().describe('Unique identifier of the compute endpoint'),
   projectId: z.string().describe('Project the endpoint belongs to'),
   branchId: z.string().describe('Branch the endpoint is connected to'),
+  name: z.string().optional().describe('Optional endpoint name'),
   type: z.string().describe('Endpoint type: read_write or read_only'),
   host: z.string().optional().describe('Hostname for connecting to the endpoint'),
   currentState: z
     .string()
     .optional()
     .describe('Current state of the endpoint (init, active, idle, suspended)'),
+  pendingState: z.string().optional().describe('Pending endpoint state'),
+  regionId: z.string().optional().describe('Region where the endpoint runs'),
   autoscalingLimitMinCu: z
     .number()
     .optional()
@@ -25,6 +29,11 @@ let endpointSchema = z.object({
     .number()
     .optional()
     .describe('Seconds of inactivity before the endpoint is suspended'),
+  disabled: z.boolean().optional().describe('Whether connections are disabled'),
+  passwordlessAccess: z
+    .boolean()
+    .optional()
+    .describe('Whether passwordless access is enabled'),
   createdAt: z.string().describe('Timestamp when the endpoint was created'),
   updatedAt: z.string().describe('Timestamp when the endpoint was last updated')
 });
@@ -55,12 +64,17 @@ export let listEndpoints = SlateTool.create(spec, {
       endpointId: e.id,
       projectId: e.project_id,
       branchId: e.branch_id,
+      name: e.name,
       type: e.type,
       host: e.host,
       currentState: e.current_state,
+      pendingState: e.pending_state,
+      regionId: e.region_id,
       autoscalingLimitMinCu: e.autoscaling_limit_min_cu,
       autoscalingLimitMaxCu: e.autoscaling_limit_max_cu,
       suspendTimeoutSeconds: e.suspend_timeout_seconds,
+      disabled: e.disabled,
+      passwordlessAccess: e.passwordless_access,
       createdAt: e.created_at,
       updatedAt: e.updated_at
     }));
@@ -88,6 +102,11 @@ export let createEndpoint = SlateTool.create(spec, {
       type: z
         .enum(['read_write', 'read_only'])
         .describe('Endpoint type: read_write for primary or read_only for replicas'),
+      name: z.string().optional().describe('Optional endpoint name'),
+      regionId: z
+        .string()
+        .optional()
+        .describe('Region where the endpoint should run. Must be the project region.'),
       autoscalingLimitMinCu: z
         .number()
         .optional()
@@ -101,7 +120,12 @@ export let createEndpoint = SlateTool.create(spec, {
         .optional()
         .describe(
           'Seconds of inactivity before the endpoint suspends (0 to disable auto-suspend)'
-        )
+        ),
+      disabled: z.boolean().optional().describe('Whether connections should be disabled'),
+      passwordlessAccess: z
+        .boolean()
+        .optional()
+        .describe('Whether passwordless access should be enabled')
     })
   )
   .output(endpointSchema)
@@ -110,9 +134,13 @@ export let createEndpoint = SlateTool.create(spec, {
     let result = await client.createEndpoint(ctx.input.projectId, {
       branchId: ctx.input.branchId,
       type: ctx.input.type,
+      name: ctx.input.name,
+      regionId: ctx.input.regionId,
       autoscalingLimitMinCu: ctx.input.autoscalingLimitMinCu,
       autoscalingLimitMaxCu: ctx.input.autoscalingLimitMaxCu,
-      suspendTimeoutSeconds: ctx.input.suspendTimeoutSeconds
+      suspendTimeoutSeconds: ctx.input.suspendTimeoutSeconds,
+      disabled: ctx.input.disabled,
+      passwordlessAccess: ctx.input.passwordlessAccess
     });
 
     let e = result.endpoint;
@@ -122,12 +150,17 @@ export let createEndpoint = SlateTool.create(spec, {
         endpointId: e.id,
         projectId: e.project_id,
         branchId: e.branch_id,
+        name: e.name,
         type: e.type,
         host: e.host,
         currentState: e.current_state,
+        pendingState: e.pending_state,
+        regionId: e.region_id,
         autoscalingLimitMinCu: e.autoscaling_limit_min_cu,
         autoscalingLimitMaxCu: e.autoscaling_limit_max_cu,
         suspendTimeoutSeconds: e.suspend_timeout_seconds,
+        disabled: e.disabled,
+        passwordlessAccess: e.passwordless_access,
         createdAt: e.created_at,
         updatedAt: e.updated_at
       },
@@ -145,21 +178,41 @@ export let updateEndpoint = SlateTool.create(spec, {
     z.object({
       projectId: z.string().describe('ID of the project'),
       endpointId: z.string().describe('ID of the endpoint to update'),
+      name: z.string().optional().describe('New endpoint name'),
       autoscalingLimitMinCu: z.number().optional().describe('New minimum compute units'),
       autoscalingLimitMaxCu: z.number().optional().describe('New maximum compute units'),
       suspendTimeoutSeconds: z
         .number()
         .optional()
-        .describe('New suspend timeout in seconds (0 to disable)')
+        .describe('New suspend timeout in seconds (0 to disable)'),
+      disabled: z.boolean().optional().describe('Whether connections should be disabled'),
+      passwordlessAccess: z
+        .boolean()
+        .optional()
+        .describe('Whether passwordless access should be enabled')
     })
   )
   .output(endpointSchema)
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.name === undefined &&
+      ctx.input.autoscalingLimitMinCu === undefined &&
+      ctx.input.autoscalingLimitMaxCu === undefined &&
+      ctx.input.suspendTimeoutSeconds === undefined &&
+      ctx.input.disabled === undefined &&
+      ctx.input.passwordlessAccess === undefined
+    ) {
+      throw neonValidationError('Provide at least one endpoint field to update.');
+    }
+
     let client = new NeonClient({ token: ctx.auth.token });
     let result = await client.updateEndpoint(ctx.input.projectId, ctx.input.endpointId, {
+      name: ctx.input.name,
       autoscalingLimitMinCu: ctx.input.autoscalingLimitMinCu,
       autoscalingLimitMaxCu: ctx.input.autoscalingLimitMaxCu,
-      suspendTimeoutSeconds: ctx.input.suspendTimeoutSeconds
+      suspendTimeoutSeconds: ctx.input.suspendTimeoutSeconds,
+      disabled: ctx.input.disabled,
+      passwordlessAccess: ctx.input.passwordlessAccess
     });
 
     let e = result.endpoint;
@@ -169,12 +222,17 @@ export let updateEndpoint = SlateTool.create(spec, {
         endpointId: e.id,
         projectId: e.project_id,
         branchId: e.branch_id,
+        name: e.name,
         type: e.type,
         host: e.host,
         currentState: e.current_state,
+        pendingState: e.pending_state,
+        regionId: e.region_id,
         autoscalingLimitMinCu: e.autoscaling_limit_min_cu,
         autoscalingLimitMaxCu: e.autoscaling_limit_max_cu,
         suspendTimeoutSeconds: e.suspend_timeout_seconds,
+        disabled: e.disabled,
+        passwordlessAccess: e.passwordless_access,
         createdAt: e.created_at,
         updatedAt: e.updated_at
       },
@@ -251,12 +309,17 @@ export let controlEndpoint = SlateTool.create(spec, {
         endpointId: e.id,
         projectId: e.project_id,
         branchId: e.branch_id,
+        name: e.name,
         type: e.type,
         host: e.host,
         currentState: e.current_state,
+        pendingState: e.pending_state,
+        regionId: e.region_id,
         autoscalingLimitMinCu: e.autoscaling_limit_min_cu,
         autoscalingLimitMaxCu: e.autoscaling_limit_max_cu,
         suspendTimeoutSeconds: e.suspend_timeout_seconds,
+        disabled: e.disabled,
+        passwordlessAccess: e.passwordless_access,
         createdAt: e.created_at,
         updatedAt: e.updated_at
       },

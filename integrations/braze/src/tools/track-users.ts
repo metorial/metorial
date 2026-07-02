@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrazeClient } from '../lib/client';
+import { brazeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let userAliasSchema = z.object({
@@ -17,6 +18,12 @@ let userIdentifierSchema = z.object({
 });
 
 let attributeSchema = userIdentifierSchema.extend({
+  updateExistingOnly: z
+    .boolean()
+    .optional()
+    .describe(
+      'Maps to _update_existing_only. Set false to allow creating an alias-only user profile.'
+    ),
   firstName: z.string().optional().describe('First name'),
   lastName: z.string().optional().describe('Last name'),
   email: z.string().optional().describe('Email address'),
@@ -42,6 +49,7 @@ let attributeSchema = userIdentifierSchema.extend({
 
 let eventSchema = userIdentifierSchema.extend({
   name: z.string().describe('Name of the custom event'),
+  appId: z.string().optional().describe('Braze app identifier for the event'),
   time: z.string().describe('ISO 8601 timestamp of the event'),
   properties: z
     .record(z.string(), z.any())
@@ -51,6 +59,7 @@ let eventSchema = userIdentifierSchema.extend({
 
 let purchaseSchema = userIdentifierSchema.extend({
   productId: z.string().describe('Identifier for the purchased product'),
+  appId: z.string().optional().describe('Braze app identifier for the purchase'),
   currency: z.string().describe('ISO 4217 currency code (e.g. USD)'),
   price: z.number().describe('Price of the purchase'),
   quantity: z.number().optional().describe('Quantity purchased (defaults to 1)'),
@@ -61,17 +70,35 @@ let purchaseSchema = userIdentifierSchema.extend({
     .describe('Custom properties for the purchase')
 });
 
+let validateUserIdentifier = (item: z.infer<typeof userIdentifierSchema>, label: string) => {
+  let primaryCount =
+    (item.externalId ? 1 : 0) + (item.brazeId ? 1 : 0) + (item.userAlias ? 1 : 0);
+
+  if (primaryCount > 1) {
+    throw brazeServiceError(
+      `${label} must include at most one primary identifier: externalId, brazeId, or userAlias.`
+    );
+  }
+
+  if (primaryCount === 0 && !item.email && !item.phone) {
+    throw brazeServiceError(
+      `${label} must include at least one identifier: externalId, brazeId, userAlias, email, or phone.`
+    );
+  }
+};
+
 export let trackUsers = SlateTool.create(spec, {
   name: 'Track Users',
   key: 'track_users',
-  description: `Record user attributes, custom events, and purchases to Braze user profiles. Supports batch operations with up to 75 attributes, 75 events, and 75 purchases per call. Users are identified by external ID, Braze ID, user alias, email, or phone.`,
+  description: `Record user attributes, custom events, and purchases to Braze user profiles. Supports batch operations with up to 75 total objects per request across attributes, events, and purchases. Users are identified by external ID, Braze ID, user alias, email, or phone.`,
   instructions: [
     'At least one of attributes, events, or purchases must be provided.',
     'Each user object must include at least one identifier (externalId, brazeId, userAlias, email, or phone).',
+    'Each object can include only one primary identifier: externalId, brazeId, or userAlias.',
     'Custom attributes are merged with existing data. Set a custom attribute to null to remove it.'
   ],
   constraints: [
-    'Maximum 75 attributes, 75 events, and 75 purchases per request (225 total user updates).',
+    'Maximum 75 total attributes, events, and purchases per request on current Braze rate limits.',
     'Rate limited to 3,000 requests per 3 seconds.'
   ],
   tags: {
@@ -107,6 +134,23 @@ export let trackUsers = SlateTool.create(spec, {
       instanceUrl: ctx.config.instanceUrl
     });
 
+    let totalObjects =
+      (ctx.input.attributes?.length ?? 0) +
+      (ctx.input.events?.length ?? 0) +
+      (ctx.input.purchases?.length ?? 0);
+
+    if (totalObjects === 0) {
+      throw brazeServiceError(
+        'At least one attribute, event, or purchase object is required.'
+      );
+    }
+
+    if (totalObjects > 75) {
+      throw brazeServiceError(
+        'Braze /users/track accepts at most 75 total objects across attributes, events, and purchases.'
+      );
+    }
+
     let body: {
       attributes?: Record<string, any>[];
       events?: Record<string, any>[];
@@ -114,10 +158,13 @@ export let trackUsers = SlateTool.create(spec, {
     } = {};
 
     if (ctx.input.attributes) {
-      body.attributes = ctx.input.attributes.map(attr => {
+      body.attributes = ctx.input.attributes.map((attr, index) => {
+        validateUserIdentifier(attr, `attributes[${index}]`);
         let mapped: Record<string, any> = {};
         if (attr.externalId) mapped.external_id = attr.externalId;
         if (attr.brazeId) mapped.braze_id = attr.brazeId;
+        if (attr.updateExistingOnly !== undefined)
+          mapped._update_existing_only = attr.updateExistingOnly;
         if (attr.userAlias)
           mapped.user_alias = {
             alias_name: attr.userAlias.aliasName,
@@ -145,10 +192,12 @@ export let trackUsers = SlateTool.create(spec, {
     }
 
     if (ctx.input.events) {
-      body.events = ctx.input.events.map(evt => {
+      body.events = ctx.input.events.map((evt, index) => {
+        validateUserIdentifier(evt, `events[${index}]`);
         let mapped: Record<string, any> = { name: evt.name, time: evt.time };
         if (evt.externalId) mapped.external_id = evt.externalId;
         if (evt.brazeId) mapped.braze_id = evt.brazeId;
+        if (evt.appId) mapped.app_id = evt.appId;
         if (evt.userAlias)
           mapped.user_alias = {
             alias_name: evt.userAlias.aliasName,
@@ -162,7 +211,8 @@ export let trackUsers = SlateTool.create(spec, {
     }
 
     if (ctx.input.purchases) {
-      body.purchases = ctx.input.purchases.map(p => {
+      body.purchases = ctx.input.purchases.map((p, index) => {
+        validateUserIdentifier(p, `purchases[${index}]`);
         let mapped: Record<string, any> = {
           product_id: p.productId,
           currency: p.currency,
@@ -171,6 +221,7 @@ export let trackUsers = SlateTool.create(spec, {
         };
         if (p.externalId) mapped.external_id = p.externalId;
         if (p.brazeId) mapped.braze_id = p.brazeId;
+        if (p.appId) mapped.app_id = p.appId;
         if (p.userAlias)
           mapped.user_alias = {
             alias_name: p.userAlias.aliasName,

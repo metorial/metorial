@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AmplitudeClient } from '../lib/client';
+import { amplitudeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTaxonomyTool = SlateTool.create(spec, {
@@ -111,7 +112,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
         };
       }
       if (action === 'get') {
-        if (!ctx.input.eventType) throw new Error('eventType is required.');
+        if (!ctx.input.eventType) throw amplitudeServiceError('eventType is required.');
         let result = await client.getEventType(ctx.input.eventType);
         return {
           output: { item: result.data ?? result },
@@ -119,7 +120,9 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
         };
       }
       if (action === 'create') {
-        if (!ctx.input.create) throw new Error('create parameters are required.');
+        if (!ctx.input.create) {
+          throw amplitudeServiceError('create parameters are required.');
+        }
         let result = await client.createEventType({
           eventType: ctx.input.create.name,
           category: ctx.input.create.category,
@@ -132,7 +135,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
       }
       if (action === 'update') {
         if (!ctx.input.eventType || !ctx.input.update)
-          throw new Error('eventType and update parameters are required.');
+          throw amplitudeServiceError('eventType and update parameters are required.');
         let result = await client.updateEventType(ctx.input.eventType, {
           newEventType: ctx.input.update.newName,
           category: ctx.input.update.category,
@@ -144,7 +147,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
         };
       }
       if (action === 'delete') {
-        if (!ctx.input.eventType) throw new Error('eventType is required.');
+        if (!ctx.input.eventType) throw amplitudeServiceError('eventType is required.');
         let result = await client.deleteEventType(ctx.input.eventType);
         return {
           output: { result: result.data ?? result },
@@ -157,7 +160,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
     if (resourceType === 'event_property') {
       if (action === 'list') {
         if (!ctx.input.eventType)
-          throw new Error('eventType is required to list event properties.');
+          throw amplitudeServiceError('eventType is required to list event properties.');
         let result = await client.getEventProperties(ctx.input.eventType);
         return {
           output: { items: result.data ?? result },
@@ -166,7 +169,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
       }
       if (action === 'create') {
         if (!ctx.input.create || !ctx.input.eventType)
-          throw new Error('create parameters and eventType are required.');
+          throw amplitudeServiceError('create parameters and eventType are required.');
         let result = await client.createEventProperty({
           eventType: ctx.input.eventType,
           eventProperty: ctx.input.create.name,
@@ -184,7 +187,9 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
       }
       if (action === 'update') {
         if (!ctx.input.eventProperty || !ctx.input.eventType || !ctx.input.update)
-          throw new Error('eventProperty, eventType, and update parameters are required.');
+          throw amplitudeServiceError(
+            'eventProperty, eventType, and update parameters are required.'
+          );
         let result = await client.updateEventProperty(
           ctx.input.eventProperty,
           ctx.input.eventType,
@@ -205,7 +210,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
       }
       if (action === 'delete') {
         if (!ctx.input.eventProperty || !ctx.input.eventType)
-          throw new Error('eventProperty and eventType are required.');
+          throw amplitudeServiceError('eventProperty and eventType are required.');
         let result = await client.deleteEventProperty(
           ctx.input.eventProperty,
           ctx.input.eventType
@@ -227,7 +232,9 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
         };
       }
       if (action === 'create') {
-        if (!ctx.input.create) throw new Error('create parameters are required.');
+        if (!ctx.input.create) {
+          throw amplitudeServiceError('create parameters are required.');
+        }
         let result = await client.createUserProperty({
           userProperty: ctx.input.create.name,
           description: ctx.input.create.description,
@@ -243,7 +250,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
       }
       if (action === 'update') {
         if (!ctx.input.userProperty || !ctx.input.update)
-          throw new Error('userProperty and update parameters are required.');
+          throw amplitudeServiceError('userProperty and update parameters are required.');
         let result = await client.updateUserProperty(ctx.input.userProperty, {
           newUserPropertyValue: ctx.input.update.newName,
           description: ctx.input.update.description,
@@ -258,7 +265,9 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
         };
       }
       if (action === 'delete') {
-        if (!ctx.input.userProperty) throw new Error('userProperty is required.');
+        if (!ctx.input.userProperty) {
+          throw amplitudeServiceError('userProperty is required.');
+        }
         let result = await client.deleteUserProperty(ctx.input.userProperty);
         return {
           output: { result: result.data ?? result },
@@ -277,7 +286,9 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
         };
       }
       if (action === 'create') {
-        if (!ctx.input.create) throw new Error('create parameters are required.');
+        if (!ctx.input.create) {
+          throw amplitudeServiceError('create parameters are required.');
+        }
         let result = await client.createEventCategory({ name: ctx.input.create.name });
         return {
           output: { result: result.data ?? result },
@@ -285,7 +296,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
         };
       }
       if (action === 'delete') {
-        if (!ctx.input.categoryId) throw new Error('categoryId is required.');
+        if (!ctx.input.categoryId) throw amplitudeServiceError('categoryId is required.');
         let result = await client.deleteEventCategory(ctx.input.categoryId);
         return {
           output: { result: result.data ?? result },
@@ -294,6 +305,8 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
       }
     }
 
-    throw new Error(`Unsupported action "${action}" for resource type "${resourceType}".`);
+    throw amplitudeServiceError(
+      `Unsupported action "${action}" for resource type "${resourceType}".`
+    );
   })
   .build();

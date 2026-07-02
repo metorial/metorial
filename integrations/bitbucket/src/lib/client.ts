@@ -1,6 +1,25 @@
 import { createAxios } from '@slates/provider';
 import { bitbucketApiError } from './errors';
 
+type BitbucketRef = {
+  name?: unknown;
+  target?: {
+    hash?: unknown;
+  };
+};
+
+type BitbucketRefPage = {
+  values?: BitbucketRef[];
+};
+
+let encodePathSegment = (value: string) => encodeURIComponent(value);
+
+let encodeSourcePath = (path: string) =>
+  path.split('/').filter(Boolean).map(encodePathSegment).join('/');
+
+let bitbucketStringLiteral = (value: string) =>
+  `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
 export class Client {
   private api: ReturnType<typeof createAxios>;
 
@@ -515,20 +534,62 @@ export class Client {
   // ─── Source / File Browsing ───
 
   async getSource(repoSlug: string, opts: { revision: string; path: string }) {
-    let response = await this.api.get(
-      `/repositories/${this.params.workspace}/${repoSlug}/src/${opts.revision}/${opts.path}`
-    );
+    let response = await this.api.get(await this.buildSourcePath(repoSlug, opts));
     return response.data;
   }
 
   async getFileContent(repoSlug: string, opts: { revision: string; path: string }) {
-    let response = await this.api.get(
-      `/repositories/${this.params.workspace}/${repoSlug}/src/${opts.revision}/${opts.path}`,
+    let response = await this.api.get(await this.buildSourcePath(repoSlug, opts), {
+      headers: { Accept: 'application/json' }
+    });
+    return response.data;
+  }
+
+  private getRepositoryPath(repoSlug: string) {
+    return `/repositories/${encodePathSegment(this.params.workspace)}/${encodePathSegment(repoSlug)}`;
+  }
+
+  private async buildSourcePath(repoSlug: string, opts: { revision: string; path: string }) {
+    let revision = await this.resolveSourceRevision(repoSlug, opts.revision);
+    let sourcePath = encodeSourcePath(opts.path);
+    let repositoryPath = this.getRepositoryPath(repoSlug);
+
+    // Root source listings require a trailing slash. Non-root paths may be files.
+    if (!sourcePath) {
+      return `${repositoryPath}/src/${encodePathSegment(revision)}/`;
+    }
+
+    return `${repositoryPath}/src/${encodePathSegment(revision)}/${sourcePath}`;
+  }
+
+  private async resolveSourceRevision(repoSlug: string, revision: string) {
+    let branchHash = await this.findRefCommitHash(repoSlug, 'branches', revision);
+    if (branchHash) {
+      return branchHash;
+    }
+
+    let tagHash = await this.findRefCommitHash(repoSlug, 'tags', revision);
+    return tagHash ?? revision;
+  }
+
+  private async findRefCommitHash(
+    repoSlug: string,
+    refType: 'branches' | 'tags',
+    refName: string
+  ) {
+    let response = await this.api.get<BitbucketRefPage>(
+      `${this.getRepositoryPath(repoSlug)}/refs/${refType}`,
       {
-        headers: { Accept: 'application/json' }
+        params: {
+          q: `name = ${bitbucketStringLiteral(refName)}`,
+          pagelen: '2'
+        }
       }
     );
-    return response.data;
+
+    let matchingRef = response.data.values?.find(item => item.name === refName);
+    let hash = matchingRef?.target?.hash;
+    return typeof hash === 'string' && hash.length > 0 ? hash : undefined;
   }
 
   // ─── Diff ───

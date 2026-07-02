@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { activeCampaignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageLists = SlateTool.create(spec, {
@@ -79,7 +80,7 @@ export let manageLists = SlateTool.create(spec, {
           !ctx.input.senderUrl ||
           !ctx.input.senderReminder
         ) {
-          throw new Error(
+          throw activeCampaignServiceError(
             'name, stringId, senderUrl, and senderReminder are required for creating a list'
           );
         }
@@ -105,7 +106,9 @@ export let manageLists = SlateTool.create(spec, {
         };
       }
       case 'update': {
-        if (!ctx.input.listId) throw new Error('listId is required for updating a list');
+        if (!ctx.input.listId) {
+          throw activeCampaignServiceError('listId is required for updating a list');
+        }
         let updatePayload: Record<string, any> = {};
         if (ctx.input.name) updatePayload.name = ctx.input.name;
         if (ctx.input.stringId) updatePayload.stringid = ctx.input.stringId;
@@ -126,7 +129,9 @@ export let manageLists = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.listId) throw new Error('listId is required for deleting a list');
+        if (!ctx.input.listId) {
+          throw activeCampaignServiceError('listId is required for deleting a list');
+        }
         await client.deleteList(ctx.input.listId);
         return {
           output: { deleted: true },
@@ -134,7 +139,9 @@ export let manageLists = SlateTool.create(spec, {
         };
       }
       case 'get': {
-        if (!ctx.input.listId) throw new Error('listId is required for getting a list');
+        if (!ctx.input.listId) {
+          throw activeCampaignServiceError('listId is required for getting a list');
+        }
         let result = await client.getList(ctx.input.listId);
         let list = result.list;
         return {

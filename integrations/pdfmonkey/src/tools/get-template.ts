@@ -22,7 +22,8 @@ export let getTemplate = SlateTool.create(spec, {
       templateId: z.string().describe('ID of the template'),
       workspaceId: z.string().describe('ID of the workspace'),
       identifier: z.string().describe('Human-readable name of the template'),
-      editionMode: z.string().nullable().describe('Edition mode: code or visual'),
+      editionMode: z.string().nullable().describe('Edition mode: code or builder'),
+      outputType: z.string().nullable().describe('Template output type: pdf or image'),
       body: z.string().nullable().describe('Published HTML body'),
       bodyDraft: z.string().nullable().describe('Draft HTML body'),
       scssStyle: z.string().nullable().describe('Published SCSS styles'),
@@ -38,6 +39,8 @@ export let getTemplate = SlateTool.create(spec, {
         .nullable()
         .describe('Draft page layout settings'),
       documentTtl: z.number().nullable().describe('Auto-deletion TTL in seconds'),
+      pdfEngineId: z.string().nullable().describe('PDF engine ID used for generation'),
+      pdfEngineDraftId: z.string().nullable().describe('PDF engine ID used for previews'),
       folderId: z.string().nullable().describe('Folder ID the template belongs to'),
       createdAt: z.string().describe('Creation timestamp'),
       updatedAt: z.string().describe('Last update timestamp')
@@ -52,6 +55,7 @@ export let getTemplate = SlateTool.create(spec, {
       workspaceId: String(tmpl.app_id),
       identifier: String(tmpl.identifier),
       editionMode: tmpl.edition_mode ? String(tmpl.edition_mode) : null,
+      outputType: tmpl.output_type ? String(tmpl.output_type) : null,
       body: tmpl.body ? String(tmpl.body) : null,
       bodyDraft: tmpl.body_draft ? String(tmpl.body_draft) : null,
       scssStyle: tmpl.scss_style ? String(tmpl.scss_style) : null,
@@ -60,7 +64,9 @@ export let getTemplate = SlateTool.create(spec, {
       sampleDataDraft: tmpl.sample_data_draft ? String(tmpl.sample_data_draft) : null,
       settings: tmpl.settings as Record<string, unknown> | null,
       settingsDraft: tmpl.settings_draft as Record<string, unknown> | null,
-      documentTtl: tmpl.document_ttl != null ? Number(tmpl.document_ttl) : null,
+      documentTtl: tmpl.ttl != null ? Number(tmpl.ttl) : null,
+      pdfEngineId: tmpl.pdf_engine_id ? String(tmpl.pdf_engine_id) : null,
+      pdfEngineDraftId: tmpl.pdf_engine_draft_id ? String(tmpl.pdf_engine_draft_id) : null,
       folderId: tmpl.template_folder_id ? String(tmpl.template_folder_id) : null,
       createdAt: String(tmpl.created_at),
       updatedAt: String(tmpl.updated_at)

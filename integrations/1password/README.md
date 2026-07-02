@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/1password.png" height="20"> 1password
 
-Manage passwords, secrets, and sensitive credentials stored in encrypted vaults. Retrieve secrets using reference URIs, create/read/update/delete vault items including API keys, passwords, SSH keys, and file attachments. Generate passwords with configurable recipes. Share items securely with expiration and recipient controls. Manage vaults, users, and groups with permissions. Monitor account activity through audit events, item usage events, and sign-in attempt events for SIEM integration.
+Manage passwords, secrets, and sensitive credentials stored in encrypted vaults through the 1Password Connect Server API. Create, read, update, delete, list, and search vault items; inspect vault metadata; download item file attachments as Slate attachments; generate passwords; check Connect server health; and monitor account activity through audit, item usage, and sign-in events.
 
 ## Tools
 
@@ -12,21 +12,45 @@ Create a new item in a 1Password vault. Supports creating logins, passwords, API
 
 Delete an item from a 1Password vault. This permanently removes the item and cannot be undone. To archive an item instead, use the Update Item tool with a patch operation to set the state.
 
+### Get File Metadata
+
+Retrieve metadata for a specific file attachment on a 1Password item without downloading file bytes.
+
 ### Generate Password
 
 Generate a secure password using 1Password's password generator. Creates a temporary PASSWORD item in the specified vault with a generated password field, retrieves the generated value, then deletes the temporary item. Supports configuring length, character sets, and excluded characters.
 
 ### Get File Content
 
-Retrieve the content of a file attachment stored on a 1Password item. Use the Get Item tool first to discover file IDs and names attached to an item. Returns the file content as text.
+Download the content of a file attachment stored on a 1Password item. Use Get Item or List Files first to discover file IDs and names attached to an item. Returns file bytes through a Slate attachment and keeps structured output to metadata.
 
 ### Get Item
 
 Retrieve the full details of a specific item from a vault, including all fields, sections, files, and metadata. Use this to read passwords, API keys, notes, and other secrets stored in 1Password.
 
+### Get Prometheus Metrics
+
+Retrieve Prometheus metrics from the 1Password Connect server. Returns metrics text through a Slate attachment.
+
+### Get Server Heartbeat
+
+Ping the 1Password Connect server heartbeat endpoint to verify the server is reachable.
+
 ### Get Server Health
 
 Check the health and status of the 1Password Connect server, including its version and the status of dependent services. Useful for verifying connectivity and diagnosing issues.
+
+### Get Vault
+
+Retrieve metadata for a specific vault accessible to the Connect token.
+
+### List API Activity
+
+List recent API activity recorded by the 1Password Connect server, including action, result, actor, and affected resource metadata.
+
+### List Files
+
+List file attachments on a 1Password item. Returns metadata only.
 
 ### List Items
 

@@ -24,6 +24,10 @@ export interface SlatesRuntimeContext {
 export type SlatesTestClient = ReturnType<typeof createSlatesClient>;
 
 type LocalSlate = Parameters<typeof createLocalSlateTransport>[0]['slate'];
+interface LocalSlateLike {
+  readonly spec: unknown;
+  readonly actions: readonly unknown[];
+}
 type SlatesAction = Awaited<ReturnType<SlatesTestClient['listActions']>>['actions'][number];
 type SlatesToolAction = Extract<SlatesAction, { type: 'action.tool' }>;
 type SlatesTriggerAction = Extract<SlatesAction, { type: 'action.trigger' }>;
@@ -185,12 +189,12 @@ export let expectToolCall = async (d: {
 };
 
 export let createLocalSlateTestClient = (opts: {
-  slate: LocalSlate;
+  slate: LocalSlateLike;
   state?: SlatesProtocolClientOptions['state'];
   participants?: SlatesProtocolClientOptions['participants'];
 }) =>
   createSlatesClient({
-    transport: createLocalSlateTransport({ slate: opts.slate }),
+    transport: createLocalSlateTransport({ slate: opts.slate as LocalSlate }),
     state: opts.state,
     participants: opts.participants
   });

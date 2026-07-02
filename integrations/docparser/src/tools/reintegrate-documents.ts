@@ -19,16 +19,24 @@ export let reintegrateDocuments = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the re-integration was successfully scheduled')
+      success: z.boolean().describe('Whether the re-integration was successfully scheduled'),
+      totalReintegrated: z
+        .number()
+        .describe('Number of documents scheduled for re-integration'),
+      message: z.string().optional().describe('Message returned by Docparser')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.reintegrateDocuments(ctx.input.parserId, ctx.input.documentIds);
+    let result = await client.reintegrateDocuments(ctx.input.parserId, ctx.input.documentIds);
 
     return {
-      output: { success: true },
-      message: `Scheduled **${ctx.input.documentIds.length}** document(s) for re-integration in parser \`${ctx.input.parserId}\`.`
+      output: {
+        success: true,
+        totalReintegrated: result.totalReintegrated,
+        message: result.message
+      },
+      message: `Scheduled **${result.totalReintegrated}** document(s) for re-integration in parser \`${ctx.input.parserId}\`.`
     };
   })
   .build();

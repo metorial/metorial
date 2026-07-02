@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireReceiptSource } from '../lib/validation';
 import { spec } from '../spec';
 
 export let validateReceipt = SlateTool.create(spec, {
@@ -45,6 +46,14 @@ Useful for loyalty programs, cashback campaigns, rebate promotions, and warranty
         .string()
         .optional()
         .describe('Unique reference ID for tracking this validation'),
+      userId: z
+        .string()
+        .optional()
+        .describe('End-user identifier used by duplicate and similarity checks'),
+      subAccountId: z
+        .string()
+        .optional()
+        .describe('Sub-account identifier for reporting or billing segmentation'),
       incognito: z
         .boolean()
         .optional()
@@ -53,7 +62,15 @@ Useful for loyalty programs, cashback campaigns, rebate promotions, and warranty
       near: z
         .string()
         .optional()
-        .describe('Geographic location hint (e.g. "New York, NY, US")')
+        .describe('Geographic location hint (e.g. "New York, NY, US")'),
+      language: z
+        .string()
+        .optional()
+        .describe('Two-letter language hint. Leave empty for auto-detection.'),
+      customHeaderKey: z
+        .string()
+        .optional()
+        .describe('Custom header value to send with URL requests (x-custom-key)')
     })
   )
   .output(
@@ -72,6 +89,7 @@ Useful for loyalty programs, cashback campaigns, rebate promotions, and warranty
         .optional()
         .describe('List of validation checks that failed'),
       totalAmount: z.number().nullable().optional().describe('Total receipt amount'),
+      currencyCode: z.string().nullable().optional().describe('Detected currency code'),
       date: z.string().nullable().optional().describe('Receipt date in ISO 8601 format'),
       merchantName: z.string().nullable().optional().describe('Detected merchant name'),
       merchantAddress: z.string().nullable().optional().describe('Merchant address'),
@@ -114,6 +132,16 @@ Useful for loyalty programs, cashback campaigns, rebate promotions, and warranty
         .nullable()
         .optional()
         .describe('Similar receipts found (fraud detection)'),
+      tamperDetection: z
+        .any()
+        .nullable()
+        .optional()
+        .describe('Tamper detection result when enabled'),
+      digitalDetection: z
+        .any()
+        .nullable()
+        .optional()
+        .describe('Digital receipt detection result when enabled'),
       trackingId: z
         .string()
         .nullable()
@@ -129,37 +157,30 @@ Useful for loyalty programs, cashback campaigns, rebate promotions, and warranty
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-
-    let hasUrl = !!ctx.input.sourceUrl;
-    let hasBase64 = !!ctx.input.image;
-
-    if (!hasUrl && !hasBase64) {
-      throw new Error('Either sourceUrl or image (base64) must be provided.');
-    }
+    let source = requireReceiptSource(ctx.input);
 
     let validationOptions = {
       campaignId: ctx.input.campaignId,
       referenceId: ctx.input.referenceId,
+      userId: ctx.input.userId,
+      subAccountId: ctx.input.subAccountId,
       incognito: ctx.input.incognito,
       ipAddress: ctx.input.ipAddress,
-      near: ctx.input.near
+      near: ctx.input.near,
+      language: ctx.input.language,
+      customHeaderKey: ctx.input.customHeaderKey
     };
 
     let result: any;
 
-    if (hasUrl) {
-      result = await client.validateReceiptFromUrl(ctx.input.sourceUrl!, validationOptions);
+    if (source.type === 'url') {
+      result = await client.validateReceiptFromUrl(source.sourceUrl, validationOptions);
     } else {
-      if (!ctx.input.filename || !ctx.input.contentType) {
-        throw new Error(
-          'filename and contentType are required when using base64 image input.'
-        );
-      }
       result = await client.validateReceiptFromBase64(
         {
-          image: ctx.input.image!,
-          filename: ctx.input.filename,
-          contentType: ctx.input.contentType
+          image: source.image,
+          filename: source.filename,
+          contentType: source.contentType
         },
         validationOptions
       );
@@ -170,6 +191,7 @@ Useful for loyalty programs, cashback campaigns, rebate promotions, and warranty
       passedValidations: result.passedValidations ?? null,
       failedValidations: result.failedValidations ?? null,
       totalAmount: result.totalAmount ?? null,
+      currencyCode: result.currencyCode ?? null,
       date: result.date ?? null,
       merchantName: result.merchantName ?? null,
       merchantAddress: result.merchantAddress ?? null,
@@ -184,6 +206,8 @@ Useful for loyalty programs, cashback campaigns, rebate promotions, and warranty
       productCodes: result.productCodes ?? null,
       balanceAmount: result.balanceAmount ?? null,
       similarReceipts: result.similarReceipts ?? null,
+      tamperDetection: result.tamperDetection ?? null,
+      digitalDetection: result.digitalDetection ?? null,
       trackingId: result.trackingId ?? null,
       smartValidate: result.smartValidate ?? null,
       error: result.error ?? null

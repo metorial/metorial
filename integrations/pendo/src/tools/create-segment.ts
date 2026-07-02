@@ -1,15 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PendoClient } from '../lib/client';
 import { spec } from '../spec';
+import { createPendoClient } from './helpers';
 
 export let createSegment = SlateTool.create(spec, {
   name: 'Create Segment',
   key: 'create_segment',
-  description: `Create a new segment in Pendo from a list of visitor or account IDs. Segments created via API are processed asynchronously — visitors are added in batches after the segment is created.`,
+  description: `Create a new API-managed segment in Pendo from a list of visitor IDs. Segments are created instantly, but adding visitors is processed asynchronously.`,
   instructions: [
     'The integration key must have write access enabled to create segments.',
-    'Segments are processed asynchronously. It may take some time for all visitors to be added.'
+    'Segments are processed asynchronously. It may take some time for all visitors to be added.',
+    'The official Pendo segment upload API accepts visitor IDs, not account IDs.'
   ],
   constraints: ['Segments process one at a time per subscription.']
 })
@@ -18,12 +19,8 @@ export let createSegment = SlateTool.create(spec, {
       name: z.string().describe('Name for the new segment'),
       visitorIds: z
         .array(z.string())
-        .optional()
-        .describe('List of visitor IDs to include in the segment'),
-      accountIds: z
-        .array(z.string())
-        .optional()
-        .describe('List of account IDs to include in the segment')
+        .min(1)
+        .describe('List of visitor IDs to include in the segment')
     })
   )
   .output(
@@ -34,20 +31,16 @@ export let createSegment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PendoClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createPendoClient(ctx);
 
     let segment = await client.createSegment({
       name: ctx.input.name,
-      visitorIds: ctx.input.visitorIds,
-      accountIds: ctx.input.accountIds
+      visitorIds: ctx.input.visitorIds
     });
 
     return {
       output: {
-        segmentId: segment.id || '',
+        segmentId: segment.id || segment.segmentId || '',
         name: segment.name || ctx.input.name,
         raw: segment
       },

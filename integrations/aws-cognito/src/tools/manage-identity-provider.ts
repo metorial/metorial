@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { cognitoServiceError } from '../lib/errors';
 import { createCognitoClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -100,7 +101,7 @@ export let manageIdentityProvider = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.providerName || !ctx.input.providerType || !ctx.input.providerDetails) {
-        throw new Error(
+        throw cognitoServiceError(
           'providerName, providerType, and providerDetails are required for create'
         );
       }
@@ -122,7 +123,9 @@ export let manageIdentityProvider = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.providerName) throw new Error('providerName is required for get');
+      if (!ctx.input.providerName) {
+        throw cognitoServiceError('providerName is required for get');
+      }
       let result = await client.describeIdentityProvider(userPoolId, ctx.input.providerName);
       return {
         output: mapProvider(result.IdentityProvider),
@@ -131,7 +134,9 @@ export let manageIdentityProvider = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.providerName) throw new Error('providerName is required for update');
+      if (!ctx.input.providerName) {
+        throw cognitoServiceError('providerName is required for update');
+      }
       let params: Record<string, any> = {
         UserPoolId: userPoolId,
         ProviderName: ctx.input.providerName
@@ -148,7 +153,9 @@ export let manageIdentityProvider = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.providerName) throw new Error('providerName is required for delete');
+      if (!ctx.input.providerName) {
+        throw cognitoServiceError('providerName is required for delete');
+      }
       await client.deleteIdentityProvider(userPoolId, ctx.input.providerName);
       return {
         output: { providerName: ctx.input.providerName, deleted: true },
@@ -156,6 +163,6 @@ export let manageIdentityProvider = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw cognitoServiceError(`Unknown action: ${action}`);
   })
   .build();

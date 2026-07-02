@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { kibanaApiError } from './errors';
 
 export interface KibanaClientConfig {
   kibanaUrl: string;
@@ -22,6 +23,11 @@ export class KibanaClient {
         'kbn-xsrf': 'true'
       }
     });
+
+    this.axios.interceptors?.response?.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(kibanaApiError(error))
+    );
   }
 
   private getApiPath(path: string): string {
@@ -185,6 +191,19 @@ export class KibanaClient {
     await this.axios.delete(this.getApiPath(`/api/data_views/data_view/${dataViewId}`));
   }
 
+  async getDefaultDataView(): Promise<any> {
+    let response = await this.axios.get(this.getApiPath('/api/data_views/default'));
+    return response.data;
+  }
+
+  async setDefaultDataView(dataViewId: string | null, force?: boolean): Promise<any> {
+    let body: Record<string, any> = { data_view_id: dataViewId };
+    if (force !== undefined) body.force = force;
+
+    let response = await this.axios.post(this.getApiPath('/api/data_views/default'), body);
+    return response.data;
+  }
+
   // ─── Spaces ────────────────────────────────────────────────────
 
   async getSpaces(): Promise<any[]> {
@@ -254,6 +273,11 @@ export class KibanaClient {
     let response = await this.axios.get(this.getApiPath('/api/alerting/rules/_find'), {
       params: query
     });
+    return response.data;
+  }
+
+  async getRuleTypes(): Promise<any[]> {
+    let response = await this.axios.get(this.getApiPath('/api/alerting/rule_types'));
     return response.data;
   }
 
@@ -354,6 +378,20 @@ export class KibanaClient {
     await this.axios.post(this.getApiPath(`/api/alerting/rule/${ruleId}/_unmute_all`));
   }
 
+  async scheduleRuleSnooze(ruleId: string, schedule: Record<string, any>): Promise<any> {
+    let response = await this.axios.post(
+      this.getApiPath(`/api/alerting/rule/${ruleId}/snooze_schedule`),
+      { schedule }
+    );
+    return response.data;
+  }
+
+  async deleteRuleSnooze(ruleId: string, scheduleId: string): Promise<void> {
+    await this.axios.delete(
+      this.getApiPath(`/api/alerting/rule/${ruleId}/snooze_schedule/${scheduleId}`)
+    );
+  }
+
   // ─── Connectors ────────────────────────────────────────────────
 
   async getConnectors(): Promise<any[]> {
@@ -415,8 +453,10 @@ export class KibanaClient {
     return response.data;
   }
 
-  async getConnectorTypes(): Promise<any[]> {
-    let response = await this.axios.get(this.getApiPath('/api/actions/connector_types'));
+  async getConnectorTypes(featureId?: string): Promise<any[]> {
+    let response = await this.axios.get(this.getApiPath('/api/actions/connector_types'), {
+      params: featureId ? { feature_id: featureId } : undefined
+    });
     return response.data;
   }
 
@@ -664,6 +704,62 @@ export class KibanaClient {
     let response = await this.axios.get(this.getApiPath('/api/fleet/agents'), {
       params: query
     });
+    return response.data;
+  }
+
+  async getPackagePolicies(params?: {
+    page?: number;
+    perPage?: number;
+    sortField?: string;
+    sortOrder?: 'asc' | 'desc';
+    showUpgradeable?: boolean;
+    kuery?: string;
+    format?: 'simplified' | 'legacy';
+    withAgentCount?: boolean;
+  }): Promise<any> {
+    let response = await this.axios.get(this.getApiPath('/api/fleet/package_policies'), {
+      params
+    });
+    return response.data;
+  }
+
+  async getPackagePolicy(packagePolicyId: string): Promise<any> {
+    let response = await this.axios.get(
+      this.getApiPath(`/api/fleet/package_policies/${packagePolicyId}`)
+    );
+    return response.data;
+  }
+
+  async createPackagePolicy(
+    packagePolicy: Record<string, any>,
+    format?: 'simplified' | 'legacy'
+  ): Promise<any> {
+    let response = await this.axios.post(
+      this.getApiPath('/api/fleet/package_policies'),
+      packagePolicy,
+      { params: format ? { format } : undefined }
+    );
+    return response.data;
+  }
+
+  async updatePackagePolicy(
+    packagePolicyId: string,
+    packagePolicy: Record<string, any>,
+    format?: 'simplified' | 'legacy'
+  ): Promise<any> {
+    let response = await this.axios.put(
+      this.getApiPath(`/api/fleet/package_policies/${packagePolicyId}`),
+      packagePolicy,
+      { params: format ? { format } : undefined }
+    );
+    return response.data;
+  }
+
+  async deletePackagePolicy(packagePolicyId: string, force?: boolean): Promise<any> {
+    let response = await this.axios.delete(
+      this.getApiPath(`/api/fleet/package_policies/${packagePolicyId}`),
+      { params: force ? { force: true } : undefined }
+    );
     return response.data;
   }
 

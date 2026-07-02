@@ -1,10 +1,44 @@
 import { createAxios } from 'slates';
+import { openRouterApiError, openRouterServiceError } from './errors';
 
 export interface ClientConfig {
   token: string;
   siteUrl?: string;
   appTitle?: string;
 }
+
+type JsonRecord = Record<string, unknown>;
+
+let isRecord = (value: unknown): value is JsonRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+let dataOrBody = (response: { data?: unknown }) => {
+  if (isRecord(response.data) && response.data.data !== undefined) {
+    return response.data.data;
+  }
+  return response.data;
+};
+
+let compact = (body: JsonRecord) => {
+  let result: JsonRecord = {};
+  for (let [key, value] of Object.entries(body)) {
+    if (value !== undefined) result[key] = value;
+  }
+  return result;
+};
+
+let modelPath = (modelId: string) => {
+  let separatorIndex = modelId.indexOf('/');
+  if (separatorIndex <= 0 || separatorIndex === modelId.length - 1) {
+    throw openRouterServiceError(
+      'OpenRouter model IDs must include an author and slug, for example "openai/gpt-4o-mini".'
+    );
+  }
+
+  let author = modelId.slice(0, separatorIndex);
+  let slug = modelId.slice(separatorIndex + 1);
+  return `${encodeURIComponent(author)}/${encodeURIComponent(slug)}`;
+};
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
@@ -28,232 +62,471 @@ export class Client {
     });
   }
 
-  // ---- Chat Completions ----
+  private async request<T>(operation: string, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      throw openRouterApiError(error, operation);
+    }
+  }
 
   async createChatCompletion(params: {
     model: string;
     messages: Array<{
       role: string;
-      content: string | Record<string, unknown>[];
+      content: string | JsonRecord[];
       name?: string;
       toolCallId?: string;
-      toolCalls?: Record<string, unknown>[];
+      toolCalls?: JsonRecord[];
     }>;
     temperature?: number;
     maxTokens?: number;
+    maxCompletionTokens?: number;
     topP?: number;
     topK?: number;
+    topA?: number;
+    minP?: number;
     frequencyPenalty?: number;
     presencePenalty?: number;
     repetitionPenalty?: number;
     stop?: string | string[];
     seed?: number;
-    tools?: Record<string, unknown>[];
-    toolChoice?: string | Record<string, unknown>;
-    responseFormat?: Record<string, unknown>;
+    tools?: JsonRecord[];
+    toolChoice?: string | JsonRecord;
+    parallelToolCalls?: boolean;
+    responseFormat?: JsonRecord;
     models?: string[];
     route?: string;
-    provider?: Record<string, unknown>;
+    provider?: JsonRecord;
     transforms?: string[];
-    plugins?: Record<string, unknown>[];
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      model: params.model,
-      messages: params.messages.map(m => {
-        let msg: Record<string, unknown> = {
-          role: m.role,
-          content: m.content
-        };
-        if (m.name !== undefined) msg.name = m.name;
-        if (m.toolCallId !== undefined) msg.tool_call_id = m.toolCallId;
-        if (m.toolCalls !== undefined) msg.tool_calls = m.toolCalls;
-        return msg;
-      })
-    };
+    plugins?: JsonRecord[];
+    reasoning?: JsonRecord;
+    reasoningEffort?: string;
+    modalities?: string[];
+    metadata?: Record<string, string>;
+    serviceTier?: string;
+    sessionId?: string;
+    trace?: JsonRecord;
+    user?: string;
+    logprobs?: boolean;
+    topLogprobs?: number;
+  }): Promise<JsonRecord> {
+    return await this.request('create chat completion', async () => {
+      let body = compact({
+        model: params.model,
+        messages: params.messages.map(m =>
+          compact({
+            role: m.role,
+            content: m.content,
+            name: m.name,
+            tool_call_id: m.toolCallId,
+            tool_calls: m.toolCalls
+          })
+        ),
+        temperature: params.temperature,
+        max_tokens: params.maxTokens,
+        max_completion_tokens: params.maxCompletionTokens,
+        top_p: params.topP,
+        top_k: params.topK,
+        top_a: params.topA,
+        min_p: params.minP,
+        frequency_penalty: params.frequencyPenalty,
+        presence_penalty: params.presencePenalty,
+        repetition_penalty: params.repetitionPenalty,
+        stop: params.stop,
+        seed: params.seed,
+        tools: params.tools,
+        tool_choice: params.toolChoice,
+        parallel_tool_calls: params.parallelToolCalls,
+        response_format: params.responseFormat,
+        models: params.models,
+        route: params.route,
+        provider: params.provider,
+        transforms: params.transforms,
+        plugins: params.plugins,
+        reasoning:
+          params.reasoning ??
+          (params.reasoningEffort ? { effort: params.reasoningEffort } : undefined),
+        modalities: params.modalities,
+        metadata: params.metadata,
+        service_tier: params.serviceTier,
+        session_id: params.sessionId,
+        trace: params.trace,
+        user: params.user,
+        logprobs: params.logprobs,
+        top_logprobs: params.topLogprobs
+      });
 
-    if (params.temperature !== undefined) body.temperature = params.temperature;
-    if (params.maxTokens !== undefined) body.max_tokens = params.maxTokens;
-    if (params.topP !== undefined) body.top_p = params.topP;
-    if (params.topK !== undefined) body.top_k = params.topK;
-    if (params.frequencyPenalty !== undefined)
-      body.frequency_penalty = params.frequencyPenalty;
-    if (params.presencePenalty !== undefined) body.presence_penalty = params.presencePenalty;
-    if (params.repetitionPenalty !== undefined)
-      body.repetition_penalty = params.repetitionPenalty;
-    if (params.stop !== undefined) body.stop = params.stop;
-    if (params.seed !== undefined) body.seed = params.seed;
-    if (params.tools !== undefined) body.tools = params.tools;
-    if (params.toolChoice !== undefined) body.tool_choice = params.toolChoice;
-    if (params.responseFormat !== undefined) body.response_format = params.responseFormat;
-    if (params.models !== undefined) body.models = params.models;
-    if (params.route !== undefined) body.route = params.route;
-    if (params.provider !== undefined) body.provider = params.provider;
-    if (params.transforms !== undefined) body.transforms = params.transforms;
-    if (params.plugins !== undefined) body.plugins = params.plugins;
-
-    let response = await this.axios.post('/chat/completions', body);
-    return response.data;
+      let response = await this.axios.post('/chat/completions', body);
+      return (response.data ?? {}) as JsonRecord;
+    });
   }
 
-  // ---- Embeddings ----
+  async createResponse(params: {
+    model?: string;
+    input: string | JsonRecord[];
+    instructions?: string;
+    maxOutputTokens?: number;
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    tools?: JsonRecord[];
+    toolChoice?: string | JsonRecord;
+    parallelToolCalls?: boolean;
+    provider?: JsonRecord;
+    plugins?: JsonRecord[];
+    reasoning?: JsonRecord;
+    modalities?: string[];
+    metadata?: Record<string, string>;
+    previousResponseId?: string;
+    sessionId?: string;
+    serviceTier?: string;
+    stream?: boolean;
+    text?: JsonRecord;
+    trace?: JsonRecord;
+    user?: string;
+  }): Promise<JsonRecord> {
+    return await this.request('create response', async () => {
+      let response = await this.axios.post(
+        '/responses',
+        compact({
+          model: params.model,
+          input: params.input,
+          instructions: params.instructions,
+          max_output_tokens: params.maxOutputTokens,
+          temperature: params.temperature,
+          top_p: params.topP,
+          top_k: params.topK,
+          tools: params.tools,
+          tool_choice: params.toolChoice,
+          parallel_tool_calls: params.parallelToolCalls,
+          provider: params.provider,
+          plugins: params.plugins,
+          reasoning: params.reasoning,
+          modalities: params.modalities,
+          metadata: params.metadata,
+          previous_response_id: params.previousResponseId,
+          session_id: params.sessionId,
+          service_tier: params.serviceTier,
+          stream: params.stream,
+          text: params.text,
+          trace: params.trace,
+          user: params.user
+        })
+      );
+      return (response.data ?? {}) as JsonRecord;
+    });
+  }
 
   async createEmbedding(params: {
     model: string;
     input: string | string[];
-  }): Promise<Record<string, unknown>> {
-    let body = {
-      model: params.model,
-      input: params.input
-    };
-
-    let response = await this.axios.post('/embeddings', body);
-    return response.data;
+    dimensions?: number;
+    inputType?: string;
+    provider?: JsonRecord;
+    user?: string;
+  }): Promise<JsonRecord> {
+    return await this.request('create embedding', async () => {
+      let response = await this.axios.post(
+        '/embeddings',
+        compact({
+          model: params.model,
+          input: params.input,
+          dimensions: params.dimensions,
+          input_type: params.inputType,
+          provider: params.provider,
+          user: params.user
+        })
+      );
+      return (response.data ?? {}) as JsonRecord;
+    });
   }
-
-  // ---- Models ----
 
   async listModels(params?: {
+    category?: string;
     supportedParameters?: string;
-  }): Promise<Record<string, unknown>[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.supportedParameters) {
-      queryParams.supported_parameters = params.supportedParameters;
-    }
-
-    let response = await this.axios.get('/models', { params: queryParams });
-    return response.data?.data || [];
+    outputModalities?: string;
+    sort?: string;
+    userFiltered?: boolean;
+  }): Promise<JsonRecord[]> {
+    return await this.request('list models', async () => {
+      let response = await this.axios.get(params?.userFiltered ? '/models/user' : '/models', {
+        params: compact({
+          category: params?.category,
+          supported_parameters: params?.supportedParameters,
+          output_modalities: params?.outputModalities,
+          sort: params?.sort
+        })
+      });
+      let data = dataOrBody(response);
+      return Array.isArray(data) ? (data as JsonRecord[]) : [];
+    });
   }
 
-  async getModel(modelId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/models/${modelId}`);
-    return response.data?.data || response.data;
+  async listEmbeddingModels(): Promise<JsonRecord[]> {
+    return await this.request('list embedding models', async () => {
+      let response = await this.axios.get('/embeddings/models');
+      let data = dataOrBody(response);
+      return Array.isArray(data) ? (data as JsonRecord[]) : [];
+    });
   }
 
-  // ---- Generation Stats ----
-
-  async getGenerationStats(generationId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/generation?id=${encodeURIComponent(generationId)}`);
-    return response.data?.data || response.data;
+  async getModel(modelId: string): Promise<JsonRecord> {
+    return await this.request('get model', async () => {
+      let response = await this.axios.get(`/model/${modelPath(modelId)}`);
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
   }
 
-  // ---- Credits ----
+  async listModelEndpoints(modelId: string): Promise<JsonRecord> {
+    return await this.request('list model endpoints', async () => {
+      let response = await this.axios.get(`/models/${modelPath(modelId)}/endpoints`);
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
+  }
+
+  async listProviders(): Promise<JsonRecord[]> {
+    return await this.request('list providers', async () => {
+      let response = await this.axios.get('/providers');
+      let data = dataOrBody(response);
+      return Array.isArray(data) ? (data as JsonRecord[]) : [];
+    });
+  }
+
+  async getGenerationStats(generationId: string): Promise<JsonRecord> {
+    return await this.request('get generation stats', async () => {
+      let response = await this.axios.get('/generation', {
+        params: { id: generationId }
+      });
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
+  }
 
   async getCredits(): Promise<{ totalCredits: number; totalUsage: number }> {
-    let response = await this.axios.get('/credits');
-    let data = response.data?.data || response.data;
-    return {
-      totalCredits: data?.total_credits ?? 0,
-      totalUsage: data?.total_usage ?? 0
-    };
+    return await this.request('get credits', async () => {
+      let response = await this.axios.get('/credits');
+      let data = dataOrBody(response) as JsonRecord | undefined;
+      return {
+        totalCredits: typeof data?.total_credits === 'number' ? data.total_credits : 0,
+        totalUsage: typeof data?.total_usage === 'number' ? data.total_usage : 0
+      };
+    });
   }
 
-  // ---- Auth/Key Info ----
-
-  async getKeyInfo(): Promise<Record<string, unknown>> {
-    let response = await this.axios.get('/auth/key');
-    return response.data?.data || response.data;
+  async getKeyInfo(): Promise<JsonRecord> {
+    return await this.request('get current API key', async () => {
+      let response = await this.axios.get('/key');
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
   }
-
-  // ---- API Key Management ----
 
   async createApiKey(params: {
     name: string;
-    limit?: number;
-    disabled?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      name: params.name
-    };
-    if (params.limit !== undefined) body.limit = params.limit;
-    if (params.disabled !== undefined) body.disabled = params.disabled;
-
-    let response = await this.axios.post('/keys', body);
-    return response.data;
+    limit?: number | null;
+    limitReset?: 'daily' | 'weekly' | 'monthly' | null;
+    includeByokInLimit?: boolean;
+    expiresAt?: string | null;
+    workspaceId?: string;
+    creatorUserId?: string | null;
+  }): Promise<JsonRecord> {
+    return await this.request('create API key', async () => {
+      let response = await this.axios.post(
+        '/keys',
+        compact({
+          name: params.name,
+          limit: params.limit,
+          limit_reset: params.limitReset,
+          include_byok_in_limit: params.includeByokInLimit,
+          expires_at: params.expiresAt,
+          workspace_id: params.workspaceId,
+          creator_user_id: params.creatorUserId
+        })
+      );
+      return (response.data ?? {}) as JsonRecord;
+    });
   }
 
-  async listApiKeys(): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.get('/keys');
-    return response.data?.data || response.data || [];
+  async listApiKeys(params?: {
+    includeDisabled?: boolean;
+    offset?: number;
+    workspaceId?: string;
+  }): Promise<JsonRecord[]> {
+    return await this.request('list API keys', async () => {
+      let response = await this.axios.get('/keys', {
+        params: compact({
+          include_disabled:
+            params?.includeDisabled === undefined ? undefined : String(params.includeDisabled),
+          offset: params?.offset,
+          workspace_id: params?.workspaceId
+        })
+      });
+      let data = dataOrBody(response);
+      return Array.isArray(data) ? (data as JsonRecord[]) : [];
+    });
   }
 
-  async deleteApiKey(keyHash: string): Promise<void> {
-    await this.axios.delete(`/keys/${encodeURIComponent(keyHash)}`);
+  async getApiKey(keyHash: string): Promise<JsonRecord> {
+    return await this.request('get API key', async () => {
+      let response = await this.axios.get(`/keys/${encodeURIComponent(keyHash)}`);
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
   }
 
-  // ---- Guardrails ----
+  async updateApiKey(
+    keyHash: string,
+    params: {
+      name?: string;
+      limit?: number | null;
+      limitReset?: 'daily' | 'weekly' | 'monthly' | null;
+      disabled?: boolean;
+      includeByokInLimit?: boolean;
+    }
+  ): Promise<JsonRecord> {
+    return await this.request('update API key', async () => {
+      let response = await this.axios.patch(
+        `/keys/${encodeURIComponent(keyHash)}`,
+        compact({
+          name: params.name,
+          limit: params.limit,
+          limit_reset: params.limitReset,
+          disabled: params.disabled,
+          include_byok_in_limit: params.includeByokInLimit
+        })
+      );
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
+  }
+
+  async deleteApiKey(keyHash: string): Promise<boolean> {
+    return await this.request('delete API key', async () => {
+      let response = await this.axios.delete(`/keys/${encodeURIComponent(keyHash)}`, {
+        data: {}
+      });
+      let data = response.data as JsonRecord | undefined;
+      return data?.deleted === true;
+    });
+  }
 
   async createGuardrail(params: {
     name: string;
-    budgetLimit?: number;
-    budgetResetInterval?: string;
-    modelAllowlist?: string[];
-    modelDenylist?: string[];
-    providerAllowlist?: string[];
-    providerDenylist?: string[];
-    zdr?: boolean;
-  }): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      name: params.name
-    };
-    if (params.budgetLimit !== undefined) body.budget_limit = params.budgetLimit;
-    if (params.budgetResetInterval !== undefined)
-      body.budget_reset_interval = params.budgetResetInterval;
-    if (params.modelAllowlist !== undefined) body.model_allowlist = params.modelAllowlist;
-    if (params.modelDenylist !== undefined) body.model_denylist = params.modelDenylist;
-    if (params.providerAllowlist !== undefined)
-      body.provider_allowlist = params.providerAllowlist;
-    if (params.providerDenylist !== undefined)
-      body.provider_denylist = params.providerDenylist;
-    if (params.zdr !== undefined) body.zdr = params.zdr;
-
-    let response = await this.axios.post('/guardrails', body);
-    return response.data;
+    description?: string | null;
+    limitUsd?: number | null;
+    resetInterval?: 'daily' | 'weekly' | 'monthly';
+    allowedModels?: string[] | null;
+    ignoredModels?: string[] | null;
+    allowedProviders?: string[] | null;
+    ignoredProviders?: string[] | null;
+    enforceZdr?: boolean | null;
+    enforceZdrAnthropic?: boolean | null;
+    enforceZdrGoogle?: boolean | null;
+    enforceZdrOpenAI?: boolean | null;
+    enforceZdrOther?: boolean | null;
+    contentFilters?: JsonRecord[] | null;
+    contentFilterBuiltins?: JsonRecord[] | null;
+    workspaceId?: string;
+  }): Promise<JsonRecord> {
+    return await this.request('create guardrail', async () => {
+      let response = await this.axios.post(
+        '/guardrails',
+        compact({
+          name: params.name,
+          description: params.description,
+          limit_usd: params.limitUsd,
+          reset_interval: params.resetInterval,
+          allowed_models: params.allowedModels,
+          ignored_models: params.ignoredModels,
+          allowed_providers: params.allowedProviders,
+          ignored_providers: params.ignoredProviders,
+          enforce_zdr: params.enforceZdr,
+          enforce_zdr_anthropic: params.enforceZdrAnthropic,
+          enforce_zdr_google: params.enforceZdrGoogle,
+          enforce_zdr_openai: params.enforceZdrOpenAI,
+          enforce_zdr_other: params.enforceZdrOther,
+          content_filters: params.contentFilters,
+          content_filter_builtins: params.contentFilterBuiltins,
+          workspace_id: params.workspaceId
+        })
+      );
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
   }
 
-  async listGuardrails(): Promise<Record<string, unknown>[]> {
-    let response = await this.axios.get('/guardrails');
-    return response.data?.data || response.data || [];
+  async listGuardrails(params?: {
+    limit?: number;
+    offset?: number;
+    workspaceId?: string;
+  }): Promise<{ guardrails: JsonRecord[]; totalCount?: number }> {
+    return await this.request('list guardrails', async () => {
+      let response = await this.axios.get('/guardrails', {
+        params: compact({
+          limit: params?.limit,
+          offset: params?.offset,
+          workspace_id: params?.workspaceId
+        })
+      });
+      let body = response.data as JsonRecord | undefined;
+      return {
+        guardrails: Array.isArray(body?.data) ? (body.data as JsonRecord[]) : [],
+        totalCount: typeof body?.total_count === 'number' ? body.total_count : undefined
+      };
+    });
   }
 
-  async getGuardrail(guardrailId: string): Promise<Record<string, unknown>> {
-    let response = await this.axios.get(`/guardrails/${encodeURIComponent(guardrailId)}`);
-    return response.data?.data || response.data;
+  async getGuardrail(guardrailId: string): Promise<JsonRecord> {
+    return await this.request('get guardrail', async () => {
+      let response = await this.axios.get(`/guardrails/${encodeURIComponent(guardrailId)}`);
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
   }
 
   async updateGuardrail(
     guardrailId: string,
     params: {
       name?: string;
-      budgetLimit?: number;
-      budgetResetInterval?: string;
-      modelAllowlist?: string[];
-      modelDenylist?: string[];
-      providerAllowlist?: string[];
-      providerDenylist?: string[];
-      zdr?: boolean;
+      description?: string | null;
+      limitUsd?: number | null;
+      resetInterval?: 'daily' | 'weekly' | 'monthly';
+      allowedModels?: string[] | null;
+      ignoredModels?: string[] | null;
+      allowedProviders?: string[] | null;
+      ignoredProviders?: string[] | null;
+      enforceZdr?: boolean | null;
+      enforceZdrAnthropic?: boolean | null;
+      enforceZdrGoogle?: boolean | null;
+      enforceZdrOpenAI?: boolean | null;
+      enforceZdrOther?: boolean | null;
+      contentFilters?: JsonRecord[] | null;
+      contentFilterBuiltins?: JsonRecord[] | null;
     }
-  ): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {};
-    if (params.name !== undefined) body.name = params.name;
-    if (params.budgetLimit !== undefined) body.budget_limit = params.budgetLimit;
-    if (params.budgetResetInterval !== undefined)
-      body.budget_reset_interval = params.budgetResetInterval;
-    if (params.modelAllowlist !== undefined) body.model_allowlist = params.modelAllowlist;
-    if (params.modelDenylist !== undefined) body.model_denylist = params.modelDenylist;
-    if (params.providerAllowlist !== undefined)
-      body.provider_allowlist = params.providerAllowlist;
-    if (params.providerDenylist !== undefined)
-      body.provider_denylist = params.providerDenylist;
-    if (params.zdr !== undefined) body.zdr = params.zdr;
-
-    let response = await this.axios.put(
-      `/guardrails/${encodeURIComponent(guardrailId)}`,
-      body
-    );
-    return response.data;
+  ): Promise<JsonRecord> {
+    return await this.request('update guardrail', async () => {
+      let response = await this.axios.patch(
+        `/guardrails/${encodeURIComponent(guardrailId)}`,
+        compact({
+          name: params.name,
+          description: params.description,
+          limit_usd: params.limitUsd,
+          reset_interval: params.resetInterval,
+          allowed_models: params.allowedModels,
+          ignored_models: params.ignoredModels,
+          allowed_providers: params.allowedProviders,
+          ignored_providers: params.ignoredProviders,
+          enforce_zdr: params.enforceZdr,
+          enforce_zdr_anthropic: params.enforceZdrAnthropic,
+          enforce_zdr_google: params.enforceZdrGoogle,
+          enforce_zdr_openai: params.enforceZdrOpenAI,
+          enforce_zdr_other: params.enforceZdrOther,
+          content_filters: params.contentFilters,
+          content_filter_builtins: params.contentFilterBuiltins
+        })
+      );
+      return (dataOrBody(response) ?? {}) as JsonRecord;
+    });
   }
 
   async deleteGuardrail(guardrailId: string): Promise<void> {
-    await this.axios.delete(`/guardrails/${encodeURIComponent(guardrailId)}`);
+    await this.request('delete guardrail', async () => {
+      await this.axios.delete(`/guardrails/${encodeURIComponent(guardrailId)}`);
+    });
   }
 }

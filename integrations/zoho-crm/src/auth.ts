@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { zohoCrmApiError, zohoCrmServiceError } from './lib/errors';
 
 let accountsBaseUrls: Record<string, string> = {
   us: 'https://accounts.zoho.com',
@@ -105,6 +106,21 @@ let scopes = [
     scope: 'ZohoCRM.settings.READ'
   },
   {
+    title: 'Custom Views - Read',
+    description: 'Read CRM custom view metadata',
+    scope: 'ZohoCRM.settings.custom_views.READ'
+  },
+  {
+    title: 'Related Lists - Read',
+    description: 'Read CRM related list metadata',
+    scope: 'ZohoCRM.settings.related_lists.READ'
+  },
+  {
+    title: 'Tags - Read',
+    description: 'Read CRM tag metadata',
+    scope: 'ZohoCRM.settings.tags.READ'
+  },
+  {
     title: 'Notifications - Full Access',
     description: 'Subscribe to and manage record change notifications',
     scope: 'ZohoCRM.notifications.ALL'
@@ -150,6 +166,21 @@ let scopes = [
     scope: 'ZohoCRM.coql.READ'
   },
   {
+    title: 'Secure Search - Read',
+    description: 'Search records through Zoho CRM secure search',
+    scope: 'ZohoSearch.securesearch.READ'
+  },
+  {
+    title: 'Notes - Full Access',
+    description: 'Read, create, update, and delete CRM notes',
+    scope: 'ZohoCRM.modules.notes.ALL'
+  },
+  {
+    title: 'Attachments - Full Access',
+    description: 'Read, upload, download, and delete CRM record attachments',
+    scope: 'ZohoCRM.modules.attachments.ALL'
+  },
+  {
     title: 'Files - Full Access',
     description: 'Upload and download files',
     scope: 'ZohoCRM.files.ALL'
@@ -185,72 +216,97 @@ function createCrmOauth(name: string, key: string, dc: keyof typeof accountsBase
     },
 
     handleCallback: async (ctx: any) => {
-      let http = createAxios({ baseURL: accountsUrl });
-      let response = await http.post(
-        '/oauth/v2/token',
-        new URLSearchParams({
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          grant_type: 'authorization_code'
-        }).toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
-      let data = response.data as Record<string, any>;
-      let expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
-      return {
-        output: {
-          token: String(data.access_token),
-          refreshToken: data.refresh_token ? String(data.refresh_token) : undefined,
-          expiresAt,
-          apiBaseUrl: apiUrl,
-          accountsBaseUrl: accountsUrl
+      try {
+        let http = createAxios({ baseURL: accountsUrl });
+        let response = await http.post(
+          '/oauth/v2/token',
+          new URLSearchParams({
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri,
+            grant_type: 'authorization_code'
+          }).toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+        let data = response.data as Record<string, any>;
+        if (!data.access_token) {
+          throw zohoCrmServiceError('Zoho CRM OAuth callback did not return an access token.');
         }
-      };
+        let expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
+        return {
+          output: {
+            token: String(data.access_token),
+            refreshToken: data.refresh_token ? String(data.refresh_token) : undefined,
+            expiresAt,
+            apiBaseUrl: apiUrl,
+            accountsBaseUrl: accountsUrl
+          }
+        };
+      } catch (error) {
+        throw zohoCrmApiError(error, 'OAuth callback');
+      }
     },
 
     handleTokenRefresh: async (ctx: any) => {
-      let http = createAxios({ baseURL: ctx.output.accountsBaseUrl || accountsUrl });
-      let response = await http.post(
-        '/oauth/v2/token',
-        new URLSearchParams({
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken || '',
-          grant_type: 'refresh_token'
-        }).toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-      );
-      let data = response.data as Record<string, any>;
-      let expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
-      return {
-        output: {
-          token: String(data.access_token),
-          refreshToken: ctx.output.refreshToken,
-          expiresAt,
-          apiBaseUrl: ctx.output.apiBaseUrl || apiUrl,
-          accountsBaseUrl: ctx.output.accountsBaseUrl || accountsUrl
+      try {
+        if (!ctx.output.refreshToken) {
+          throw zohoCrmServiceError(
+            'Zoho CRM OAuth refresh token is missing. Reconnect the account with offline access.'
+          );
         }
-      };
+
+        let http = createAxios({ baseURL: ctx.output.accountsBaseUrl || accountsUrl });
+        let response = await http.post(
+          '/oauth/v2/token',
+          new URLSearchParams({
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            refresh_token: ctx.output.refreshToken,
+            grant_type: 'refresh_token'
+          }).toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        );
+        let data = response.data as Record<string, any>;
+        if (!data.access_token) {
+          throw zohoCrmServiceError('Zoho CRM token refresh did not return an access token.');
+        }
+        let expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
+        return {
+          output: {
+            token: String(data.access_token),
+            refreshToken: ctx.output.refreshToken,
+            expiresAt,
+            apiBaseUrl: ctx.output.apiBaseUrl || apiUrl,
+            accountsBaseUrl: ctx.output.accountsBaseUrl || accountsUrl
+          }
+        };
+      } catch (error) {
+        throw zohoCrmApiError(error, 'OAuth token refresh');
+      }
     },
 
     getProfile: async (ctx: any) => {
-      let http = createAxios({ baseURL: ctx.output.apiBaseUrl || apiUrl });
-      let response = await http.get('/crm/v7/users?type=CurrentUser', {
-        headers: { Authorization: `Zoho-oauthtoken ${ctx.output.token}` }
-      });
-      let user = response.data?.users?.[0];
-      return {
-        profile: {
-          id: user?.id,
-          email: user?.email,
-          name: user?.full_name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim(),
-          imageUrl: user?.image_link,
-          role: user?.role?.name,
-          profileName: user?.profile?.name
-        }
-      };
+      try {
+        let http = createAxios({ baseURL: ctx.output.apiBaseUrl || apiUrl });
+        let response = await http.get('/crm/v8/users?type=CurrentUser', {
+          headers: { Authorization: `Zoho-oauthtoken ${ctx.output.token}` }
+        });
+        let user = response.data?.users?.[0];
+        return {
+          profile: {
+            id: user?.id,
+            email: user?.email,
+            name:
+              user?.full_name || `${user?.first_name || ''} ${user?.last_name || ''}`.trim(),
+            imageUrl: user?.image_link,
+            role: user?.role?.name,
+            profileName: user?.profile?.name
+          }
+        };
+      } catch (error) {
+        throw zohoCrmApiError(error, 'get profile');
+      }
     }
   };
 }

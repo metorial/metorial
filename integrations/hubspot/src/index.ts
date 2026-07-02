@@ -18,6 +18,7 @@ import {
   deleteList,
   deletePipeline,
   deleteTicket,
+  enrollContactInSequence,
   getAssociations,
   getCompany,
   getContact,
@@ -26,6 +27,8 @@ import {
   getList,
   getOwner,
   getPipeline,
+  getSequence,
+  getSequenceEnrollmentStatus,
   getTicket,
   listCompanies,
   listContacts,
@@ -33,6 +36,7 @@ import {
   listOwners,
   listPipelines,
   listProperties,
+  listSequences,
   listTickets,
   searchCrm,
   searchLists,
@@ -88,7 +92,11 @@ export let provider = Slate.create({
     listProperties,
     createProperty,
     listOwners,
-    getOwner
+    getOwner,
+    listSequences,
+    getSequence,
+    enrollContactInSequence,
+    getSequenceEnrollmentStatus
   ],
   triggers: [crmObjectChanges, crmObjectWebhook]
 });

@@ -12,6 +12,7 @@ import {
   manageSchemas,
   manageTable,
   manageViews,
+  selectQuery,
   updateRows
 } from './tools';
 import { inboundWebhook, tableChanges } from './triggers';
@@ -20,6 +21,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     executeQuery,
+    selectQuery,
     listTables,
     describeTable,
     insertRows,

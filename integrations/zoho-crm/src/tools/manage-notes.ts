@@ -1,20 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireZohoCrmString, zohoCrmServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageNotes = SlateTool.create(spec, {
   name: 'Manage Notes',
   key: 'manage_notes',
-  description: `List, create, or delete notes associated with a CRM record.
-Set **action** to "list" to get notes, "create" to add a new note, or "delete" to remove a note.`,
+  description: `List, create, update, or delete notes associated with a CRM record.
+Set **action** to "list" to get notes, "create" to add a new note, "update" to edit a note, or "delete" to remove a note.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'delete']).describe('Action to perform'),
+      action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform'),
       module: z
         .string()
         .describe('API name of the parent module (e.g. "Leads", "Contacts", "Deals")'),
@@ -30,7 +31,15 @@ Set **action** to "list" to get notes, "create" to add a new note, or "delete" t
       noteId: z
         .string()
         .optional()
-        .describe('ID of the note to delete (required for "delete")'),
+        .describe('ID of the note to update or delete (required for "update" and "delete")'),
+      isSharedToClient: z
+        .boolean()
+        .optional()
+        .describe('Whether an updated note should be visible to associated portal users.'),
+      fields: z
+        .array(z.string())
+        .optional()
+        .describe('Note field API names to include for the "list" action.'),
       page: z.number().optional().describe('Page number for listing notes'),
       perPage: z.number().optional().describe('Number of notes per page')
     })
@@ -45,6 +54,10 @@ Set **action** to "list" to get notes, "create" to add a new note, or "delete" t
         .string()
         .optional()
         .describe('ID of the created note (for "create" action)'),
+      updatedNoteId: z
+        .string()
+        .optional()
+        .describe('ID of the updated note (for "update" action)'),
       deleted: z
         .boolean()
         .optional()
@@ -62,7 +75,8 @@ Set **action** to "list" to get notes, "create" to add a new note, or "delete" t
         ctx.input.module,
         ctx.input.recordId,
         ctx.input.page,
-        ctx.input.perPage
+        ctx.input.perPage,
+        ctx.input.fields
       );
       let notes = result?.data || [];
       return {
@@ -72,11 +86,13 @@ Set **action** to "list" to get notes, "create" to add a new note, or "delete" t
     }
 
     if (ctx.input.action === 'create') {
+      let noteTitle = requireZohoCrmString(ctx.input.noteTitle, 'noteTitle', 'create');
+      let noteContent = requireZohoCrmString(ctx.input.noteContent, 'noteContent', 'create');
       let result = await client.createNote(
         ctx.input.module,
         ctx.input.recordId,
-        ctx.input.noteTitle || '',
-        ctx.input.noteContent || ''
+        noteTitle,
+        noteContent
       );
       let createdNoteId = result?.data?.[0]?.details?.id;
       return {
@@ -85,11 +101,36 @@ Set **action** to "list" to get notes, "create" to add a new note, or "delete" t
       };
     }
 
+    if (ctx.input.action === 'update') {
+      let noteId = requireZohoCrmString(ctx.input.noteId, 'noteId', 'update');
+      if (
+        ctx.input.noteTitle === undefined &&
+        ctx.input.noteContent === undefined &&
+        ctx.input.isSharedToClient === undefined
+      ) {
+        throw zohoCrmServiceError(
+          'Provide noteTitle, noteContent, or isSharedToClient for "update".'
+        );
+      }
+
+      let result = await client.updateNote(ctx.input.module, ctx.input.recordId, noteId, {
+        noteTitle: ctx.input.noteTitle,
+        noteContent: ctx.input.noteContent,
+        isSharedToClient: ctx.input.isSharedToClient
+      });
+      let updatedNoteId = result?.data?.[0]?.details?.id ?? noteId;
+      return {
+        output: { updatedNoteId },
+        message: `Updated note **${updatedNoteId}** on record **${ctx.input.recordId}**.`
+      };
+    }
+
     if (ctx.input.action === 'delete') {
-      await client.deleteNote(ctx.input.module, ctx.input.recordId, ctx.input.noteId || '');
+      let noteId = requireZohoCrmString(ctx.input.noteId, 'noteId', 'delete');
+      await client.deleteNote(ctx.input.module, ctx.input.recordId, noteId);
       return {
         output: { deleted: true },
-        message: `Deleted note **${ctx.input.noteId}** from record **${ctx.input.recordId}**.`
+        message: `Deleted note **${noteId}** from record **${ctx.input.recordId}**.`
       };
     }
 

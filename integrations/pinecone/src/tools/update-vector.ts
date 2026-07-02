@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PineconeDataPlaneClient } from '../lib/client';
+import { pineconeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateVectorTool = SlateTool.create(spec, {
@@ -37,6 +38,12 @@ export let updateVectorTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.values && !ctx.input.sparseValues && !ctx.input.metadata) {
+      throw pineconeServiceError(
+        'Provide values, sparseValues, or metadata when updating a vector.'
+      );
+    }
+
     let client = new PineconeDataPlaneClient({
       token: ctx.auth.token,
       indexHost: ctx.input.indexHost

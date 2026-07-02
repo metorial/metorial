@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getCatalogVersion,
   getSiteProperties,
   manageBlog,
   manageBookings,
@@ -10,6 +11,7 @@ import {
   manageEvents,
   manageMedia,
   manageMembers,
+  manageOrderFulfillments,
   manageOrders,
   managePricingPlans,
   manageProducts
@@ -33,11 +35,13 @@ export let provider = Slate.create({
     manageBookings,
     manageEvents,
     manageCollections,
+    getCatalogVersion,
     getSiteProperties,
     manageDataItems,
     managePricingPlans,
     manageMembers,
-    manageMedia
+    manageMedia,
+    manageOrderFulfillments
   ],
   triggers: [
     ecommerceEvents,

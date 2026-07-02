@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -58,7 +58,11 @@ export let upsertContacts = SlateTool.create(spec, {
           })
         )
         .min(1)
-        .describe('Contacts to add or update')
+        .describe('Contacts to add or update'),
+      listIds: z
+        .array(z.string())
+        .optional()
+        .describe('SendGrid Marketing list IDs to add these contacts to')
     })
   )
   .output(
@@ -68,13 +72,76 @@ export let upsertContacts = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
-    let result = await client.upsertContacts(ctx.input.contacts);
+    let result = await client.upsertContacts(ctx.input.contacts, ctx.input.listIds);
 
     return {
       output: {
         jobId: result.job_id
       },
-      message: `Submitted **${ctx.input.contacts.length}** contact(s) for upsert. Job ID: \`${result.job_id}\`.`
+      message: `Submitted **${ctx.input.contacts.length}** contact(s) for upsert${ctx.input.listIds?.length ? ` into **${ctx.input.listIds.length}** list(s)` : ''}. Job ID: \`${result.job_id}\`.`
+    };
+  });
+
+export let getContactImportStatus = SlateTool.create(spec, {
+  name: 'Get Contact Import Status',
+  key: 'get_contact_import_status',
+  description: `Check the asynchronous job status returned by contact upsert, contact import, or contact deletion operations.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      jobId: z.string().describe('Job ID returned by a contact upsert or deletion tool')
+    })
+  )
+  .output(
+    z.object({
+      jobId: z.string().describe('Contact import/delete job ID'),
+      status: z.string().describe('Job status such as pending, completed, errored, or failed'),
+      results: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Provider job result details'),
+      errorsUrl: z.string().optional().describe('URL with detailed import errors if provided')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.getContactImportStatus(ctx.input.jobId);
+
+    return {
+      output: {
+        jobId: result.id || ctx.input.jobId,
+        status: result.status,
+        results: result.results,
+        errorsUrl: result.errors_url
+      },
+      message: `Contact job \`${ctx.input.jobId}\` is **${result.status}**.`
+    };
+  });
+
+export let getContactCount = SlateTool.create(spec, {
+  name: 'Get Contact Count',
+  key: 'get_contact_count',
+  description: `Retrieve the total marketing contact count for the SendGrid account, including billable contact count when available.`,
+  tags: { readOnly: true }
+})
+  .input(z.object({}))
+  .output(
+    z.object({
+      contactCount: z.number().describe('Total number of marketing contacts'),
+      billableCount: z.number().optional().describe('Billable contact count')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.getContactCount();
+
+    return {
+      output: {
+        contactCount: result.contact_count || 0,
+        billableCount: result.billable_count
+      },
+      message: `SendGrid has **${result.contact_count || 0}** marketing contact(s).`
     };
   });
 
@@ -191,6 +258,12 @@ export let deleteContacts = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    if (!ctx.input.deleteAll && (!ctx.input.contactIds || ctx.input.contactIds.length === 0)) {
+      throw createApiServiceError(
+        'Provide contactIds or set deleteAll to true when deleting contacts.'
+      );
+    }
+
     let result = await client.deleteContacts(ctx.input.contactIds || [], ctx.input.deleteAll);
 
     return {

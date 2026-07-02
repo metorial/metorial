@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+import { newRelicApiError, newRelicGraphqlErrors } from './errors';
 
 export type Region = 'us' | 'eu';
 
@@ -32,6 +33,227 @@ export interface ClientConfig {
   licenseKey?: string;
 }
 
+let assertNoPayloadErrors = (operation: string, errors?: unknown[] | null) => {
+  if (errors?.length) {
+    throw newRelicGraphqlErrors(operation, errors);
+  }
+};
+
+let defaultRuntime = (monitorType: string) =>
+  monitorType === 'SCRIPT_API'
+    ? {
+        runtimeType: 'NODE_API',
+        runtimeTypeVersion: '22.20.0',
+        scriptLanguage: 'JAVASCRIPT'
+      }
+    : {
+        runtimeType: 'CHROME_BROWSER',
+        runtimeTypeVersion: 'LATEST',
+        scriptLanguage: 'JAVASCRIPT'
+      };
+
+type DashboardWidgetInput = {
+  id?: string;
+  widgetId?: string;
+  title: string;
+  visualization: string | { id?: string };
+  rawConfiguration: any;
+  layout?: { column: number; row: number; width: number; height: number };
+  linkedEntityGuids?: string[];
+  linkedEntities?: Array<{ guid?: string | null }>;
+};
+
+type DashboardPageInput = {
+  guid?: string;
+  pageGuid?: string;
+  name: string;
+  description?: string | null;
+  widgets: DashboardWidgetInput[];
+};
+
+type DashboardVariableInput = Record<string, any>;
+
+export type NewRelicMetricInput = {
+  name: string;
+  type: string;
+  value: unknown;
+  timestamp?: number;
+  intervalMs?: number;
+  attributes?: Record<string, any>;
+};
+
+export type NewRelicTraceSpanInput = {
+  traceId: string;
+  spanId: string;
+  parentId?: string;
+  serviceName: string;
+  name: string;
+  durationMs: number;
+  timestamp?: number;
+  attributes?: Record<string, any>;
+};
+
+export type NewRelicAlertIssuesFilter = {
+  states?: string[];
+  priorities?: string[];
+  entityGuids?: string[];
+  entityTypes?: string[];
+  issueIds?: string[];
+  conditionIds?: number[];
+  contains?: string;
+  isAcknowledged?: boolean;
+  isCorrelated?: boolean;
+  mutingStates?: string[];
+  policyIds?: number[];
+  sources?: string[];
+};
+
+export type NewRelicAlertIssuesTimeWindow = {
+  startTime: number;
+  endTime: number;
+};
+
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value);
+
+let isNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+export let assertValidMetrics = (metrics: NewRelicMetricInput[]) => {
+  for (let [index, metric] of metrics.entries()) {
+    if (
+      (metric.type === 'count' || metric.type === 'summary') &&
+      metric.intervalMs === undefined
+    ) {
+      throw createApiServiceError(
+        `intervalMs is required for ${metric.type} metric at index ${index}`
+      );
+    }
+
+    if (metric.type === 'summary') {
+      if (!isRecord(metric.value)) {
+        throw createApiServiceError(
+          `summary metric value at index ${index} must be an object with count, sum, min, and max`
+        );
+      }
+
+      for (let field of ['count', 'sum', 'min', 'max']) {
+        if (!isNumber(metric.value[field])) {
+          throw createApiServiceError(
+            `summary metric value.${field} at index ${index} must be a number`
+          );
+        }
+      }
+
+      continue;
+    }
+
+    if (!isNumber(metric.value)) {
+      throw createApiServiceError(
+        `${metric.type} metric value at index ${index} must be a number`
+      );
+    }
+  }
+};
+
+export let assertValidEvents = (events: Record<string, any>[]) => {
+  for (let [index, event] of events.entries()) {
+    if (typeof event.eventType !== 'string' || !/^[A-Za-z0-9_:]+$/.test(event.eventType)) {
+      throw createApiServiceError(
+        `eventType is required for event at index ${index} and may only contain letters, numbers, underscores, and colons`
+      );
+    }
+
+    for (let [key, value] of Object.entries(event)) {
+      if (typeof value !== 'string' && !isNumber(value)) {
+        throw createApiServiceError(
+          `Event attribute "${key}" at index ${index} must be a string or number`
+        );
+      }
+    }
+  }
+};
+
+export let toMetricPayload = (metrics: NewRelicMetricInput[]) => [
+  {
+    metrics: metrics.map(metric => ({
+      name: metric.name,
+      type: metric.type,
+      value: metric.value,
+      timestamp: metric.timestamp ?? Math.floor(Date.now() / 1000),
+      ...(metric.intervalMs !== undefined ? { 'interval.ms': metric.intervalMs } : {}),
+      attributes: metric.attributes || {}
+    }))
+  }
+];
+
+export let toTracePayload = (spans: NewRelicTraceSpanInput[]) => [
+  {
+    spans: spans.map(span => ({
+      'trace.id': span.traceId,
+      id: span.spanId,
+      timestamp: span.timestamp ?? Date.now(),
+      attributes: {
+        ...(span.attributes || {}),
+        'service.name': span.serviceName,
+        name: span.name,
+        'duration.ms': span.durationMs,
+        ...(span.parentId !== undefined ? { 'parent.id': span.parentId } : {})
+      }
+    }))
+  }
+];
+
+export let toDashboardPageInputs = (pages: DashboardPageInput[] = []) =>
+  pages.map(page => ({
+    ...(page.guid || page.pageGuid ? { guid: page.guid ?? page.pageGuid } : {}),
+    name: page.name,
+    description: page.description || '',
+    widgets: (page.widgets || []).map(widget => {
+      let linkedEntityGuids =
+        widget.linkedEntityGuids ??
+        widget.linkedEntities
+          ?.map(entity => entity.guid)
+          .filter((guid): guid is string => typeof guid === 'string' && guid.length > 0);
+
+      return {
+        ...(widget.id || widget.widgetId ? { id: widget.id ?? widget.widgetId } : {}),
+        title: widget.title,
+        visualization: {
+          id:
+            typeof widget.visualization === 'string'
+              ? widget.visualization
+              : widget.visualization?.id
+        },
+        rawConfiguration: widget.rawConfiguration,
+        layout: widget.layout,
+        ...(linkedEntityGuids?.length ? { linkedEntityGuids } : {})
+      };
+    })
+  }));
+
+let toDashboardVariableInputs = (variables?: DashboardVariableInput[]) =>
+  variables?.map(variable => ({ ...variable }));
+
+export let toAlertIssuesFilterInput = (filter?: NewRelicAlertIssuesFilter) => {
+  let filterInput: any = {};
+
+  if (filter?.conditionIds?.length) filterInput.conditionIds = filter.conditionIds;
+  if (filter?.contains !== undefined) filterInput.contains = filter.contains;
+  if (filter?.entityGuids?.length) filterInput.entityGuids = filter.entityGuids;
+  if (filter?.entityTypes?.length) filterInput.entityTypes = filter.entityTypes;
+  if (filter?.issueIds?.length) filterInput.ids = filter.issueIds;
+  if (filter?.isAcknowledged !== undefined) filterInput.isAcknowledged = filter.isAcknowledged;
+  if (filter?.isCorrelated !== undefined) filterInput.isCorrelated = filter.isCorrelated;
+  if (filter?.mutingStates?.length) filterInput.mutingStates = filter.mutingStates;
+  if (filter?.policyIds?.length) filterInput.policyIds = filter.policyIds;
+  if (filter?.priorities?.length) filterInput.priority = filter.priorities;
+  if (filter?.sources?.length) filterInput.sources = filter.sources;
+  if (filter?.states?.length) filterInput.states = filter.states;
+
+  return filterInput;
+};
+
 export class NerdGraphClient {
   private http: ReturnType<typeof createAxios>;
   private accountId: string;
@@ -48,18 +270,20 @@ export class NerdGraphClient {
   }
 
   async query(graphqlQuery: string, variables?: Record<string, any>): Promise<any> {
-    let response = await this.http.post('', {
-      query: graphqlQuery,
-      variables: variables || {}
-    });
+    try {
+      let response = await this.http.post('', {
+        query: graphqlQuery,
+        variables: variables || {}
+      });
 
-    if (response.data?.errors?.length) {
-      throw new Error(
-        `NerdGraph error: ${response.data.errors.map((e: any) => e.message).join(', ')}`
-      );
+      if (response.data?.errors?.length) {
+        throw newRelicGraphqlErrors('NerdGraph request', response.data.errors);
+      }
+
+      return response.data?.data;
+    } catch (error) {
+      throw newRelicApiError(error, 'NerdGraph request');
     }
-
-    return response.data?.data;
   }
 
   async runNrql(nrql: string, timeout?: number): Promise<any> {
@@ -160,9 +384,7 @@ export class NerdGraphClient {
     );
 
     let result = data?.taggingAddTagsToEntity;
-    if (result?.errors?.length) {
-      throw new Error(`Tag error: ${result.errors.map((e: any) => e.message).join(', ')}`);
-    }
+    assertNoPayloadErrors('tag add', result?.errors);
     return result;
   }
 
@@ -177,11 +399,7 @@ export class NerdGraphClient {
     );
 
     let result = data?.taggingDeleteTagFromEntity;
-    if (result?.errors?.length) {
-      throw new Error(
-        `Tag deletion error: ${result.errors.map((e: any) => e.message).join(', ')}`
-      );
-    }
+    assertNoPayloadErrors('tag deletion', result?.errors);
     return result;
   }
 
@@ -199,12 +417,133 @@ export class NerdGraphClient {
     );
 
     let result = data?.taggingReplaceTagsOnEntity;
-    if (result?.errors?.length) {
-      throw new Error(
-        `Tag replace error: ${result.errors.map((e: any) => e.message).join(', ')}`
-      );
-    }
+    assertNoPayloadErrors('tag replace', result?.errors);
     return result;
+  }
+
+  async listAlertPolicies(params?: {
+    cursor?: string;
+    ids?: string[];
+    name?: string;
+    nameLike?: string;
+  }): Promise<any> {
+    let searchCriteria: Record<string, unknown> = {};
+    if (params?.ids?.length) searchCriteria.ids = params.ids;
+    if (params?.name) searchCriteria.name = params.name;
+    if (params?.nameLike) searchCriteria.nameLike = params.nameLike;
+
+    let data = await this.query(
+      `query($accountId: Int!, $cursor: String, $searchCriteria: AlertsPoliciesSearchCriteriaInput) {
+        actor {
+          account(id: $accountId) {
+            alerts {
+              policiesSearch(cursor: $cursor, searchCriteria: $searchCriteria) {
+                policies {
+                  id
+                  name
+                  incidentPreference
+                }
+                nextCursor
+                totalCount
+              }
+            }
+          }
+        }
+      }`,
+      {
+        accountId: Number.parseInt(this.accountId, 10),
+        cursor: params?.cursor,
+        searchCriteria: Object.keys(searchCriteria).length > 0 ? searchCriteria : undefined
+      }
+    );
+
+    return data?.actor?.account?.alerts?.policiesSearch;
+  }
+
+  async getAlertPolicy(policyId: string): Promise<any> {
+    let data = await this.query(
+      `query($accountId: Int!, $id: ID!) {
+        actor {
+          account(id: $accountId) {
+            alerts {
+              policy(id: $id) {
+                id
+                name
+                incidentPreference
+              }
+            }
+          }
+        }
+      }`,
+      { accountId: Number.parseInt(this.accountId, 10), id: policyId }
+    );
+
+    return data?.actor?.account?.alerts?.policy;
+  }
+
+  async createAlertPolicy(params: { name: string; incidentPreference: string }): Promise<any> {
+    let data = await this.query(
+      `mutation($accountId: Int!, $policy: AlertsPolicyInput!) {
+        alertsPolicyCreate(accountId: $accountId, policy: $policy) {
+          id
+          name
+          incidentPreference
+        }
+      }`,
+      {
+        accountId: Number.parseInt(this.accountId, 10),
+        policy: {
+          name: params.name,
+          incidentPreference: params.incidentPreference
+        }
+      }
+    );
+
+    return data?.alertsPolicyCreate;
+  }
+
+  async updateAlertPolicy(
+    policyId: string,
+    params: {
+      name?: string;
+      incidentPreference?: string;
+    }
+  ): Promise<any> {
+    let policy: Record<string, unknown> = {};
+    if (params.name !== undefined) policy.name = params.name;
+    if (params.incidentPreference !== undefined) {
+      policy.incidentPreference = params.incidentPreference;
+    }
+
+    let data = await this.query(
+      `mutation($accountId: Int!, $id: ID!, $policy: AlertsPolicyUpdateInput!) {
+        alertsPolicyUpdate(accountId: $accountId, id: $id, policy: $policy) {
+          id
+          name
+          incidentPreference
+        }
+      }`,
+      {
+        accountId: Number.parseInt(this.accountId, 10),
+        id: policyId,
+        policy
+      }
+    );
+
+    return data?.alertsPolicyUpdate;
+  }
+
+  async deleteAlertPolicy(policyId: string): Promise<any> {
+    let data = await this.query(
+      `mutation($accountId: Int!, $id: ID!) {
+        alertsPolicyDelete(accountId: $accountId, id: $id) {
+          id
+        }
+      }`,
+      { accountId: Number.parseInt(this.accountId, 10), id: policyId }
+    );
+
+    return data?.alertsPolicyDelete;
   }
 
   async createNrqlAlertCondition(
@@ -238,6 +577,8 @@ export class NerdGraphClient {
         expirationDuration?: number;
         openViolationOnExpiration?: boolean;
       };
+      baselineDirection?: string;
+      violationTimeLimitSeconds?: number;
       description?: string;
     }
   ): Promise<any> {
@@ -259,8 +600,13 @@ export class NerdGraphClient {
         aggregationMethod: 'EVENT_FLOW',
         aggregationDelay: 120
       },
-      description: params.description || ''
+      description: params.description || '',
+      violationTimeLimitSeconds: params.violationTimeLimitSeconds || 86400
     };
+
+    if (params.type === 'BASELINE') {
+      conditionInput.baselineDirection = params.baselineDirection || 'UPPER_ONLY';
+    }
 
     if (params.expiration) {
       conditionInput.expiration = params.expiration;
@@ -309,6 +655,8 @@ export class NerdGraphClient {
         operator: string;
         thresholdOccurrences: string;
       };
+      baselineDirection?: string;
+      violationTimeLimitSeconds?: number;
       description?: string;
     }
   ): Promise<any> {
@@ -317,6 +665,12 @@ export class NerdGraphClient {
     if (params.nrql !== undefined) conditionInput.nrql = { query: params.nrql };
     if (params.enabled !== undefined) conditionInput.enabled = params.enabled;
     if (params.description !== undefined) conditionInput.description = params.description;
+    if (params.violationTimeLimitSeconds !== undefined) {
+      conditionInput.violationTimeLimitSeconds = params.violationTimeLimitSeconds;
+    }
+    if (params.type === 'BASELINE' && params.baselineDirection !== undefined) {
+      conditionInput.baselineDirection = params.baselineDirection;
+    }
 
     let terms: any[] = [];
     if (params.critical) terms.push({ ...params.critical, priority: 'CRITICAL' });
@@ -325,12 +679,12 @@ export class NerdGraphClient {
 
     let mutation =
       params.type === 'STATIC'
-        ? `mutation($accountId: Int!, $id: ID!, $condition: AlertsNrqlConditionStaticInput!) {
+        ? `mutation($accountId: Int!, $id: ID!, $condition: AlertsNrqlConditionUpdateStaticInput!) {
           alertsNrqlConditionStaticUpdate(accountId: $accountId, id: $id, condition: $condition) {
             id name enabled nrql { query } terms { threshold thresholdDuration operator priority thresholdOccurrences } policyId description
           }
         }`
-        : `mutation($accountId: Int!, $id: ID!, $condition: AlertsNrqlConditionBaselineInput!) {
+        : `mutation($accountId: Int!, $id: ID!, $condition: AlertsNrqlConditionUpdateBaselineInput!) {
           alertsNrqlConditionBaselineUpdate(accountId: $accountId, id: $id, condition: $condition) {
             id name enabled nrql { query } terms { threshold thresholdDuration operator priority thresholdOccurrences } policyId description
           }
@@ -364,39 +718,36 @@ export class NerdGraphClient {
     name: string;
     description?: string;
     permissions?: string;
-    pages: Array<{
-      name: string;
-      description?: string;
-      widgets: Array<{
-        title: string;
-        visualization: string;
-        rawConfiguration: any;
-        layout?: { column: number; row: number; width: number; height: number };
-      }>;
-    }>;
+    pages: DashboardPageInput[];
+    variables?: DashboardVariableInput[];
   }): Promise<any> {
     let dashboardInput: any = {
       name: params.name,
       description: params.description || '',
       permissions: params.permissions || 'PUBLIC_READ_WRITE',
-      pages: params.pages.map(page => ({
-        name: page.name,
-        description: page.description || '',
-        widgets: page.widgets.map(widget => ({
-          title: widget.title,
-          visualization: { id: widget.visualization },
-          rawConfiguration: widget.rawConfiguration,
-          layout: widget.layout
-        }))
-      }))
+      pages: toDashboardPageInputs(params.pages)
     };
+    if (params.variables !== undefined) {
+      dashboardInput.variables = toDashboardVariableInputs(params.variables);
+    }
 
     let data = await this.query(
       `mutation($accountId: Int!, $dashboard: DashboardInput!) {
         dashboardCreate(accountId: $accountId, dashboard: $dashboard) {
           entityResult {
-            guid name description permalink
+            guid name description
             pages { guid name widgets { id title visualization { id } } }
+            variables {
+              name
+              items { title value }
+              defaultValues { value { string } }
+              nrqlQuery { accountIds query }
+              options { excluded ignoreTimeRange showApplyAction hiddenOnVariablesBar }
+              title
+              type
+              isMultiSelection
+              replacementStrategy
+            }
           }
           errors { description type }
         }
@@ -405,11 +756,7 @@ export class NerdGraphClient {
     );
 
     let result = data?.dashboardCreate;
-    if (result?.errors?.length) {
-      throw new Error(
-        `Dashboard create error: ${result.errors.map((e: any) => e.description).join(', ')}`
-      );
-    }
+    assertNoPayloadErrors('dashboard create', result?.errors);
     return result?.entityResult;
   }
 
@@ -419,41 +766,50 @@ export class NerdGraphClient {
       name?: string;
       description?: string;
       permissions?: string;
-      pages?: Array<{
-        name: string;
-        description?: string;
-        widgets: Array<{
-          title: string;
-          visualization: string;
-          rawConfiguration: any;
-          layout?: { column: number; row: number; width: number; height: number };
-        }>;
-      }>;
+      pages?: DashboardPageInput[];
+      variables?: DashboardVariableInput[];
     }
   ): Promise<any> {
-    let dashboardInput: any = {};
-    if (params.name !== undefined) dashboardInput.name = params.name;
-    if (params.description !== undefined) dashboardInput.description = params.description;
-    if (params.permissions !== undefined) dashboardInput.permissions = params.permissions;
-    if (params.pages !== undefined) {
-      dashboardInput.pages = params.pages.map(page => ({
-        name: page.name,
-        description: page.description || '',
-        widgets: page.widgets.map(widget => ({
-          title: widget.title,
-          visualization: { id: widget.visualization },
-          rawConfiguration: widget.rawConfiguration,
-          layout: widget.layout
-        }))
-      }));
+    let existingDashboard = await this.getDashboard(dashboardGuid);
+    if (!existingDashboard) {
+      throw createApiServiceError(`Dashboard ${dashboardGuid} was not found`);
+    }
+
+    let variables = params.variables ?? existingDashboard.variables;
+    let dashboardInput: any = {
+      name: params.name ?? existingDashboard.name,
+      description: params.description ?? existingDashboard.description ?? '',
+      permissions: params.permissions ?? existingDashboard.permissions ?? 'PUBLIC_READ_WRITE',
+      pages: toDashboardPageInputs(params.pages ?? existingDashboard.pages ?? [])
+    };
+    if (variables !== undefined) {
+      dashboardInput.variables = toDashboardVariableInputs(variables);
+    }
+
+    if (!dashboardInput.name) {
+      throw createApiServiceError('Dashboard name is required for update action');
+    }
+    if (!dashboardInput.pages.length) {
+      throw createApiServiceError('At least one page is required for update action');
     }
 
     let data = await this.query(
-      `mutation($guid: EntityGuid!, $dashboard: DashboardUpdateInput!) {
+      `mutation($guid: EntityGuid!, $dashboard: DashboardInput!) {
         dashboardUpdate(guid: $guid, dashboard: $dashboard) {
           entityResult {
-            guid name description permalink
+            guid name description
             pages { guid name widgets { id title visualization { id } } }
+            variables {
+              name
+              items { title value }
+              defaultValues { value { string } }
+              nrqlQuery { accountIds query }
+              options { excluded ignoreTimeRange showApplyAction hiddenOnVariablesBar }
+              title
+              type
+              isMultiSelection
+              replacementStrategy
+            }
           }
           errors { description type }
         }
@@ -462,11 +818,7 @@ export class NerdGraphClient {
     );
 
     let result = data?.dashboardUpdate;
-    if (result?.errors?.length) {
-      throw new Error(
-        `Dashboard update error: ${result.errors.map((e: any) => e.description).join(', ')}`
-      );
-    }
+    assertNoPayloadErrors('dashboard update', result?.errors);
     return result?.entityResult;
   }
 
@@ -482,11 +834,7 @@ export class NerdGraphClient {
     );
 
     let result = data?.dashboardDelete;
-    if (result?.errors?.length) {
-      throw new Error(
-        `Dashboard delete error: ${result.errors.map((e: any) => e.description).join(', ')}`
-      );
-    }
+    assertNoPayloadErrors('dashboard delete', result?.errors);
     return result;
   }
 
@@ -504,7 +852,19 @@ export class NerdGraphClient {
                   visualization { id }
                   rawConfiguration
                   layout { column row width height }
+                  linkedEntities { guid }
                 }
+              }
+              variables {
+                name
+                items { title value }
+                defaultValues { value { string } }
+                nrqlQuery { accountIds query }
+                options { excluded ignoreTimeRange showApplyAction hiddenOnVariablesBar }
+                title
+                type
+                isMultiSelection
+                replacementStrategy
               }
             }
           }
@@ -524,10 +884,38 @@ export class NerdGraphClient {
     status: string;
     locations: { public: string[] };
     script?: string;
+    runtimeTypeVersion?: string;
+    browsers?: string[];
+    devices?: string[];
+    apdexTarget?: number;
+    advancedOptions?: Record<string, unknown>;
   }): Promise<any> {
     let monitorType = params.type.toUpperCase();
 
+    let monitorInput: Record<string, unknown> = {
+      name: params.name,
+      period: params.period,
+      status: params.status,
+      locations: params.locations
+    };
+    if (params.apdexTarget !== undefined) monitorInput.apdexTarget = params.apdexTarget;
+    if (params.advancedOptions !== undefined)
+      monitorInput.advancedOptions = params.advancedOptions;
+
     if (monitorType === 'SIMPLE_BROWSER') {
+      monitorInput = {
+        ...monitorInput,
+        uri: params.uri,
+        browsers: params.browsers || ['CHROME'],
+        devices: params.devices || ['DESKTOP'],
+        runtime: {
+          ...defaultRuntime(monitorType),
+          ...(params.runtimeTypeVersion
+            ? { runtimeTypeVersion: params.runtimeTypeVersion }
+            : {})
+        }
+      };
+
       let data = await this.query(
         `mutation($accountId: Int!, $monitor: SyntheticsCreateSimpleBrowserMonitorInput!) {
           syntheticsCreateSimpleBrowserMonitor(accountId: $accountId, monitor: $monitor) {
@@ -537,21 +925,11 @@ export class NerdGraphClient {
         }`,
         {
           accountId: Number.parseInt(this.accountId, 10),
-          monitor: {
-            name: params.name,
-            uri: params.uri,
-            period: params.period,
-            status: params.status,
-            locations: params.locations
-          }
+          monitor: monitorInput
         }
       );
       let result = data?.syntheticsCreateSimpleBrowserMonitor;
-      if (result?.errors?.length) {
-        throw new Error(
-          `Synthetics error: ${result.errors.map((e: any) => e.description).join(', ')}`
-        );
-      }
+      assertNoPayloadErrors('synthetic monitor create', result?.errors);
       return result?.monitor;
     }
 
@@ -564,6 +942,23 @@ export class NerdGraphClient {
         monitorType === 'SCRIPT_BROWSER'
           ? 'SyntheticsCreateScriptBrowserMonitorInput'
           : 'SyntheticsCreateScriptApiMonitorInput';
+      monitorInput = {
+        ...monitorInput,
+        script: params.script,
+        runtime: {
+          ...defaultRuntime(monitorType),
+          ...(params.runtimeTypeVersion
+            ? { runtimeTypeVersion: params.runtimeTypeVersion }
+            : {})
+        },
+        ...(monitorType === 'SCRIPT_BROWSER'
+          ? {
+              browsers: params.browsers || ['CHROME'],
+              devices: params.devices || ['DESKTOP']
+            }
+          : {}),
+        ...(params.uri ? { uri: params.uri } : {})
+      };
 
       let data = await this.query(
         `mutation($accountId: Int!, $monitor: ${inputType}!) {
@@ -574,26 +969,20 @@ export class NerdGraphClient {
         }`,
         {
           accountId: Number.parseInt(this.accountId, 10),
-          monitor: {
-            name: params.name,
-            period: params.period,
-            status: params.status,
-            locations: params.locations,
-            script: params.script,
-            ...(params.uri ? { uri: params.uri } : {})
-          }
+          monitor: monitorInput
         }
       );
       let result = data?.[mutationName];
-      if (result?.errors?.length) {
-        throw new Error(
-          `Synthetics error: ${result.errors.map((e: any) => e.description).join(', ')}`
-        );
-      }
+      assertNoPayloadErrors('synthetic monitor create', result?.errors);
       return result?.monitor;
     }
 
     // Default: simple ping monitor
+    monitorInput = {
+      ...monitorInput,
+      uri: params.uri
+    };
+
     let data = await this.query(
       `mutation($accountId: Int!, $monitor: SyntheticsCreateSimpleMonitorInput!) {
         syntheticsCreateSimpleMonitor(accountId: $accountId, monitor: $monitor) {
@@ -603,22 +992,85 @@ export class NerdGraphClient {
       }`,
       {
         accountId: Number.parseInt(this.accountId, 10),
-        monitor: {
-          name: params.name,
-          uri: params.uri,
-          period: params.period,
-          status: params.status,
-          locations: params.locations
-        }
+        monitor: monitorInput
       }
     );
     let result = data?.syntheticsCreateSimpleMonitor;
-    if (result?.errors?.length) {
-      throw new Error(
-        `Synthetics error: ${result.errors.map((e: any) => e.description).join(', ')}`
-      );
-    }
+    assertNoPayloadErrors('synthetic monitor create', result?.errors);
     return result?.monitor;
+  }
+
+  async updateSyntheticMonitor(
+    monitorGuid: string,
+    params: {
+      type: string;
+      name?: string;
+      uri?: string;
+      period?: string;
+      status?: string;
+      locations?: { public: string[] };
+      script?: string;
+      runtimeTypeVersion?: string;
+      browsers?: string[];
+      devices?: string[];
+      apdexTarget?: number;
+      advancedOptions?: Record<string, unknown>;
+    }
+  ): Promise<any> {
+    let monitorType = params.type.toUpperCase();
+    let monitorInput: Record<string, unknown> = {};
+    if (params.name !== undefined) monitorInput.name = params.name;
+    if (params.uri !== undefined) monitorInput.uri = params.uri;
+    if (params.period !== undefined) monitorInput.period = params.period;
+    if (params.status !== undefined) monitorInput.status = params.status;
+    if (params.locations !== undefined) monitorInput.locations = params.locations;
+    if (params.script !== undefined) monitorInput.script = params.script;
+    if (params.apdexTarget !== undefined) monitorInput.apdexTarget = params.apdexTarget;
+    if (params.advancedOptions !== undefined)
+      monitorInput.advancedOptions = params.advancedOptions;
+
+    if (params.runtimeTypeVersion !== undefined) {
+      monitorInput.runtime = {
+        ...defaultRuntime(monitorType),
+        runtimeTypeVersion: params.runtimeTypeVersion
+      };
+    }
+
+    if (monitorType === 'SIMPLE_BROWSER' || monitorType === 'SCRIPT_BROWSER') {
+      if (params.browsers !== undefined) monitorInput.browsers = params.browsers;
+      if (params.devices !== undefined) monitorInput.devices = params.devices;
+    }
+
+    let mutationName =
+      monitorType === 'SIMPLE_BROWSER'
+        ? 'syntheticsUpdateSimpleBrowserMonitor'
+        : monitorType === 'SCRIPT_BROWSER'
+          ? 'syntheticsUpdateScriptBrowserMonitor'
+          : monitorType === 'SCRIPT_API'
+            ? 'syntheticsUpdateScriptApiMonitor'
+            : 'syntheticsUpdateSimpleMonitor';
+    let inputType =
+      monitorType === 'SIMPLE_BROWSER'
+        ? 'SyntheticsUpdateSimpleBrowserMonitorInput'
+        : monitorType === 'SCRIPT_BROWSER'
+          ? 'SyntheticsUpdateScriptBrowserMonitorInput'
+          : monitorType === 'SCRIPT_API'
+            ? 'SyntheticsUpdateScriptApiMonitorInput'
+            : 'SyntheticsUpdateSimpleMonitorInput';
+
+    let data = await this.query(
+      `mutation($guid: EntityGuid!, $monitor: ${inputType}!) {
+        ${mutationName}(guid: $guid, monitor: $monitor) {
+          monitor { guid name status period uri locations { public } }
+          errors { description type }
+        }
+      }`,
+      { guid: monitorGuid, monitor: monitorInput }
+    );
+
+    let result = data?.[mutationName];
+    assertNoPayloadErrors('synthetic monitor update', result?.errors);
+    return result?.monitor || { guid: monitorGuid };
   }
 
   async deleteSyntheticMonitor(monitorGuid: string): Promise<any> {
@@ -636,7 +1088,7 @@ export class NerdGraphClient {
 
   async createChangeTrackingMarker(params: {
     entityGuid: string;
-    version?: string;
+    version: string;
     changelog?: string;
     commit?: string;
     description?: string;
@@ -646,9 +1098,15 @@ export class NerdGraphClient {
     user?: string;
     timestamp?: number;
   }): Promise<any> {
+    if (!params.version) {
+      throw createApiServiceError(
+        'version is required for change tracking deployment markers'
+      );
+    }
+
     let deploymentInput: any = {
       entityGuid: params.entityGuid,
-      version: params.version || ''
+      version: params.version
     };
     if (params.changelog) deploymentInput.changelog = params.changelog;
     if (params.commit) deploymentInput.commit = params.commit;
@@ -657,7 +1115,7 @@ export class NerdGraphClient {
     if (params.deepLink) deploymentInput.deepLink = params.deepLink;
     if (params.groupId) deploymentInput.groupId = params.groupId;
     if (params.user) deploymentInput.user = params.user;
-    if (params.timestamp) deploymentInput.timestamp = params.timestamp;
+    if (params.timestamp !== undefined) deploymentInput.timestamp = params.timestamp;
 
     let data = await this.query(
       `mutation($deployment: ChangeTrackingDeploymentInput!) {
@@ -672,33 +1130,37 @@ export class NerdGraphClient {
   }
 
   async listAlertIssues(params?: {
-    filter?: { states?: string[]; priorities?: string[] };
+    filter?: NewRelicAlertIssuesFilter;
+    timeWindow?: NewRelicAlertIssuesTimeWindow;
     cursor?: string;
   }): Promise<any> {
-    let filterInput: any = {};
-    if (params?.filter?.states) filterInput.states = params.filter.states;
-    if (params?.filter?.priorities) filterInput.priorities = params.filter.priorities;
+    let filterInput = toAlertIssuesFilterInput(params?.filter);
 
     let data = await this.query(
-      `query($accountId: Int!, $cursor: String, $filter: AiIssuesFilterInput) {
+      `query($accountId: Int!, $cursor: String, $filter: AiIssuesFilterIssues, $timeWindow: TimeWindowInput) {
         actor {
           account(id: $accountId) {
             aiIssues {
-              issues(cursor: $cursor, filter: $filter) {
+              issues(cursor: $cursor, filter: $filter, timeWindow: $timeWindow) {
                 issues {
                   issueId
                   title
                   state
                   priority
+                  accountIds
+                  createdAt
                   activatedAt
                   closedAt
                   acknowledgedAt
                   updatedAt
                   entityGuids
                   entityNames
-                  conditionName
-                  policyName
+                  entityTypes
+                  isCorrelated
+                  mutingState
+                  policyIds
                   sources
+                  totalIncidents
                 }
                 nextCursor
               }
@@ -709,7 +1171,8 @@ export class NerdGraphClient {
       {
         accountId: Number.parseInt(this.accountId, 10),
         cursor: params?.cursor,
-        filter: Object.keys(filterInput).length > 0 ? filterInput : undefined
+        filter: Object.keys(filterInput).length > 0 ? filterInput : undefined,
+        timeWindow: params?.timeWindow
       }
     );
 
@@ -728,15 +1191,8 @@ export class IngestClient {
     this.licenseKey = config.licenseKey;
   }
 
-  async ingestMetrics(
-    metrics: Array<{
-      name: string;
-      type: string;
-      value: number;
-      timestamp?: number;
-      attributes?: Record<string, any>;
-    }>
-  ): Promise<any> {
+  async ingestMetrics(metrics: NewRelicMetricInput[]): Promise<any> {
+    assertValidMetrics(metrics);
     let http = createAxios({
       baseURL: getMetricIngestUrl(this.region),
       headers: {
@@ -745,23 +1201,18 @@ export class IngestClient {
       }
     });
 
-    let payload = [
-      {
-        metrics: metrics.map(m => ({
-          name: m.name,
-          type: m.type,
-          value: m.value,
-          timestamp: m.timestamp || Math.floor(Date.now() / 1000),
-          attributes: m.attributes || {}
-        }))
-      }
-    ];
+    let payload = toMetricPayload(metrics);
 
-    let response = await http.post('', payload);
-    return response.data;
+    try {
+      let response = await http.post('', payload);
+      return response.data;
+    } catch (error) {
+      throw newRelicApiError(error, 'metric ingest');
+    }
   }
 
   async ingestEvents(events: Record<string, any>[]): Promise<any> {
+    assertValidEvents(events);
     let http = createAxios({
       baseURL: getEventIngestUrl(this.region, this.accountId),
       headers: {
@@ -770,8 +1221,12 @@ export class IngestClient {
       }
     });
 
-    let response = await http.post('', events);
-    return response.data;
+    try {
+      let response = await http.post('', events);
+      return response.data;
+    } catch (error) {
+      throw newRelicApiError(error, 'event ingest');
+    }
   }
 
   async ingestLogs(
@@ -799,22 +1254,15 @@ export class IngestClient {
       }
     ];
 
-    let response = await http.post('', payload);
-    return response.data;
+    try {
+      let response = await http.post('', payload);
+      return response.data;
+    } catch (error) {
+      throw newRelicApiError(error, 'log ingest');
+    }
   }
 
-  async ingestTraces(
-    spans: Array<{
-      traceId: string;
-      spanId: string;
-      parentId?: string;
-      serviceName: string;
-      name: string;
-      durationMs: number;
-      timestamp?: number;
-      attributes?: Record<string, any>;
-    }>
-  ): Promise<any> {
+  async ingestTraces(spans: NewRelicTraceSpanInput[]): Promise<any> {
     let http = createAxios({
       baseURL: getTraceIngestUrl(this.region),
       headers: {
@@ -825,24 +1273,13 @@ export class IngestClient {
       }
     });
 
-    let payload = [
-      {
-        spans: spans.map(s => ({
-          'trace.id': s.traceId,
-          id: s.spanId,
-          attributes: {
-            'parent.id': s.parentId,
-            'service.name': s.serviceName,
-            name: s.name,
-            'duration.ms': s.durationMs,
-            timestamp: s.timestamp || Date.now(),
-            ...(s.attributes || {})
-          }
-        }))
-      }
-    ];
+    let payload = toTracePayload(spans);
 
-    let response = await http.post('', payload);
-    return response.data;
+    try {
+      let response = await http.post('', payload);
+      return response.data;
+    } catch (error) {
+      throw newRelicApiError(error, 'trace ingest');
+    }
   }
 }

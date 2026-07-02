@@ -1,5 +1,6 @@
 import { Buffer } from 'buffer';
 import { createAxios } from 'slates';
+import { affindaApiError } from './errors';
 
 let BASE_URLS: Record<string, string> = {
   global: 'https://api.affinda.com/v3',
@@ -25,10 +26,19 @@ export class Client {
     });
   }
 
+  private async request<T>(operation: string, run: () => Promise<{ data: T }>): Promise<T> {
+    try {
+      let response = await run();
+      return response.data;
+    } catch (error) {
+      throw affindaApiError(error, operation);
+    }
+  }
+
   // ---- Documents ----
 
   async uploadDocument(params: {
-    file?: { name: string; data: string };
+    file?: { name: string; data: string; mimeType?: string };
     url?: string;
     workspace?: string;
     collection?: string;
@@ -43,6 +53,10 @@ export class Client {
     compact?: boolean;
     deleteAfterParse?: boolean;
     enableValidationTool?: boolean;
+    expiryTime?: string;
+    useOcr?: boolean;
+    llmHint?: string;
+    limitToExamples?: string[];
   }): Promise<any> {
     let data: Record<string, any> = {};
 
@@ -51,35 +65,37 @@ export class Client {
     }
     if (params.workspace) data.workspace = params.workspace;
     if (params.collection) data.collection = params.collection;
-    if (params.documentType) data.document_type = params.documentType;
+    if (params.documentType) data.documentType = params.documentType;
     if (params.wait !== undefined) data.wait = params.wait;
     if (params.identifier) data.identifier = params.identifier;
-    if (params.customIdentifier) data.custom_identifier = params.customIdentifier;
-    if (params.fileName) data.file_name = params.fileName;
+    if (params.customIdentifier) data.customIdentifier = params.customIdentifier;
+    if (params.fileName) data.fileName = params.fileName;
     if (params.language) data.language = params.language;
-    if (params.rejectDuplicates !== undefined)
-      data.reject_duplicates = params.rejectDuplicates;
-    if (params.lowPriority !== undefined) data.low_priority = params.lowPriority;
+    if (params.rejectDuplicates !== undefined) data.rejectDuplicates = params.rejectDuplicates;
+    if (params.lowPriority !== undefined) data.lowPriority = params.lowPriority;
     if (params.compact !== undefined) data.compact = params.compact;
-    if (params.deleteAfterParse !== undefined)
-      data.delete_after_parse = params.deleteAfterParse;
+    if (params.deleteAfterParse !== undefined) data.deleteAfterParse = params.deleteAfterParse;
     if (params.enableValidationTool !== undefined)
-      data.enable_validation_tool = params.enableValidationTool;
+      data.enableValidationTool = params.enableValidationTool;
+    if (params.expiryTime) data.expiryTime = params.expiryTime;
+    if (params.useOcr !== undefined) data.useOcr = params.useOcr;
+    if (params.llmHint) data.llmHint = params.llmHint;
+    if (params.limitToExamples) data.limitToExamples = JSON.stringify(params.limitToExamples);
 
+    let formData = new FormData();
     if (params.file) {
       let buffer = Buffer.from(params.file.data, 'base64');
-      let blob = new Blob([buffer]);
-      let formData = new FormData();
+      let blob = new Blob([buffer], {
+        type: params.file.mimeType ?? 'application/octet-stream'
+      });
       formData.append('file', blob, params.file.name);
-      for (let [key, value] of Object.entries(data)) {
-        formData.append(key, String(value));
-      }
-      let response = await this.axios.post('/documents', formData);
-      return response.data;
     }
 
-    let response = await this.axios.post('/documents', data);
-    return response.data;
+    for (let [key, value] of Object.entries(data)) {
+      formData.append(key, String(value));
+    }
+
+    return this.request('upload document', () => this.axios.post('/documents', formData));
   }
 
   async getDocument(
@@ -89,20 +105,23 @@ export class Client {
     let queryParams: Record<string, any> = {};
     if (params?.format) queryParams.format = params.format;
     if (params?.compact !== undefined) queryParams.compact = params.compact;
-    let response = await this.axios.get(`/documents/${identifier}`, { params: queryParams });
-    return response.data;
+    return this.request('get document', () =>
+      this.axios.get(`/documents/${identifier}`, { params: queryParams })
+    );
   }
 
   async listDocuments(params?: {
     workspace?: string;
     collection?: string;
     state?: string;
-    tags?: string[];
+    tags?: number[];
     search?: string;
+    createdDt?: string;
     offset?: number;
     limit?: number;
-    ordering?: string;
+    ordering?: string[];
     includeData?: boolean;
+    exclude?: string[];
     inReview?: boolean;
     failed?: boolean;
     ready?: boolean;
@@ -110,6 +129,7 @@ export class Client {
     hasChallenges?: boolean;
     customIdentifier?: string;
     compact?: boolean;
+    count?: boolean;
   }): Promise<any> {
     let queryParams: Record<string, any> = {};
     if (params?.workspace) queryParams.workspace = params.workspace;
@@ -117,10 +137,12 @@ export class Client {
     if (params?.state) queryParams.state = params.state;
     if (params?.tags) queryParams.tags = params.tags;
     if (params?.search) queryParams.search = params.search;
+    if (params?.createdDt) queryParams.created_dt = params.createdDt;
     if (params?.offset !== undefined) queryParams.offset = params.offset;
     if (params?.limit !== undefined) queryParams.limit = params.limit;
     if (params?.ordering) queryParams.ordering = params.ordering;
     if (params?.includeData !== undefined) queryParams.include_data = params.includeData;
+    if (params?.exclude) queryParams.exclude = params.exclude;
     if (params?.inReview !== undefined) queryParams.in_review = params.inReview;
     if (params?.failed !== undefined) queryParams.failed = params.failed;
     if (params?.ready !== undefined) queryParams.ready = params.ready;
@@ -128,58 +150,46 @@ export class Client {
     if (params?.hasChallenges !== undefined) queryParams.has_challenges = params.hasChallenges;
     if (params?.customIdentifier) queryParams.custom_identifier = params.customIdentifier;
     if (params?.compact !== undefined) queryParams.compact = params.compact;
+    if (params?.count !== undefined) queryParams.count = params.count;
 
-    let response = await this.axios.get('/documents', { params: queryParams });
-    return response.data;
+    return this.request('list documents', () =>
+      this.axios.get('/documents', { params: queryParams })
+    );
   }
 
-  async updateDocument(identifier: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/documents/${identifier}`, data);
-    return response.data;
+  async updateDocument(
+    identifier: string,
+    data: Record<string, any>,
+    params?: { compact?: boolean }
+  ): Promise<any> {
+    let queryParams: Record<string, any> = {};
+    if (params?.compact !== undefined) queryParams.compact = params.compact;
+
+    return this.request('update document', () =>
+      this.axios.patch(`/documents/${identifier}`, data, { params: queryParams })
+    );
   }
 
   async deleteDocument(identifier: string): Promise<void> {
-    await this.axios.delete(`/documents/${identifier}`);
+    await this.request('delete document', () => this.axios.delete(`/documents/${identifier}`));
   }
 
-  async getRedactedDocument(
-    identifier: string,
-    params?: {
-      redactHeadshot?: boolean;
-      redactPersonalDetails?: boolean;
-      redactWorkDetails?: boolean;
-      redactEducationDetails?: boolean;
-      redactReferees?: boolean;
-      redactLocations?: boolean;
-      redactDates?: boolean;
-      redactGender?: boolean;
-      redactPdfMetadata?: boolean;
-    }
-  ): Promise<string> {
-    let queryParams: Record<string, any> = {};
-    if (params?.redactHeadshot !== undefined)
-      queryParams.redact_headshot = params.redactHeadshot;
-    if (params?.redactPersonalDetails !== undefined)
-      queryParams.redact_personal_details = params.redactPersonalDetails;
-    if (params?.redactWorkDetails !== undefined)
-      queryParams.redact_work_details = params.redactWorkDetails;
-    if (params?.redactEducationDetails !== undefined)
-      queryParams.redact_education_details = params.redactEducationDetails;
-    if (params?.redactReferees !== undefined)
-      queryParams.redact_referees = params.redactReferees;
-    if (params?.redactLocations !== undefined)
-      queryParams.redact_locations = params.redactLocations;
-    if (params?.redactDates !== undefined) queryParams.redact_dates = params.redactDates;
-    if (params?.redactGender !== undefined) queryParams.redact_gender = params.redactGender;
-    if (params?.redactPdfMetadata !== undefined)
-      queryParams.redact_pdf_metadata = params.redactPdfMetadata;
-
-    let response = await this.axios.get(`/documents/${identifier}/redacted`, {
-      params: queryParams,
-      responseType: 'arraybuffer'
-    });
-    let buffer = Buffer.from(response.data as ArrayBuffer);
-    return buffer.toString('base64');
+  async getRedactedDocument(identifier: string): Promise<{
+    contentBase64: string;
+    mimeType: string;
+    byteLength: number;
+  }> {
+    let data = await this.request<ArrayBuffer>('get redacted document', () =>
+      this.axios.get(`/documents/${identifier}/redacted`, {
+        responseType: 'arraybuffer'
+      })
+    );
+    let buffer = Buffer.from(data);
+    return {
+      contentBase64: buffer.toString('base64'),
+      mimeType: 'application/pdf',
+      byteLength: buffer.byteLength
+    };
   }
 
   // ---- Workspaces ----
@@ -187,39 +197,39 @@ export class Client {
   async listWorkspaces(organization: string, name?: string): Promise<any> {
     let params: Record<string, any> = { organization };
     if (name) params.name = name;
-    let response = await this.axios.get('/workspaces', { params });
-    return response.data;
+    return this.request('list workspaces', () => this.axios.get('/workspaces', { params }));
   }
 
   async getWorkspace(identifier: string): Promise<any> {
-    let response = await this.axios.get(`/workspaces/${identifier}`);
-    return response.data;
+    return this.request('get workspace', () => this.axios.get(`/workspaces/${identifier}`));
   }
 
   async createWorkspace(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/workspaces', data);
-    return response.data;
+    return this.request('create workspace', () => this.axios.post('/workspaces', data));
   }
 
   async updateWorkspace(identifier: string, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/workspaces/${identifier}`, data);
-    return response.data;
+    return this.request('update workspace', () =>
+      this.axios.patch(`/workspaces/${identifier}`, data)
+    );
   }
 
   async deleteWorkspace(identifier: string): Promise<void> {
-    await this.axios.delete(`/workspaces/${identifier}`);
+    await this.request('delete workspace', () =>
+      this.axios.delete(`/workspaces/${identifier}`)
+    );
   }
 
   // ---- Organizations ----
 
   async listOrganizations(): Promise<any> {
-    let response = await this.axios.get('/organizations');
-    return response.data;
+    return this.request('list organizations', () => this.axios.get('/organizations'));
   }
 
   async getOrganization(identifier: string): Promise<any> {
-    let response = await this.axios.get(`/organizations/${identifier}`);
-    return response.data;
+    return this.request('get organization', () =>
+      this.axios.get(`/organizations/${identifier}`)
+    );
   }
 
   // ---- Document Types ----
@@ -228,96 +238,132 @@ export class Client {
     organization?: string;
     workspace?: string;
   }): Promise<any> {
-    let response = await this.axios.get('/document_types', { params });
-    return response.data;
+    return this.request('list document types', () =>
+      this.axios.get('/document_types', { params })
+    );
   }
 
   async getDocumentType(identifier: string): Promise<any> {
-    let response = await this.axios.get(`/document_types/${identifier}`);
-    return response.data;
+    return this.request('get document type', () =>
+      this.axios.get(`/document_types/${identifier}`)
+    );
   }
 
   // ---- Annotations ----
 
   async listAnnotations(documentIdentifier: string): Promise<any> {
-    let response = await this.axios.get('/annotations', {
-      params: { document: documentIdentifier }
-    });
-    return response.data;
+    return this.request('list annotations', () =>
+      this.axios.get('/annotations', {
+        params: { document: documentIdentifier }
+      })
+    );
   }
 
   async updateAnnotation(annotationId: number, data: Record<string, any>): Promise<any> {
-    let response = await this.axios.patch(`/annotations/${annotationId}`, data);
-    return response.data;
+    return this.request('update annotation', () =>
+      this.axios.patch(`/annotations/${annotationId}`, data)
+    );
   }
 
   async batchUpdateAnnotations(data: Record<string, any>[]): Promise<any> {
-    let response = await this.axios.post('/annotations/batch_update', data);
-    return response.data;
+    return this.request('batch update annotations', () =>
+      this.axios.post('/annotations/batch_update', data)
+    );
   }
 
   async batchCreateAnnotations(data: Record<string, any>[]): Promise<any> {
-    let response = await this.axios.post('/annotations/batch_create', data);
-    return response.data;
+    return this.request('batch create annotations', () =>
+      this.axios.post('/annotations/batch_create', data)
+    );
   }
 
   async batchDeleteAnnotations(data: number[]): Promise<any> {
-    let response = await this.axios.post('/annotations/batch_delete', data);
-    return response.data;
+    return this.request('batch delete annotations', () =>
+      this.axios.post('/annotations/batch_delete', data)
+    );
   }
 
   // ---- Validation Results ----
 
-  async listValidationResults(documentIdentifier: string): Promise<any> {
-    let response = await this.axios.get('/validation_results', {
-      params: { document: documentIdentifier }
-    });
-    return response.data;
+  async listValidationResults(params: {
+    documentIdentifier: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<any> {
+    let queryParams: Record<string, any> = {
+      document: params.documentIdentifier
+    };
+    if (params.offset !== undefined) queryParams.offset = params.offset;
+    if (params.limit !== undefined) queryParams.limit = params.limit;
+
+    return this.request('list validation results', () =>
+      this.axios.get('/validation_results', {
+        params: queryParams
+      })
+    );
   }
 
   async createValidationResult(data: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/validation_results', data);
-    return response.data;
+    return this.request('create validation result', () =>
+      this.axios.post('/validation_results', data)
+    );
   }
 
   // ---- Tags ----
 
-  async listTags(workspace: string): Promise<any> {
-    let response = await this.axios.get('/tags', { params: { workspace } });
-    return response.data;
+  async listTags(params?: {
+    workspace?: string;
+    name?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<any> {
+    return this.request('list tags', () => this.axios.get('/tags', { params }));
+  }
+
+  async getTag(tagId: number): Promise<any> {
+    return this.request('get tag', () => this.axios.get(`/tags/${tagId}`));
   }
 
   async createTag(data: { name: string; workspace: string }): Promise<any> {
-    let response = await this.axios.post('/tags', data);
-    return response.data;
+    return this.request('create tag', () => this.axios.post('/tags', data));
+  }
+
+  async updateTag(tagId: number, data: { name?: string; workspace?: string }): Promise<any> {
+    return this.request('update tag', () => this.axios.patch(`/tags/${tagId}`, data));
+  }
+
+  async deleteTag(tagId: number): Promise<void> {
+    await this.request('delete tag', () => this.axios.delete(`/tags/${tagId}`));
   }
 
   async batchAddTag(tagId: number, documentIdentifiers: string[]): Promise<any> {
-    let response = await this.axios.post('/documents/batch_add_tag', {
-      tag: tagId,
-      documents: documentIdentifiers
-    });
-    return response.data;
+    return this.request('add tag to documents', () =>
+      this.axios.post('/documents/batch_add_tag', {
+        tag: tagId,
+        identifiers: documentIdentifiers
+      })
+    );
   }
 
   async batchRemoveTag(tagId: number, documentIdentifiers: string[]): Promise<any> {
-    let response = await this.axios.post('/documents/batch_remove_tag', {
-      tag: tagId,
-      documents: documentIdentifiers
-    });
-    return response.data;
+    return this.request('remove tag from documents', () =>
+      this.axios.post('/documents/batch_remove_tag', {
+        tag: tagId,
+        identifiers: documentIdentifiers
+      })
+    );
   }
 
   // ---- Search & Match ----
 
   async searchResumes(params: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/resume_search', params);
-    return response.data;
+    return this.request('search resumes', () => this.axios.post('/resume_search', params));
   }
 
   async getResumeSearchDetails(identifier: string, params: Record<string, any>): Promise<any> {
-    let response = await this.axios.post(`/resume_search/details/${identifier}`, params);
-    return response.data;
+    return this.request('get resume search details', () =>
+      this.axios.post(`/resume_search/details/${identifier}`, params)
+    );
   }
 
   async matchResumeToJob(
@@ -330,13 +376,15 @@ export class Client {
       job_description: jobDescriptionIdentifier,
       ...params
     };
-    let response = await this.axios.get('/resume_search/match', { params: queryParams });
-    return response.data;
+    return this.request('match resume to job', () =>
+      this.axios.get('/resume_search/match', { params: queryParams })
+    );
   }
 
   async searchJobDescriptions(params: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/job_description_search', params);
-    return response.data;
+    return this.request('search job descriptions', () =>
+      this.axios.post('/job_description_search', params)
+    );
   }
 
   // ---- Resthook Subscriptions ----
@@ -348,33 +396,95 @@ export class Client {
     workspace?: string;
     version?: string;
   }): Promise<any> {
-    let response = await this.axios.post('/resthook_subscriptions', data);
-    return response.data;
+    return this.request('create resthook subscription', () =>
+      this.axios.post('/resthook_subscriptions', data)
+    );
   }
 
   async activateResthookSubscription(hookSecret: string): Promise<any> {
-    let response = await this.axios.post('/resthook_subscriptions/activate', null, {
-      headers: { 'X-Hook-Secret': hookSecret }
-    });
-    return response.data;
+    return this.request('activate resthook subscription', () =>
+      this.axios.post('/resthook_subscriptions/activate', null, {
+        headers: { 'X-Hook-Secret': hookSecret }
+      })
+    );
   }
 
   async listResthookSubscriptions(params?: { offset?: number; limit?: number }): Promise<any> {
-    let response = await this.axios.get('/resthook_subscriptions', { params });
-    return response.data;
+    return this.request('list resthook subscriptions', () =>
+      this.axios.get('/resthook_subscriptions', { params })
+    );
   }
 
   async deleteResthookSubscription(subscriptionId: number): Promise<void> {
-    await this.axios.delete(`/resthook_subscriptions/${subscriptionId}`);
+    await this.request('delete resthook subscription', () =>
+      this.axios.delete(`/resthook_subscriptions/${subscriptionId}`)
+    );
   }
 
   // ---- Indexes ----
 
-  async listIndexes(params?: { documentType?: string; name?: string }): Promise<any> {
+  async listIndexes(params?: {
+    documentType?: string;
+    name?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<any> {
     let queryParams: Record<string, any> = {};
     if (params?.documentType) queryParams.document_type = params.documentType;
     if (params?.name) queryParams.name = params.name;
-    let response = await this.axios.get('/index', { params: queryParams });
-    return response.data;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    return this.request('list search indexes', () =>
+      this.axios.get('/index', { params: queryParams })
+    );
+  }
+
+  async createIndex(data: { name: string; docType: string }): Promise<any> {
+    return this.request('create search index', () => this.axios.post('/index', data));
+  }
+
+  async updateIndex(name: string, data: { name: string }): Promise<any> {
+    return this.request('update search index', () =>
+      this.axios.patch(`/index/${encodeURIComponent(name)}`, data)
+    );
+  }
+
+  async deleteIndex(name: string): Promise<void> {
+    await this.request('delete search index', () =>
+      this.axios.delete(`/index/${encodeURIComponent(name)}`)
+    );
+  }
+
+  async listIndexedDocuments(
+    name: string,
+    params?: { offset?: number; limit?: number }
+  ): Promise<any> {
+    return this.request('list indexed documents', () =>
+      this.axios.get(`/index/${encodeURIComponent(name)}/documents`, { params })
+    );
+  }
+
+  async indexDocument(name: string, documentIdentifier: string): Promise<any> {
+    return this.request('index document', () =>
+      this.axios.post(`/index/${encodeURIComponent(name)}/documents`, {
+        document: documentIdentifier
+      })
+    );
+  }
+
+  async deleteIndexedDocument(name: string, documentIdentifier: string): Promise<void> {
+    await this.request('delete indexed document', () =>
+      this.axios.delete(
+        `/index/${encodeURIComponent(name)}/documents/${encodeURIComponent(documentIdentifier)}`
+      )
+    );
+  }
+
+  async reindexDocument(name: string, documentIdentifier: string): Promise<void> {
+    await this.request('re-index document', () =>
+      this.axios.post(
+        `/index/${encodeURIComponent(name)}/documents/${encodeURIComponent(documentIdentifier)}/re_index`
+      )
+    );
   }
 }

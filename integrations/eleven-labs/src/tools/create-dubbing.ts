@@ -29,12 +29,18 @@ export let createDubbing = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Source language code. Defaults to auto-detection.'),
+      targetAccent: z
+        .string()
+        .optional()
+        .describe('Experimental target accent preference for translation and voice selection'),
       name: z.string().optional().describe('Name for the dubbing project'),
       numSpeakers: z
         .number()
         .optional()
         .describe('Number of speakers (0 for auto-detection, recommended max 9)'),
       watermark: z.boolean().optional().describe('Apply a watermark to the output video'),
+      startTime: z.number().optional().describe('Start time of the source media in seconds'),
+      endTime: z.number().optional().describe('End time of the source media in seconds'),
       highestResolution: z
         .boolean()
         .optional()
@@ -43,7 +49,11 @@ export let createDubbing = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      dubbingId: z.string().describe('ID of the created dubbing project')
+      dubbingId: z.string().describe('ID of the created dubbing project'),
+      expectedDurationSeconds: z
+        .number()
+        .optional()
+        .describe('Expected source media duration in seconds')
     })
   )
   .handleInvocation(async ctx => {
@@ -53,9 +63,12 @@ export let createDubbing = SlateTool.create(spec, {
       sourceUrl: ctx.input.sourceUrl,
       targetLang: ctx.input.targetLang,
       sourceLang: ctx.input.sourceLang,
+      targetAccent: ctx.input.targetAccent,
       name: ctx.input.name,
       numSpeakers: ctx.input.numSpeakers,
       watermark: ctx.input.watermark,
+      startTime: ctx.input.startTime,
+      endTime: ctx.input.endTime,
       highestResolution: ctx.input.highestResolution
     });
 
@@ -63,7 +76,8 @@ export let createDubbing = SlateTool.create(spec, {
 
     return {
       output: {
-        dubbingId: data.dubbing_id as string
+        dubbingId: data.dubbing_id as string,
+        expectedDurationSeconds: data.expected_duration_sec as number | undefined
       },
       message: `Created dubbing project \`${data.dubbing_id}\` — translating to **${ctx.input.targetLang}**${ctx.input.name ? ` ("${ctx.input.name}")` : ''}.`
     };

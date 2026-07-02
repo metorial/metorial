@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let managePurchases = SlateTool.create(spec, {
@@ -101,7 +102,9 @@ export let managePurchases = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.purchaseId) throw new Error('Purchase ID is required for get');
+      if (!ctx.input.purchaseId) {
+        throw kitServiceError('Purchase ID is required for get');
+      }
       let data = await client.getPurchase(ctx.input.purchaseId);
       return {
         output: { purchase: mapPurchase(data.purchase) },
@@ -110,10 +113,15 @@ export let managePurchases = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.emailAddress) throw new Error('Email address is required for create');
-      if (!ctx.input.transactionId) throw new Error('Transaction ID is required for create');
-      if (!ctx.input.products || ctx.input.products.length === 0)
-        throw new Error('At least one product is required for create');
+      if (!ctx.input.emailAddress) {
+        throw kitServiceError('Email address is required for create');
+      }
+      if (!ctx.input.transactionId) {
+        throw kitServiceError('Transaction ID is required for create');
+      }
+      if (!ctx.input.products || ctx.input.products.length === 0) {
+        throw kitServiceError('At least one product is required for create');
+      }
 
       let data = await client.createPurchase({
         emailAddress: ctx.input.emailAddress,
@@ -133,6 +141,6 @@ export let managePurchases = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw kitServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

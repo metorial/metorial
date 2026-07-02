@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/fly-io.png" height="20"> Fly Io
 
-Provision and manage applications, virtual machines (Machines), persistent storage volumes, secrets, certificates, and networking on the Fly.io cloud platform. Create and deploy containerized workloads to specific geographic regions using fast-launching Firecracker microVMs. Control the full Machine lifecycle—create, start, stop, restart, clone, update, and destroy VMs with configurable CPU, memory, and GPU resources. Manage persistent volumes, allocate IP addresses (Anycast IPv4/IPv6), configure SSL/TLS certificates for custom domains, and set app-level secrets. Query Prometheus-compatible metrics for monitoring HTTP responses, CPU, memory, disk I/O, and network traffic. Generate OIDC tokens for external service authentication.
+Provision and manage applications, virtual machines (Machines), persistent storage volumes, app secrets, certificates, and networking on the Fly.io cloud platform. Create and deploy containerized workloads to specific geographic regions using fast-launching Firecracker microVMs. Control Machine lifecycle operations, inspect events, processes, versions, memory, and org-wide inventory, manage app IP assignments, configure SSL/TLS certificates for custom domains, and generate OIDC tokens for external service authentication.
 
 ## Tools
 
@@ -11,6 +11,10 @@ Start, stop, restart, or suspend a Fly Machine. Also supports cordoning (disabli
 ### Create App
 
 Create a new Fly App in an organization. Apps serve as named collections that group Machines, volumes, networking, and secrets. Optionally isolate the app on its own private network.
+
+### Assign IP Address
+
+Assign a new IP address to a Fly App.
 
 ### Create Machine
 
@@ -24,6 +28,10 @@ Create a new persistent storage volume for a Fly App. Volumes provide local pers
 
 Delete a Fly App and all its associated resources. Use force to stop all running Machines before deletion.
 
+### Delete IP Assignment
+
+Remove an IP assignment from a Fly App.
+
 ### Delete Machine
 
 Permanently destroy a Fly Machine. Use force to stop a running machine before deletion. This action cannot be undone.
@@ -36,13 +44,45 @@ Retrieve details for a specific Fly App including its status and organization. U
 
 Retrieve full details of a specific Fly Machine including its configuration, state, events, and image reference.
 
+### Get Machine Memory
+
+Get the current memory limit and available capacity for a Fly Machine.
+
+### List IP Assignments
+
+List public IP assignments for a Fly App, including shared status, region, and service name.
+
 ### List Apps
 
 List all Fly Apps in an organization. Returns app names, machine counts, volume counts, and network configuration for each app.
 
+### List Machine Events
+
+List recent events for a Fly Machine.
+
+### List Machine Processes
+
+List processes currently running on a Fly Machine.
+
+### List Machine Versions
+
+List historical configuration versions for a Fly Machine.
+
 ### List Machines
 
 List all Fly Machines in an app. Optionally filter by region or metadata. Returns machine IDs, states, regions, and configuration details.
+
+### List Organization Machines
+
+List Fly Machines across an organization with filters and pagination.
+
+### List Organization Volumes
+
+List Fly Volumes across an organization with filters and pagination.
+
+### List Regions
+
+List Fly.io platform regions and the nearest region for the current API caller.
 
 ### List Volumes
 

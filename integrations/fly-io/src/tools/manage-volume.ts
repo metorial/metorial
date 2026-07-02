@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { flyIoServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -113,7 +114,7 @@ export let manageVolume = SlateTool.create(spec, {
         };
       }
       case 'extend': {
-        if (!ctx.input.sizeGb) throw new Error('sizeGb is required for extend action');
+        if (!ctx.input.sizeGb) throw flyIoServiceError('sizeGb is required for extend action');
         let result = await client.extendVolume(appName, volumeId, ctx.input.sizeGb);
         return {
           output: {

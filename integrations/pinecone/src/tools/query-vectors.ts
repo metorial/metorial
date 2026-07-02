@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PineconeDataPlaneClient } from '../lib/client';
+import { pineconeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let queryVectorsTool = SlateTool.create(spec, {
@@ -54,6 +55,10 @@ export let queryVectorsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if ((ctx.input.vector ? 1 : 0) + (ctx.input.vectorId ? 1 : 0) !== 1) {
+      throw pineconeServiceError('Provide exactly one query input: vector or vectorId.');
+    }
+
     let client = new PineconeDataPlaneClient({
       token: ctx.auth.token,
       indexHost: ctx.input.indexHost
@@ -81,7 +86,7 @@ export let queryVectorsTool = SlateTool.create(spec, {
       output: {
         matches,
         namespace: result.namespace || '',
-        readUnits: result.usage?.readUnits
+        readUnits: result.usage?.readUnits ?? result.usage?.read_units
       },
       message: `Found **${matches.length}** match${matches.length === 1 ? '' : 'es'}${matches.length > 0 && matches[0] ? ` (top score: ${matches[0].score.toFixed(4)})` : ''}.`
     };

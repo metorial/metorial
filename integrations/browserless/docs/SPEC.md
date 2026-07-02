@@ -2,7 +2,7 @@
 
 ## Overview
 
-Browserless is a cloud-hosted headless browser service that provides managed Chrome/Chromium instances for browser automation tasks. It offers HTTP endpoints for common browser tasks like screenshots, PDFs, content scraping, file downloads, function execution, and website unblocking. It also provides BrowserQL (BQL), a GraphQL API for browser automation with built-in stealth and CAPTCHA solving, and BaaS v2, which lets you connect Puppeteer or Playwright to managed browsers over WebSocket.
+Browserless is a cloud-hosted headless browser service that provides managed Chrome/Chromium instances for browser automation tasks. It offers REST endpoints for common browser tasks like Smart Scrape, rendered content retrieval, CSS-selector scraping, screenshots, PDFs, website unblocking, function execution, browser-triggered downloads, native URL exports, Lighthouse audits, search, site mapping, and asynchronous crawls. It also provides BrowserQL (BQL), a GraphQL API for browser automation with built-in stealth and CAPTCHA solving, and BaaS v2, which lets you connect Puppeteer or Playwright to managed browsers over WebSocket.
 
 ## Authentication
 
@@ -20,27 +20,36 @@ All Browserless APIs require an API token. Include your token as a query paramet
 
 Extract structured data from web pages using CSS selectors. You provide a URL and one or more CSS selectors, and Browserless returns matching elements with their text, HTML, attributes, and position. Browserless loads the page, runs client-side JavaScript, and then waits (up to 30 seconds by default) for your selectors before scraping.
 
+### Smart Scrape
+
+Smart Scrape intelligently scrapes any HTTP or HTTPS URL using cascading strategies. Browserless starts with fast HTTP fetching and can escalate through proxying, headless browser rendering, and page-gating CAPTCHA solving as needed. The tool supports HTML, markdown, links, screenshot, and PDF formats. Screenshot and PDF bytes are returned through Slate attachments.
+
 ### Full Page HTML Retrieval
 
 Retrieve the fully rendered HTML content of a web page after JavaScript execution. Useful for getting the complete DOM of single-page applications or dynamically rendered pages.
 
 ### PDF Generation
 
-The PDF API can render dynamically generated content, ideal for dashboard and report exports. You can supply a URL or raw HTML and configure options such as `printBackground`, page size, margins, headers/footers, and media type emulation.
+The PDF API can render dynamically generated content, ideal for dashboard and report exports. You can supply a URL or raw HTML and configure options such as `printBackground`, page size, margins, headers/footers, and media type emulation. PDF bytes are returned through Slate attachments, with only MIME type, byte length, filename, and attachment count in structured output.
 
 ### Screenshot Capture
 
-The screenshot API navigates to a page then captures a JPEG or PNG, with options to set the HTML of the page to render dynamically generated content. Supports full-page captures, custom viewport sizes, and various image formats.
+The screenshot API navigates to a page then captures a PNG, JPEG, or WebP image, with options to set the HTML of the page to render dynamically generated content. Supports full-page captures, clipping, transparency, resource blocking, and custom navigation waits. Image bytes are returned through Slate attachments.
 
 ### File Download
 
-Allows executing browser automation code that triggers file downloads and returns the downloaded files. You provide JavaScript code that navigates and interacts with a page, and Browserless captures any files downloaded during execution.
+Allows executing browser automation code that triggers file downloads and returns the downloaded file bytes. You provide JavaScript code that navigates and interacts with a page, and Browserless captures files downloaded during execution. Downloaded bytes are returned through Slate attachments.
+
+### URL Export
+
+The export API fetches a URL and streams the result in its native content type, such as HTML, PDF, image, or another binary response. It can also bundle rendered HTML and linked resources into a ZIP when `includeResources` is enabled. Exported bytes are returned through Slate attachments.
 
 ### Custom Function Execution
 
 A JavaScript content-type API for running Puppeteer code in the browser's context. Browserless sets up a blank page, injects your code, and runs it. You can optionally load external libraries via the "import" module. This enables multi-step browser interactions within a single request, such as navigating, filling forms, and extracting data.
 
-- Supports both raw JavaScript and JSON with context data payloads.
+- Supports JSON with code and context data payloads.
+- Supports explicit JSON or attachment response modes. File-producing function responses are returned through Slate attachments.
 - REST APIs are stateless, single-action endpoints. Each request launches a browser, performs one task, and closes the session.
 
 ### Website Unblocking
@@ -70,9 +79,17 @@ Browserless provides a search endpoint that performs web searches and optionally
 - When scraping is enabled, each result URL is fetched and processed into your preferred format: clean markdown, raw HTML, extracted links, or a screenshot. You can further refine scraping output with main content extraction, tag filtering, and base64 image removal.
 - Only available on Cloud plans.
 
+### URL Mapping
+
+The map API discovers URLs on a website and returns a deduplicated list of links with optional title and description metadata. It supports relevance search, sitemap behavior, geo-targeting, proxy selection, subdomain inclusion, query-parameter deduplication, and result limits.
+
+### Crawl Management
+
+The crawl API is an asynchronous, beta Browserless Cloud API for discovering and scraping pages from a site. The integration exposes a single `manage_crawl` tool with `start`, `get`, `list`, and `cancel` actions. Start options include depth, page limit, retries, sitemap handling, path filters, per-page scrape formats, proxy, and optional webhook notifications. Get and list actions return crawl status and metadata; full page content remains available through Browserless-provided short-lived `contentUrl` values.
+
 ### Session Management
 
-The sessions API is for creating and managing persistent browser sessions via REST endpoints. You can create sessions with configurable TTL, stealth mode, and browser arguments, then connect to them via WebSocket for multi-step workflows.
+The BaaS sessions API is for creating and managing persistent browser sessions, then connecting Puppeteer or Playwright over WebSocket for long-lived workflows. This integration focuses on Browserless REST tools; BaaS session management is not exposed as a Slate tool here.
 
 ### Residential Proxy Support
 

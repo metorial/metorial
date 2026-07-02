@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { brevoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let recipientSchema = z.object({
@@ -66,6 +67,27 @@ Use for automated messages like order confirmations, password resets, or any tri
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.htmlContent && ctx.input.templateId !== undefined) {
+      throw brevoServiceError('Provide either htmlContent or templateId, not both.');
+    }
+
+    if (!ctx.input.htmlContent && ctx.input.templateId === undefined) {
+      throw brevoServiceError('Provide either htmlContent or templateId.');
+    }
+
+    if (ctx.input.templateId === undefined && !ctx.input.subject) {
+      throw brevoServiceError('subject is required when sending without a templateId.');
+    }
+
+    for (let attachment of ctx.input.attachments ?? []) {
+      if (!attachment.url && !attachment.content) {
+        throw brevoServiceError('Each attachment must include either url or base64 content.');
+      }
+      if (attachment.url && attachment.content) {
+        throw brevoServiceError('Each attachment must include only one of url or content.');
+      }
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       authType: ctx.auth.authType

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { invalidAction, requireString, resolveProjectId } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getClusterMetricsTool = SlateTool.create(spec, {
@@ -77,8 +78,7 @@ export let getClusterMetricsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
     let { action } = ctx.input;
 
@@ -98,12 +98,12 @@ export let getClusterMetricsTool = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.processId) throw new Error('processId is required for measurements.');
-    if (!ctx.input.granularity) throw new Error('granularity is required for measurements.');
+    let processId = requireString(ctx.input.processId, 'processId', 'for measurements');
+    let granularity = requireString(ctx.input.granularity, 'granularity', 'for measurements');
 
     if (action === 'get_measurements') {
-      let result = await client.getProcessMeasurements(projectId, ctx.input.processId, {
-        granularity: ctx.input.granularity,
+      let result = await client.getProcessMeasurements(projectId, processId, {
+        granularity,
         period: ctx.input.period,
         start: ctx.input.start,
         end: ctx.input.end,
@@ -120,26 +120,24 @@ export let getClusterMetricsTool = SlateTool.create(spec, {
       }));
 
       return {
-        output: { measurements, processId: ctx.input.processId },
-        message: `Retrieved **${measurements.length}** metric(s) for process **${ctx.input.processId}**.`
+        output: { measurements, processId },
+        message: `Retrieved **${measurements.length}** metric(s) for process **${processId}**.`
       };
     }
 
     if (action === 'get_disk_measurements') {
-      if (!ctx.input.partitionName)
-        throw new Error('partitionName is required for disk measurements.');
-      let result = await client.getDiskMeasurements(
-        projectId,
-        ctx.input.processId,
+      let partitionName = requireString(
         ctx.input.partitionName,
-        {
-          granularity: ctx.input.granularity,
-          period: ctx.input.period,
-          start: ctx.input.start,
-          end: ctx.input.end,
-          m: ctx.input.metrics
-        }
+        'partitionName',
+        'for disk measurements'
       );
+      let result = await client.getDiskMeasurements(projectId, processId, partitionName, {
+        granularity,
+        period: ctx.input.period,
+        start: ctx.input.start,
+        end: ctx.input.end,
+        m: ctx.input.metrics
+      });
 
       let measurements = (result.measurements || []).map((m: any) => ({
         name: m.name,
@@ -151,11 +149,11 @@ export let getClusterMetricsTool = SlateTool.create(spec, {
       }));
 
       return {
-        output: { measurements, processId: ctx.input.processId },
-        message: `Retrieved **${measurements.length}** disk metric(s) for process **${ctx.input.processId}** partition **${ctx.input.partitionName}**.`
+        output: { measurements, processId },
+        message: `Retrieved **${measurements.length}** disk metric(s) for process **${processId}** partition **${partitionName}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

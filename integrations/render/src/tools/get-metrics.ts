@@ -24,11 +24,14 @@ export let getMetrics = SlateTool.create(spec, {
           'http-requests',
           'http-latency',
           'bandwidth',
+          'bandwidth-sources',
           'disk-usage',
           'disk-capacity',
           'instance-count',
-          'connections',
-          'replication-lag'
+          'active-connections',
+          'replication-lag',
+          'task-runs-queued',
+          'task-runs-completed'
         ])
         .describe('Type of metric to retrieve'),
       resourceId: z.string().describe('Resource ID (service, postgres, or key-value ID)'),

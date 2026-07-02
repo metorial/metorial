@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { mysqlServiceError } from '../lib/errors';
 import { createClient, qualifiedTableName } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -31,7 +32,12 @@ Requires a WHERE clause to target specific rows unless confirmDeleteAll is expli
         .optional()
         .default(false)
         .describe('Set to true to confirm deleting all rows when no WHERE clause is provided'),
-      limit: z.number().optional().describe('Maximum number of rows to delete')
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Maximum number of rows to delete')
     })
   )
   .output(
@@ -45,7 +51,7 @@ Requires a WHERE clause to target specific rows unless confirmDeleteAll is expli
     let fullTableName = qualifiedTableName(ctx.input.tableName, db);
 
     if (!ctx.input.where && !ctx.input.confirmDeleteAll) {
-      throw new Error(
+      throw mysqlServiceError(
         'A WHERE clause is required to delete rows. Set confirmDeleteAll to true to delete all rows.'
       );
     }

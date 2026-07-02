@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrazeClient } from '../lib/client';
+import { brazeServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let userAliasSchema = z.object({
+  aliasName: z.string().describe('Alias name'),
+  aliasLabel: z.string().describe('Alias label')
+});
 
 export let triggerCampaign = SlateTool.create(spec, {
   name: 'Trigger Campaign',
@@ -30,6 +36,7 @@ export let triggerCampaign = SlateTool.create(spec, {
               .string()
               .optional()
               .describe('External user ID of the recipient'),
+            userAlias: userAliasSchema.optional().describe('User alias of the recipient'),
             triggerProperties: z
               .record(z.string(), z.any())
               .optional()
@@ -70,6 +77,22 @@ export let triggerCampaign = SlateTool.create(spec, {
       token: ctx.auth.token,
       instanceUrl: ctx.config.instanceUrl
     });
+
+    if (ctx.input.broadcast && (ctx.input.recipients?.length ?? 0) > 0) {
+      throw brazeServiceError('broadcast cannot be used with recipients.');
+    }
+
+    if (!ctx.input.broadcast && (ctx.input.recipients?.length ?? 0) === 0) {
+      throw brazeServiceError('Provide recipients or set broadcast to true.');
+    }
+
+    for (let [index, recipient] of (ctx.input.recipients ?? []).entries()) {
+      if (!recipient.externalUserId && !recipient.userAlias) {
+        throw brazeServiceError(
+          `recipients[${index}] must include externalUserId or userAlias.`
+        );
+      }
+    }
 
     let result = await client.triggerCampaignSend({
       campaignId: ctx.input.campaignId,

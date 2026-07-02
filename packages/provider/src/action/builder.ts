@@ -32,6 +32,7 @@ export class SlateActionBuilder<
   #inputSchema: z.ZodType<InputType> | null = null;
   #outputSchema: z.ZodType<OutputType> | null = null;
   #scopes: SlateActionScopes | undefined;
+  #authMethods: string[] | undefined;
 
   #toolParams: SlateActionParametersTool<ConfigType, AuthType, InputType, OutputType> | null =
     null;
@@ -74,6 +75,24 @@ export class SlateActionBuilder<
     validateScopes(scopes);
     this.#scopes = scopes;
     return this;
+  }
+
+  authMethods(
+    authMethods: string[]
+  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result> {
+    this.#authMethods = this.validateAuthMethods(authMethods);
+    return this;
+  }
+
+  private validateAuthMethods(authMethods: string[] | undefined) {
+    if (!authMethods) return undefined;
+
+    let normalized = [...new Set(authMethods.map(authMethod => authMethod.trim()))];
+    if (normalized.some(authMethod => !authMethod)) {
+      throw new SlateDeclarationError('Auth method IDs must be non-empty strings');
+    }
+
+    return normalized;
   }
 
   handleInvocation(
@@ -138,6 +157,7 @@ export class SlateActionBuilder<
     if (scopes) {
       validateScopes(scopes);
     }
+    let authMethods = this.validateAuthMethods(this.#authMethods ?? this.params.authMethods);
 
     if (!this.#inputSchema) {
       throw new SlateDeclarationError('Input schema is not defined');
@@ -155,6 +175,7 @@ export class SlateActionBuilder<
     return this.factory({
       ...this.params,
       scopes,
+      authMethods,
       configSchema: this.#configSchema,
       authSchema: this.#authSchema,
       inputSchema: this.#inputSchema,

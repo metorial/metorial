@@ -1,6 +1,52 @@
 import { createAxios } from 'slates';
+import { pdf4meUpstreamError, toPdf4meServiceError } from './errors';
 
 let BASE_URL = 'https://api.pdf4me.com';
+
+type Pdf4meFileResult = {
+  fileContent: string;
+  fileName: string;
+};
+
+type Pdf4meRawFileResult = {
+  fileContent?: string;
+  fileName?: string;
+  docContent?: string;
+  docName?: string;
+  FileContent?: string;
+  FileName?: string;
+  'File Content'?: string;
+  'File Name'?: string;
+};
+
+let normalizeAuthorization = (token: string) => {
+  let trimmedToken = token.trim();
+
+  if (/^(Basic|Bearer)\s+/i.test(trimmedToken)) {
+    return trimmedToken;
+  }
+
+  return `Basic ${Buffer.from(trimmedToken, 'utf8').toString('base64')}`;
+};
+
+let normalizeFileResult = (
+  data: Pdf4meRawFileResult,
+  fallbackFileName: string,
+  operation: string
+): Pdf4meFileResult => {
+  let fileContent =
+    data.fileContent ?? data.docContent ?? data.FileContent ?? data['File Content'];
+  let fileName = data.fileName ?? data.docName ?? data.FileName ?? data['File Name'];
+
+  if (!fileContent) {
+    throw pdf4meUpstreamError(`${operation}: PDF4me did not return file content.`);
+  }
+
+  return {
+    fileContent,
+    fileName: fileName || fallbackFileName
+  };
+};
 
 export class Client {
   private axios;
@@ -10,20 +56,78 @@ export class Client {
       baseURL: BASE_URL,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: config.token
+        Authorization: normalizeAuthorization(config.token)
       }
     });
+  }
+
+  private async post<T>(operation: string, path: string, params: unknown): Promise<T> {
+    try {
+      let response = await this.axios.post(path, params);
+      return response.data as T;
+    } catch (error) {
+      throw toPdf4meServiceError(error, operation);
+    }
+  }
+
+  private async postFile(
+    operation: string,
+    path: string,
+    params: unknown,
+    fallbackFileName: string
+  ): Promise<Pdf4meFileResult> {
+    let data = await this.post<Pdf4meRawFileResult>(operation, path, params);
+    return normalizeFileResult(data, fallbackFileName, operation);
+  }
+
+  private async postBinaryFile(
+    operation: string,
+    path: string,
+    params: unknown,
+    fallbackFileName: string
+  ): Promise<Pdf4meFileResult> {
+    try {
+      let response = await this.axios.post(path, params, { responseType: 'arraybuffer' });
+      let contentType = String(response.headers?.['content-type'] ?? '');
+      let buffer = Buffer.from(response.data);
+
+      if (contentType.includes('application/json')) {
+        let data = JSON.parse(buffer.toString('utf8')) as Pdf4meRawFileResult;
+        return normalizeFileResult(data, fallbackFileName, operation);
+      }
+
+      return {
+        fileContent: buffer.toString('base64'),
+        fileName: fallbackFileName
+      };
+    } catch (error) {
+      throw toPdf4meServiceError(error, operation);
+    }
   }
 
   async convertToPdf(params: {
     docContent: string;
     docName: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ConvertToPdf', {
-      docContent: params.docContent,
-      docName: params.docName
-    });
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Convert to PDF failed',
+      '/api/v2/ConvertToPdf',
+      params,
+      'converted.pdf'
+    );
+  }
+
+  async convertMarkdownToPdf(params: {
+    docContent: string;
+    docName: string;
+    mdFilePath?: string;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Convert Markdown to PDF failed',
+      '/api/v2/ConvertMdToPdf',
+      params,
+      'converted.pdf'
+    );
   }
 
   async convertHtmlToPdf(params: {
@@ -38,9 +142,13 @@ export class Client {
     leftMargin?: string;
     rightMargin?: string;
     printBackground?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ConvertHtmlToPdf', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Convert HTML to PDF failed',
+      '/api/v2/ConvertHtmlToPdf',
+      params,
+      'converted.pdf'
+    );
   }
 
   async convertUrlToPdf(params: {
@@ -48,9 +156,13 @@ export class Client {
     authType?: string;
     username?: string;
     password?: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ConvertUrlToPdf', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Convert URL to PDF failed',
+      '/api/v2/ConvertUrlToPdf',
+      params,
+      'converted.pdf'
+    );
   }
 
   async convertPdfToWord(params: {
@@ -58,9 +170,13 @@ export class Client {
     docName: string;
     qualityType: string;
     language?: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ConvertPdfToWord', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Convert PDF to Word failed',
+      '/api/v2/ConvertPdfToWord',
+      params,
+      'converted.docx'
+    );
   }
 
   async convertPdfToExcel(params: {
@@ -70,9 +186,13 @@ export class Client {
     language?: string;
     mergeAllSheets?: boolean;
     outputFormat?: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ConvertPdfToExcel', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Convert PDF to Excel failed',
+      '/api/v2/ConvertPdfToExcel',
+      params,
+      'converted.xlsx'
+    );
   }
 
   async convertPdfToPowerPoint(params: {
@@ -80,20 +200,17 @@ export class Client {
     docName: string;
     qualityType?: string;
     language?: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ConvertPdfToPowerPoint', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Convert PDF to PowerPoint failed',
+      '/api/v2/ConvertPdfToPowerPoint',
+      params,
+      'converted.pptx'
+    );
   }
 
-  async merge(params: {
-    docContent: string[];
-    docName: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/Merge', {
-      docContent: params.docContent,
-      docName: params.docName
-    });
-    return response.data;
+  async merge(params: { docContent: string[]; docName: string }): Promise<Pdf4meFileResult> {
+    return this.postFile('Merge PDFs failed', '/api/v2/Merge', params, params.docName);
   }
 
   async splitPdf(params: {
@@ -105,8 +222,7 @@ export class Client {
     splitRanges?: string;
     fileNaming?: string;
   }): Promise<{ splitedDocuments: Array<{ fileName: string; streamFile: string }> }> {
-    let response = await this.axios.post('/api/v2/SplitPdf', params);
-    return response.data;
+    return this.post('Split PDF failed', '/api/v2/SplitPdf', params);
   }
 
   async splitByText(params: {
@@ -118,8 +234,7 @@ export class Client {
   }): Promise<{
     splitedDocuments: Array<{ fileName: string; docText: string; streamFile: string }>;
   }> {
-    let response = await this.axios.post('/api/v2/SplitByText', params);
-    return response.data;
+    return this.post('Split PDF by text failed', '/api/v2/SplitByText', params);
   }
 
   async splitByBarcode(params: {
@@ -134,17 +249,15 @@ export class Client {
   }): Promise<{
     splitedDocuments: Array<{ fileName: string; barcodeText: string; streamFile: string }>;
   }> {
-    let response = await this.axios.post('/api/v2/SplitByBarcode', params);
-    return response.data;
+    return this.post('Split PDF by barcode failed', '/api/v2/SplitByBarcode', params);
   }
 
   async optimize(params: {
     docContent: string;
     docName: string;
     optimizeProfile: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/Optimize', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Compress PDF failed', '/api/v2/Optimize', params, params.docName);
   }
 
   async extractResources(params: {
@@ -153,21 +266,19 @@ export class Client {
     extractText?: boolean;
     extractImage?: boolean;
   }): Promise<{ texts: string[]; images: Array<{ fileName: string; streamFile: string }> }> {
-    let response = await this.axios.post('/api/v2/ExtractResources', {
+    return this.post('Extract resources failed', '/api/v2/ExtractResources', {
       docContent: params.docContent,
       docName: params.docName,
       extractText: params.extractText ?? true,
       extractImage: params.extractImage ?? false
     });
-    return response.data;
   }
 
   async extractTable(params: {
     docContent: string;
     docName: string;
   }): Promise<{ tableList: Array<{ pageNumber: number; table: string[][] }> }> {
-    let response = await this.axios.post('/api/v2/ExtractTable', params);
-    return response.data;
+    return this.post('Extract table failed', '/api/v2/ExtractTable', params);
   }
 
   async extractTextByExpression(params: {
@@ -176,8 +287,11 @@ export class Client {
     expression: string;
     pageSequence: string;
   }): Promise<{ textList: string[] }> {
-    let response = await this.axios.post('/api/v2/ExtractTextByExpression', params);
-    return response.data;
+    return this.post(
+      'Extract text by expression failed',
+      '/api/v2/ExtractTextByExpression',
+      params
+    );
   }
 
   async textStamp(params: {
@@ -200,9 +314,8 @@ export class Client {
     showOnlyInPrint?: boolean;
     transverse?: boolean;
     fitTextOverPage?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/Stamp', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Add text stamp failed', '/api/v2/Stamp', params, params.docName);
   }
 
   async imageStamp(params: {
@@ -219,9 +332,36 @@ export class Client {
     marginYInMM: string;
     opacity: number;
     showOnlyInPrint?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ImageStamp', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Add image stamp failed',
+      '/api/v2/ImageStamp',
+      params,
+      params.docName
+    );
+  }
+
+  async signPdf(params: {
+    docContent: string;
+    docName: string;
+    imageFile: string;
+    imageName: string;
+    alignX: string;
+    alignY: string;
+    pages?: string;
+    widthInMM?: string;
+    heightInMM?: string;
+    widthInPx?: string;
+    heightInPx?: string;
+    marginXInMM?: string;
+    marginYInMM?: string;
+    marginXInPx?: string;
+    marginYInPx?: string;
+    opacity?: string;
+    showOnlyInPrint?: boolean;
+    isBackground?: boolean;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Sign PDF failed', '/api/v2/SignPdf', params, params.docName);
   }
 
   async addBarcode(params: {
@@ -241,18 +381,21 @@ export class Client {
     hideText?: boolean;
     isTextAbove?: boolean;
     showOnlyInPrint?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/AddBarcode', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Add barcode failed', '/api/v2/AddBarcode', params, params.docName);
   }
 
   async createBarcode(params: {
     barcodeType: string;
     text: string;
     hideText?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/CreateBarcode', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Create barcode failed',
+      '/api/v2/CreateBarcode',
+      params,
+      'barcode.png'
+    );
   }
 
   async readBarcode(params: {
@@ -261,8 +404,7 @@ export class Client {
     barcodeType: string[];
     pages?: string;
   }): Promise<{ barcodes: Array<{ barcodeType: string; Value: string; page: number }> }> {
-    let response = await this.axios.post('/api/v2/ReadBarcode', params);
-    return response.data;
+    return this.post('Read barcode failed', '/api/v2/ReadBarcode', params);
   }
 
   async protect(params: {
@@ -270,18 +412,16 @@ export class Client {
     docName: string;
     password: string;
     pdfPermission: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/Protect', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Protect PDF failed', '/api/v2/Protect', params, params.docName);
   }
 
   async unlock(params: {
     docContent: string;
     docName: string;
     password: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/Unlock', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Unlock PDF failed', '/api/v2/Unlock', params, params.docName);
   }
 
   async ocrPdf(params: {
@@ -290,9 +430,13 @@ export class Client {
     qualityType: string;
     ocrWhenNeeded?: string;
     language?: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ConvertOcrPdf', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Convert OCR PDF failed',
+      '/api/v2/ConvertOcrPdf',
+      params,
+      params.docName
+    );
   }
 
   async getPdfMetadata(params: { docContent: string; docName: string }): Promise<{
@@ -311,8 +455,7 @@ export class Client {
     IsSigned: boolean;
     PdfVersion: string;
   }> {
-    let response = await this.axios.post('/api/v2/GetPdfMetadata', params);
-    return response.data;
+    return this.post('Get PDF metadata failed', '/api/v2/GetPdfMetadata', params);
   }
 
   async createPdfA(params: {
@@ -321,18 +464,21 @@ export class Client {
     compliance: string;
     allowUpgrade?: boolean;
     allowDowngrade?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/PdfA', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Create PDF/A failed', '/api/v2/PdfA', params, params.docName);
   }
 
   async rotateDocument(params: {
     docContent: string;
     docName: string;
     rotationType: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/RotateDocument', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Rotate document failed',
+      '/api/v2/RotateDocument',
+      params,
+      params.docName
+    );
   }
 
   async rotatePage(params: {
@@ -340,36 +486,42 @@ export class Client {
     docName: string;
     page: number;
     rotationType: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/RotatePage', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Rotate page failed', '/api/v2/RotatePage', params, params.docName);
   }
 
   async extractPages(params: {
     docContent: string;
     docName: string;
     pageNumbers: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/ExtractPages', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Extract pages failed',
+      '/api/v2/ExtractPages',
+      params,
+      params.docName
+    );
   }
 
   async deletePages(params: {
     docContent: string;
     docName: string;
     pageNumbers: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/DeletePages', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Delete pages failed', '/api/v2/DeletePages', params, params.docName);
   }
 
   async deleteBlankPages(params: {
     docContent: string;
     docName: string;
     deletePageOption: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/DeleteBlankPages', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Delete blank pages failed',
+      '/api/v2/DeleteBlankPages',
+      params,
+      params.docName
+    );
   }
 
   async addPageNumber(params: {
@@ -384,34 +536,37 @@ export class Client {
     isBold?: boolean;
     isItalic?: boolean;
     skipFirstPage?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/AddPageNumber', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Add page number failed',
+      '/api/v2/AddPageNumber',
+      params,
+      params.docName
+    );
   }
 
   async linearizePdf(params: {
     docContent: string;
     docName: string;
     optimizeProfile: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/LinearizePdf', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Linearize PDF failed',
+      '/api/v2/LinearizePdf',
+      params,
+      params.docName
+    );
   }
 
   async flattenPdf(params: {
     docContent: string;
     docName: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/FlattenPdf', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Flatten PDF failed', '/api/v2/FlattenPdf', params, params.docName);
   }
 
-  async repairPdf(params: {
-    docContent: string;
-    docName: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/RepairPdf', params);
-    return response.data;
+  async repairPdf(params: { docContent: string; docName: string }): Promise<Pdf4meFileResult> {
+    return this.postFile('Repair PDF failed', '/api/v2/RepairPdf', params, params.docName);
   }
 
   async findAndReplace(params: {
@@ -420,9 +575,13 @@ export class Client {
     oldText: string;
     newText: string;
     pageSequence: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/FindAndReplace', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Find and replace failed',
+      '/api/v2/FindAndReplace',
+      params,
+      params.docName
+    );
   }
 
   async fillPdfForm(params: {
@@ -430,9 +589,38 @@ export class Client {
     templateDocName: string;
     dataArray: string;
     keepPdfEditable?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/GenerateDocumentFromPdf', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Fill PDF form failed',
+      '/api/v2/GenerateDocumentFromPdf',
+      params,
+      params.templateDocName
+    );
+  }
+
+  async addFormField(params: {
+    docContent: string;
+    docName: string;
+    initialValue: string;
+    positionX: number;
+    positionY: number;
+    fieldName: string;
+    Size: number;
+    pages: string;
+    formFieldType: string;
+  }): Promise<Pdf4meFileResult> {
+    return this.postBinaryFile(
+      'Add form field failed',
+      '/api/v2/AddFormField',
+      params,
+      params.docName
+    );
+  }
+
+  async extractPdfFormData(params: { docContent: string; docName: string }): Promise<{
+    formFields: Array<{ fieldName: string; fieldValue: string; fieldType: string }>;
+  }> {
+    return this.post('Extract PDF form data failed', '/api/v2/ExtractPdfFormData', params);
   }
 
   async generateDocument(params: {
@@ -445,9 +633,13 @@ export class Client {
     metaDataJson?: string;
     outputType: string;
     keepPdfEditable?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/GenerateDocumentSingle', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Generate document failed',
+      '/api/v2/GenerateDocumentSingle',
+      params,
+      `generated.${params.outputType}`
+    );
   }
 
   async addHtmlHeaderFooter(params: {
@@ -461,9 +653,13 @@ export class Client {
     marginRight?: string;
     marginTop?: string;
     marginBottom?: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/AddHtmlHeaderFooter', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Add HTML header/footer failed',
+      '/api/v2/AddHtmlHeaderFooter',
+      params,
+      params.docName
+    );
   }
 
   async mergeOverlay(params: {
@@ -471,9 +667,13 @@ export class Client {
     baseDocName: string;
     layerDocContent: string;
     layerDocName: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/MergeOverlay', params);
-    return response.data;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Merge overlay failed',
+      '/api/v2/MergeOverlay',
+      params,
+      params.baseDocName
+    );
   }
 
   async createImages(params: {
@@ -484,47 +684,64 @@ export class Client {
     WidthPixel: number;
     pageNrs: string;
   }): Promise<{ outputDocuments: Array<{ fileName: string; streamFile: string }> }> {
-    let response = await this.axios.post('/api/v2/CreateImages', params);
-    return response.data;
+    return this.post('Create images failed', '/api/v2/CreateImages', params);
   }
 
   async classifyDocument(params: {
     docContent: string;
     docName?: string;
   }): Promise<{ className: string }> {
-    let response = await this.axios.post('/api/v2/ClassifyDocument', params);
-    return response.data;
+    return this.post('Classify document failed', '/api/v2/ClassifyDocument', params);
   }
 
   async addMargin(params: {
     docContent: string;
     docName: string;
-    marginLeft: string;
-    marginRight: string;
-    marginTop: string;
-    marginBottom: string;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/AddMargin', params);
-    return response.data;
+    marginLeft?: number;
+    marginRight?: number;
+    marginTop?: number;
+    marginBottom?: number;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile('Add margin failed', '/api/v2/AddMargin', params, params.docName);
   }
 
-  async digitalSign(params: {
+  async addAttachmentToPdf(params: {
     docContent: string;
     docName: string;
-    signCertificate: string;
-    signCertificatePassword: string;
-    pageNr?: string;
-    marginX?: number;
-    marginY?: number;
-    width?: number;
-    height?: number;
-    sigLocation?: string;
-    signerName?: string;
-    sigReason?: string;
-    visible?: boolean;
-  }): Promise<{ fileContent: string; fileName: string }> {
-    let response = await this.axios.post('/api/v2/DigitalSignPdf', params);
-    return response.data;
+    attachments: Array<{ docName: string; docContent: string }>;
+  }): Promise<Pdf4meFileResult> {
+    return this.postFile(
+      'Add attachments to PDF failed',
+      '/api/v2/AddAttachmentToPdf',
+      params,
+      params.docName
+    );
+  }
+
+  async extractAttachmentFromPdf(params: {
+    docContent: string;
+    docName: string;
+  }): Promise<{ outputDocuments: Array<{ fileName: string; streamFile: string }> }> {
+    return this.post(
+      'Extract attachments from PDF failed',
+      '/api/v2/ExtractAttachmentFromPdf',
+      params
+    );
+  }
+
+  async parseDocument(params: {
+    docContent?: string;
+    docName: string;
+    TemplateId: string;
+    TemplateName?: string;
+    ParseId: string;
+  }): Promise<{
+    parsedData?: Record<string, unknown>;
+    documentType?: string;
+    pageCount?: number;
+    confidence?: number;
+  }> {
+    return this.post('Parse document failed', '/api/v2/ParseDocument', params);
   }
 
   async startWorkflow(params: {
@@ -532,7 +749,6 @@ export class Client {
     docName: string;
     wfName: string;
   }): Promise<{ status: string; jobId: string }> {
-    let response = await this.axios.post('/api/v2/StartPDF4meWorkflow', params);
-    return response.data;
+    return this.post('Start PDF4me workflow failed', '/api/v2/StartPDF4meWorkflow', params);
   }
 }

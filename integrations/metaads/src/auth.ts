@@ -1,5 +1,17 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { metaAdsApiError } from './lib/errors';
+
+let createGraphAxios = () => {
+  let axios = createAxios({ baseURL: 'https://graph.facebook.com' });
+
+  axios.interceptors.response.use(
+    response => response,
+    error => Promise.reject(metaAdsApiError(error, 'auth request'))
+  );
+
+  return axios;
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -62,7 +74,7 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let axios = createAxios({ baseURL: 'https://graph.facebook.com' });
+      let axios = createGraphAxios();
 
       let response = await axios.get('/oauth/access_token', {
         params: {
@@ -100,7 +112,7 @@ export let auth = SlateAuth.create()
     },
 
     handleTokenRefresh: async (ctx: any) => {
-      let axios = createAxios({ baseURL: 'https://graph.facebook.com' });
+      let axios = createGraphAxios();
 
       // Meta long-lived tokens can be refreshed by exchanging again
       let response = await axios.get('/oauth/access_token', {
@@ -131,7 +143,7 @@ export let auth = SlateAuth.create()
       input: {};
       scopes: string[];
     }) => {
-      let axios = createAxios({ baseURL: 'https://graph.facebook.com' });
+      let axios = createGraphAxios();
 
       let response = await axios.get('/me', {
         params: {
@@ -174,7 +186,7 @@ export let auth = SlateAuth.create()
       output: { token: string; refreshToken?: string; expiresAt?: string };
       input: { apiToken: string };
     }) => {
-      let axios = createAxios({ baseURL: 'https://graph.facebook.com' });
+      let axios = createGraphAxios();
 
       let response = await axios.get('/me', {
         params: {

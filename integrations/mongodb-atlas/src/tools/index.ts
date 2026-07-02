@@ -1,12 +1,15 @@
 export { getClusterMetricsTool } from './get-cluster-metrics';
 export { getPerformanceAdvisorTool } from './get-performance-advisor';
+export { listAccessLogsTool } from './list-access-logs';
 export { listEventsTool } from './list-events';
 export { listProjectsTool } from './list-projects';
 export { manageAlertsTool } from './manage-alerts';
 export { manageBackupsTool } from './manage-backups';
 export { manageClusterTool } from './manage-cluster';
 export { manageDatabaseUserTool } from './manage-database-user';
+export { manageFlexClusterTool } from './manage-flex-cluster';
 export { manageIpAccessListTool } from './manage-ip-access-list';
+export { manageMaintenanceWindowTool } from './manage-maintenance-window';
 export { manageNetworkPeeringTool } from './manage-network-peering';
 export { manageOnlineArchiveTool } from './manage-online-archive';
 export { manageSearchIndexesTool } from './manage-search-indexes';

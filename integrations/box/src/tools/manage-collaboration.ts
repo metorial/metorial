@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { boxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCollaboration = SlateTool.create(spec, {
@@ -102,7 +103,7 @@ export let manageCollaboration = SlateTool.create(spec, {
 
     if (action === 'list') {
       if (!itemType || !itemId)
-        throw new Error('itemType and itemId are required for list action');
+        throw boxServiceError('itemType and itemId are required for list action');
       let collabs =
         itemType === 'file'
           ? await client.getFileCollaborations(itemId)
@@ -122,8 +123,8 @@ export let manageCollaboration = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!itemType || !itemId)
-        throw new Error('itemType and itemId are required for create action');
-      if (!role) throw new Error('role is required for create action');
+        throw boxServiceError('itemType and itemId are required for create action');
+      if (!role) throw boxServiceError('role is required for create action');
 
       let accessibleBy: { type: string; id?: string; login?: string } = { type: 'user' };
       if (collaboratorGroupId) {
@@ -133,7 +134,7 @@ export let manageCollaboration = SlateTool.create(spec, {
       } else if (collaboratorEmail) {
         accessibleBy = { type: 'user', login: collaboratorEmail };
       } else {
-        throw new Error(
+        throw boxServiceError(
           'One of collaboratorEmail, collaboratorUserId, or collaboratorGroupId is required'
         );
       }
@@ -155,8 +156,9 @@ export let manageCollaboration = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!collaborationId) throw new Error('collaborationId is required for update action');
-      if (!role) throw new Error('role is required for update action');
+      if (!collaborationId)
+        throw boxServiceError('collaborationId is required for update action');
+      if (!role) throw boxServiceError('role is required for update action');
       let collab = await client.updateCollaboration(collaborationId, role);
       return {
         output: {
@@ -174,7 +176,8 @@ export let manageCollaboration = SlateTool.create(spec, {
     }
 
     // delete
-    if (!collaborationId) throw new Error('collaborationId is required for delete action');
+    if (!collaborationId)
+      throw boxServiceError('collaborationId is required for delete action');
     await client.deleteCollaboration(collaborationId);
     return {
       output: { collaborationId, deleted: true },

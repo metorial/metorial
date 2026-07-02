@@ -1,12 +1,12 @@
 # <img src="https://provider-logos.metorial-cdn.com/posthog.svg" height="20"> Posthog
 
-Capture and analyze product usage events, manage feature flags, run A/B test experiments, and create user surveys. Track persons and groups, evaluate feature flags for specific users, query analytics data using HogQL, and manage cohorts. Retrieve session recording metadata, create and manage insights and dashboards (trends, funnels, retention, paths), and configure data pipeline destinations and sources. Manage projects, organizations, annotations, actions, and event/property definitions.
+Capture and analyze product usage events, manage feature flags, run A/B test experiments, and create user surveys. Track persons and groups, evaluate feature flags for specific users, query analytics data using HogQL, and manage cohorts. Retrieve session recording metadata, create and manage insights and dashboards (trends, funnels, retention, paths). Manage projects, organizations, annotations, actions, and event/property definitions.
 
 ## Tools
 
 ### Capture Event
 
-Send one or more events to PostHog. Supports single event capture or batch capture of multiple events. Use this to track pageviews, custom events, screen views, identify users (\
+Send one or more events to PostHog. Supports single event capture or batch capture of multiple events. Use this to track pageviews, custom events, screen views, and identify users.
 
 ### List Event Definitions
 
@@ -15,6 +15,14 @@ List all event definitions in the project. Event definitions describe the possib
 ### List Projects
 
 List all projects accessible with the current credentials. Returns project IDs, names, and tokens needed for configuration.
+
+### List Organizations
+
+List organizations accessible with the current credentials. Use an organization ID with List Projects when targeting PostHog's organization-scoped project endpoint.
+
+### Get Current User
+
+Retrieve the current PostHog user, current organization, and current project context.
 
 ### List Session Recordings
 
@@ -48,9 +56,21 @@ List analytics insights (trends, funnels, retention, paths, stickiness, lifecycl
 
 Search and list person profiles in PostHog. Supports filtering by search query and person properties. Returns paginated results with person details including distinct IDs and properties.
 
+### List Group Types
+
+List configured PostHog group types and their group type indexes.
+
+### List Groups
+
+List groups for a specific group type, with optional group key or search filtering.
+
 ### List Surveys
 
 List all surveys in the project with their configuration, questions, and status.
+
+### List Actions
+
+List PostHog actions. Actions group one or more event patterns into reusable analytics definitions.
 
 ### Run HogQL Query
 

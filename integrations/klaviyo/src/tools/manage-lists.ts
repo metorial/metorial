@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient, extractPaginationCursor } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -77,7 +78,7 @@ Lists are static collections of profiles used for campaign targeting.`,
     }
 
     if (action === 'get') {
-      if (!listId) throw new Error('listId is required');
+      if (!listId) throw klaviyoServiceError('listId is required');
       let result = await client.getList(listId);
       let l = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -98,7 +99,7 @@ Lists are static collections of profiles used for campaign targeting.`,
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create');
+      if (!name) throw klaviyoServiceError('name is required for create');
       let result = await client.createList(name);
       let l = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -108,8 +109,8 @@ Lists are static collections of profiles used for campaign targeting.`,
     }
 
     if (action === 'update') {
-      if (!listId) throw new Error('listId is required');
-      if (!name) throw new Error('name is required for update');
+      if (!listId) throw klaviyoServiceError('listId is required');
+      if (!name) throw klaviyoServiceError('name is required for update');
       let result = await client.updateList(listId, name);
       let l = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -119,7 +120,7 @@ Lists are static collections of profiles used for campaign targeting.`,
     }
 
     if (action === 'delete') {
-      if (!listId) throw new Error('listId is required');
+      if (!listId) throw klaviyoServiceError('listId is required');
       await client.deleteList(listId);
       return {
         output: { listId, success: true },
@@ -128,8 +129,8 @@ Lists are static collections of profiles used for campaign targeting.`,
     }
 
     if (action === 'add_profiles') {
-      if (!listId) throw new Error('listId is required');
-      if (!profileIds?.length) throw new Error('profileIds are required');
+      if (!listId) throw klaviyoServiceError('listId is required');
+      if (!profileIds?.length) throw klaviyoServiceError('profileIds are required');
       await client.addProfilesToList(listId, profileIds);
       return {
         output: { listId, success: true },
@@ -138,8 +139,8 @@ Lists are static collections of profiles used for campaign targeting.`,
     }
 
     if (action === 'remove_profiles') {
-      if (!listId) throw new Error('listId is required');
-      if (!profileIds?.length) throw new Error('profileIds are required');
+      if (!listId) throw klaviyoServiceError('listId is required');
+      if (!profileIds?.length) throw klaviyoServiceError('profileIds are required');
       await client.removeProfilesFromList(listId, profileIds);
       return {
         output: { listId, success: true },
@@ -147,6 +148,6 @@ Lists are static collections of profiles used for campaign targeting.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw klaviyoServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -8,6 +8,10 @@ Manage email, SMS, and push notification marketing campaigns for eCommerce. Crea
 
 Create a new customer profile or update an existing one in Klaviyo. When a profileId is provided, the existing profile will be updated. Otherwise a new profile is created. Supports setting email, phone, name, location, and custom properties.
 
+### Get Account
+
+Retrieve the Klaviyo account associated with the current credentials, including account identity, contact information, timezone, currency, and public API key when available. Use this to verify the connected account before making changes.
+
 ### Get Events
 
 Retrieve events (actions tracked for profiles) from Klaviyo. Filter by metric, profile, timestamp, or other attributes. Events include email opens, clicks, purchases, and any custom events.
@@ -15,6 +19,10 @@ Retrieve events (actions tracked for profiles) from Klaviyo. Filter by metric, p
 ### Get Flows
 
 Retrieve automation flows from Klaviyo. Flows are automated messaging workflows triggered by events, list membership, or dates. Can fetch a specific flow by ID or list all flows. Optionally include flow actions.
+
+### Get Forms
+
+Retrieve Klaviyo signup forms. Can fetch a single form by ID or list forms with filtering, sorting, sparse fields, and pagination. Use this to audit active forms, find form IDs, and verify list-building entry points.
 
 ### Get List or Segment Profiles
 
@@ -44,6 +52,10 @@ Create, retrieve, update, or delete product catalog items in Klaviyo. Catalog it
 
 Create and retrieve coupons in Klaviyo, and bulk-create coupon codes. Coupons are used in campaigns and flows to offer discounts.
 
+### Manage Images
+
+List, retrieve, upload from URL or data URI, and update Klaviyo images used in templates and campaigns. Use upload to import a hosted image or data URI into Klaviyo's image library.
+
 ### Manage Lists
 
 Create, update, delete, or retrieve lists in Klaviyo. Also supports adding and removing profiles from lists. Lists are static collections of profiles used for campaign targeting.
@@ -63,6 +75,10 @@ Create, retrieve, update, delete, clone, or render email templates in Klaviyo. T
 ### Query Metric Aggregates
 
 Query aggregate analytics data for a specific metric in Klaviyo. Returns computed measurements like count, sum, or unique values over a time period. Useful for building reports on email opens, revenue, clicks, conversions, and other performance metrics.
+
+### Query Reports
+
+Query Klaviyo Reporting API values and time series for campaigns, flows, forms, and segments. Use this for performance reporting that is scoped to Klaviyo marketing assets rather than raw metric aggregates.
 
 ### Request Profile Deletion
 

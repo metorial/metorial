@@ -2,11 +2,12 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
+import { mapRun, paginationInput, requireString } from './shared';
 
 export let listRuns = SlateTool.create(spec, {
   name: 'List Runs',
   key: 'list_runs',
-  description: `List runs for a specific Actor. Returns run metadata including status, timing, and storage IDs. Useful for monitoring Actor execution history and finding completed runs.`,
+  description: `List Apify Actor runs either account-wide or for a specific Actor. Use this to monitor recent runs and find run IDs for status, logs, datasets, or cleanup.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -14,20 +15,20 @@ export let listRuns = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      actorId: z.string().describe('Actor ID or full name to list runs for'),
-      limit: z.number().optional().default(25).describe('Maximum number of runs to return'),
-      offset: z.number().optional().default(0).describe('Pagination offset'),
-      descending: z
-        .boolean()
+      scope: z
+        .enum(['account', 'actor'])
         .optional()
-        .default(true)
-        .describe('Sort in descending order (newest first)'),
-      status: z
+        .default('actor')
+        .describe('Use account for all runs or actor for runs of one Actor'),
+      actorId: z
         .string()
         .optional()
-        .describe(
-          'Filter by status: READY, RUNNING, SUCCEEDED, FAILED, ABORTING, ABORTED, TIMED-OUT'
-        )
+        .describe('Actor ID or full name; required when scope is actor'),
+      ...paginationInput,
+      status: z
+        .enum(['READY', 'RUNNING', 'SUCCEEDED', 'FAILED', 'ABORTING', 'ABORTED', 'TIMED-OUT'])
+        .optional()
+        .describe('Optional run status filter')
     })
   )
   .output(
@@ -36,45 +37,40 @@ export let listRuns = SlateTool.create(spec, {
         .array(
           z.object({
             runId: z.string().describe('Run ID'),
-            actorId: z.string().describe('Actor ID'),
-            status: z.string().describe('Run status'),
-            startedAt: z.string().optional().describe('ISO start timestamp'),
-            finishedAt: z.string().optional().describe('ISO finish timestamp'),
-            buildId: z.string().optional().describe('Build ID used'),
-            defaultDatasetId: z.string().optional().describe('Default dataset ID'),
-            defaultKeyValueStoreId: z
-              .string()
-              .optional()
-              .describe('Default key-value store ID')
+            actorId: z.string().optional().describe('Actor ID'),
+            actorTaskId: z.string().optional().describe('Task ID if applicable'),
+            status: z.string().optional().describe('Run status'),
+            startedAt: z.string().optional(),
+            finishedAt: z.string().optional(),
+            buildId: z.string().optional(),
+            defaultDatasetId: z.string().optional(),
+            defaultKeyValueStoreId: z.string().optional(),
+            defaultRequestQueueId: z.string().optional()
           })
         )
-        .describe('List of runs'),
-      total: z.number().describe('Total number of runs')
+        .describe('Runs'),
+      total: z.number().describe('Total runs matching the query')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ApifyClient({ token: ctx.auth.token });
-    let result = await client.listRuns(ctx.input.actorId, {
+    let actorId =
+      ctx.input.scope === 'actor'
+        ? requireString(ctx.input.actorId, 'actorId', 'list actor runs')
+        : undefined;
+    let result = await client.listRuns({
+      actorId,
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       desc: ctx.input.descending,
       status: ctx.input.status
     });
 
-    let runs = result.items.map(item => ({
-      runId: item.id,
-      actorId: item.actId,
-      status: item.status,
-      startedAt: item.startedAt,
-      finishedAt: item.finishedAt,
-      buildId: item.buildId,
-      defaultDatasetId: item.defaultDatasetId,
-      defaultKeyValueStoreId: item.defaultKeyValueStoreId
-    }));
+    let runs = result.items.map(mapRun);
 
     return {
       output: { runs, total: result.total },
-      message: `Found **${result.total}** run(s) for Actor \`${ctx.input.actorId}\`, showing **${runs.length}**.`
+      message: `Found **${result.total}** run(s), showing **${runs.length}**.`
     };
   })
   .build();

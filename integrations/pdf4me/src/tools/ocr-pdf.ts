@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let ocrPdf = SlateTool.create(spec, {
   name: 'OCR PDF',
@@ -30,12 +31,7 @@ Useful for making scanned documents indexable and enabling text extraction.`,
         .describe('Language of the document for better OCR accuracy (e.g. "en", "de", "fr")')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded searchable PDF content'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -51,7 +47,8 @@ Useful for making scanned documents indexable and enabling text extraction.`,
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully applied OCR to create searchable PDF: **${result.fileName}**`
     };
   })

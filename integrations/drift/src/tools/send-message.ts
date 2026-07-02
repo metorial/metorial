@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DriftClient } from '../lib/client';
+import { driftServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let sendMessage = SlateTool.create(spec, {
@@ -46,6 +47,10 @@ export let sendMessage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new DriftClient(ctx.auth.token);
+
+    if (!ctx.input.body && !ctx.input.buttons?.length) {
+      throw driftServiceError('body or buttons is required to send a Drift message.');
+    }
 
     let result = await client.sendMessage(ctx.input.conversationId, {
       type: ctx.input.type,

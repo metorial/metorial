@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getAccount,
+  getEmailAddressInsights,
   getMessageInsights,
   manageConfigurationSet,
   manageContact,
@@ -30,6 +31,7 @@ export let provider = Slate.create({
     manageConfigurationSet,
     manageDedicatedIpPool,
     manageEventDestination,
+    getEmailAddressInsights,
     getMessageInsights
   ],
   triggers: [inboundWebhook, suppressionChanges, identityChanges]

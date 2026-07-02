@@ -6,11 +6,23 @@ Convert text to lifelike speech with customizable voices, intonation, and emotio
 
 ### Compose Music
 
-Generate music from a text prompt describing genre, mood, style, and optionally lyrics. Returns base64-encoded audio. This is a batch operation and may take longer for longer compositions.
+Generate music from a text prompt describing genre, mood, style, and optionally lyrics. Returns audio as a Slate attachment. This is a batch operation and may take longer for longer compositions.
 
 ### Create Dubbing
 
 Start a dubbing job to translate and voice-over audio/video content into another language. Provide a source URL and target language to begin. Returns the dubbing project ID for tracking progress.
+
+### Create Dialogue
+
+Generate multi-turn dialogue audio from text and voice ID pairs. Returns audio as a Slate attachment.
+
+### Create Forced Alignment
+
+Align an audio file to a transcript and return character-level and word-level timing information.
+
+### Delete Dubbing
+
+Delete a dubbing project by ID.
 
 ### Delete Voice
 
@@ -22,7 +34,7 @@ Update the default settings for a specific voice. These settings control how the
 
 ### Generate Sound Effect
 
-Create sound effects from text descriptions. Describe the desired sound using natural language or audio terminology to generate cinematic sound effects, Foley, ambient sounds, and more. Returns base64-encoded audio.
+Create sound effects from text descriptions. Describe the desired sound using natural language or audio terminology to generate cinematic sound effects, Foley, ambient sounds, and more. Returns audio as a Slate attachment.
 
 ### Get Account
 
@@ -32,13 +44,17 @@ Retrieve current user profile and subscription details including character usage
 
 Check the status and details of a dubbing project. Use this to monitor progress of a dubbing job created with the "Create Dubbing" tool.
 
+### Get History Audio
+
+Download the audio for a generated history item. Returns audio as a Slate attachment.
+
 ### Get Voice
 
 Retrieve detailed metadata and settings for a specific voice by its ID. Includes voice properties, labels, and current settings like stability and similarity.
 
 ### Isolate Audio
 
-Remove background noise from audio and isolate vocal tracks. Takes a base64-encoded audio file and returns cleaned audio with background noise, music, and ambient sounds removed.
+Remove background noise from audio and isolate vocal tracks. Takes a base64-encoded audio file and returns cleaned audio as a Slate attachment.
 
 ### List History
 
@@ -54,11 +70,15 @@ Search and browse available voices with filtering, sorting, and pagination. Retu
 
 ### Speech to Text
 
-Transcribe audio into text with high accuracy. Supports speaker diarization, word-level timestamps, and 99+ languages. Provide audio as a base64-encoded file or a publicly accessible cloud storage URL.
+Transcribe audio into text with high accuracy. Supports speaker diarization, word-level timestamps, and 99+ languages. Provide audio as a base64-encoded file or a publicly accessible source URL.
 
 ### Text to Speech
 
-Convert text into lifelike speech audio using ElevenLabs voices and models. Returns base64-encoded audio that can be saved or played back. Supports multiple languages, voice customization, and various output formats.
+Convert text into lifelike speech audio using ElevenLabs voices and models. Returns audio as a Slate attachment. Supports multiple languages, voice customization, pronunciation dictionaries, continuity hints, and various output formats.
+
+### Voice Changer
+
+Transform an existing audio file to sound like a selected ElevenLabs voice while preserving timing and delivery. Returns audio as a Slate attachment.
 
 ## License
 

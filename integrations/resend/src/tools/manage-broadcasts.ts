@@ -125,6 +125,47 @@ export let getBroadcast = SlateTool.create(spec, {
   })
   .build();
 
+export let updateBroadcast = SlateTool.create(spec, {
+  name: 'Update Broadcast',
+  key: 'update_broadcast',
+  description: `Update draft broadcast content, sender, subject, or internal name before it is sent.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      broadcastId: z.string().describe('ID of the draft broadcast to update.'),
+      from: z.string().optional().describe('Updated sender email address.'),
+      subject: z.string().optional().describe('Updated email subject line.'),
+      html: z.string().optional().describe('Updated HTML content.'),
+      text: z.string().optional().describe('Updated plain text content.'),
+      name: z.string().optional().describe('Updated internal broadcast name.')
+    })
+  )
+  .output(
+    z.object({
+      broadcastId: z.string().describe('ID of the updated broadcast.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let result = await client.updateBroadcast(ctx.input.broadcastId, {
+      from: ctx.input.from,
+      subject: ctx.input.subject,
+      html: ctx.input.html,
+      text: ctx.input.text,
+      name: ctx.input.name
+    });
+
+    return {
+      output: { broadcastId: result.id },
+      message: `Broadcast \`${result.id}\` updated.`
+    };
+  })
+  .build();
+
 export let sendBroadcast = SlateTool.create(spec, {
   name: 'Send Broadcast',
   key: 'send_broadcast',

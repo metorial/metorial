@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageUser = SlateTool.create(spec, {
@@ -52,7 +53,9 @@ export let manageUser = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.username || !ctx.input.fullName || !ctx.input.role) {
-          throw new Error('username, fullName, and role are required when creating a user.');
+          throw opsgenieServiceError(
+            'username, fullName, and role are required when creating a user.'
+          );
         }
         let user = await client.createUser({
           username: ctx.input.username,
@@ -74,7 +77,7 @@ export let manageUser = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.userIdentifier) {
-          throw new Error('userIdentifier is required when updating a user.');
+          throw opsgenieServiceError('userIdentifier is required when updating a user.');
         }
         let updateData: any = {};
         if (ctx.input.username !== undefined) updateData.username = ctx.input.username;
@@ -96,7 +99,7 @@ export let manageUser = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.userIdentifier) {
-          throw new Error('userIdentifier is required when deleting a user.');
+          throw opsgenieServiceError('userIdentifier is required when deleting a user.');
         }
         await client.deleteUser(ctx.input.userIdentifier);
         return {

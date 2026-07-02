@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { planetscaleServiceError, requireAtLeastOne, requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 let webhookEventTypes = z.enum([
@@ -123,39 +124,58 @@ export let manageWebhook = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteWebhook(databaseName, ctx.input.webhookId!);
+      let webhookId = requireField(ctx.input.webhookId, 'webhookId', 'delete action');
+      await client.deleteWebhook(databaseName, webhookId);
       return {
         output: { deleted: true },
-        message: `Deleted webhook **${ctx.input.webhookId}** from database **${databaseName}**.`
+        message: `Deleted webhook **${webhookId}** from database **${databaseName}**.`
       };
     }
 
     if (action === 'test') {
-      await client.testWebhook(databaseName, ctx.input.webhookId!);
+      let webhookId = requireField(ctx.input.webhookId, 'webhookId', 'test action');
+      await client.testWebhook(databaseName, webhookId);
       return {
         output: { testSent: true },
-        message: `Sent test event to webhook **${ctx.input.webhookId}**.`
+        message: `Sent test event to webhook **${webhookId}**.`
       };
     }
 
     let wh: any;
     switch (action) {
       case 'create':
+        if (!ctx.input.url?.startsWith('https://')) {
+          throw planetscaleServiceError('url must be an HTTPS URL for create action.');
+        }
         wh = await client.createWebhook(databaseName, {
-          url: ctx.input.url!,
+          url: ctx.input.url,
           enabled: ctx.input.enabled,
           events: ctx.input.events
         });
         break;
       case 'get':
-        wh = await client.getWebhook(databaseName, ctx.input.webhookId!);
+        wh = await client.getWebhook(
+          databaseName,
+          requireField(ctx.input.webhookId, 'webhookId', 'get action')
+        );
         break;
       case 'update':
-        wh = await client.updateWebhook(databaseName, ctx.input.webhookId!, {
-          url: ctx.input.url,
-          enabled: ctx.input.enabled,
-          events: ctx.input.events
-        });
+        if (ctx.input.url !== undefined && !ctx.input.url.startsWith('https://')) {
+          throw planetscaleServiceError('url must be an HTTPS URL for update action.');
+        }
+        requireAtLeastOne(
+          { url: ctx.input.url, enabled: ctx.input.enabled, events: ctx.input.events },
+          'Provide url, enabled, or events when updating a PlanetScale webhook.'
+        );
+        wh = await client.updateWebhook(
+          databaseName,
+          requireField(ctx.input.webhookId, 'webhookId', 'update action'),
+          {
+            url: ctx.input.url,
+            enabled: ctx.input.enabled,
+            events: ctx.input.events
+          }
+        );
         break;
     }
 

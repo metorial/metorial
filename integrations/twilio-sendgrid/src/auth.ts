@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { twilioSendGridApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -32,7 +33,12 @@ export let auth = SlateAuth.create()
         }
       });
 
-      let response = await http.get('/user/profile');
+      let response: any;
+      try {
+        response = await http.get('/user/profile');
+      } catch (error) {
+        throw twilioSendGridApiError(error, 'get profile');
+      }
       let profile = response.data;
 
       return {

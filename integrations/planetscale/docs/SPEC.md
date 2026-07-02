@@ -2,7 +2,7 @@
 
 ## Overview
 
-PlanetScale is a managed database platform powered by Vitess (MySQL-compatible) and also offering PostgreSQL-compatible databases. It provides scale, performance, and reliability with features like horizontal sharding, non-blocking schema changes, and branching workflows. The API allows programmatic management of databases, branches, deploy requests, passwords, and other platform features.
+PlanetScale is a managed database platform powered by Vitess (MySQL-compatible) and also offering PostgreSQL-compatible databases. It provides scale, performance, and reliability with features like horizontal sharding, non-blocking schema changes, and branching workflows. This integration exposes practical API workflows for databases, branches, deploy requests, passwords, backups, webhooks, organization metadata, members, audit logs, regions, cluster sizes, and service tokens.
 
 ## Authentication
 
@@ -47,19 +47,19 @@ Users can manage the lifecycle of a deploy request — a mechanism similar to pu
 
 ### Connection Credential (Password) Management
 
-Automate creating and deleting database connection strings for internal users or tools. Passwords are scoped to specific branches and can be configured with specific roles (e.g., read-only, read-write, admin).
+Automate creating and deleting database connection strings for internal users or tools. Passwords are scoped to specific branches and can be configured with TTLs, CIDR restrictions, read replica routing, and direct vtgate access.
 
 ### Backup Management
 
-Create, list, read, and delete backups for database branches. Backups can be restored to new branches. Production branch backups have separate permissions for additional safety.
+Create, list, read, protect or unprotect, and delete backups for database branches. Backups can be restored to new branches. Production branch backups have separate permissions for additional safety.
 
 ### Organization and Member Management
 
-List and manage organizations, members, and teams. View invoices. Manage audit logs for compliance and security tracking.
+Read organization metadata, list members, and list audit logs for compliance and security tracking.
 
-### Query Insights
+### Provisioning Metadata
 
-Access query insights reports to analyze database query performance and detect anomalies. Schema recommendations are also available through the API.
+List organization regions and available cluster sizes so database and branch creation can use valid `region` and `clusterSize` values.
 
 ### Service Token Management
 
@@ -71,11 +71,7 @@ Create, update, list, and delete webhooks for databases via the API. Each databa
 
 ### Vitess-specific Features
 
-Manage keyspaces and VSchemas, configure sharding, manage safe migrations, control deploy request throttling, and run workflows for Vitess databases.
-
-### Postgres-specific Features
-
-Manage cluster extensions, cluster parameters, dedicated PgBouncers, IP restrictions, and database roles for PostgreSQL databases.
+Manage deploy requests, safe migrations, branch promotion, branch schema, and deploy request status/operations for Vitess databases.
 
 ## Events
 

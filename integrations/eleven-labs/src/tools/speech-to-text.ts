@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ElevenLabsClient } from '../lib/client';
+import { elevenLabsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let wordSchema = z.object({
@@ -14,9 +15,9 @@ let wordSchema = z.object({
 export let speechToText = SlateTool.create(spec, {
   name: 'Speech to Text',
   key: 'speech_to_text',
-  description: `Transcribe audio into text with high accuracy. Supports speaker diarization, word-level timestamps, and 99+ languages. Provide audio as a base64-encoded file or a publicly accessible cloud storage URL.`,
+  description: `Transcribe audio into text with high accuracy. Supports speaker diarization, word-level timestamps, and 99+ languages. Provide audio as a base64-encoded file or a publicly accessible source URL.`,
   instructions: [
-    'Provide either a base64-encoded audio file via "fileBase64" or a public URL via "cloudStorageUrl", not both.',
+    'Set sourceType to "file" with fileBase64, or "url" with sourceUrl. cloudStorageUrl remains available only for deprecated provider compatibility.',
     'Enable "diarize" to identify different speakers in the audio.'
   ],
   constraints: [
@@ -34,6 +35,12 @@ export let speechToText = SlateTool.create(spec, {
         .enum(['scribe_v1', 'scribe_v2'])
         .default('scribe_v2')
         .describe('Transcription model to use'),
+      sourceType: z
+        .enum(['file', 'url'])
+        .default('file')
+        .describe(
+          'Audio source type. For "file", provide fileBase64. For "url", provide sourceUrl.'
+        ),
       fileBase64: z
         .string()
         .optional()
@@ -45,7 +52,13 @@ export let speechToText = SlateTool.create(spec, {
       cloudStorageUrl: z
         .string()
         .optional()
-        .describe('HTTPS URL to an audio/video file to transcribe'),
+        .describe('Deprecated HTTPS URL field. Prefer sourceUrl for URL transcription.'),
+      sourceUrl: z
+        .string()
+        .optional()
+        .describe(
+          'URL of an audio or video file to transcribe. Supports hosted files and video URLs.'
+        ),
       languageCode: z
         .string()
         .optional()
@@ -65,7 +78,38 @@ export let speechToText = SlateTool.create(spec, {
       tagAudioEvents: z
         .boolean()
         .optional()
-        .describe('Tag non-speech audio events like music and laughter')
+        .describe('Tag non-speech audio events like music and laughter'),
+      diarizationThreshold: z
+        .number()
+        .min(0.1)
+        .max(0.4)
+        .optional()
+        .describe(
+          'Speaker diarization threshold. Only valid with diarize=true and no numSpeakers.'
+        ),
+      fileFormat: z
+        .enum(['pcm_s16le_16', 'other'])
+        .optional()
+        .describe('Input format. Use pcm_s16le_16 for raw 16-bit 16kHz mono PCM.'),
+      temperature: z
+        .number()
+        .min(0)
+        .max(2)
+        .optional()
+        .describe('Transcription randomness, from 0.0 to 2.0'),
+      seed: z
+        .number()
+        .int()
+        .min(0)
+        .max(2147483647)
+        .optional()
+        .describe('Best-effort deterministic transcription seed'),
+      useMultiChannel: z
+        .boolean()
+        .optional()
+        .describe(
+          'Transcribe each audio channel independently when input has multiple channels'
+        )
     })
   )
   .output(
@@ -81,18 +125,52 @@ export let speechToText = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let hasFile = Boolean(ctx.input.fileBase64);
+    let hasUrl = Boolean(ctx.input.sourceUrl || ctx.input.cloudStorageUrl);
+
+    if (ctx.input.sourceType === 'file' && (!hasFile || hasUrl)) {
+      throw elevenLabsServiceError(
+        'For sourceType "file", provide fileBase64 and do not provide sourceUrl or cloudStorageUrl.'
+      );
+    }
+
+    if (ctx.input.sourceType === 'url' && (!hasUrl || hasFile)) {
+      throw elevenLabsServiceError(
+        'For sourceType "url", provide exactly one of sourceUrl or cloudStorageUrl and do not provide fileBase64.'
+      );
+    }
+
+    if (ctx.input.sourceUrl && ctx.input.cloudStorageUrl) {
+      throw elevenLabsServiceError('Provide only one of sourceUrl or cloudStorageUrl.');
+    }
+
+    if (
+      ctx.input.diarizationThreshold !== undefined &&
+      (!ctx.input.diarize || ctx.input.numSpeakers !== undefined)
+    ) {
+      throw elevenLabsServiceError(
+        'diarizationThreshold can only be used when diarize is true and numSpeakers is omitted.'
+      );
+    }
+
     let client = new ElevenLabsClient(ctx.auth.token);
 
     let result = await client.speechToText({
       modelId: ctx.input.modelId,
       fileBase64: ctx.input.fileBase64,
       fileName: ctx.input.fileName,
+      sourceUrl: ctx.input.sourceUrl,
       cloudStorageUrl: ctx.input.cloudStorageUrl,
       languageCode: ctx.input.languageCode,
       diarize: ctx.input.diarize,
       numSpeakers: ctx.input.numSpeakers,
       timestampsGranularity: ctx.input.timestampsGranularity,
-      tagAudioEvents: ctx.input.tagAudioEvents
+      tagAudioEvents: ctx.input.tagAudioEvents,
+      diarizationThreshold: ctx.input.diarizationThreshold,
+      fileFormat: ctx.input.fileFormat,
+      temperature: ctx.input.temperature,
+      seed: ctx.input.seed,
+      useMultiChannel: ctx.input.useMultiChannel
     });
 
     let data = result as Record<string, unknown>;

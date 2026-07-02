@@ -1,7 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Api2PdfClient } from '../lib/client';
+import { api2PdfServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  api2PdfFileOutputSchema,
+  fetchApi2PdfAttachment,
+  fileAttachment,
+  fileOutput
+} from './shared';
 
 let chromePdfOptionsSchema = z
   .object({
@@ -46,6 +53,9 @@ let chromePdfOptionsSchema = z
       .boolean()
       .optional()
       .describe('Omit default white background for transparent PDFs'),
+    tagged: z.boolean().optional().describe('Generate a tagged, accessible PDF'),
+    outline: z.boolean().optional().describe('Embed a document outline/bookmarks'),
+    usePrintCss: z.boolean().optional().describe('Use print media CSS styles while rendering'),
     puppeteerWaitForMethod: z
       .string()
       .optional()
@@ -65,7 +75,7 @@ export let generatePdf = SlateTool.create(spec, {
   instructions: [
     'Provide exactly one of: html, url, or markdown as the source content.',
     'For URLs requiring authentication, pass the necessary headers via extraHttpHeaders.',
-    'Use the options object to customize page layout, margins, orientation, and header/footer templates.'
+    'Use the options object to customize page layout, margins, orientation, header/footer templates, accessibility tagging, and print CSS.'
   ],
   tags: {
     destructive: false,
@@ -89,17 +99,7 @@ export let generatePdf = SlateTool.create(spec, {
         .describe('Extra HTTP headers to send when fetching the source URL')
     })
   )
-  .output(
-    z.object({
-      responseId: z
-        .string()
-        .describe('Unique ID for this request, can be used to delete the file later'),
-      fileUrl: z.string().describe('URL to download the generated PDF'),
-      mbOut: z.number().describe('Size of the generated file in megabytes'),
-      cost: z.number().describe('Cost of this API call in USD'),
-      seconds: z.number().describe('Processing time in seconds')
-    })
-  )
+  .output(api2PdfFileOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Api2PdfClient({
       token: ctx.auth.token,
@@ -110,7 +110,7 @@ export let generatePdf = SlateTool.create(spec, {
       Boolean
     ).length;
     if (sourceCount !== 1) {
-      throw new Error('Provide exactly one of: html, url, or markdown');
+      throw api2PdfServiceError('Provide exactly one of: html, url, or markdown');
     }
 
     let result: any;
@@ -139,21 +139,14 @@ export let generatePdf = SlateTool.create(spec, {
       });
     }
 
-    if (!result.success) {
-      throw new Error(result.error || 'PDF generation failed');
-    }
+    let file = await fetchApi2PdfAttachment(client, result, 'PDF generation failed');
 
     let sourceType = ctx.input.html ? 'HTML' : ctx.input.url ? 'URL' : 'Markdown';
 
     return {
-      output: {
-        responseId: result.responseId,
-        fileUrl: result.fileUrl,
-        mbOut: result.mbOut,
-        cost: result.cost,
-        seconds: result.seconds
-      },
-      message: `Generated PDF from ${sourceType} (${result.mbOut} MB, ${result.seconds}s). [Download PDF](${result.fileUrl})`
+      output: fileOutput(result, file),
+      attachments: [fileAttachment(file)],
+      message: `Generated PDF from ${sourceType} (${result.mbOut} MB, ${result.seconds}s) and returned it as a Slate attachment.`
     };
   })
   .build();

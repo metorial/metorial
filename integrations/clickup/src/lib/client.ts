@@ -1,4 +1,7 @@
 import { createAxios } from 'slates';
+import { clickupApiError } from './errors';
+
+let encodePathSegment = (value: string) => encodeURIComponent(value);
 
 export class ClickUpClient {
   private axios: ReturnType<typeof createAxios>;
@@ -11,6 +14,11 @@ export class ClickUpClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(clickupApiError(error))
+    );
   }
 
   // ── Workspaces (Teams) ──
@@ -405,17 +413,45 @@ export class ClickUpClient {
     spaceId: string,
     tag: { name: string; tagFg?: string; tagBg?: string }
   ) {
-    let response = await this.axios.post(`/space/${spaceId}/tag`, { tag });
+    let response = await this.axios.post(`/space/${spaceId}/tag`, {
+      tag: {
+        name: tag.name,
+        tag_fg: tag.tagFg,
+        tag_bg: tag.tagBg
+      }
+    });
     return response.data as any;
   }
 
+  async updateSpaceTag(
+    spaceId: string,
+    tagName: string,
+    tag: { name?: string; tagFg?: string; tagBg?: string }
+  ) {
+    let response = await this.axios.put(
+      `/space/${spaceId}/tag/${encodePathSegment(tagName)}`,
+      {
+        tag: {
+          name: tag.name,
+          tag_fg: tag.tagFg,
+          tag_bg: tag.tagBg
+        }
+      }
+    );
+    return response.data as any;
+  }
+
+  async deleteSpaceTag(spaceId: string, tagName: string) {
+    await this.axios.delete(`/space/${spaceId}/tag/${encodePathSegment(tagName)}`);
+  }
+
   async addTagToTask(taskId: string, tagName: string) {
-    let response = await this.axios.post(`/task/${taskId}/tag/${tagName}`);
+    let response = await this.axios.post(`/task/${taskId}/tag/${encodePathSegment(tagName)}`);
     return response.data as any;
   }
 
   async removeTagFromTask(taskId: string, tagName: string) {
-    await this.axios.delete(`/task/${taskId}/tag/${tagName}`);
+    await this.axios.delete(`/task/${taskId}/tag/${encodePathSegment(tagName)}`);
   }
 
   // ── Time Tracking ──
@@ -474,6 +510,33 @@ export class ClickUpClient {
   async deleteTimeEntry(teamId: string, timerId: string) {
     let response = await this.axios.delete(`/team/${teamId}/time_entries/${timerId}`);
     return response.data as any;
+  }
+
+  async updateTimeEntry(
+    teamId: string,
+    timerId: string,
+    data: {
+      taskId?: string;
+      description?: string;
+      start?: number;
+      end?: number;
+      duration?: number;
+      assignee?: number;
+      tags?: { name: string }[];
+      billable?: boolean;
+    }
+  ) {
+    let response = await this.axios.put(`/team/${teamId}/time_entries/${timerId}`, {
+      tid: data.taskId,
+      description: data.description,
+      start: data.start,
+      end: data.end,
+      duration: data.duration,
+      assignee: data.assignee,
+      tags: data.tags,
+      billable: data.billable
+    });
+    return response.data.data as any;
   }
 
   async startTimer(
@@ -699,6 +762,11 @@ export class ClickUpClient {
     return response.data.checklist as any;
   }
 
+  async updateChecklist(checklistId: string, data: { name?: string; position?: number }) {
+    let response = await this.axios.put(`/checklist/${checklistId}`, data);
+    return response.data as any;
+  }
+
   async createChecklistItem(checklistId: string, name: string, assignee?: number) {
     let response = await this.axios.post(`/checklist/${checklistId}/checklist_item`, {
       name,
@@ -710,13 +778,22 @@ export class ClickUpClient {
   async updateChecklistItem(
     checklistId: string,
     checklistItemId: string,
-    data: { name?: string; resolved?: boolean; assignee?: number | null }
+    data: {
+      name?: string;
+      resolved?: boolean;
+      assignee?: number | null;
+      parent?: string | null;
+    }
   ) {
     let response = await this.axios.put(
       `/checklist/${checklistId}/checklist_item/${checklistItemId}`,
       data
     );
     return response.data.checklist as any;
+  }
+
+  async deleteChecklistItem(checklistId: string, checklistItemId: string) {
+    await this.axios.delete(`/checklist/${checklistId}/checklist_item/${checklistItemId}`);
   }
 
   async deleteChecklist(checklistId: string) {

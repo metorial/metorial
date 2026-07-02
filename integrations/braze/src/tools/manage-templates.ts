@@ -1,7 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrazeClient } from '../lib/client';
+import { brazeServiceError, requireBrazeString } from '../lib/errors';
 import { spec } from '../spec';
+
+let requireAnyUpdate = (fields: Record<string, unknown>, action: string) => {
+  if (Object.values(fields).some(value => value !== undefined)) {
+    return;
+  }
+
+  throw brazeServiceError(`At least one updatable field is required for "${action}".`);
+};
 
 export let manageEmailTemplates = SlateTool.create(spec, {
   name: 'Manage Email Templates',
@@ -86,7 +95,8 @@ export let manageEmailTemplates = SlateTool.create(spec, {
         };
       }
       case 'get': {
-        let result = await client.getEmailTemplate(ctx.input.templateId!);
+        let templateId = requireBrazeString(ctx.input.templateId, 'templateId', 'get');
+        let result = await client.getEmailTemplate(templateId);
         return {
           output: {
             templateId: result.email_template_id,
@@ -98,14 +108,21 @@ export let manageEmailTemplates = SlateTool.create(spec, {
             updatedAt: result.updated_at,
             message: result.message
           },
-          message: `Retrieved template **${result.template_name ?? ctx.input.templateId}**.`
+          message: `Retrieved template **${result.template_name ?? templateId}**.`
         };
       }
       case 'create': {
+        let templateName = requireBrazeString(
+          ctx.input.templateName,
+          'templateName',
+          'create'
+        );
+        let subject = requireBrazeString(ctx.input.subject, 'subject', 'create');
+        let body = requireBrazeString(ctx.input.body, 'body', 'create');
         let result = await client.createEmailTemplate({
-          templateName: ctx.input.templateName!,
-          subject: ctx.input.subject!,
-          body: ctx.input.body!,
+          templateName,
+          subject,
+          body,
           plaintextBody: ctx.input.plaintextBody,
           preheader: ctx.input.preheader,
           tags: ctx.input.tags
@@ -115,12 +132,24 @@ export let manageEmailTemplates = SlateTool.create(spec, {
             templateId: result.email_template_id,
             message: result.message
           },
-          message: `Created email template **${ctx.input.templateName}** (ID: ${result.email_template_id}).`
+          message: `Created email template **${templateName}** (ID: ${result.email_template_id}).`
         };
       }
       case 'update': {
+        let templateId = requireBrazeString(ctx.input.templateId, 'templateId', 'update');
+        requireAnyUpdate(
+          {
+            templateName: ctx.input.templateName,
+            subject: ctx.input.subject,
+            body: ctx.input.body,
+            plaintextBody: ctx.input.plaintextBody,
+            preheader: ctx.input.preheader,
+            tags: ctx.input.tags
+          },
+          'update'
+        );
         let result = await client.updateEmailTemplate({
-          templateId: ctx.input.templateId!,
+          templateId,
           templateName: ctx.input.templateName,
           subject: ctx.input.subject,
           body: ctx.input.body,
@@ -130,10 +159,10 @@ export let manageEmailTemplates = SlateTool.create(spec, {
         });
         return {
           output: {
-            templateId: ctx.input.templateId,
+            templateId,
             message: result.message
           },
-          message: `Updated email template **${ctx.input.templateId}**.`
+          message: `Updated email template **${templateId}**.`
         };
       }
     }
@@ -229,7 +258,12 @@ export let manageContentBlocks = SlateTool.create(spec, {
         };
       }
       case 'get': {
-        let result = await client.getContentBlock(ctx.input.contentBlockId!);
+        let contentBlockId = requireBrazeString(
+          ctx.input.contentBlockId,
+          'contentBlockId',
+          'get'
+        );
+        let result = await client.getContentBlock(contentBlockId);
         return {
           output: {
             contentBlockId: result.content_block_id,
@@ -240,14 +274,17 @@ export let manageContentBlocks = SlateTool.create(spec, {
             updatedAt: result.last_edited,
             message: result.message
           },
-          message: `Retrieved Content Block **${result.name ?? ctx.input.contentBlockId}**.`
+          message: `Retrieved Content Block **${result.name ?? contentBlockId}**.`
         };
       }
       case 'create': {
+        let name = requireBrazeString(ctx.input.name, 'name', 'create');
+        let contentType = requireBrazeString(ctx.input.contentType, 'contentType', 'create');
+        let content = requireBrazeString(ctx.input.content, 'content', 'create');
         let result = await client.createContentBlock({
-          name: ctx.input.name!,
-          contentType: ctx.input.contentType!,
-          content: ctx.input.content!,
+          name,
+          contentType,
+          content,
           description: ctx.input.description,
           state: ctx.input.state,
           tags: ctx.input.tags
@@ -257,12 +294,28 @@ export let manageContentBlocks = SlateTool.create(spec, {
             contentBlockId: result.content_block_id,
             message: result.message
           },
-          message: `Created Content Block **${ctx.input.name}** (ID: ${result.content_block_id}).`
+          message: `Created Content Block **${name}** (ID: ${result.content_block_id}).`
         };
       }
       case 'update': {
+        let contentBlockId = requireBrazeString(
+          ctx.input.contentBlockId,
+          'contentBlockId',
+          'update'
+        );
+        requireAnyUpdate(
+          {
+            name: ctx.input.name,
+            contentType: ctx.input.contentType,
+            content: ctx.input.content,
+            description: ctx.input.description,
+            state: ctx.input.state,
+            tags: ctx.input.tags
+          },
+          'update'
+        );
         let result = await client.updateContentBlock({
-          contentBlockId: ctx.input.contentBlockId!,
+          contentBlockId,
           name: ctx.input.name,
           contentType: ctx.input.contentType,
           content: ctx.input.content,
@@ -272,10 +325,10 @@ export let manageContentBlocks = SlateTool.create(spec, {
         });
         return {
           output: {
-            contentBlockId: ctx.input.contentBlockId,
+            contentBlockId,
             message: result.message
           },
-          message: `Updated Content Block **${ctx.input.contentBlockId}**.`
+          message: `Updated Content Block **${contentBlockId}**.`
         };
       }
     }

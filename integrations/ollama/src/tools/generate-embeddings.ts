@@ -28,7 +28,12 @@ export let generateEmbeddings = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Automatically truncate inputs exceeding context limits. Defaults to true.'),
-      dimensions: z.number().optional().describe('Desired embedding vector dimensions.'),
+      dimensions: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Desired embedding vector dimensions.'),
       keepAlive: z
         .string()
         .optional()

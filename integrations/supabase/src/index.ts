@@ -2,7 +2,10 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   getAuthConfig,
+  getDatabaseSchema,
   getProject,
+  getProjectHealth,
+  getProjectLogs,
   invokeRpc,
   listOrganizations,
   listProjects,
@@ -34,7 +37,10 @@ export let provider = Slate.create({
     manageStorageObjects,
     manageAuthUsers,
     invokeRpc,
-    getAuthConfig
+    getAuthConfig,
+    getProjectHealth,
+    getProjectLogs,
+    getDatabaseSchema
   ],
   triggers: [databaseChangesTrigger, databaseWebhookTrigger]
 });

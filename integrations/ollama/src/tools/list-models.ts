@@ -30,7 +30,10 @@ export let listModels = SlateTool.create(spec, {
           z.object({
             name: z.string().describe('Full model name including tag.'),
             model: z.string().describe('Model identifier.'),
-            modifiedAt: z.string().describe('ISO 8601 timestamp of last modification.'),
+            modifiedAt: z
+              .string()
+              .optional()
+              .describe('ISO 8601 timestamp of last modification, when returned by Ollama.'),
             size: z.number().describe('Model size in bytes.'),
             digest: z.string().describe('SHA256 digest of the model.'),
             details: modelDetailsSchema
@@ -42,7 +45,10 @@ export let listModels = SlateTool.create(spec, {
           z.object({
             name: z.string().describe('Full model name including tag.'),
             model: z.string().describe('Model identifier.'),
-            modifiedAt: z.string().describe('ISO 8601 timestamp of last modification.'),
+            modifiedAt: z
+              .string()
+              .optional()
+              .describe('ISO 8601 timestamp of last modification, when returned by Ollama.'),
             size: z.number().describe('Model size in bytes.'),
             digest: z.string().describe('SHA256 digest of the model.'),
             details: modelDetailsSchema,

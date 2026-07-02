@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { replicateApiError } from './lib/errors';
 
 let axios = createAxios({
   baseURL: 'https://api.replicate.com/v1'
@@ -29,11 +30,16 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await axios.get('/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+      try {
+        response = await axios.get('/account', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+      } catch (error) {
+        throw replicateApiError(error, 'get auth profile');
+      }
 
       return {
         profile: {

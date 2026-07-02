@@ -1,12 +1,17 @@
-import { SlateTool } from '@slates/provider';
+import { createBase64Attachment, SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { openAIServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
+
+let usesGptImageModelOrOptions = (params: { model?: string; quality?: string }) =>
+  params.model?.startsWith('gpt-image-') ||
+  ['low', 'medium', 'high', 'auto'].includes(params.quality ?? '');
 
 export let generateImage = SlateTool.create(spec, {
   name: 'Generate Image',
   key: 'generate_image',
-  description: `Generate images from text prompts using OpenAI's image generation models (e.g. DALL·E 3, gpt-image-1). Returns URLs or base64-encoded images. Supports configurable size, quality, and style.`,
+  description: `Generate images from text prompts using OpenAI's image generation models (e.g. DALL·E 3, gpt-image-1). Returns generated image content as Slate attachments when the API returns base64 data. Supports configurable size, quality, and style.`,
   tags: {
     readOnly: true,
     destructive: false
@@ -38,7 +43,7 @@ export let generateImage = SlateTool.create(spec, {
         .enum(['url', 'b64_json'])
         .optional()
         .describe(
-          'Format of the response. "url" returns temporary URLs, "b64_json" returns base64-encoded images.'
+          'Legacy DALL-E response transport. Use "b64_json" for attachment output. GPT image models always return base64 image data and do not support "url".'
         ),
       user: z.string().optional().describe('Unique identifier for the end-user')
     })
@@ -49,7 +54,11 @@ export let generateImage = SlateTool.create(spec, {
         .array(
           z.object({
             url: z.string().optional().describe('Temporary URL of the generated image'),
-            b64Json: z.string().optional().describe('Base64-encoded image data'),
+            attachmentIndex: z
+              .number()
+              .optional()
+              .describe('Index of the generated image attachment, when returned'),
+            mimeType: z.string().optional().describe('MIME type of the generated attachment'),
             revisedPrompt: z
               .string()
               .optional()
@@ -57,10 +66,17 @@ export let generateImage = SlateTool.create(spec, {
           })
         )
         .describe('Generated images'),
-      createdAt: z.number().describe('Unix timestamp when images were created')
+      createdAt: z.number().describe('Unix timestamp when images were created'),
+      attachmentCount: z.number().describe('Number of generated image attachments returned')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.outputFormat === 'url' && usesGptImageModelOrOptions(ctx.input)) {
+      throw openAIServiceError(
+        'outputFormat "url" is only supported for DALL-E image models. GPT image models always return base64 image data as attachments.'
+      );
+    }
+
     let client = createClient(ctx);
 
     let result = await client.createImage({
@@ -74,17 +90,29 @@ export let generateImage = SlateTool.create(spec, {
       user: ctx.input.user
     });
 
-    let images = (result.data ?? []).map((img: any) => ({
-      url: img.url,
-      b64Json: img.b64_json,
-      revisedPrompt: img.revised_prompt
-    }));
+    let attachments: ReturnType<typeof createBase64Attachment>[] = [];
+
+    let images = (result.data ?? []).map((img: any) => {
+      let attachmentIndex: number | undefined;
+      if (typeof img.b64_json === 'string') {
+        attachmentIndex = attachments.length;
+        attachments.push(createBase64Attachment(img.b64_json, 'image/png'));
+      }
+      return {
+        url: img.url,
+        attachmentIndex,
+        mimeType: attachmentIndex === undefined ? undefined : 'image/png',
+        revisedPrompt: img.revised_prompt
+      };
+    });
 
     return {
       output: {
         images,
-        createdAt: result.created
+        createdAt: result.created,
+        attachmentCount: attachments.length
       },
+      attachments,
       message: `Generated **${images.length}** image(s) from prompt.`
     };
   })

@@ -1,14 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { IterableClient } from '../lib/client';
+import { requireUserIdentity } from '../lib/validation';
 import { spec } from '../spec';
 
 export let upsertUser = SlateTool.create(spec, {
   name: 'Create or Update User',
   key: 'upsert_user',
-  description: `Creates a new user or updates an existing user profile in Iterable. Identify the user by **email** and/or **userId**. Attach custom data fields to the profile for personalization in campaigns and journeys.`,
+  description: `Creates a new user or updates an existing user profile in Iterable. Identify the user by **email** or **userId**. Attach custom data fields to the profile for personalization in campaigns and journeys.`,
   instructions: [
-    'Provide either email or userId (or both) to identify the user.',
+    'Provide either email or userId to identify the user, not both.',
     'Use preferUserId: true if creating a user with only a userId and no email.'
   ],
   tags: {
@@ -49,6 +50,8 @@ export let upsertUser = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireUserIdentity(ctx.input);
+
     let client = new IterableClient({
       token: ctx.auth.token,
       dataCenter: ctx.config.dataCenter

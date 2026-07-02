@@ -13,6 +13,12 @@ export let config = SlateConfig.create(
       .optional()
       .describe(
         'Organization ID to scope API requests to. If not set, the default organization context is used.'
+      ),
+    apiNamespace: z
+      .string()
+      .optional()
+      .describe(
+        'Grafana App Platform namespace for /apis endpoints. Defaults to "default" for org 1 or org-<organizationId> when organizationId is set. Grafana Cloud stacks can use stacks-<stack_id>.'
       )
   })
 );

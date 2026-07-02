@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { dynamoDbServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -34,17 +35,34 @@ Can also be used to manage global secondary indexes (create, update, or delete).
       tableClass: z
         .enum(['STANDARD', 'STANDARD_INFREQUENT_ACCESS'])
         .optional()
-        .describe('New table class')
+        .describe('New table class'),
+      deletionProtectionEnabled: z
+        .boolean()
+        .optional()
+        .describe('Enable or disable deletion protection')
     })
   )
   .output(
     z.object({
       tableName: z.string().describe('Name of the updated table'),
-      tableStatus: z.string().describe('Current status of the table')
+      tableStatus: z.string().describe('Current status of the table'),
+      deletionProtectionEnabled: z
+        .boolean()
+        .optional()
+        .describe('Whether deletion protection is enabled')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
+    if (
+      ctx.input.billingMode === undefined &&
+      ctx.input.provisionedThroughput === undefined &&
+      ctx.input.enableStreams === undefined &&
+      ctx.input.tableClass === undefined &&
+      ctx.input.deletionProtectionEnabled === undefined
+    ) {
+      throw dynamoDbServiceError('Provide at least one table setting to update.');
+    }
 
     let result = await client.updateTable({
       tableName: ctx.input.tableName,
@@ -62,7 +80,8 @@ Can also be used to manage global secondary indexes (create, update, or delete).
               StreamViewType: ctx.input.streamViewType
             }
           : undefined,
-      tableClass: ctx.input.tableClass
+      tableClass: ctx.input.tableClass,
+      deletionProtectionEnabled: ctx.input.deletionProtectionEnabled
     });
 
     let tableDesc = result.TableDescription;
@@ -70,7 +89,8 @@ Can also be used to manage global secondary indexes (create, update, or delete).
     return {
       output: {
         tableName: tableDesc.TableName,
-        tableStatus: tableDesc.TableStatus
+        tableStatus: tableDesc.TableStatus,
+        deletionProtectionEnabled: tableDesc.DeletionProtectionEnabled
       },
       message: `Updated table **${tableDesc.TableName}** (status: ${tableDesc.TableStatus})`
     };

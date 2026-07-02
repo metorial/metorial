@@ -36,7 +36,7 @@ export let searchRepositories = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.searchRepositories(ctx.input.query, {
       page: ctx.input.page,
       pageSize: ctx.input.pageSize

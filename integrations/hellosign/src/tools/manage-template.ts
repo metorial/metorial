@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { hellosignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTemplate = SlateTool.create(spec, {
@@ -53,6 +54,11 @@ export let manageTemplate = SlateTool.create(spec, {
 
     switch (action) {
       case 'update':
+        if (!ctx.input.title && !ctx.input.subject && !ctx.input.message) {
+          throw hellosignServiceError(
+            'Provide title, subject, or message for the "update" action.'
+          );
+        }
         await client.updateTemplate(templateId, {
           title: ctx.input.title,
           subject: ctx.input.subject,
@@ -65,6 +71,11 @@ export let manageTemplate = SlateTool.create(spec, {
         break;
 
       case 'add_user':
+        if (!ctx.input.userEmailAddress && !ctx.input.userAccountId) {
+          throw hellosignServiceError(
+            'userEmailAddress or userAccountId is required for the "add_user" action.'
+          );
+        }
         await client.addTemplateUser(templateId, {
           accountId: ctx.input.userAccountId,
           emailAddress: ctx.input.userEmailAddress
@@ -72,6 +83,11 @@ export let manageTemplate = SlateTool.create(spec, {
         break;
 
       case 'remove_user':
+        if (!ctx.input.userEmailAddress && !ctx.input.userAccountId) {
+          throw hellosignServiceError(
+            'userEmailAddress or userAccountId is required for the "remove_user" action.'
+          );
+        }
         await client.removeTemplateUser(templateId, {
           accountId: ctx.input.userAccountId,
           emailAddress: ctx.input.userEmailAddress

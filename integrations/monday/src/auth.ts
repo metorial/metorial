@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { mondayApiError, mondayGraphQLError } from './lib/errors';
 
 let mondayApi = createAxios({
   baseURL: 'https://api.monday.com/v2'
@@ -8,6 +9,42 @@ let mondayApi = createAxios({
 let mondayAuth = createAxios({
   baseURL: 'https://auth.monday.com'
 });
+
+let getProfile = async (token: string) => {
+  let response: any;
+  try {
+    response = await mondayApi.post(
+      '',
+      {
+        query: `{ me { id name email photo_original } }`
+      },
+      {
+        headers: {
+          Authorization: token,
+          'Content-Type': 'application/json',
+          'API-Version': '2026-04'
+        }
+      }
+    );
+  } catch (error) {
+    throw mondayApiError(error, 'get profile');
+  }
+
+  if (response.data.errors?.length) {
+    throw mondayGraphQLError(response.data.errors, 'get profile');
+  }
+
+  let me = response.data.data.me;
+
+  return {
+    profile: {
+      id: String(me.id),
+      name: me.name,
+      email: me.email,
+      imageUrl: me.photo_original
+    }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -115,12 +152,17 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let response = await mondayAuth.post('/oauth2/token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        code: ctx.code,
-        redirect_uri: ctx.redirectUri
-      });
+      let response: any;
+      try {
+        response = await mondayAuth.post('/oauth2/token', {
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          code: ctx.code,
+          redirect_uri: ctx.redirectUri
+        });
+      } catch (error) {
+        throw mondayApiError(error, 'oauth callback');
+      }
 
       return {
         output: {
@@ -130,29 +172,7 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: any; scopes: string[] }) => {
-      let response = await mondayApi.post(
-        '',
-        {
-          query: `{ me { id name email photo_original } }`
-        },
-        {
-          headers: {
-            Authorization: ctx.output.token,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      let me = response.data.data.me;
-
-      return {
-        profile: {
-          id: String(me.id),
-          name: me.name,
-          email: me.email,
-          imageUrl: me.photo_original
-        }
-      };
+      return getProfile(ctx.output.token);
     }
   })
   .addTokenAuth({
@@ -173,28 +193,6 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { apiToken: string } }) => {
-      let response = await mondayApi.post(
-        '',
-        {
-          query: `{ me { id name email photo_original } }`
-        },
-        {
-          headers: {
-            Authorization: ctx.output.token,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      let me = response.data.data.me;
-
-      return {
-        profile: {
-          id: String(me.id),
-          name: me.name,
-          email: me.email,
-          imageUrl: me.photo_original
-        }
-      };
+      return getProfile(ctx.output.token);
     }
   });

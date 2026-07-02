@@ -1,5 +1,6 @@
 import { createAxios } from 'slates';
 import { buildDigestHeader, parseDigestChallenge } from './digest';
+import { atlasApiError, atlasServiceError } from './errors';
 
 let BASE_URL = 'https://cloud.mongodb.com/api/atlas/v2';
 let ACCEPT_HEADER = 'application/vnd.atlas.2025-03-12+json';
@@ -28,31 +29,36 @@ export class Client {
     data?: any,
     params?: Record<string, any>
   ): Promise<T> {
-    let headers: Record<string, string> = {
-      Accept: ACCEPT_HEADER
-    };
-
-    if (data && method !== 'GET' && method !== 'DELETE') {
-      headers['Content-Type'] = 'application/json';
-    }
-
-    if (this.config.authMethod === 'oauth') {
-      headers.Authorization = `Bearer ${this.config.token}`;
-      let response = await this.axios.request<T>({
-        method,
-        url: path,
-        data,
-        params,
-        headers
-      });
-      return response.data;
-    }
-
-    // Digest auth: first request without auth to get the challenge
-    let publicKey = this.config.publicKey!;
-    let privateKey = this.config.privateKey!;
-
     try {
+      let headers: Record<string, string> = {
+        Accept: ACCEPT_HEADER
+      };
+
+      if (data && method !== 'GET' && method !== 'DELETE') {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      if (this.config.authMethod === 'oauth') {
+        headers.Authorization = `Bearer ${this.config.token}`;
+        let response = await this.axios.request<T>({
+          method,
+          url: path,
+          data,
+          params,
+          headers
+        });
+        return response.data;
+      }
+
+      // Digest auth: first request without auth to get the challenge.
+      let publicKey = this.config.publicKey;
+      let privateKey = this.config.privateKey;
+      if (!publicKey || !privateKey) {
+        throw atlasServiceError(
+          'MongoDB Atlas API key authentication requires publicKey and privateKey.'
+        );
+      }
+
       let initialResponse = await this.axios.request<T>({
         method,
         url: path,
@@ -68,12 +74,12 @@ export class Client {
 
       let wwwAuth = initialResponse.headers['www-authenticate'] as string | undefined;
       if (!wwwAuth) {
-        throw new Error('Expected WWW-Authenticate header for digest auth');
+        throw atlasServiceError('Expected WWW-Authenticate header for digest auth.');
       }
 
       let challenge = parseDigestChallenge(wwwAuth);
       if (!challenge) {
-        throw new Error('Failed to parse digest authentication challenge');
+        throw atlasServiceError('Failed to parse digest authentication challenge.');
       }
 
       let uri = path.startsWith('/') ? path : `/${path}`;
@@ -108,14 +114,8 @@ export class Client {
       });
 
       return response.data;
-    } catch (error: any) {
-      if (error?.response?.data) {
-        let errData = error.response.data;
-        throw new Error(
-          errData.detail || errData.reason || errData.errorCode || JSON.stringify(errData)
-        );
-      }
-      throw error;
+    } catch (error) {
+      throw atlasApiError(error, `${method} ${path}`);
     }
   }
 
@@ -725,5 +725,9 @@ export class Client {
 
   async deferMaintenanceWindow(projectId: string): Promise<void> {
     await this.request('POST', `/groups/${projectId}/maintenanceWindow/defer`);
+  }
+
+  async resetMaintenanceWindow(projectId: string): Promise<void> {
+    await this.request('DELETE', `/groups/${projectId}/maintenanceWindow`);
   }
 }

@@ -1,7 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DynamicsClient } from '../lib/client';
-import { resolveDynamicsInstanceUrl } from '../lib/resolve-instance-url';
+import {
+  createDynamicsClient,
+  dataverseAlternateKeySchema,
+  inferDataverseRecordId,
+  recordKeyFromInput
+} from '../lib/client';
 import { spec } from '../spec';
 
 export let deleteRecord = SlateTool.create(spec, {
@@ -18,25 +22,35 @@ export let deleteRecord = SlateTool.create(spec, {
       entitySetName: z
         .string()
         .describe('OData entity set name (e.g., "accounts", "contacts", "leads")'),
-      recordId: z.string().describe('GUID of the record to delete')
+      recordId: z.string().optional().describe('GUID of the record to delete'),
+      alternateKey: dataverseAlternateKeySchema
+        .optional()
+        .describe('Alternate key values to identify the record when recordId is omitted')
     })
   )
   .output(
     z.object({
+      entitySetName: z.string().describe('OData entity set name used for the delete'),
+      recordId: z.string().optional().describe('Deleted GUID when supplied'),
       deleted: z.boolean().describe('Whether the record was successfully deleted')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new DynamicsClient({
-      token: ctx.auth.token,
-      instanceUrl: resolveDynamicsInstanceUrl(ctx)
+    let client = createDynamicsClient(ctx);
+    let recordKey = recordKeyFromInput({
+      recordId: ctx.input.recordId,
+      alternateKey: ctx.input.alternateKey
     });
 
-    await client.deleteRecord(ctx.input.entitySetName, ctx.input.recordId);
+    await client.deleteRecord(ctx.input.entitySetName, recordKey);
 
     return {
-      output: { deleted: true },
-      message: `Deleted record **${ctx.input.recordId}** from **${ctx.input.entitySetName}**.`
+      output: {
+        entitySetName: ctx.input.entitySetName,
+        recordId: inferDataverseRecordId(undefined, ctx.input.recordId),
+        deleted: true
+      },
+      message: `Deleted record from **${ctx.input.entitySetName}**.`
     };
   })
   .build();

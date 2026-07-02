@@ -16,17 +16,17 @@ import {
   listMemories,
   listMessages,
   listPipes,
+  parseDocument,
   retrieveMemory,
   retryDocumentEmbeddings,
   runAgent,
   runPipe,
   updatePipe,
   updateThread,
+  uploadDocument,
   webCrawl,
   webSearch
 } from './tools';
-
-import { inboundWebhook } from './triggers/inbound-webhook';
 
 export let provider = Slate.create({
   spec,
@@ -39,6 +39,7 @@ export let provider = Slate.create({
     listMemories,
     deleteMemory,
     retrieveMemory,
+    uploadDocument,
     listDocuments,
     deleteDocument,
     retryDocumentEmbeddings,
@@ -48,6 +49,7 @@ export let provider = Slate.create({
     deleteThread,
     appendMessages,
     listMessages,
+    parseDocument,
     runAgent,
     chunkText,
     generateEmbeddings,
@@ -55,5 +57,5 @@ export let provider = Slate.create({
     webSearch,
     webCrawl
   ],
-  triggers: [inboundWebhook]
+  triggers: []
 });

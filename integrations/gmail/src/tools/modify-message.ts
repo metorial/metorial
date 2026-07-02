@@ -7,11 +7,10 @@ import { spec } from '../spec';
 export let modifyMessage = SlateTool.create(spec, {
   name: 'Modify Message',
   key: 'modify_message',
-  description: `Modify a message's labels, move it to trash, restore it from trash, or permanently delete it. Supports both single and batch operations on multiple messages.`,
+  description: `Modify a message's labels, move it to trash, or restore it from trash. Supports both single and batch operations on multiple messages.`,
   instructions: [
     'Use **action** "modify_labels" to add/remove labels (e.g., mark as read by removing UNREAD, star by adding STARRED).',
     'Use **action** "trash" or "untrash" to manage trash status.',
-    'Use **action** "delete" for permanent deletion (cannot be undone).',
     'For batch label modifications, provide multiple **messageIds**. Batch only works with "modify_labels" action.'
   ],
   tags: {
@@ -24,7 +23,7 @@ export let modifyMessage = SlateTool.create(spec, {
     z.object({
       messageIds: z.array(z.string()).describe('One or more message IDs to modify.'),
       action: z
-        .enum(['modify_labels', 'trash', 'untrash', 'delete'])
+        .enum(['modify_labels', 'trash', 'untrash'])
         .describe('Action to perform on the message(s).'),
       addLabelIds: z
         .array(z.string())
@@ -64,10 +63,6 @@ export let modifyMessage = SlateTool.create(spec, {
       for (let id of messageIds) {
         await client.untrashMessage(id);
       }
-    } else if (action === 'delete') {
-      for (let id of messageIds) {
-        await client.deleteMessage(id);
-      }
     }
 
     let actionLabel =
@@ -75,9 +70,7 @@ export let modifyMessage = SlateTool.create(spec, {
         ? 'Modified labels on'
         : action === 'trash'
           ? 'Trashed'
-          : action === 'untrash'
-            ? 'Untrashed'
-            : 'Deleted';
+          : 'Untrashed';
 
     return {
       output: {

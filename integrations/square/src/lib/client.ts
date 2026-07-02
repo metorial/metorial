@@ -1,4 +1,6 @@
 import { createAxios } from 'slates';
+import { SQUARE_API_VERSION } from './constants';
+import { squareApiError } from './errors';
 import type {
   SquareCatalogObject,
   SquareClientConfig,
@@ -27,9 +29,14 @@ export class SquareClient {
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json',
-        'Square-Version': '2025-04-16'
+        'Square-Version': SQUARE_API_VERSION
       }
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(squareApiError(error))
+    );
   }
 
   // ─── Payments ───
@@ -69,6 +76,7 @@ export class SquareClient {
     amountMoney: { amount: number; currency: string };
     tipMoney?: { amount: number; currency: string };
     appFeeMoney?: { amount: number; currency: string };
+    appFeeAllocations?: Record<string, any>[];
     customerId?: string;
     locationId?: string;
     orderId?: string;
@@ -83,6 +91,7 @@ export class SquareClient {
       amount_money: payment.amountMoney,
       tip_money: payment.tipMoney,
       app_fee_money: payment.appFeeMoney,
+      app_fee_allocations: payment.appFeeAllocations,
       customer_id: payment.customerId,
       location_id: payment.locationId,
       order_id: payment.orderId,
@@ -112,7 +121,12 @@ export class SquareClient {
     sortOrder?: string;
     cursor?: string;
     locationId?: string;
+    status?: string;
+    sourceType?: string;
     limit?: number;
+    updatedAtBeginTime?: string;
+    updatedAtEndTime?: string;
+    sortField?: string;
   }): Promise<{ refunds: SquareRefund[]; cursor?: string }> {
     let response = await this.axios.get('/refunds', {
       params: {
@@ -121,7 +135,12 @@ export class SquareClient {
         sort_order: params?.sortOrder,
         cursor: params?.cursor,
         location_id: params?.locationId,
-        limit: params?.limit
+        status: params?.status,
+        source_type: params?.sourceType,
+        limit: params?.limit,
+        updated_at_begin_time: params?.updatedAtBeginTime,
+        updated_at_end_time: params?.updatedAtEndTime,
+        sort_field: params?.sortField
       }
     });
     return {
@@ -140,12 +159,16 @@ export class SquareClient {
     paymentId: string;
     amountMoney: { amount: number; currency: string };
     reason?: string;
+    appFeeMoney?: { amount: number; currency: string };
+    appFeeAllocations?: Record<string, any>[];
   }): Promise<SquareRefund> {
     let response = await this.axios.post('/refunds', {
       idempotency_key: params.idempotencyKey,
       payment_id: params.paymentId,
       amount_money: params.amountMoney,
-      reason: params.reason
+      reason: params.reason,
+      app_fee_money: params.appFeeMoney,
+      app_fee_allocations: params.appFeeAllocations
     });
     return response.data.refund;
   }
@@ -215,6 +238,22 @@ export class SquareClient {
       order: { ...params.order, version: params.order.version },
       fields_to_clear: params.fieldsToClear,
       idempotency_key: params.idempotencyKey
+    });
+    return response.data.order;
+  }
+
+  async payOrder(
+    orderId: string,
+    params: {
+      idempotencyKey: string;
+      paymentIds?: string[];
+      orderVersion?: number;
+    }
+  ): Promise<SquareOrder> {
+    let response = await this.axios.post(`/orders/${orderId}/pay`, {
+      idempotency_key: params.idempotencyKey,
+      payment_ids: params.paymentIds,
+      order_version: params.orderVersion
     });
     return response.data.order;
   }
@@ -315,15 +354,18 @@ export class SquareClient {
     cursor?: string;
     limit?: number;
     query?: Record<string, any>;
-  }): Promise<{ customers: SquareCustomer[]; cursor?: string }> {
+    count?: boolean;
+  }): Promise<{ customers: SquareCustomer[]; cursor?: string; count?: number }> {
     let response = await this.axios.post('/customers/search', {
       cursor: params.cursor,
       limit: params.limit,
-      query: params.query
+      query: params.query,
+      count: params.count
     });
     return {
       customers: response.data.customers || [],
-      cursor: response.data.cursor
+      cursor: response.data.cursor,
+      count: response.data.count
     };
   }
 
@@ -523,6 +565,22 @@ export class SquareClient {
     return response.data.invoice;
   }
 
+  async searchInvoices(params: {
+    query: Record<string, any>;
+    cursor?: string;
+    limit?: number;
+  }): Promise<{ invoices: SquareInvoice[]; cursor?: string }> {
+    let response = await this.axios.post('/invoices/search', {
+      query: params.query,
+      cursor: params.cursor,
+      limit: params.limit
+    });
+    return {
+      invoices: response.data.invoices || [],
+      cursor: response.data.cursor
+    };
+  }
+
   async updateInvoice(
     invoiceId: string,
     params: {
@@ -615,7 +673,7 @@ export class SquareClient {
         name: params.subscription.name,
         event_types: params.subscription.eventTypes,
         notification_url: params.subscription.notificationUrl,
-        api_version: params.subscription.apiVersion
+        api_version: params.subscription.apiVersion ?? SQUARE_API_VERSION
       }
     });
     return response.data.subscription;

@@ -42,6 +42,35 @@ export let listSecrets = SlateTool.create(spec, {
   })
   .build();
 
+export let getSecret = SlateTool.create(spec, {
+  name: 'Get Secret Metadata',
+  key: 'get_secret',
+  description: `Retrieve metadata for a secret binding on a Worker script. Secret values are not exposed in tool output.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      scriptName: z.string().describe('Name of the Worker script'),
+      secretName: z.string().describe('Name of the secret binding')
+    })
+  )
+  .output(secretSchema)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx);
+    let result = await client.getSecret(ctx.input.scriptName, ctx.input.secretName);
+
+    return {
+      output: {
+        secretName: result.name || ctx.input.secretName,
+        type: result.type || 'secret_text'
+      },
+      message: `Retrieved metadata for secret **${ctx.input.secretName}** on Worker **${ctx.input.scriptName}**.`
+    };
+  })
+  .build();
+
 export let putSecret = SlateTool.create(spec, {
   name: 'Set Secret',
   key: 'put_secret',

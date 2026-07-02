@@ -24,13 +24,25 @@ Delete a user from FullStory by their uid. This is an asynchronous operation tha
 
 Start an export of segment data from FullStory. Exports can include individual user data or event data in CSV, JSON, or NDJSON format. Returns an operation ID that can be used to track the export progress.
 
+### Generate Session Context
+
+Generate a structured, AI-friendly context summary for a FullStory session, including selected session metadata and transformed event details.
+
 ### Get Operation Status
 
 Check the status of an asynchronous FullStory operation such as user deletion or segment export. If the operation is a completed export, also retrieves the download URL for the results.
 
+### Get Organization Quotas
+
+Retrieve FullStory organization quota usage for the current billing cycle, including session quota and server event quota.
+
 ### Get Segment
 
 Retrieve details of a specific FullStory segment by its ID. Returns the segment name, creator, creation date, and URL.
+
+### Get Session Events
+
+Retrieve the raw captured events for a FullStory session. This is useful for inspecting the exact timeline behind a replay or downstream activation workflow.
 
 ### Get User
 

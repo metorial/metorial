@@ -96,7 +96,7 @@ export let searchDocumentsTool = SlateTool.create(spec, {
     let hits = (result.hits?.hits || []).map((hit: any) => ({
       indexName: hit._index,
       documentId: hit._id,
-      score: hit._score,
+      score: hit._score ?? null,
       source: hit._source,
       highlight: hit.highlight
     }));

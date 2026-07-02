@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { frontServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let contactOutputSchema = z.object({
@@ -17,6 +18,19 @@ let contactOutputSchema = z.object({
   ),
   customFields: z.record(z.string(), z.string()).optional()
 });
+
+let handleSchema = z.object({
+  handle: z.string().describe('Handle value (email, phone, etc.)'),
+  source: z
+    .enum(['twitter', 'email', 'phone', 'facebook', 'intercom', 'front_chat', 'custom'])
+    .describe('Handle source type')
+});
+
+let requireHandles = (handles: z.infer<typeof handleSchema>[] | undefined) => {
+  if (!handles || handles.length === 0) {
+    throw frontServiceError('At least one contact handle is required.');
+  }
+};
 
 export let listContacts = SlateTool.create(spec, {
   name: 'List Contacts',
@@ -142,26 +156,32 @@ export let createContact = SlateTool.create(spec, {
       name: z.string().optional().describe('Contact name'),
       description: z.string().optional().describe('Contact description'),
       handles: z
-        .array(
-          z.object({
-            handle: z.string().describe('Handle value (email, phone, etc.)'),
-            source: z.string().describe('Handle source type (e.g., email, phone, twitter)')
-          })
-        )
+        .array(handleSchema)
         .optional()
-        .describe('Contact handles'),
-      groupNames: z.array(z.string()).optional().describe('Contact group names to assign'),
+        .describe(
+          'Contact handles. Front requires at least one handle when creating a contact.'
+        ),
+      listNames: z
+        .array(z.string())
+        .optional()
+        .describe('Contact list names to assign. Front creates missing lists automatically.'),
+      groupNames: z
+        .array(z.string())
+        .optional()
+        .describe('Deprecated by Front. Use listNames instead.'),
       customFields: z.record(z.string(), z.string()).optional().describe('Custom field values')
     })
   )
   .output(contactOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    requireHandles(ctx.input.handles);
 
     let contact = await client.createContact({
       name: ctx.input.name,
       description: ctx.input.description,
       handles: ctx.input.handles,
+      list_names: ctx.input.listNames,
       group_names: ctx.input.groupNames,
       custom_fields: ctx.input.customFields
     });
@@ -192,27 +212,21 @@ export let updateContact = SlateTool.create(spec, {
       name: z.string().optional().describe('Updated name'),
       description: z.string().optional().describe('Updated description'),
       isSpammer: z.boolean().optional().describe('Mark/unmark as spammer'),
-      groupNames: z.array(z.string()).optional().describe('Updated group names'),
+      listNames: z
+        .array(z.string())
+        .optional()
+        .describe('Updated contact list names. Front creates missing lists automatically.'),
+      groupNames: z
+        .array(z.string())
+        .optional()
+        .describe('Deprecated by Front. Use listNames instead.'),
       customFields: z
         .record(z.string(), z.string())
         .optional()
         .describe('Updated custom field values'),
-      addHandles: z
-        .array(
-          z.object({
-            handle: z.string(),
-            source: z.string()
-          })
-        )
-        .optional()
-        .describe('Handles to add to the contact'),
+      addHandles: z.array(handleSchema).optional().describe('Handles to add to the contact'),
       removeHandles: z
-        .array(
-          z.object({
-            handle: z.string(),
-            source: z.string()
-          })
-        )
+        .array(handleSchema)
         .optional()
         .describe('Handles to remove from the contact')
     })
@@ -225,6 +239,7 @@ export let updateContact = SlateTool.create(spec, {
       name: ctx.input.name,
       description: ctx.input.description,
       is_spammer: ctx.input.isSpammer,
+      list_names: ctx.input.listNames,
       group_names: ctx.input.groupNames,
       custom_fields: ctx.input.customFields
     });
@@ -241,6 +256,10 @@ export let updateContact = SlateTool.create(spec, {
       }
     }
 
+    if (ctx.input.addHandles?.length || ctx.input.removeHandles?.length) {
+      contact = await client.getContact(ctx.input.contactId);
+    }
+
     return {
       output: {
         contactId: contact.id,
@@ -252,6 +271,56 @@ export let updateContact = SlateTool.create(spec, {
         customFields: contact.custom_fields
       },
       message: `Updated contact **${contact.name || contact.id}**.`
+    };
+  });
+
+export let mergeContacts = SlateTool.create(spec, {
+  name: 'Merge Contacts',
+  key: 'merge_contacts',
+  description: `Merge duplicate Front contacts into one contact. Front deletes the merged-in contacts and preserves handles, groups, links, and notes on the surviving contact.`,
+  tags: { destructive: true }
+})
+  .input(
+    z.object({
+      targetContactId: z
+        .string()
+        .optional()
+        .describe('Optional contact ID that should survive the merge'),
+      contactIds: z
+        .array(z.string())
+        .describe(
+          'Contact IDs to merge. If targetContactId is omitted or included, provide at least two IDs. If targetContactId is separate, provide at least one source ID.'
+        )
+    })
+  )
+  .output(contactOutputSchema)
+  .handleInvocation(async ctx => {
+    let { targetContactId, contactIds } = ctx.input;
+
+    if (contactIds.length === 0) {
+      throw frontServiceError('contactIds must contain at least one contact ID.');
+    }
+
+    if ((!targetContactId || contactIds.includes(targetContactId)) && contactIds.length < 2) {
+      throw frontServiceError(
+        'Provide at least two contactIds when targetContactId is omitted or included in contactIds.'
+      );
+    }
+
+    let client = new Client({ token: ctx.auth.token });
+    let contact = await client.mergeContacts(targetContactId ?? contactIds[0]!, contactIds);
+
+    return {
+      output: {
+        contactId: contact.id,
+        name: contact.name,
+        description: contact.description,
+        avatarUrl: contact.avatar_url,
+        isSpammer: contact.is_spammer,
+        handles: contact.handles,
+        customFields: contact.custom_fields
+      },
+      message: `Merged ${contactIds.length} contact(s) into ${contact.id}.`
     };
   });
 

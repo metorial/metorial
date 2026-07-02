@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import {
+  invalidAction,
+  requireNonEmptyArray,
+  requireString,
+  resolveProjectId
+} from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageIpAccessListTool = SlateTool.create(spec, {
@@ -64,8 +70,7 @@ export let manageIpAccessListTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
     let { action } = ctx.input;
 
@@ -79,28 +84,32 @@ export let manageIpAccessListTool = SlateTool.create(spec, {
     }
 
     if (action === 'add') {
-      if (!ctx.input.entries || ctx.input.entries.length === 0) {
-        throw new Error('entries are required for the add action.');
-      }
-      let result = await client.addIpAccessListEntries(projectId, ctx.input.entries);
+      let requestedEntries = requireNonEmptyArray(
+        ctx.input.entries,
+        'entries',
+        'for the add action'
+      );
+      let result = await client.addIpAccessListEntries(projectId, requestedEntries);
       let entries = result.results || [];
       return {
         output: { entries, totalCount: entries.length },
-        message: `Added **${ctx.input.entries.length}** IP access list entry/entries.`
+        message: `Added **${requestedEntries.length}** IP access list entry/entries.`
       };
     }
 
     if (action === 'remove') {
-      if (!ctx.input.entryValue) {
-        throw new Error('entryValue is required for the remove action.');
-      }
-      await client.deleteIpAccessListEntry(projectId, ctx.input.entryValue);
+      let entryValue = requireString(
+        ctx.input.entryValue,
+        'entryValue',
+        'for the remove action'
+      );
+      await client.deleteIpAccessListEntry(projectId, entryValue);
       return {
         output: { removed: true },
-        message: `Removed IP access list entry **${ctx.input.entryValue}**.`
+        message: `Removed IP access list entry **${entryValue}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

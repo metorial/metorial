@@ -14,7 +14,7 @@ export let listSessions = SlateTool.create(spec, {
   .input(
     z.object({
       status: z
-        .enum(['RUNNING', 'ERROR', 'TIMED_OUT', 'COMPLETED'])
+        .enum(['PENDING', 'RUNNING', 'ERROR', 'TIMED_OUT', 'COMPLETED'])
         .optional()
         .describe('Filter sessions by status'),
       query: z.string().optional().describe('Search sessions by user metadata')

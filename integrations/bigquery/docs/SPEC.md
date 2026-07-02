@@ -82,7 +82,7 @@ This API facilitates data sharing within and across organizations. It allows dat
 
 ### Machine Learning (BigQuery ML)
 
-Create, train, evaluate, and predict with machine learning models directly in BigQuery using SQL. Supports models for classification, regression, clustering, time series forecasting, and more. Models are managed as resources within datasets.
+Create, train, evaluate, and predict with machine learning models directly in BigQuery using SQL. Supports models for classification, regression, clustering, time series forecasting, and more. Models are managed as resources within datasets; the REST API exposes model list, get, patch, and delete operations for metadata and lifecycle management.
 
 ### IAM and Access Control
 

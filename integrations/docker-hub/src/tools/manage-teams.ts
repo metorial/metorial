@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { dockerHubServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listTeams = SlateTool.create(spec, {
@@ -32,7 +33,7 @@ export let listTeams = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listTeams(ctx.input.orgName, {
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
@@ -73,7 +74,7 @@ export let createTeam = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let team = await client.createTeam(ctx.input.orgName, {
       name: ctx.input.teamName,
       description: ctx.input.description
@@ -110,7 +111,7 @@ export let deleteTeam = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteTeam(ctx.input.orgName, ctx.input.teamName);
 
     return {
@@ -156,7 +157,7 @@ export let manageTeamMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
 
     if (ctx.input.action === 'list') {
       let result = await client.listTeamMembers(ctx.input.orgName, ctx.input.teamName);
@@ -173,7 +174,7 @@ export let manageTeamMembers = SlateTool.create(spec, {
     }
 
     if (!ctx.input.username) {
-      throw new Error(`Username is required for "${ctx.input.action}" action.`);
+      throw dockerHubServiceError(`Username is required for "${ctx.input.action}" action.`);
     }
 
     if (ctx.input.action === 'add') {

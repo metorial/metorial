@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DriftClient } from '../lib/client';
+import { driftServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getBookedMeetings = SlateTool.create(spec, {
@@ -58,6 +59,16 @@ export let getBookedMeetings = SlateTool.create(spec, {
 
     let minMs = new Date(ctx.input.minStartTime).getTime();
     let maxMs = new Date(ctx.input.maxStartTime).getTime();
+
+    if (!Number.isFinite(minMs) || !Number.isFinite(maxMs)) {
+      throw driftServiceError(
+        'minStartTime and maxStartTime must be valid ISO 8601 datetimes.'
+      );
+    }
+
+    if (minMs > maxMs) {
+      throw driftServiceError('minStartTime must be before maxStartTime.');
+    }
 
     let meetings = await client.getBookedMeetings({
       minStartTime: minMs,

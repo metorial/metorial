@@ -1,5 +1,21 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { GumroadClient } from './lib/client';
+import { gumroadApiError, gumroadServiceError } from './lib/errors';
+
+let getGumroadProfile = async (token: string) => {
+  let client = new GumroadClient({ token });
+  let user = await client.getUser();
+
+  return {
+    profile: {
+      id: user.user_id || user.id,
+      email: user.email,
+      name: user.name || user.display_name,
+      imageUrl: user.profile_url
+    }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -14,8 +30,14 @@ export let auth = SlateAuth.create()
 
     scopes: [
       {
+        title: 'View Profile',
+        description: 'Read public profile and product information',
+        scope: 'view_profile'
+      },
+      {
         title: 'Edit Products',
-        description: 'Create and manage products, offer codes, variants, and custom fields',
+        description:
+          'Create and manage products, offer codes, variants, custom fields, and files',
         scope: 'edit_products'
       },
       {
@@ -24,14 +46,24 @@ export let auth = SlateAuth.create()
         scope: 'view_sales'
       },
       {
+        title: 'Edit Sales',
+        description: 'Refund sales and resend purchase receipts',
+        scope: 'edit_sales'
+      },
+      {
         title: 'Mark Sales as Shipped',
         description: 'Mark sales as shipped with tracking information',
         scope: 'mark_sales_as_shipped'
       },
       {
-        title: 'Revenue Share',
-        description: 'Revenue sharing access',
-        scope: 'revenue_share'
+        title: 'View Payouts',
+        description: 'View payout information',
+        scope: 'view_payouts'
+      },
+      {
+        title: 'View Tax Data',
+        description: 'View annual earnings and tax data',
+        scope: 'view_tax_data'
       }
     ],
 
@@ -52,40 +84,33 @@ export let auth = SlateAuth.create()
     handleCallback: async ctx => {
       let axios = createAxios();
 
-      let response = await axios.post('https://gumroad.com/oauth/token', {
-        code: ctx.code,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        redirect_uri: ctx.redirectUri,
-        grant_type: 'authorization_code'
-      });
+      let response: any;
+      try {
+        response = await axios.post('https://gumroad.com/oauth/token', {
+          code: ctx.code,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          redirect_uri: ctx.redirectUri,
+          grant_type: 'authorization_code'
+        });
+      } catch (error) {
+        throw gumroadApiError(error, 'exchange OAuth code');
+      }
+
+      let token = response.data?.access_token;
+      if (!token) {
+        throw gumroadServiceError('Gumroad OAuth did not return an access token.');
+      }
 
       return {
         output: {
-          token: response.data.access_token
+          token
         }
       };
     },
 
     getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.gumroad.com/v2',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/user');
-      let user = response.data.user;
-
-      return {
-        profile: {
-          id: user.user_id,
-          email: user.email,
-          name: user.name || user.display_name,
-          imageUrl: user.profile_url
-        }
-      };
+      return getGumroadProfile(ctx.output.token);
     }
   })
   .addTokenAuth({
@@ -108,23 +133,6 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let axios = createAxios({
-        baseURL: 'https://api.gumroad.com/v2',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await axios.get('/user');
-      let user = response.data.user;
-
-      return {
-        profile: {
-          id: user.user_id,
-          email: user.email,
-          name: user.name || user.display_name,
-          imageUrl: user.profile_url
-        }
-      };
+      return getGumroadProfile(ctx.output.token);
     }
   });

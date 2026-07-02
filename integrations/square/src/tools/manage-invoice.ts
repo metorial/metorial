@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { squareServiceError } from '../lib/errors';
 import { createClient, generateIdempotencyKey } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -14,6 +15,7 @@ export let manageInvoice = SlateTool.create(spec, {
       action: z.enum(['publish', 'cancel', 'delete']).describe('Action to perform'),
       version: z
         .number()
+        .optional()
         .describe('Current version of the invoice (required for publish and cancel)'),
       idempotencyKey: z.string().optional()
     })
@@ -29,6 +31,10 @@ export let manageInvoice = SlateTool.create(spec, {
     let client = createClient(ctx.auth, ctx.config);
 
     if (ctx.input.action === 'publish') {
+      if (ctx.input.version === undefined) {
+        throw squareServiceError('version is required to publish an invoice.');
+      }
+
       let i = await client.publishInvoice(ctx.input.invoiceId, {
         version: ctx.input.version,
         idempotencyKey: ctx.input.idempotencyKey || generateIdempotencyKey()
@@ -40,6 +46,10 @@ export let manageInvoice = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'cancel') {
+      if (ctx.input.version === undefined) {
+        throw squareServiceError('version is required to cancel an invoice.');
+      }
+
       let i = await client.cancelInvoice(ctx.input.invoiceId, ctx.input.version);
       return {
         output: { invoiceId: i.id, status: i.status, success: true },

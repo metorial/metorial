@@ -2,6 +2,7 @@ export * from './create-task';
 export * from './delete-task';
 export * from './get-task';
 export * from './get-workspace';
+export * from './manage-checklists';
 export * from './manage-comments';
 export * from './manage-custom-fields';
 export * from './manage-folders';

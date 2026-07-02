@@ -34,6 +34,7 @@ export let getTopic = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Whether content-based deduplication is enabled'),
+      fifoThroughputScope: z.string().optional().describe('FIFO throughput scope'),
       subscriptionsConfirmed: z
         .string()
         .optional()
@@ -41,6 +42,7 @@ export let getTopic = SlateTool.create(spec, {
       subscriptionsPending: z.string().optional().describe('Number of pending subscriptions'),
       subscriptionsDeleted: z.string().optional().describe('Number of deleted subscriptions'),
       tracingConfig: z.string().optional().describe('X-Ray tracing configuration'),
+      archivePolicy: z.string().optional().describe('JSON FIFO archive policy'),
       tags: z.record(z.string(), z.string()).optional().describe('Tags attached to the topic')
     })
   )
@@ -68,10 +70,12 @@ export let getTopic = SlateTool.create(spec, {
         kmsMasterKeyId: attrs.KmsMasterKeyId || undefined,
         fifoTopic: attrs.FifoTopic || undefined,
         contentBasedDeduplication: attrs.ContentBasedDeduplication || undefined,
+        fifoThroughputScope: attrs.FifoThroughputScope || undefined,
         subscriptionsConfirmed: attrs.SubscriptionsConfirmed || undefined,
         subscriptionsPending: attrs.SubscriptionsPending || undefined,
         subscriptionsDeleted: attrs.SubscriptionsDeleted || undefined,
         tracingConfig: attrs.TracingConfig || undefined,
+        archivePolicy: attrs.ArchivePolicy || undefined,
         tags: Object.keys(tags).length > 0 ? tags : undefined
       },
       message: `Retrieved topic **${topicName}** with ${attrs.SubscriptionsConfirmed || 0} confirmed subscriptions`

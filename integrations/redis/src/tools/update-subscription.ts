@@ -2,6 +2,11 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RedisCloudClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  rejectInputFields,
+  requireAtLeastOneInputField,
+  subscriptionTypeSchema
+} from './common';
 
 export let updateSubscription = SlateTool.create(spec, {
   name: 'Update Subscription',
@@ -14,7 +19,7 @@ export let updateSubscription = SlateTool.create(spec, {
   .input(
     z.object({
       subscriptionId: z.number().describe('The subscription ID to update'),
-      type: z.enum(['pro', 'essentials']).default('pro').describe('Subscription type'),
+      type: subscriptionTypeSchema,
       name: z.string().optional().describe('New subscription name'),
       paymentMethodId: z.number().optional().describe('New payment method ID'),
       planId: z.number().optional().describe('New plan ID (Essentials only)')
@@ -29,6 +34,20 @@ export let updateSubscription = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new RedisCloudClient(ctx.auth);
     let body: Record<string, any> = {};
+
+    requireAtLeastOneInputField(
+      ctx.input,
+      ['name', 'paymentMethodId', 'planId'],
+      'Provide at least one subscription setting to update.'
+    );
+
+    if (ctx.input.type === 'pro') {
+      rejectInputFields(
+        ctx.input,
+        ['planId'],
+        'planId can only be changed for Essentials subscriptions.'
+      );
+    }
 
     if (ctx.input.name !== undefined) body.name = ctx.input.name;
     if (ctx.input.paymentMethodId !== undefined)

@@ -1,0 +1,17 @@
+{
+  "name": "@visma/business-nxt",
+  "description": "Query Visma Business NXT ERP data through the official GraphQL API. Discover accessible customers and companies, search associates, inspect chart of accounts, and list orders for accounting and operations workflows.",
+  "categories": [
+    "apis-and-http-requests",
+    "financial-data-and-stock-market",
+    "crm-and-sales-tools"
+  ],
+  "skills": [
+    "discover Visma Business NXT customers and companies",
+    "search customers and suppliers",
+    "inspect chart of accounts",
+    "list sales orders",
+    "query Nordic ERP data"
+  ],
+  "logoUrl": "https://cdn.prod.website-files.com/642284f33fc26c8faad516ef/656f389907b7ddd490bb13e2_Business%20NXT-logo-main-inline-black-512h.png"
+}

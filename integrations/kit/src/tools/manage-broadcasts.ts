@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let broadcastOutputSchema = z.object({
@@ -84,7 +85,9 @@ export let manageBroadcasts = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.broadcastId) throw new Error('Broadcast ID is required for get');
+      if (!ctx.input.broadcastId) {
+        throw kitServiceError('Broadcast ID is required for get');
+      }
       let data = await client.getBroadcast(ctx.input.broadcastId);
       return {
         output: { broadcast: mapBroadcast(data.broadcast) },
@@ -110,7 +113,9 @@ export let manageBroadcasts = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.broadcastId) throw new Error('Broadcast ID is required for update');
+      if (!ctx.input.broadcastId) {
+        throw kitServiceError('Broadcast ID is required for update');
+      }
       let data = await client.updateBroadcast(ctx.input.broadcastId, {
         subject: ctx.input.subject,
         content: ctx.input.content,
@@ -128,7 +133,9 @@ export let manageBroadcasts = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.broadcastId) throw new Error('Broadcast ID is required for delete');
+      if (!ctx.input.broadcastId) {
+        throw kitServiceError('Broadcast ID is required for delete');
+      }
       await client.deleteBroadcast(ctx.input.broadcastId);
       return {
         output: { deleted: true },
@@ -136,6 +143,6 @@ export let manageBroadcasts = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw kitServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

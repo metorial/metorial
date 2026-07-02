@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateAlert = SlateTool.create(spec, {
@@ -65,7 +66,7 @@ export let updateAlert = SlateTool.create(spec, {
     }
 
     if (updatedFields.length === 0) {
-      throw new Error(
+      throw opsgenieServiceError(
         'No fields provided to update. Provide at least one of: message, description, priority.'
       );
     }

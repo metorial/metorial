@@ -21,6 +21,9 @@ export let listBookings = SlateTool.create(spec, {
       attendeeName: z.string().optional().describe('Filter by attendee name'),
       eventTypeId: z.number().optional().describe('Filter by event type ID'),
       eventTypeIds: z.string().optional().describe('Comma-separated list of event type IDs'),
+      bookingUid: z.string().optional().describe('Filter by booking UID'),
+      teamId: z.number().optional().describe('Filter by team ID'),
+      teamIds: z.string().optional().describe('Comma-separated list of team IDs'),
       afterStart: z
         .string()
         .optional()
@@ -29,14 +32,50 @@ export let listBookings = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Only return bookings ending before this ISO 8601 date'),
+      afterCreatedAt: z
+        .string()
+        .optional()
+        .describe('Only return bookings created after this ISO 8601 date'),
+      beforeCreatedAt: z
+        .string()
+        .optional()
+        .describe('Only return bookings created before this ISO 8601 date'),
+      afterUpdatedAt: z
+        .string()
+        .optional()
+        .describe('Only return bookings updated after this ISO 8601 date'),
+      beforeUpdatedAt: z
+        .string()
+        .optional()
+        .describe('Only return bookings updated before this ISO 8601 date'),
       sortStart: z.enum(['asc', 'desc']).optional().describe('Sort order by start time'),
-      take: z.number().optional().describe('Number of bookings to return (pagination)'),
-      skip: z.number().optional().describe('Number of bookings to skip (pagination)')
+      sortEnd: z.enum(['asc', 'desc']).optional().describe('Sort order by end time'),
+      sortCreated: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe('Sort order by booking creation time'),
+      sortUpdatedAt: z
+        .enum(['asc', 'desc'])
+        .optional()
+        .describe('Sort order by booking update time'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Opaque pagination cursor from a previous list_bookings response'),
+      limit: z.number().optional().describe('Number of bookings to return, default 50'),
+      take: z
+        .number()
+        .optional()
+        .describe('Deprecated alias for limit; prefer limit for cursor pagination')
     })
   )
   .output(
     z.object({
-      bookings: z.array(z.any()).describe('List of bookings matching the filter criteria')
+      bookings: z.array(z.any()).describe('List of bookings matching the filter criteria'),
+      pagination: z
+        .any()
+        .optional()
+        .describe('Cursor pagination metadata including nextCursor and hasMore')
     })
   )
   .handleInvocation(async ctx => {
@@ -51,17 +90,28 @@ export let listBookings = SlateTool.create(spec, {
     if (ctx.input.attendeeName) params.attendeeName = ctx.input.attendeeName;
     if (ctx.input.eventTypeId) params.eventTypeId = ctx.input.eventTypeId;
     if (ctx.input.eventTypeIds) params.eventTypeIds = ctx.input.eventTypeIds;
+    if (ctx.input.bookingUid) params.bookingUid = ctx.input.bookingUid;
+    if (ctx.input.teamId) params.teamId = ctx.input.teamId;
+    if (ctx.input.teamIds) params.teamIds = ctx.input.teamIds;
     if (ctx.input.afterStart) params.afterStart = ctx.input.afterStart;
     if (ctx.input.beforeEnd) params.beforeEnd = ctx.input.beforeEnd;
+    if (ctx.input.afterCreatedAt) params.afterCreatedAt = ctx.input.afterCreatedAt;
+    if (ctx.input.beforeCreatedAt) params.beforeCreatedAt = ctx.input.beforeCreatedAt;
+    if (ctx.input.afterUpdatedAt) params.afterUpdatedAt = ctx.input.afterUpdatedAt;
+    if (ctx.input.beforeUpdatedAt) params.beforeUpdatedAt = ctx.input.beforeUpdatedAt;
     if (ctx.input.sortStart) params.sortStart = ctx.input.sortStart;
-    if (ctx.input.take) params.take = ctx.input.take;
-    if (ctx.input.skip) params.skip = ctx.input.skip;
+    if (ctx.input.sortEnd) params.sortEnd = ctx.input.sortEnd;
+    if (ctx.input.sortCreated) params.sortCreated = ctx.input.sortCreated;
+    if (ctx.input.sortUpdatedAt) params.sortUpdatedAt = ctx.input.sortUpdatedAt;
+    if (ctx.input.cursor) params.cursor = ctx.input.cursor;
+    if (ctx.input.limit) params.limit = ctx.input.limit;
+    if (!ctx.input.limit && ctx.input.take) params.limit = ctx.input.take;
 
-    let bookings = await client.listBookings(params);
+    let { bookings, pagination } = await client.listBookings(params);
 
     let count = Array.isArray(bookings) ? bookings.length : 0;
     return {
-      output: { bookings: Array.isArray(bookings) ? bookings : [] },
+      output: { bookings: Array.isArray(bookings) ? bookings : [], pagination },
       message: `Found **${count}** booking(s).`
     };
   })

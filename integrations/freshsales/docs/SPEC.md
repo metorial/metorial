@@ -32,7 +32,7 @@ Using the APIs, users would only be able to view data that they have access to.
 
 ### Lead Management
 
-Create, view, update, delete, and list leads. You can create or update a lead based on a unique identifier value — it searches for a record with the value mentioned and updates it if found, else it creates the record. Leads can be converted to contacts. You can add, update, or remove team members of the lead team. Leads support custom fields, filtering via views, sorting, and activity tracking.
+Create, view, update, delete, and list leads. You can create or update a lead based on a unique identifier value, which searches for a record with the value mentioned and updates it if found, otherwise it creates the record. Leads can be converted to contacts. Leads support custom fields, filtering via views, sorting, and activity tracking.
 
 ### Contact Management
 
@@ -48,27 +48,23 @@ Create, view, update, delete, and list deals. You can manage deals with the pipe
 
 ### Tasks and Appointments
 
-Create, view, update, delete, and list tasks and appointments. Tasks are organized according to status and due date (open, due today, due tomorrow, overdue, completed). Appointments are divided into past and upcoming.
+Create, view, update, delete, and list tasks and appointments. Tasks are organized according to status and due date (open, due today, due tomorrow, overdue, completed), and can be marked done. Appointments are divided into past and upcoming.
 
 ### Notes and Activities
 
-Create notes for leads, contacts, accounts, and deals. Track sales activities and retrieve activity timelines for contacts and leads.
+Create and update notes for leads, contacts, accounts, and deals. Delete notes by ID. Create, view, update, delete, and list sales activities for contacts, accounts, and deals.
 
 ### Search and Filtering
 
-Search across entities (leads, contacts, etc.) using keywords. Filter records based on certain conditions using the filterize option in real-time, applicable for contacts, accounts, and deals. Use saved views to retrieve filtered record sets.
+Search across entities using keywords. Run exact lookup search by field for contacts, accounts, and deals. Use filtered contact search for exact contact matches such as email address. Use saved views to retrieve filtered record sets.
 
 ### Sales Activities
 
 Log and manage sales activities such as calls, emails, and custom activities associated with leads, contacts, and deals.
 
-### Files and Documents
-
-List and manage file and document associations on records.
-
 ### Settings and Customization
 
-Retrieve field metadata for contacts, leads, deals, accounts, and sales activities. Create and manage custom modules.
+Retrieve field metadata for contacts, leads, deals, accounts, and sales activities. Retrieve selectors for owners, territories, deal metadata, lifecycle stages, and sales activity metadata.
 
 ## Events
 

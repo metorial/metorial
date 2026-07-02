@@ -14,6 +14,10 @@ export let listAssets = SlateTool.create(spec, {
   .input(
     z.object({
       siteId: z.string().describe('Unique identifier of the Webflow site'),
+      offset: z.number().optional().describe('Pagination offset'),
+      limit: z.number().optional().describe('Maximum number of assets to return'),
+      folderId: z.string().optional().describe('Only return assets in this folder'),
+      localeId: z.string().optional().describe('Only return assets for this locale'),
       includeFolders: z
         .boolean()
         .optional()
@@ -48,23 +52,35 @@ export let listAssets = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Asset folders (if includeFolders is true)')
+        .describe('Asset folders (if includeFolders is true)'),
+      pagination: z
+        .object({
+          offset: z.number().optional(),
+          limit: z.number().optional(),
+          total: z.number().optional()
+        })
+        .optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new WebflowClient(ctx.auth.token);
-    let assetsData = await client.listAssets(ctx.input.siteId);
+    let assetsData = await client.listAssets(ctx.input.siteId, {
+      offset: ctx.input.offset,
+      limit: ctx.input.limit,
+      folderId: ctx.input.folderId,
+      localeId: ctx.input.localeId
+    });
 
     let assets = (assetsData.assets ?? []).map((a: any) => ({
       assetId: a.id ?? a._id,
       displayName: a.displayName,
-      fileName: a.fileName,
+      fileName: a.originalFileName ?? a.fileName,
       contentType: a.contentType,
       url: a.hostedUrl ?? a.url,
-      folderId: a.parentFolder,
+      folderId: a.folderId ?? a.parentFolder,
       createdOn: a.createdOn,
       lastUpdated: a.lastUpdated,
-      fileSize: a.fileSize
+      fileSize: a.size ?? a.fileSize
     }));
 
     let folders: any[] | undefined;
@@ -79,7 +95,7 @@ export let listAssets = SlateTool.create(spec, {
     }
 
     return {
-      output: { assets, folders },
+      output: { assets, folders, pagination: assetsData.pagination },
       message: `Found **${assets.length}** asset(s)${folders ? ` and **${folders.length}** folder(s)` : ''}.`
     };
   })

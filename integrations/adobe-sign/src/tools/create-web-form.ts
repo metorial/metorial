@@ -9,7 +9,8 @@ export let createWebForm = SlateTool.create(spec, {
   description: `Create an embeddable web form (widget) that generates a unique signing URL. Each time a participant fills in the web form, a new agreement is generated. Web forms can be embedded on websites or shared via link.`,
   instructions: [
     'Upload the document first using the Upload Document tool, then reference the transientDocumentId.',
-    'A library template ID can also be used instead of a transient document.'
+    'Current Adobe Acrobat Sign v6 web form creation supports transientDocumentId or urlFileInfo documents, not libraryDocumentId.',
+    'The primary web form participant has an unknown email at creation time; set participantRole and optional participantSecurityOption instead of an email address.'
   ],
   tags: {
     destructive: false,
@@ -26,14 +27,31 @@ export let createWebForm = SlateTool.create(spec, {
               .string()
               .optional()
               .describe('ID of a previously uploaded transient document'),
-            libraryDocumentId: z
-              .string()
+            urlFileInfo: z
+              .object({
+                url: z.string().describe('Public URL of the document'),
+                name: z.string().optional().describe('Display name for the document'),
+                mimeType: z.string().optional().describe('MIME type of the document')
+              })
               .optional()
-              .describe('ID of a library document template')
+              .describe('URL-based document reference')
           })
         )
         .describe('Documents to use in the web form'),
-      participantSetsInfo: z
+      participantRole: z
+        .enum(['SIGNER', 'APPROVER', 'ACCEPTOR', 'FORM_FILLER', 'CERTIFIED_RECIPIENT'])
+        .optional()
+        .describe('Role of the unknown primary web form participant. Defaults to SIGNER.'),
+      participantSecurityOption: z
+        .object({
+          authenticationMethod: z
+            .enum(['NONE', 'PASSWORD', 'PHONE', 'KBA', 'EMAIL_OTP'])
+            .optional()
+            .describe('Authentication method for the unknown primary participant')
+        })
+        .optional()
+        .describe('Optional security settings for the unknown primary web form participant'),
+      additionalParticipantSetsInfo: z
         .array(
           z.object({
             memberInfos: z
@@ -49,7 +67,15 @@ export let createWebForm = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Pre-defined participant sets for the web form'),
+        .describe('Additional participants that act after the web form signer'),
+      ccs: z
+        .array(
+          z.object({
+            email: z.string().describe('Email address to CC')
+          })
+        )
+        .optional()
+        .describe('Email addresses to CC when web form agreements complete'),
       state: z
         .enum(['ACTIVE', 'DRAFT', 'AUTHORING'])
         .optional()
@@ -73,7 +99,16 @@ export let createWebForm = SlateTool.create(spec, {
     let result = await client.createWebForm({
       name: ctx.input.name,
       fileInfos: ctx.input.fileInfos,
-      participantSetsInfo: ctx.input.participantSetsInfo,
+      widgetParticipantSetInfo: {
+        role: ctx.input.participantRole || 'SIGNER',
+        memberInfos: [
+          ctx.input.participantSecurityOption
+            ? { securityOption: ctx.input.participantSecurityOption }
+            : {}
+        ]
+      },
+      additionalParticipantSetsInfo: ctx.input.additionalParticipantSetsInfo,
+      ccs: ctx.input.ccs,
       state: ctx.input.state
     });
 

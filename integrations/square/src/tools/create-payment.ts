@@ -22,6 +22,12 @@ export let createPayment = SlateTool.create(spec, {
       amountMoney: moneyInputSchema.describe('The payment amount'),
       tipMoney: moneyInputSchema.optional().describe('Optional tip amount'),
       appFeeMoney: moneyInputSchema.optional().describe('Optional application fee amount'),
+      appFeeAllocations: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe(
+          'Optional Square app_fee_allocations entries for distributing an application fee'
+        ),
       customerId: z.string().optional().describe('Customer ID to associate with the payment'),
       locationId: z.string().optional().describe('Location ID for the payment'),
       orderId: z.string().optional().describe('Order ID to associate with the payment'),
@@ -55,7 +61,14 @@ export let createPayment = SlateTool.create(spec, {
         .optional(),
       receiptUrl: z.string().optional(),
       orderId: z.string().optional(),
-      createdAt: z.string().optional()
+      createdAt: z.string().optional(),
+      appFeeMoney: z
+        .object({
+          amount: z.number().optional(),
+          currency: z.string().optional()
+        })
+        .optional(),
+      appFeeAllocations: z.array(z.record(z.string(), z.any())).optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -66,6 +79,7 @@ export let createPayment = SlateTool.create(spec, {
       amountMoney: ctx.input.amountMoney,
       tipMoney: ctx.input.tipMoney,
       appFeeMoney: ctx.input.appFeeMoney,
+      appFeeAllocations: ctx.input.appFeeAllocations,
       customerId: ctx.input.customerId,
       locationId: ctx.input.locationId,
       orderId: ctx.input.orderId,
@@ -82,7 +96,9 @@ export let createPayment = SlateTool.create(spec, {
         totalMoney: p.total_money,
         receiptUrl: p.receipt_url,
         orderId: p.order_id,
-        createdAt: p.created_at
+        createdAt: p.created_at,
+        appFeeMoney: p.app_fee_money,
+        appFeeAllocations: p.app_fee_allocations
       },
       message: `Payment **${p.id}** created with status **${p.status}**.`
     };

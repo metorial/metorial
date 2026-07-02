@@ -1,3 +1,4 @@
+export * from './create-client-token';
 export * from './create-transaction';
 export * from './find-transaction';
 export * from './manage-customer';
@@ -5,6 +6,9 @@ export * from './manage-dispute';
 export * from './manage-payment-method';
 export * from './manage-subscription';
 export * from './refund-transaction';
+export * from './search-customers';
+export * from './search-disputes';
+export * from './search-subscriptions';
 export * from './search-transactions';
 export * from './settle-transaction';
 export * from './settlement-report';

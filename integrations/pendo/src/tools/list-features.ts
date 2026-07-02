@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PendoClient } from '../lib/client';
 import { spec } from '../spec';
+import { createPendoClient, validateMultiAppFilter } from './helpers';
 
 export let listFeatures = SlateTool.create(spec, {
   name: 'List Features',
@@ -16,7 +16,11 @@ export let listFeatures = SlateTool.create(spec, {
       appId: z
         .string()
         .optional()
-        .describe('Application ID to filter features for a specific app')
+        .describe('Application ID to filter features for a specific app'),
+      expandAll: z
+        .boolean()
+        .optional()
+        .describe('Set to true to return features from all apps in a multi-app subscription')
     })
   )
   .output(
@@ -34,15 +38,16 @@ export let listFeatures = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PendoClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
+    validateMultiAppFilter(ctx.input);
+    let client = createPendoClient(ctx);
+
+    let features = await client.listFeatures({
+      appId: ctx.input.appId,
+      expandAll: ctx.input.expandAll
     });
 
-    let features = await client.listFeatures(ctx.input.appId);
-
     let mappedFeatures = (Array.isArray(features) ? features : []).map((f: any) => ({
-      featureId: f.id || '',
+      featureId: f.id || f.featureId || '',
       name: f.name || '',
       raw: f
     }));

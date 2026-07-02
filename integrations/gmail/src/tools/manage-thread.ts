@@ -1,18 +1,21 @@
+import { badRequestError, ServiceError } from '@lowerdeck/error';
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client, parseMessage } from '../lib/client';
 import { gmailActionScopes } from '../scopes';
 import { spec } from '../spec';
 
+let gmailServiceError = (message: string) => new ServiceError(badRequestError({ message }));
+
 export let manageThread = SlateTool.create(spec, {
   name: 'Manage Thread',
   key: 'manage_thread',
-  description: `Get, list, modify labels, trash, untrash, or delete email conversation threads. Retrieve full thread conversations with all messages.`,
+  description: `Get, list, modify labels, trash, or restore email conversation threads. Retrieve full thread conversations with all messages.`,
   instructions: [
     'Use **action** "get" to retrieve a thread with all its messages.',
     'Use **action** "list" to search/list threads with an optional query.',
     'Use **action** "modify_labels" to add/remove labels on a thread (applies to all messages).',
-    'Use **action** "trash", "untrash", or "delete" to manage thread lifecycle.'
+    'Use **action** "trash" or "untrash" to manage thread trash state.'
   ],
   tags: {
     readOnly: false
@@ -22,12 +25,12 @@ export let manageThread = SlateTool.create(spec, {
   .input(
     z.object({
       action: z
-        .enum(['get', 'list', 'modify_labels', 'trash', 'untrash', 'delete'])
+        .enum(['get', 'list', 'modify_labels', 'trash', 'untrash'])
         .describe('Thread operation to perform.'),
       threadId: z
         .string()
         .optional()
-        .describe('Thread ID (required for get, modify_labels, trash, untrash, delete).'),
+        .describe('Thread ID (required for get, modify_labels, trash, untrash).'),
       query: z.string().optional().describe('Gmail search query (for list action).'),
       labelIds: z
         .array(z.string())
@@ -95,11 +98,7 @@ export let manageThread = SlateTool.create(spec, {
         .optional()
         .describe('List of threads (for list action).'),
       nextPageToken: z.string().optional().describe('Next page token (for list).'),
-      resultSizeEstimate: z
-        .number()
-        .optional()
-        .describe('Estimated total results (for list).'),
-      deleted: z.boolean().optional().describe('Whether deletion was successful.')
+      resultSizeEstimate: z.number().optional().describe('Estimated total results (for list).')
     })
   )
   .handleInvocation(async ctx => {
@@ -109,10 +108,16 @@ export let manageThread = SlateTool.create(spec, {
     });
 
     let { action } = ctx.input;
+    let requireThreadId = (actionName: string) => {
+      if (!ctx.input.threadId) {
+        throw gmailServiceError(`threadId is required for ${actionName} action`);
+      }
+      return ctx.input.threadId;
+    };
 
     if (action === 'get') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for get action');
-      let thread = await client.getThread(ctx.input.threadId);
+      let threadId = requireThreadId('get');
+      let thread = await client.getThread(threadId);
       let messages = (thread.messages || []).map(parseMessage);
 
       return {
@@ -164,10 +169,9 @@ export let manageThread = SlateTool.create(spec, {
     }
 
     if (action === 'modify_labels') {
-      if (!ctx.input.threadId)
-        throw new Error('threadId is required for modify_labels action');
+      let threadId = requireThreadId('modify_labels');
       let thread = await client.modifyThread(
-        ctx.input.threadId,
+        threadId,
         ctx.input.addLabelIds,
         ctx.input.removeLabelIds
       );
@@ -178,44 +182,35 @@ export let manageThread = SlateTool.create(spec, {
           snippet: thread.snippet,
           historyId: thread.historyId
         },
-        message: `Modified labels on thread **${ctx.input.threadId}**.`
+        message: `Modified labels on thread **${threadId}**.`
       };
     }
 
     if (action === 'trash') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for trash action');
-      let thread = await client.trashThread(ctx.input.threadId);
+      let threadId = requireThreadId('trash');
+      let thread = await client.trashThread(threadId);
       return {
         output: {
           threadId: thread.id,
           snippet: thread.snippet,
           historyId: thread.historyId
         },
-        message: `Thread **${ctx.input.threadId}** moved to trash.`
+        message: `Thread **${threadId}** moved to trash.`
       };
     }
 
     if (action === 'untrash') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for untrash action');
-      let thread = await client.untrashThread(ctx.input.threadId);
+      let threadId = requireThreadId('untrash');
+      let thread = await client.untrashThread(threadId);
       return {
         output: {
           threadId: thread.id,
           snippet: thread.snippet,
           historyId: thread.historyId
         },
-        message: `Thread **${ctx.input.threadId}** restored from trash.`
+        message: `Thread **${threadId}** restored from trash.`
       };
     }
 
-    if (action === 'delete') {
-      if (!ctx.input.threadId) throw new Error('threadId is required for delete action');
-      await client.deleteThread(ctx.input.threadId);
-      return {
-        output: { deleted: true },
-        message: `Thread **${ctx.input.threadId}** permanently deleted.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
+    throw gmailServiceError(`Unknown action: ${action}`);
   });

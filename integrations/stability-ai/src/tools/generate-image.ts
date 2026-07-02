@@ -1,40 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { stabilityServiceError } from '../lib/errors';
 import { spec } from '../spec';
-
-let aspectRatioEnum = z
-  .enum(['16:9', '1:1', '21:9', '2:3', '3:2', '4:5', '5:4', '9:16', '9:21'])
-  .optional()
-  .describe('Aspect ratio of the generated image. Defaults to 1:1.');
-
-let outputFormatEnum = z
-  .enum(['png', 'jpeg', 'webp'])
-  .optional()
-  .describe('Output image format. Defaults to png.');
-
-let stylePresetEnum = z
-  .enum([
-    'enhance',
-    'anime',
-    'photographic',
-    'digital-art',
-    'comic-book',
-    'fantasy-art',
-    'line-art',
-    'analog-film',
-    'neon-punk',
-    'isometric',
-    'low-poly',
-    'origami',
-    'modeling-compound',
-    'cinematic',
-    '3d-model',
-    'pixel-art',
-    'tile-texture'
-  ])
-  .optional()
-  .describe('Visual style preset to apply.');
+import {
+  aspectRatioEnum,
+  createMediaAttachment,
+  imageOutputFormatEnum,
+  mediaAttachmentOutputSchema,
+  stylePresetEnum,
+  toMediaAttachmentOutput
+} from './shared';
 
 export let generateImage = SlateTool.create(spec, {
   name: 'Generate Image',
@@ -48,7 +24,7 @@ Optionally provide a reference image for image-to-image generation (Ultra and SD
   constraints: [
     'Seed range: 0 to 4,294,967,294. Use 0 for random.',
     'Image-to-image is only supported with Ultra and SD3.5 models.',
-    'Style presets are only available with the Core model.'
+    'CFG scale is only available with SD3.5 and must be between 1 and 10.'
   ],
   tags: {
     destructive: false,
@@ -77,7 +53,7 @@ Optionally provide a reference image for image-to-image generation (Ultra and SD
         .number()
         .optional()
         .describe('Seed for reproducible results. Use 0 or omit for random.'),
-      outputFormat: outputFormatEnum,
+      outputFormat: imageOutputFormatEnum,
       stylePreset: stylePresetEnum,
       referenceImage: z
         .string()
@@ -99,30 +75,27 @@ Optionally provide a reference image for image-to-image generation (Ultra and SD
         .describe('Specific SD3.5 model variant. Only used when model is sd3.'),
       cfgScale: z
         .number()
-        .min(0)
-        .max(35)
+        .min(1)
+        .max(10)
         .optional()
-        .describe('CFG scale for prompt adherence (0-35). Only used with SD3.5.')
+        .describe('CFG scale for prompt adherence (1-10). Only used with SD3.5.')
     })
   )
-  .output(
-    z.object({
-      base64Image: z.string().describe('Base64-encoded generated image.'),
-      seed: z
-        .number()
-        .describe('Seed used for this generation. Save this to reproduce the same output.'),
-      finishReason: z
-        .string()
-        .describe(
-          'Reason generation finished. "SUCCESS" or "CONTENT_FILTERED" if flagged by safety systems.'
-        )
-    })
-  )
+  .output(mediaAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: { base64Image: string; seed: number; finishReason: string };
+    if (ctx.input.model === 'core' && ctx.input.referenceImage) {
+      throw stabilityServiceError(
+        'referenceImage is only supported with Ultra and SD3.5 models.'
+      );
+    }
 
+    if (ctx.input.strength !== undefined && !ctx.input.referenceImage) {
+      throw stabilityServiceError('strength requires referenceImage.');
+    }
+
+    let result: any;
     if (ctx.input.model === 'ultra') {
       result = await client.generateImageUltra({
         prompt: ctx.input.prompt,
@@ -131,7 +104,8 @@ Optionally provide a reference image for image-to-image generation (Ultra and SD
         seed: ctx.input.seed,
         outputFormat: ctx.input.outputFormat,
         image: ctx.input.referenceImage,
-        strength: ctx.input.strength
+        strength: ctx.input.strength,
+        stylePreset: ctx.input.stylePreset
       });
     } else if (ctx.input.model === 'core') {
       result = await client.generateImageCore({
@@ -152,13 +126,15 @@ Optionally provide a reference image for image-to-image generation (Ultra and SD
         model: ctx.input.sd3Model,
         image: ctx.input.referenceImage,
         strength: ctx.input.strength,
-        cfgScale: ctx.input.cfgScale
+        cfgScale: ctx.input.cfgScale,
+        stylePreset: ctx.input.stylePreset
       });
     }
 
     return {
-      output: result,
-      message: `Generated image using **${ctx.input.model}** model with seed **${result.seed}**. Finish reason: ${result.finishReason}.`
+      output: toMediaAttachmentOutput(result),
+      attachments: [createMediaAttachment(result)],
+      message: `Generated image using **${ctx.input.model}** model. Attachment MIME: \`${result.mimeType}\`.`
     };
   })
   .build();

@@ -1,4 +1,8 @@
-import { createLocalSlateTestClient, expectSlateContract } from '@slates/test';
+import {
+  createLocalSlateTestClient,
+  describeMcpCompatibleToolSchemas,
+  expectSlateContract
+} from '@slates/test';
 import { describe, expect, it } from 'vitest';
 import { provider } from './index';
 import { googleDriveActionScopes } from './scopes';
@@ -115,3 +119,5 @@ describe('google-drive provider contract', () => {
     expect(scopeTitles.has('User Email')).toBe(true);
   });
 });
+
+describeMcpCompatibleToolSchemas('Google Drive tool input schemas', provider.actions);

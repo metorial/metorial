@@ -20,6 +20,19 @@ let contactOutputSchema = z.object({
     .describe('Custom contact properties.')
 });
 
+let segmentOutputSchema = z.object({
+  segmentId: z.string().describe('Segment ID.'),
+  name: z.string().optional().describe('Segment name.'),
+  createdAt: z.string().optional().describe('Creation timestamp.')
+});
+
+let topicSubscriptionSchema = z.object({
+  topicId: z.string().describe('Topic ID.'),
+  name: z.string().optional().describe('Topic name.'),
+  description: z.string().optional().nullable().describe('Topic description.'),
+  subscription: z.enum(['opt_in', 'opt_out']).describe('Contact subscription status.')
+});
+
 export let createContact = SlateTool.create(spec, {
   name: 'Create Contact',
   key: 'create_contact',
@@ -41,7 +54,22 @@ export let createContact = SlateTool.create(spec, {
       properties: z
         .record(z.string(), z.string())
         .optional()
-        .describe('Custom properties as key-value pairs for personalization.')
+        .describe('Custom properties as key-value pairs for personalization.'),
+      segments: z
+        .array(z.string())
+        .optional()
+        .describe('Segment IDs to add the new contact to.'),
+      topics: z
+        .array(
+          z.object({
+            id: z.string().describe('Topic ID.'),
+            subscription: z
+              .enum(['opt_in', 'opt_out'])
+              .describe('Initial topic subscription status.')
+          })
+        )
+        .optional()
+        .describe('Initial topic subscriptions for the contact.')
     })
   )
   .output(
@@ -56,7 +84,9 @@ export let createContact = SlateTool.create(spec, {
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName,
       unsubscribed: ctx.input.unsubscribed,
-      properties: ctx.input.properties
+      properties: ctx.input.properties,
+      segments: ctx.input.segments,
+      topics: ctx.input.topics
     });
 
     return {
@@ -232,6 +262,197 @@ export let deleteContact = SlateTool.create(spec, {
         deleted: result.deleted ?? true
       },
       message: `Contact \`${result.contact}\` has been **deleted**.`
+    };
+  })
+  .build();
+
+export let addContactToSegment = SlateTool.create(spec, {
+  name: 'Add Contact to Segment',
+  key: 'add_contact_to_segment',
+  description: `Add an existing contact to a Resend segment by contact ID or email address.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.'),
+      segmentId: z.string().describe('Segment ID to add the contact to.')
+    })
+  )
+  .output(
+    z.object({
+      segmentId: z.string().describe('Segment ID.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let result = await client.addContactToSegment(
+      ctx.input.contactIdOrEmail,
+      ctx.input.segmentId
+    );
+
+    return {
+      output: { segmentId: result.id },
+      message: `Contact **${ctx.input.contactIdOrEmail}** added to segment \`${result.id}\`.`
+    };
+  })
+  .build();
+
+export let listContactSegments = SlateTool.create(spec, {
+  name: 'List Contact Segments',
+  key: 'list_contact_segments',
+  description: `List Resend segments that a contact belongs to by contact ID or email address.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.')
+    })
+  )
+  .output(
+    z.object({
+      segments: z.array(segmentOutputSchema).describe('Segments for the contact.'),
+      hasMore: z.boolean().describe('Whether more results are available.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let result = await client.listContactSegments(ctx.input.contactIdOrEmail);
+    let segments = (result.data || []).map((segment: any) => ({
+      segmentId: segment.id,
+      name: segment.name,
+      createdAt: segment.created_at
+    }));
+
+    return {
+      output: {
+        segments,
+        hasMore: result.has_more ?? false
+      },
+      message: `Found **${segments.length}** segment(s) for this contact.`
+    };
+  })
+  .build();
+
+export let removeContactFromSegment = SlateTool.create(spec, {
+  name: 'Remove Contact From Segment',
+  key: 'remove_contact_from_segment',
+  description: `Remove an existing contact from a Resend segment by contact ID or email address.`,
+  tags: {
+    destructive: true,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.'),
+      segmentId: z.string().describe('Segment ID to remove the contact from.')
+    })
+  )
+  .output(
+    z.object({
+      contactId: z.string().describe('Contact ID.'),
+      segmentId: z.string().describe('Segment ID.'),
+      deleted: z.boolean().describe('Whether the membership was removed.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let result = await client.removeContactFromSegment(
+      ctx.input.contactIdOrEmail,
+      ctx.input.segmentId
+    );
+
+    return {
+      output: {
+        contactId: result.id,
+        segmentId: result.segment_id ?? result.audienceId ?? ctx.input.segmentId,
+        deleted: result.deleted ?? true
+      },
+      message: `Contact **${ctx.input.contactIdOrEmail}** removed from segment \`${ctx.input.segmentId}\`.`
+    };
+  })
+  .build();
+
+export let listContactTopics = SlateTool.create(spec, {
+  name: 'List Contact Topics',
+  key: 'list_contact_topics',
+  description: `List topic subscription preferences for a contact by contact ID or email address.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.')
+    })
+  )
+  .output(
+    z.object({
+      topics: z.array(topicSubscriptionSchema).describe('Topic subscriptions.'),
+      hasMore: z.boolean().describe('Whether more results are available.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let result = await client.listContactTopics(ctx.input.contactIdOrEmail);
+    let topics = (result.data || []).map((topic: any) => ({
+      topicId: topic.id,
+      name: topic.name,
+      description: topic.description,
+      subscription: topic.subscription
+    }));
+
+    return {
+      output: {
+        topics,
+        hasMore: result.has_more ?? false
+      },
+      message: `Found **${topics.length}** topic subscription(s) for this contact.`
+    };
+  })
+  .build();
+
+export let updateContactTopics = SlateTool.create(spec, {
+  name: 'Update Contact Topics',
+  key: 'update_contact_topics',
+  description: `Update one or more topic subscription preferences for a contact by contact ID or email address.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      contactIdOrEmail: z.string().describe('Contact ID (UUID) or email address.'),
+      topics: z
+        .array(
+          z.object({
+            id: z.string().describe('Topic ID.'),
+            subscription: z.enum(['opt_in', 'opt_out']).describe('New subscription status.')
+          })
+        )
+        .describe('Topic subscription updates.')
+    })
+  )
+  .output(
+    z.object({
+      topicId: z.string().describe('ID returned by Resend for the topic update.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let result = await client.updateContactTopics(ctx.input.contactIdOrEmail, {
+      topics: ctx.input.topics
+    });
+
+    return {
+      output: { topicId: result.id },
+      message: `Updated **${ctx.input.topics.length}** topic subscription(s) for contact **${ctx.input.contactIdOrEmail}**.`
     };
   })
   .build();

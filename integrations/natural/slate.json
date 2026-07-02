@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/natural",
+  "description": "Manage Natural agentic payments workflows through the REST API. List and manage agents, customer delegations, wallets, counterparties, payments, transfers, payment requests, approvals, party members, API keys, agent keys, webhooks, and events with explicit confirmation gates for high-risk money movement and destructive actions.",
+  "categories": ["finance-and-accounting", "apis-and-http-requests"],
+  "skills": [
+    "manage Natural agents",
+    "invite and revoke agent customers",
+    "list wallets and counterparties",
+    "create and inspect payments",
+    "create and fulfill payment requests",
+    "deposit and withdraw funds",
+    "review transactions and transfers",
+    "approve or deny payment approvals",
+    "manage API keys and agent keys",
+    "configure webhooks and inspect events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/natural.svg"
+}

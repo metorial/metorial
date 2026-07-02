@@ -1,20 +1,28 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { stabilityServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  createMediaAttachment,
+  imageOutputFormatEnum,
+  mediaAttachmentOutputSchema,
+  stylePresetEnum,
+  toMediaAttachmentOutput
+} from './shared';
 
 export let editImage = SlateTool.create(spec, {
   name: 'Edit Image',
   key: 'edit_image',
   description: `Edit images using Stability AI's suite of editing tools. Supports multiple operations:
-- **erase**: Remove unwanted elements using a mask.
+- **erase**: Remove unwanted elements using a prompt and optional mask.
 - **inpaint**: Fill or replace masked areas with new content based on a prompt.
 - **outpaint**: Extend image boundaries in any direction while maintaining visual consistency.
 - **search_and_replace**: Swap objects by describing what to find and what to replace it with (no mask needed).
 - **search_and_recolor**: Change colors of specific objects described in plain language (no mask needed).
 - **remove_background**: Remove the background from an image, leaving the subject on a transparent background.`,
   instructions: [
-    'For erase: provide a mask image where white areas indicate regions to erase.',
+    'For erase: provide prompt and optionally a mask image where white areas indicate regions to erase.',
     'For inpaint: provide a mask where transparent/white areas will be filled. If no mask, the image alpha channel is used.',
     'For outpaint: specify at least one direction (left, right, up, down) with a positive pixel value.',
     'For search_and_replace: use searchPrompt to describe what to find, and prompt to describe the replacement.',
@@ -42,7 +50,7 @@ export let editImage = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Text prompt describing the desired edit result. Required for inpaint, search_and_replace, and search_and_recolor.'
+          'Text prompt describing the desired edit result. Required for erase, inpaint, search_and_replace, and search_and_recolor; optional for outpaint.'
         ),
       negativePrompt: z
         .string()
@@ -83,45 +91,71 @@ export let editImage = SlateTool.create(spec, {
         .optional()
         .describe('Pixels to extend downward. Used by outpaint.'),
       seed: z.number().optional().describe('Seed for reproducible results.'),
-      outputFormat: z.enum(['png', 'jpeg', 'webp']).optional().describe('Output image format.')
+      growMask: z
+        .number()
+        .min(0)
+        .max(100)
+        .optional()
+        .describe(
+          'Pixels to grow the generated mask. Used by erase, inpaint, search_and_replace, and search_and_recolor.'
+        ),
+      creativity: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Creative freedom for outpaint.'),
+      stylePreset: stylePresetEnum,
+      outputFormat: imageOutputFormatEnum
     })
   )
-  .output(
-    z.object({
-      base64Image: z.string().describe('Base64-encoded edited image.'),
-      seed: z.number().optional().describe('Seed used for this edit.'),
-      finishReason: z.string().describe('Reason the operation finished.')
-    })
-  )
+  .output(mediaAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let input = ctx.input;
 
-    let result: { base64Image: string; seed?: number; finishReason: string };
+    let result: any;
 
     switch (input.operation) {
       case 'erase':
+        if (!input.prompt)
+          throw stabilityServiceError('Prompt is required for erase operation.');
         result = await client.eraseImage({
           image: input.image,
+          prompt: input.prompt,
           mask: input.mask,
+          growMask: input.growMask,
           outputFormat: input.outputFormat,
           seed: input.seed
         });
         break;
 
       case 'inpaint':
-        if (!input.prompt) throw new Error('Prompt is required for inpaint operation.');
+        if (!input.prompt)
+          throw stabilityServiceError('Prompt is required for inpaint operation.');
         result = await client.inpaintImage({
           image: input.image,
           prompt: input.prompt,
           mask: input.mask,
           negativePrompt: input.negativePrompt,
+          growMask: input.growMask,
+          stylePreset: input.stylePreset,
           outputFormat: input.outputFormat,
           seed: input.seed
         });
         break;
 
       case 'outpaint':
+        if (
+          (input.left ?? 0) === 0 &&
+          (input.right ?? 0) === 0 &&
+          (input.up ?? 0) === 0 &&
+          (input.down ?? 0) === 0
+        ) {
+          throw stabilityServiceError(
+            'At least one of left, right, up, or down must be greater than 0 for outpaint operation.'
+          );
+        }
         result = await client.outpaintImage({
           image: input.image,
           prompt: input.prompt,
@@ -129,6 +163,8 @@ export let editImage = SlateTool.create(spec, {
           right: input.right,
           up: input.up,
           down: input.down,
+          creativity: input.creativity,
+          stylePreset: input.stylePreset,
           outputFormat: input.outputFormat,
           seed: input.seed
         });
@@ -136,14 +172,18 @@ export let editImage = SlateTool.create(spec, {
 
       case 'search_and_replace':
         if (!input.prompt)
-          throw new Error('Prompt is required for search_and_replace operation.');
+          throw stabilityServiceError('Prompt is required for search_and_replace operation.');
         if (!input.searchPrompt)
-          throw new Error('searchPrompt is required for search_and_replace operation.');
+          throw stabilityServiceError(
+            'searchPrompt is required for search_and_replace operation.'
+          );
         result = await client.searchAndReplace({
           image: input.image,
           prompt: input.prompt,
           searchPrompt: input.searchPrompt,
           negativePrompt: input.negativePrompt,
+          growMask: input.growMask,
+          stylePreset: input.stylePreset,
           outputFormat: input.outputFormat,
           seed: input.seed
         });
@@ -151,20 +191,29 @@ export let editImage = SlateTool.create(spec, {
 
       case 'search_and_recolor':
         if (!input.prompt)
-          throw new Error('Prompt is required for search_and_recolor operation.');
+          throw stabilityServiceError('Prompt is required for search_and_recolor operation.');
         if (!input.selectPrompt)
-          throw new Error('selectPrompt is required for search_and_recolor operation.');
+          throw stabilityServiceError(
+            'selectPrompt is required for search_and_recolor operation.'
+          );
         result = await client.searchAndRecolor({
           image: input.image,
           prompt: input.prompt,
           selectPrompt: input.selectPrompt,
           negativePrompt: input.negativePrompt,
+          growMask: input.growMask,
+          stylePreset: input.stylePreset,
           outputFormat: input.outputFormat,
           seed: input.seed
         });
         break;
 
       case 'remove_background':
+        if (input.outputFormat === 'jpeg') {
+          throw stabilityServiceError(
+            'remove_background only supports png or webp outputFormat.'
+          );
+        }
         result = await client.removeBackground({
           image: input.image,
           outputFormat: input.outputFormat
@@ -173,12 +222,9 @@ export let editImage = SlateTool.create(spec, {
     }
 
     return {
-      output: {
-        base64Image: result.base64Image,
-        seed: 'seed' in result ? result.seed : undefined,
-        finishReason: result.finishReason
-      },
-      message: `Completed **${input.operation}** edit operation. Finish reason: ${result.finishReason}.`
+      output: toMediaAttachmentOutput(result),
+      attachments: [createMediaAttachment(result)],
+      message: `Completed **${input.operation}** edit operation. Attachment MIME: \`${result.mimeType}\`.`
     };
   })
   .build();

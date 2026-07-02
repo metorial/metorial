@@ -1,0 +1,14 @@
+{
+  "name": "@sparebank1/regnskap",
+  "description": "Query SpareBank 1 Regnskap accounting data through the Unimicro Platform API. Discover companies, list and inspect customers, suppliers, invoices, supplier invoices, products, accounts, projects, accounting reports, and download files as attachments.",
+  "categories": ["accounting", "erp", "finance"],
+  "skills": [
+    "discover SpareBank 1 Regnskap companies",
+    "search customer and supplier master data",
+    "review customer and supplier invoices",
+    "inspect chart of accounts and project records",
+    "retrieve trial balance, profit and loss, and balance sheet reports",
+    "download accounting files as attachments"
+  ],
+  "logoUrl": "https://www.sparebank1.no/content/dam/SB1/ikoner/GUI-ikoner/logo-sparebank1.svg"
+}

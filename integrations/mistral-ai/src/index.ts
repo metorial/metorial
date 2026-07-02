@@ -11,15 +11,21 @@ import {
   createFineTuningJobTool,
   deleteFileTool,
   deleteModelTool,
+  downloadFileTool,
   extractDocumentTool,
+  generateSpeechTool,
   getBatchJobTool,
   getFileTool,
   getFineTuningJobTool,
+  getModelTool,
   listBatchJobsTool,
   listFilesTool,
   listFineTuningJobsTool,
   listModelsTool,
-  moderateContentTool
+  listVoicesTool,
+  moderateContentTool,
+  transcribeAudioTool,
+  uploadFileTool
 } from './tools';
 import { batchJobStatusTrigger, fineTuningJobStatusTrigger, inboundWebhook } from './triggers';
 
@@ -31,9 +37,15 @@ export let provider = Slate.create({
     moderateContentTool,
     extractDocumentTool,
     listModelsTool,
+    getModelTool,
+    uploadFileTool,
     listFilesTool,
     getFileTool,
+    downloadFileTool,
     deleteFileTool,
+    transcribeAudioTool,
+    generateSpeechTool,
+    listVoicesTool,
     createFineTuningJobTool,
     getFineTuningJobTool,
     listFineTuningJobsTool,

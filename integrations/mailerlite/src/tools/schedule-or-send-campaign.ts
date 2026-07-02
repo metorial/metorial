@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mailerLiteServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let scheduleOrSendCampaign = SlateTool.create(spec, {
@@ -16,9 +17,9 @@ export let scheduleOrSendCampaign = SlateTool.create(spec, {
     z.object({
       campaignId: z.string().describe('ID of the campaign to schedule or send'),
       action: z
-        .enum(['send', 'schedule', 'cancel'])
+        .enum(['send', 'schedule', 'timezone_based', 'smart_sending', 'cancel'])
         .describe(
-          '"send" for instant delivery, "schedule" to set a future date, "cancel" to revert to draft'
+          '"send" for instant delivery, "schedule" to set a future date, "timezone_based" for local-recipient time delivery, "smart_sending" for MailerLite smart sending, "cancel" to revert a ready campaign to draft'
         ),
       date: z
         .string()
@@ -54,8 +55,31 @@ export let scheduleOrSendCampaign = SlateTool.create(spec, {
       };
     }
 
+    if (ctx.input.action === 'schedule' || ctx.input.action === 'smart_sending') {
+      if (!ctx.input.date) {
+        throw mailerLiteServiceError(
+          'date is required for schedule and smart_sending actions.'
+        );
+      }
+    }
+
+    if (ctx.input.action === 'schedule' || ctx.input.action === 'timezone_based') {
+      if (!ctx.input.hours || !ctx.input.minutes) {
+        throw mailerLiteServiceError(
+          'hours and minutes are required for schedule and timezone_based actions.'
+        );
+      }
+    }
+
+    let deliveryByAction = {
+      send: 'instant',
+      schedule: 'scheduled',
+      timezone_based: 'timezone_based',
+      smart_sending: 'smart_sending'
+    } as const;
+
     let result = await client.scheduleCampaign(ctx.input.campaignId, {
-      delivery: ctx.input.action === 'send' ? 'instant' : 'scheduled',
+      delivery: deliveryByAction[ctx.input.action],
       date: ctx.input.date,
       hours: ctx.input.hours,
       minutes: ctx.input.minutes,

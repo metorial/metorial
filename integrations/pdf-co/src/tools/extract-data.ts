@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let parseInvoice = SlateTool.create(spec, {
@@ -41,7 +42,7 @@ Extracts vendor info, customer info, invoice details, payment information, line 
     });
 
     if (result.error) {
-      throw new Error(`Invoice parsing failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Invoice parsing failed', result);
     }
 
     return {
@@ -94,7 +95,7 @@ Use template ID "1" for the built-in general invoice template, or specify a cust
     });
 
     if (result.error) {
-      throw new Error(`Document parsing failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Document parsing failed', result);
     }
 
     return {
@@ -168,7 +169,7 @@ Provide custom classification rules in CSV format, or use a URL to an external C
     });
 
     if (result.error) {
-      throw new Error(`Document classification failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Document classification failed', result);
     }
 
     let classes = (result.body?.classes || []).map((c: any) => ({

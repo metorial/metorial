@@ -1,18 +1,22 @@
 {
   "name": "@metorial/pinecone",
-  "description": "Manage vector database indexes and perform vector operations for AI applications. Create, configure, and delete serverless or pod-based indexes. Upsert, query, fetch, update, and delete vector embeddings with metadata filtering and namespace partitioning. Generate embeddings and rerank results using hosted inference models. Upload documents and chat with an AI assistant for RAG-based Q&A with citations. Bulk import data from cloud storage, create backups and collections, and manage organizational resources like projects, API keys, and service accounts.",
+  "description": "Manage Pinecone vector database indexes and records for AI applications. Create and configure serverless, BYOC, integrated-embedding, and legacy pod indexes. Upsert, search, fetch, update, list, and delete vectors with metadata filtering and namespace partitioning. Work with integrated-embedding text records, hosted embedding/reranking models, and Pinecone Assistants with files, context retrieval, and grounded chat.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "manage vector indexes",
+    "create integrated embedding indexes",
+    "manage namespaces",
     "upsert vector embeddings",
+    "upsert text records",
     "query similar vectors",
+    "search records",
+    "fetch records by metadata",
     "filter by metadata",
     "generate embeddings via inference",
     "rerank search results",
-    "upload and chat with documents",
-    "bulk import from cloud storage",
-    "create backups and collections",
-    "manage projects and API keys"
+    "manage assistant files",
+    "retrieve assistant context",
+    "chat with assistant documents"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/pinecone-logo.svg"
 }

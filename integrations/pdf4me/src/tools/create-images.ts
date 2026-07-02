@@ -2,6 +2,11 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import {
+  attachmentMetadataSchema,
+  streamDocumentAttachment,
+  streamDocumentOutput
+} from './shared';
 
 export let createImagesFromPdf = SlateTool.create(spec, {
   name: 'Create Images from PDF',
@@ -27,15 +32,9 @@ export let createImagesFromPdf = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      images: z
-        .array(
-          z.object({
-            fileName: z.string().describe('Image file name'),
-            fileContent: z.string().describe('Base64-encoded image content')
-          })
-        )
-        .describe('Generated images'),
-      imageCount: z.number().describe('Number of images generated')
+      images: z.array(attachmentMetadataSchema).describe('Generated images'),
+      imageCount: z.number().describe('Number of images generated'),
+      attachmentCount: z.number().describe('Number of image attachments returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,13 +51,13 @@ export let createImagesFromPdf = SlateTool.create(spec, {
       pageNrs: ctx.input.pageNumbers
     });
 
-    let images = (result.outputDocuments ?? []).map(doc => ({
-      fileName: doc.fileName,
-      fileContent: doc.streamFile
-    }));
+    let imageDocuments = result.outputDocuments ?? [];
+    let images = imageDocuments.map(streamDocumentOutput);
+    let attachments = imageDocuments.map(streamDocumentAttachment);
 
     return {
-      output: { images, imageCount: images.length },
+      output: { images, imageCount: images.length, attachmentCount: attachments.length },
+      attachments,
       message: `Created **${images.length}** ${ctx.input.imageFormat.toUpperCase()} image(s) from PDF pages`
     };
   })

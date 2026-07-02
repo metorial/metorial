@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let fillPdfForm = SlateTool.create(spec, {
   name: 'Fill PDF Form',
@@ -27,12 +28,7 @@ Optionally keep the form editable after filling.`,
         .describe('Keep the PDF form fields editable after filling (default: false)')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded filled PDF form'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -44,7 +40,8 @@ Optionally keep the form editable after filling.`,
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully filled PDF form: **${result.fileName}**`
     };
   })

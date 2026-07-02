@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createKubeClient } from '../lib/client';
+import { kubernetesServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let portSchema = z.object({
@@ -40,6 +41,12 @@ Also manages Ingress resources for HTTP(S) routing.`,
         .enum(['ClusterIP', 'NodePort', 'LoadBalancer', 'ExternalName'])
         .optional()
         .describe('Service type (only for services)'),
+      externalName: z
+        .string()
+        .optional()
+        .describe(
+          'DNS name for ExternalName services. Required when serviceType is ExternalName.'
+        ),
       selector: z
         .record(z.string(), z.string())
         .optional()
@@ -87,6 +94,22 @@ Also manages Ingress resources for HTTP(S) routing.`,
       }
     } else if (resourceKind === 'services') {
       if (action === 'create') {
+        if (ctx.input.serviceType === 'ExternalName' && !ctx.input.externalName) {
+          throw kubernetesServiceError(
+            'externalName is required when creating an ExternalName service.'
+          );
+        }
+        if (ctx.input.serviceType !== 'ExternalName' && !ctx.input.ports?.length) {
+          throw kubernetesServiceError(
+            'ports is required when creating a Kubernetes service.'
+          );
+        }
+        if (ctx.input.serviceType !== 'ExternalName' && ctx.input.externalName) {
+          throw kubernetesServiceError(
+            'externalName can only be used with ExternalName services.'
+          );
+        }
+
         let body: any = {
           apiVersion: 'v1',
           kind: 'Service',
@@ -97,7 +120,9 @@ Also manages Ingress resources for HTTP(S) routing.`,
           },
           spec: {
             type: ctx.input.serviceType || 'ClusterIP',
-            selector: ctx.input.selector,
+            selector:
+              ctx.input.serviceType === 'ExternalName' ? undefined : ctx.input.selector,
+            externalName: ctx.input.externalName,
             ports: ctx.input.ports?.map(p => ({
               name: p.portName,
               port: p.port,
@@ -111,6 +136,17 @@ Also manages Ingress resources for HTTP(S) routing.`,
       } else {
         let patch: any = { spec: {} };
         if (ctx.input.serviceType) patch.spec.type = ctx.input.serviceType;
+        if (ctx.input.serviceType === 'ExternalName' && !ctx.input.externalName) {
+          throw kubernetesServiceError(
+            'externalName is required when changing a service to ExternalName.'
+          );
+        }
+        if (ctx.input.externalName && ctx.input.serviceType !== 'ExternalName') {
+          throw kubernetesServiceError(
+            'externalName can only be used when serviceType is ExternalName.'
+          );
+        }
+        if (ctx.input.externalName) patch.spec.externalName = ctx.input.externalName;
         if (ctx.input.selector) patch.spec.selector = ctx.input.selector;
         if (ctx.input.ports) {
           patch.spec.ports = ctx.input.ports.map(p => ({
@@ -126,6 +162,11 @@ Also manages Ingress resources for HTTP(S) routing.`,
           patch.metadata = patch.metadata || {};
           patch.metadata.annotations = ctx.input.annotations;
         }
+        if (Object.keys(patch.spec).length === 0 && !patch.metadata) {
+          throw kubernetesServiceError(
+            'Provide serviceType, externalName, selector, ports, labels, or annotations when updating a service.'
+          );
+        }
         result = await client.patchResource(
           'services',
           serviceName,
@@ -135,7 +176,9 @@ Also manages Ingress resources for HTTP(S) routing.`,
         );
       }
     } else {
-      throw new Error('For Ingress creation/update, please provide a full manifest.');
+      throw kubernetesServiceError(
+        'For Ingress creation/update, please provide a full manifest.'
+      );
     }
 
     let ports = result.spec?.ports?.map((p: any) => ({

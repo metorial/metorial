@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AmplitudeClient } from '../lib/client';
+import { amplitudeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let deleteUserDataTool = SlateTool.create(spec, {
@@ -78,6 +79,14 @@ export let deleteUserDataTool = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'delete') {
+      if (!ctx.input.userId && ctx.input.amplitudeId === undefined) {
+        throw amplitudeServiceError('Provide userId or amplitudeId for "delete" action.');
+      }
+
+      if (ctx.input.userId && ctx.input.amplitudeId !== undefined) {
+        throw amplitudeServiceError('Provide only one of userId or amplitudeId.');
+      }
+
       let result = await client.requestUserDeletion({
         userId: ctx.input.userId,
         amplitudeId: ctx.input.amplitudeId,
@@ -90,7 +99,22 @@ export let deleteUserDataTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'bulk_delete') {
-      if (!ctx.input.bulkDelete) throw new Error('bulkDelete parameters are required.');
+      if (!ctx.input.bulkDelete) {
+        throw amplitudeServiceError('bulkDelete parameters are required.');
+      }
+
+      let count =
+        (ctx.input.bulkDelete.userIds?.length ?? 0) +
+        (ctx.input.bulkDelete.amplitudeIds?.length ?? 0);
+      if (count === 0) {
+        throw amplitudeServiceError(
+          'bulkDelete must include at least one userId or amplitudeId.'
+        );
+      }
+      if (count > 100) {
+        throw amplitudeServiceError('Bulk deletion accepts at most 100 IDs.');
+      }
+
       let result = await client.requestBulkUserDeletion({
         userIds: ctx.input.bulkDelete.userIds,
         amplitudeIds: ctx.input.bulkDelete.amplitudeIds,
@@ -98,9 +122,6 @@ export let deleteUserDataTool = SlateTool.create(spec, {
         deleteFromOrg: ctx.input.bulkDelete.deleteFromOrg,
         ignoreInvalidId: ctx.input.bulkDelete.ignoreInvalidId
       });
-      let count =
-        (ctx.input.bulkDelete.userIds?.length ?? 0) +
-        (ctx.input.bulkDelete.amplitudeIds?.length ?? 0);
       return {
         output: { deletionResult: result },
         message: `Bulk deletion requested for **${count}** user(s).`
@@ -115,6 +136,6 @@ export let deleteUserDataTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw amplitudeServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

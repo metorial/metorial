@@ -42,6 +42,7 @@ export let listSurveys = SlateTool.create(spec, {
             responsesUrl: z.string().describe('URL to access survey responses.'),
             isEnabled: z.boolean().describe('Whether the survey is currently active.'),
             createdTime: z.string().describe('When the survey was created.'),
+            updatedTime: z.string().optional().describe('When the survey was last updated.'),
             sentimentAnalysisEnabled: z
               .boolean()
               .describe('Whether sentiment analysis is enabled.'),
@@ -68,7 +69,12 @@ export let listSurveys = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({
+      token: ctx.auth.token,
+      clientId: ctx.auth.clientId,
+      clientSecret: ctx.auth.clientSecret,
+      expiresAt: ctx.auth.expiresAt
+    });
 
     let result = await client.listSurveys(ctx.input.siteId, {
       withQuestions: ctx.input.withQuestions,
@@ -84,6 +90,7 @@ export let listSurveys = SlateTool.create(spec, {
       responsesUrl: survey.responses_url,
       isEnabled: survey.is_enabled,
       createdTime: survey.created_time,
+      updatedTime: survey.updated_time,
       sentimentAnalysisEnabled: survey.sentiment_analysis_enabled,
       questions: survey.questions?.map(q => ({
         questionId: q.id,

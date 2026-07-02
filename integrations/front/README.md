@@ -1,12 +1,16 @@
 # <img src="https://provider-logos.metorial-cdn.com/front.svg" height="20"> Front
 
-Manage shared inboxes and team-based communication across email, SMS, chat, and social media. Create, reply to, and manage conversations including assignment, tagging, archiving, and moving between inboxes. Send messages, create drafts, and import historical messages. Manage contacts, accounts, and contact groups with custom fields and handles. Add internal comments and mentions for team collaboration. Create and organize tags with hierarchical structures. Configure and manage channels connecting external messaging platforms. Create and manage knowledge base articles and categories. Export analytics data on team performance and response times. Manage message templates, teammate shifts, email signatures, and automation rules. Listen for real-time webhook events on conversation assignments, inbound/outbound messages, tagging changes, and conversation lifecycle updates.
+Manage shared inboxes and team-based communication across email, SMS, chat, and social media. List, read, reply to, and manage conversations including assignment, status, tags, followers, links, reminders, custom fields, and inbox moves. Send messages through Front channels, manage contacts, merge duplicate contacts, manage accounts, create tags, attach links, add internal comments, discover inboxes and channels, manage teams and teammates, work with message templates, request analytics reports/exports, read knowledge base content, and listen for webhook events.
 
 ## Tools
 
 ### Add Comment
 
 Add an internal comment to a conversation or reply to an existing comment. Comments are visible only to teammates, not external contacts. Supports @mentions by including teammate handles in the body.
+
+### List Channels
+
+List Front channels available in the company. Use this to find channel IDs or addresses for sending new outbound messages.
 
 ### Create Analytics Export
 
@@ -35,6 +39,10 @@ List company/organization accounts in Front with optional pagination and sorting
 ### List Contacts
 
 List and search contacts in Front. Supports filtering by search query and pagination.
+
+### Merge Contacts
+
+Merge duplicate Front contacts into one contact. Front deletes the merged-in contacts and preserves handles, groups, links, and notes on the surviving contact.
 
 ### List Inboxes
 
@@ -70,7 +78,7 @@ Send a reply to an existing Front conversation. The reply will be sent to the co
 
 ### Update Conversation
 
-Update a conversation's properties including status, assignee, tags, followers, and inbox. Supports assigning/unassigning teammates, archiving, reopening, trashing, restoring, adding/removing tags, and managing followers — all in a single flexible operation.
+Update a conversation's properties including status, assignee, tags, followers, links, reminders, description, custom fields, and inbox. Supports assigning/unassigning teammates, archiving, reopening, trashing, restoring, adding/removing tags and links, and managing followers — all in a single flexible operation.
 
 ## License
 

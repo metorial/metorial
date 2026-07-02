@@ -2,37 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
-
-let languageEnum = z.enum([
-  'ara',
-  'bul',
-  'chs',
-  'cht',
-  'hrv',
-  'cze',
-  'dan',
-  'dut',
-  'eng',
-  'fin',
-  'fre',
-  'ger',
-  'gre',
-  'hun',
-  'kor',
-  'ita',
-  'jpn',
-  'pol',
-  'por',
-  'rus',
-  'slv',
-  'spa',
-  'swe',
-  'tha',
-  'tur',
-  'ukr',
-  'vnm',
-  'auto'
-]);
+import { languageEnum, validateLanguageForEngine, validateSingleSource } from './shared';
 
 let wordSchema = z.object({
   wordText: z.string().describe('Recognized text of the word'),
@@ -61,7 +31,7 @@ Useful for overlaying recognized text on the original image, building text annot
   ],
   constraints: [
     'Free tier: max 1 MB file size, max 3 PDF pages.',
-    'Overlay data may not be available for Engine 3.'
+    'Engine 3 overlay coordinates are available but less precise than Engine 1/2 and slower when requested.'
   ],
   tags: {
     readOnly: true,
@@ -82,10 +52,12 @@ Useful for overlaying recognized text on the original image, building text annot
         .default('eng')
         .describe('Language code for OCR recognition'),
       ocrEngine: z
-        .enum(['1', '2'])
+        .enum(['1', '2', '3'])
         .optional()
         .default('1')
-        .describe('OCR engine to use: "1" (fastest) or "2" (complex backgrounds)'),
+        .describe(
+          'OCR engine to use: "1" (fastest), "2" (complex backgrounds), or "3" (best text quality with slower overlay data)'
+        ),
       detectOrientation: z
         .boolean()
         .optional()
@@ -122,9 +94,8 @@ Useful for overlaying recognized text on the original image, building text annot
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.input.sourceUrl && !ctx.input.base64Image) {
-      throw new Error('Either "sourceUrl" or "base64Image" must be provided.');
-    }
+    validateSingleSource(ctx.input);
+    validateLanguageForEngine(ctx.input.language, ctx.input.ocrEngine);
 
     let client = new Client({ token: ctx.auth.token });
 
@@ -134,7 +105,7 @@ Useful for overlaying recognized text on the original image, building text annot
       url: ctx.input.sourceUrl,
       base64Image: ctx.input.base64Image,
       language: ctx.input.language,
-      ocrEngine: Number(ctx.input.ocrEngine) as 1 | 2,
+      ocrEngine: Number(ctx.input.ocrEngine) as 1 | 2 | 3,
       isOverlayRequired: true,
       detectOrientation: ctx.input.detectOrientation,
       scale: ctx.input.scale,

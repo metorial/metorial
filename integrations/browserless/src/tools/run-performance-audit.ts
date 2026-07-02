@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrowserlessClient } from '../lib/client';
 import { spec } from '../spec';
+import { requireHttpUrl } from './shared';
 
 export let runPerformanceAudit = SlateTool.create(spec, {
   name: 'Run Performance Audit',
@@ -61,6 +62,8 @@ export let runPerformanceAudit = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireHttpUrl(ctx.input.url);
+
     let client = new BrowserlessClient({
       token: ctx.auth.token,
       region: ctx.config.region

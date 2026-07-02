@@ -26,6 +26,10 @@ export let listProjects = SlateTool.create(spec, {
     z.object({
       search: z.string().optional().describe('Search term to filter projects by name or ID'),
       orgId: z.string().optional().describe('Organization ID to filter projects by'),
+      recoverable: z
+        .boolean()
+        .optional()
+        .describe('Whether to list deleted projects still within the recovery window'),
       limit: z
         .number()
         .optional()
@@ -48,6 +52,7 @@ export let listProjects = SlateTool.create(spec, {
     let result = await client.listProjects({
       search: ctx.input.search,
       orgId: ctx.input.orgId,
+      recoverable: ctx.input.recoverable,
       limit: ctx.input.limit,
       cursor: ctx.input.cursor
     });

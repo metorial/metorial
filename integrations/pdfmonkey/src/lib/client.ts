@@ -1,4 +1,9 @@
 import { createAxios } from 'slates';
+import {
+  applyPdfmonkeyApiErrorInterceptor,
+  pdfmonkeyApiError,
+  pdfmonkeyServiceError
+} from './errors';
 
 export interface DocumentCreateParams {
   templateId: string;
@@ -8,7 +13,7 @@ export interface DocumentCreateParams {
 }
 
 export interface DocumentUpdateParams {
-  status?: 'draft' | 'pending';
+  status?: 'pending';
   templateId?: string;
   payload?: Record<string, unknown>;
   meta?: Record<string, unknown>;
@@ -25,7 +30,10 @@ export interface TemplateCreateParams {
   sampleDataDraft?: string;
   settings?: Record<string, unknown>;
   settingsDraft?: Record<string, unknown>;
-  editionMode?: 'code' | 'visual';
+  editionMode?: 'code' | 'builder';
+  outputType?: 'pdf' | 'image';
+  pdfEngineId?: string;
+  pdfEngineDraftId?: string;
   templateFolderId?: string | null;
   documentTtl?: number;
 }
@@ -40,7 +48,10 @@ export interface TemplateUpdateParams {
   sampleDataDraft?: string;
   settings?: Record<string, unknown>;
   settingsDraft?: Record<string, unknown>;
-  editionMode?: 'code' | 'visual';
+  editionMode?: 'code' | 'builder';
+  outputType?: 'pdf' | 'image';
+  pdfEngineId?: string;
+  pdfEngineDraftId?: string;
   templateFolderId?: string | null;
   documentTtl?: number;
 }
@@ -59,8 +70,62 @@ export interface ListTemplatesParams {
   sort?: 'identifier' | 'created_at' | 'updated_at';
 }
 
+export interface DownloadedDocumentFile {
+  document: Record<string, unknown>;
+  contentBase64: string;
+  mimeType: string;
+  byteLength: number;
+  filename: string | null;
+}
+
+let getHeader = (headers: unknown, key: string) => {
+  if (!headers || typeof headers !== 'object') {
+    return undefined;
+  }
+
+  let lowerKey = key.toLowerCase();
+  for (let [headerKey, value] of Object.entries(headers as Record<string, unknown>)) {
+    if (headerKey.toLowerCase() === lowerKey) {
+      return Array.isArray(value) ? value[0] : value;
+    }
+  }
+
+  return undefined;
+};
+
+let toBuffer = (data: unknown) => {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+
+  if (typeof data === 'string') {
+    return Buffer.from(data);
+  }
+
+  return Buffer.from([]);
+};
+
+let defaultMimeTypeFor = (document: Record<string, unknown>) => {
+  let filename = typeof document.filename === 'string' ? document.filename.toLowerCase() : '';
+
+  if (filename.endsWith('.png')) return 'image/png';
+  if (filename.endsWith('.jpg') || filename.endsWith('.jpeg')) return 'image/jpeg';
+  if (filename.endsWith('.webp')) return 'image/webp';
+
+  return 'application/pdf';
+};
+
 export class Client {
   private axios: ReturnType<typeof createAxios>;
+  private downloadAxios: ReturnType<typeof createAxios>;
 
   constructor(config: { token: string }) {
     this.axios = createAxios({
@@ -70,6 +135,10 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+    applyPdfmonkeyApiErrorInterceptor(this.axios);
+
+    this.downloadAxios = createAxios({});
+    applyPdfmonkeyApiErrorInterceptor(this.downloadAxios);
   }
 
   // === Current User ===
@@ -117,46 +186,38 @@ export class Client {
   }
 
   async createDocument(params: DocumentCreateParams): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      document: {
-        document_template_id: params.templateId,
-        status: params.status || 'pending'
-      }
+    let document: Record<string, unknown> = {
+      document_template_id: params.templateId,
+      status: params.status || 'pending'
     };
 
     if (params.payload !== undefined) {
-      (body.document as Record<string, unknown>).payload =
-        typeof params.payload === 'string' ? params.payload : JSON.stringify(params.payload);
+      document.payload = params.payload;
     }
 
     if (params.meta !== undefined) {
-      (body.document as Record<string, unknown>).meta =
-        typeof params.meta === 'string' ? params.meta : JSON.stringify(params.meta);
+      document.meta = params.meta;
     }
 
-    let response = await this.axios.post('/documents', body);
+    let response = await this.axios.post('/documents', { document });
     return response.data.document;
   }
 
   async createDocumentSync(params: DocumentCreateParams): Promise<Record<string, unknown>> {
-    let body: Record<string, unknown> = {
-      document: {
-        document_template_id: params.templateId,
-        status: params.status || 'pending'
-      }
+    let document: Record<string, unknown> = {
+      document_template_id: params.templateId,
+      status: params.status || 'pending'
     };
 
     if (params.payload !== undefined) {
-      (body.document as Record<string, unknown>).payload =
-        typeof params.payload === 'string' ? params.payload : JSON.stringify(params.payload);
+      document.payload = params.payload;
     }
 
     if (params.meta !== undefined) {
-      (body.document as Record<string, unknown>).meta =
-        typeof params.meta === 'string' ? params.meta : JSON.stringify(params.meta);
+      document.meta = params.meta;
     }
 
-    let response = await this.axios.post('/documents/sync', body);
+    let response = await this.axios.post('/documents/sync', { document });
     return response.data.document_card;
   }
 
@@ -173,12 +234,14 @@ export class Client {
       docData.document_template_id = params.templateId;
     }
     if (params.payload !== undefined) {
-      docData.payload =
-        typeof params.payload === 'string' ? params.payload : JSON.stringify(params.payload);
+      docData.payload = params.payload;
     }
     if (params.meta !== undefined) {
-      docData.meta =
-        typeof params.meta === 'string' ? params.meta : JSON.stringify(params.meta);
+      docData.meta = params.meta;
+    }
+
+    if (Object.keys(docData).length === 0) {
+      throw pdfmonkeyServiceError('Provide at least one document field to update.');
     }
 
     let response = await this.axios.put(`/documents/${documentId}`, { document: docData });
@@ -189,13 +252,53 @@ export class Client {
     await this.axios.delete(`/documents/${documentId}`);
   }
 
+  async downloadDocumentFile(documentId: string): Promise<DownloadedDocumentFile> {
+    let document = await this.getDocumentCard(documentId);
+    let status =
+      typeof document.status === 'string' ? document.status : String(document.status);
+
+    if (status !== 'success') {
+      throw pdfmonkeyServiceError(
+        `Document ${documentId} is not ready to download. Current status: ${status}.`
+      );
+    }
+
+    if (typeof document.download_url !== 'string' || document.download_url.length === 0) {
+      throw pdfmonkeyServiceError(
+        `Document ${documentId} does not include a download URL. Fetch the document again after generation succeeds.`
+      );
+    }
+
+    try {
+      let response = await this.downloadAxios.get(document.download_url, {
+        responseType: 'arraybuffer'
+      });
+      let buffer = toBuffer(response.data);
+      let contentType = getHeader(response.headers, 'content-type');
+      let mimeType =
+        typeof contentType === 'string' && contentType.length > 0
+          ? contentType.split(';')[0]!
+          : defaultMimeTypeFor(document);
+
+      return {
+        document,
+        contentBase64: buffer.toString('base64'),
+        mimeType,
+        byteLength: buffer.byteLength,
+        filename: document.filename ? String(document.filename) : null
+      };
+    } catch (error) {
+      throw pdfmonkeyApiError(error, 'download document file');
+    }
+  }
+
   // === Templates ===
 
   async listTemplates(
     params: ListTemplatesParams
   ): Promise<{ templates: Record<string, unknown>[]; meta: Record<string, unknown> }> {
     let queryParams: Record<string, string> = {
-      'q[workspaceId]': params.workspaceId
+      'q[workspace_id]': params.workspaceId
     };
 
     if (params.page) {
@@ -227,6 +330,10 @@ export class Client {
     };
 
     if (params.editionMode !== undefined) templateData.edition_mode = params.editionMode;
+    if (params.outputType !== undefined) templateData.output_type = params.outputType;
+    if (params.pdfEngineId !== undefined) templateData.pdf_engine_id = params.pdfEngineId;
+    if (params.pdfEngineDraftId !== undefined)
+      templateData.pdf_engine_draft_id = params.pdfEngineDraftId;
     if (params.body !== undefined) templateData.body = params.body;
     if (params.bodyDraft !== undefined) templateData.body_draft = params.bodyDraft;
     if (params.scssStyle !== undefined) templateData.scss_style = params.scssStyle;
@@ -239,7 +346,7 @@ export class Client {
     if (params.settingsDraft !== undefined) templateData.settings_draft = params.settingsDraft;
     if (params.templateFolderId !== undefined)
       templateData.template_folder_id = params.templateFolderId;
-    if (params.documentTtl !== undefined) templateData.document_ttl = params.documentTtl;
+    if (params.documentTtl !== undefined) templateData.ttl = params.documentTtl;
 
     let response = await this.axios.post('/document_templates', {
       document_template: templateData
@@ -255,6 +362,10 @@ export class Client {
 
     if (params.identifier !== undefined) templateData.identifier = params.identifier;
     if (params.editionMode !== undefined) templateData.edition_mode = params.editionMode;
+    if (params.outputType !== undefined) templateData.output_type = params.outputType;
+    if (params.pdfEngineId !== undefined) templateData.pdf_engine_id = params.pdfEngineId;
+    if (params.pdfEngineDraftId !== undefined)
+      templateData.pdf_engine_draft_id = params.pdfEngineDraftId;
     if (params.body !== undefined) templateData.body = params.body;
     if (params.bodyDraft !== undefined) templateData.body_draft = params.bodyDraft;
     if (params.scssStyle !== undefined) templateData.scss_style = params.scssStyle;
@@ -267,7 +378,11 @@ export class Client {
     if (params.settingsDraft !== undefined) templateData.settings_draft = params.settingsDraft;
     if (params.templateFolderId !== undefined)
       templateData.template_folder_id = params.templateFolderId;
-    if (params.documentTtl !== undefined) templateData.document_ttl = params.documentTtl;
+    if (params.documentTtl !== undefined) templateData.ttl = params.documentTtl;
+
+    if (Object.keys(templateData).length === 0) {
+      throw pdfmonkeyServiceError('Provide at least one template field to update.');
+    }
 
     let response = await this.axios.put(`/document_templates/${templateId}`, {
       document_template: templateData

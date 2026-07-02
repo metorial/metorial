@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -50,12 +50,18 @@ export let getAgreement = SlateTool.create(spec, {
         .describe(
           'Signing URLs for pending signers (only populated if includeSigningUrls is true)'
         ),
-      formData: z
-        .any()
+      formDataMimeType: z
+        .string()
         .optional()
-        .describe(
-          'Form field data from the agreement (only populated if includeFormData is true)'
-        ),
+        .describe('MIME type of the form data attachment, if requested'),
+      formDataByteLength: z
+        .number()
+        .optional()
+        .describe('Size of the form data attachment in bytes, if requested'),
+      formDataAttachmentCount: z
+        .number()
+        .optional()
+        .describe('Number of form data attachments returned, if requested'),
       events: z
         .array(z.any())
         .optional()
@@ -82,6 +88,8 @@ export let getAgreement = SlateTool.create(spec, {
       documentVisibilityEnabled: agreement.documentVisibilityEnabled
     };
 
+    let attachments: ReturnType<typeof createTextAttachment>[] = [];
+
     if (ctx.input.includeSigningUrls) {
       try {
         let signingUrlsData = await client.getSigningUrls(ctx.input.agreementId);
@@ -95,7 +103,11 @@ export let getAgreement = SlateTool.create(spec, {
     if (ctx.input.includeFormData) {
       try {
         let formData = await client.getAgreementFormData(ctx.input.agreementId);
-        output.formData = formData;
+        let content = typeof formData === 'string' ? formData : JSON.stringify(formData);
+        output.formDataMimeType = 'text/csv';
+        output.formDataByteLength = Buffer.byteLength(content, 'utf8');
+        output.formDataAttachmentCount = 1;
+        attachments.push(createTextAttachment(content, 'text/csv'));
       } catch (e: any) {
         ctx.warn(`Could not fetch form data: ${e.message}`);
       }
@@ -112,6 +124,7 @@ export let getAgreement = SlateTool.create(spec, {
 
     return {
       output,
+      attachments,
       message: `Agreement **${agreement.name}** is in status **${agreement.status}**.`
     };
   });

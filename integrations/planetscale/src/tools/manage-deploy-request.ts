@@ -15,7 +15,9 @@ export let manageDeployRequest = SlateTool.create(spec, {
     'Use action "approve" to approve the deploy request (optionally with a review comment).',
     'Use action "skip_revert" to skip the revert period after deployment.',
     'Use action "revert" to revert a deployed schema change.',
-    'Use action "deployment" to get deployment status details.'
+    'Use action "deployment" to get deployment status details.',
+    'Use action "operations" to list deploy operations.',
+    'Use action "storage_check" to check whether the target branch has enough storage for deployment.'
   ],
   constraints: [
     'Deploy requests are only available for Vitess (MySQL) databases.',
@@ -35,13 +37,21 @@ export let manageDeployRequest = SlateTool.create(spec, {
           'approve',
           'skip_revert',
           'revert',
-          'deployment'
+          'deployment',
+          'operations',
+          'storage_check'
         ])
         .describe('Action to perform'),
       reviewComment: z
         .string()
         .optional()
-        .describe('Review comment (used with approve action)')
+        .describe('Review comment (used with approve action)'),
+      instantDdl: z
+        .boolean()
+        .optional()
+        .describe('Whether to queue deployment with instant DDL (used with deploy action)'),
+      page: z.number().optional().describe('Page number for operations pagination'),
+      perPage: z.number().optional().describe('Results per page for operations pagination')
     })
   )
   .output(
@@ -57,7 +67,11 @@ export let manageDeployRequest = SlateTool.create(spec, {
       closedAt: z.string().optional(),
       deployedAt: z.string().optional(),
       htmlUrl: z.string().optional(),
-      deployment: z.any().optional()
+      deployment: z.any().optional(),
+      deployOperations: z.array(z.any()).optional(),
+      storageCheck: z.any().optional(),
+      currentPage: z.number().optional(),
+      nextPage: z.number().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -77,13 +91,42 @@ export let manageDeployRequest = SlateTool.create(spec, {
       };
     }
 
+    if (action === 'operations') {
+      let result = await client.listDeployOperations(databaseName, deployRequestNumber, {
+        page: ctx.input.page,
+        perPage: ctx.input.perPage
+      });
+      return {
+        output: {
+          number: deployRequestNumber,
+          deployOperations: result.data,
+          currentPage: result.currentPage,
+          nextPage: result.nextPage
+        },
+        message: `Found **${result.data.length}** operation(s) for deploy request **#${deployRequestNumber}**.`
+      };
+    }
+
+    if (action === 'storage_check') {
+      let storageCheck = await client.checkDeployRequestStorage(
+        databaseName,
+        deployRequestNumber
+      );
+      return {
+        output: { number: deployRequestNumber, storageCheck },
+        message: `Checked storage for deploy request **#${deployRequestNumber}**.`
+      };
+    }
+
     let dr: any;
     switch (action) {
       case 'get':
         dr = await client.getDeployRequest(databaseName, deployRequestNumber);
         break;
       case 'deploy':
-        dr = await client.deployDeployRequest(databaseName, deployRequestNumber);
+        dr = await client.deployDeployRequest(databaseName, deployRequestNumber, {
+          instantDdl: ctx.input.instantDdl
+        });
         break;
       case 'cancel':
         dr = await client.cancelDeployRequest(databaseName, deployRequestNumber);

@@ -6,10 +6,11 @@ import { spec } from '../spec';
 export let sendTemplateRequest = SlateTool.create(spec, {
   name: 'Send Template Signature Request',
   key: 'send_template_request',
-  description: `Send a signature request based on one or more existing templates. Templates define the document layout, signer roles, and form fields. You assign actual signers to the template roles and optionally pre-fill custom fields.`,
+  description: `Send an email or embedded signature request based on one or more existing templates. Templates define the document layout, signer roles, and form fields. You assign actual signers to the template roles and optionally pre-fill custom fields.`,
   instructions: [
     'Signer roles must match the roles defined in the template.',
-    'Custom field names must match the merge fields defined in the template.'
+    'Custom field names must match the merge fields defined in the template.',
+    'Use embeddedSigning=true with clientId to create embedded template signing requests.'
   ],
   tags: {
     destructive: false,
@@ -60,7 +61,11 @@ export let sendTemplateRequest = SlateTool.create(spec, {
         .optional()
         .describe('URL to redirect signers to after signing'),
       testMode: z.boolean().optional().describe('Enable test mode'),
-      clientId: z.string().optional().describe('API App client ID')
+      clientId: z.string().optional().describe('API App client ID'),
+      embeddedSigning: z
+        .boolean()
+        .optional()
+        .describe('Create embedded signing requests instead of email signing requests')
     })
   )
   .output(
@@ -104,7 +109,8 @@ export let sendTemplateRequest = SlateTool.create(spec, {
       metadata: ctx.input.metadata,
       signingRedirectUrl: ctx.input.signingRedirectUrl,
       testMode: ctx.input.testMode,
-      clientId: ctx.input.clientId
+      clientId: ctx.input.clientId,
+      embeddedSigning: ctx.input.embeddedSigning
     });
 
     let signatures = (result.signatures || []).map((s: any) => ({

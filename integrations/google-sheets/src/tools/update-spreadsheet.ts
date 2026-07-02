@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SheetsClient } from '../lib/client';
 import { googleSheetsActionScopes } from '../scopes';
@@ -48,7 +48,7 @@ export let updateSpreadsheet = SlateTool.create(spec, {
     }
 
     if (fields.length === 0) {
-      throw new Error('At least one property must be provided to update');
+      throw createApiServiceError('At least one property must be provided to update');
     }
 
     await client.updateSpreadsheetProperties(

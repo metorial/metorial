@@ -8,6 +8,7 @@ import {
   listPoliciesTool,
   listUsersTool,
   manageAppAssignmentTool,
+  manageEventHookTool,
   manageGroupMembershipTool,
   manageGroupTool,
   manageUserFactorsTool,
@@ -30,6 +31,7 @@ export let provider = Slate.create({
     manageGroupMembershipTool,
     listApplicationsTool,
     manageAppAssignmentTool,
+    manageEventHookTool,
     querySystemLogTool,
     listPoliciesTool,
     manageUserFactorsTool

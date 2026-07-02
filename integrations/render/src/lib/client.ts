@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { renderApiError } from './errors';
 
 export interface PaginationParams {
   cursor?: string;
@@ -12,6 +13,11 @@ export class RenderClient {
     this.axios = createAxios({
       baseURL: 'https://api.render.com/v1'
     });
+
+    this.axios.interceptors.response.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(renderApiError(error))
+    );
   }
 
   private get headers() {
@@ -19,6 +25,15 @@ export class RenderClient {
       Authorization: `Bearer ${this.token}`,
       'Content-Type': 'application/json'
     };
+  }
+
+  // ─── User ───────────────────────────────────────────
+
+  async getUser() {
+    let response = await this.axios.get('/users', {
+      headers: this.headers
+    });
+    return response.data;
   }
 
   // ─── Services ────────────────────────────────────────
@@ -199,8 +214,8 @@ export class RenderClient {
 
   async rollbackDeploy(serviceId: string, deployId: string) {
     let response = await this.axios.post(
-      `/services/${serviceId}/deploys/${deployId}/rollback`,
-      null,
+      `/services/${serviceId}/rollback`,
+      { deployId },
       {
         headers: this.headers
       }
@@ -211,17 +226,17 @@ export class RenderClient {
   // ─── Custom Domains ──────────────────────────────────
 
   async listCustomDomains(serviceId: string, params?: PaginationParams) {
-    let response = await this.axios.get('/custom-domains', {
+    let response = await this.axios.get(`/services/${serviceId}/custom-domains`, {
       headers: this.headers,
-      params: { ...params, serviceId: [serviceId] }
+      params
     });
     return response.data;
   }
 
   async addCustomDomain(serviceId: string, name: string) {
     let response = await this.axios.post(
-      '/custom-domains',
-      { serviceId, name },
+      `/services/${serviceId}/custom-domains`,
+      { name },
       {
         headers: this.headers
       }
@@ -229,22 +244,47 @@ export class RenderClient {
     return response.data;
   }
 
-  async getCustomDomain(domainId: string) {
-    let response = await this.axios.get(`/custom-domains/${domainId}`, {
-      headers: this.headers
+  async getCustomDomain(serviceId: string, domainIdOrName: string) {
+    let response = await this.axios.get(
+      `/services/${serviceId}/custom-domains/${domainIdOrName}`,
+      {
+        headers: this.headers
+      }
+    );
+    return response.data;
+  }
+
+  async deleteCustomDomain(serviceId: string, domainIdOrName: string) {
+    let response = await this.axios.delete(
+      `/services/${serviceId}/custom-domains/${domainIdOrName}`,
+      {
+        headers: this.headers
+      }
+    );
+    return response.data;
+  }
+
+  async verifyCustomDomain(serviceId: string, domainIdOrName: string) {
+    let response = await this.axios.post(
+      `/services/${serviceId}/custom-domains/${domainIdOrName}/verify`,
+      null,
+      {
+        headers: this.headers
+      }
+    );
+    return response.data;
+  }
+
+  async listServiceEvents(serviceId: string, params?: PaginationParams & Record<string, any>) {
+    let response = await this.axios.get(`/services/${serviceId}/events`, {
+      headers: this.headers,
+      params
     });
     return response.data;
   }
 
-  async deleteCustomDomain(domainId: string) {
-    let response = await this.axios.delete(`/custom-domains/${domainId}`, {
-      headers: this.headers
-    });
-    return response.data;
-  }
-
-  async verifyCustomDomain(domainId: string) {
-    let response = await this.axios.post(`/custom-domains/${domainId}/verify`, null, {
+  async listServiceInstances(serviceId: string) {
+    let response = await this.axios.get(`/services/${serviceId}/instances`, {
       headers: this.headers
     });
     return response.data;
@@ -324,35 +364,35 @@ export class RenderClient {
   }
 
   async listPostgresExports(postgresId: string) {
-    let response = await this.axios.get(`/postgres/${postgresId}/exports`, {
+    let response = await this.axios.get(`/postgres/${postgresId}/export`, {
       headers: this.headers
     });
     return response.data;
   }
 
   async createPostgresExport(postgresId: string) {
-    let response = await this.axios.post(`/postgres/${postgresId}/exports`, null, {
+    let response = await this.axios.post(`/postgres/${postgresId}/export`, null, {
       headers: this.headers
     });
     return response.data;
   }
 
   async getPostgresRecoveryInfo(postgresId: string) {
-    let response = await this.axios.get(`/postgres/${postgresId}/recovery-info`, {
+    let response = await this.axios.get(`/postgres/${postgresId}/recovery`, {
       headers: this.headers
     });
     return response.data;
   }
 
   async recoverPostgres(postgresId: string, body: Record<string, any>) {
-    let response = await this.axios.post(`/postgres/${postgresId}/recover`, body, {
+    let response = await this.axios.post(`/postgres/${postgresId}/recovery`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async listPostgresUsers(postgresId: string) {
-    let response = await this.axios.get(`/postgres/${postgresId}/users`, {
+    let response = await this.axios.get(`/postgres/${postgresId}/credentials`, {
       headers: this.headers
     });
     return response.data;
@@ -360,7 +400,7 @@ export class RenderClient {
 
   async createPostgresUser(postgresId: string, username: string) {
     let response = await this.axios.post(
-      `/postgres/${postgresId}/users`,
+      `/postgres/${postgresId}/credentials`,
       { username },
       {
         headers: this.headers
@@ -370,7 +410,7 @@ export class RenderClient {
   }
 
   async deletePostgresUser(postgresId: string, username: string) {
-    let response = await this.axios.delete(`/postgres/${postgresId}/users/${username}`, {
+    let response = await this.axios.delete(`/postgres/${postgresId}/credentials/${username}`, {
       headers: this.headers
     });
     return response.data;
@@ -481,10 +521,10 @@ export class RenderClient {
     return response.data;
   }
 
-  async restoreDiskSnapshot(diskId: string, snapshotId: string) {
+  async restoreDiskSnapshot(diskId: string, snapshotKey: string) {
     let response = await this.axios.post(
-      `/disks/${diskId}/snapshots/${snapshotId}/restore`,
-      null,
+      `/disks/${diskId}/snapshots/restore`,
+      { snapshotKey },
       {
         headers: this.headers
       }
@@ -494,44 +534,47 @@ export class RenderClient {
 
   // ─── Cron Jobs & One-Off Jobs ────────────────────────
 
-  async triggerCronJobRun(serviceId: string) {
-    let response = await this.axios.post(`/services/${serviceId}/cron-jobs/run`, null, {
+  async triggerCronJobRun(cronJobId: string) {
+    let response = await this.axios.post(`/cron-jobs/${cronJobId}/runs`, null, {
       headers: this.headers
     });
     return response.data;
   }
 
-  async cancelCronJobRun(serviceId: string, runId: string) {
-    let response = await this.axios.delete(`/services/${serviceId}/cron-jobs/runs/${runId}`, {
+  async cancelCronJobRun(cronJobId: string) {
+    let response = await this.axios.delete(`/cron-jobs/${cronJobId}/runs`, {
       headers: this.headers
     });
     return response.data;
   }
 
-  async listJobs(params?: { serviceId?: string; status?: string } & PaginationParams) {
-    let response = await this.axios.get('/jobs', {
+  async listJobs(
+    serviceId: string,
+    params?: { status?: string[] } & PaginationParams & Record<string, any>
+  ) {
+    let response = await this.axios.get(`/services/${serviceId}/jobs`, {
       headers: this.headers,
       params
     });
     return response.data;
   }
 
-  async createJob(body: Record<string, any>) {
-    let response = await this.axios.post('/jobs', body, {
+  async createJob(serviceId: string, body: Record<string, any>) {
+    let response = await this.axios.post(`/services/${serviceId}/jobs`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
-  async getJob(jobId: string) {
-    let response = await this.axios.get(`/jobs/${jobId}`, {
+  async getJob(serviceId: string, jobId: string) {
+    let response = await this.axios.get(`/services/${serviceId}/jobs/${jobId}`, {
       headers: this.headers
     });
     return response.data;
   }
 
-  async cancelJob(jobId: string) {
-    let response = await this.axios.post(`/jobs/${jobId}/cancel`, null, {
+  async cancelJob(serviceId: string, jobId: string) {
+    let response = await this.axios.post(`/services/${serviceId}/jobs/${jobId}/cancel`, null, {
       headers: this.headers
     });
     return response.data;
@@ -618,6 +661,31 @@ export class RenderClient {
     return response.data;
   }
 
+  async getEnvGroupSecretFile(envGroupId: string, name: string) {
+    let response = await this.axios.get(`/env-groups/${envGroupId}/secret-files/${name}`, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async setEnvGroupSecretFile(envGroupId: string, name: string, content: string) {
+    let response = await this.axios.put(
+      `/env-groups/${envGroupId}/secret-files/${name}`,
+      { content },
+      {
+        headers: this.headers
+      }
+    );
+    return response.data;
+  }
+
+  async deleteEnvGroupSecretFile(envGroupId: string, name: string) {
+    let response = await this.axios.delete(`/env-groups/${envGroupId}/secret-files/${name}`, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
   // ─── Projects & Environments ─────────────────────────
 
   async listProjects(params?: { ownerId?: string[] } & PaginationParams) {
@@ -657,23 +725,49 @@ export class RenderClient {
   }
 
   async listEnvironments(projectId: string, params?: PaginationParams) {
-    let response = await this.axios.get(`/projects/${projectId}/environments`, {
+    let response = await this.axios.get('/environments', {
       headers: this.headers,
-      params
+      params: { ...params, projectId: [projectId] }
     });
     return response.data;
   }
 
   async createEnvironment(projectId: string, body: Record<string, any>) {
-    let response = await this.axios.post(`/projects/${projectId}/environments`, body, {
+    let response = await this.axios.post(
+      '/environments',
+      { ...body, projectId },
+      {
+        headers: this.headers
+      }
+    );
+    return response.data;
+  }
+
+  async getEnvironment(environmentId: string) {
+    let response = await this.axios.get(`/environments/${environmentId}`, {
       headers: this.headers
     });
     return response.data;
   }
 
-  async getEnvironment(projectId: string, environmentId: string) {
-    let response = await this.axios.get(
-      `/projects/${projectId}/environments/${environmentId}`,
+  async updateEnvironment(environmentId: string, body: Record<string, any>) {
+    let response = await this.axios.patch(`/environments/${environmentId}`, body, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async deleteEnvironment(environmentId: string) {
+    let response = await this.axios.delete(`/environments/${environmentId}`, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async addResourcesToEnvironment(environmentId: string, resourceIds: string[]) {
+    let response = await this.axios.post(
+      `/environments/${environmentId}/resources`,
+      { resourceIds },
       {
         headers: this.headers
       }
@@ -681,28 +775,11 @@ export class RenderClient {
     return response.data;
   }
 
-  async updateEnvironment(
-    projectId: string,
-    environmentId: string,
-    body: Record<string, any>
-  ) {
-    let response = await this.axios.patch(
-      `/projects/${projectId}/environments/${environmentId}`,
-      body,
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
-  }
-
-  async deleteEnvironment(projectId: string, environmentId: string) {
-    let response = await this.axios.delete(
-      `/projects/${projectId}/environments/${environmentId}`,
-      {
-        headers: this.headers
-      }
-    );
+  async removeResourcesFromEnvironment(environmentId: string, resourceIds: string[]) {
+    let response = await this.axios.delete(`/environments/${environmentId}/resources`, {
+      headers: this.headers,
+      params: { resourceIds }
+    });
     return response.data;
   }
 
@@ -775,7 +852,7 @@ export class RenderClient {
   // ─── Workspaces ──────────────────────────────────────
 
   async listWorkspaces(params?: PaginationParams) {
-    let response = await this.axios.get('/workspaces', {
+    let response = await this.axios.get('/owners', {
       headers: this.headers,
       params
     });
@@ -783,14 +860,14 @@ export class RenderClient {
   }
 
   async getWorkspace(workspaceId: string) {
-    let response = await this.axios.get(`/workspaces/${workspaceId}`, {
+    let response = await this.axios.get(`/owners/${workspaceId}`, {
       headers: this.headers
     });
     return response.data;
   }
 
   async listWorkspaceMembers(workspaceId: string, params?: PaginationParams) {
-    let response = await this.axios.get(`/workspaces/${workspaceId}/members`, {
+    let response = await this.axios.get(`/owners/${workspaceId}/members`, {
       headers: this.headers,
       params
     });
@@ -825,7 +902,7 @@ export class RenderClient {
   // ─── Registry Credentials ───────────────────────────
 
   async listRegistryCredentials(params?: PaginationParams) {
-    let response = await this.axios.get('/registry-credentials', {
+    let response = await this.axios.get('/registrycredentials', {
       headers: this.headers,
       params
     });
@@ -833,14 +910,28 @@ export class RenderClient {
   }
 
   async createRegistryCredential(body: Record<string, any>) {
-    let response = await this.axios.post('/registry-credentials', body, {
+    let response = await this.axios.post('/registrycredentials', body, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async getRegistryCredential(credentialId: string) {
+    let response = await this.axios.get(`/registrycredentials/${credentialId}`, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async updateRegistryCredential(credentialId: string, body: Record<string, any>) {
+    let response = await this.axios.patch(`/registrycredentials/${credentialId}`, body, {
       headers: this.headers
     });
     return response.data;
   }
 
   async deleteRegistryCredential(credentialId: string) {
-    let response = await this.axios.delete(`/registry-credentials/${credentialId}`, {
+    let response = await this.axios.delete(`/registrycredentials/${credentialId}`, {
       headers: this.headers
     });
     return response.data;
@@ -857,7 +948,11 @@ export class RenderClient {
 
   // ─── Maintenance ─────────────────────────────────────
 
-  async listMaintenance(params?: { serviceId?: string } & PaginationParams) {
+  async listMaintenance(params?: {
+    resourceId?: string[];
+    ownerId?: string[];
+    state?: string[];
+  }) {
     let response = await this.axios.get('/maintenance', {
       headers: this.headers,
       params
@@ -872,6 +967,13 @@ export class RenderClient {
     return response.data;
   }
 
+  async updateMaintenanceRun(maintenanceId: string, body: Record<string, any>) {
+    let response = await this.axios.patch(`/maintenance/${maintenanceId}`, body, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
   async triggerMaintenanceRun(maintenanceId: string) {
     let response = await this.axios.post(`/maintenance/${maintenanceId}/trigger`, null, {
       headers: this.headers
@@ -879,20 +981,12 @@ export class RenderClient {
     return response.data;
   }
 
-  // ─── Service Instances ───────────────────────────────
-
-  async listServiceInstances(serviceId: string) {
-    let response = await this.axios.get(`/services/${serviceId}/instances`, {
-      headers: this.headers
-    });
-    return response.data;
-  }
-
   // ─── Secret Files ────────────────────────────────────
 
-  async listServiceSecretFiles(serviceId: string) {
+  async listServiceSecretFiles(serviceId: string, params?: PaginationParams) {
     let response = await this.axios.get(`/services/${serviceId}/secret-files`, {
-      headers: this.headers
+      headers: this.headers,
+      params
     });
     return response.data;
   }
@@ -902,6 +996,31 @@ export class RenderClient {
     secretFiles: Array<{ name: string; content: string }>
   ) {
     let response = await this.axios.put(`/services/${serviceId}/secret-files`, secretFiles, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async getServiceSecretFile(serviceId: string, name: string) {
+    let response = await this.axios.get(`/services/${serviceId}/secret-files/${name}`, {
+      headers: this.headers
+    });
+    return response.data;
+  }
+
+  async setServiceSecretFile(serviceId: string, name: string, content: string) {
+    let response = await this.axios.put(
+      `/services/${serviceId}/secret-files/${name}`,
+      { content },
+      {
+        headers: this.headers
+      }
+    );
+    return response.data;
+  }
+
+  async deleteServiceSecretFile(serviceId: string, name: string) {
+    let response = await this.axios.delete(`/services/${serviceId}/secret-files/${name}`, {
       headers: this.headers
     });
     return response.data;

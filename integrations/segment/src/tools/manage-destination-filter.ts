@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageDestinationFilter = SlateTool.create(spec, {
@@ -89,7 +90,7 @@ export let manageDestinationFilter = SlateTool.create(spec, {
         !ctx.input.condition ||
         !ctx.input.filterActions
       ) {
-        throw new Error(
+        throw segmentServiceError(
           'sourceId, title, condition, and filterActions are required to create a filter'
         );
       }
@@ -113,7 +114,7 @@ export let manageDestinationFilter = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.filterId) {
-        throw new Error('filterId is required to update a filter');
+        throw segmentServiceError('filterId is required to update a filter');
       }
       let updateData: Record<string, any> = {};
       if (ctx.input.title !== undefined) updateData.title = ctx.input.title;
@@ -139,7 +140,7 @@ export let manageDestinationFilter = SlateTool.create(spec, {
 
     if (ctx.input.action === 'remove') {
       if (!ctx.input.filterId) {
-        throw new Error('filterId is required to remove a filter');
+        throw segmentServiceError('filterId is required to remove a filter');
       }
       await client.removeDestinationFilter(ctx.input.destinationId, ctx.input.filterId);
       return {
@@ -151,6 +152,6 @@ export let manageDestinationFilter = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw segmentServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

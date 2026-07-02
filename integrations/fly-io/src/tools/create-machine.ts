@@ -8,6 +8,8 @@ let serviceSchema = z.object({
     .array(
       z.object({
         port: z.number().describe('External port number'),
+        startPort: z.number().optional().describe('Start of external port range'),
+        endPort: z.number().optional().describe('End of external port range'),
         handlers: z
           .array(z.string())
           .optional()
@@ -18,22 +20,45 @@ let serviceSchema = z.object({
     .describe('Port configurations for the service'),
   protocol: z.string().describe('Protocol (tcp or udp)'),
   internalPort: z.number().describe('Port the application listens on inside the machine'),
-  autoStopMachines: z.boolean().optional().describe('Automatically stop machines when idle'),
-  autoStartMachines: z
+  autostop: z
+    .enum(['off', 'stop', 'suspend'])
+    .optional()
+    .describe('Current Fly Proxy autostop behavior for this service'),
+  autostart: z
     .boolean()
     .optional()
     .describe('Automatically start machines on incoming requests'),
+  autoStopMachines: z
+    .boolean()
+    .optional()
+    .describe('Deprecated compatibility input; use autostop instead'),
+  autoStartMachines: z
+    .boolean()
+    .optional()
+    .describe('Deprecated compatibility input; use autostart instead'),
   minMachinesRunning: z
     .number()
     .optional()
-    .describe('Minimum number of machines to keep running')
+    .describe('Minimum number of machines to keep running'),
+  concurrency: z
+    .object({
+      type: z.string().optional().describe('Concurrency metric type'),
+      softLimit: z.number().optional().describe('Preferred concurrency limit'),
+      hardLimit: z.number().optional().describe('Maximum concurrency limit')
+    })
+    .optional()
+    .describe('Fly Proxy service concurrency settings')
 });
 
 let guestSchema = z.object({
   cpus: z.number().optional().describe('Number of CPU cores (default: 1)'),
   memoryMb: z.number().optional().describe('Memory in MB, multiples of 256 (default: 256)'),
+  maxMemoryMb: z.number().optional().describe('Maximum memory in MB'),
   cpuKind: z.enum(['shared', 'performance']).optional().describe('CPU type'),
-  gpuKind: z.string().optional().describe('GPU type (e.g. "a100-pcie-40gb")')
+  gpuKind: z.string().optional().describe('GPU type (e.g. "a100-pcie-40gb")'),
+  gpus: z.number().optional().describe('Number of GPUs'),
+  hostDedicationId: z.string().optional().describe('Dedicated host ID'),
+  kernelArgs: z.array(z.string()).optional().describe('Kernel arguments')
 });
 
 export let createMachine = SlateTool.create(spec, {
@@ -57,6 +82,18 @@ export let createMachine = SlateTool.create(spec, {
         .optional()
         .describe('Region code to deploy in (e.g. "ord", "lhr", "sin", "iad")'),
       skipLaunch: z.boolean().optional().describe('Create the machine but do not start it'),
+      skipServiceRegistration: z
+        .boolean()
+        .optional()
+        .describe('Create the machine without registering services with Fly Proxy'),
+      skipSecrets: z
+        .boolean()
+        .optional()
+        .describe('Do not inject app secrets into the machine'),
+      minSecretsVersion: z
+        .number()
+        .optional()
+        .describe('Minimum app secrets version required before machine creation'),
       image: z
         .string()
         .describe('Container image to run (e.g. "registry.fly.io/my-app:latest")'),
@@ -92,8 +129,12 @@ export let createMachine = SlateTool.create(spec, {
         .describe('Process init overrides'),
       restart: z
         .object({
-          policy: z.enum(['no', 'on-failure', 'always']).optional().describe('Restart policy'),
-          maxRetries: z.number().optional().describe('Max retries for on-failure policy')
+          policy: z
+            .enum(['no', 'on-failure', 'always', 'spot-price'])
+            .optional()
+            .describe('Restart policy'),
+          maxRetries: z.number().optional().describe('Max retries for on-failure policy'),
+          gpuBidPrice: z.number().optional().describe('GPU bid price for spot Machines')
         })
         .optional()
         .describe('Restart configuration'),
@@ -127,6 +168,9 @@ export let createMachine = SlateTool.create(spec, {
       name: ctx.input.machineName,
       region: ctx.input.region,
       skipLaunch: ctx.input.skipLaunch,
+      skipServiceRegistration: ctx.input.skipServiceRegistration,
+      skipSecrets: ctx.input.skipSecrets,
+      minSecretsVersion: ctx.input.minSecretsVersion,
       config: {
         image: ctx.input.image,
         guest: ctx.input.guest,

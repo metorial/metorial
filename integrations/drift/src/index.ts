@@ -7,13 +7,19 @@ import {
   getBookedMeetings,
   getContact,
   getConversation,
+  getConversationStats,
+  getConversationTranscript,
+  getTokenInfo,
   listConversations,
+  listCustomAttributes,
   listPlaybooks,
   listTeams,
   listUsers,
   manageAccount,
+  postTimelineEvent,
   sendMessage,
-  updateContact
+  updateContact,
+  updateUserAvailability
 } from './tools';
 import {
   contactEvent,
@@ -32,13 +38,19 @@ export let provider = Slate.create({
     deleteContact,
     listConversations,
     getConversation,
+    getConversationTranscript,
+    getConversationStats,
     createConversation,
     sendMessage,
     listUsers,
+    updateUserAvailability,
     manageAccount,
+    postTimelineEvent,
+    listCustomAttributes,
     getBookedMeetings,
     listPlaybooks,
-    listTeams
+    listTeams,
+    getTokenInfo
   ],
   triggers: [conversationEvent, contactEvent, meetingEvent, userEvent, playbookEvent]
 });

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createKubeClient } from '../lib/client';
+import { kubernetesServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let ruleSchema = z.object({
@@ -114,7 +115,7 @@ Use this to define access control policies for users, groups, and service accoun
         clusterrolebindings: 'ClusterRoleBinding'
       };
       if (!ctx.input.roleRef) {
-        throw new Error('roleRef is required for creating/updating bindings');
+        throw kubernetesServiceError('roleRef is required for creating/updating bindings');
       }
       let body: any = {
         apiVersion: 'rbac.authorization.k8s.io/v1',

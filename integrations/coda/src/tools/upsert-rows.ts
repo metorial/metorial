@@ -41,7 +41,11 @@ export let upsertRowsTool = SlateTool.create(spec, {
       keyColumns: z
         .array(z.string())
         .optional()
-        .describe('Column IDs or names to match on for upsert behavior')
+        .describe('Column IDs or names to match on for upsert behavior'),
+      disableParsing: z
+        .boolean()
+        .optional()
+        .describe('If true, preserve values exactly instead of letting Coda parse strings')
     })
   )
   .output(
@@ -53,10 +57,17 @@ export let upsertRowsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result = await client.upsertRows(ctx.input.docId, ctx.input.tableIdOrName, {
-      rows: ctx.input.rows,
-      keyColumns: ctx.input.keyColumns
-    });
+    let result = await client.upsertRows(
+      ctx.input.docId,
+      ctx.input.tableIdOrName,
+      {
+        rows: ctx.input.rows,
+        keyColumns: ctx.input.keyColumns
+      },
+      {
+        disableParsing: ctx.input.disableParsing
+      }
+    );
 
     return {
       output: {

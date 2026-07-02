@@ -1,7 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdf4meServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  fileAttachment,
+  fileAttachmentOutputSchema,
+  fileOutput,
+  type Pdf4meFileResult
+} from './shared';
 
 export let mergePdfs = SlateTool.create(spec, {
   name: 'Merge PDFs',
@@ -40,16 +47,11 @@ Also supports overlaying one PDF on another (e.g. adding a letterhead or waterma
         .describe('Overlay/layer PDF file name (for "overlay" mode)')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded merged PDF content'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: { fileContent: string; fileName: string };
+    let result: Pdf4meFileResult;
 
     if (ctx.input.mode === 'overlay') {
       if (
@@ -58,7 +60,9 @@ Also supports overlaying one PDF on another (e.g. adding a letterhead or waterma
         !ctx.input.layerFileContent ||
         !ctx.input.layerFileName
       ) {
-        throw new Error('Base and layer file content and names are required for overlay mode');
+        throw pdf4meServiceError(
+          'Base and layer file content and names are required for overlay mode'
+        );
       }
       result = await client.mergeOverlay({
         baseDocContent: ctx.input.baseFileContent,
@@ -68,7 +72,7 @@ Also supports overlaying one PDF on another (e.g. adding a letterhead or waterma
       });
     } else {
       if (!ctx.input.documents || ctx.input.documents.length < 2) {
-        throw new Error('At least 2 documents are required for merge');
+        throw pdf4meServiceError('At least 2 documents are required for merge');
       }
       result = await client.merge({
         docContent: ctx.input.documents,
@@ -77,7 +81,8 @@ Also supports overlaying one PDF on another (e.g. adding a letterhead or waterma
     }
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message:
         ctx.input.mode === 'overlay'
           ? `Successfully overlaid PDFs: **${result.fileName}**`

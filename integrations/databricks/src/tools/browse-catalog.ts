@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let browseCatalog = SlateTool.create(spec, {
@@ -114,7 +115,7 @@ export let browseCatalog = SlateTool.create(spec, {
       }
       case 'schemas': {
         if (!ctx.input.catalogName)
-          throw new Error('catalogName is required for listing schemas');
+          throw databricksServiceError('catalogName is required for listing schemas');
         let schemas = await client.listSchemas(ctx.input.catalogName);
         let mapped = schemas.map((s: any) => ({
           schemaName: s.full_name ?? `${ctx.input.catalogName}.${s.name}`,
@@ -128,7 +129,9 @@ export let browseCatalog = SlateTool.create(spec, {
       }
       case 'tables': {
         if (!ctx.input.catalogName || !ctx.input.schemaName)
-          throw new Error('catalogName and schemaName are required for listing tables');
+          throw databricksServiceError(
+            'catalogName and schemaName are required for listing tables'
+          );
         let tables = await client.listTables(ctx.input.catalogName, ctx.input.schemaName);
         let mapped = tables.map((t: any) => ({
           tableName:
@@ -144,7 +147,8 @@ export let browseCatalog = SlateTool.create(spec, {
         };
       }
       case 'table_detail': {
-        if (!ctx.input.tableName) throw new Error('tableName is required for table detail');
+        if (!ctx.input.tableName)
+          throw databricksServiceError('tableName is required for table detail');
         let table = await client.getTable(ctx.input.tableName);
         let detail = {
           tableName: table.full_name ?? ctx.input.tableName,

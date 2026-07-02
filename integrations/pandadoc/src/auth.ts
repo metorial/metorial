@@ -1,9 +1,12 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { applyPandaDocApiErrorInterceptor } from './lib/client';
+import { pandadocServiceError } from './lib/errors';
 
 let apiAxios = createAxios({
   baseURL: 'https://api.pandadoc.com'
 });
+applyPandaDocApiErrorInterceptor(apiAxios);
 
 export let auth = SlateAuth.create()
   .output(
@@ -81,7 +84,7 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw pandadocServiceError('No PandaDoc refresh token is available.');
       }
 
       let params = new URLSearchParams();

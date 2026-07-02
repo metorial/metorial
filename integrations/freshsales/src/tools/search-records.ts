@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { freshsalesServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let searchRecords = SlateTool.create(spec, {
   name: 'Search Records',
   key: 'search_records',
-  description: `Search across Freshsales entities (contacts, leads, deals, accounts) using keywords or field-specific lookup.
+  description: `Search across Freshsales entities (contacts, accounts, deals, users, and custom modules) using keywords or field-specific lookup.
 Use **keyword** for general search or **lookupField** + **lookupValue** for precise field-based lookups.`,
   instructions: [
     'For general keyword search, provide "keyword" and optionally "entities" to filter by type.',
@@ -24,7 +25,7 @@ Use **keyword** for general search or **lookupField** + **lookupValue** for prec
         .string()
         .optional()
         .describe(
-          'Comma-separated entity types to search: "contact", "lead", "deal", "sales_account"'
+          'Comma-separated entity types to search, e.g. "contact", "sales_account", "deal", or "user"'
         ),
       lookupValue: z
         .string()
@@ -47,20 +48,25 @@ Use **keyword** for general search or **lookupField** + **lookupValue** for prec
 
     let results: Record<string, any>[];
 
+    let hasAnyLookupInput =
+      ctx.input.lookupValue || ctx.input.lookupField || ctx.input.lookupEntity;
+
     if (ctx.input.lookupValue && ctx.input.lookupField && ctx.input.lookupEntity) {
       results = await client.lookup(
         ctx.input.lookupValue,
         ctx.input.lookupField,
         ctx.input.lookupEntity
       );
+    } else if (hasAnyLookupInput) {
+      throw freshsalesServiceError(
+        'lookupValue, lookupField, and lookupEntity are all required for lookup search.'
+      );
     } else if (ctx.input.keyword) {
       results = await client.search(ctx.input.keyword, ctx.input.entities);
     } else {
-      return {
-        output: { results: [] },
-        message:
-          'No search criteria provided. Provide either **keyword** or **lookupValue** with **lookupField** and **lookupEntity**.'
-      };
+      throw freshsalesServiceError(
+        'Provide either keyword, or lookupValue with lookupField and lookupEntity.'
+      );
     }
 
     return {

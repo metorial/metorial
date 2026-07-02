@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { requireProjectRef } from '../lib/errors';
 import { ProjectClient } from '../lib/project-client';
 import { spec } from '../spec';
 
@@ -35,12 +36,7 @@ export let invokeRpc = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectRef = ctx.input.projectRef ?? ctx.config.projectRef;
-    if (!projectRef) {
-      throw new Error(
-        'projectRef is required — provide it as input or set it in the configuration'
-      );
-    }
+    let projectRef = requireProjectRef(ctx.input.projectRef ?? ctx.config.projectRef);
 
     let mgmt = new ManagementClient(ctx.auth.token);
     let keys = await mgmt.getProjectApiKeys(projectRef);
@@ -50,7 +46,7 @@ export let invokeRpc = SlateTool.create(spec, {
     let apiKey = serviceKey?.api_key;
 
     if (!apiKey) {
-      throw new Error('Could not retrieve service_role API key for the project');
+      throw createApiServiceError('Could not retrieve service_role API key for the project');
     }
 
     let projectClient = new ProjectClient(projectRef, apiKey);

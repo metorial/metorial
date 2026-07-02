@@ -1,5 +1,22 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { cloudflareWorkersApiError, cloudflareWorkersApiResponseError } from './lib/errors';
+
+let ensureSuccessfulCloudflareResponse = (response: {
+  data?: unknown;
+  status?: number;
+  statusText?: string;
+}) => {
+  let data = response.data;
+  if (
+    data &&
+    typeof data === 'object' &&
+    'success' in data &&
+    (data as { success?: unknown }).success === false
+  ) {
+    throw cloudflareWorkersApiResponseError(response);
+  }
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -32,20 +49,25 @@ export let auth = SlateAuth.create()
       output: { token: string; email?: string; authType: string };
       input: { token: string };
     }) => {
-      let http = createAxios({
-        baseURL: 'https://api.cloudflare.com/client/v4',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-      let response = await http.get('/user/tokens/verify');
-      let result = response.data.result;
-      return {
-        profile: {
-          id: result.id,
-          status: result.status
-        }
-      };
+      try {
+        let http = createAxios({
+          baseURL: 'https://api.cloudflare.com/client/v4',
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+        let response = await http.get('/user/tokens/verify');
+        ensureSuccessfulCloudflareResponse(response);
+        let result = response.data.result;
+        return {
+          profile: {
+            id: result.id,
+            status: result.status
+          }
+        };
+      } catch (error) {
+        throw cloudflareWorkersApiError(error, 'verify API token');
+      }
     }
   })
   .addCustomAuth({
@@ -73,21 +95,26 @@ export let auth = SlateAuth.create()
       output: { token: string; email?: string; authType: string };
       input: { email: string; token: string };
     }) => {
-      let http = createAxios({
-        baseURL: 'https://api.cloudflare.com/client/v4',
-        headers: {
-          'X-Auth-Email': ctx.output.email!,
-          'X-Auth-Key': ctx.output.token
-        }
-      });
-      let response = await http.get('/user');
-      let user = response.data.result;
-      return {
-        profile: {
-          id: user.id,
-          email: user.email,
-          name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || undefined
-        }
-      };
+      try {
+        let http = createAxios({
+          baseURL: 'https://api.cloudflare.com/client/v4',
+          headers: {
+            'X-Auth-Email': ctx.output.email!,
+            'X-Auth-Key': ctx.output.token
+          }
+        });
+        let response = await http.get('/user');
+        ensureSuccessfulCloudflareResponse(response);
+        let user = response.data.result;
+        return {
+          profile: {
+            id: user.id,
+            email: user.email,
+            name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || undefined
+          }
+        };
+      } catch (error) {
+        throw cloudflareWorkersApiError(error, 'verify global API key');
+      }
     }
   });

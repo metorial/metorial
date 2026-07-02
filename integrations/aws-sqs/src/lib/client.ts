@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { sqsApiError } from './errors';
 import { type AwsCredentials, signRequest } from './signing';
 
 export interface SqsClientConfig {
@@ -58,6 +59,12 @@ export interface QueueAttributes {
   [key: string]: string;
 }
 
+export interface ChangeMessageVisibilityBatchEntry {
+  entryId: string;
+  receiptHandle: string;
+  visibilityTimeout: number;
+}
+
 export class SqsClient {
   private region: string;
   private credentials: AwsCredentials;
@@ -88,9 +95,13 @@ export class SqsClient {
       body: jsonBody
     });
 
-    let ax = createAxios({ baseURL: endpoint });
-    let response = await ax.post('/', jsonBody, { headers });
-    return response.data as T;
+    try {
+      let ax = createAxios({ baseURL: endpoint });
+      let response = await ax.post('/', jsonBody, { headers });
+      return response.data as T;
+    } catch (error) {
+      throw sqsApiError(error, action);
+    }
   }
 
   async createQueue(params: CreateQueueParams): Promise<{ queueUrl: string }> {
@@ -174,9 +185,12 @@ export class SqsClient {
     });
   }
 
-  async sendMessage(
-    params: SendMessageParams
-  ): Promise<{ messageId: string; md5OfMessageBody: string; sequenceNumber?: string }> {
+  async sendMessage(params: SendMessageParams): Promise<{
+    messageId: string;
+    md5OfMessageBody: string;
+    md5OfMessageAttributes?: string;
+    sequenceNumber?: string;
+  }> {
     let body: Record<string, unknown> = {
       QueueUrl: params.queueUrl,
       MessageBody: params.messageBody
@@ -202,11 +216,13 @@ export class SqsClient {
     let result = await this.request<{
       MessageId: string;
       MD5OfMessageBody: string;
+      MD5OfMessageAttributes?: string;
       SequenceNumber?: string;
     }>('SendMessage', body);
     return {
       messageId: result.MessageId,
       md5OfMessageBody: result.MD5OfMessageBody,
+      md5OfMessageAttributes: result.MD5OfMessageAttributes,
       sequenceNumber: result.SequenceNumber
     };
   }
@@ -219,6 +235,7 @@ export class SqsClient {
       messageId: string;
       sqsMessageId: string;
       md5OfMessageBody: string;
+      md5OfMessageAttributes?: string;
       sequenceNumber?: string;
     }[];
     failed: { messageId: string; senderFault: boolean; code: string; message?: string }[];
@@ -255,6 +272,7 @@ export class SqsClient {
         Id: string;
         MessageId: string;
         MD5OfMessageBody: string;
+        MD5OfMessageAttributes?: string;
         SequenceNumber?: string;
       }[];
       Failed?: { Id: string; SenderFault: boolean; Code: string; Message?: string }[];
@@ -265,6 +283,7 @@ export class SqsClient {
         messageId: s.Id,
         sqsMessageId: s.MessageId,
         md5OfMessageBody: s.MD5OfMessageBody,
+        md5OfMessageAttributes: s.MD5OfMessageAttributes,
         sequenceNumber: s.SequenceNumber
       })),
       failed: (result.Failed ?? []).map(f => ({
@@ -373,6 +392,36 @@ export class SqsClient {
       ReceiptHandle: receiptHandle,
       VisibilityTimeout: visibilityTimeout
     });
+  }
+
+  async changeMessageVisibilityBatch(
+    queueUrl: string,
+    entries: ChangeMessageVisibilityBatchEntry[]
+  ): Promise<{
+    successful: string[];
+    failed: { entryId: string; code: string; message?: string; senderFault: boolean }[];
+  }> {
+    let result = await this.request<{
+      Successful?: { Id: string }[];
+      Failed?: { Id: string; Code: string; Message?: string; SenderFault: boolean }[];
+    }>('ChangeMessageVisibilityBatch', {
+      QueueUrl: queueUrl,
+      Entries: entries.map(e => ({
+        Id: e.entryId,
+        ReceiptHandle: e.receiptHandle,
+        VisibilityTimeout: e.visibilityTimeout
+      }))
+    });
+
+    return {
+      successful: (result.Successful ?? []).map(s => s.Id),
+      failed: (result.Failed ?? []).map(f => ({
+        entryId: f.Id,
+        code: f.Code,
+        message: f.Message,
+        senderFault: f.SenderFault
+      }))
+    };
   }
 
   async purgeQueue(queueUrl: string): Promise<void> {

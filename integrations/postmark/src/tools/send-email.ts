@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { postmarkServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let sendEmail = SlateTool.create(spec, {
@@ -92,6 +93,10 @@ export let sendEmail = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.htmlBody && !ctx.input.textBody) {
+      throw postmarkServiceError('htmlBody or textBody is required for sending email.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       accountToken: ctx.auth.accountToken

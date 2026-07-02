@@ -32,6 +32,10 @@ Search and list users in your Okta organization. Supports keyword search, Okta f
 
 Assign or unassign users and groups to/from an Okta application. Also supports listing current user and group assignments for an app.
 
+### Manage Event Hook
+
+Create, read, update, delete, list, and run lifecycle operations for Okta event hooks. Event hooks deliver selected Okta system events to an HTTPS endpoint.
+
 ### Manage Group Membership
 
 Add or remove users from an Okta group, or list current group members. Use this to manage who belongs to a group.

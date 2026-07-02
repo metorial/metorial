@@ -6,6 +6,21 @@ export interface DatadogAuthConfig {
   site: string;
 }
 
+export interface MetricResource {
+  name: string;
+  type: string;
+}
+
+export interface MetricSeriesInput {
+  metric: string;
+  type?: number;
+  points: [number, number][];
+  host?: string;
+  tags?: string[];
+  resources?: MetricResource[];
+  unit?: string;
+}
+
 export interface MonitorOptions {
   thresholds?: {
     critical?: number;

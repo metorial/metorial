@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WebflowClient } from '../lib/client';
 import { spec } from '../spec';
@@ -42,7 +42,7 @@ export let manageUser = SlateTool.create(spec, {
     let { siteId, action, userId, email, accessGroups } = ctx.input;
 
     if (action === 'delete') {
-      if (!userId) throw new Error('userId is required for delete action');
+      if (!userId) throw createApiServiceError('userId is required for delete action.');
       await client.deleteUser(siteId, userId);
       return {
         output: { userId, deleted: true },
@@ -51,7 +51,7 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!userId) throw new Error('userId is required for get action');
+      if (!userId) throw createApiServiceError('userId is required for get action.');
       let user = await client.getUser(siteId, userId);
       return {
         output: {
@@ -67,7 +67,7 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!userId) throw new Error('userId is required for update action');
+      if (!userId) throw createApiServiceError('userId is required for update action.');
       let user = await client.updateUser(siteId, userId, { accessGroups });
       return {
         output: {
@@ -83,7 +83,7 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     // invite
-    if (!email) throw new Error('email is required for invite action');
+    if (!email) throw createApiServiceError('email is required for invite action.');
     let user = await client.inviteUser(siteId, { email, accessGroups });
     return {
       output: {

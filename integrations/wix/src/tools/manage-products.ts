@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createWixClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -31,11 +31,13 @@ export let manageProducts = SlateTool.create(spec, {
   key: 'manage_products',
   description: `Create, update, delete, or retrieve products from a Wix Store catalog.
 Use **action** to specify the operation: \`get\`, \`list\`, \`create\`, \`update\`, or \`delete\`.
-For listing, supports filtering and pagination. Products include name, pricing, description, inventory, and variant information.`,
+For listing, supports filtering and pagination. Products include name, pricing, description, inventory, and variant information.
+Supports Wix Stores Catalog V1 and Catalog V3; use \`catalogVersion: "auto"\` to detect the site's catalog version before the product call.`,
   instructions: [
     'For "list" action, use filter with JSON filter expressions compatible with the Wix Query Language.',
     'For "update" action, only include fields you want to change.',
-    'Currently only physical products can be created via the API.'
+    'Use productData for raw Wix product fields, especially Catalog V3 fields that are not represented by the simplified inputs.',
+    'Currently only physical products can be created through the simplified product fields.'
   ],
   tags: { destructive: false, readOnly: false }
 })
@@ -44,10 +46,22 @@ For listing, supports filtering and pagination. Products include name, pricing, 
       action: z
         .enum(['get', 'list', 'create', 'update', 'delete'])
         .describe('Operation to perform'),
+      catalogVersion: z
+        .enum(['v1', 'v3', 'auto'])
+        .optional()
+        .describe(
+          'Wix Stores Catalog version to use. Defaults to v1 for backwards compatibility; use auto to call the Catalog Versioning API first.'
+        ),
       productId: z
         .string()
         .optional()
         .describe('Product ID (required for get, update, delete)'),
+      productData: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Raw Wix product object fields to merge into create/update requests. Useful for Catalog V3 product fields.'
+        ),
       name: z.string().optional().describe('Product name (for create/update)'),
       productType: z
         .enum(['physical', 'digital'])
@@ -97,35 +111,45 @@ For listing, supports filtering and pagination. Products include name, pricing, 
     z.object({
       product: z.any().optional().describe('Single product data'),
       products: z.array(z.any()).optional().describe('List of products'),
-      totalResults: z.number().optional().describe('Total number of matching products')
+      totalResults: z.number().optional().describe('Total number of matching products'),
+      catalogVersion: z.string().optional().describe('Catalog version used for the request')
     })
   )
   .handleInvocation(async ctx => {
     let client = createWixClient(ctx.auth, ctx.config);
+    let catalogVersion = ctx.input.catalogVersion || 'v1';
 
     switch (ctx.input.action) {
       case 'get': {
-        if (!ctx.input.productId) throw new Error('productId is required for get action');
-        let result = await client.getProduct(ctx.input.productId);
+        if (!ctx.input.productId)
+          throw createApiServiceError('productId is required for get action');
+        let result = await client.getProduct(ctx.input.productId, catalogVersion);
         return {
-          output: { product: result.product },
+          output: { product: result.product, catalogVersion: result.catalogVersion },
           message: `Retrieved product **${result.product?.name || ctx.input.productId}**`
         };
       }
       case 'list': {
-        let result = await client.queryProducts({
-          filter: ctx.input.filter,
-          sort: ctx.input.sort,
-          paging: { limit: ctx.input.limit, offset: ctx.input.offset }
-        });
+        let result = await client.queryProducts(
+          {
+            filter: ctx.input.filter,
+            sort: ctx.input.sort,
+            paging: { limit: ctx.input.limit, offset: ctx.input.offset }
+          },
+          catalogVersion
+        );
         let products = result.products || [];
         return {
-          output: { products, totalResults: result.totalResults },
+          output: {
+            products,
+            totalResults: result.totalResults || result.pagingMetadata?.total,
+            catalogVersion: result.catalogVersion
+          },
           message: `Found **${products.length}** products${result.totalResults ? ` out of ${result.totalResults} total` : ''}`
         };
       }
       case 'create': {
-        let productData: Record<string, any> = {};
+        let productData: Record<string, any> = { ...(ctx.input.productData || {}) };
         if (ctx.input.name) productData.name = ctx.input.name;
         if (ctx.input.productType) productData.productType = ctx.input.productType;
         if (ctx.input.description) productData.description = ctx.input.description;
@@ -138,15 +162,16 @@ For listing, supports filtering and pagination. Products include name, pricing, 
         if (ctx.input.productOptions) productData.productOptions = ctx.input.productOptions;
         if (ctx.input.manageVariants !== undefined)
           productData.manageVariants = ctx.input.manageVariants;
-        let result = await client.createProduct(productData);
+        let result = await client.createProduct(productData, catalogVersion);
         return {
-          output: { product: result.product },
+          output: { product: result.product, catalogVersion: result.catalogVersion },
           message: `Created product **${result.product?.name}** (ID: ${result.product?.id})`
         };
       }
       case 'update': {
-        if (!ctx.input.productId) throw new Error('productId is required for update action');
-        let productData: Record<string, any> = {};
+        if (!ctx.input.productId)
+          throw createApiServiceError('productId is required for update action');
+        let productData: Record<string, any> = { ...(ctx.input.productData || {}) };
         if (ctx.input.name) productData.name = ctx.input.name;
         if (ctx.input.description) productData.description = ctx.input.description;
         if (ctx.input.priceData) productData.priceData = ctx.input.priceData;
@@ -158,17 +183,22 @@ For listing, supports filtering and pagination. Products include name, pricing, 
         if (ctx.input.productOptions) productData.productOptions = ctx.input.productOptions;
         if (ctx.input.manageVariants !== undefined)
           productData.manageVariants = ctx.input.manageVariants;
-        let result = await client.updateProduct(ctx.input.productId, productData);
+        let result = await client.updateProduct(
+          ctx.input.productId,
+          productData,
+          catalogVersion
+        );
         return {
-          output: { product: result.product },
+          output: { product: result.product, catalogVersion: result.catalogVersion },
           message: `Updated product **${result.product?.name || ctx.input.productId}**`
         };
       }
       case 'delete': {
-        if (!ctx.input.productId) throw new Error('productId is required for delete action');
-        await client.deleteProduct(ctx.input.productId);
+        if (!ctx.input.productId)
+          throw createApiServiceError('productId is required for delete action');
+        let result = await client.deleteProduct(ctx.input.productId, catalogVersion);
         return {
-          output: {},
+          output: { catalogVersion: result.catalogVersion },
           message: `Deleted product **${ctx.input.productId}**`
         };
       }

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/supabase.jpeg" height="20"> Supabase
 
-Manage PostgreSQL databases, authenticate users, store files, and run edge functions on Supabase. Perform CRUD operations on database tables via auto-generated REST and GraphQL APIs with row-level security. Create and manage user accounts with password, magic link, OTP, social login, and SSO authentication. Upload, download, list, and delete files organized in storage buckets. Deploy and invoke server-side TypeScript edge functions. Listen to realtime database changes, broadcast messages, and track user presence. Configure database webhooks for INSERT, UPDATE, and DELETE events. Programmatically manage Supabase organizations and projects, including creating/deleting projects, managing API keys, configuring auth settings, custom domains, network restrictions, and Edge Function secrets.
+Manage PostgreSQL databases, authenticate users, store files, and run Edge Functions on Supabase. Perform CRUD operations on database tables via auto-generated REST APIs with row-level security. Create and manage user accounts with password, magic link, OTP, social login, and SSO authentication. Upload, download, list, and delete files organized in storage buckets. Deploy and invoke server-side TypeScript Edge Functions. Listen to realtime database changes and configure database webhooks for INSERT, UPDATE, and DELETE events. Programmatically manage Supabase organizations and projects, including project lifecycle, API keys, auth settings, health checks, logs, database schema exports, and Edge Function secrets.
 
 ## Tools
 
@@ -11,6 +11,18 @@ Retrieve or update the authentication configuration for a Supabase project. This
 ### Get Project
 
 Retrieve detailed information about a specific Supabase project, including its configuration, status, database host, and API keys.
+
+### Get Database Schema
+
+Generate database schema artifacts for a Supabase project. Returns the PostgREST OpenAPI document or generated TypeScript database types as a Slate attachment.
+
+### Get Project Health
+
+Check health for Supabase project services such as Auth, Postgres, REST, Realtime, Storage, and Pooler.
+
+### Get Project Logs
+
+Query Supabase project logs through the Management API using a custom logs SQL query or the default recent Edge Logs window.
 
 ### Invoke Database Function
 
@@ -30,7 +42,7 @@ List, get, create, update, or delete authentication users in a Supabase project.
 
 ### Manage Edge Functions
 
-List, get, create, update, or delete Supabase Edge Functions. Edge Functions are server-side TypeScript functions distributed globally at the edge.
+List, get, deploy, update, or delete Supabase Edge Functions. Edge Functions are server-side TypeScript functions distributed globally at the edge. Function source can be returned as a Slate attachment.
 
 ### Manage Project
 
@@ -46,7 +58,7 @@ List, get, create, update, empty, or delete storage buckets in a Supabase projec
 
 ### Manage Storage Objects
 
-List, move, copy, or delete files in Supabase Storage buckets. Also generate public URLs or signed URLs for file access.
+List, inspect, upload, update, download, move, copy, or delete files in Supabase Storage buckets. Downloads return file contents as Slate attachments. Also generate public URLs or signed URLs for file access.
 
 ### Manage Table Rows
 

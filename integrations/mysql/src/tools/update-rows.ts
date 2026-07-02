@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { mysqlServiceError } from '../lib/errors';
 import {
   createClient,
   escapeIdentifier,
@@ -52,7 +53,7 @@ Requires a WHERE clause to target specific rows unless confirmUpdateAll is expli
     let fullTableName = qualifiedTableName(ctx.input.tableName, db);
 
     if (!ctx.input.where && !ctx.input.confirmUpdateAll) {
-      throw new Error(
+      throw mysqlServiceError(
         'A WHERE clause is required to update rows. Set confirmUpdateAll to true to update all rows.'
       );
     }
@@ -62,7 +63,7 @@ Requires a WHERE clause to target specific rows unless confirmUpdateAll is expli
     );
 
     if (setClauses.length === 0) {
-      throw new Error('No values provided to update.');
+      throw mysqlServiceError('No values provided to update.');
     }
 
     let sql = `UPDATE ${fullTableName} SET ${setClauses.join(', ')}`;

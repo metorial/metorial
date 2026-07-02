@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let alertAction = SlateTool.create(spec, {
   name: 'Alert Action',
   key: 'alert_action',
-  description: `Perform an action on an existing alert: close, acknowledge, unacknowledge, snooze, assign ownership, escalate, add a note, or add/remove tags. All actions are processed asynchronously.`,
+  description: `Perform an action on an existing alert: close, acknowledge, unacknowledge, snooze, assign ownership, escalate, add a note, add/remove tags, or delete. All mutating actions are processed asynchronously.`,
   instructions: [
     'Choose exactly one action to perform on the alert.',
     'For "snooze", provide snoozeEndTime as an ISO 8601 datetime.',
@@ -14,7 +15,8 @@ export let alertAction = SlateTool.create(spec, {
     'For "escalate", provide escalationId or escalationName.',
     'For "add_note", provide note text.',
     'For "add_tags", provide an array of tags to add.',
-    'For "remove_tags", provide an array of tags to remove.'
+    'For "remove_tags", provide an array of tags to remove.',
+    'For "delete", use identifierType "id" or "tiny".'
   ]
 })
   .input(
@@ -34,7 +36,8 @@ export let alertAction = SlateTool.create(spec, {
           'escalate',
           'add_note',
           'add_tags',
-          'remove_tags'
+          'remove_tags',
+          'delete'
         ])
         .describe('Action to perform on the alert'),
       note: z
@@ -95,7 +98,7 @@ export let alertAction = SlateTool.create(spec, {
         break;
       case 'snooze':
         if (!ctx.input.snoozeEndTime) {
-          throw new Error('snoozeEndTime is required for the snooze action.');
+          throw opsgenieServiceError('snoozeEndTime is required for the snooze action.');
         }
         response = await client.snoozeAlert(id, idType, {
           endTime: ctx.input.snoozeEndTime,
@@ -104,7 +107,9 @@ export let alertAction = SlateTool.create(spec, {
         break;
       case 'assign':
         if (!ctx.input.ownerUsername && !ctx.input.ownerId) {
-          throw new Error('ownerUsername or ownerId is required for the assign action.');
+          throw opsgenieServiceError(
+            'ownerUsername or ownerId is required for the assign action.'
+          );
         }
         response = await client.assignAlert(id, idType, {
           owner: ctx.input.ownerId
@@ -115,7 +120,7 @@ export let alertAction = SlateTool.create(spec, {
         break;
       case 'escalate':
         if (!ctx.input.escalationId && !ctx.input.escalationName) {
-          throw new Error(
+          throw opsgenieServiceError(
             'escalationId or escalationName is required for the escalate action.'
           );
         }
@@ -128,7 +133,7 @@ export let alertAction = SlateTool.create(spec, {
         break;
       case 'add_note':
         if (!ctx.input.note) {
-          throw new Error('note is required for the add_note action.');
+          throw opsgenieServiceError('note is required for the add_note action.');
         }
         response = await client.addNoteToAlert(id, idType, {
           note: ctx.input.note,
@@ -138,7 +143,7 @@ export let alertAction = SlateTool.create(spec, {
         break;
       case 'add_tags':
         if (!ctx.input.tags || ctx.input.tags.length === 0) {
-          throw new Error('tags array is required for the add_tags action.');
+          throw opsgenieServiceError('tags array is required for the add_tags action.');
         }
         response = await client.addTagsToAlert(id, idType, {
           tags: ctx.input.tags,
@@ -147,10 +152,19 @@ export let alertAction = SlateTool.create(spec, {
         break;
       case 'remove_tags':
         if (!ctx.input.tags || ctx.input.tags.length === 0) {
-          throw new Error('tags array is required for the remove_tags action.');
+          throw opsgenieServiceError('tags array is required for the remove_tags action.');
         }
         response = await client.removeTagsFromAlert(id, idType, {
           tags: ctx.input.tags.join(','),
+          user: ctx.input.user,
+          source: ctx.input.source
+        });
+        break;
+      case 'delete':
+        if (idType === 'alias') {
+          throw opsgenieServiceError('Alert delete only supports id or tiny identifierType.');
+        }
+        response = await client.deleteAlert(id, idType, {
           user: ctx.input.user,
           source: ctx.input.source
         });

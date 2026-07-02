@@ -1,6 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import { mixpanelServiceError } from '../lib/errors';
+import {
+  createClientFromContext,
+  requireProjectToken,
+  requireServiceAccount
+} from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageIdentities = SlateTool.create(spec, {
@@ -40,7 +45,14 @@ Use **merge** to combine two distinct IDs into one identity cluster. Merging is 
     let client = createClientFromContext(ctx);
     let { operation } = ctx.input;
 
-    if (operation === 'identify' && ctx.input.identifiedId && ctx.input.anonId) {
+    if (operation === 'identify') {
+      requireProjectToken(ctx);
+      if (!ctx.input.identifiedId?.trim() || !ctx.input.anonId?.trim()) {
+        throw mixpanelServiceError(
+          'identifiedId and anonId are required for identify operations.'
+        );
+      }
+
       let result = await client.createIdentity(ctx.input.identifiedId, ctx.input.anonId);
       return {
         output: { success: result.success },
@@ -50,7 +62,15 @@ Use **merge** to combine two distinct IDs into one identity cluster. Merging is 
       };
     }
 
-    if (operation === 'merge' && ctx.input.distinctId1 && ctx.input.distinctId2) {
+    if (operation === 'merge') {
+      requireServiceAccount(ctx);
+      requireProjectToken(ctx);
+      if (!ctx.input.distinctId1?.trim() || !ctx.input.distinctId2?.trim()) {
+        throw mixpanelServiceError(
+          'distinctId1 and distinctId2 are required for merge operations.'
+        );
+      }
+
       let result = await client.mergeIdentities(ctx.input.distinctId1, ctx.input.distinctId2);
       return {
         output: { success: result.success },
@@ -60,9 +80,6 @@ Use **merge** to combine two distinct IDs into one identity cluster. Merging is 
       };
     }
 
-    return {
-      output: { success: false },
-      message: 'Missing required parameters for the specified operation.'
-    };
+    throw mixpanelServiceError(`Unsupported identity operation: ${operation}`);
   })
   .build();

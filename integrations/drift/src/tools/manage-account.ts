@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DriftClient } from '../lib/client';
+import { driftServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageAccount = SlateTool.create(spec, {
@@ -77,7 +78,7 @@ export let manageAccount = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.ownerId || !ctx.input.name) {
-          throw new Error('ownerId and name are required to create an account');
+          throw driftServiceError('ownerId and name are required to create an account.');
         }
         let account = await client.createAccount({
           ownerId: ctx.input.ownerId,
@@ -92,7 +93,7 @@ export let manageAccount = SlateTool.create(spec, {
         };
       }
       case 'get': {
-        if (!ctx.input.accountId) throw new Error('accountId is required');
+        if (!ctx.input.accountId) throw driftServiceError('accountId is required.');
         let account = await client.getAccount(ctx.input.accountId);
         return {
           output: { accounts: [mapAccount(account)] },
@@ -107,13 +108,18 @@ export let manageAccount = SlateTool.create(spec, {
         };
       }
       case 'update': {
-        if (!ctx.input.accountId) throw new Error('accountId is required');
+        if (!ctx.input.accountId) throw driftServiceError('accountId is required.');
         let updateData: Record<string, any> = {};
         if (ctx.input.name) updateData.name = ctx.input.name;
         if (ctx.input.domain) updateData.domain = ctx.input.domain;
         if (ctx.input.ownerId) updateData.ownerId = ctx.input.ownerId;
         if (ctx.input.customProperties)
           updateData.customProperties = ctx.input.customProperties;
+        if (Object.keys(updateData).length === 0) {
+          throw driftServiceError(
+            'At least one account field is required to update an account.'
+          );
+        }
         let account = await client.updateAccount(ctx.input.accountId, updateData);
         return {
           output: { accounts: [mapAccount(account)] },
@@ -121,7 +127,7 @@ export let manageAccount = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.accountId) throw new Error('accountId is required');
+        if (!ctx.input.accountId) throw driftServiceError('accountId is required.');
         await client.deleteAccount(ctx.input.accountId);
         return {
           output: { deleted: true },

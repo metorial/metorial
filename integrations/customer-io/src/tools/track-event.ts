@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TrackClient } from '../lib/client';
+import { customerIoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let trackEvent = SlateTool.create(spec, {
@@ -30,6 +31,10 @@ Supports tracking events attributed to a specific person, anonymous events (asso
       eventName: z
         .string()
         .describe('The name of the event (e.g. "purchase", "button_click", "/home")'),
+      eventId: z
+        .string()
+        .optional()
+        .describe('Optional ULID used by Customer.io to deduplicate events'),
       eventType: z
         .enum(['event', 'page', 'screen'])
         .default('event')
@@ -61,21 +66,24 @@ Supports tracking events attributed to a specific person, anonymous events (asso
     });
 
     if (ctx.input.personIdentifier) {
-      if (ctx.input.eventType === 'page') {
-        await trackClient.trackPageView(ctx.input.personIdentifier, {
-          name: ctx.input.eventName,
-          data: ctx.input.properties,
-          timestamp: ctx.input.timestamp
-        });
-      } else {
-        await trackClient.trackEvent(ctx.input.personIdentifier, {
-          name: ctx.input.eventName,
-          data: ctx.input.properties,
-          timestamp: ctx.input.timestamp
-        });
+      if (ctx.input.eventType === 'screen' && !ctx.input.anonymousId) {
+        throw customerIoServiceError(
+          'anonymousId is required for screen events attributed to a person.'
+        );
       }
+
+      await trackClient.trackEvent(ctx.input.personIdentifier, {
+        id: ctx.input.eventId,
+        type: ctx.input.eventType,
+        name: ctx.input.eventName,
+        data: ctx.input.properties,
+        anonymous_id: ctx.input.anonymousId,
+        timestamp: ctx.input.timestamp
+      });
     } else {
       await trackClient.trackAnonymousEvent({
+        id: ctx.input.eventId,
+        type: ctx.input.eventType,
         name: ctx.input.eventName,
         data: ctx.input.properties,
         anonymous_id: ctx.input.anonymousId,

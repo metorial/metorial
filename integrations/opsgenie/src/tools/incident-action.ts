@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let incidentAction = SlateTool.create(spec, {
@@ -54,7 +55,7 @@ export let incidentAction = SlateTool.create(spec, {
         break;
       case 'add_note':
         if (!ctx.input.note) {
-          throw new Error('note is required for the add_note action.');
+          throw opsgenieServiceError('note is required for the add_note action.');
         }
         response = await client.addNoteToIncident(id, idType, { note: ctx.input.note });
         break;

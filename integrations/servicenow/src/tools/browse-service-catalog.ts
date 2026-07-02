@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { servicenowServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -62,7 +63,7 @@ export let browseServiceCatalog = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.catalogItemId) {
-        throw new Error('catalogItemId is required for get action');
+        throw servicenowServiceError('catalogItemId is required for get action');
       }
       let item = await client.getCatalogItem(ctx.input.catalogItemId);
       return {
@@ -73,7 +74,7 @@ export let browseServiceCatalog = SlateTool.create(spec, {
 
     if (ctx.input.action === 'order') {
       if (!ctx.input.catalogItemId) {
-        throw new Error('catalogItemId is required for order action');
+        throw servicenowServiceError('catalogItemId is required for order action');
       }
       let orderResult = await client.orderCatalogItem(
         ctx.input.catalogItemId,
@@ -85,6 +86,6 @@ export let browseServiceCatalog = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw servicenowServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

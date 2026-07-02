@@ -30,13 +30,16 @@ To run APIs in non-default spaces, you must add s/{space_id}/ to the path. All A
 
 Export sets of saved objects that you want to import into Kibana, resolve import errors, and rotate an encryption key for encrypted saved objects with the saved objects APIs. These objects include dashboards, visualizations, maps, data views, Canvas workpads, and other saved objects.
 
-- Import/export saved objects in NDJSON format for migration between environments.
+- Export saved objects in NDJSON format for migration between environments. The
+  integration returns exported NDJSON as a Slate attachment and keeps structured
+  output to metadata such as MIME type, byte length, line count, and attachment
+  count.
 - Copy or share saved objects between spaces.
 - Saved objects are not backwards-compatible across Kibana versions.
 
 ### Data Views (Index Patterns)
 
-Create, read, update, and delete data views that define which Elasticsearch indices Kibana queries. An index pattern identifies one or more Elasticsearch indices that you want to explore with Kibana. Kibana looks for index names that match the specified pattern. Supports runtime fields and field formatting configuration.
+Create, read, update, and delete data views that define which Elasticsearch indices Kibana queries. An index pattern identifies one or more Elasticsearch indices that you want to explore with Kibana. Kibana looks for index names that match the specified pattern. Supports runtime fields and field formatting configuration. The integration can also get, set, and unset the default data view for the current Kibana space.
 
 ### Spaces
 
@@ -52,6 +55,7 @@ When a condition is met, the rule tracks it as an alert and runs the actions tha
 
 - Create, update, delete, enable/disable, mute/unmute, and snooze alerting rules.
 - Rule types include Elasticsearch query, index threshold, metric threshold, log threshold, and more.
+- List available rule types to discover rule type IDs, action groups, authorized consumers, and license availability before creating a rule.
 - Configure action frequency (on every check, on status change, or throttled intervals).
 - Rules are authorized using API keys scoped to the creating user's privileges.
 
@@ -60,6 +64,7 @@ When a condition is met, the rule tracks it as an alert and runs the actions tha
 Manage connectors that integrate with external services for rule-triggered notifications. Supported connector types include email, Slack, PagerDuty, webhook, Jira, ServiceNow, Microsoft Teams, Opsgenie, and more.
 
 - Create, update, delete, and test connectors.
+- List available connector types to discover connector type IDs, supported features, and license/config availability before creating a connector.
 - The Webhook connector uses axios to send a request to a web service. Webhook connectors support basic auth, OAuth 2.0, and SSL authentication.
 
 ### Cases
@@ -79,6 +84,7 @@ You must have all privileges for the SLOs feature in the Observability section o
 Manage Elastic Agents and their policies programmatically.
 
 - Create and manage agent policies and integration (package) policies.
+- List and manage Fleet package policies that attach Elastic integrations to agent policies.
 - To get a list of valid enrollment tokens from Fleet, call GET /api/fleet/enrollment_api_keys.
 - Enroll, unenroll, and upgrade agents; manage tags and assign policies.
 
@@ -89,6 +95,11 @@ Elasticsearch API user: uses an Elasticsearch client, cURL, or Kibana Dev Tools 
 ### Security (Roles and User Sessions)
 
 Manage role-based access control including Kibana feature privileges. Create and manage roles with specific space-level feature access. Invalidate user sessions.
+
+### Error Handling
+
+Integration validation failures and upstream Kibana API failures are wrapped in
+`ServiceError` from `@lowerdeck/error` for user-facing tool behavior.
 
 ### Detection Rules (Elastic Security)
 

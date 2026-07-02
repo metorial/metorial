@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { cognitoServiceError } from '../lib/errors';
 import { createCognitoClient, formatAttributes, toAttributeList } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -112,8 +113,9 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     if (action === 'update_attributes') {
-      if (!ctx.input.attributes)
-        throw new Error('attributes are required for update_attributes action');
+      if (!ctx.input.attributes) {
+        throw cognitoServiceError('attributes are required for update_attributes action');
+      }
 
       await client.adminUpdateUserAttributes(
         userPoolId,
@@ -168,7 +170,9 @@ export let manageUser = SlateTool.create(spec, {
     }
 
     if (action === 'set_password') {
-      if (!ctx.input.password) throw new Error('password is required for set_password action');
+      if (!ctx.input.password) {
+        throw cognitoServiceError('password is required for set_password action');
+      }
       await client.adminSetUserPassword(
         userPoolId,
         username,
@@ -181,6 +185,6 @@ export let manageUser = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw cognitoServiceError(`Unknown action: ${action}`);
   })
   .build();

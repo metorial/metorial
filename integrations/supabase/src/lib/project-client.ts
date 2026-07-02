@@ -1,4 +1,11 @@
 import { createAxios } from 'slates';
+import { supabaseApiError } from './errors';
+
+let storagePath = (bucketId: string, path: string) =>
+  `/storage/v1/object/${encodeURIComponent(bucketId)}/${path
+    .split('/')
+    .map(part => encodeURIComponent(part))
+    .join('/')}`;
 
 export class ProjectClient {
   private http: ReturnType<typeof createAxios>;
@@ -13,6 +20,11 @@ export class ProjectClient {
         Authorization: `Bearer ${apiKey}`
       }
     });
+
+    this.http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(supabaseApiError(error, 'Project API request'))
+    );
   }
 
   // ─── REST API (PostgREST) ─────────────────────────────────
@@ -248,6 +260,7 @@ export class ProjectClient {
       prefix?: string;
       limit?: number;
       offset?: number;
+      search?: string;
       sortBy?: { column: string; order: string };
     } = {}
   ) {
@@ -255,6 +268,7 @@ export class ProjectClient {
       prefix: params.prefix ?? '',
       limit: params.limit ?? 100,
       offset: params.offset ?? 0,
+      search: params.search,
       sortBy: params.sortBy ?? { column: 'name', order: 'asc' }
     });
     return response.data;
@@ -285,14 +299,89 @@ export class ProjectClient {
     return response.data;
   }
 
+  async uploadStorageObject(
+    bucketId: string,
+    path: string,
+    content: string | Buffer,
+    params: {
+      contentType?: string;
+      cacheControl?: string;
+      upsert?: boolean;
+    } = {}
+  ) {
+    let response = await this.http.post(storagePath(bucketId, path), content, {
+      headers: {
+        'Content-Type': params.contentType ?? 'application/octet-stream',
+        ...(params.cacheControl ? { 'Cache-Control': params.cacheControl } : {}),
+        ...(params.upsert !== undefined ? { 'x-upsert': String(params.upsert) } : {})
+      }
+    });
+    return response.data;
+  }
+
+  async updateStorageObject(
+    bucketId: string,
+    path: string,
+    content: string | Buffer,
+    params: {
+      contentType?: string;
+      cacheControl?: string;
+    } = {}
+  ) {
+    let response = await this.http.put(storagePath(bucketId, path), content, {
+      headers: {
+        'Content-Type': params.contentType ?? 'application/octet-stream',
+        ...(params.cacheControl ? { 'Cache-Control': params.cacheControl } : {})
+      }
+    });
+    return response.data;
+  }
+
+  async downloadStorageObject(bucketId: string, path: string) {
+    let response = await this.http.get(storagePath(bucketId, path), {
+      responseType: 'arraybuffer'
+    });
+    let content = Buffer.from(response.data).toString('base64');
+    let contentType =
+      typeof response.headers?.['content-type'] === 'string'
+        ? response.headers['content-type']
+        : 'application/octet-stream';
+    let contentLength = Buffer.byteLength(content, 'base64');
+
+    return {
+      content,
+      contentType,
+      contentLength
+    };
+  }
+
+  async getStorageObjectInfo(bucketId: string, path: string) {
+    let response = await this.http.get(
+      `/storage/v1/object/info/${encodeURIComponent(bucketId)}/${path
+        .split('/')
+        .map(part => encodeURIComponent(part))
+        .join('/')}`
+    );
+    return response.data;
+  }
+
   async getPublicUrl(bucketId: string, path: string) {
-    return `https://${this.projectRef}.supabase.co/storage/v1/object/public/${bucketId}/${path}`;
+    return `https://${this.projectRef}.supabase.co/storage/v1/object/public/${encodeURIComponent(bucketId)}/${path
+      .split('/')
+      .map(part => encodeURIComponent(part))
+      .join('/')}`;
   }
 
   async createSignedUrl(bucketId: string, path: string, expiresIn: number) {
-    let response = await this.http.post(`/storage/v1/object/sign/${bucketId}/${path}`, {
-      expiresIn
-    });
+    let response = await this.http.post(
+      `/storage/v1/object/sign/${encodeURIComponent(bucketId)}/${path
+        .split('/')
+        .map(part => encodeURIComponent(part))
+        .join('/')}`,
+      {
+        expiresIn
+      }
+    );
     return response.data;
   }
 }

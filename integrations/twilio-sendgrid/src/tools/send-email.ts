@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { twilioSendGridServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let emailAddressSchema = z.object({
@@ -42,6 +43,7 @@ export let sendEmail = SlateTool.create(spec, {
       from: emailAddressSchema.describe('Sender email address and optional name'),
       to: z
         .array(emailAddressSchema)
+        .optional()
         .describe('Primary recipients (used if personalizations is not provided)'),
       subject: z.string().optional().describe('Email subject line'),
       textContent: z.string().optional().describe('Plain text email body'),
@@ -97,7 +99,11 @@ export let sendEmail = SlateTool.create(spec, {
         .describe('Unsubscribe groups to display in the subscription management page'),
       ipPoolName: z.string().optional().describe('IP pool name to send from'),
       trackClicks: z.boolean().optional().describe('Enable click tracking'),
-      trackOpens: z.boolean().optional().describe('Enable open tracking')
+      trackOpens: z.boolean().optional().describe('Enable open tracking'),
+      sandboxMode: z
+        .boolean()
+        .optional()
+        .describe('Validate the request without delivering email')
     })
   )
   .output(
@@ -110,8 +116,26 @@ export let sendEmail = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
 
+    let hasInlineContent = Boolean(ctx.input.textContent || ctx.input.htmlContent);
+    if (hasInlineContent && ctx.input.templateId) {
+      throw twilioSendGridServiceError(
+        'Provide either inline content or templateId when sending email, not both.'
+      );
+    }
+
+    if (!hasInlineContent && !ctx.input.templateId) {
+      throw twilioSendGridServiceError(
+        'Provide textContent, htmlContent, or templateId when sending email.'
+      );
+    }
+
     let personalizations = ctx.input.personalizations;
     if (!personalizations || personalizations.length === 0) {
+      if (!ctx.input.to || ctx.input.to.length === 0) {
+        throw twilioSendGridServiceError(
+          'Provide to recipients or at least one personalization when sending email.'
+        );
+      }
       personalizations = [
         {
           to: ctx.input.to,
@@ -121,8 +145,18 @@ export let sendEmail = SlateTool.create(spec, {
       ];
     }
 
+    if (
+      !ctx.input.templateId &&
+      !ctx.input.subject &&
+      personalizations.some(personalization => !personalization.subject)
+    ) {
+      throw twilioSendGridServiceError(
+        'subject is required unless every personalization has its own subject or templateId is used.'
+      );
+    }
+
     let content: Array<{ type: string; value: string }> | undefined;
-    if (ctx.input.textContent || ctx.input.htmlContent) {
+    if (hasInlineContent) {
       content = [];
       if (ctx.input.textContent)
         content.push({ type: 'text/plain', value: ctx.input.textContent });
@@ -141,6 +175,11 @@ export let sendEmail = SlateTool.create(spec, {
       }
     }
 
+    let mailSettings: { sandboxMode?: { enable?: boolean } } | undefined;
+    if (ctx.input.sandboxMode) {
+      mailSettings = { sandboxMode: { enable: true } };
+    }
+
     let result = await client.sendEmail({
       personalizations,
       from: ctx.input.from,
@@ -156,7 +195,8 @@ export let sendEmail = SlateTool.create(spec, {
       asmGroupId: ctx.input.asmGroupId,
       asmGroupsToDisplay: ctx.input.asmGroupsToDisplay,
       ipPoolName: ctx.input.ipPoolName,
-      trackingSettings
+      trackingSettings,
+      mailSettings
     });
 
     let recipientCount = personalizations.reduce((sum, p) => sum + p.to.length, 0);
@@ -167,7 +207,7 @@ export let sendEmail = SlateTool.create(spec, {
         statusCode: result.statusCode,
         messageId: result.messageId
       },
-      message: `Email sent to **${recipientCount}** recipient(s) from **${ctx.input.from.email}**${ctx.input.subject ? ` with subject "${ctx.input.subject}"` : ''}. Status: ${result.statusCode}.${result.messageId ? ` Message ID: ${result.messageId}` : ''}`
+      message: `Email ${ctx.input.sandboxMode ? 'validated in sandbox mode' : 'sent'} to **${recipientCount}** recipient(s) from **${ctx.input.from.email}**${ctx.input.subject ? ` with subject "${ctx.input.subject}"` : ''}. Status: ${result.statusCode}.${result.messageId ? ` Message ID: ${result.messageId}` : ''}`
     };
   })
   .build();

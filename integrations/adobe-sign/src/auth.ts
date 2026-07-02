@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { adobeSignRequest, adobeSignServiceError } from './lib/errors';
 
 let scopes = [
   { title: 'Read Users', description: 'Read user information', scope: 'user_read:account' },
@@ -50,6 +51,16 @@ let scopes = [
     scope: 'workflow_write:account'
   },
   {
+    title: 'Read Web Forms',
+    description: 'Read web form details',
+    scope: 'widget_read:account'
+  },
+  {
+    title: 'Write Web Forms',
+    description: 'Create and modify web forms',
+    scope: 'widget_write:account'
+  },
+  {
     title: 'Read Webhooks',
     description: 'Read webhook configurations',
     scope: 'webhook_read:account'
@@ -84,23 +95,33 @@ function createAdobeSignOauth(name: string, key: string, shard: Shard) {
 
     handleCallback: async (ctx: any) => {
       let ax = createAxios({ baseURL: `https://api.${shard}.adobesign.com` });
-      let tokenResponse = await ax.post(
-        '/oauth/v2/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          redirect_uri: ctx.redirectUri
-        }).toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      let tokenResponse = await adobeSignRequest('OAuth token exchange', () =>
+        ax.post(
+          '/oauth/v2/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            redirect_uri: ctx.redirectUri
+          }).toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        )
       );
       let data = tokenResponse.data;
+      if (!data.access_token) {
+        throw adobeSignServiceError(
+          'Adobe Acrobat Sign OAuth response did not include an access token.'
+        );
+      }
+
       let expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
 
-      let baseUriResponse = await ax.get('/api/rest/v6/baseUris', {
-        headers: { Authorization: `Bearer ${data.access_token}` }
-      });
+      let baseUriResponse = await adobeSignRequest('base URI lookup', () =>
+        ax.get('/api/rest/v6/baseUris', {
+          headers: { Authorization: `Bearer ${data.access_token}` }
+        })
+      );
       let apiBaseUrl =
         baseUriResponse.data.apiAccessPoint || `https://api.${shard}.adobesign.com/`;
 
@@ -116,23 +137,35 @@ function createAdobeSignOauth(name: string, key: string, shard: Shard) {
     },
 
     handleTokenRefresh: async (ctx: any) => {
+      if (!ctx.output.refreshToken) {
+        throw adobeSignServiceError('No Adobe Acrobat Sign refresh token is available.');
+      }
+
       let ax = createAxios({ baseURL: `https://api.${shard}.adobesign.com` });
-      let refreshResponse = await ax.post(
-        '/oauth/v2/refresh',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken || '',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }).toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+      let refreshResponse = await adobeSignRequest('OAuth token refresh', () =>
+        ax.post(
+          '/oauth/v2/refresh',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          }).toString(),
+          { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+        )
       );
       let data = refreshResponse.data;
+      if (!data.access_token) {
+        throw adobeSignServiceError(
+          'Adobe Acrobat Sign refresh response did not include an access token.'
+        );
+      }
+
       let expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString();
       return {
         output: {
           token: data.access_token,
-          refreshToken: ctx.output.refreshToken,
+          refreshToken: data.refresh_token || ctx.output.refreshToken,
           expiresAt,
           apiBaseUrl: ctx.output.apiBaseUrl,
           shard
@@ -143,9 +176,11 @@ function createAdobeSignOauth(name: string, key: string, shard: Shard) {
     getProfile: async (ctx: any) => {
       let baseUrl = ctx.output.apiBaseUrl || `https://api.${shard}.adobesign.com/`;
       let ax = createAxios({ baseURL: baseUrl });
-      let response = await ax.get('/api/rest/v6/users/me', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
+      let response = await adobeSignRequest('profile lookup', () =>
+        ax.get('/api/rest/v6/users/me', {
+          headers: { Authorization: `Bearer ${ctx.output.token}` }
+        })
+      );
       let user = response.data;
       return {
         profile: {
@@ -172,10 +207,16 @@ function createAdobeSignIntegrationKey(name: string, key: string, shard: Shard) 
         )
     }),
     getOutput: async (ctx: { input: { integrationKey: string } }) => {
+      if (!ctx.input.integrationKey.trim()) {
+        throw adobeSignServiceError('integrationKey is required.');
+      }
+
       let ax = createAxios({ baseURL: `https://api.${shard}.adobesign.com` });
-      let baseUriResponse = await ax.get('/api/rest/v6/baseUris', {
-        headers: { Authorization: `Bearer ${ctx.input.integrationKey}` }
-      });
+      let baseUriResponse = await adobeSignRequest('base URI lookup', () =>
+        ax.get('/api/rest/v6/baseUris', {
+          headers: { Authorization: `Bearer ${ctx.input.integrationKey}` }
+        })
+      );
       let apiBaseUrl =
         baseUriResponse.data.apiAccessPoint || `https://api.${shard}.adobesign.com/`;
       return {
@@ -189,9 +230,11 @@ function createAdobeSignIntegrationKey(name: string, key: string, shard: Shard) 
     getProfile: async (ctx: any) => {
       let baseUrl = ctx.output.apiBaseUrl || `https://api.${shard}.adobesign.com/`;
       let ax = createAxios({ baseURL: baseUrl });
-      let response = await ax.get('/api/rest/v6/users/me', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
+      let response = await adobeSignRequest('profile lookup', () =>
+        ax.get('/api/rest/v6/users/me', {
+          headers: { Authorization: `Bearer ${ctx.output.token}` }
+        })
+      );
       let user = response.data;
       return {
         profile: {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AmplitudeClient } from '../lib/client';
+import { amplitudeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getUserProfileTool = SlateTool.create(spec, {
@@ -49,6 +50,20 @@ export let getUserProfileTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.config.region === 'EU') {
+      throw amplitudeServiceError(
+        'Amplitude User Profile API is not available for EU data region projects.'
+      );
+    }
+
+    if (!ctx.input.userId && ctx.input.amplitudeId === undefined) {
+      throw amplitudeServiceError('Provide either userId or amplitudeId.');
+    }
+
+    if (ctx.input.userId && ctx.input.amplitudeId !== undefined) {
+      throw amplitudeServiceError('Provide only one of userId or amplitudeId.');
+    }
+
     let client = new AmplitudeClient({
       apiKey: ctx.auth.apiKey,
       secretKey: ctx.auth.secretKey,

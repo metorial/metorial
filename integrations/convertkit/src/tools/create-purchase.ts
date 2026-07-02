@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let createPurchase = SlateTool.create(spec, {
@@ -53,7 +53,7 @@ export let createPurchase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx.auth);
     let input = ctx.input;
 
     let purchase = await client.createPurchase({

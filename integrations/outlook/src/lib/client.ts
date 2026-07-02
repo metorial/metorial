@@ -18,7 +18,8 @@ import type {
   Recipient,
   Subscription,
   TodoTask,
-  TodoTaskList
+  TodoTaskList,
+  UserProfile
 } from './types';
 
 export class Client {
@@ -32,6 +33,13 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  // ─── User Profile ─────────────────────────────────────────────────
+
+  async getMyProfile(): Promise<UserProfile> {
+    let response = await this.axios.get('/me');
+    return response.data;
   }
 
   // ─── Messages ──────────────────────────────────────────────────────

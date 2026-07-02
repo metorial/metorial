@@ -2,7 +2,7 @@
 
 ## Overview
 
-Meta Ads (officially the Marketing API) provides programmatic access to Meta's advertising platform, enabling management of ad campaigns across Facebook, Instagram, Messenger, and WhatsApp. The Marketing API is a collection of Graph API endpoints and other features that can be used to help you advertise across Meta technologies. The API encompasses campaign management, performance reporting via the Insights API, conversion tracking via the Conversions API, audience management, and access to the public Ad Library.
+Meta Ads (officially the Marketing API) provides programmatic access to Meta's advertising platform, enabling management of ad campaigns across Facebook, Instagram, Messenger, and WhatsApp. The Marketing API is a collection of Graph API endpoints and other features that can be used to help you advertise across Meta technologies. The API encompasses campaign management, performance reporting via the Insights API, conversion tracking via the Conversions API, audience management, product catalog discovery, account and Page discovery, and access to the public Ad Library.
 
 ## Authentication
 
@@ -69,7 +69,7 @@ The Conversions API is designed to create a connection between an advertiser's m
 
 ### Product Catalog Management
 
-Automate catalog updates to keep product information, pricing, availability, and other details up-to-date across campaigns. Supports dynamic ads (Advantage+ catalog ads) that automatically show products from your catalog based on user behavior.
+Discover product catalogs owned by a Meta Business and list products in a catalog. Product catalogs support dynamic ads (Advantage+ catalog ads) that automatically show products from your catalog based on user behavior.
 
 ### Ad Library API
 

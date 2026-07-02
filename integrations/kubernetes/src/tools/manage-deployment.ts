@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createKubeClient } from '../lib/client';
+import { kubernetesServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageDeployment = SlateTool.create(spec, {
@@ -23,7 +24,7 @@ Also supports StatefulSets and DaemonSets for similar workload management.`,
         .enum(['create', 'update', 'scale', 'restart'])
         .describe('Action to perform on the deployment'),
       workloadType: z
-        .enum(['deployments', 'statefulsets', 'daemonsets'])
+        .enum(['deployments', 'statefulsets', 'daemonsets', 'replicasets'])
         .default('deployments')
         .describe('Type of workload to manage'),
       deploymentName: z.string().describe('Name of the deployment/workload'),
@@ -34,6 +35,12 @@ Also supports StatefulSets and DaemonSets for similar workload management.`,
         .describe('Desired number of replicas (for scale action or create/update)'),
       containerName: z.string().optional().describe('Name of the container to update'),
       image: z.string().optional().describe('New container image (e.g. "nginx:1.25")'),
+      serviceName: z
+        .string()
+        .optional()
+        .describe(
+          'Headless service name for StatefulSet creation. Defaults to deploymentName when omitted.'
+        ),
       labels: z
         .record(z.string(), z.string())
         .optional()
@@ -80,21 +87,26 @@ Also supports StatefulSets and DaemonSets for similar workload management.`,
       if (ctx.input.manifest) {
         result = await client.createResource(workloadType, ctx.input.manifest, namespace);
       } else {
+        if (!ctx.input.image) {
+          throw kubernetesServiceError(
+            'image is required when creating a workload without a full manifest.'
+          );
+        }
+        let kindMap: Record<string, string> = {
+          deployments: 'Deployment',
+          statefulsets: 'StatefulSet',
+          daemonsets: 'DaemonSet',
+          replicasets: 'ReplicaSet'
+        };
         let body: any = {
-          apiVersion: workloadType === 'deployments' ? 'apps/v1' : 'apps/v1',
-          kind:
-            workloadType === 'deployments'
-              ? 'Deployment'
-              : workloadType === 'statefulsets'
-                ? 'StatefulSet'
-                : 'DaemonSet',
+          apiVersion: 'apps/v1',
+          kind: kindMap[workloadType],
           metadata: {
             name: deploymentName,
             labels: ctx.input.labels,
             annotations: ctx.input.annotations
           },
           spec: {
-            replicas: ctx.input.replicas ?? 1,
             selector: {
               matchLabels: ctx.input.labels || { app: deploymentName }
             },
@@ -115,11 +127,22 @@ Also supports StatefulSets and DaemonSets for similar workload management.`,
             }
           }
         };
+        if (workloadType !== 'daemonsets') {
+          body.spec.replicas = ctx.input.replicas ?? 1;
+        }
+        if (workloadType === 'statefulsets') {
+          body.spec.serviceName = ctx.input.serviceName || deploymentName;
+        }
         result = await client.createResource(workloadType, body, namespace);
       }
     } else if (action === 'scale') {
+      if (workloadType === 'daemonsets') {
+        throw kubernetesServiceError(
+          'DaemonSets do not expose the Kubernetes scale subresource.'
+        );
+      }
       if (ctx.input.replicas === undefined) {
-        throw new Error('replicas is required for scale action');
+        throw kubernetesServiceError('replicas is required for scale action');
       }
       let _scaleResult = await client.setResourceScale(
         workloadType,
@@ -129,6 +152,11 @@ Also supports StatefulSets and DaemonSets for similar workload management.`,
       );
       result = await client.getResource(workloadType, deploymentName, namespace);
     } else if (action === 'restart') {
+      if (workloadType === 'replicasets') {
+        throw kubernetesServiceError(
+          'Restart is supported for deployments, statefulsets, and daemonsets.'
+        );
+      }
       if (workloadType === 'deployments') {
         result = await client.restartDeployment(deploymentName, namespace);
       } else {
@@ -154,6 +182,11 @@ Also supports StatefulSets and DaemonSets for similar workload management.`,
     } else {
       // update
       let patch: any = {};
+      if (ctx.input.image && !ctx.input.containerName) {
+        throw kubernetesServiceError(
+          'containerName is required when updating a container image.'
+        );
+      }
       if (ctx.input.image && ctx.input.containerName) {
         patch.spec = {
           template: {
@@ -179,6 +212,12 @@ Also supports StatefulSets and DaemonSets for similar workload management.`,
       if (ctx.input.annotations) {
         patch.metadata = patch.metadata || {};
         patch.metadata.annotations = ctx.input.annotations;
+      }
+
+      if (Object.keys(patch).length === 0) {
+        throw kubernetesServiceError(
+          'Provide image, replicas, labels, or annotations when updating a workload.'
+        );
       }
 
       result = await client.patchResource(

@@ -50,6 +50,40 @@ export let listKeysTool = SlateTool.create(spec, {
   })
   .build();
 
+export let getKeyTool = SlateTool.create(spec, {
+  name: 'Get API Key',
+  key: 'get_key',
+  description: `Get metadata for a specific Deepgram API key. Deepgram does not return the secret key value after creation.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      projectId: z.string().describe('ID of the project.'),
+      keyId: z.string().describe('ID of the API key.')
+    })
+  )
+  .output(keySchema)
+  .handleInvocation(async ctx => {
+    let client = new DeepgramClient(ctx.auth.token);
+    let result = await client.getKey(ctx.input.projectId, ctx.input.keyId);
+    let key = result.api_key || result;
+
+    return {
+      output: {
+        keyId: key.api_key_id || key.id || ctx.input.keyId,
+        comment: key.comment,
+        scopes: key.scopes,
+        tags: key.tags,
+        created: key.created,
+        expirationDate: key.expiration_date
+      },
+      message: `Retrieved API key **${key.comment || ctx.input.keyId}**.`
+    };
+  })
+  .build();
+
 export let createKeyTool = SlateTool.create(spec, {
   name: 'Create API Key',
   key: 'create_key',
@@ -71,11 +105,7 @@ export let createKeyTool = SlateTool.create(spec, {
         .array(z.string())
         .describe('Permission scopes (e.g., ["member"], ["admin"], ["owner"]).'),
       tags: z.array(z.string()).optional().describe('Tags for usage tracking.'),
-      expirationDate: z.string().optional().describe('Expiration date in ISO 8601 format.'),
-      timeToLiveInSeconds: z
-        .number()
-        .optional()
-        .describe('Time to live in seconds. Alternative to expirationDate.')
+      expirationDate: z.string().optional().describe('Expiration date in ISO 8601 format.')
     })
   )
   .output(
@@ -97,20 +127,20 @@ export let createKeyTool = SlateTool.create(spec, {
       comment: ctx.input.comment,
       scopes: ctx.input.scopes,
       tags: ctx.input.tags,
-      expirationDate: ctx.input.expirationDate,
-      timeToLiveInSeconds: ctx.input.timeToLiveInSeconds
+      expirationDate: ctx.input.expirationDate
     });
+    let key = result.api_key || result;
 
     return {
       output: {
-        keyId: result.api_key_id,
-        key: result.key,
-        comment: result.comment,
-        scopes: result.scopes,
-        tags: result.tags,
-        created: result.created
+        keyId: key.api_key_id || key.id,
+        key: result.key || key.key,
+        comment: key.comment,
+        scopes: key.scopes,
+        tags: key.tags,
+        created: key.created
       },
-      message: `Created API key **${result.comment || result.api_key_id}**.`
+      message: `Created API key **${key.comment || key.api_key_id || key.id}**.`
     };
   })
   .build();

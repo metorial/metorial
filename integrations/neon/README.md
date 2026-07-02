@@ -1,64 +1,172 @@
 # <img src="https://provider-logos.metorial-cdn.com/neon.png" height="20"> Neon
 
-Manage serverless PostgreSQL databases on Neon. Create, update, and delete projects, branches, databases, compute endpoints, and roles. Configure autoscaling limits, suspend timeouts, and read replicas. Create branches from any point in time for development, testing, or backups. Compare schemas between branches and create anonymized data copies. Track consumption metrics including compute time, storage, and data transfer, and set quota limits. Manage organization members, permissions, and API keys. Monitor asynchronous operation status and query databases over HTTP via the Data API.
+Manage serverless PostgreSQL databases on Neon. Create, update, recover, and delete projects and branches. Manage databases, compute endpoints, roles, connection URIs, supported regions, snapshots, and operation status. Configure autoscaling limits, suspend timeouts, password storage, and branch history retention. Track paid-plan consumption history for eligible accounts.
 
 ## Tools
 
-### Create Branch
+### List Regions
 
-Creates a new branch in a Neon project. Branches are copies of the parent branch's data at a specific point in time. Optionally creates a compute endpoint for the branch so it can accept connections.
-
-### Create Project
-
-Creates a new Neon project. A project is the top-level organizational unit that contains branches, databases, and compute endpoints. You can specify the region, Postgres version, and default compute settings.
-
-### Delete Branch
-
-Deletes a branch from a Neon project. This also deletes all databases, roles, and compute endpoints associated with the branch.
-
-### Delete Project
-
-Permanently deletes a Neon project and all its branches, databases, endpoints, and roles. The project can be recovered within the deletion grace period using the recover project tool.
-
-### Get Consumption
-
-Retrieves consumption metrics across all projects for the account. Tracks compute time, active time, storage, written data, and data transfer. Available on Neon paid plans.
-
-### Get Project
-
-Retrieves detailed information about a specific Neon project, including its configuration, connection URI, consumption metrics, and settings.
-
-### List Branches
-
-Lists all branches in a Neon project. Branches contain databases and can be created from any point in the project's history retention window.
-
-### List Operations
-
-Lists recent operations for a Neon project. Operations are asynchronous tasks like creating branches, starting compute endpoints, or applying configuration changes. Use this to track the progress and status of background tasks.
+Lists supported Neon regions.
 
 ### List Projects
 
-Lists all Neon projects accessible to the authenticated user. Supports searching by name or ID and filtering by organization. Returns project metadata including region, Postgres version, and timestamps.
+Lists Neon projects accessible to the authenticated user, including recoverable deleted projects when requested.
 
-### List Databases
+### Get Project
 
-Lists all databases on a specific branch in a Neon project. Each database belongs to a branch and has an owner role.
+Retrieves detailed information about a specific Neon project.
 
-### List Endpoints
+### Create Project
 
-Lists all compute endpoints in a Neon project. Endpoints are processing instances that connect to branches and provide database connectivity.
-
-### List Roles
-
-Lists all database roles on a specific branch. Roles control database access and permissions. They are copied to child branches upon creation.
-
-### Restore Branch
-
-Restores a branch to a previous state using a point-in-time timestamp or LSN. Optionally preserves the current state under a new branch name before restoring.
+Creates a Neon project with optional region, Postgres version, default branch, database, role, password-storage, and branch-history settings.
 
 ### Update Project
 
-Updates an existing Neon project's settings, including its name and default endpoint configuration.
+Updates a Neon project's name or branch-history retention.
+
+### Delete Project
+
+Deletes a Neon project and all of its branches, databases, endpoints, and roles.
+
+### Recover Project
+
+Recovers a deleted Neon project within the deletion recovery period.
+
+### List Branches
+
+Lists branches in a Neon project, with search, sort, pagination, and recoverable-deleted branch support.
+
+### Get Branch
+
+Retrieves details for a specific Neon branch.
+
+### Create Branch
+
+Creates a Neon branch, optionally from a parent timestamp or LSN and optionally with a compute endpoint.
+
+### Update Branch
+
+Updates a Neon branch name, protected flag, or expiration timestamp.
+
+### Set Default Branch
+
+Sets a branch as the default branch for a Neon project.
+
+### Delete Branch
+
+Deletes a branch from a Neon project.
+
+### Restore Branch
+
+Restores a branch to a previous state using a point-in-time timestamp or LSN.
+
+### Recover Branch
+
+Recovers a soft-deleted Neon branch within the deletion recovery period when available.
+
+### List Databases
+
+Lists databases on a specific branch.
+
+### Get Database
+
+Retrieves details for a specific database on a branch.
+
+### Create Database
+
+Creates a database on a branch.
+
+### Update Database
+
+Renames a database or changes its owner role.
+
+### Delete Database
+
+Deletes a database from a branch.
+
+### List Endpoints
+
+Lists compute endpoints in a Neon project.
+
+### Get Endpoint
+
+Retrieves details for a specific compute endpoint.
+
+### Create Endpoint
+
+Creates a compute endpoint for a branch.
+
+### Update Endpoint
+
+Updates compute endpoint name, autoscaling, suspend timeout, disabled, or passwordless access settings.
+
+### Delete Endpoint
+
+Deletes a compute endpoint.
+
+### Control Endpoint
+
+Starts, suspends, or restarts a compute endpoint.
+
+### List Roles
+
+Lists database roles on a branch.
+
+### Get Role
+
+Retrieves details for a database role.
+
+### Create Role
+
+Creates a database role on a branch.
+
+### Delete Role
+
+Deletes a database role from a branch.
+
+### Reset Role Password
+
+Rotates and returns the password for a database role.
+
+### Reveal Role Password
+
+Retrieves the stored password for a database role when password storage is enabled.
+
+### List Operations
+
+Lists recent operations for a Neon project.
+
+### Get Operation
+
+Retrieves the status of a specific Neon operation.
+
+### Get Connection URI
+
+Retrieves a PostgreSQL connection URI for a Neon database and role.
+
+### List Snapshots
+
+Lists snapshots for a Neon project.
+
+### Create Snapshot
+
+Creates a point-in-time snapshot from a Neon branch.
+
+### Update Snapshot
+
+Renames a Neon project snapshot.
+
+### Delete Snapshot
+
+Deletes a Neon project snapshot.
+
+### Restore Snapshot
+
+Restores a Neon snapshot to a branch.
+
+### Get Consumption
+
+Retrieves consumption history for eligible paid Neon plans.
 
 ## License
 

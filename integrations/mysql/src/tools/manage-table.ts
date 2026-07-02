@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient, escapeIdentifier, qualifiedTableName } from '../lib/helpers';
+import { mysqlServiceError } from '../lib/errors';
+import {
+  createClient,
+  escapeIdentifier,
+  qualifiedTableName,
+  validateSqlOptionName
+} from '../lib/helpers';
 import { spec } from '../spec';
 
 let columnDefinitionSchema = z.object({
@@ -138,7 +144,7 @@ For altering tables, supports adding columns, dropping columns, renaming columns
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.columns || ctx.input.columns.length === 0) {
-        throw new Error('Column definitions are required for create action');
+        throw mysqlServiceError('Column definitions are required for create action');
       }
 
       let columnDefs: string[] = [];
@@ -168,9 +174,15 @@ For altering tables, supports adding columns, dropping columns, renaming columns
       let ifNotExists = ctx.input.ifNotExists ? 'IF NOT EXISTS ' : '';
       let sql = `CREATE TABLE ${ifNotExists}${fullTableName} (\n  ${columnDefs.join(',\n  ')}\n)`;
 
-      if (ctx.input.engine) sql += ` ENGINE=${ctx.input.engine}`;
-      if (ctx.input.charset) sql += ` DEFAULT CHARSET=${ctx.input.charset}`;
-      if (ctx.input.collation) sql += ` COLLATE=${ctx.input.collation}`;
+      if (ctx.input.engine) {
+        sql += ` ENGINE=${validateSqlOptionName(ctx.input.engine, 'engine')}`;
+      }
+      if (ctx.input.charset) {
+        sql += ` DEFAULT CHARSET=${validateSqlOptionName(ctx.input.charset, 'charset')}`;
+      }
+      if (ctx.input.collation) {
+        sql += ` COLLATE=${validateSqlOptionName(ctx.input.collation, 'collation')}`;
+      }
 
       statements.push(sql);
     } else if (ctx.input.action === 'alter') {
@@ -201,7 +213,6 @@ For altering tables, supports adding columns, dropping columns, renaming columns
 
       if (ctx.input.modifyColumns) {
         for (let modify of ctx.input.modifyColumns) {
-          let _parts: string[] = [];
           if (modify.newDataType) {
             let def = `${escapeIdentifier(modify.columnName)} ${modify.newDataType}`;
             if (modify.nullable === false) def += ' NOT NULL';
@@ -231,7 +242,7 @@ For altering tables, supports adding columns, dropping columns, renaming columns
       }
 
       if (statements.length === 0) {
-        throw new Error(
+        throw mysqlServiceError(
           'No alter operations specified. Provide addColumns, dropColumns, renameColumn, modifyColumns, or renameTable.'
         );
       }

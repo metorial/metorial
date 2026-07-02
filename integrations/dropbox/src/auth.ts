@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { dropboxApiError, dropboxServiceError } from './lib/errors';
 
 let apiAxios = createAxios({
   baseURL: 'https://api.dropboxapi.com'
@@ -75,19 +76,6 @@ export let auth = SlateAuth.create()
         title: 'File Requests Write',
         description: 'Manage file requests',
         scope: 'file_requests.write'
-      },
-      { title: 'Contacts Read', description: 'Read contacts', scope: 'contacts.read' },
-      { title: 'Contacts Write', description: 'Manage contacts', scope: 'contacts.write' },
-      { title: 'OpenID', description: 'OpenID Connect authentication', scope: 'openid' },
-      {
-        title: 'Email',
-        description: 'Access email address via OpenID Connect',
-        scope: 'email'
-      },
-      {
-        title: 'Profile',
-        description: 'Access profile information via OpenID Connect',
-        scope: 'profile'
       }
     ],
 
@@ -110,19 +98,24 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let params = new URLSearchParams({
-        code: ctx.code,
-        grant_type: 'authorization_code',
-        redirect_uri: ctx.redirectUri,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
+      let response: any;
+      try {
+        let params = new URLSearchParams({
+          code: ctx.code,
+          grant_type: 'authorization_code',
+          redirect_uri: ctx.redirectUri,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret
+        });
 
-      let response = await apiAxios.post('/oauth2/token', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
+        response = await apiAxios.post('/oauth2/token', params.toString(), {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        });
+      } catch (error) {
+        throw dropboxApiError(error, 'exchange OAuth code');
+      }
 
       let data = response.data;
       let expiresAt = data.expires_in
@@ -140,21 +133,28 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        throw dropboxServiceError(
+          'Dropbox refresh token is missing. Reconnect the account to restore offline access.'
+        );
       }
 
-      let params = new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
+      let response: any;
+      try {
+        let params = new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: ctx.output.refreshToken,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret
+        });
 
-      let response = await apiAxios.post('/oauth2/token', params.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
+        response = await apiAxios.post('/oauth2/token', params.toString(), {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        });
+      } catch (error) {
+        throw dropboxApiError(error, 'refresh OAuth token');
+      }
 
       let data = response.data;
       let expiresAt = data.expires_in
@@ -175,11 +175,16 @@ export let auth = SlateAuth.create()
       input: {};
       scopes: string[];
     }) => {
-      let response = await apiAxios.post('/2/users/get_current_account', null, {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+      try {
+        response = await apiAxios.post('/2/users/get_current_account', null, {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+      } catch (error) {
+        throw dropboxApiError(error, 'load OAuth profile');
+      }
 
       let account = response.data;
 

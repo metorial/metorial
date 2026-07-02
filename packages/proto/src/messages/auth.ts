@@ -296,7 +296,8 @@ export let slatesMessageAuthOutputGetResponse = z.object({
   jsonrpc: z.literal('2.0'),
   id: z.string(),
   result: withRequestTraces({
-    output: z.record(z.string(), z.any())
+    output: z.record(z.string(), z.any()),
+    scopes: z.array(z.string()).optional()
   })
 });
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { dockerHubServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateRepository = SlateTool.create(spec, {
@@ -48,7 +49,13 @@ export let updateRepository = SlateTool.create(spec, {
       updateData.full_description = ctx.input.fullDescription;
     if (ctx.input.isPrivate !== undefined) updateData.is_private = ctx.input.isPrivate;
 
-    let client = new Client({ token: ctx.auth.token });
+    if (Object.keys(updateData).length === 0) {
+      throw dockerHubServiceError(
+        'Provide description, fullDescription, or isPrivate to update the repository.'
+      );
+    }
+
+    let client = new Client(ctx.auth);
     let repo = await client.updateRepository(ns, ctx.input.repositoryName, updateData);
 
     return {

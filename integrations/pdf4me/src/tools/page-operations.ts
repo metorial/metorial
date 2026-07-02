@@ -1,7 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdf4meServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  fileAttachment,
+  fileAttachmentOutputSchema,
+  fileOutput,
+  type Pdf4meFileResult
+} from './shared';
 
 export let extractPages = SlateTool.create(spec, {
   name: 'Extract Pages',
@@ -20,12 +27,7 @@ export let extractPages = SlateTool.create(spec, {
         .describe('Comma-separated page numbers to extract (e.g. "1,3,5")')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded PDF with extracted pages'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -36,7 +38,8 @@ export let extractPages = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Extracted pages ${ctx.input.pageNumbers} into **${result.fileName}**`
     };
   })
@@ -73,16 +76,11 @@ export let deletePages = SlateTool.create(spec, {
         )
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded PDF with pages removed'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: { fileContent: string; fileName: string };
+    let result: Pdf4meFileResult;
 
     if (ctx.input.mode === 'blank') {
       result = await client.deleteBlankPages({
@@ -92,7 +90,7 @@ export let deletePages = SlateTool.create(spec, {
       });
     } else {
       if (!ctx.input.pageNumbers) {
-        throw new Error('pageNumbers is required for specific page deletion');
+        throw pdf4meServiceError('pageNumbers is required for specific page deletion');
       }
       result = await client.deletePages({
         docContent: ctx.input.fileContent,
@@ -102,7 +100,8 @@ export let deletePages = SlateTool.create(spec, {
     }
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message:
         ctx.input.mode === 'blank'
           ? `Removed blank pages from **${result.fileName}**`
@@ -130,16 +129,11 @@ export let rotatePdf = SlateTool.create(spec, {
         .describe('Specific page to rotate (omit to rotate all pages)')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded rotated PDF'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: { fileContent: string; fileName: string };
+    let result: Pdf4meFileResult;
 
     if (ctx.input.pageNumber !== undefined) {
       result = await client.rotatePage({
@@ -157,7 +151,8 @@ export let rotatePdf = SlateTool.create(spec, {
     }
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message:
         ctx.input.pageNumber !== undefined
           ? `Rotated page ${ctx.input.pageNumber} by ${ctx.input.rotationType.replace('rotate', '')}°: **${result.fileName}**`
@@ -198,12 +193,7 @@ export let addPageNumbers = SlateTool.create(spec, {
       skipFirstPage: z.boolean().optional().describe('Skip numbering on the first page')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded PDF with page numbers'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -222,7 +212,8 @@ export let addPageNumbers = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Added page numbers to **${result.fileName}**`
     };
   })

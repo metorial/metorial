@@ -44,6 +44,14 @@ List available hardware options on Replicate. Use these SKU values when creating
 
 List all versions of a specific model. Each version represents a different iteration of the model with its own input/output schema.
 
+### Get Model Version
+
+Get a specific model version, including the OpenAPI schema that describes its inputs and outputs.
+
+### Delete Model Version
+
+Delete a private model version and its associated predictions and output files when Replicate deletion restrictions allow it.
+
 ### List Predictions
 
 List recent predictions for your account. Returns predictions sorted by creation time (newest first) with pagination support.
@@ -56,9 +64,21 @@ List recent training jobs for your account, sorted by creation time (newest firs
 
 Create a new production deployment for a model on Replicate. Deployments provide dedicated infrastructure with configurable hardware and auto-scaling.
 
+### List Public Models
+
+List public models on Replicate with sorting options.
+
 ### List Files
 
 List files that have been uploaded to Replicate. Files are used as inputs to models (images, audio, documents, etc.).
+
+### Create File
+
+Upload a file to Replicate for use as model input. Files expire after 24 hours.
+
+### Download File
+
+Download a Replicate file through a signed file download URL. Returns file content as a Slate attachment.
 
 ### Create Model
 
@@ -66,11 +86,23 @@ Create a new model on Replicate. The model acts as a container for versions that
 
 ### Run Prediction
 
-Run an AI model prediction on Replicate. Provide either a **model** identifier (e.g. \
+Run an AI model prediction on Replicate using an official model, a model version, or a deployment. Supports synchronous wait and automatic cancellation headers.
 
 ### Search Models
 
 Search for public models, collections, and documentation on Replicate. Returns results ranked by relevance.
+
+### Get Model README
+
+Get a model's README content as a Markdown attachment.
+
+### List Model Examples
+
+List example predictions saved by a model author to demonstrate a model's capabilities.
+
+### Get Webhook Signing Secret
+
+Get the signing secret for Replicate's default webhook so incoming webhook payloads can be verified.
 
 ## License
 

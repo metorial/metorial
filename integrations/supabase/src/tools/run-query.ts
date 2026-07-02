@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { requireProjectRef } from '../lib/errors';
 import { spec } from '../spec';
 
 export let runQuery = SlateTool.create(spec, {
@@ -34,12 +35,7 @@ export let runQuery = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectRef = ctx.input.projectRef ?? ctx.config.projectRef;
-    if (!projectRef) {
-      throw new Error(
-        'projectRef is required — provide it as input or set it in the configuration'
-      );
-    }
+    let projectRef = requireProjectRef(ctx.input.projectRef ?? ctx.config.projectRef);
 
     let client = new ManagementClient(ctx.auth.token);
     let result = await client.runQuery(projectRef, ctx.input.query);

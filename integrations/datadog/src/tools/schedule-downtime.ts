@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { datadogServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -55,6 +56,12 @@ export let scheduleDowntime = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth, ctx.config);
+
+    if (!ctx.input.monitorId && !ctx.input.monitorTags?.length) {
+      throw datadogServiceError(
+        'Provide either monitorId or monitorTags when scheduling Datadog downtime.'
+      );
+    }
 
     let schedule: any;
     if (ctx.input.start || ctx.input.end) {

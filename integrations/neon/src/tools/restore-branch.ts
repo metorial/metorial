@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NeonClient } from '../lib/client';
+import { neonValidationError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let restoreBranch = SlateTool.create(spec, {
@@ -31,6 +32,12 @@ export let restoreBranch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.sourceTimestamp && ctx.input.sourceLsn) {
+      throw neonValidationError(
+        'Provide either sourceTimestamp or sourceLsn when restoring a branch, not both.'
+      );
+    }
+
     let client = new NeonClient({ token: ctx.auth.token });
 
     let result = await client.restoreBranch(ctx.input.projectId, ctx.input.branchId, {

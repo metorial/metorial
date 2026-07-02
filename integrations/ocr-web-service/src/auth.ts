@@ -14,8 +14,8 @@ export let auth = SlateAuth.create()
     key: 'basic_auth',
 
     inputSchema: z.object({
-      username: z.string().describe('Your OCR Web Service account username'),
-      licenseCode: z.string().describe('Your OCR Web Service license API key/password')
+      username: z.string().min(1).describe('Your OCR Web Service account username'),
+      licenseCode: z.string().min(1).describe('Your OCR Web Service license API key/password')
     }),
 
     getOutput: async ctx => {

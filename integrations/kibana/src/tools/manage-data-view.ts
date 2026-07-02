@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { kibanaServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -123,7 +124,7 @@ Supports configuring runtime fields, time fields, field formats, and source filt
     } = ctx.input;
 
     if (action === 'get') {
-      if (!dataViewId) throw new Error('dataViewId is required for get action');
+      if (!dataViewId) throw kibanaServiceError('dataViewId is required for get action');
       let result = await client.getDataView(dataViewId);
       let dv = result.data_view ?? result;
       return {
@@ -141,7 +142,8 @@ Supports configuring runtime fields, time fields, field formats, and source filt
     }
 
     if (action === 'create') {
-      if (!title) throw new Error('title (index pattern) is required for create action');
+      if (!title)
+        throw kibanaServiceError('title (index pattern) is required for create action');
       let result = await client.createDataView({
         title,
         name,
@@ -167,7 +169,7 @@ Supports configuring runtime fields, time fields, field formats, and source filt
     }
 
     if (action === 'update') {
-      if (!dataViewId) throw new Error('dataViewId is required for update action');
+      if (!dataViewId) throw kibanaServiceError('dataViewId is required for update action');
       let result = await client.updateDataView(dataViewId, {
         title,
         name,
@@ -192,7 +194,7 @@ Supports configuring runtime fields, time fields, field formats, and source filt
     }
 
     if (action === 'delete') {
-      if (!dataViewId) throw new Error('dataViewId is required for delete action');
+      if (!dataViewId) throw kibanaServiceError('dataViewId is required for delete action');
       await client.deleteDataView(dataViewId);
       return {
         output: {
@@ -204,6 +206,6 @@ Supports configuring runtime fields, time fields, field formats, and source filt
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw kibanaServiceError(`Unknown action: ${action}`);
   })
   .build();

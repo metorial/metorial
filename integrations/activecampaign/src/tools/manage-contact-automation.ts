@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { activeCampaignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageContactAutomation = SlateTool.create(spec, {
@@ -45,7 +46,9 @@ export let manageContactAutomation = SlateTool.create(spec, {
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.automationId) {
-        throw new Error('automationId is required when adding a contact to an automation');
+        throw activeCampaignServiceError(
+          'automationId is required when adding a contact to an automation'
+        );
       }
       let result = await client.addContactToAutomation(
         ctx.input.contactId,
@@ -60,7 +63,7 @@ export let manageContactAutomation = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.contactAutomationId) {
-        throw new Error(
+        throw activeCampaignServiceError(
           'contactAutomationId is required when removing a contact from an automation'
         );
       }

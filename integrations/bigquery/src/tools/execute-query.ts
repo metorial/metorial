@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
+import { bigQueryServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let queryParameterSchema = z.object({
@@ -163,15 +164,14 @@ Parameterized queries are supported for safe value interpolation. You can option
     let status = completedJob.status;
 
     if (status?.errorResult) {
-      return {
-        output: {
-          jobId,
-          jobComplete: true,
-          errors: [status.errorResult, ...(status.errors || [])],
-          totalBytesProcessed: completedJob.statistics?.totalBytesProcessed
-        },
-        message: `Query job **${jobId}** failed: ${status.errorResult.message}`
-      };
+      let serviceError = bigQueryServiceError(
+        `Query job ${jobId} failed: ${status.errorResult.message || 'Unknown query error.'}`
+      );
+      serviceError.data.reason = 'bigquery_query_job_failed';
+      serviceError.data.jobId = jobId;
+      serviceError.data.errors = [status.errorResult, ...(status.errors || [])];
+      serviceError.data.totalBytesProcessed = completedJob.statistics?.totalBytesProcessed;
+      throw serviceError;
     }
 
     let queryStats = completedJob.statistics?.query;

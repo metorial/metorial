@@ -28,7 +28,7 @@ export let listEnvironmentsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let environments = await client.listEnvironments(ctx.input.projectId);
 
     let mapped = environments.map((e: any) => ({
@@ -72,7 +72,7 @@ export let getEnvironmentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let env = await client.getEnvironment(ctx.input.environmentId);
 
     return {
@@ -117,7 +117,7 @@ export let createEnvironmentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let env = await client.createEnvironment({
       projectId: ctx.input.projectId,
       name: ctx.input.name,
@@ -131,6 +131,42 @@ export let createEnvironmentTool = SlateTool.create(spec, {
         createdAt: env.createdAt
       },
       message: `Created environment **${env.name}**.`
+    };
+  })
+  .build();
+
+export let renameEnvironmentTool = SlateTool.create(spec, {
+  name: 'Rename Environment',
+  key: 'rename_environment',
+  description: `Rename a Railway environment.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      environmentId: z.string().describe('ID of the environment to rename'),
+      name: z.string().describe('New environment name')
+    })
+  )
+  .output(
+    z.object({
+      environmentId: z.string().describe('Environment ID'),
+      name: z.string().describe('Updated environment name'),
+      updatedAt: z.string().nullable().describe('Last update timestamp')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let env = await client.renameEnvironment(ctx.input.environmentId, ctx.input.name);
+
+    return {
+      output: {
+        environmentId: env.id,
+        name: env.name,
+        updatedAt: env.updatedAt ?? null
+      },
+      message: `Renamed environment to **${env.name}**.`
     };
   })
   .build();
@@ -154,12 +190,59 @@ export let deleteEnvironmentTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     await client.deleteEnvironment(ctx.input.environmentId);
 
     return {
       output: { deleted: true },
       message: `Environment deleted successfully.`
+    };
+  })
+  .build();
+
+export let getEnvironmentLogsTool = SlateTool.create(spec, {
+  name: 'Get Environment Logs',
+  key: 'get_environment_logs',
+  description: `Retrieve recent logs from all services in a Railway environment.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      environmentId: z.string().describe('ID of the environment to retrieve logs for'),
+      limit: z.number().optional().default(100).describe('Maximum number of log lines'),
+      filter: z.string().optional().describe('Optional Railway log filter expression')
+    })
+  )
+  .output(
+    z.object({
+      logs: z.array(
+        z.object({
+          timestamp: z.string().nullable().describe('Log entry timestamp'),
+          message: z.string().describe('Log message'),
+          severity: z.string().nullable().describe('Log severity level')
+        })
+      )
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let logs = await client.getEnvironmentLogs({
+      environmentId: ctx.input.environmentId,
+      limit: ctx.input.limit,
+      filter: ctx.input.filter
+    });
+
+    let mapped = (logs || []).map((log: any) => ({
+      timestamp: log.timestamp ?? null,
+      message: log.message,
+      severity: log.severity ?? null
+    }));
+
+    return {
+      output: { logs: mapped },
+      message: `Retrieved **${mapped.length}** environment log line(s).`
     };
   })
   .build();

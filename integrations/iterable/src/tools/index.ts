@@ -2,6 +2,7 @@ export * from './delete-user';
 export * from './export-data';
 export * from './get-channels';
 export * from './get-user';
+export * from './list-journeys';
 export * from './manage-campaigns';
 export * from './manage-catalogs';
 export * from './manage-lists';

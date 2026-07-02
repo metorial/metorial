@@ -6,8 +6,8 @@ import { spec } from '../spec';
 export let getStats = SlateTool.create(spec, {
   name: 'Get Stats',
   key: 'get_stats',
-  description: `Get email sending statistics for a domain. Returns aggregate counts for events like accepted, delivered, failed, opened, clicked, unsubscribed, and complained over a time range.
-Useful for monitoring email performance and deliverability.`,
+  description: `Get email sending statistics from Mailgun's legacy Stats API for a domain. Returns aggregate counts for events like accepted, delivered, failed, opened, clicked, unsubscribed, and complained over a time range.
+Prefer the Query Metrics tool for current analytics unless you specifically need the legacy Stats API.`,
   instructions: [
     'At least one event type must be specified.',
     'Use duration for relative time ranges (e.g. "7d" for 7 days, "1m" for 1 month).',

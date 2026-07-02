@@ -24,9 +24,10 @@ let signerSchema = z.object({
 export let sendSignatureRequest = SlateTool.create(spec, {
   name: 'Send Signature Request',
   key: 'send_signature_request',
-  description: `Send documents for electronic signature to one or more signers via email. Supports uploading documents via URL, setting signer order, adding CC recipients, access codes for signer authentication, and attaching metadata.`,
+  description: `Send documents for electronic signature to one or more signers via email or as an embedded Dropbox Sign request. Supports document URLs, signer order, CC recipients, access codes for signer authentication, and metadata.`,
   instructions: [
     'Provide at least one file URL and at least one signer.',
+    'Use embeddedSigning=true with clientId to create an embedded signing request.',
     'Use testMode=true for testing without consuming signature requests.'
   ],
   tags: {
@@ -72,7 +73,11 @@ export let sendSignatureRequest = SlateTool.create(spec, {
       clientId: z
         .string()
         .optional()
-        .describe('API App client ID for branding and embedded flows')
+        .describe('API App client ID for branding and embedded signing flows'),
+      embeddedSigning: z
+        .boolean()
+        .optional()
+        .describe('Create an embedded signing request instead of an email signing request')
     })
   )
   .output(
@@ -123,7 +128,8 @@ export let sendSignatureRequest = SlateTool.create(spec, {
       useTextTags: ctx.input.useTextTags,
       signingRedirectUrl: ctx.input.signingRedirectUrl,
       testMode: ctx.input.testMode,
-      clientId: ctx.input.clientId
+      clientId: ctx.input.clientId,
+      embeddedSigning: ctx.input.embeddedSigning
     });
 
     let signatures = (result.signatures || []).map((s: any) => ({

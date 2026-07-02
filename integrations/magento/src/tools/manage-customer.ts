@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MagentoClient } from '../lib/client';
+import { magentoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let customerAddressSchema = z.object({
@@ -112,7 +113,8 @@ export let manageCustomer = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.customerId) throw new Error('customerId is required for get action');
+      if (!ctx.input.customerId)
+        throw magentoServiceError('customerId is required for get action');
       let customer = await client.getCustomer(ctx.input.customerId);
       return {
         output: { customer: mapCustomer(customer) },
@@ -121,7 +123,8 @@ export let manageCustomer = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.customerId) throw new Error('customerId is required for delete action');
+      if (!ctx.input.customerId)
+        throw magentoServiceError('customerId is required for delete action');
       await client.deleteCustomer(ctx.input.customerId);
       return {
         output: { deleted: true },
@@ -165,7 +168,8 @@ export let manageCustomer = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.customerId) throw new Error('customerId is required for update action');
+    if (!ctx.input.customerId)
+      throw magentoServiceError('customerId is required for update action');
     customerData.id = ctx.input.customerId;
     let customer = await client.updateCustomer(ctx.input.customerId, customerData);
     return {

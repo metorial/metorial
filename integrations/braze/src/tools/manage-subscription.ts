@@ -1,7 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrazeClient } from '../lib/client';
+import { brazeServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let hasAnyUserIdentifier = (input: {
+  externalIds?: string[];
+  emails?: string[];
+  phones?: string[];
+  externalId?: string;
+  email?: string;
+  phone?: string;
+}) =>
+  (input.externalIds?.length ?? 0) > 0 ||
+  (input.emails?.length ?? 0) > 0 ||
+  (input.phones?.length ?? 0) > 0 ||
+  Boolean(input.externalId) ||
+  Boolean(input.email) ||
+  Boolean(input.phone);
 
 export let updateSubscriptionStatus = SlateTool.create(spec, {
   name: 'Update Subscription Status',
@@ -40,6 +56,10 @@ export let updateSubscriptionStatus = SlateTool.create(spec, {
       token: ctx.auth.token,
       instanceUrl: ctx.config.instanceUrl
     });
+
+    if (!hasAnyUserIdentifier(ctx.input)) {
+      throw brazeServiceError('Provide externalIds, emails, or phones to update.');
+    }
 
     let result = await client.setSubscriptionStatus({
       subscriptionGroupId: ctx.input.subscriptionGroupId,
@@ -99,6 +119,10 @@ export let getSubscriptionStatus = SlateTool.create(spec, {
       token: ctx.auth.token,
       instanceUrl: ctx.config.instanceUrl
     });
+
+    if (!hasAnyUserIdentifier(ctx.input)) {
+      throw brazeServiceError('Provide externalId, email, or phone to query.');
+    }
 
     let result: any;
     if (ctx.input.subscriptionGroupId) {

@@ -20,11 +20,19 @@ export let sendReply = SlateTool.create(spec, {
       bcc: z.array(z.string()).optional().describe('BCC recipients'),
       subject: z.string().optional().describe('Override subject line'),
       body: z.string().describe('Reply body content (HTML or markdown)'),
-      bodyFormat: z
-        .enum(['html', 'markdown'])
+      text: z.string().optional().describe('Plain-text body for email replies'),
+      quoteBody: z
+        .string()
         .optional()
-        .describe('Format of the body content'),
-      channelId: z.string().optional().describe('Channel ID to send the reply from')
+        .describe('Quoted body that the reply references. Only available on email channels.'),
+      channelId: z.string().optional().describe('Channel ID to send the reply from'),
+      signatureId: z.string().optional().describe('Signature ID to attach for email channels'),
+      shouldAddDefaultSignature: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether Front should try to resolve the default signature for email channels'
+        )
     })
   )
   .output(
@@ -42,8 +50,11 @@ export let sendReply = SlateTool.create(spec, {
       bcc: ctx.input.bcc,
       subject: ctx.input.subject,
       body: ctx.input.body,
-      body_format: ctx.input.bodyFormat,
-      channel_id: ctx.input.channelId
+      text: ctx.input.text,
+      quote_body: ctx.input.quoteBody,
+      channel_id: ctx.input.channelId,
+      signature_id: ctx.input.signatureId,
+      should_add_default_signature: ctx.input.shouldAddDefaultSignature
     });
 
     return {

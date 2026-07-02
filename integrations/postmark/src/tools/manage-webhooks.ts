@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { postmarkServiceError, requirePostmarkNumber } from '../lib/errors';
 import { spec } from '../spec';
 
 let triggerSchema = z
@@ -160,9 +161,9 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required');
+      let webhookId = requirePostmarkNumber(ctx.input.webhookId, 'webhookId', 'get');
 
-      let w = await client.getWebhook(ctx.input.webhookId);
+      let w = await client.getWebhook(webhookId);
 
       return {
         output: {
@@ -174,7 +175,7 @@ export let manageWebhooks = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.url || !ctx.input.triggers) {
-        throw new Error('url and triggers are required for creating a webhook');
+        throw postmarkServiceError('url and triggers are required for "create".');
       }
 
       let w = await client.createWebhook({
@@ -194,9 +195,9 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required');
+      let webhookId = requirePostmarkNumber(ctx.input.webhookId, 'webhookId', 'update');
 
-      let w = await client.editWebhook(ctx.input.webhookId, {
+      let w = await client.editWebhook(webhookId, {
         url: ctx.input.url,
         httpAuth: ctx.input.httpAuth,
         httpHeaders: ctx.input.httpHeaders,
@@ -212,14 +213,14 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.webhookId) throw new Error('webhookId is required');
+    let webhookId = requirePostmarkNumber(ctx.input.webhookId, 'webhookId', 'delete');
 
-    await client.deleteWebhook(ctx.input.webhookId);
+    await client.deleteWebhook(webhookId);
 
     return {
       output: {
         deleted: true
       },
-      message: `Deleted webhook **${ctx.input.webhookId}**.`
+      message: `Deleted webhook **${webhookId}**.`
     };
   });

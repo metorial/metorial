@@ -32,6 +32,10 @@ List all sales channels configured for the store. Channels represent different s
 
 Search and list customers. Supports filtering by email, name, company, customer group, date range, and more. Returns paginated results with customer details.
 
+### List Order Statuses
+
+List BigCommerce order statuses and their IDs. Use this before updating an order status when you need the correct statusId value.
+
 ### List Orders
 
 Search and list orders from the store. Supports filtering by status, customer, date range, and more. Returns order details including totals, status, and customer information.
@@ -46,7 +50,7 @@ List, create, update, or delete product brands. Brands help organize products an
 
 ### Manage Cart
 
-Create, retrieve, update, or delete carts and their line items. Supports creating draft carts with customer association, adding/removing items, and updating quantities.
+Create, retrieve, update, or delete carts and their line items. Supports draft carts, item quantity or list price updates, optimistic cart versions, included sub-resources, and one-time redirect URLs.
 
 ### Manage Category
 
@@ -59,6 +63,10 @@ List, create, update, or delete coupons for marketing promotions. Supports perce
 ### Manage Customer
 
 Create, update, or delete a customer. When creating, provide first name, last name, and email. When updating, provide the customer ID and the fields to change. Supports managing addresses alongside the customer.
+
+### Manage Inventory
+
+List location-aware inventory items, list inventory locations, or apply absolute inventory adjustments. Absolute adjustments set the current quantity for tracked products or variants at specific locations.
 
 ### Manage Order Shipment
 

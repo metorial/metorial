@@ -9,4 +9,5 @@ export { manageRoles } from './manage-roles';
 export { manageSchemas } from './manage-schemas';
 export { manageTable } from './manage-table';
 export { manageViews } from './manage-views';
+export { selectQuery } from './select-query';
 export { updateRows } from './update-rows';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PandaDocClient } from '../lib/client';
+import { pandadocServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let sendDocument = SlateTool.create(spec, {
@@ -25,7 +26,20 @@ export let sendDocument = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('If true, no email is sent — used for embedded signing. Defaults to false.'),
-      senderEmail: z.string().optional().describe('Override the sender email address')
+      senderEmail: z.string().optional().describe('Override the sender email address'),
+      senderMembershipId: z
+        .string()
+        .optional()
+        .describe('Override the sender by PandaDoc membership ID'),
+      replyTo: z.string().optional().describe('Reply-to email address for recipient emails'),
+      forwardingSettings: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Raw PandaDoc forwarding_settings payload'),
+      selectedApprovers: z
+        .array(z.string())
+        .optional()
+        .describe('Selected approver membership IDs for approval workflows')
     })
   )
   .output(
@@ -40,11 +54,23 @@ export let sendDocument = SlateTool.create(spec, {
       authType: ctx.auth.authType
     });
 
+    if (ctx.input.senderEmail && ctx.input.senderMembershipId) {
+      throw pandadocServiceError(
+        'Provide either senderEmail or senderMembershipId, not both.'
+      );
+    }
+
     await client.sendDocument(ctx.input.documentId, {
       subject: ctx.input.subject,
       message: ctx.input.message,
       silent: ctx.input.silent,
-      sender: ctx.input.senderEmail ? { email: ctx.input.senderEmail } : undefined
+      sender:
+        ctx.input.senderEmail || ctx.input.senderMembershipId
+          ? { email: ctx.input.senderEmail, membership_id: ctx.input.senderMembershipId }
+          : undefined,
+      reply_to: ctx.input.replyTo,
+      forwarding_settings: ctx.input.forwardingSettings,
+      selected_approvers: ctx.input.selectedApprovers
     });
 
     return {

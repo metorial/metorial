@@ -263,7 +263,7 @@ Priority: 1=Low, 2=Medium, 3=High, 4=Urgent.`,
 export let deleteProblem = SlateTool.create(spec, {
   name: 'Delete Problem',
   key: 'delete_problem',
-  description: `Permanently delete a problem by its ID.`,
+  description: `Delete a problem by its ID. Deleted problems can be restored.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -295,6 +295,45 @@ export let deleteProblem = SlateTool.create(spec, {
         deleted: true
       },
       message: `Deleted problem **#${ctx.input.problemId}**`
+    };
+  })
+  .build();
+
+export let restoreProblem = SlateTool.create(spec, {
+  name: 'Restore Problem',
+  key: 'restore_problem',
+  description: `Restore a deleted Freshservice problem by ID.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      problemId: z.number().describe('ID of the deleted problem to restore')
+    })
+  )
+  .output(
+    z.object({
+      problemId: z.number().describe('ID of the restored problem'),
+      restored: z.boolean().describe('Whether the restore was accepted')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      subdomain: ctx.config.subdomain,
+      authType: ctx.auth.authType
+    });
+
+    await client.restoreProblem(ctx.input.problemId);
+
+    return {
+      output: {
+        problemId: ctx.input.problemId,
+        restored: true
+      },
+      message: `Restored problem **#${ctx.input.problemId}**`
     };
   })
   .build();

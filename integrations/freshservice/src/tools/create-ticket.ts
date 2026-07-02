@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { freshserviceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createTicket = SlateTool.create(spec, {
@@ -66,6 +67,12 @@ Source: 1=Email, 2=Portal, 3=Phone, 7=Chat, 9=Feedback Widget, 10=Outbound Email
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.email && !ctx.input.phone && !ctx.input.requesterId) {
+      throw freshserviceServiceError(
+        'Provide one requester identifier: email, phone, or requesterId.'
+      );
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       subdomain: ctx.config.subdomain,

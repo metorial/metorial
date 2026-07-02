@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AppClient } from '../lib/client';
+import { customerIoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCollection = SlateTool.create(spec, {
@@ -56,15 +57,43 @@ export let manageCollection = SlateTool.create(spec, {
     let result: any;
 
     if (ctx.input.action === 'create') {
-      let data: unknown[] | string = ctx.input.jsonData ?? ctx.input.dataUrl ?? [];
-      result = await appClient.createCollection(ctx.input.name!, data);
+      if (!ctx.input.name) {
+        throw customerIoServiceError('name is required to create a collection.');
+      }
+      if (ctx.input.jsonData && ctx.input.dataUrl) {
+        throw customerIoServiceError('Provide only one of jsonData or dataUrl.');
+      }
+      if (!ctx.input.jsonData && !ctx.input.dataUrl) {
+        throw customerIoServiceError(
+          'jsonData or dataUrl is required to create a collection.'
+        );
+      }
+
+      let data = ctx.input.jsonData ?? ctx.input.dataUrl!;
+      result = await appClient.createCollection(ctx.input.name, data);
     } else if (ctx.input.action === 'update') {
-      result = await appClient.updateCollection(ctx.input.collectionId!, {
+      if (!ctx.input.collectionId) {
+        throw customerIoServiceError('collectionId is required to update a collection.');
+      }
+      if (ctx.input.jsonData && ctx.input.dataUrl) {
+        throw customerIoServiceError('Provide only one of jsonData or dataUrl.');
+      }
+      if (!ctx.input.name && !ctx.input.jsonData && !ctx.input.dataUrl) {
+        throw customerIoServiceError(
+          'Provide name, jsonData, or dataUrl to update a collection.'
+        );
+      }
+
+      result = await appClient.updateCollection(ctx.input.collectionId, {
         name: ctx.input.name,
         data: ctx.input.jsonData ?? ctx.input.dataUrl
       });
     } else {
-      await appClient.deleteCollection(ctx.input.collectionId!);
+      if (!ctx.input.collectionId) {
+        throw customerIoServiceError('collectionId is required to delete a collection.');
+      }
+
+      await appClient.deleteCollection(ctx.input.collectionId);
       return {
         output: { collectionId: ctx.input.collectionId, success: true },
         message: `Deleted collection **${ctx.input.collectionId}**.`

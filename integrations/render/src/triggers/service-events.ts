@@ -1,4 +1,4 @@
-import { SlateTrigger } from 'slates';
+import { createApiServiceError, SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { RenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -32,13 +32,14 @@ export let serviceEvents = SlateTrigger.create(spec, {
 
       let workspaces = await client.listWorkspaces({ limit: 1 });
       let ownerId = (workspaces as any[])?.[0]?.owner?.id;
-      if (!ownerId) throw new Error('No workspace found to register webhook');
+      if (!ownerId) throw createApiServiceError('No workspace found to register webhook');
 
       let webhook = await client.createWebhook({
         ownerId,
         url: ctx.input.webhookBaseUrl,
         name: 'Slates Service Events',
-        eventTypes: [
+        enabled: true,
+        eventFilter: [
           'server_available',
           'server_failed',
           'server_hardware_failure',

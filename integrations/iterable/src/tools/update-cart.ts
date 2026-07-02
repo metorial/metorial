@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { IterableClient } from '../lib/client';
+import { requireArrayField, requireUserIdentity } from '../lib/validation';
 import { spec } from '../spec';
 
 let cartItemSchema = z.object({
@@ -46,6 +47,9 @@ export let updateCart = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireUserIdentity(ctx.input);
+    requireArrayField(ctx.input.items, 'items');
+
     let client = new IterableClient({
       token: ctx.auth.token,
       dataCenter: ctx.config.dataCenter

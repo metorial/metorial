@@ -213,16 +213,14 @@ export let appendMessages = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let body = {
-      messages: ctx.input.messages.map(m => ({
-        role: m.role,
-        content: m.content,
-        ...(m.name ? { name: m.name } : {}),
-        ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {})
-      }))
-    };
+    let messages = ctx.input.messages.map(m => ({
+      role: m.role,
+      content: m.content,
+      ...(m.name ? { name: m.name } : {}),
+      ...(m.toolCallId ? { tool_call_id: m.toolCallId } : {})
+    }));
 
-    let result = await client.appendMessages(ctx.input.threadId, body);
+    let result = await client.appendMessages(ctx.input.threadId, messages);
     let msgs = (Array.isArray(result) ? result : []).map((m: any) => ({
       messageId: m.id ?? '',
       threadId: m.thread_id ?? ctx.input.threadId,

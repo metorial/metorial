@@ -4,6 +4,10 @@ Manage Wix-hosted websites and business solutions programmatically. Create and m
 
 ## Tools
 
+### Get Catalog Version
+
+Retrieve the Wix Stores catalog version installed on the site. Use this before product catalog flows when you need to know whether the site uses Catalog V1 or Catalog V3.
+
 ### Get Site Properties
 
 Retrieve the site's metadata including business name, description, logo, contact info, locale settings, and more. Returns comprehensive site configuration and business information in a single call.
@@ -44,13 +48,17 @@ Query and retrieve site members on a Wix site. Use **action** to specify the ope
 
 Search, retrieve, create, or update eCommerce orders on a Wix site. Use **action** to specify the operation: \
 
+### Manage Order Fulfillments
+
+List, create, update, or delete fulfillment records for Wix eCommerce orders. Use **action** to specify the operation: \
+
 ### Manage Pricing Plans
 
-Query and retrieve pricing plans on a Wix site. Use **action** to specify the operation: \
+Query and retrieve pricing plans on a Wix site using Wix Pricing Plans V3. Use **action** to specify the operation: \
 
 ### Manage Products
 
-Create, update, delete, or retrieve products from a Wix Store catalog. Use **action** to specify the operation: \
+Create, update, delete, or retrieve products from a Wix Store catalog. Supports Wix Stores Catalog V1 and Catalog V3. Use **action** to specify the operation: \
 
 ## License
 

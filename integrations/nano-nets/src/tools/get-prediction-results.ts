@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NanonetsClient } from '../lib/client';
+import { nanonetsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let predictionSchema = z.object({
@@ -63,7 +64,11 @@ export let getPredictionResults = SlateTool.create(spec, {
     let client = new NanonetsClient(ctx.auth.token);
 
     if (!ctx.input.requestFileId && !ctx.input.pageId) {
-      throw new Error('Either requestFileId or pageId must be provided');
+      throw nanonetsServiceError('Either requestFileId or pageId must be provided.');
+    }
+
+    if (ctx.input.requestFileId && ctx.input.pageId) {
+      throw nanonetsServiceError('Provide only one of requestFileId or pageId.');
     }
 
     let result: any;
@@ -80,42 +85,24 @@ export let getPredictionResults = SlateTool.create(spec, {
     let approvalStatus: string | undefined;
     let isModerated: boolean | undefined;
 
-    if (result?.result && Array.isArray(result.result)) {
-      for (let page of result.result) {
-        fileName = fileName || page.input || page.original_file_name;
-        fileUrl = fileUrl || page.file_url;
-        approvalStatus = approvalStatus || page.approval_status;
-        isModerated = isModerated ?? page.is_moderated;
+    let resultPages = Array.isArray(result?.result)
+      ? result.result
+      : [
+          ...(result?.moderated_images || []),
+          ...(result?.unmoderated_images || []),
+          ...(result ? [result] : [])
+        ];
 
-        for (let pred of page.prediction || page.predicted_boxes || []) {
-          predictions.push({
-            label: pred.label,
-            extractedText: pred.ocr_text || '',
-            confidence: pred.score,
-            type: pred.type,
-            page: pred.page,
-            boundingBox:
-              pred.xmin != null
-                ? {
-                    xmin: pred.xmin,
-                    ymin: pred.ymin,
-                    xmax: pred.xmax,
-                    ymax: pred.ymax
-                  }
-                : undefined
-          });
-        }
-      }
-    } else if (result) {
-      fileName = result.input || result.original_file_name;
-      fileUrl = result.file_url;
-      approvalStatus = result.approval_status;
-      isModerated = result.is_moderated;
+    for (let page of resultPages) {
+      fileName = fileName || page.input || page.original_file_name;
+      fileUrl = fileUrl || page.file_url;
+      approvalStatus = approvalStatus || page.approval_status;
+      isModerated = isModerated ?? page.is_moderated;
 
-      for (let pred of result.prediction || result.predicted_boxes || []) {
+      for (let pred of page.prediction || page.predicted_boxes || page.moderated_boxes || []) {
         predictions.push({
           label: pred.label,
-          extractedText: pred.ocr_text || '',
+          extractedText: pred.ocr_text || pred.text || '',
           confidence: pred.score,
           type: pred.type,
           page: pred.page,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bigcommerceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let managePage = SlateTool.create(spec, {
@@ -65,7 +66,7 @@ export let managePage = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.pageId) throw new Error('pageId is required for get');
+      if (!ctx.input.pageId) throw bigcommerceServiceError('pageId is required for get');
       let result = await client.getPage(ctx.input.pageId);
       return {
         output: { contentPage: result.data },
@@ -74,7 +75,7 @@ export let managePage = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.pageId) throw new Error('pageId is required for delete');
+      if (!ctx.input.pageId) throw bigcommerceServiceError('pageId is required for delete');
       await client.deletePage(ctx.input.pageId);
       return {
         output: { deleted: true },
@@ -102,7 +103,7 @@ export let managePage = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.pageId) throw new Error('pageId is required for update');
+    if (!ctx.input.pageId) throw bigcommerceServiceError('pageId is required for update');
     let result = await client.updatePage(ctx.input.pageId, data);
     return {
       output: { contentPage: result.data },

@@ -1,15 +1,13 @@
 {
   "name": "@metorial/1password",
-  "description": "Manage passwords, secrets, and sensitive credentials stored in encrypted vaults. Retrieve secrets using reference URIs, create/read/update/delete vault items including API keys, passwords, SSH keys, and file attachments. Generate passwords with configurable recipes. Share items securely with expiration and recipient controls. Manage vaults, users, and groups with permissions. Monitor account activity through audit events, item usage events, and sign-in attempt events for SIEM integration.",
+  "description": "Manage passwords, secrets, and sensitive credentials stored in encrypted vaults through 1Password Connect. Create, read, update, delete, list, and search vault items; inspect vault metadata; retrieve file attachments through Slate attachments; generate passwords; check Connect server health; and monitor audit, item usage, and sign-in events.",
   "categories": ["apis-and-http-requests", "security"],
   "skills": [
-    "resolve secrets by reference",
     "manage vault items",
+    "inspect vault metadata",
     "generate passwords",
-    "share items securely",
-    "manage vaults and permissions",
-    "manage users and groups",
-    "store and retrieve files",
+    "download file attachments",
+    "monitor connect server health",
     "monitor audit events",
     "track sign-in attempts",
     "track item usage events"

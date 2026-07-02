@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { GoogleDriveClient } from '../lib/client';
+import { GOOGLE_DRIVE_MAX_PAGE_SIZE, GoogleDriveClient } from '../lib/client';
 import { googleDriveActionScopes } from '../scopes';
 import { spec } from '../spec';
 
@@ -40,7 +40,7 @@ export let searchFilesTool = SlateTool.create(spec, {
     'Combine conditions with "and"/"or": name contains \'budget\' and mimeType = \'application/vnd.google-apps.spreadsheet\'.',
     "To find folders, use: mimeType = 'application/vnd.google-apps.folder'.",
     "To list files in a specific folder, use: 'FOLDER_ID' in parents.",
-    'Pagination: when using `pageToken`, keep the same `query`, `orderBy`, and `driveId` as the request that returned that token. Changing filters while reusing a token returns HTTP 400.'
+    'Pagination: omit `pageToken` unless it is exactly the `nextPageToken` from a previous response. When using `pageToken`, keep the same `query`, `orderBy`, and `driveId` as the request that returned that token. Changing filters while reusing a token returns HTTP 400.'
   ],
   tags: {
     readOnly: true
@@ -57,9 +57,19 @@ export let searchFilesTool = SlateTool.create(spec, {
         ),
       pageSize: z
         .number()
+        .int()
+        .min(1)
+        .max(GOOGLE_DRIVE_MAX_PAGE_SIZE)
         .optional()
-        .describe('Maximum number of files to return (1-1000, default 100)'),
-      pageToken: z.string().optional().describe('Token for fetching the next page of results'),
+        .describe(
+          `Maximum number of files to return (1-${GOOGLE_DRIVE_MAX_PAGE_SIZE}, default 100)`
+        ),
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Token for fetching the next page of results. Must be the exact nextPageToken returned by a previous response; omit this field for the first page or when no token is available.'
+        ),
       orderBy: z
         .string()
         .optional()

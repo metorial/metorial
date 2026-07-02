@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { squarespaceApiError, squarespaceServiceError } from './lib/errors';
 
 let loginAxios = createAxios({
   baseURL: 'https://login.squarespace.com/api/1/login/oauth/provider'
@@ -8,6 +9,40 @@ let loginAxios = createAxios({
 let apiAxios = createAxios({
   baseURL: 'https://api.squarespace.com/1.0'
 });
+
+for (let api of [loginAxios, apiAxios]) {
+  api.interceptors?.response?.use(
+    response => response,
+    error => Promise.reject(squarespaceApiError(error))
+  );
+}
+
+let expiresAtFromTokenResponse = (data: any) => {
+  let explicitExpiresAt = data.access_token_expires_at;
+  if (explicitExpiresAt !== undefined) {
+    let timestamp = Number(explicitExpiresAt);
+    if (Number.isFinite(timestamp)) {
+      return new Date(timestamp * 1000).toISOString();
+    }
+  }
+
+  return new Date(Date.now() + (data.expires_in || 1800) * 1000).toISOString();
+};
+
+let outputFromTokenResponse = (data: any, fallbackRefreshToken?: string) => {
+  let token = data.access_token || data.token;
+  if (!token) {
+    throw squarespaceServiceError(
+      'Squarespace OAuth token response did not include an access token.'
+    );
+  }
+
+  return {
+    token,
+    refreshToken: data.refresh_token || fallbackRefreshToken,
+    expiresAt: expiresAtFromTokenResponse(data)
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -57,6 +92,16 @@ export let auth = SlateAuth.create()
         title: 'Products (Read)',
         description: 'View product information',
         scope: 'website.products.read'
+      },
+      {
+        title: 'Contacts (Read/Write)',
+        description: 'Manage customer contact records and address book entries',
+        scope: 'website.contacts'
+      },
+      {
+        title: 'Contacts (Read)',
+        description: 'View customer contact records and address book entries',
+        scope: 'website.contacts.read'
       }
     ],
 
@@ -92,19 +137,18 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + (data.expires_in || 1800) * 1000).toISOString();
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: outputFromTokenResponse(response.data)
       };
     },
 
     handleTokenRefresh: async (ctx: any) => {
+      if (!ctx.output.refreshToken) {
+        throw squarespaceServiceError(
+          'Squarespace OAuth refresh requires a refresh token. Reconnect the account with offline access.'
+        );
+      }
+
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
       let response = await loginAxios.post(
@@ -121,15 +165,8 @@ export let auth = SlateAuth.create()
         }
       );
 
-      let data = response.data;
-      let expiresAt = new Date(Date.now() + (data.expires_in || 1800) * 1000).toISOString();
-
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
-        }
+        output: outputFromTokenResponse(response.data, ctx.output.refreshToken)
       };
     },
 

@@ -74,7 +74,7 @@ Retrieve the currently authenticated Confluence user's profile information.
 
 ### Search Content
 
-Search Confluence content using CQL (Confluence Query Language). CQL supports filtering by type, space, label, creator, date, title, text content, and more. **Example CQL queries:** - \
+Search Confluence content by plain text or advanced CQL. Use `query` for normal keyword searches such as `release notes`, or use `cql` for structured filters such as `type=page AND space=DEV` or `text ~ "release notes"`.
 
 ### Update Page
 

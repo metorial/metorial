@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { cognitoServiceError } from '../lib/errors';
 import { createIdentityClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -149,7 +150,7 @@ export let manageIdentityPool = SlateTool.create(spec, {
         !ctx.input.identityPoolName ||
         ctx.input.allowUnauthenticatedIdentities === undefined
       ) {
-        throw new Error(
+        throw cognitoServiceError(
           'identityPoolName and allowUnauthenticatedIdentities are required for create'
         );
       }
@@ -161,7 +162,9 @@ export let manageIdentityPool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.identityPoolId) throw new Error('identityPoolId is required for get');
+      if (!ctx.input.identityPoolId) {
+        throw cognitoServiceError('identityPoolId is required for get');
+      }
       let result = await client.describeIdentityPool(ctx.input.identityPoolId);
       return {
         output: mapPool(result),
@@ -175,7 +178,7 @@ export let manageIdentityPool = SlateTool.create(spec, {
         !ctx.input.identityPoolName ||
         ctx.input.allowUnauthenticatedIdentities === undefined
       ) {
-        throw new Error(
+        throw cognitoServiceError(
           'identityPoolId, identityPoolName, and allowUnauthenticatedIdentities are required for update'
         );
       }
@@ -187,7 +190,9 @@ export let manageIdentityPool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.identityPoolId) throw new Error('identityPoolId is required for delete');
+      if (!ctx.input.identityPoolId) {
+        throw cognitoServiceError('identityPoolId is required for delete');
+      }
       await client.deleteIdentityPool(ctx.input.identityPoolId);
       return {
         output: { identityPoolId: ctx.input.identityPoolId, deleted: true },
@@ -195,6 +200,6 @@ export let manageIdentityPool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw cognitoServiceError(`Unknown action: ${action}`);
   })
   .build();

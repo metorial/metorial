@@ -1,7 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Api2PdfClient } from '../lib/client';
+import { api2PdfServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  api2PdfFileOutputSchema,
+  fetchApi2PdfAttachment,
+  fileAttachment,
+  fileOutput
+} from './shared';
 
 let imageOptionsSchema = z
   .object({
@@ -23,7 +30,15 @@ let imageOptionsSchema = z
         hasTouch: z.boolean().optional().describe('Simulate touch-enabled device')
       })
       .optional()
-      .describe('Viewport configuration for the screenshot')
+      .describe('Viewport configuration for the screenshot'),
+    puppeteerWaitForMethod: z
+      .string()
+      .optional()
+      .describe('Puppeteer wait method, e.g. "WaitForNavigation" or "WaitForExpression"'),
+    puppeteerWaitForValue: z
+      .string()
+      .optional()
+      .describe('Value to pass to the Puppeteer wait method')
   })
   .optional()
   .describe('Screenshot capture options');
@@ -59,17 +74,7 @@ export let captureScreenshot = SlateTool.create(spec, {
         .describe('Extra HTTP headers when fetching the source URL')
     })
   )
-  .output(
-    z.object({
-      responseId: z
-        .string()
-        .describe('Unique ID for this request, can be used to delete the file later'),
-      fileUrl: z.string().describe('URL to download the generated screenshot image'),
-      mbOut: z.number().describe('Size of the generated file in megabytes'),
-      cost: z.number().describe('Cost of this API call in USD'),
-      seconds: z.number().describe('Processing time in seconds')
-    })
-  )
+  .output(api2PdfFileOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Api2PdfClient({
       token: ctx.auth.token,
@@ -80,7 +85,7 @@ export let captureScreenshot = SlateTool.create(spec, {
       Boolean
     ).length;
     if (sourceCount !== 1) {
-      throw new Error('Provide exactly one of: html, url, or markdown');
+      throw api2PdfServiceError('Provide exactly one of: html, url, or markdown');
     }
 
     let result: any;
@@ -109,21 +114,14 @@ export let captureScreenshot = SlateTool.create(spec, {
       });
     }
 
-    if (!result.success) {
-      throw new Error(result.error || 'Screenshot capture failed');
-    }
+    let file = await fetchApi2PdfAttachment(client, result, 'Screenshot capture failed');
 
     let sourceType = ctx.input.html ? 'HTML' : ctx.input.url ? 'URL' : 'Markdown';
 
     return {
-      output: {
-        responseId: result.responseId,
-        fileUrl: result.fileUrl,
-        mbOut: result.mbOut,
-        cost: result.cost,
-        seconds: result.seconds
-      },
-      message: `Captured screenshot from ${sourceType} (${result.mbOut} MB, ${result.seconds}s). [Download Image](${result.fileUrl})`
+      output: fileOutput(result, file),
+      attachments: [fileAttachment(file)],
+      message: `Captured screenshot from ${sourceType} (${result.mbOut} MB, ${result.seconds}s) and returned it as a Slate attachment.`
     };
   })
   .build();

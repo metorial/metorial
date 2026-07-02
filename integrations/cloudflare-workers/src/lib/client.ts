@@ -1,4 +1,10 @@
+import { Buffer } from 'node:buffer';
 import { createAxios } from 'slates';
+import {
+  cloudflareWorkersApiError,
+  cloudflareWorkersApiResponseError,
+  cloudflareWorkersServiceError
+} from './errors';
 
 export interface CloudflareAuthConfig {
   token: string;
@@ -6,6 +12,170 @@ export interface CloudflareAuthConfig {
   authType: 'api_token' | 'global_api_key';
   accountId: string;
 }
+
+export interface WorkerScriptUploadParams {
+  scriptName: string;
+  scriptContent: string;
+  moduleName?: string;
+  syntax?: 'module' | 'service_worker';
+  contentType?: string;
+  compatibilityDate?: string;
+  compatibilityFlags?: string[];
+  bindings?: Record<string, any>[];
+  usageModel?: string;
+  logpush?: boolean;
+  observability?: {
+    enabled?: boolean;
+    headSamplingRate?: number;
+  };
+  placementMode?: string;
+  message?: string;
+  tag?: string;
+  alias?: string;
+  bindingsInheritStrict?: boolean;
+}
+
+export interface ScriptContentUpdateParams {
+  scriptName: string;
+  scriptContent: string;
+  moduleName?: string;
+  syntax?: 'module' | 'service_worker';
+  contentType?: string;
+}
+
+export interface DownloadedScriptContent {
+  content: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+let isCloudflareEnvelopeFailure = (value: unknown) =>
+  isRecord(value) && value.success === false;
+
+let responseHeader = (headers: unknown, name: string) => {
+  if (!headers || typeof headers !== 'object') {
+    return undefined;
+  }
+
+  let record = headers as Record<string, unknown> & {
+    get?: (key: string) => unknown;
+  };
+  let value = record[name] ?? record[name.toLowerCase()] ?? record.get?.(name);
+
+  return typeof value === 'string' ? value : undefined;
+};
+
+let contentTypeWithoutParams = (value: string | undefined, fallback: string) =>
+  value?.split(';', 1)[0]?.trim() || fallback;
+
+let toDownloadedContent = (
+  data: unknown,
+  headers: unknown,
+  fallbackContentType: string
+): DownloadedScriptContent => {
+  let content =
+    typeof data === 'string'
+      ? data
+      : Buffer.isBuffer(data)
+        ? data.toString('utf8')
+        : isRecord(data)
+          ? JSON.stringify(data, null, 2)
+          : String(data ?? '');
+  let contentType = contentTypeWithoutParams(
+    responseHeader(headers, 'content-type'),
+    fallbackContentType
+  );
+
+  return {
+    content,
+    contentType,
+    sizeBytes: Buffer.byteLength(content, 'utf8')
+  };
+};
+
+let defaultModuleName = (syntax: 'module' | 'service_worker') =>
+  syntax === 'service_worker' ? 'worker.js' : 'index.js';
+
+let defaultContentType = (syntax: 'module' | 'service_worker') =>
+  syntax === 'service_worker' ? 'application/javascript' : 'application/javascript+module';
+
+let appendWorkerFile = (
+  formData: FormData,
+  name: string,
+  content: string,
+  contentType: string
+) => {
+  formData.append(name, new Blob([content], { type: contentType }), name);
+};
+
+let buildUploadMetadata = (
+  params: WorkerScriptUploadParams,
+  options: { versionUpload?: boolean } = {}
+) => {
+  let syntax = options.versionUpload ? 'module' : (params.syntax ?? 'module');
+  let moduleName = params.moduleName || defaultModuleName(syntax);
+  let metadata: Record<string, any> =
+    syntax === 'service_worker' ? { body_part: moduleName } : { main_module: moduleName };
+
+  if (params.compatibilityDate !== undefined) {
+    metadata.compatibility_date = params.compatibilityDate;
+  }
+  if (params.compatibilityFlags !== undefined) {
+    metadata.compatibility_flags = params.compatibilityFlags;
+  }
+  if (params.bindings !== undefined) {
+    metadata.bindings = params.bindings;
+  }
+  if (params.usageModel !== undefined) {
+    metadata.usage_model = params.usageModel;
+  }
+  if (params.logpush !== undefined) {
+    metadata.logpush = params.logpush;
+  }
+  if (params.observability !== undefined) {
+    metadata.observability = {
+      enabled: params.observability.enabled,
+      head_sampling_rate: params.observability.headSamplingRate
+    };
+  }
+  if (params.placementMode !== undefined) {
+    metadata.placement = { mode: params.placementMode };
+  }
+
+  let annotations: Record<string, string> = {};
+  if (params.message !== undefined) {
+    annotations['workers/message'] = params.message;
+  }
+  if (params.tag !== undefined) {
+    annotations['workers/tag'] = params.tag;
+  }
+  if (params.alias !== undefined) {
+    annotations['workers/alias'] = params.alias;
+  }
+  if (Object.keys(annotations).length > 0) {
+    metadata.annotations = annotations;
+  }
+
+  return {
+    metadata,
+    moduleName,
+    syntax
+  };
+};
+
+let buildScriptContentMetadata = (params: ScriptContentUpdateParams) => {
+  let syntax = params.syntax ?? 'module';
+  let moduleName = params.moduleName || defaultModuleName(syntax);
+  return {
+    metadata:
+      syntax === 'service_worker' ? { body_part: moduleName } : { main_module: moduleName },
+    moduleName,
+    syntax
+  };
+};
 
 export class CloudflareClient {
   private accountId: string;
@@ -26,6 +196,17 @@ export class CloudflareClient {
       baseURL: 'https://api.cloudflare.com/client/v4',
       headers
     });
+
+    this.http.interceptors.response.use(
+      response => {
+        if (isCloudflareEnvelopeFailure(response.data)) {
+          throw cloudflareWorkersApiResponseError(response);
+        }
+
+        return response;
+      },
+      error => Promise.reject(cloudflareWorkersApiError(error))
+    );
   }
 
   private get basePath() {
@@ -48,9 +229,62 @@ export class CloudflareClient {
 
   async getScriptContent(scriptName: string) {
     let response = await this.http.get(`${this.basePath}/scripts/${scriptName}/content/v2`, {
-      headers: { Accept: 'application/javascript' }
+      headers: {
+        Accept: 'application/javascript, text/javascript, application/json, text/plain'
+      },
+      responseType: 'text',
+      transformResponse: data => data
     });
-    return response.data;
+    return toDownloadedContent(response.data, response.headers, 'application/javascript');
+  }
+
+  async uploadWorkerModule(params: WorkerScriptUploadParams) {
+    if (!params.scriptContent.trim()) {
+      throw cloudflareWorkersServiceError('scriptContent must not be empty.');
+    }
+
+    let { metadata, moduleName, syntax } = buildUploadMetadata(params);
+    let formData = new FormData();
+    formData.append('metadata', JSON.stringify(metadata));
+    appendWorkerFile(
+      formData,
+      moduleName,
+      params.scriptContent,
+      params.contentType || defaultContentType(syntax)
+    );
+
+    let response = await this.http.put(
+      `${this.basePath}/scripts/${params.scriptName}`,
+      formData,
+      {
+        params: {
+          bindings_inherit: params.bindingsInheritStrict ? 'strict' : undefined
+        }
+      }
+    );
+    return response.data.result;
+  }
+
+  async putScriptContent(params: ScriptContentUpdateParams) {
+    if (!params.scriptContent.trim()) {
+      throw cloudflareWorkersServiceError('scriptContent must not be empty.');
+    }
+
+    let { metadata, moduleName, syntax } = buildScriptContentMetadata(params);
+    let formData = new FormData();
+    formData.append('metadata', JSON.stringify(metadata));
+    appendWorkerFile(
+      formData,
+      moduleName,
+      params.scriptContent,
+      params.contentType || defaultContentType(syntax)
+    );
+
+    let response = await this.http.put(
+      `${this.basePath}/scripts/${params.scriptName}/content`,
+      formData
+    );
+    return response.data.result;
   }
 
   async deleteScript(scriptName: string, force?: boolean) {
@@ -85,6 +319,35 @@ export class CloudflareClient {
   async getVersion(scriptName: string, versionId: string) {
     let response = await this.http.get(
       `${this.basePath}/scripts/${scriptName}/versions/${versionId}`
+    );
+    return response.data.result;
+  }
+
+  async uploadVersion(params: WorkerScriptUploadParams) {
+    if (!params.scriptContent.trim()) {
+      throw cloudflareWorkersServiceError('scriptContent must not be empty.');
+    }
+
+    let { metadata, moduleName, syntax } = buildUploadMetadata(params, {
+      versionUpload: true
+    });
+    let formData = new FormData();
+    formData.append('metadata', JSON.stringify(metadata));
+    appendWorkerFile(
+      formData,
+      moduleName,
+      params.scriptContent,
+      params.contentType || defaultContentType(syntax)
+    );
+
+    let response = await this.http.post(
+      `${this.basePath}/scripts/${params.scriptName}/versions`,
+      formData,
+      {
+        params: {
+          bindings_inherit: params.bindingsInheritStrict ? 'strict' : undefined
+        }
+      }
     );
     return response.data.result;
   }
@@ -136,6 +399,13 @@ export class CloudflareClient {
 
   async listSecrets(scriptName: string) {
     let response = await this.http.get(`${this.basePath}/scripts/${scriptName}/secrets`);
+    return response.data.result;
+  }
+
+  async getSecret(scriptName: string, secretName: string) {
+    let response = await this.http.get(
+      `${this.basePath}/scripts/${scriptName}/secrets/${secretName}`
+    );
     return response.data.result;
   }
 

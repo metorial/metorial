@@ -27,8 +27,8 @@ let eventOutputSchema = z.object({
 export let getEvents = SlateTool.create(spec, {
   name: 'Get Events',
   key: 'get_events',
-  description: `Query the event log for a domain. Returns delivery, open, click, bounce, complaint, and other email events.
-Filter by event type, recipient, sender, subject, date range, and more. Useful for tracking email delivery status and debugging issues.`,
+  description: `Query Mailgun's legacy Events API for a domain. Returns delivery, open, click, bounce, complaint, and other email events.
+Filter by event type, recipient, sender, subject, date range, and more. Prefer the Query Logs tool for current delivery/debug logging unless you specifically need the legacy Events API.`,
   instructions: [
     'Dates should be in RFC 2822 format (e.g. "Thu, 13 Oct 2011 18:02:00 GMT").',
     'Use eventType to filter by specific events like "delivered", "failed", "opened", "clicked".',

@@ -19,16 +19,22 @@ export let reparseDocuments = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the re-parse was successfully scheduled')
+      success: z.boolean().describe('Whether the re-parse was successfully scheduled'),
+      totalReparsed: z.number().describe('Number of documents scheduled for re-parsing'),
+      message: z.string().optional().describe('Message returned by Docparser')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.reparseDocuments(ctx.input.parserId, ctx.input.documentIds);
+    let result = await client.reparseDocuments(ctx.input.parserId, ctx.input.documentIds);
 
     return {
-      output: { success: true },
-      message: `Scheduled **${ctx.input.documentIds.length}** document(s) for re-parsing in parser \`${ctx.input.parserId}\`.`
+      output: {
+        success: true,
+        totalReparsed: result.totalReparsed,
+        message: result.message
+      },
+      message: `Scheduled **${result.totalReparsed}** document(s) for re-parsing in parser \`${ctx.input.parserId}\`.`
     };
   })
   .build();

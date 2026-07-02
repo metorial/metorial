@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NanonetsClient } from '../lib/client';
+import { nanonetsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let uploadTrainingData = SlateTool.create(spec, {
@@ -52,7 +53,7 @@ export let uploadTrainingData = SlateTool.create(spec, {
 
     if (ctx.input.modelType === 'image_classification') {
       if (!ctx.input.category) {
-        throw new Error('Category is required for image classification models');
+        throw nanonetsServiceError('Category is required for image classification models.');
       }
       await client.uploadClassificationTrainingUrls(
         ctx.input.modelId,

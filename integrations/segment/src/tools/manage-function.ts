@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageFunction = SlateTool.create(spec, {
@@ -83,7 +84,7 @@ export let manageFunction = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.functionId) throw new Error('functionId is required');
+      if (!ctx.input.functionId) throw segmentServiceError('functionId is required');
       let fn = await client.getFunction(ctx.input.functionId);
       return {
         output: {
@@ -97,7 +98,7 @@ export let manageFunction = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.displayName || !ctx.input.code || !ctx.input.resourceType) {
-        throw new Error(
+        throw segmentServiceError(
           'displayName, code, and resourceType are required to create a function'
         );
       }
@@ -119,7 +120,7 @@ export let manageFunction = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.functionId) throw new Error('functionId is required');
+      if (!ctx.input.functionId) throw segmentServiceError('functionId is required');
       let updateData: Record<string, any> = {};
       if (ctx.input.displayName !== undefined) updateData.displayName = ctx.input.displayName;
       if (ctx.input.code !== undefined) updateData.code = ctx.input.code;
@@ -138,7 +139,7 @@ export let manageFunction = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.functionId) throw new Error('functionId is required');
+      if (!ctx.input.functionId) throw segmentServiceError('functionId is required');
       await client.deleteFunction(ctx.input.functionId);
       return {
         output: { functionId: ctx.input.functionId, deleted: true },
@@ -146,6 +147,6 @@ export let manageFunction = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw segmentServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

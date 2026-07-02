@@ -7,7 +7,6 @@ export let gmailScopes = {
   gmailModify: 'https://www.googleapis.com/auth/gmail.modify',
   gmailLabels: 'https://www.googleapis.com/auth/gmail.labels',
   gmailInsert: 'https://www.googleapis.com/auth/gmail.insert',
-  gmailMetadata: 'https://www.googleapis.com/auth/gmail.metadata',
   gmailSettingsBasic: 'https://www.googleapis.com/auth/gmail.settings.basic',
   gmailSettingsSharing: 'https://www.googleapis.com/auth/gmail.settings.sharing',
   contactsReadonly: 'https://www.googleapis.com/auth/contacts.readonly',
@@ -20,14 +19,11 @@ export let gmailScopes = {
 let gmailReadBody = anyOf(
   gmailScopes.gmailReadonly,
   gmailScopes.gmailModify,
-  gmailScopes.gmailCompose,
-  gmailScopes.gmailInsert,
   gmailScopes.fullMail
 );
 
-let gmailHistoryOrWebhook = anyOf(
+let gmailHistory = anyOf(
   gmailScopes.gmailReadonly,
-  gmailScopes.gmailMetadata,
   gmailScopes.gmailModify,
   gmailScopes.fullMail
 );
@@ -43,22 +39,14 @@ export let gmailActionScopes = {
   getMessage: gmailReadBody,
   getAttachment: gmailReadBody,
   modifyMessage: anyOf(gmailScopes.gmailModify, gmailScopes.fullMail),
-  manageDraft: anyOf(
-    gmailScopes.gmailCompose,
-    gmailScopes.gmailModify,
-    gmailScopes.gmailInsert,
-    gmailScopes.fullMail
-  ),
+  manageDraft: anyOf(gmailScopes.gmailCompose, gmailScopes.gmailModify, gmailScopes.fullMail),
   manageLabels: anyOf(gmailScopes.gmailLabels, gmailScopes.gmailModify, gmailScopes.fullMail),
   manageThread: anyOf(gmailScopes.gmailModify, gmailScopes.fullMail),
-  manageSettings: anyOf(
-    gmailScopes.gmailSettingsBasic,
-    gmailScopes.gmailSettingsSharing,
-    gmailScopes.fullMail
-  ),
+  manageSettings: anyOf(gmailScopes.gmailSettingsBasic),
+  deleteMessagesPermanently: anyOf(gmailScopes.fullMail),
+  deleteThreadPermanently: anyOf(gmailScopes.fullMail),
   listGoogleContacts: anyOf(gmailScopes.contactsReadonly),
   searchGoogleContacts: anyOf(gmailScopes.contactsReadonly),
   getGoogleContact: anyOf(gmailScopes.contactsReadonly),
-  mailboxChanges: gmailHistoryOrWebhook,
-  inboundWebhook: gmailHistoryOrWebhook
+  mailboxChanges: gmailHistory
 } as const;

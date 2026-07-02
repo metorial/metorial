@@ -19,19 +19,23 @@ export let deletePageTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deleted: z.boolean().describe('Whether the page was successfully deleted')
+      requestId: z.string().describe('ID to track the asynchronous page deletion'),
+      pageId: z.string().describe('ID of the page queued for deletion'),
+      deleted: z.boolean().describe('Whether the delete was successfully queued')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    await client.deletePage(ctx.input.docId, ctx.input.pageIdOrName);
+    let result = await client.deletePage(ctx.input.docId, ctx.input.pageIdOrName);
 
     return {
       output: {
+        requestId: result.requestId,
+        pageId: result.id,
         deleted: true
       },
-      message: `Deleted page **${ctx.input.pageIdOrName}** from doc **${ctx.input.docId}**.`
+      message: `Queued deletion of page **${ctx.input.pageIdOrName}** from doc **${ctx.input.docId}**. Request ID: ${result.requestId}`
     };
   })
   .build();

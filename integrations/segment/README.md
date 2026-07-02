@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/segment.png" height="20"> Segment
 
-Collect, unify, and route customer event data across tools and platforms. Track user actions (identify, track, page, screen, group, alias) via the Tracking API. Manage workspace resources including sources, destinations, warehouses, tracking plans, functions, and reverse ETL models via the Public API. Create and enforce event schemas with tracking plans. Configure destination filters to control event routing. Build audiences and computed traits based on user behavior. Create custom JavaScript functions for source, destination, or middleware logic. Monitor API usage, event delivery metrics, and monthly tracked users. Handle GDPR deletion and suppression requests. Browse the integration catalog and manage identity, access, and roles for workspace users. Forward events to external webhooks in real time.
+Collect, unify, and route customer event data across tools and platforms. Track user actions (identify, track, page, screen, group, alias) via the Tracking API. Manage workspace resources including sources, source write keys, destinations, destination subscriptions, warehouses, tracking plans, functions, and reverse ETL models via the Public API. Create and enforce event schemas with tracking plans. Configure destination filters to control event routing. Build audiences and computed traits based on user behavior. Create custom JavaScript functions for source, destination, or middleware logic. Monitor API usage, event volume, event delivery metrics, and monthly tracked users. Handle GDPR deletion and suppression requests. Browse the integration catalog and manage identity, access, and roles for workspace users. Forward events to external webhooks in real time.
 
 ## Tools
 
@@ -26,7 +26,7 @@ Retrieve detailed information about a specific source, including its connected d
 
 ### Get Usage Metrics
 
-Query workspace-level API call usage, monthly tracked users (MTU), and delivery metrics. Useful for monitoring consumption and identifying sources of high event volume.
+Query current Segment monitoring data: daily API call usage, daily monthly tracked users (MTU), destination delivery metrics, and workspace event volume. Useful for monitoring consumption and identifying sources of high event volume.
 
 ### Group User
 
@@ -60,6 +60,10 @@ List all data warehouses in the workspace, optionally with connected sources and
 
 Create, update, or remove filters on a destination. Destination filters control which events are forwarded, allowing you to drop events, sample a percentage, or strip specific properties before delivery.
 
+### Manage Destination Subscription
+
+Create, retrieve, update, list, or remove Segment destination subscriptions. Destination subscriptions configure an Actions destination mapping, including the action to run, trigger condition, enabled state, and mapping settings.
+
 ### Manage Destination
 
 Create, update, or delete a destination in your Segment workspace. Destinations are analytics tools, marketing platforms, or data warehouses where Segment routes collected data. To create a new destination, provide the **sourceId** and **metadataId** (from the catalog). To update or delete, provide the **destinationId**.
@@ -75,6 +79,10 @@ Create, update, list, or delete reverse ETL models. Reverse ETL models define SQ
 ### Manage Source
 
 Create, update, or delete a data source in your Segment workspace. Sources represent websites, mobile apps, servers, or cloud services that send data into Segment. To create a new source, provide the **metadataId** (from the catalog) and a **slug**. To update or delete, provide the **sourceId**.
+
+### Manage Source Write Key
+
+Create or remove Segment source write keys. Use this to rotate Tracking API credentials for a source without recreating the source.
 
 ### Manage Tracking Plan
 

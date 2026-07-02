@@ -20,6 +20,14 @@ Create a new product in the WooCommerce store. Supports simple, grouped, externa
 
 Issue a refund for an order. Specify the refund amount and optionally refund specific line items. Can also list existing refunds for an order.
 
+### Delete Customer
+
+Delete a customer account from WooCommerce. Use force to permanently delete the customer record.
+
+### Delete Order
+
+Delete an order from WooCommerce. By default moves to trash; use force to permanently delete.
+
 ### Delete Product
 
 Delete a product from the WooCommerce store. By default moves to trash; use force to permanently delete.
@@ -39,6 +47,10 @@ Retrieve detailed information about a specific product, including pricing, inven
 ### Get Sales Report
 
 Retrieve sales reports and top sellers data. Get total sales, order counts, average order value, and top-selling products for a given period.
+
+### Get Shipping Methods
+
+List available WooCommerce shipping methods, or retrieve one method by ID. Use these method IDs when adding methods to shipping zones.
 
 ### Get Store Settings
 
@@ -72,13 +84,29 @@ List, create, or delete notes on an order. Notes can be private (admin-only) or 
 
 List all payment gateways or update a gateway's settings, including enabling/disabling gateways and changing their title and description.
 
+### Manage Product Attributes
+
+List, get, create, update, or delete global product attributes and their terms. Use these for reusable product facets and variable product options.
+
 ### Manage Product Categories
 
 List, create, update, or delete product categories. Categories help organize products and can be nested hierarchically.
 
+### Manage Product Reviews
+
+List, get, create, update, or delete product reviews for catalog moderation and customer feedback workflows.
+
+### Manage Product Tags
+
+List, get, create, update, or delete product tags used to organize and filter products in WooCommerce.
+
 ### Manage Product Variations
 
 List, create, update, or delete variations for a variable product. Use the action field to choose the operation.
+
+### Manage Shipping Classes
+
+List, get, create, update, or delete product shipping classes used to group products with similar shipping costs.
 
 ### Manage Shipping Zones
 
@@ -87,6 +115,10 @@ List, create, update, or delete shipping zones. View and add shipping methods wi
 ### Manage Tax Rates
 
 List, create, update, or delete tax rates. Configure rates by country, state, postcode, and city with options for compound taxes and shipping applicability.
+
+### Manage Webhooks
+
+List, get, create, update, or delete WooCommerce webhooks for store events such as order, product, customer, and coupon changes.
 
 ### Update Customer
 

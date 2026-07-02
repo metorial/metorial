@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RedisCloudClient } from '../lib/client';
 import { spec } from '../spec';
+import { requireAtLeastOneInputField, subscriptionTypeSchema } from './common';
 
 export let updateDatabase = SlateTool.create(spec, {
   name: 'Update Database',
@@ -18,7 +19,7 @@ export let updateDatabase = SlateTool.create(spec, {
     z.object({
       subscriptionId: z.number().describe('Subscription ID containing the database'),
       databaseId: z.number().describe('Database ID to update'),
-      type: z.enum(['pro', 'essentials']).default('pro').describe('Subscription type'),
+      type: subscriptionTypeSchema,
       dryRun: z.boolean().default(false).describe('Estimate costs without applying changes'),
       name: z.string().optional().describe('New database name'),
       memoryLimitInGb: z.number().optional().describe('New memory limit in GB'),
@@ -61,6 +62,24 @@ export let updateDatabase = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new RedisCloudClient(ctx.auth);
+
+    requireAtLeastOneInputField(
+      ctx.input,
+      [
+        'name',
+        'memoryLimitInGb',
+        'datasetSizeInGb',
+        'replication',
+        'dataPersistence',
+        'dataEvictionPolicy',
+        'password',
+        'supportOSSClusterApi',
+        'periodicBackupPath',
+        'throughputMeasurement',
+        'alerts'
+      ],
+      'Provide at least one database setting to update.'
+    );
 
     let body: Record<string, any> = {};
     if (ctx.input.dryRun) body.dryRun = true;

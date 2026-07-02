@@ -1,10 +1,12 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { applyOktaErrorInterceptor, oktaServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      authMethod: z.enum(['api_token', 'oauth']).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -91,7 +93,12 @@ export let auth = SlateAuth.create()
         description: 'Access user profile via OpenID Connect',
         scope: 'openid'
       },
-      { title: 'Profile', description: 'Access user profile information', scope: 'profile' }
+      { title: 'Profile', description: 'Access user profile information', scope: 'profile' },
+      {
+        title: 'Offline Access',
+        description: 'Allow refreshing OAuth access tokens without reconnecting',
+        scope: 'offline_access'
+      }
     ],
 
     inputSchema: z.object({
@@ -119,6 +126,7 @@ export let auth = SlateAuth.create()
     handleCallback: async ctx => {
       let domain = ctx.input.domain.replace(/\/+$/, '');
       let http = createAxios({ baseURL: domain });
+      applyOktaErrorInterceptor(http);
 
       let response = await http.post(
         '/oauth2/v1/token',
@@ -143,6 +151,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: response.data.access_token,
+          authMethod: 'oauth' as const,
           refreshToken: response.data.refresh_token,
           expiresAt
         },
@@ -152,11 +161,14 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        throw oktaServiceError(
+          'Okta OAuth token cannot be refreshed because no refresh token was returned. Reconnect with offline_access enabled.'
+        );
       }
 
       let domain = ctx.input.domain.replace(/\/+$/, '');
       let http = createAxios({ baseURL: domain });
+      applyOktaErrorInterceptor(http);
 
       let response = await http.post(
         '/oauth2/v1/token',
@@ -181,6 +193,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: response.data.access_token,
+          authMethod: 'oauth' as const,
           refreshToken: response.data.refresh_token || ctx.output.refreshToken,
           expiresAt
         }
@@ -190,6 +203,7 @@ export let auth = SlateAuth.create()
     getProfile: async (ctx: any) => {
       let domain = ctx.input.domain.replace(/\/+$/, '');
       let http = createAxios({ baseURL: domain });
+      applyOktaErrorInterceptor(http);
 
       let response = await http.get('/oauth2/v1/userinfo', {
         headers: {
@@ -224,7 +238,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          authMethod: 'api_token' as const
         }
       };
     },

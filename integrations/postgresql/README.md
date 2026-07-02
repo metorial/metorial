@@ -16,6 +16,10 @@ Get detailed schema information for a specific table, including columns, data ty
 
 Execute an arbitrary SQL query against the PostgreSQL database. Supports all SQL operations including SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, and more. Returns column metadata and result rows for SELECT queries, or affected row counts for DML statements. Supports complex queries with joins, subqueries, CTEs, window functions, and aggregations.
 
+### Select Query
+
+Run a read-only SELECT query against the PostgreSQL database. Use this tool for data retrieval, reporting, analytics, joins, subqueries, read-only CTEs, window functions, and aggregations. Non-SELECT SQL is rejected and the query runs inside a PostgreSQL READ ONLY transaction.
+
 ### Insert Rows
 
 Insert one or more rows into a PostgreSQL table. Provide the data as an array of objects where keys are column names and values are the data to insert. Supports inserting multiple rows in a single operation and can optionally return the inserted rows.

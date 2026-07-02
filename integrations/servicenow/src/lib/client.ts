@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { servicenowApiError } from './errors';
 
 export interface ClientConfig {
   token: string;
@@ -43,6 +44,12 @@ export interface AttachmentRecord {
   [key: string]: any;
 }
 
+export interface DownloadedAttachment {
+  contentBase64: string;
+  contentType?: string;
+  sizeBytes: number;
+}
+
 export class Client {
   private axios: ReturnType<typeof createAxios>;
   private baseUrl: string;
@@ -61,6 +68,14 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  private async request<T>(operation: string, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      throw servicenowApiError(error, operation);
+    }
   }
 
   // ---- Table API (generic CRUD) ----
@@ -96,9 +111,11 @@ export class Client {
         : orderQuery;
     }
 
-    let response = await this.axios.get(`/api/now/table/${tableName}`, {
-      params
-    });
+    let response = await this.request('query records', () =>
+      this.axios.get(`/api/now/table/${tableName}`, {
+        params
+      })
+    );
 
     let totalCount: number | undefined;
     let totalHeader = response.headers?.['x-total-count'];
@@ -126,9 +143,11 @@ export class Client {
       params.sysparm_fields = options.fields.join(',');
     if (options?.displayValue) params.sysparm_display_value = options.displayValue;
 
-    let response = await this.axios.get(`/api/now/table/${tableName}/${recordId}`, {
-      params
-    });
+    let response = await this.request('get record', () =>
+      this.axios.get(`/api/now/table/${tableName}/${recordId}`, {
+        params
+      })
+    );
 
     return response.data?.result;
   }
@@ -143,9 +162,11 @@ export class Client {
     let params: Record<string, any> = {};
     if (options?.displayValue) params.sysparm_display_value = options.displayValue;
 
-    let response = await this.axios.post(`/api/now/table/${tableName}`, fields, {
-      params
-    });
+    let response = await this.request('create record', () =>
+      this.axios.post(`/api/now/table/${tableName}`, fields, {
+        params
+      })
+    );
 
     return response.data?.result;
   }
@@ -161,15 +182,19 @@ export class Client {
     let params: Record<string, any> = {};
     if (options?.displayValue) params.sysparm_display_value = options.displayValue;
 
-    let response = await this.axios.patch(`/api/now/table/${tableName}/${recordId}`, fields, {
-      params
-    });
+    let response = await this.request('update record', () =>
+      this.axios.patch(`/api/now/table/${tableName}/${recordId}`, fields, {
+        params
+      })
+    );
 
     return response.data?.result;
   }
 
   async deleteRecord(tableName: string, recordId: string): Promise<void> {
-    await this.axios.delete(`/api/now/table/${tableName}/${recordId}`);
+    await this.request('delete record', () =>
+      this.axios.delete(`/api/now/table/${tableName}/${recordId}`)
+    );
   }
 
   // ---- CMDB ----
@@ -187,9 +212,11 @@ export class Client {
     if (options?.limit) params.sysparm_limit = options.limit;
     if (options?.offset) params.sysparm_offset = options.offset;
 
-    let response = await this.axios.get(`/api/now/cmdb/instance/${className}`, {
-      params
-    });
+    let response = await this.request('query CMDB instances', () =>
+      this.axios.get(`/api/now/cmdb/instance/${className}`, {
+        params
+      })
+    );
 
     return {
       records: response.data?.result || []
@@ -197,7 +224,9 @@ export class Client {
   }
 
   async getCmdbInstance(className: string, recordId: string): Promise<TableRecord> {
-    let response = await this.axios.get(`/api/now/cmdb/instance/${className}/${recordId}`);
+    let response = await this.request('get CMDB instance', () =>
+      this.axios.get(`/api/now/cmdb/instance/${className}/${recordId}`)
+    );
     return response.data?.result;
   }
 
@@ -205,9 +234,11 @@ export class Client {
     className: string,
     attributes: Record<string, any>
   ): Promise<TableRecord> {
-    let response = await this.axios.post(`/api/now/cmdb/instance/${className}`, {
-      attributes
-    });
+    let response = await this.request('create CMDB instance', () =>
+      this.axios.post(`/api/now/cmdb/instance/${className}`, {
+        attributes
+      })
+    );
     return response.data?.result;
   }
 
@@ -216,9 +247,11 @@ export class Client {
     recordId: string,
     attributes: Record<string, any>
   ): Promise<TableRecord> {
-    let response = await this.axios.put(`/api/now/cmdb/instance/${className}/${recordId}`, {
-      attributes
-    });
+    let response = await this.request('update CMDB instance', () =>
+      this.axios.put(`/api/now/cmdb/instance/${className}/${recordId}`, {
+        attributes
+      })
+    );
     return response.data?.result;
   }
 
@@ -237,15 +270,19 @@ export class Client {
     if (options?.catalogId) params.sysparm_catalog = options.catalogId;
     if (options?.categoryId) params.sysparm_category = options.categoryId;
 
-    let response = await this.axios.get('/api/sn_sc/servicecatalog/items', {
-      params
-    });
+    let response = await this.request('list service catalog items', () =>
+      this.axios.get('/api/sn_sc/servicecatalog/items', {
+        params
+      })
+    );
 
     return response.data?.result || [];
   }
 
   async getCatalogItem(itemId: string): Promise<TableRecord> {
-    let response = await this.axios.get(`/api/sn_sc/servicecatalog/items/${itemId}`);
+    let response = await this.request('get service catalog item', () =>
+      this.axios.get(`/api/sn_sc/servicecatalog/items/${itemId}`)
+    );
     return response.data?.result;
   }
 
@@ -253,12 +290,11 @@ export class Client {
     itemId: string,
     variables: Record<string, any>
   ): Promise<TableRecord> {
-    let response = await this.axios.post(
-      `/api/sn_sc/servicecatalog/items/${itemId}/order_now`,
-      {
+    let response = await this.request('order service catalog item', () =>
+      this.axios.post(`/api/sn_sc/servicecatalog/items/${itemId}/order_now`, {
         sysparm_quantity: 1,
         variables
-      }
+      })
     );
     return response.data?.result;
   }
@@ -280,15 +316,19 @@ export class Client {
       params.sysparm_query += `^kb_knowledge_base=${options.knowledgeBaseId}`;
     }
 
-    let response = await this.axios.get('/api/now/table/kb_knowledge', {
-      params
-    });
+    let response = await this.request('search knowledge articles', () =>
+      this.axios.get('/api/now/table/kb_knowledge', {
+        params
+      })
+    );
 
     return response.data?.result || [];
   }
 
   async createKnowledgeArticle(fields: Record<string, any>): Promise<TableRecord> {
-    let response = await this.axios.post('/api/now/table/kb_knowledge', fields);
+    let response = await this.request('create knowledge article', () =>
+      this.axios.post('/api/now/table/kb_knowledge', fields)
+    );
     return response.data?.result;
   }
 
@@ -296,7 +336,9 @@ export class Client {
     articleId: string,
     fields: Record<string, any>
   ): Promise<TableRecord> {
-    let response = await this.axios.patch(`/api/now/table/kb_knowledge/${articleId}`, fields);
+    let response = await this.request('update knowledge article', () =>
+      this.axios.patch(`/api/now/table/kb_knowledge/${articleId}`, fields)
+    );
     return response.data?.result;
   }
 
@@ -315,11 +357,21 @@ export class Client {
     if (queryParts.length > 0) params.sysparm_query = queryParts.join('^');
     if (options.limit) params.sysparm_limit = options.limit;
 
-    let response = await this.axios.get('/api/now/attachment', {
-      params
-    });
+    let response = await this.request('list attachments', () =>
+      this.axios.get('/api/now/attachment', {
+        params
+      })
+    );
 
     return response.data?.result || [];
+  }
+
+  async getAttachment(attachmentId: string): Promise<AttachmentRecord> {
+    let response = await this.request('get attachment metadata', () =>
+      this.axios.get(`/api/now/attachment/${attachmentId}`)
+    );
+
+    return response.data?.result;
   }
 
   async uploadAttachment(
@@ -329,22 +381,54 @@ export class Client {
     contentType: string,
     content: string
   ): Promise<AttachmentRecord> {
-    let response = await this.axios.post('/api/now/attachment/file', content, {
-      params: {
-        table_name: tableName,
-        table_sys_id: recordId,
-        file_name: fileName
-      },
-      headers: {
-        'Content-Type': contentType
-      }
-    });
+    let response = await this.request('upload attachment', () =>
+      this.axios.post('/api/now/attachment/file', content, {
+        params: {
+          table_name: tableName,
+          table_sys_id: recordId,
+          file_name: fileName
+        },
+        headers: {
+          'Content-Type': contentType
+        }
+      })
+    );
 
     return response.data?.result;
   }
 
+  async downloadAttachment(attachmentId: string): Promise<DownloadedAttachment> {
+    let response = await this.request('download attachment', () =>
+      this.axios.get(`/api/now/attachment/${attachmentId}/file`, {
+        responseType: 'arraybuffer',
+        headers: {
+          Accept: '*/*'
+        }
+      })
+    );
+
+    let buffer = Buffer.isBuffer(response.data)
+      ? response.data
+      : Buffer.from(response.data ?? '');
+    let contentLength = response.headers?.['content-length'];
+    let parsedContentLength =
+      typeof contentLength === 'string' ? Number.parseInt(contentLength, 10) : undefined;
+    let contentType = response.headers?.['content-type'];
+
+    return {
+      contentBase64: buffer.toString('base64'),
+      contentType: typeof contentType === 'string' ? contentType : undefined,
+      sizeBytes:
+        parsedContentLength !== undefined && !Number.isNaN(parsedContentLength)
+          ? parsedContentLength
+          : buffer.length
+    };
+  }
+
   async deleteAttachment(attachmentId: string): Promise<void> {
-    await this.axios.delete(`/api/now/attachment/${attachmentId}`);
+    await this.request('delete attachment', () =>
+      this.axios.delete(`/api/now/attachment/${attachmentId}`)
+    );
   }
 
   // ---- Import Sets ----
@@ -355,7 +439,9 @@ export class Client {
   ): Promise<TableRecord[]> {
     let results: TableRecord[] = [];
     for (let record of records) {
-      let response = await this.axios.post(`/api/now/import/${stagingTableName}`, record);
+      let response = await this.request('create import set record', () =>
+        this.axios.post(`/api/now/import/${stagingTableName}`, record)
+      );
       if (response.data?.result) {
         results.push(
           ...(Array.isArray(response.data.result)

@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { dockerHubApiError, dockerHubServiceError } from './errors';
 
 export interface PaginatedResponse<T> {
   count: number;
@@ -8,18 +9,42 @@ export interface PaginatedResponse<T> {
 }
 
 export interface Repository {
+  user?: string;
   namespace: string;
   name: string;
   description: string;
-  full_description: string;
+  full_description?: string | null;
   is_private: boolean;
+  is_automated?: boolean;
   star_count: number;
   pull_count: number;
   last_updated: string;
   date_registered: string;
   status: number;
-  repository_type: string;
+  status_description?: string;
+  repository_type: string | null;
   content_types: string[];
+  media_types?: string[];
+  categories?: RepositoryCategory[];
+  permissions?: RepositoryPermissions;
+  immutable_tags_settings?: ImmutableTagsSettings;
+  storage_size?: number | null;
+}
+
+export interface RepositoryCategory {
+  name: string;
+  slug: string;
+}
+
+export interface RepositoryPermissions {
+  read: boolean;
+  write: boolean;
+  admin: boolean;
+}
+
+export interface ImmutableTagsSettings {
+  enabled: boolean;
+  rules: string[];
 }
 
 export interface Tag {
@@ -89,6 +114,7 @@ export interface PersonalAccessToken {
   token: string;
   token_label: string;
   scopes: string[];
+  expires_at?: string | null;
 }
 
 export interface SearchRepository {
@@ -113,29 +139,176 @@ export interface AuditLogEvent {
 export interface AuditLogAction {
   name: string;
   description: string;
+  label?: string;
 }
+
+export interface AuditLogActionGroup {
+  label?: string;
+  actions: AuditLogAction[];
+}
+
+export interface AuditLogActionsResponse {
+  actions: AuditLogAction[] | Record<string, AuditLogActionGroup>;
+}
+
+export interface RepositoryGroup {
+  group_id: number;
+  group_name: string;
+  permission: 'read' | 'write' | 'admin';
+}
+
+export interface OrgAccessTokenResource {
+  type: 'TYPE_REPO' | 'TYPE_ORG';
+  path: string;
+  scopes: string[];
+}
+
+export interface OrgAccessToken {
+  id: string;
+  label: string;
+  description?: string;
+  created_by: string;
+  is_active: boolean;
+  created_at: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+  token?: string;
+  resources?: OrgAccessTokenResource[];
+}
+
+export interface OrgAccessTokensResponse {
+  total: number;
+  next: string | null;
+  previous: string | null;
+  results: OrgAccessToken[];
+}
+
+type AuthTokenOptions = {
+  identifier: string;
+  secret: string;
+};
+
+export let createDockerHubBearerToken = async (opts: AuthTokenOptions) => {
+  let http = createAxios({
+    baseURL: 'https://hub.docker.com',
+    headers: { 'Content-Type': 'application/json' }
+  });
+
+  try {
+    let response = await http.post('/v2/auth/token', {
+      identifier: opts.identifier,
+      secret: opts.secret
+    });
+    let token = response.data.access_token;
+
+    if (typeof token !== 'string' || token.length === 0) {
+      throw dockerHubServiceError('Docker Hub did not return an access token.');
+    }
+
+    return token;
+  } catch (error) {
+    throw dockerHubApiError(error, 'authentication');
+  }
+};
+
+let isPlainHeaders = (value: unknown): value is Record<string, string> =>
+  typeof value === 'object' && value !== null && !('set' in value);
+
+let setAuthorizationHeader = (config: Record<string, any>, token: string) => {
+  let headers = config.headers as
+    | Record<string, string>
+    | { set?: (name: string, value: string) => void }
+    | undefined;
+
+  if (headers && typeof headers.set === 'function') {
+    headers.set('Authorization', `Bearer ${token}`);
+    return;
+  }
+
+  config.headers = {
+    ...(isPlainHeaders(headers) ? headers : {}),
+    Authorization: `Bearer ${token}`
+  };
+};
 
 export class Client {
   private http;
+  private token: string;
+  private tokenExpiresAt = 0;
+  private identifier?: string;
+  private secret?: string;
 
-  constructor(opts: { token: string }) {
+  constructor(opts: { token: string; identifier?: string; secret?: string }) {
+    this.token = opts.token;
+    this.identifier = opts.identifier;
+    this.secret = opts.secret;
+    this.tokenExpiresAt = Date.now() + 9 * 60 * 1000;
+
     this.http = createAxios({
       baseURL: 'https://hub.docker.com',
       headers: {
-        Authorization: `JWT ${opts.token}`,
         'Content-Type': 'application/json'
       }
     });
+
+    this.http.interceptors.request.use(async config => {
+      setAuthorizationHeader(config, await this.getBearerToken());
+      return config;
+    });
+
+    this.http.interceptors.response.use(
+      response => response,
+      async error => {
+        let config = error?.config as any;
+        let status = error?.response?.status;
+
+        if (
+          status === 401 &&
+          config &&
+          !config._dockerHubRetried &&
+          this.identifier &&
+          this.secret
+        ) {
+          config._dockerHubRetried = true;
+          this.tokenExpiresAt = 0;
+          setAuthorizationHeader(config, await this.getBearerToken());
+          return this.http.request(config);
+        }
+
+        return Promise.reject(dockerHubApiError(error));
+      }
+    );
+  }
+
+  private async getBearerToken() {
+    if (!this.identifier || !this.secret) {
+      return this.token;
+    }
+
+    if (Date.now() >= this.tokenExpiresAt) {
+      this.token = await createDockerHubBearerToken({
+        identifier: this.identifier,
+        secret: this.secret
+      });
+      this.tokenExpiresAt = Date.now() + 9 * 60 * 1000;
+    }
+
+    return this.token;
   }
 
   // ── Repositories ─────────────────────────────────────────────
 
   async listRepositories(
     namespace: string,
-    params?: { page?: number; pageSize?: number }
+    params?: { page?: number; pageSize?: number; name?: string; ordering?: string }
   ): Promise<PaginatedResponse<Repository>> {
     let response = await this.http.get(`/v2/namespaces/${namespace}/repositories`, {
-      params: { page: params?.page, page_size: params?.pageSize }
+      params: {
+        page: params?.page,
+        page_size: params?.pageSize,
+        name: params?.name,
+        ordering: params?.ordering
+      }
     });
     return response.data as PaginatedResponse<Repository>;
   }
@@ -154,9 +327,14 @@ export class Client {
       description?: string;
       full_description?: string;
       is_private?: boolean;
+      registry?: string;
     }
   ) {
-    let response = await this.http.post(`/v2/namespaces/${namespace}/repositories`, data);
+    let response = await this.http.post(`/v2/namespaces/${namespace}/repositories`, {
+      ...data,
+      namespace,
+      registry: data.registry ?? 'docker.io'
+    });
     return response.data;
   }
 
@@ -295,6 +473,18 @@ export class Client {
     await this.http.delete(`/v2/orgs/${orgName}/groups/${teamName}/members/${username}`);
   }
 
+  async assignRepositoryTeam(
+    namespace: string,
+    repository: string,
+    data: { groupId: number; permission: 'read' | 'write' | 'admin' }
+  ): Promise<RepositoryGroup> {
+    let response = await this.http.post(`/v2/repositories/${namespace}/${repository}/groups`, {
+      group_id: data.groupId,
+      permission: data.permission
+    });
+    return response.data as RepositoryGroup;
+  }
+
   // ── Webhooks ─────────────────────────────────────────────────
 
   async listWebhooks(
@@ -345,7 +535,11 @@ export class Client {
     return response.data as PaginatedResponse<PersonalAccessToken>;
   }
 
-  async createAccessToken(data: { token_label: string; scopes: string[] }) {
+  async createAccessToken(data: {
+    token_label: string;
+    scopes: string[];
+    expires_at?: string;
+  }) {
     let response = await this.http.post(`/v2/access-tokens`, data);
     return response.data;
   }
@@ -364,12 +558,88 @@ export class Client {
     await this.http.delete(`/v2/access-tokens/${uuid}`);
   }
 
+  // ── Organization Access Tokens ──────────────────────────────
+
+  async listOrgAccessTokens(
+    orgName: string,
+    params?: { page?: number; pageSize?: number }
+  ): Promise<OrgAccessTokensResponse> {
+    let response = await this.http.get(`/v2/orgs/${orgName}/access-tokens`, {
+      params: { page: params?.page, page_size: params?.pageSize }
+    });
+    return response.data as OrgAccessTokensResponse;
+  }
+
+  async getOrgAccessToken(orgName: string, tokenId: string): Promise<OrgAccessToken> {
+    let response = await this.http.get(`/v2/orgs/${orgName}/access-tokens/${tokenId}`);
+    return response.data as OrgAccessToken;
+  }
+
+  async createOrgAccessToken(
+    orgName: string,
+    data: {
+      label: string;
+      description?: string;
+      resources?: OrgAccessTokenResource[];
+      expires_at?: string;
+    }
+  ): Promise<OrgAccessToken> {
+    let response = await this.http.post(`/v2/orgs/${orgName}/access-tokens`, data);
+    return response.data as OrgAccessToken;
+  }
+
+  async updateOrgAccessToken(
+    orgName: string,
+    tokenId: string,
+    data: {
+      label?: string;
+      description?: string;
+      resources?: OrgAccessTokenResource[];
+      is_active?: boolean;
+    }
+  ): Promise<OrgAccessToken> {
+    let response = await this.http.patch(`/v2/orgs/${orgName}/access-tokens/${tokenId}`, data);
+    return response.data as OrgAccessToken;
+  }
+
+  async deleteOrgAccessToken(orgName: string, tokenId: string) {
+    await this.http.delete(`/v2/orgs/${orgName}/access-tokens/${tokenId}`);
+  }
+
+  // ── Immutable Tags ──────────────────────────────────────────
+
+  async updateRepositoryImmutableTags(
+    namespace: string,
+    repository: string,
+    data: { immutable_tags: boolean; immutable_tags_rules: string[] }
+  ): Promise<Repository> {
+    let response = await this.http.patch(
+      `/v2/namespaces/${namespace}/repositories/${repository}/immutabletags`,
+      data
+    );
+    return response.data as Repository;
+  }
+
+  async verifyRepositoryImmutableTags(
+    namespace: string,
+    repository: string,
+    regex: string
+  ): Promise<{ tags: string[] }> {
+    let response = await this.http.post(
+      `/v2/namespaces/${namespace}/repositories/${repository}/immutabletags/verify`,
+      { regex }
+    );
+    return response.data as { tags: string[] };
+  }
+
   // ── Audit Logs ──────────────────────────────────────────────
 
   async listAuditLogs(
     account: string,
     params?: {
       action?: string;
+      name?: string;
+      actor?: string;
       from?: string;
       to?: string;
       page?: number;
@@ -379,17 +649,30 @@ export class Client {
     let response = await this.http.get(`/v2/auditlogs/${account}`, {
       params: {
         action: params?.action,
+        name: params?.name,
+        actor: params?.actor,
         from: params?.from,
         to: params?.to,
         page: params?.page,
         page_size: params?.pageSize
       }
     });
-    return response.data as PaginatedResponse<AuditLogEvent>;
+    let data = response.data;
+
+    if (Array.isArray(data?.logs)) {
+      return {
+        count: data.logs.length,
+        next: null,
+        previous: null,
+        results: data.logs
+      } as PaginatedResponse<AuditLogEvent>;
+    }
+
+    return data as PaginatedResponse<AuditLogEvent>;
   }
 
-  async listAuditLogActions(account: string): Promise<{ actions: AuditLogAction[] }> {
+  async listAuditLogActions(account: string): Promise<AuditLogActionsResponse> {
     let response = await this.http.get(`/v2/auditlogs/${account}/actions`);
-    return response.data as { actions: AuditLogAction[] };
+    return response.data as AuditLogActionsResponse;
   }
 }

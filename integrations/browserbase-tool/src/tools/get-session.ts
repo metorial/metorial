@@ -19,7 +19,9 @@ export let getSession = SlateTool.create(spec, {
   .output(
     z.object({
       sessionId: z.string().describe('Session identifier'),
-      status: z.string().describe('Session status (RUNNING, COMPLETED, ERROR, TIMED_OUT)'),
+      status: z
+        .string()
+        .describe('Session status (PENDING, RUNNING, COMPLETED, ERROR, TIMED_OUT)'),
       region: z.string().describe('Session region'),
       createdAt: z.string().describe('Creation timestamp'),
       startedAt: z.string().describe('Start timestamp'),

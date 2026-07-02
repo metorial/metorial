@@ -1,39 +1,75 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WorkableClient } from '../lib/client';
+import { requireWorkableString } from '../lib/errors';
+import {
+  buildEmployeeBody,
+  mapEmployee,
+  mapEmployeeDocument,
+  unwrapEmployee
+} from '../lib/shapes';
 import { spec } from '../spec';
+
+let allowedEmployeeDocumentLimits = [10, 20];
 
 export let manageEmployeeTool = SlateTool.create(spec, {
   name: 'Manage Employee',
   key: 'manage_employee',
-  description: `Get, create, or update an employee record in Workable HR. Use action "get" to fetch full employee details and documents, "create" to add a new employee, or "update" to modify an existing employee record.`,
+  description: `Get, create, or update a Workable HR employee. Create and update requests are wrapped in Workable's documented { employee } payload, with optional memberId for account-token access.`,
   instructions: [
-    'Use action "get" with an employeeId to retrieve complete employee information and optionally their documents',
-    'Use action "create" to add a new employee — firstname, lastname, and workEmail are required',
-    'Use action "update" to modify employee fields — provide the employeeId and any fields to change'
+    'Use "get" with employeeId to retrieve employee information and optionally documents.',
+    'Use "create" with employee fields and optional state draft/published.',
+    'Use "update" with employeeId and any fields to change.'
   ]
 })
   .input(
     z.object({
       action: z.enum(['get', 'create', 'update']).describe('The action to perform'),
-      employeeId: z
+      employeeId: z.string().optional().describe('Employee ID required for get and update'),
+      memberId: z
         .string()
         .optional()
-        .describe('Employee ID (required for "get" and "update")'),
+        .describe('Member ID required for some account-token employee operations'),
       includeDocuments: z
         .boolean()
         .optional()
         .describe('Include documents when getting employee details'),
+      documentType: z
+        .enum([
+          'simple_employee_document',
+          'signature_request_employee_document',
+          'timeoff_attachment',
+          'i_9_form_document'
+        ])
+        .optional()
+        .describe('Document type filter'),
+      documentLimit: z
+        .number()
+        .optional()
+        .describe('Maximum documents to return. Workable accepts 10 or 20.'),
+      documentOffset: z.number().optional().describe('Document pagination offset'),
+      state: z.enum(['draft', 'published']).optional().describe('Employee state for create'),
       firstname: z.string().optional().describe('First name'),
       lastname: z.string().optional().describe('Last name'),
       workEmail: z.string().optional().describe('Work email address'),
       email: z.string().optional().describe('Personal email'),
       phone: z.string().optional().describe('Phone number'),
       jobTitle: z.string().optional().describe('Job title'),
-      department: z.string().optional().describe('Department'),
-      startDate: z.string().optional().describe('Start date (ISO 8601)'),
+      department: z.string().optional().describe('Department name'),
+      departmentId: z.string().optional().describe('Department ID'),
+      startDate: z.string().optional().describe('Start date'),
+      reportsTo: z.string().optional().describe('Reports-to value accepted by Workable'),
       managerId: z.string().optional().describe('Manager employee ID'),
-      employmentType: z.string().optional().describe('Employment type')
+      legalEntity: z.string().optional().describe('Legal entity value accepted by Workable'),
+      legalEntityId: z.string().optional().describe('Legal entity ID'),
+      workSchedule: z.string().optional().describe('Work schedule value accepted by Workable'),
+      workScheduleId: z.string().optional().describe('Work schedule ID'),
+      employmentType: z.string().optional().describe('Employment type'),
+      employeeNumber: z.string().optional().describe('Employee number'),
+      customFields: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Employee custom fields in Workable API shape')
     })
   )
   .output(
@@ -46,23 +82,20 @@ export let manageEmployeeTool = SlateTool.create(spec, {
       workEmail: z.string().optional().describe('Work email'),
       phone: z.string().optional().describe('Phone number'),
       department: z.string().optional().describe('Department'),
+      departmentId: z.string().optional().describe('Department ID'),
       jobTitle: z.string().optional().describe('Job title'),
-      status: z.string().optional().describe('Employee status'),
+      state: z.string().optional().describe('Employee state'),
+      status: z.string().optional().describe('Employee status/state'),
       startDate: z.string().optional().describe('Start date'),
       managerId: z.string().optional().describe('Manager ID'),
+      legalEntityId: z.string().optional().describe('Legal entity ID'),
+      workScheduleId: z.string().optional().describe('Work schedule ID'),
       employmentType: z.string().optional().describe('Employment type'),
+      employeeNumber: z.string().optional().describe('Employee number'),
       createdAt: z.string().optional().describe('Creation timestamp'),
-      documents: z
-        .array(
-          z.object({
-            documentId: z.string().optional(),
-            name: z.string().optional(),
-            type: z.string().optional(),
-            url: z.string().optional()
-          })
-        )
-        .optional()
-        .describe('Employee documents'),
+      updatedAt: z.string().optional().describe('Update timestamp'),
+      documents: z.array(z.any()).optional().describe('Employee document metadata'),
+      documentsTotalCount: z.number().optional().describe('Total employee document count'),
       actionPerformed: z.string().describe('Description of the action taken')
     })
   )
@@ -72,97 +105,82 @@ export let manageEmployeeTool = SlateTool.create(spec, {
       subdomain: ctx.config.subdomain
     });
 
-    let mapEmployee = (e: any) => ({
-      employeeId: e.id,
-      name: e.name,
-      firstname: e.firstname,
-      lastname: e.lastname,
-      email: e.email,
-      workEmail: e.work_email,
-      phone: e.phone,
-      department: e.department,
-      jobTitle: e.job_title,
-      status: e.status,
-      startDate: e.start_date,
-      managerId: e.manager_id,
-      employmentType: e.employment_type,
-      createdAt: e.created_at
-    });
-
     switch (ctx.input.action) {
       case 'get': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required for get action');
-        let result = await client.getEmployee(ctx.input.employeeId);
-        let emp = result.employee || result;
-        let output: any = { ...mapEmployee(emp), actionPerformed: 'Retrieved employee' };
+        let employeeId = requireWorkableString(ctx.input.employeeId, 'employeeId', 'get');
+        let result = await client.getEmployee(employeeId, {
+          member_id: ctx.input.memberId
+        });
+        let output: any = {
+          ...mapEmployee(unwrapEmployee(result)),
+          actionPerformed: 'Retrieved employee'
+        };
 
         if (ctx.input.includeDocuments) {
-          let docsResult = await client.getEmployeeDocuments(ctx.input.employeeId);
-          output.documents = (docsResult.documents || []).map((d: any) => ({
-            documentId: d.id,
-            name: d.name,
-            type: d.type,
-            url: d.url
-          }));
+          if (
+            ctx.input.documentLimit !== undefined &&
+            !allowedEmployeeDocumentLimits.includes(ctx.input.documentLimit)
+          ) {
+            throw createApiServiceError('documentLimit must be one of 10 or 20.');
+          }
+
+          let docsResult = await client.getEmployeeDocuments(employeeId, {
+            member_id: ctx.input.memberId,
+            type: ctx.input.documentType,
+            limit: ctx.input.documentLimit,
+            offset: ctx.input.documentOffset
+          });
+          output.documents = (docsResult.employee_documents || docsResult.documents || []).map(
+            mapEmployeeDocument
+          );
+          output.documentsTotalCount = docsResult.total_count ?? docsResult.totalCount;
         }
 
         return {
           output,
-          message: `Retrieved employee **"${output.name || output.firstname}"** (${output.employeeId}).`
+          message: `Retrieved employee **"${output.name || output.firstname || output.employeeId}"**.`
         };
       }
       case 'create': {
-        let payload: any = {
-          firstname: ctx.input.firstname,
-          lastname: ctx.input.lastname,
-          work_email: ctx.input.workEmail,
-          email: ctx.input.email,
-          phone: ctx.input.phone,
-          job_title: ctx.input.jobTitle,
-          department: ctx.input.department,
-          start_date: ctx.input.startDate,
-          manager_id: ctx.input.managerId,
-          employment_type: ctx.input.employmentType
-        };
+        if (!ctx.input.firstname) {
+          throw createApiServiceError('firstname is required for create.');
+        }
+        if (!ctx.input.lastname) {
+          throw createApiServiceError('lastname is required for create.');
+        }
+        if (!ctx.input.workEmail) {
+          throw createApiServiceError('workEmail is required for create.');
+        }
 
-        // Remove undefined values
-        Object.keys(payload).forEach(key => {
-          if (payload[key] === undefined) delete payload[key];
-        });
-
-        let result = await client.createEmployee(payload);
-        let emp = result.employee || result;
+        let result = await client.createEmployee(buildEmployeeBody(ctx.input));
+        let employee = unwrapEmployee(result);
 
         return {
-          output: { ...mapEmployee(emp), actionPerformed: 'Created employee' },
-          message: `Created employee **"${ctx.input.firstname} ${ctx.input.lastname}"** (${emp.id}).`
+          output: {
+            ...mapEmployee(employee),
+            actionPerformed: 'Created employee'
+          },
+          message: `Created employee **"${employee.name || `${ctx.input.firstname} ${ctx.input.lastname}`}"**.`
         };
       }
       case 'update': {
-        if (!ctx.input.employeeId) throw new Error('employeeId is required for update action');
-        let payload: any = {};
-        if (ctx.input.firstname !== undefined) payload.firstname = ctx.input.firstname;
-        if (ctx.input.lastname !== undefined) payload.lastname = ctx.input.lastname;
-        if (ctx.input.workEmail !== undefined) payload.work_email = ctx.input.workEmail;
-        if (ctx.input.email !== undefined) payload.email = ctx.input.email;
-        if (ctx.input.phone !== undefined) payload.phone = ctx.input.phone;
-        if (ctx.input.jobTitle !== undefined) payload.job_title = ctx.input.jobTitle;
-        if (ctx.input.department !== undefined) payload.department = ctx.input.department;
-        if (ctx.input.startDate !== undefined) payload.start_date = ctx.input.startDate;
-        if (ctx.input.managerId !== undefined) payload.manager_id = ctx.input.managerId;
-        if (ctx.input.employmentType !== undefined)
-          payload.employment_type = ctx.input.employmentType;
+        let employeeId = requireWorkableString(ctx.input.employeeId, 'employeeId', 'update');
+        let body = buildEmployeeBody(ctx.input);
+        if (!body.employee || Object.keys(body.employee).length === 0) {
+          throw createApiServiceError('Provide at least one employee field for update.');
+        }
 
-        let result = await client.updateEmployee(ctx.input.employeeId, payload);
-        let emp = result.employee || result;
+        let result = await client.updateEmployee(employeeId, body);
+        let employee = unwrapEmployee(result);
 
         return {
-          output: { ...mapEmployee(emp), actionPerformed: 'Updated employee' },
-          message: `Updated employee **${ctx.input.employeeId}**.`
+          output: {
+            ...mapEmployee(employee),
+            actionPerformed: 'Updated employee'
+          },
+          message: `Updated employee **${employeeId}**.`
         };
       }
     }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
   })
   .build();

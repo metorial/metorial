@@ -1,7 +1,9 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
+import { createPdfCoAttachment } from './shared';
 
 export let splitPdf = SlateTool.create(spec, {
   name: 'Split PDF',
@@ -25,7 +27,9 @@ When splitting by pages, specify comma-separated page ranges. When splitting by 
       pages: z
         .string()
         .optional()
-        .describe('Page ranges for splitting, e.g. "1-3,4-6,7-" (required for "pages" mode)'),
+        .describe(
+          '1-based page ranges for splitting, e.g. "1-3,4-6,7-" (required for "pages" mode)'
+        ),
       searchString: z
         .string()
         .optional()
@@ -53,10 +57,20 @@ When splitting by pages, specify comma-separated page ranges. When splitting by 
   .output(
     z.object({
       outputUrls: z.array(z.string()).describe('URLs to download the split PDF files'),
+      outputFiles: z
+        .array(
+          z.object({
+            outputUrl: z.string().describe('PDF.co temporary output URL'),
+            mimeType: z.string().describe('MIME type of the returned attachment'),
+            byteLength: z.number().describe('Decoded byte length of the attachment')
+          })
+        )
+        .describe('Attachment metadata for each split file in attachment order'),
       partCount: z.number().describe('Number of parts the PDF was split into'),
       pageCount: z.number().describe('Total pages in the source document'),
       creditsUsed: z.number().describe('API credits consumed'),
-      remainingCredits: z.number().describe('Credits remaining on the account')
+      remainingCredits: z.number().describe('Credits remaining on the account'),
+      attachmentCount: z.number().describe('Number of attachments returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -65,7 +79,7 @@ When splitting by pages, specify comma-separated page ranges. When splitting by 
 
     if (ctx.input.splitMode === 'pages') {
       if (!ctx.input.pages) {
-        throw new Error('Pages parameter is required for page-based splitting');
+        throw createApiServiceError('Pages parameter is required for page-based splitting.');
       }
       result = await client.splitPdfByPages({
         url: ctx.input.sourceUrl,
@@ -75,7 +89,9 @@ When splitting by pages, specify comma-separated page ranges. When splitting by 
       });
     } else {
       if (!ctx.input.searchString) {
-        throw new Error('Search string is required for text/barcode-based splitting');
+        throw createApiServiceError(
+          'Search string is required for text/barcode-based splitting.'
+        );
       }
       result = await client.splitPdfByTextOrBarcode({
         url: ctx.input.sourceUrl,
@@ -89,17 +105,27 @@ When splitting by pages, specify comma-separated page ranges. When splitting by 
     }
 
     if (result.error) {
-      throw new Error(`Split failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Split failed', result);
     }
+    let files = await Promise.all(
+      result.urls.map((url: string) => client.downloadFileUrl(url, 'application/pdf'))
+    );
 
     return {
       output: {
         outputUrls: result.urls,
+        outputFiles: result.urls.map((url: string, index: number) => ({
+          outputUrl: url,
+          mimeType: files[index]?.mimeType || 'application/pdf',
+          byteLength: files[index]?.byteLength || 0
+        })),
         partCount: result.urls.length,
         pageCount: result.pageCount,
         creditsUsed: result.credits,
-        remainingCredits: result.remainingCredits
+        remainingCredits: result.remainingCredits,
+        attachmentCount: files.length
       },
+      attachments: files.map(createPdfCoAttachment),
       message: `Split PDF into **${result.urls.length}** parts using **${ctx.input.splitMode}** mode.`
     };
   })

@@ -4,7 +4,7 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'stability-ai',
-  name: 'Stability Ai',
+  name: 'Stability AI',
   description: undefined,
   metadata: {},
   config,

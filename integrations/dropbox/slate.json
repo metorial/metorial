@@ -1,6 +1,6 @@
 {
   "name": "@dropbox/dropbox",
-  "description": "Upload, download, and manage files and folders in Dropbox cloud storage. Create, move, copy, and delete files and folders. Search files by name or content. Share files and folders via shared links with configurable access settings. Manage shared folder members and permissions. Create and manage file requests for document collection. Assign custom metadata properties to files and folders. View and restore file revisions. Retrieve user account information including storage quota. Administer Dropbox Business teams: add, remove, suspend, and update team members and groups. Create and manage team folders. Access team audit logs for change tracking. Receive webhook notifications for file changes.",
+  "description": "Upload, download, and manage files and folders in Dropbox cloud storage. Create, move, copy, and delete files and folders. Search files by name or content. Share files and folders via shared links with configurable access settings. Manage shared folder membership, create file requests for document collection, generate temporary links and thumbnails, use upload sessions for chunked uploads, view and restore file revisions, retrieve account quota information, and receive file-change notifications.",
   "categories": ["apis-and-http-requests", "document-processing", "email-and-messaging"],
   "skills": [
     "upload and download files",
@@ -9,10 +9,11 @@
     "share files and folders",
     "manage shared link permissions",
     "create file requests",
+    "create temporary file links",
+    "generate thumbnails",
+    "use upload sessions",
     "view and restore file revisions",
-    "manage team members",
-    "administer team folders",
-    "access team audit logs"
+    "read account quota"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/dropbox.svg"
 }

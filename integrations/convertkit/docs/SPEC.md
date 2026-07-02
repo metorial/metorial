@@ -1,131 +1,109 @@
-Now let me fetch the V4 API authentication docs to get more details:Now I have enough information to write the specification.
-
 # Slates Specification for ConvertKit
 
 ## Overview
 
-ConvertKit (now rebranded as Kit) is an email marketing platform designed for creators such as bloggers, podcasters, and course creators. It provides tools for managing email subscribers, sending broadcasts, creating automated email sequences, building forms and landing pages, and selling digital products. The API (currently V4, with legacy V3 still available) allows programmatic access to manage subscribers, tags, forms, sequences, broadcasts, custom fields, purchases, and webhooks.
+ConvertKit is now branded as Kit. It is an email marketing platform for creators, newsletters, courses, memberships, and digital products. This integration exposes the practical high-value Kit API V4 surfaces for subscriber management, tags, forms, sequences, sequence emails, broadcasts, purchases, account insights, posts, snippets, segments, and email templates.
+
+The implementation targets Kit API V4 at `https://api.kit.com/v4`. Legacy API V3 is deprecated and is not used for integration business logic.
 
 ## Authentication
 
-ConvertKit supports multiple authentication methods depending on the API version.
+Kit API V4 supports two authentication modes.
 
-### API V4 (Current — recommended)
+### OAuth 2.0
 
-**1. OAuth 2.0** (required for public apps listed in the Kit App Store)
+OAuth is the supported mode for public applications and is required by selected V4 endpoints, including purchase creation.
 
-- When a user installs your app from the Kit App Store, Kit redirects them to the Authorization URL you've configured. Your app should present the user a screen to sign in. Kit appends a `redirect` query parameter. After the user authenticates, redirect them to Kit's OAuth server at `https://app.kit.com/oauth/authorize`.
-- Token endpoint: `https://api.convertkit.com/oauth/token`
-- Register your OAuth application in the OAuth Applications section at `https://app.kit.com/account_settings/advanced_settings`. Using the supplied Client ID and secret, redirect the user to Kit to grant your application access.
-- The OAuth flow returns an access token and a refresh token. Access tokens expire and must be refreshed using the refresh token.
-- If your app will be used in an insecure location where the client secret can't be kept confidential (such as mobile or single page apps), you must use the PKCE flow.
-- Some endpoints require OAuth authentication — for example, bulk and purchase creation endpoints.
+- Authorization URL: `https://api.kit.com/v4/oauth/authorize`
+- Token URL: `https://api.kit.com/v4/oauth/token`
+- Refresh URL: `https://api.kit.com/v4/oauth/token`
+- Access tokens are sent as `Authorization: Bearer <token>`.
+- Refresh responses can rotate both the access token and refresh token.
 
-**2. API Key** (for personal account automation and testing only)
+### V4 API Key
 
-- API key authentication is the simplest way to access V4 of the API, tailored for programmatic access to your own Kit account for simple account automation, or for pulling account data for deeper external analysis.
-- To use V4 API key authentication, pass the key alongside a `X-Kit-Api-Key` header when making requests.
-- If you are looking to publish an app for public listing and installation, you must use OAuth and not API Keys. V4 API keys are only meant for individual use — for testing and for you to automate your own workflows.
-- Create a V4 API key from the "Developer" tab in account settings.
-- Base URL: `https://api.kit.com/v4/`
+API key authentication is intended for personal account automation and testing. V4 API keys are sent with `X-Kit-Api-Key: <key>`. API key authentication does not grant access to every V4 endpoint, so tools that call OAuth-only endpoints surface upstream authorization failures as `ServiceError`.
 
-### API V3 (Legacy — deprecated)
+## Tool Coverage
 
-- All API calls require the `api_key` parameter. Some API calls require the `api_secret` parameter. You can find your API Key and Secret in the ConvertKit Account page.
-- The API key and secret are passed as query parameters or in the request body.
-- Base URL: `https://api.convertkit.com/v3/`
-- V4 API Keys are not compatible with V3.
+### Account
 
-## Features
+- `get_account`: retrieve account name, plan, primary email, timezone, and sending addresses.
+- `get_account_insights`: retrieve creator profile, email stats, or growth stats.
 
-### Subscriber Management
+### Subscribers
 
-Create, update, list, and search subscribers. Subscribers can be filtered by status (active, inactive, bounced, complained, cancelled), date ranges, and custom fields. You can unsubscribe subscribers or update their information such as name, email, and custom field values.
+- `list_subscribers`: list/search subscribers, including tag, form, or sequence filtered subscriber lists.
+- `manage_subscriber`: create, update, get, unsubscribe, list subscriber tags, or fetch subscriber stats.
 
 ### Tags
 
-Create and manage tags to organize and segment subscribers. Tags can be added to or removed from individual subscribers. You can list all subscribers associated with a specific tag.
+- `manage_tags`: list, create, update, tag subscribers, untag subscribers, or list subscribers for a tag.
 
-### Forms and Landing Pages
+### Forms
 
-List and retrieve forms and landing pages. Add subscribers directly to forms, which can trigger opt-in confirmation depending on form settings.
+- `manage_forms`: list forms and landing pages, or add a subscriber to a form.
 
-### Email Sequences
+### Sequences and Sequence Emails
 
-List and manage email sequences (automated drip campaigns). Add subscribers to sequences to enroll them in automated email series. You can view sequence details and list subscribers in a sequence.
+- `manage_sequences`: list, create, get, update, delete, or add a subscriber to a sequence.
+- `manage_sequence_emails`: list, create, get, update, or delete sequence emails.
 
 ### Broadcasts
 
-Create, update, list, and delete email broadcasts (one-time email sends). You can create and send broadcasts to your subscribers. V4 includes improved HTML support and access to subscriber filters for targeting.
+- `manage_broadcasts`: list, create, get, update, delete, retrieve stats, or list click analytics for broadcasts.
 
 ### Custom Fields
 
-Create, update, list, and delete custom fields for storing additional subscriber data. Custom field values can be set when creating or updating subscribers.
+- `manage_custom_fields`: list, create, update, or delete custom fields.
 
 ### Purchases
 
-Import purchase/transaction data, including product details, pricing, and transaction metadata. Purchase creation endpoints require OAuth authentication.
+- `create_purchase`: create purchase records. This is OAuth-only in Kit API V4.
+- `manage_purchases`: list or retrieve purchase records.
 
-### Segments
+### Segments and Templates
 
-Access subscriber segments, which are saved filters for grouping subscribers based on various criteria.
+- `list_segments`: list saved subscriber segments.
+- `list_email_templates`: list email templates.
 
-### Email Templates
+### Posts
 
-List available email templates that can be used with broadcasts.
+- `manage_posts`: list or retrieve Kit posts.
 
-### Account Information
+### Snippets
 
-Retrieve account-level information such as account name and plan details.
+- `manage_snippets`: list, create, get, update, archive, or restore reusable snippets. Supports inline content snippets and block snippets with HTML document attributes.
 
 ## Events
 
-ConvertKit supports webhooks that send a POST request with a JSON payload to a specified URL when subscriber events occur.
+The integration supports Kit webhook automation events for:
 
-### Subscriber Activation
+- Subscriber activation
+- Subscriber unsubscribe
+- Subscriber bounce
+- Subscriber complaint
+- Form subscription
+- Tag added
+- Tag removed
+- Sequence subscription
+- Sequence completion
+- Purchase created
+- Link click
+- Product purchase
 
-Webhooks are automations that will receive subscriber data when a subscriber event is triggered. Fires when a subscriber becomes active. No additional parameters required.
+## Non-Goals
 
-### Subscriber Unsubscribe
+The integration intentionally does not expose every administrative or dashboard-only detail from Kit. Low-value or highly UI-specific dashboard workflows are left out unless they become necessary for agent-driven automation. File-returning/export workflows are not currently exposed; any future file-producing tool must return content through Slate attachments instead of inline payload fields.
 
-Fires when a subscriber unsubscribes. No additional parameters required.
+## Validation and Error Handling
 
-### Subscriber Bounce
+Tool inputs use top-level `z.object` schemas for MCP/OpenAI tool bridge compatibility. Branching actions are modeled with an `action` enum plus optional action-specific fields and runtime validation.
 
-Fires when a subscriber's email bounces. No additional parameters required.
+User-facing validation failures and upstream Kit API failures are surfaced with `ServiceError` from `@lowerdeck/error`.
 
-### Subscriber Complaint
+## Verification
 
-Fires when a subscriber marks an email as spam. No additional parameters required.
+The package includes a schema regression test that serializes every tool input schema with `z.toJSONSchema` and asserts the top-level schema is an object without top-level `oneOf`, `anyOf`, or `allOf`.
 
-### Form Subscription
-
-Fires when a subscriber subscribes to a specific form. Requires specifying a `form_id`.
-
-### Sequence Subscription
-
-Fires when a subscriber is added to a specific sequence. Requires specifying a `sequence_id`.
-
-### Sequence Completion
-
-Fires when a subscriber completes a specific sequence. Requires specifying a `sequence_id`.
-
-### Link Click
-
-Fires when a subscriber clicks a specific link in an email. Requires specifying the link URL via `initiator_value`.
-
-### Product Purchase
-
-Fires when a subscriber purchases a specific product. Requires specifying a `product_id`.
-
-### Tag Added
-
-Fires when a specific tag is added to a subscriber. Requires specifying a `tag_id`.
-
-### Tag Removed
-
-Fires when a specific tag is removed from a subscriber. Requires specifying a `tag_id`.
-
-### Purchase Created
-
-Fires when a new purchase record is created. No additional parameters required.
+Private live E2E coverage lives at `tests/integrations/convertkit/tools.e2e.ts` and covers each tool with safe setup and cleanup. Live E2E should be run only with an appropriate private profile and was not run as part of this update.

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { replicateServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let deploymentOutputSchema = z.object({
@@ -60,6 +61,12 @@ export let createDeployment = SlateTool.create(spec, {
   )
   .output(deploymentOutputSchema)
   .handleInvocation(async ctx => {
+    if (ctx.input.maxInstances < ctx.input.minInstances) {
+      throw replicateServiceError(
+        'maxInstances must be greater than or equal to minInstances.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let result = await client.createDeployment({
       name: ctx.input.deploymentName,
@@ -175,6 +182,24 @@ export let updateDeployment = SlateTool.create(spec, {
   )
   .output(deploymentOutputSchema)
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.version === undefined &&
+      ctx.input.hardware === undefined &&
+      ctx.input.minInstances === undefined &&
+      ctx.input.maxInstances === undefined
+    ) {
+      throw replicateServiceError('Provide at least one deployment field to update.');
+    }
+    if (
+      ctx.input.minInstances !== undefined &&
+      ctx.input.maxInstances !== undefined &&
+      ctx.input.maxInstances < ctx.input.minInstances
+    ) {
+      throw replicateServiceError(
+        'maxInstances must be greater than or equal to minInstances.'
+      );
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let result = await client.updateDeployment(ctx.input.owner, ctx.input.deploymentName, {
       version: ctx.input.version,

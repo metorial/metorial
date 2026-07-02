@@ -31,13 +31,44 @@ export let listVoices = SlateTool.create(spec, {
         .optional()
         .describe('Search term to filter voices by name, description, labels, or category'),
       voiceType: z
-        .enum(['personal', 'community', 'default', 'workspace', 'non-default', 'saved'])
+        .enum([
+          'personal',
+          'community',
+          'default',
+          'workspace',
+          'non-default',
+          'non-community',
+          'saved'
+        ])
         .optional()
         .describe('Filter voices by type'),
       category: z
         .enum(['premade', 'cloned', 'generated', 'professional'])
         .optional()
         .describe('Filter voices by category'),
+      fineTuningState: z
+        .enum([
+          'draft',
+          'not_verified',
+          'not_started',
+          'queued',
+          'fine_tuning',
+          'fine_tuned',
+          'failed',
+          'delayed'
+        ])
+        .optional()
+        .describe('Filter professional voice clones by fine-tuning state'),
+      collectionId: z.string().optional().describe('Collection ID to filter voices by'),
+      includeTotalCount: z
+        .boolean()
+        .optional()
+        .describe('Whether to include totalCount. Defaults to the provider behavior.'),
+      voiceIds: z
+        .array(z.string())
+        .max(100)
+        .optional()
+        .describe('Specific voice IDs to look up, maximum 100'),
       pageSize: z
         .number()
         .min(1)
@@ -70,6 +101,10 @@ export let listVoices = SlateTool.create(spec, {
       search: ctx.input.search,
       voiceType: ctx.input.voiceType,
       category: ctx.input.category,
+      fineTuningState: ctx.input.fineTuningState,
+      collectionId: ctx.input.collectionId,
+      includeTotalCount: ctx.input.includeTotalCount,
+      voiceIds: ctx.input.voiceIds,
       pageSize: ctx.input.pageSize,
       nextPageToken: ctx.input.nextPageToken,
       sort: ctx.input.sort,

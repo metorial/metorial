@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { woocommerceApiError } from './errors';
 
 export class WooCommerceClient {
   private ax;
@@ -18,6 +19,11 @@ export class WooCommerceClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.ax.interceptors.response.use(
+      response => response,
+      error => Promise.reject(woocommerceApiError(error))
+    );
   }
 
   // ─── Products ──────────────────────────────────────────────
@@ -125,6 +131,21 @@ export class WooCommerceClient {
     return response.data;
   }
 
+  async getProductTag(tagId: number) {
+    let response = await this.ax.get(`/products/tags/${tagId}`);
+    return response.data;
+  }
+
+  async updateProductTag(tagId: number, data: Record<string, any>) {
+    let response = await this.ax.put(`/products/tags/${tagId}`, data);
+    return response.data;
+  }
+
+  async deleteProductTag(tagId: number, force: boolean = true) {
+    let response = await this.ax.delete(`/products/tags/${tagId}`, { params: { force } });
+    return response.data;
+  }
+
   // ─── Product Attributes ────────────────────────────────────
 
   async listProductAttributes() {
@@ -137,6 +158,64 @@ export class WooCommerceClient {
     return response.data;
   }
 
+  async getProductAttribute(attributeId: number) {
+    let response = await this.ax.get(`/products/attributes/${attributeId}`);
+    return response.data;
+  }
+
+  async updateProductAttribute(attributeId: number, data: Record<string, any>) {
+    let response = await this.ax.put(`/products/attributes/${attributeId}`, data);
+    return response.data;
+  }
+
+  async deleteProductAttribute(attributeId: number, force: boolean = true) {
+    let response = await this.ax.delete(`/products/attributes/${attributeId}`, {
+      params: { force }
+    });
+    return response.data;
+  }
+
+  async listProductAttributeTerms(attributeId: number, params?: Record<string, any>) {
+    let response = await this.ax.get(`/products/attributes/${attributeId}/terms`, { params });
+    return response.data;
+  }
+
+  async getProductAttributeTerm(attributeId: number, termId: number) {
+    let response = await this.ax.get(`/products/attributes/${attributeId}/terms/${termId}`);
+    return response.data;
+  }
+
+  async createProductAttributeTerm(attributeId: number, data: Record<string, any>) {
+    let response = await this.ax.post(`/products/attributes/${attributeId}/terms`, data);
+    return response.data;
+  }
+
+  async updateProductAttributeTerm(
+    attributeId: number,
+    termId: number,
+    data: Record<string, any>
+  ) {
+    let response = await this.ax.put(
+      `/products/attributes/${attributeId}/terms/${termId}`,
+      data
+    );
+    return response.data;
+  }
+
+  async deleteProductAttributeTerm(
+    attributeId: number,
+    termId: number,
+    force: boolean = true
+  ) {
+    let response = await this.ax.delete(
+      `/products/attributes/${attributeId}/terms/${termId}`,
+      {
+        params: { force }
+      }
+    );
+    return response.data;
+  }
+
   // ─── Product Reviews ──────────────────────────────────────
 
   async listProductReviews(params?: Record<string, any>) {
@@ -146,6 +225,23 @@ export class WooCommerceClient {
 
   async getProductReview(reviewId: number) {
     let response = await this.ax.get(`/products/reviews/${reviewId}`);
+    return response.data;
+  }
+
+  async createProductReview(data: Record<string, any>) {
+    let response = await this.ax.post('/products/reviews', data);
+    return response.data;
+  }
+
+  async updateProductReview(reviewId: number, data: Record<string, any>) {
+    let response = await this.ax.put(`/products/reviews/${reviewId}`, data);
+    return response.data;
+  }
+
+  async deleteProductReview(reviewId: number, force: boolean = true) {
+    let response = await this.ax.delete(`/products/reviews/${reviewId}`, {
+      params: { force }
+    });
     return response.data;
   }
 
@@ -445,10 +541,44 @@ export class WooCommerceClient {
     return response.data;
   }
 
+  // ─── Shipping Methods ──────────────────────────────────────
+
+  async listShippingMethods() {
+    let response = await this.ax.get('/shipping_methods');
+    return response.data;
+  }
+
+  async getShippingMethod(methodId: string) {
+    let response = await this.ax.get(`/shipping_methods/${methodId}`);
+    return response.data;
+  }
+
   // ─── Shipping Classes ──────────────────────────────────────
 
   async listShippingClasses(params?: Record<string, any>) {
     let response = await this.ax.get('/products/shipping_classes', { params });
+    return response.data;
+  }
+
+  async getShippingClass(shippingClassId: number) {
+    let response = await this.ax.get(`/products/shipping_classes/${shippingClassId}`);
+    return response.data;
+  }
+
+  async createShippingClass(data: Record<string, any>) {
+    let response = await this.ax.post('/products/shipping_classes', data);
+    return response.data;
+  }
+
+  async updateShippingClass(shippingClassId: number, data: Record<string, any>) {
+    let response = await this.ax.put(`/products/shipping_classes/${shippingClassId}`, data);
+    return response.data;
+  }
+
+  async deleteShippingClass(shippingClassId: number, force: boolean = true) {
+    let response = await this.ax.delete(`/products/shipping_classes/${shippingClassId}`, {
+      params: { force }
+    });
     return response.data;
   }
 }

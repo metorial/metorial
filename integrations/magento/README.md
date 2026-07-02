@@ -14,7 +14,7 @@ Retrieve store configuration, websites, store groups, currencies, and available 
 
 ### Manage Cart
 
-Create and manage shopping carts. Create carts for customers or guests, add/update/remove items, apply or remove coupon codes, and view cart contents. Supports the full pre-checkout shopping experience.
+Create and manage shopping carts. Create carts for customers or guests, add/update/remove items, estimate shipping methods, apply or remove coupon codes, and view cart contents. Supports the full pre-checkout shopping experience.
 
 ### Manage Category
 
@@ -39,6 +39,10 @@ Retrieve order details or perform order actions including adding comments, cance
 ### Manage Product
 
 Create, update, retrieve, or delete products in the Magento catalog. Supports all product types including simple, configurable, bundle, grouped, and virtual. Set pricing, status, visibility, weight, custom attributes, and more.
+
+### Manage Product Media
+
+List, add, update, or delete product media gallery entries. Use this for product images and storefront image roles such as image, small_image, and thumbnail.
 
 ### Search Customers
 

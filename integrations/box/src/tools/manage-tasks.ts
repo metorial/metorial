@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { boxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTasks = SlateTool.create(spec, {
@@ -80,7 +81,7 @@ export let manageTasks = SlateTool.create(spec, {
     } = ctx.input;
 
     if (action === 'list') {
-      if (!fileId) throw new Error('fileId is required for list action');
+      if (!fileId) throw boxServiceError('fileId is required for list action');
       let tasks = await client.getFileTasks(fileId);
       let mapped = tasks.map((t: any) => ({
         taskId: t.id,
@@ -96,7 +97,7 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!fileId) throw new Error('fileId is required for create action');
+      if (!fileId) throw boxServiceError('fileId is required for create action');
       let task = await client.createTask(fileId, {
         message: taskMessage,
         dueAt,
@@ -125,7 +126,7 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!taskId) throw new Error('taskId is required for update action');
+      if (!taskId) throw boxServiceError('taskId is required for update action');
       let updates: Record<string, any> = {};
       if (taskMessage !== undefined) updates.message = taskMessage;
       if (dueAt !== undefined) updates.due_at = dueAt;
@@ -142,7 +143,7 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     // delete
-    if (!taskId) throw new Error('taskId is required for delete action');
+    if (!taskId) throw boxServiceError('taskId is required for delete action');
     await client.deleteTask(taskId);
     return {
       output: { taskId, deleted: true },

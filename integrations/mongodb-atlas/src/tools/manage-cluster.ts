@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { invalidAction, requireString, resolveProjectId } from '../lib/validation';
 import { spec } from '../spec';
 
 let replicationSpecSchema = z
@@ -124,8 +125,7 @@ export let manageClusterTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
     let { action, clusterName } = ctx.input;
 
@@ -138,7 +138,7 @@ export let manageClusterTool = SlateTool.create(spec, {
       };
     }
 
-    if (!clusterName) throw new Error('clusterName is required for this action.');
+    clusterName = requireString(clusterName, 'clusterName', 'for this action');
 
     if (action === 'get') {
       let cluster = await client.getCluster(projectId, clusterName);
@@ -210,6 +210,6 @@ export let manageClusterTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

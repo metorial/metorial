@@ -39,7 +39,14 @@ export let generateEmbeddingsTool = SlateTool.create(spec, {
       embeddings: z
         .array(
           z.object({
-            values: z.array(z.number()).describe('Embedding vector values')
+            values: z.array(z.number()).optional().describe('Dense embedding vector values'),
+            sparseValues: z
+              .object({
+                indices: z.array(z.number().int()).describe('Sparse vector indices'),
+                values: z.array(z.number()).describe('Sparse vector values')
+              })
+              .optional()
+              .describe('Sparse embedding values')
           })
         )
         .describe('Generated embedding vectors'),
@@ -60,7 +67,8 @@ export let generateEmbeddingsTool = SlateTool.create(spec, {
     });
 
     let embeddings = (result.data || []).map(d => ({
-      values: d.values
+      values: d.values,
+      sparseValues: d.sparse_values
     }));
 
     return {

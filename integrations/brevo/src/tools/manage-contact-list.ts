@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { brevoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listContactLists = SlateTool.create(spec, {
@@ -61,6 +62,49 @@ export let listContactLists = SlateTool.create(spec, {
     };
   });
 
+export let getContactList = SlateTool.create(spec, {
+  name: 'Get Contact List',
+  key: 'get_contact_list',
+  description: `Retrieve details for a specific Brevo contact list, including folder association and subscriber counts.`,
+  tags: {
+    destructive: false,
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      listId: z.number().describe('ID of the contact list to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      listId: z.number().describe('List ID'),
+      name: z.string().describe('List name'),
+      totalSubscribers: z.number().describe('Total subscriber count'),
+      uniqueSubscribers: z.number().describe('Unique subscriber count'),
+      folderId: z.number().describe('Associated folder ID')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      authType: ctx.auth.authType
+    });
+
+    let list = await client.getContactList(ctx.input.listId);
+
+    return {
+      output: {
+        listId: list.id,
+        name: list.name,
+        totalSubscribers: list.totalSubscribers ?? 0,
+        uniqueSubscribers: list.uniqueSubscribers ?? 0,
+        folderId: list.folderId
+      },
+      message: `Retrieved contact list **${list.name}**.`
+    };
+  });
+
 export let createContactList = SlateTool.create(spec, {
   name: 'Create Contact List',
   key: 'create_contact_list',
@@ -98,6 +142,81 @@ export let createContactList = SlateTool.create(spec, {
     };
   });
 
+export let updateContactList = SlateTool.create(spec, {
+  name: 'Update Contact List',
+  key: 'update_contact_list',
+  description: `Update a Brevo contact list's name or move it to another folder.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      listId: z.number().describe('ID of the contact list to update'),
+      name: z.string().optional().describe('New list name'),
+      folderId: z.number().optional().describe('New parent folder ID')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean().describe('Whether the update completed successfully')
+    })
+  )
+  .handleInvocation(async ctx => {
+    if (!ctx.input.name && ctx.input.folderId === undefined) {
+      throw brevoServiceError('Provide at least one of name or folderId.');
+    }
+
+    let client = new Client({
+      token: ctx.auth.token,
+      authType: ctx.auth.authType
+    });
+
+    await client.updateContactList(ctx.input.listId, {
+      name: ctx.input.name,
+      folderId: ctx.input.folderId
+    });
+
+    return {
+      output: { success: true },
+      message: `Contact list **${ctx.input.listId}** updated successfully.`
+    };
+  });
+
+export let deleteContactList = SlateTool.create(spec, {
+  name: 'Delete Contact List',
+  key: 'delete_contact_list',
+  description: `Delete a Brevo contact list. Contacts are not deleted, but the list itself is removed.`,
+  tags: {
+    destructive: true,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      listId: z.number().describe('ID of the contact list to delete')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean().describe('Whether the deletion completed successfully')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      authType: ctx.auth.authType
+    });
+
+    await client.deleteContactList(ctx.input.listId);
+
+    return {
+      output: { success: true },
+      message: `Contact list **${ctx.input.listId}** deleted successfully.`
+    };
+  });
+
 export let addContactsToList = SlateTool.create(spec, {
   name: 'Add Contacts to List',
   key: 'add_contacts_to_list',
@@ -120,6 +239,10 @@ export let addContactsToList = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.emails?.length && !ctx.input.contactIds?.length) {
+      throw brevoServiceError('Provide at least one email or contactId to add.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       authType: ctx.auth.authType
@@ -159,6 +282,10 @@ export let removeContactsFromList = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.emails?.length && !ctx.input.contactIds?.length) {
+      throw brevoServiceError('Provide at least one email or contactId to remove.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       authType: ctx.auth.authType

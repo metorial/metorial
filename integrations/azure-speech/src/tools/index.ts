@@ -1,5 +1,7 @@
 export * from './create-batch-transcription';
 export * from './delete-batch-transcription';
+export * from './enroll-speaker-profile';
+export * from './fast-transcribe-audio';
 export * from './get-batch-transcription';
 export * from './identify-speaker';
 export * from './list-batch-transcriptions';

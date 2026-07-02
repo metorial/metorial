@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -26,7 +26,13 @@ export let managePostgres = SlateTool.create(spec, {
           'restart',
           'failover',
           'connection_info',
-          'export'
+          'export',
+          'list_exports',
+          'recovery_info',
+          'recover',
+          'list_users',
+          'create_user',
+          'delete_user'
         ])
         .describe('Action to perform'),
       postgresId: z
@@ -40,6 +46,15 @@ export let managePostgres = SlateTool.create(spec, {
       version: z.string().optional().describe('Postgres version (for create)'),
       databaseName: z.string().optional().describe('Initial database name (for create)'),
       databaseUser: z.string().optional().describe('Initial database user (for create)'),
+      username: z
+        .string()
+        .optional()
+        .describe('Postgres credential username (for create_user/delete_user)'),
+      restoreTime: z
+        .string()
+        .optional()
+        .describe('Point-in-time recovery timestamp (ISO 8601, required for recover)'),
+      restoreName: z.string().optional().describe('Name of the recovered database'),
       highAvailabilityEnabled: z
         .boolean()
         .optional()
@@ -66,6 +81,32 @@ export let managePostgres = SlateTool.create(spec, {
         })
         .optional()
         .describe('Connection details (for connection_info action)'),
+      exports: z
+        .array(
+          z.object({
+            exportId: z.string().optional().describe('Export ID'),
+            status: z.string().optional().describe('Export status'),
+            downloadUrl: z.string().optional().describe('Download URL for the export'),
+            createdAt: z.string().optional().describe('Creation timestamp'),
+            expiresAt: z.string().optional().describe('Expiration timestamp')
+          })
+        )
+        .optional()
+        .describe('Postgres exports'),
+      users: z
+        .array(
+          z.object({
+            username: z.string().describe('Postgres username'),
+            password: z.string().optional().describe('Generated password if returned'),
+            createdAt: z.string().optional().describe('Creation timestamp')
+          })
+        )
+        .optional()
+        .describe('Postgres credential users'),
+      recoveryInfo: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Point-in-time recovery status and availability metadata'),
       success: z.boolean().describe('Whether the action succeeded')
     })
   )
@@ -74,7 +115,7 @@ export let managePostgres = SlateTool.create(spec, {
     let { action, postgresId } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.ownerId) throw new Error('ownerId is required for create');
+      if (!ctx.input.ownerId) throw createApiServiceError('ownerId is required for create');
       let body: Record<string, any> = {
         ownerId: ctx.input.ownerId,
         name: ctx.input.name,
@@ -102,7 +143,7 @@ export let managePostgres = SlateTool.create(spec, {
       };
     }
 
-    if (!postgresId) throw new Error('postgresId is required');
+    if (!postgresId) throw createApiServiceError('postgresId is required');
 
     if (action === 'get') {
       let pg = await client.getPostgres(postgresId);
@@ -158,6 +199,100 @@ export let managePostgres = SlateTool.create(spec, {
       return {
         output: { postgresId, success: true },
         message: `Export triggered for Postgres \`${postgresId}\`.`
+      };
+    }
+
+    if (action === 'list_exports') {
+      let data = await client.listPostgresExports(postgresId);
+      let exports = (Array.isArray(data) ? data : [data]).map((item: any) => {
+        let postgresExport = item.export || item.postgresExport || item;
+        return {
+          exportId: postgresExport.id,
+          status: postgresExport.status,
+          downloadUrl: postgresExport.url || postgresExport.downloadUrl,
+          createdAt: postgresExport.createdAt,
+          expiresAt: postgresExport.expiresAt
+        };
+      });
+      return {
+        output: { postgresId, exports, success: true },
+        message: `Found **${exports.length}** export(s) for Postgres \`${postgresId}\`.`
+      };
+    }
+
+    if (action === 'recovery_info') {
+      let recoveryInfo = await client.getPostgresRecoveryInfo(postgresId);
+      return {
+        output: { postgresId, recoveryInfo, success: true },
+        message: `Retrieved recovery info for Postgres \`${postgresId}\`.`
+      };
+    }
+
+    if (action === 'recover') {
+      if (!ctx.input.restoreTime)
+        throw createApiServiceError('restoreTime is required for recover');
+      let body: Record<string, any> = { restoreTime: ctx.input.restoreTime };
+      if (ctx.input.restoreName) body.restoreName = ctx.input.restoreName;
+      if (ctx.input.plan) body.plan = ctx.input.plan;
+      let pg = await client.recoverPostgres(postgresId, body);
+      return {
+        output: {
+          postgresId: pg.id,
+          name: pg.name,
+          status: pg.status,
+          plan: pg.plan,
+          region: pg.region,
+          version: pg.version,
+          success: true
+        },
+        message: `Triggered point-in-time recovery for Postgres \`${postgresId}\`.`
+      };
+    }
+
+    if (action === 'list_users') {
+      let data = await client.listPostgresUsers(postgresId);
+      let users = (Array.isArray(data) ? data : [data]).map((item: any) => {
+        let user = item.user || item.credential || item;
+        return {
+          username: user.username,
+          password: user.password,
+          createdAt: user.createdAt
+        };
+      });
+      return {
+        output: { postgresId, users, success: true },
+        message: `Found **${users.length}** credential user(s) for Postgres \`${postgresId}\`.`
+      };
+    }
+
+    if (action === 'create_user') {
+      if (!ctx.input.username)
+        throw createApiServiceError('username is required for create_user');
+      let user = await client.createPostgresUser(postgresId, ctx.input.username);
+      let credential = user.user || user.credential || user;
+      return {
+        output: {
+          postgresId,
+          users: [
+            {
+              username: credential.username ?? ctx.input.username,
+              password: credential.password,
+              createdAt: credential.createdAt
+            }
+          ],
+          success: true
+        },
+        message: `Created credential user \`${ctx.input.username}\` for Postgres \`${postgresId}\`.`
+      };
+    }
+
+    if (action === 'delete_user') {
+      if (!ctx.input.username)
+        throw createApiServiceError('username is required for delete_user');
+      await client.deletePostgresUser(postgresId, ctx.input.username);
+      return {
+        output: { postgresId, success: true },
+        message: `Deleted credential user \`${ctx.input.username}\` from Postgres \`${postgresId}\`.`
       };
     }
 

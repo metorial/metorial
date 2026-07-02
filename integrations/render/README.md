@@ -20,6 +20,10 @@ List recent deployments for a Render service. Shows deployment history including
 
 List all Render Postgres database instances. Optionally filter by workspace/owner ID.
 
+### List Service Instances
+
+List the currently known instances for a Render service. Useful for checking active instance IDs and creation timestamps before inspecting metrics or operational state.
+
 ### List Services
 
 List all services in your Render account. Filter by workspace, service type, or name. Returns service metadata including type, status, repository, branch, and URL.
@@ -31,6 +35,10 @@ List all Render workspaces accessible to the authenticated user. Returns workspa
 ### Manage Custom Domains
 
 Add, list, verify, or delete custom domains on a Render service. Use **list** to see configured domains, **add** to attach a new domain, **verify** to check DNS configuration, or **delete** to remove a domain.
+
+### Manage Blueprints
+
+List Render Blueprints, retrieve a Blueprint, or list Blueprint sync history. Blueprints define Render infrastructure from render.yaml files.
 
 ### Manage Deployments
 
@@ -44,6 +52,10 @@ Manage persistent disks on Render services. Supports **list** (disks for a servi
 
 Manage Render environment groups — shared sets of environment variables that can be linked to multiple services. Supports **list**, **get**, **create**, **update**, **delete**, **link_service**, **unlink_service**, **set_var**, and **delete_var** actions.
 
+### Manage Events
+
+List events for a Render service or retrieve a specific event by ID. Useful for auditing service lifecycle changes, deploy events, and datastore events.
+
 ### Manage Environment Variables
 
 List, set, or delete environment variables on a Render service. Use **list** to view all env vars, **set** to add/update one or more variables, or **delete** to remove a variable by key name.
@@ -56,6 +68,10 @@ Manage Render cron job runs and one-off jobs. **trigger_cron** runs a cron job i
 
 Manage Render Key Value (Redis-compatible) instances. Perform actions such as **list**, **get**, **create**, **update**, **delete**, **suspend**, **resume**, or retrieve **connection_info**.
 
+### Manage Maintenance
+
+List, retrieve, reschedule, or trigger Render maintenance runs for services and datastores.
+
 ### Manage Postgres Database
 
 Manage Render Postgres databases. Perform lifecycle actions such as **get**, **create**, **update**, **delete**, **suspend**, **resume**, **restart**, or **failover**. Also supports retrieving **connection_info** and triggering a database **export**.
@@ -64,9 +80,21 @@ Manage Render Postgres databases. Perform lifecycle actions such as **get**, **c
 
 Manage Render projects and environments. Supports **list**, **get**, **create**, **update**, and **delete** for projects. Also supports **list_environments** and **create_environment** within a project.
 
+### Manage Registry Credentials
+
+List, retrieve, create, update, or delete Render registry credentials for private image deployments.
+
+### Manage Secret Files
+
+Manage secret files on a Render service. Retrieved secret-file content is returned as Slate attachments, not inline output.
+
 ### Manage Service
 
 Perform lifecycle actions on a Render service: **suspend**, **resume**, **restart**, or **delete**. Use this to control service state without modifying its configuration.
+
+### Manage Webhooks
+
+List, retrieve, create, update, delete, or inspect delivery events for Render webhooks.
 
 ### Query Logs
 

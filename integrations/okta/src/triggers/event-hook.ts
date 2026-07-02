@@ -55,7 +55,8 @@ export let eventHookTrigger = SlateTrigger.create(spec, {
     autoRegisterWebhook: async ctx => {
       let client = new OktaClient({
         domain: ctx.config.domain,
-        token: ctx.auth.token
+        token: ctx.auth.token,
+        authMethod: ctx.auth.authMethod
       });
 
       // Register an event hook with Okta for common event types
@@ -111,7 +112,8 @@ export let eventHookTrigger = SlateTrigger.create(spec, {
     autoUnregisterWebhook: async ctx => {
       let client = new OktaClient({
         domain: ctx.config.domain,
-        token: ctx.auth.token
+        token: ctx.auth.token,
+        authMethod: ctx.auth.authMethod
       });
 
       let hookId = ctx.input.registrationDetails?.eventHookId;

@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { dynamoDbApiError } from './errors';
 import { signRequest } from './signing';
 
 export interface DynamoDBClientConfig {
@@ -97,11 +98,15 @@ export class DynamoDBClient {
       baseURL: this.endpoint
     });
 
-    let response = await axiosInstance.post('/', body, {
-      headers: signedHeaders
-    });
+    try {
+      let response = await axiosInstance.post('/', body, {
+        headers: signedHeaders
+      });
 
-    return response.data;
+      return response.data;
+    } catch (error) {
+      throw dynamoDbApiError(error, target);
+    }
   }
 
   private async streamsRequest(target: string, payload: Record<string, any>): Promise<any> {
@@ -126,8 +131,12 @@ export class DynamoDBClient {
     });
 
     let axiosInstance = createAxios({ baseURL: endpoint });
-    let response = await axiosInstance.post('/', body, { headers: signedHeaders });
-    return response.data;
+    try {
+      let response = await axiosInstance.post('/', body, { headers: signedHeaders });
+      return response.data;
+    } catch (error) {
+      throw dynamoDbApiError(error, `DynamoDB Streams ${target}`);
+    }
   }
 
   // Table Management
@@ -146,6 +155,7 @@ export class DynamoDBClient {
       StreamViewType?: 'KEYS_ONLY' | 'NEW_IMAGE' | 'OLD_IMAGE' | 'NEW_AND_OLD_IMAGES';
     };
     tags?: { Key: string; Value: string }[];
+    deletionProtectionEnabled?: boolean;
   }): Promise<any> {
     let payload: Record<string, any> = {
       TableName: params.tableName,
@@ -163,6 +173,8 @@ export class DynamoDBClient {
     if (params.tableClass) payload.TableClass = params.tableClass;
     if (params.streamSpecification) payload.StreamSpecification = params.streamSpecification;
     if (params.tags) payload.Tags = params.tags;
+    if (params.deletionProtectionEnabled !== undefined)
+      payload.DeletionProtectionEnabled = params.deletionProtectionEnabled;
 
     return this.request('CreateTable', payload);
   }
@@ -196,6 +208,7 @@ export class DynamoDBClient {
       StreamViewType?: 'KEYS_ONLY' | 'NEW_IMAGE' | 'OLD_IMAGE' | 'NEW_AND_OLD_IMAGES';
     };
     tableClass?: 'STANDARD' | 'STANDARD_INFREQUENT_ACCESS';
+    deletionProtectionEnabled?: boolean;
   }): Promise<any> {
     let payload: Record<string, any> = {
       TableName: params.tableName
@@ -207,6 +220,8 @@ export class DynamoDBClient {
       payload.GlobalSecondaryIndexUpdates = params.globalSecondaryIndexUpdates;
     if (params.streamSpecification) payload.StreamSpecification = params.streamSpecification;
     if (params.tableClass) payload.TableClass = params.tableClass;
+    if (params.deletionProtectionEnabled !== undefined)
+      payload.DeletionProtectionEnabled = params.deletionProtectionEnabled;
     return this.request('UpdateTable', payload);
   }
 
@@ -451,10 +466,14 @@ export class DynamoDBClient {
         ExpressionAttributeNames?: Record<string, string>;
       };
     }>;
+    returnConsumedCapacity?: 'INDEXES' | 'TOTAL' | 'NONE';
   }): Promise<any> {
-    return this.request('TransactGetItems', {
+    let payload: Record<string, any> = {
       TransactItems: params.transactItems
-    });
+    };
+    if (params.returnConsumedCapacity)
+      payload.ReturnConsumedCapacity = params.returnConsumedCapacity;
+    return this.request('TransactGetItems', payload);
   }
 
   // PartiQL
@@ -578,6 +597,26 @@ export class DynamoDBClient {
 
   async deleteBackup(backupArn: string): Promise<any> {
     return this.request('DeleteBackup', { BackupArn: backupArn });
+  }
+
+  async describeBackup(backupArn: string): Promise<any> {
+    return this.request('DescribeBackup', { BackupArn: backupArn });
+  }
+
+  async restoreTableFromBackup(params: {
+    backupArn: string;
+    targetTableName: string;
+    billingModeOverride?: 'PROVISIONED' | 'PAY_PER_REQUEST';
+    provisionedThroughputOverride?: ProvisionedThroughput;
+  }): Promise<any> {
+    let payload: Record<string, any> = {
+      BackupArn: params.backupArn,
+      TargetTableName: params.targetTableName
+    };
+    if (params.billingModeOverride) payload.BillingModeOverride = params.billingModeOverride;
+    if (params.provisionedThroughputOverride)
+      payload.ProvisionedThroughputOverride = params.provisionedThroughputOverride;
+    return this.request('RestoreTableFromBackup', payload);
   }
 
   async describeContinuousBackups(tableName: string): Promise<any> {

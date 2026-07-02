@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { activeCampaignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createOrUpdateAccount = SlateTool.create(spec, {
@@ -59,7 +60,9 @@ export let createOrUpdateAccount = SlateTool.create(spec, {
     if (ctx.input.accountId) {
       result = await client.updateAccount(ctx.input.accountId, accountInput);
     } else {
-      if (!ctx.input.name) throw new Error('name is required for creating an account');
+      if (!ctx.input.name) {
+        throw activeCampaignServiceError('name is required for creating an account');
+      }
       result = await client.createAccount(accountInput);
     }
 

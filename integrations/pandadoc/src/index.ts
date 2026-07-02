@@ -10,6 +10,7 @@ import {
   deleteDocument,
   downloadDocument,
   getDocument,
+  getDocumentStatus,
   getTemplate,
   linkCrmObject,
   listContacts,
@@ -20,11 +21,12 @@ import {
   listMembers,
   listTemplates,
   manageDocumentStatus,
-  moveDocumentToFolder,
   removeRecipient,
+  renameDocumentFolder,
   sendDocument,
   sendReminder,
   updateContact,
+  updateDocument,
   updateRecipient
 } from './tools';
 import { documentEvents, templateEvents } from './triggers';
@@ -33,8 +35,10 @@ export let provider = Slate.create({
   spec,
   tools: [
     createDocument,
+    updateDocument,
     listDocuments,
     getDocument,
+    getDocumentStatus,
     sendDocument,
     manageDocumentStatus,
     deleteDocument,
@@ -56,7 +60,7 @@ export let provider = Slate.create({
     listContentLibrary,
     listDocumentFolders,
     createDocumentFolder,
-    moveDocumentToFolder
+    renameDocumentFolder
   ],
   triggers: [documentEvents, templateEvents]
 });

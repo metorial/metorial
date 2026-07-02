@@ -238,6 +238,36 @@ export let publishTemplate = SlateTool.create(spec, {
   })
   .build();
 
+export let duplicateTemplate = SlateTool.create(spec, {
+  name: 'Duplicate Template',
+  key: 'duplicate_template',
+  description: `Duplicate an existing Resend template so it can be edited without changing the original.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      templateId: z.string().describe('Template ID to duplicate.')
+    })
+  )
+  .output(
+    z.object({
+      templateId: z.string().describe('ID of the duplicated template.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let result = await client.duplicateTemplate(ctx.input.templateId);
+
+    return {
+      output: { templateId: result.id },
+      message: `Template \`${ctx.input.templateId}\` duplicated as \`${result.id}\`.`
+    };
+  })
+  .build();
+
 export let deleteTemplate = SlateTool.create(spec, {
   name: 'Delete Template',
   key: 'delete_template',

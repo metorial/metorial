@@ -1,22 +1,32 @@
 import { createAxios } from 'slates';
+import { withCrispErrorHandling } from './errors';
 
-let axios = createAxios({
-  baseURL: 'https://api.crisp.chat/v1'
-});
+let axios = withCrispErrorHandling(
+  createAxios({
+    baseURL: 'https://api.crisp.chat/v1'
+  }),
+  'request'
+);
 
 export class Client {
   private token: string;
   private websiteId: string;
+  private tier: 'plugin' | 'website' | 'user';
 
-  constructor(config: { token: string; websiteId: string }) {
+  constructor(config: {
+    token: string;
+    websiteId: string;
+    tier?: 'plugin' | 'website' | 'user';
+  }) {
     this.token = config.token;
     this.websiteId = config.websiteId;
+    this.tier = config.tier ?? 'plugin';
   }
 
   private headers() {
     return {
       Authorization: `Basic ${this.token}`,
-      'X-Crisp-Tier': 'plugin',
+      'X-Crisp-Tier': this.tier,
       'Content-Type': 'application/json'
     };
   }
@@ -167,6 +177,16 @@ export class Client {
     );
   }
 
+  async updateConversationInbox(sessionId: string, inboxId: string | null) {
+    await axios.patch(
+      this.url(`/conversation/${sessionId}/inbox`),
+      { inbox_id: inboxId },
+      {
+        headers: this.headers()
+      }
+    );
+  }
+
   // ── Conversation Block ──
 
   async updateConversationBlock(sessionId: string, blocked: boolean) {
@@ -239,27 +259,22 @@ export class Client {
 
   async markMessagesRead(
     sessionId: string,
-    from: string,
+    from: 'user' | 'operator',
     origin: string,
-    fingerprints: string[]
+    fingerprints?: number[]
   ) {
-    await axios.patch(
-      this.url(`/conversation/${sessionId}/read`),
-      {
-        from,
-        origin,
-        fingerprints
-      },
-      {
-        headers: this.headers()
-      }
-    );
+    let body: Record<string, unknown> = { from, origin };
+    if (fingerprints !== undefined) body.fingerprints = fingerprints;
+
+    await axios.patch(this.url(`/conversation/${sessionId}/read`), body, {
+      headers: this.headers()
+    });
   }
 
-  async markConversationUnread(sessionId: string) {
+  async markConversationUnread(sessionId: string, from: 'user') {
     await axios.patch(
       this.url(`/conversation/${sessionId}/unread`),
-      {},
+      { from },
       {
         headers: this.headers()
       }
@@ -268,9 +283,9 @@ export class Client {
 
   async markMessagesDelivered(
     sessionId: string,
-    from: string,
+    from: 'operator',
     origin: string,
-    fingerprints: string[]
+    fingerprints: number[]
   ) {
     await axios.patch(
       this.url(`/conversation/${sessionId}/delivered`),
@@ -572,6 +587,13 @@ export class Client {
     return response.data.data;
   }
 
+  async listOperatorAvailabilities() {
+    let response = await axios.get(this.url('/availability/operators'), {
+      headers: this.headers()
+    });
+    return response.data.data;
+  }
+
   async getOperator(userId: string) {
     let response = await axios.get(this.url(`/operator/${userId}`), {
       headers: this.headers()
@@ -623,6 +645,14 @@ export class Client {
 
   async updateWebsiteSettings(settings: Record<string, any>) {
     let response = await axios.patch(this.url('/settings'), settings, {
+      headers: this.headers()
+    });
+    return response.data.data;
+  }
+
+  async listWebsiteInboxes(pageNumber?: number) {
+    let page = pageNumber ?? 1;
+    let response = await axios.get(this.url(`/inboxes/list/${page}`), {
       headers: this.headers()
     });
     return response.data.data;

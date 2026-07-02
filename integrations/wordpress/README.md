@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/wordpress.png" height="20"> Wordpress
 
-Create, read, update, and delete posts, pages, and custom post types. Manage media files, comments, categories, tags, and taxonomies. Upload images and documents to the media library. Moderate comments and manage user accounts and roles. Retrieve and update site settings such as title, description, and timezone. View site statistics including page views, visitors, referrers, and traffic trends. Manage navigation menus and menu items. Follow and unfollow blogs via the WordPress.com Reader. Configure social media sharing and Publicize connections for automatic post distribution. Access user notifications for likes, comments, follows, and mentions. Supports both WordPress.com hosted sites and self-hosted WordPress.org sites via REST API.
+Create, read, update, and delete WordPress posts and pages. Manage media library items, comments, categories, tags, site users, site metadata, editable site settings, content search, and WordPress.com site statistics. Supports WordPress.com hosted sites via OAuth and self-hosted WordPress sites via application passwords.
 
 ## Tools
 
@@ -8,37 +8,141 @@ Create, read, update, and delete posts, pages, and custom post types. Manage med
 
 Retrieve a list of blog posts with filtering options. Filter by status, search term, category, tag, author, and date range. Results are paginated.
 
-### List Comments
+### Get Post
 
-Retrieve comments from the site. Can filter by post ID, status, and search term. Results are paginated.
-
-### List Media
-
-Browse the site's media library. Filter by media type (image, video, audio, application) or search by keyword. Results are paginated.
-
-### List Pages
-
-Retrieve a list of pages with optional filtering by status, search term, and sorting. Results are paginated.
+Retrieve a single blog post by ID, including full content, metadata, and comment count.
 
 ### Create Post
 
-Create a new blog post on the WordPress site. Supports setting title, content, excerpt, status (draft/publish/pending/private), scheduling via date, post format, categories, tags, featured image, and comment settings.
+Create a new blog post with title, content, status, scheduling, taxonomy, featured image, and comment settings.
+
+### Update Post
+
+Update an existing blog post.
+
+### Delete Post
+
+Permanently delete a blog post.
+
+### List Pages
+
+Retrieve pages with filtering and pagination.
+
+### Create Page
+
+Create a draft or published page.
+
+### Update Page
+
+Update an existing page.
+
+### Delete Page
+
+Permanently delete a page.
+
+### List Comments
+
+Retrieve comments from the site. Can filter by post ID, status, and search term.
+
+### Create Comment
+
+Add a new comment or reply to a post.
+
+### Moderate Comment
+
+Update a comment's content or moderation status.
+
+### Delete Comment
+
+Permanently delete a comment.
+
+### Upload Media
+
+Upload a file to the media library from a publicly accessible URL.
+
+### List Media
+
+Browse the site's media library.
+
+### Get Media
+
+Retrieve details for a single media item.
+
+### Update Media
+
+Update media metadata such as title, caption, alt text, and description.
+
+### Delete Media
+
+Permanently delete a media item.
 
 ### List Categories
 
-Retrieve all categories on the site. Categories are hierarchical and can be used to organize posts. Supports search filtering.
+Retrieve post categories.
+
+### Create Category
+
+Create a new post category.
+
+### Get Category
+
+Retrieve a single post category.
+
+### Update Category
+
+Update a post category.
+
+### Delete Category
+
+Delete a post category.
+
+### List Tags
+
+Retrieve post tags.
+
+### Create Tag
+
+Create a new post tag.
+
+### Get Tag
+
+Retrieve a single post tag.
+
+### Update Tag
+
+Update a post tag.
+
+### Delete Tag
+
+Delete a post tag.
 
 ### List Users
 
-Retrieve a list of users on the WordPress site. Filter by search term or role. Results are paginated.
+Retrieve site users.
 
-### Search Content
+### Get Current User
 
-Search across posts and pages on the site by keyword. Returns matching content with titles, excerpts, and URLs. Useful for finding specific content or checking for duplicate topics.
+Retrieve the authenticated WordPress user.
 
 ### Get Site Info
 
-Retrieve general site information including title, description, URL, and other metadata. Useful for verifying site configuration and connectivity.
+Retrieve general site metadata and verify connectivity.
+
+### Get Site Settings
+
+Retrieve editable WordPress site settings.
+
+### Update Site Settings
+
+Update common editable WordPress site settings.
+
+### Get Site Stats
+
+Retrieve WordPress.com site traffic statistics.
+
+### Search Content
+
+Search posts and pages by keyword.
 
 ## License
 

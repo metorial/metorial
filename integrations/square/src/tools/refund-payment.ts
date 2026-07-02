@@ -18,6 +18,17 @@ export let refundPayment = SlateTool.create(spec, {
           currency: z.string().describe('Currency code, e.g., USD')
         })
         .describe('Amount to refund'),
+      appFeeMoney: z
+        .object({
+          amount: z.number().describe('Application fee amount to refund'),
+          currency: z.string().describe('Currency code, e.g., USD')
+        })
+        .optional()
+        .describe('Optional application fee amount to refund'),
+      appFeeAllocations: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Optional Square app_fee_allocations entries for fee-allocation refunds'),
       reason: z.string().optional().describe('Reason for the refund'),
       idempotencyKey: z
         .string()
@@ -37,7 +48,8 @@ export let refundPayment = SlateTool.create(spec, {
         .optional(),
       paymentId: z.string().optional(),
       orderId: z.string().optional(),
-      createdAt: z.string().optional()
+      createdAt: z.string().optional(),
+      updatedAt: z.string().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -46,6 +58,8 @@ export let refundPayment = SlateTool.create(spec, {
       idempotencyKey: ctx.input.idempotencyKey || generateIdempotencyKey(),
       paymentId: ctx.input.paymentId,
       amountMoney: ctx.input.amountMoney,
+      appFeeMoney: ctx.input.appFeeMoney,
+      appFeeAllocations: ctx.input.appFeeAllocations,
       reason: ctx.input.reason
     });
 
@@ -56,7 +70,8 @@ export let refundPayment = SlateTool.create(spec, {
         amountMoney: r.amount_money,
         paymentId: r.payment_id,
         orderId: r.order_id,
-        createdAt: r.created_at
+        createdAt: r.created_at,
+        updatedAt: r.updated_at
       },
       message: `Refund **${r.id}** created for payment **${r.payment_id}**. Status: **${r.status}**`
     };

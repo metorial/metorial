@@ -8,6 +8,7 @@ import {
   createTag,
   createTask,
   deleteProject,
+  deleteSection,
   deleteTask,
   getGoal,
   getPortfolio,
@@ -23,11 +24,17 @@ import {
   listTags,
   listTasks,
   listTeams,
+  listTimeTrackingEntries,
   listUsers,
   listWorkspaces,
+  manageAttachments,
+  manageCustomFields,
+  manageProjectTemplates,
   searchTasks,
+  typeaheadSearch,
   updatePortfolio,
   updateProject,
+  updateSection,
   updateTask
 } from './tools';
 import { projectEvents, taskChangesWebhook, taskEvents } from './triggers';
@@ -50,19 +57,26 @@ export let provider = Slate.create({
     listSubtasks,
     listSections,
     createSection,
+    updateSection,
+    deleteSection,
     listComments,
     addComment,
     listTags,
     createTag,
+    manageAttachments,
+    manageCustomFields,
     listPortfolios,
     getPortfolio,
     createPortfolio,
     updatePortfolio,
+    manageProjectTemplates,
     listGoals,
     getGoal,
     listUsers,
     getUser,
-    listTeams
+    listTeams,
+    listTimeTrackingEntries,
+    typeaheadSearch
   ],
   triggers: [projectEvents, taskEvents, taskChangesWebhook]
 });

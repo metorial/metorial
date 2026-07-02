@@ -24,7 +24,11 @@ export let updateRowTool = SlateTool.create(spec, {
             value: z.any().describe('New value for the cell')
           })
         )
-        .describe('Cell values to update')
+        .describe('Cell values to update'),
+      disableParsing: z
+        .boolean()
+        .optional()
+        .describe('If true, preserve values exactly instead of letting Coda parse strings')
     })
   )
   .output(
@@ -42,6 +46,9 @@ export let updateRowTool = SlateTool.create(spec, {
       ctx.input.rowIdOrName,
       {
         row: { cells: ctx.input.cells }
+      },
+      {
+        disableParsing: ctx.input.disableParsing
       }
     );
 

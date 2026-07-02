@@ -1,6 +1,6 @@
 {
   "name": "@metorial/datadog",
-  "description": "Monitor infrastructure, applications, and services across cloud environments. Submit and query metrics, create and manage monitors and alerts, build dashboards, search and analyze logs, manage incidents, track SLOs, run synthetic tests, and configure integrations with cloud providers. Create on-call schedules, automate workflows, manage users and roles, handle security monitoring and detection rules, submit DORA metrics, and retrieve usage and cost data. Supports outbound webhooks for alert notifications.",
+  "description": "Monitor infrastructure, applications, and services across cloud environments. Submit, discover, and query metrics; create and manage monitors and alerts; build and clean up dashboards; search and analyze logs; manage incidents; track SLOs; run synthetic tests; inspect users and hosts; and schedule or cancel monitor downtimes.",
   "categories": ["apis-and-http-requests", "security"],
   "skills": [
     "submit and query metrics",
@@ -10,9 +10,8 @@
     "manage incidents",
     "run synthetic tests",
     "track service level objectives",
-    "configure cloud integrations",
-    "manage on-call schedules",
-    "automate workflows"
+    "inspect users and hosts",
+    "schedule and cancel downtimes"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/datadog-logo.png"
 }

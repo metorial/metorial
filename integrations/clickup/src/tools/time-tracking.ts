@@ -121,6 +121,126 @@ export let createTimeEntry = SlateTool.create(spec, {
   })
   .build();
 
+export let updateTimeEntry = SlateTool.create(spec, {
+  name: 'Update Time Entry',
+  key: 'update_time_entry',
+  description: `Update a ClickUp time entry's task, description, start/end time, duration, assignee, tags, or billable flag.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      timeEntryId: z.string().describe('The time entry ID to update'),
+      start: z.string().optional().describe('Start time as Unix timestamp in milliseconds'),
+      end: z.string().optional().describe('End time as Unix timestamp in milliseconds'),
+      duration: z.number().optional().describe('Duration in milliseconds'),
+      taskId: z.string().optional().describe('Task ID to associate the entry with'),
+      description: z.string().optional().describe('Updated description of the work'),
+      assignee: z.number().optional().describe('User ID to assign the entry to'),
+      billable: z.boolean().optional().describe('Whether the entry is billable'),
+      tags: z.array(z.string()).optional().describe('Tag names for the time entry')
+    })
+  )
+  .output(
+    z.object({
+      timeEntryId: z.string(),
+      updated: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new ClickUpClient(ctx.auth.token);
+    let entry = await client.updateTimeEntry(ctx.config.workspaceId, ctx.input.timeEntryId, {
+      start: ctx.input.start ? Number(ctx.input.start) : undefined,
+      end: ctx.input.end ? Number(ctx.input.end) : undefined,
+      duration: ctx.input.duration,
+      taskId: ctx.input.taskId,
+      description: ctx.input.description,
+      assignee: ctx.input.assignee,
+      billable: ctx.input.billable,
+      tags: ctx.input.tags?.map(name => ({ name }))
+    });
+
+    return {
+      output: {
+        timeEntryId: String(entry?.id ?? ctx.input.timeEntryId),
+        updated: true
+      },
+      message: `Updated time entry ${ctx.input.timeEntryId}.`
+    };
+  })
+  .build();
+
+export let deleteTimeEntry = SlateTool.create(spec, {
+  name: 'Delete Time Entry',
+  key: 'delete_time_entry',
+  description: `Delete a ClickUp time entry from the configured workspace.`,
+  tags: {
+    destructive: true
+  }
+})
+  .input(
+    z.object({
+      timeEntryId: z.string().describe('The time entry ID to delete')
+    })
+  )
+  .output(
+    z.object({
+      deleted: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new ClickUpClient(ctx.auth.token);
+    await client.deleteTimeEntry(ctx.config.workspaceId, ctx.input.timeEntryId);
+
+    return {
+      output: { deleted: true },
+      message: `Deleted time entry ${ctx.input.timeEntryId}.`
+    };
+  })
+  .build();
+
+export let getRunningTimer = SlateTool.create(spec, {
+  name: 'Get Running Timer',
+  key: 'get_running_timer',
+  description: `Retrieve the currently running ClickUp timer for the authenticated user or a specified assignee.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      assignee: z.string().optional().describe('User ID to retrieve a running timer for')
+    })
+  )
+  .output(
+    z.object({
+      running: z.boolean(),
+      timeEntryId: z.string().optional(),
+      taskId: z.string().optional(),
+      description: z.string().optional(),
+      duration: z.string().optional(),
+      start: z.string().optional()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new ClickUpClient(ctx.auth.token);
+    let entry = await client.getRunningTimer(ctx.config.workspaceId, ctx.input.assignee);
+
+    return {
+      output: {
+        running: Boolean(entry?.id),
+        timeEntryId: entry?.id,
+        taskId: entry?.task?.id ?? entry?.tid,
+        description: entry?.description,
+        duration: entry?.duration !== undefined ? String(entry.duration) : undefined,
+        start: entry?.start !== undefined ? String(entry.start) : undefined
+      },
+      message: entry?.id ? `Found running timer ${entry.id}.` : 'No running timer found.'
+    };
+  })
+  .build();
+
 export let startTimer = SlateTool.create(spec, {
   name: 'Start Timer',
   key: 'start_timer',

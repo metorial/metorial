@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'deepseek',
   name: 'DeepSeek',
   description:
-    'AI company providing cloud-based API access to large language models for chat, reasoning, and code completion. Compatible with OpenAI API format.',
+    'AI company providing OpenAI-compatible API access to DeepSeek V4 models for chat, thinking-mode reasoning, tool calling, and code completion.',
   metadata: {},
   config,
   auth

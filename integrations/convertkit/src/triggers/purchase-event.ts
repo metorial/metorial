@@ -1,6 +1,6 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let purchaseEvent = SlateTrigger.create(spec, {
@@ -52,7 +52,7 @@ export let purchaseEvent = SlateTrigger.create(spec, {
   )
   .webhook({
     autoRegisterWebhook: async ctx => {
-      let client = new Client({ token: ctx.auth.token });
+      let client = createClient(ctx.auth);
 
       let webhook = await client.createWebhook(ctx.input.webhookBaseUrl, {
         name: 'purchase.purchase_create'
@@ -64,7 +64,7 @@ export let purchaseEvent = SlateTrigger.create(spec, {
     },
 
     autoUnregisterWebhook: async ctx => {
-      let client = new Client({ token: ctx.auth.token });
+      let client = createClient(ctx.auth);
       let details = ctx.input.registrationDetails as { webhookId: number };
 
       try {

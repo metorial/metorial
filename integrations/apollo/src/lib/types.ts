@@ -75,6 +75,23 @@ export interface ApolloOrganization {
   [key: string]: any;
 }
 
+export interface ApolloNewsArticle {
+  id?: string;
+  title?: string;
+  url?: string;
+  source_name?: string;
+  source_url?: string;
+  summary?: string;
+  description?: string;
+  category?: string;
+  categories?: string[];
+  published_at?: string;
+  organization_id?: string;
+  organization_name?: string;
+  organization?: ApolloOrganization;
+  [key: string]: any;
+}
+
 export interface ApolloAccount {
   id?: string;
   name?: string;
@@ -188,6 +205,15 @@ export interface OrganizationSearchFilters {
   currentlyUsingAnyTechnologyUids?: string[];
   organizationJobTitles?: string[];
   organizationJobLocations?: string[];
+  page?: number;
+  perPage?: number;
+}
+
+export interface NewsArticleSearchFilters {
+  organizationIds: string[];
+  categories?: string[];
+  publishedAtMin?: string;
+  publishedAtMax?: string;
   page?: number;
   perPage?: number;
 }

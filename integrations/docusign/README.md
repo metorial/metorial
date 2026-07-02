@@ -8,9 +8,21 @@ Send, sign, and manage documents and agreements electronically. Create and track
 
 Generates a URL for embedded signing, allowing a recipient to sign documents directly within your application. The signer must have been created with a **clientUserId** when the envelope was sent. The returned URL is valid for a limited time (typically 5 minutes).
 
+### Create Sender View
+
+Generates a URL for DocuSign's embedded sender view so a user can prepare, tag, and send a draft envelope inside your application. Uses DocuSign's current sender-view request format with **viewAccess** set to **envelope**.
+
+### Delete Envelope
+
+Moves an envelope from its current folder to DocuSign Deleted Items. Useful for discarding draft envelopes and cleaning up test envelopes. Moving an in-process sent or delivered envelope to Deleted Items voids it in DocuSign.
+
 ### Download Document
 
-Downloads a document from a DocuSign envelope as base64-encoded content. Can download individual documents by ID, all documents combined, or list available documents in the envelope.
+Downloads a document from a DocuSign envelope as a Slate attachment. Can download individual documents by ID, all documents combined, the archive ZIP, the completion certificate, or list available documents in the envelope.
+
+### Get Envelope Audit Events
+
+Retrieves audit events for an envelope, including lifecycle and recipient activity records used for compliance review.
 
 ### Get Envelope Recipients
 
@@ -28,13 +40,17 @@ Searches and lists DocuSign envelopes with flexible filtering by date range, sta
 
 Lists and searches DocuSign templates available in the account. Returns template details including name, description, and recipient roles. Use search to find specific templates by name or keyword.
 
+### Get Template
+
+Retrieves the definition of a specific DocuSign template, including subject, documents, and placeholder recipient roles.
+
 ### Send Envelope from Template
 
 Creates and sends a DocuSign envelope using a pre-existing template. Assign recipients to template roles and optionally override the email subject, message, and tab values. Use **List Templates** first to find the templateId and available role names.
 
 ### Send Envelope
 
-Creates and sends a DocuSign envelope with documents for electronic signature. Supports inline documents with signers, carbon copy recipients, sequential/parallel signing workflows, and embedded signing. Set **status** to \
+Creates and sends a DocuSign envelope with documents for electronic signature. Supports inline documents with signers, carbon copy recipients, sequential/parallel signing workflows, and embedded signing. Set **status** to **sent** to send immediately or **created** to save as a draft.
 
 ### Void Envelope
 

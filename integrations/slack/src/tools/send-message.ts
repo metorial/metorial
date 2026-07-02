@@ -1,9 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SlackClient } from '../lib/client';
-import { missingRequiredFieldError } from '../lib/errors';
+import { missingRequiredAlternativeError, missingRequiredFieldError } from '../lib/errors';
 import { slackActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
+
+const hasMessageContent = (text?: string, blocks?: unknown[]) =>
+  (typeof text === 'string' && text.trim().length > 0) ||
+  (Array.isArray(blocks) && blocks.length > 0);
 
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
@@ -22,7 +26,11 @@ export let sendMessage = SlateTool.create(spec, {
   .scopes(slackActionScopes.chatWrite)
   .input(
     z.object({
-      channelId: z.string().describe('Channel, DM, or group DM ID to send the message to'),
+      channelId: z
+        .string()
+        .describe(
+          'Slack conversation ID to send the message to, such as C..., G..., or D...; do not pass a channel name like #general'
+        ),
       text: z.string().optional().describe('Message text (supports Slack mrkdwn formatting)'),
       blocks: z
         .array(z.any())
@@ -56,6 +64,12 @@ export let sendMessage = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new SlackClient(ctx.auth.token);
+
+    if (!hasMessageContent(ctx.input.text, ctx.input.blocks)) {
+      throw missingRequiredAlternativeError(
+        'Either text or at least one Block Kit block must be provided'
+      );
+    }
 
     if (ctx.input.ephemeral) {
       if (!ctx.input.targetUserId) {

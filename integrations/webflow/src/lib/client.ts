@@ -1,6 +1,14 @@
 import { createAxios } from 'slates';
+import { webflowApiError } from './errors';
 
 let BASE_URL = 'https://api.webflow.com/v2';
+
+let applyWebflowErrorInterceptor = (http: ReturnType<typeof createAxios>) => {
+  http.interceptors.response.use(
+    response => response,
+    error => Promise.reject(webflowApiError(error))
+  );
+};
 
 export class WebflowClient {
   private http: ReturnType<typeof createAxios>;
@@ -14,6 +22,7 @@ export class WebflowClient {
         'Content-Type': 'application/json'
       }
     });
+    applyWebflowErrorInterceptor(this.http);
   }
 
   // ── Sites ──────────────────────────────────────────
@@ -158,16 +167,17 @@ export class WebflowClient {
     return response.data;
   }
 
-  async getPageMetadata(pageId: string): Promise<any> {
-    let response = await this.http.get(`/pages/${pageId}`);
+  async getPageMetadata(pageId: string, params: { localeId?: string } = {}): Promise<any> {
+    let response = await this.http.get(`/pages/${pageId}`, { params });
     return response.data;
   }
 
   async updatePageSettings(
     pageId: string,
-    data: { title?: string; slug?: string; description?: string; openGraph?: any; seo?: any }
+    data: { title?: string; slug?: string; openGraph?: any; seo?: any },
+    params: { localeId?: string } = {}
   ): Promise<any> {
-    let response = await this.http.patch(`/pages/${pageId}`, data);
+    let response = await this.http.put(`/pages/${pageId}`, data, { params });
     return response.data;
   }
 
@@ -219,7 +229,10 @@ export class WebflowClient {
     return response.data;
   }
 
-  async createProduct(siteId: string, data: { product: any; sku?: any }): Promise<any> {
+  async createProduct(
+    siteId: string,
+    data: { product: any; sku: any; publishStatus?: 'staging' | 'live' }
+  ): Promise<any> {
     let response = await this.http.post(`/sites/${siteId}/products`, data);
     return response.data;
   }
@@ -227,7 +240,7 @@ export class WebflowClient {
   async updateProduct(
     siteId: string,
     productId: string,
-    data: { product?: any; sku?: any }
+    data: { product?: any; sku?: any; publishStatus?: 'staging' | 'live' }
   ): Promise<any> {
     let response = await this.http.patch(`/sites/${siteId}/products/${productId}`, data);
     return response.data;
@@ -248,6 +261,29 @@ export class WebflowClient {
 
   async updateOrder(siteId: string, orderId: string, data: any): Promise<any> {
     let response = await this.http.patch(`/sites/${siteId}/orders/${orderId}`, data);
+    return response.data;
+  }
+
+  async fulfillOrder(
+    siteId: string,
+    orderId: string,
+    data: { sendOrderFulfilledEmail?: boolean } = {}
+  ): Promise<any> {
+    let response = await this.http.post(`/sites/${siteId}/orders/${orderId}/fulfill`, data);
+    return response.data;
+  }
+
+  async unfulfillOrder(siteId: string, orderId: string): Promise<any> {
+    let response = await this.http.post(`/sites/${siteId}/orders/${orderId}/unfulfill`);
+    return response.data;
+  }
+
+  async refundOrder(
+    siteId: string,
+    orderId: string,
+    data: { reason?: 'duplicate' | 'fraudulent' | 'requested' } = {}
+  ): Promise<any> {
+    let response = await this.http.post(`/sites/${siteId}/orders/${orderId}/refund`, data);
     return response.data;
   }
 
@@ -317,8 +353,11 @@ export class WebflowClient {
 
   // ── Assets ─────────────────────────────────────────
 
-  async listAssets(siteId: string): Promise<any> {
-    let response = await this.http.get(`/sites/${siteId}/assets`);
+  async listAssets(
+    siteId: string,
+    params: { offset?: number; limit?: number; folderId?: string; localeId?: string } = {}
+  ): Promise<any> {
+    let response = await this.http.get(`/sites/${siteId}/assets`, { params });
     return response.data;
   }
 

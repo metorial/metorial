@@ -1,7 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  createPdfCoAttachment,
+  downloadPdfCoOutput,
+  fileAttachmentOutputFields,
+  toFileOutput
+} from './shared';
 
 export let pdfSecurity = SlateTool.create(spec, {
   name: 'PDF Security',
@@ -60,7 +67,7 @@ Use "add" action to protect a PDF, or "remove" action to unlock a protected PDF.
   )
   .output(
     z.object({
-      outputUrl: z.string().describe('URL to download the processed PDF'),
+      ...fileAttachmentOutputFields,
       pageCount: z.number().describe('Number of pages in the PDF'),
       creditsUsed: z.number().describe('API credits consumed'),
       remainingCredits: z.number().describe('Credits remaining on the account')
@@ -84,7 +91,7 @@ Use "add" action to protect a PDF, or "remove" action to unlock a protected PDF.
       });
     } else {
       if (!ctx.input.currentPassword) {
-        throw new Error('Current password is required to remove PDF protection');
+        throw createApiServiceError('Current password is required to remove PDF protection.');
       }
       result = await client.removePassword({
         url: ctx.input.sourceUrl,
@@ -94,17 +101,14 @@ Use "add" action to protect a PDF, or "remove" action to unlock a protected PDF.
     }
 
     if (result.error) {
-      throw new Error(`PDF security operation failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('PDF security operation failed', result);
     }
+    let file = await downloadPdfCoOutput(client, result, 'application/pdf');
 
     return {
-      output: {
-        outputUrl: result.url,
-        pageCount: result.pageCount,
-        creditsUsed: result.credits,
-        remainingCredits: result.remainingCredits
-      },
-      message: `${ctx.input.action === 'add' ? 'Added' : 'Removed'} password protection. [Download PDF](${result.url})`
+      output: toFileOutput(result, file),
+      attachments: [createPdfCoAttachment(file)],
+      message: `${ctx.input.action === 'add' ? 'Added' : 'Removed'} password protection and returned the PDF as an attachment.`
     };
   })
   .build();

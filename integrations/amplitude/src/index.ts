@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   deleteUserDataTool,
+  exportEventsTool,
   getChartResultsTool,
   getUserProfileTool,
   identifyUserTool,
@@ -29,6 +30,7 @@ export let provider = Slate.create({
     queryRetentionTool,
     querySessionsTool,
     queryUserCompositionTool,
+    exportEventsTool,
     getUserProfileTool,
     getChartResultsTool,
     manageCohortsTool,

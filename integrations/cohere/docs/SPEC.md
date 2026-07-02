@@ -33,22 +33,26 @@ There are no OAuth2 flows, scopes, or additional credentials required for standa
 
 ### Chat / Text Generation
 
-The Command family of models (Command A, Command R7B, Command A Translate, Command A Reasoning, Command A Vision, Command R+, Command R) are text-generation LLMs powering tool-using agents, RAG, translation, copywriting, and similar use cases. The Chat API supports multi-turn conversations with system prompts, configurable parameters like temperature, max tokens, stop sequences, frequency penalty, and seed for reproducibility. The Chat API is capable of streaming events (such as text generation) as they come, meaning partial results from the model can be displayed within moments.
+The Command family of models (Command A+, Command A, Command R7B, Command A Translate, Command A Reasoning, Command A Vision, Command R+, Command R) are text-generation LLMs powering tool-using agents, RAG, translation, copywriting, and similar use cases. The Chat API supports multi-turn conversations with system prompts, configurable parameters like temperature, max tokens, stop sequences, frequency penalty, seed, top-k/top-p sampling, response format, tool choice, and priority. The Chat API is capable of streaming events (such as text generation) as they come, meaning partial results from the model can be displayed within moments.
 
 - **Retrieval Augmented Generation (RAG):** Documents can be passed directly in the request to ground model responses in provided context, with inline citations generated automatically.
 - **Tool Use:** The models can integrate with external APIs, databases, and services to access real-time information and perform actions beyond text generation. This capability turns simple language models into intelligent agents. Tools are defined using JSON schema.
-- **Reasoning:** Command A Reasoning is a hybrid reasoning model designed to excel at complex agentic tasks, with 111 billion parameters and a 256K context length. Thinking can be enabled/disabled, and a token budget can be set to limit reasoning tokens.
+- **Reasoning:** Command A Reasoning is a hybrid reasoning model designed to excel at complex agentic tasks, with 111 billion parameters and a 256K context length. Thinking is enabled by default for reasoning models, can be disabled, and a token budget can be set to limit reasoning tokens.
 - **Vision:** Command A Vision brings enterprise-grade vision capabilities, supporting text + image processing, with up to 20 images per request and a 128K token context length.
 - **Translation:** Command A Translate is Cohere's machine translation model, achieving state-of-the-art performance across 23 languages.
 
 ### Text Embeddings
 
-The Embed endpoint returns text embeddings — lists of floating point numbers that capture semantic information about the text. Embeddings can be used to create text classifiers as well as empower semantic search.
+The Embed endpoint returns embeddings — vectors that capture semantic information about text, image data URIs, or mixed text/image inputs. Embeddings can be used to create classifiers, cluster documents, and power semantic search.
 
-- Supports text and image inputs.
-- Input types include `search_document` (for vector DB storage), `search_query` (for search queries), `classification`, and `clustering`.
+- Supports text, image, and mixed inputs.
+- Input types include `search_document` (for vector DB storage), `search_query` (for search queries), `classification`, `clustering`, and `image`.
 - Output embedding dimensionality can be configured (256, 512, 1024, or 1536) for embed-v4 and newer models.
-- Multiple embedding formats available: float, int8, uint8, and binary.
+- Multiple embedding formats available: float, int8, uint8, binary, ubinary, and base64.
+
+### Audio Transcription
+
+Cohere Transcribe is the audio transcription model for automatic speech recognition. The API accepts an uploaded audio file with a model and ISO-639-1 language code, returning transcript text.
 
 ### Batch Embedding Jobs
 
@@ -63,7 +67,7 @@ The Rerank endpoint takes in a query and a list of texts and produces an ordered
 
 ### Dataset Management
 
-The Cohere platform allows you to upload and manage datasets that can be used in batch embedding with Embedding Jobs. Datasets can be managed in the Dashboard or programmatically using the Datasets API.
+The Cohere platform allows you to upload and manage datasets that can be used in batch embedding with Embedding Jobs. Datasets can be managed in the Dashboard or programmatically using the Datasets API, including create, list, get, delete, and organization storage usage.
 
 - Supports CSV and JSONL file formats.
 - Metadata can be preserved via `keep_fields` or `optional_fields`.

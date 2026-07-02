@@ -28,7 +28,7 @@ export let listVolumesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let volumes = await client.listVolumes(ctx.input.projectId);
 
     let mapped = volumes.map((v: any) => ({
@@ -40,6 +40,57 @@ export let listVolumesTool = SlateTool.create(spec, {
     return {
       output: { volumes: mapped },
       message: `Found **${mapped.length}** volume(s).`
+    };
+  })
+  .build();
+
+export let getVolumeInstanceTool = SlateTool.create(spec, {
+  name: 'Get Volume Instance',
+  key: 'get_volume_instance',
+  description: `Get details for a Railway volume instance in a specific environment, including mount path, size, and state.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      volumeInstanceId: z.string().describe('ID of the volume instance to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      volumeInstanceId: z.string(),
+      volumeId: z.string(),
+      serviceId: z.string(),
+      environmentId: z.string(),
+      mountPath: z.string().nullable(),
+      region: z.string().nullable(),
+      state: z.string().nullable(),
+      sizeMB: z.number().nullable(),
+      currentSizeMB: z.number().nullable(),
+      externalId: z.string().nullable(),
+      createdAt: z.string().nullable()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let volumeInstance = await client.getVolumeInstance(ctx.input.volumeInstanceId);
+
+    return {
+      output: {
+        volumeInstanceId: volumeInstance.id,
+        volumeId: volumeInstance.volumeId,
+        serviceId: volumeInstance.serviceId,
+        environmentId: volumeInstance.environmentId,
+        mountPath: volumeInstance.mountPath ?? null,
+        region: volumeInstance.region ?? null,
+        state: volumeInstance.state ?? null,
+        sizeMB: volumeInstance.sizeMB ?? null,
+        currentSizeMB: volumeInstance.currentSizeMB ?? null,
+        externalId: volumeInstance.externalId ?? null,
+        createdAt: volumeInstance.createdAt ?? null
+      },
+      message: `Volume instance **${volumeInstance.id}** is **${volumeInstance.state ?? 'unknown'}**.`
     };
   })
   .build();
@@ -67,7 +118,7 @@ export let createVolumeTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let volume = await client.createVolume({
       projectId: ctx.input.projectId,
       serviceId: ctx.input.serviceId,
@@ -106,7 +157,7 @@ export let updateVolumeTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let volume = await client.updateVolume(ctx.input.volumeId, { name: ctx.input.name });
 
     return {
@@ -138,12 +189,93 @@ export let deleteVolumeTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     await client.deleteVolume(ctx.input.volumeId);
 
     return {
       output: { deleted: true },
       message: `Volume deleted successfully.`
+    };
+  })
+  .build();
+
+export let listVolumeBackupsTool = SlateTool.create(spec, {
+  name: 'List Volume Backups',
+  key: 'list_volume_backups',
+  description: `List backups for a Railway volume instance.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      volumeInstanceId: z.string().describe('ID of the volume instance')
+    })
+  )
+  .output(
+    z.object({
+      backups: z.array(
+        z.object({
+          backupId: z.string(),
+          name: z.string().nullable(),
+          createdAt: z.string().nullable(),
+          expiresAt: z.string().nullable(),
+          usedMB: z.number().nullable(),
+          referencedMB: z.number().nullable(),
+          volumeInstanceSizeMB: z.number().nullable()
+        })
+      )
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let backups = await client.listVolumeBackups(ctx.input.volumeInstanceId);
+
+    let mapped = (backups || []).map((backup: any) => ({
+      backupId: backup.id,
+      name: backup.name ?? null,
+      createdAt: backup.createdAt ?? null,
+      expiresAt: backup.expiresAt ?? null,
+      usedMB: backup.usedMB ?? null,
+      referencedMB: backup.referencedMB ?? null,
+      volumeInstanceSizeMB: backup.volumeInstanceSizeMB ?? null
+    }));
+
+    return {
+      output: { backups: mapped },
+      message: `Found **${mapped.length}** volume backup(s).`
+    };
+  })
+  .build();
+
+export let createVolumeBackupTool = SlateTool.create(spec, {
+  name: 'Create Volume Backup',
+  key: 'create_volume_backup',
+  description: `Create a backup for a Railway volume instance. Railway returns a workflow ID for the backup job.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      volumeInstanceId: z.string().describe('ID of the volume instance to back up'),
+      name: z.string().optional().describe('Optional backup name')
+    })
+  )
+  .output(
+    z.object({
+      workflowId: z.string().describe('Railway workflow ID for the backup job')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let backup = await client.createVolumeBackup(ctx.input.volumeInstanceId, ctx.input.name);
+
+    return {
+      output: {
+        workflowId: backup.workflowId
+      },
+      message: `Volume backup workflow **${backup.workflowId}** started.`
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PagerDutyClient } from '../lib/client';
+import { pagerDutyServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageService = SlateTool.create(spec, {
@@ -62,9 +63,10 @@ export let manageService = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for creating a service');
+      if (!ctx.input.name)
+        throw pagerDutyServiceError('name is required for creating a service');
       if (!ctx.input.escalationPolicyId)
-        throw new Error('escalationPolicyId is required for creating a service');
+        throw pagerDutyServiceError('escalationPolicyId is required for creating a service');
 
       let service = await client.createService({
         name: ctx.input.name,
@@ -89,7 +91,7 @@ export let manageService = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.serviceId)
-        throw new Error('serviceId is required for updating a service');
+        throw pagerDutyServiceError('serviceId is required for updating a service');
 
       let service = await client.updateService(ctx.input.serviceId, {
         name: ctx.input.name,
@@ -114,7 +116,7 @@ export let manageService = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.serviceId)
-        throw new Error('serviceId is required for deleting a service');
+        throw pagerDutyServiceError('serviceId is required for deleting a service');
       await client.deleteService(ctx.input.serviceId);
 
       return {
@@ -126,6 +128,6 @@ export let manageService = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw pagerDutyServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import { mixpanelServiceError } from '../lib/errors';
+import { createClientFromContext, requireServiceAccount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageAnnotations = SlateTool.create(spec, {
@@ -65,6 +66,8 @@ export let manageAnnotations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireServiceAccount(ctx);
+
     let client = createClientFromContext(ctx);
     let { operation } = ctx.input;
 
@@ -80,9 +83,13 @@ export let manageAnnotations = SlateTool.create(spec, {
     }
 
     if (operation === 'create') {
+      if (!ctx.input.description?.trim()) {
+        throw mixpanelServiceError('description is required for create operations.');
+      }
+
       let created = await client.createAnnotation({
         date: ctx.input.date ?? new Date().toISOString().slice(0, 19).replace('T', ' '),
-        description: ctx.input.description ?? ''
+        description: ctx.input.description
       });
       return {
         output: { createdAnnotation: created },
@@ -90,7 +97,11 @@ export let manageAnnotations = SlateTool.create(spec, {
       };
     }
 
-    if (operation === 'delete' && ctx.input.annotationId !== undefined) {
+    if (operation === 'delete') {
+      if (ctx.input.annotationId === undefined) {
+        throw mixpanelServiceError('annotationId is required for delete operations.');
+      }
+
       await client.deleteAnnotation(ctx.input.annotationId);
       return {
         output: { deleted: true },
@@ -98,9 +109,6 @@ export let manageAnnotations = SlateTool.create(spec, {
       };
     }
 
-    return {
-      output: {},
-      message: 'No operation performed. Provide a valid operation and required parameters.'
-    };
+    throw mixpanelServiceError(`Unsupported annotation operation: ${operation}`);
   })
   .build();

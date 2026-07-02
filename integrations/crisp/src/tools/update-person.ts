@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { crispServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updatePerson = SlateTool.create(spec, {
@@ -38,7 +39,11 @@ export let updatePerson = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+    let client = new Client({
+      token: ctx.auth.token,
+      websiteId: ctx.config.websiteId,
+      tier: ctx.auth.tier
+    });
     let updated: string[] = [];
 
     let profile: Record<string, any> = {};
@@ -67,6 +72,10 @@ export let updatePerson = SlateTool.create(spec, {
         email: ctx.input.emailSubscribed
       });
       updated.push('subscription');
+    }
+
+    if (updated.length === 0) {
+      throw crispServiceError('Provide at least one contact field to update.');
     }
 
     return {

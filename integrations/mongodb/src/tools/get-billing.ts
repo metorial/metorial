@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let invoiceSummarySchema = z.object({
@@ -52,7 +53,7 @@ export let getBillingTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let orgId = ctx.input.organizationId || ctx.config.organizationId;
-    if (!orgId) throw new Error('organizationId is required');
+    if (!orgId) throw mongodbServiceError('organizationId is required');
 
     let client = new AtlasClient(ctx.auth);
 
@@ -79,7 +80,7 @@ export let getBillingTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_invoice') {
-      if (!ctx.input.invoiceId) throw new Error('invoiceId is required');
+      if (!ctx.input.invoiceId) throw mongodbServiceError('invoiceId is required');
       let invoice = await client.getOrganizationInvoice(orgId, ctx.input.invoiceId);
       return {
         output: { invoice },
@@ -95,6 +96,6 @@ export let getBillingTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

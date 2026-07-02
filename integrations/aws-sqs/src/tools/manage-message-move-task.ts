@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SqsClient } from '../lib/client';
+import { sqsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageMessageMoveTask = SlateTool.create(spec, {
@@ -86,7 +87,7 @@ export let manageMessageMoveTask = SlateTool.create(spec, {
 
     if (ctx.input.action === 'start') {
       if (!ctx.input.sourceArn) {
-        throw new Error('"sourceArn" is required for "start" action');
+        throw sqsServiceError('"sourceArn" is required for "start" action');
       }
       let result = await client.startMessageMoveTask(
         ctx.input.sourceArn,
@@ -101,7 +102,7 @@ export let manageMessageMoveTask = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       if (!ctx.input.sourceArn) {
-        throw new Error('"sourceArn" is required for "list" action');
+        throw sqsServiceError('"sourceArn" is required for "list" action');
       }
       let result = await client.listMessageMoveTasks(
         ctx.input.sourceArn,
@@ -118,7 +119,7 @@ export let manageMessageMoveTask = SlateTool.create(spec, {
 
     if (ctx.input.action === 'cancel') {
       if (!ctx.input.taskHandle) {
-        throw new Error('"taskHandle" is required for "cancel" action');
+        throw sqsServiceError('"taskHandle" is required for "cancel" action');
       }
       let result = await client.cancelMessageMoveTask(ctx.input.taskHandle);
       return {
@@ -127,6 +128,6 @@ export let manageMessageMoveTask = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw sqsServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

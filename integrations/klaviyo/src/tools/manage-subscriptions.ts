@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -52,7 +53,7 @@ Use this tool to manage consent and marketing opt-in/opt-out.`,
     let { action, listId, profiles, channels } = ctx.input;
 
     if ((action === 'subscribe' || action === 'unsubscribe') && !listId) {
-      throw new Error('listId is required for subscribe/unsubscribe actions');
+      throw klaviyoServiceError('listId is required for subscribe/unsubscribe actions');
     }
 
     if (action === 'subscribe') {
@@ -83,11 +84,13 @@ Use this tool to manage consent and marketing opt-in/opt-out.`,
       );
     } else if (action === 'suppress') {
       let ids = profiles.map(p => p.profileId).filter((id): id is string => !!id);
-      if (ids.length === 0) throw new Error('Profile IDs are required for suppression');
+      if (ids.length === 0)
+        throw klaviyoServiceError('Profile IDs are required for suppression');
       await client.suppressProfiles(ids);
     } else if (action === 'unsuppress') {
       let ids = profiles.map(p => p.profileId).filter((id): id is string => !!id);
-      if (ids.length === 0) throw new Error('Profile IDs are required for unsuppression');
+      if (ids.length === 0)
+        throw klaviyoServiceError('Profile IDs are required for unsuppression');
       await client.unsuppressProfiles(ids);
     }
 

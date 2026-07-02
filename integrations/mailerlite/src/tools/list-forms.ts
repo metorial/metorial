@@ -26,6 +26,7 @@ export let listForms = SlateTool.create(spec, {
         .describe('Filter form subscribers by status (only when formId is provided)'),
       limit: z.number().optional().describe('Number of results per page'),
       page: z.number().optional().describe('Page number'),
+      cursor: z.string().optional().describe('Pagination cursor for form subscriber results'),
       sort: z.string().optional().describe('Sort field')
     })
   )
@@ -54,7 +55,12 @@ export let listForms = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('Subscribers who signed up through the form')
+        .describe('Subscribers who signed up through the form'),
+      nextCursor: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('Cursor for the next form-subscriber page')
     })
   )
   .handleInvocation(async ctx => {
@@ -64,7 +70,7 @@ export let listForms = SlateTool.create(spec, {
       let result = await client.getFormSubscribers(ctx.input.formId, {
         status: ctx.input.subscriberStatus,
         limit: ctx.input.limit,
-        page: ctx.input.page
+        cursor: ctx.input.cursor
       });
 
       let subscribers = (result.data || []).map((s: any) => ({
@@ -74,7 +80,7 @@ export let listForms = SlateTool.create(spec, {
       }));
 
       return {
-        output: { subscribers },
+        output: { subscribers, nextCursor: result.meta?.next_cursor || null },
         message: `Retrieved **${subscribers.length}** subscribers from form **${ctx.input.formId}**.`
       };
     }

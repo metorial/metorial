@@ -28,6 +28,18 @@ Create a new engagement (note, email, call, meeting, or task) in HubSpot and opt
 
 Create a new contact list in HubSpot. Lists can be STATIC (manually managed membership) or DYNAMIC (membership based on filter criteria).
 
+### Enroll Contact In Sequence
+
+Enroll a HubSpot contact in a sales or service sequence using a connected sender email address.
+
+### Get Sequence
+
+Retrieve details for a specific HubSpot sales or service sequence, including steps, settings, and dependencies.
+
+### Get Sequence Enrollment Status
+
+Check whether a HubSpot contact is currently enrolled in a sales or service sequence.
+
 ### List Owners
 
 List CRM owners (users who can be assigned to records) in HubSpot. Useful for finding owner IDs to assign to contacts, companies, deals, or tickets.
@@ -39,6 +51,10 @@ List all pipelines for a given object type in HubSpot. Pipelines define the life
 ### List Properties
 
 List all properties defined for a CRM object type in HubSpot. Returns both default and custom properties with their configurations.
+
+### List Sequences
+
+List HubSpot sales or service sequences for a HubSpot user.
 
 ### Create Ticket
 

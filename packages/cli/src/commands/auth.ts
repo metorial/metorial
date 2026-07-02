@@ -388,12 +388,12 @@ let runAuthSetup = async (opts: AuthSetupOptions): Promise<SlatesStoredAuth> => 
     return stored;
   }
 
-  output = (
-    await client.getAuthOutput({
-      authenticationMethodId: authMethod.id,
-      input: authInput
-    })
-  ).output;
+  let authOutput = await client.getAuthOutput({
+    authenticationMethodId: authMethod.id,
+    input: authInput
+  });
+  output = authOutput.output;
+  scopes = authOutput.scopes ?? scopes;
 
   let profileInfo = authMethod.capabilities.getProfile?.enabled
     ? await client.getAuthProfile({

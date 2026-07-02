@@ -32,13 +32,44 @@ export let getRepository = SlateTool.create(spec, {
       starCount: z.number().describe('Number of stars.'),
       pullCount: z.number().describe('Number of pulls.'),
       lastUpdated: z.string().describe('ISO timestamp of the last update.'),
-      dateRegistered: z.string().describe('ISO timestamp when the repository was created.')
+      dateRegistered: z.string().describe('ISO timestamp when the repository was created.'),
+      statusDescription: z.string().optional().describe('Repository status label.'),
+      contentTypes: z.array(z.string()).describe('Repository content types.'),
+      mediaTypes: z.array(z.string()).describe('Repository media types.'),
+      storageSize: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('Repository storage size in bytes when returned by Docker Hub.'),
+      categories: z
+        .array(
+          z.object({
+            name: z.string().describe('Category display name.'),
+            slug: z.string().describe('Category slug.')
+          })
+        )
+        .describe('Docker Hub repository categories.'),
+      permissions: z
+        .object({
+          read: z.boolean().describe('Whether the caller can read the repository.'),
+          write: z.boolean().describe('Whether the caller can write to the repository.'),
+          admin: z.boolean().describe('Whether the caller can administer the repository.')
+        })
+        .optional()
+        .describe('Caller permissions when returned by Docker Hub.'),
+      immutableTags: z
+        .object({
+          enabled: z.boolean().describe('Whether immutable tags are enabled.'),
+          rules: z.array(z.string()).describe('Immutable tag regex rules.')
+        })
+        .optional()
+        .describe('Immutable tag settings for the repository.')
     })
   )
   .handleInvocation(async ctx => {
     let ns = ctx.input.namespace || ctx.config.namespace || ctx.auth.username;
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let repo = await client.getRepository(ns, ctx.input.repositoryName);
 
     return {
@@ -51,7 +82,14 @@ export let getRepository = SlateTool.create(spec, {
         starCount: repo.star_count,
         pullCount: repo.pull_count,
         lastUpdated: repo.last_updated,
-        dateRegistered: repo.date_registered
+        dateRegistered: repo.date_registered,
+        statusDescription: repo.status_description,
+        contentTypes: repo.content_types || [],
+        mediaTypes: repo.media_types || [],
+        storageSize: repo.storage_size,
+        categories: repo.categories || [],
+        permissions: repo.permissions,
+        immutableTags: repo.immutable_tags_settings
       },
       message: `Retrieved details for repository **${ns}/${ctx.input.repositoryName}** (${repo.is_private ? 'private' : 'public'}, ${repo.star_count} stars, ${repo.pull_count} pulls).`
     };

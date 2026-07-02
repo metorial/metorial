@@ -9,7 +9,7 @@ export let listProducts = SlateTool.create(spec, {
   description: `Retrieve products from a Squarespace store. Supports filtering by product type and date range. Returns physical, service, gift card, and download products with their variants and images.`,
   instructions: [
     'Cannot combine cursor with date range filters — use one or the other',
-    'Use comma-separated product types to filter (e.g., "PHYSICAL,SERVICE")'
+    'Use productTypes for current API product type filtering, or type for a raw comma-separated value'
   ],
   tags: {
     readOnly: true
@@ -26,6 +26,14 @@ export let listProducts = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ISO 8601 UTC datetime — only return products modified before this date'),
+      query: z
+        .string()
+        .optional()
+        .describe('Search query for matching product names and metadata'),
+      productTypes: z
+        .array(z.enum(['PHYSICAL', 'SERVICE', 'GIFT_CARD', 'DIGITAL']))
+        .optional()
+        .describe('Product types to include'),
       type: z
         .string()
         .optional()
@@ -46,6 +54,8 @@ export let listProducts = SlateTool.create(spec, {
       cursor: ctx.input.cursor,
       modifiedAfter: ctx.input.modifiedAfter,
       modifiedBefore: ctx.input.modifiedBefore,
+      query: ctx.input.query,
+      productTypes: ctx.input.productTypes,
       type: ctx.input.type
     });
 

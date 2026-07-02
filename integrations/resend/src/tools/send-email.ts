@@ -1,7 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+
+let templateSchema = z.object({
+  id: z.string().describe('Published template ID or alias to send.'),
+  variables: z
+    .record(z.string(), z.union([z.string(), z.number()]))
+    .optional()
+    .describe('Template variables as key-value pairs.')
+});
 
 export let sendEmail = SlateTool.create(spec, {
   name: 'Send Email',
@@ -64,6 +72,11 @@ export let sendEmail = SlateTool.create(spec, {
         )
         .optional()
         .describe('Metadata tags for the email.'),
+      template: templateSchema
+        .optional()
+        .describe(
+          'Published template to send. Do not provide html or text when template is set.'
+        ),
       scheduledAt: z
         .string()
         .optional()
@@ -82,6 +95,12 @@ export let sendEmail = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.template && (ctx.input.html || ctx.input.text)) {
+      throw createApiServiceError(
+        'Do not provide html or text when sending a Resend template.'
+      );
+    }
+
     let result = await client.sendEmail({
       from: ctx.input.from,
       to: ctx.input.to,
@@ -94,6 +113,7 @@ export let sendEmail = SlateTool.create(spec, {
       headers: ctx.input.headers,
       attachments: ctx.input.attachments,
       tags: ctx.input.tags,
+      template: ctx.input.template,
       scheduledAt: ctx.input.scheduledAt,
       idempotencyKey: ctx.input.idempotencyKey
     });

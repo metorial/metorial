@@ -1,12 +1,12 @@
 # <img src="https://provider-logos.metorial-cdn.com/mixpanel.svg" height="20"> Mixpanel
 
-Track, import, and query product analytics data. Send events and manage user and group profiles. Query analytics reports including funnels, retention, segmentation, and cohorts. Export raw event data and configure data pipelines to external warehouses. Import data from warehouses into Mixpanel. Manage lookup tables, data schemas, and annotations. Submit GDPR data retrieval and deletion requests. Evaluate feature flags for users. Sync cohort membership changes via webhooks.
+Track, import, and query product analytics data. Send events, manage user and group profiles, query analytics reports including funnels, retention, segmentation, cohorts, event counts, and event property breakdowns, export raw event data as attachments, manage annotations, manage identities, and sync cohort membership changes via webhooks.
 
 ## Tools
 
 ### Export Raw Events
 
-Export raw event data from Mixpanel for a specified date range. Returns individual event records with all properties. Useful for feeding data into external systems or performing custom analysis.
+Export raw event data from Mixpanel for a specified date range as a JSONL attachment. Useful for feeding data into external systems or performing custom analysis.
 
 ### Get Activity Feed
 
@@ -18,11 +18,19 @@ Get today's most popular events in the Mixpanel project ranked by volume. Useful
 
 ### Import Events
 
-Send a batch of events to Mixpanel. Supports historical events older than 5 days (use Track Events for recent real-time events). Each event requires an event name, a distinct user ID, a Unix timestamp, and an optional insert ID for deduplication. Up to **2000 events** per request.
+Send a batch of events to Mixpanel. Supports historical events older than 5 days (use Track Events for recent real-time events). Each event requires an event name, a distinct user ID, a Unix timestamp, and an insert ID for deduplication. Up to **2000 events** per request.
 
 ### List Cohorts
 
 List all saved cohorts in the Mixpanel project. Returns cohort IDs, names, descriptions, and member counts. Cohort IDs can be used to filter profiles in **Query User Profiles**.
+
+### List Event Properties
+
+List the top property names observed for a Mixpanel event, ordered by event count.
+
+### List Event Property Values
+
+List the top observed values for a property on a Mixpanel event.
 
 ### List Funnels
 
@@ -34,7 +42,7 @@ Create, list, or delete annotations in a Mixpanel project. Annotations mark sign
 
 ### Manage Group Profile
 
-Create or update a group profile in Mixpanel. Groups represent entity-level analytics such as companies or accounts. Supports setting properties on a group or deleting the group profile entirely. Requires Group Analytics to be enabled on the Mixpanel project.
+Create or update a group profile in Mixpanel. Groups represent entity-level analytics such as companies or accounts. Supports setting properties, setting properties only once, list-property updates, unsetting properties, or deleting the group profile entirely. Requires Group Analytics to be enabled on the Mixpanel project.
 
 ### Manage Identities
 
@@ -47,6 +55,14 @@ Create or update a user profile in Mixpanel. Supports multiple operations: setti
 ### Query Funnel
 
 Query a saved funnel report in Mixpanel. Returns conversion data for each step of the funnel over a date range. Use **List Funnels** first to discover available funnel IDs.
+
+### Query Event Counts
+
+Get aggregate total, unique, or average counts for one or more Mixpanel events over a date range or recent interval.
+
+### Query Event Property Values
+
+Get aggregate total, unique, or average counts for values of a specific property on a Mixpanel event.
 
 ### Query Insights Report
 

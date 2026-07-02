@@ -34,13 +34,21 @@ export let createOrUpdateSubscriber = SlateTool.create(spec, {
       subscribedAt: z
         .string()
         .optional()
-        .describe('Date when the subscriber was added (ISO 8601 format)'),
+        .describe('Date when the subscriber was added, in yyyy-MM-dd HH:mm:ss format'),
       ipAddress: z.string().optional().describe('IP address of the subscriber'),
       optedInAt: z
         .string()
         .optional()
-        .describe('Date when the subscriber opted in (ISO 8601 format)'),
-      optinIp: z.string().optional().describe('IP address used when opting in')
+        .describe('Date when the subscriber opted in, in yyyy-MM-dd HH:mm:ss format'),
+      optinIp: z.string().optional().describe('IP address used when opting in'),
+      unsubscribedAt: z
+        .string()
+        .optional()
+        .describe('Unsubscribe date in yyyy-MM-dd HH:mm:ss format'),
+      resubscribe: z
+        .boolean()
+        .optional()
+        .describe('Set true to resubscribe a previously unsubscribed subscriber when allowed')
     })
   )
   .output(
@@ -64,7 +72,9 @@ export let createOrUpdateSubscriber = SlateTool.create(spec, {
       subscribed_at: ctx.input.subscribedAt,
       ip_address: ctx.input.ipAddress,
       opted_in_at: ctx.input.optedInAt,
-      optin_ip: ctx.input.optinIp
+      optin_ip: ctx.input.optinIp,
+      unsubscribed_at: ctx.input.unsubscribedAt,
+      resubscribe: ctx.input.resubscribe
     });
 
     let subscriber = result.data;

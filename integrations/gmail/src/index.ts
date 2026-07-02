@@ -1,6 +1,8 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  deleteMessagesPermanently,
+  deleteThreadPermanently,
   getAttachment,
   getGoogleContact,
   getMessage,
@@ -23,9 +25,11 @@ export let provider = Slate.create({
     searchMessages.build(),
     getMessage.build(),
     modifyMessage.build(),
+    deleteMessagesPermanently.build(),
     manageDraft.build(),
     manageLabels.build(),
     manageThread.build(),
+    deleteThreadPermanently.build(),
     manageSettings.build(),
     getAttachment.build(),
     listGoogleContacts,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTrackingPlan = SlateTool.create(spec, {
@@ -53,7 +54,7 @@ export let manageTrackingPlan = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('name is required to create a tracking plan');
+        throw segmentServiceError('name is required to create a tracking plan');
       }
       let plan = await client.createTrackingPlan({
         name: ctx.input.name,
@@ -73,7 +74,7 @@ export let manageTrackingPlan = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.trackingPlanId) {
-        throw new Error('trackingPlanId is required to update a tracking plan');
+        throw segmentServiceError('trackingPlanId is required to update a tracking plan');
       }
       let plan = await client.updateTrackingPlan(ctx.input.trackingPlanId, {
         name: ctx.input.name,
@@ -91,7 +92,7 @@ export let manageTrackingPlan = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.trackingPlanId) {
-        throw new Error('trackingPlanId is required to delete a tracking plan');
+        throw segmentServiceError('trackingPlanId is required to delete a tracking plan');
       }
       await client.deleteTrackingPlan(ctx.input.trackingPlanId);
       return {
@@ -105,7 +106,7 @@ export let manageTrackingPlan = SlateTool.create(spec, {
 
     if (ctx.input.action === 'connect_source') {
       if (!ctx.input.trackingPlanId || !ctx.input.sourceId) {
-        throw new Error('trackingPlanId and sourceId are required');
+        throw segmentServiceError('trackingPlanId and sourceId are required');
       }
       await client.connectSourceToTrackingPlan(ctx.input.trackingPlanId, ctx.input.sourceId);
       return {
@@ -119,7 +120,7 @@ export let manageTrackingPlan = SlateTool.create(spec, {
 
     if (ctx.input.action === 'disconnect_source') {
       if (!ctx.input.trackingPlanId || !ctx.input.sourceId) {
-        throw new Error('trackingPlanId and sourceId are required');
+        throw segmentServiceError('trackingPlanId and sourceId are required');
       }
       await client.disconnectSourceFromTrackingPlan(
         ctx.input.trackingPlanId,
@@ -134,6 +135,6 @@ export let manageTrackingPlan = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw segmentServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -13,7 +13,19 @@ export let listPredictions = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      createdAfter: z
+        .string()
+        .optional()
+        .describe('Only include predictions created after this ISO timestamp'),
+      createdBefore: z
+        .string()
+        .optional()
+        .describe('Only include predictions created before this ISO timestamp'),
+      source: z
+        .enum(['api', 'web'])
+        .optional()
+        .describe('Filter predictions by where they were created')
     })
   )
   .output(
@@ -24,6 +36,11 @@ export let listPredictions = SlateTool.create(spec, {
           model: z.string().optional().describe('Model identifier'),
           version: z.string().optional().describe('Version ID'),
           status: z.string().describe('Current status'),
+          source: z.enum(['api', 'web']).optional().describe('How the prediction was created'),
+          dataRemoved: z
+            .boolean()
+            .optional()
+            .describe('Whether the prediction output has been deleted'),
           createdAt: z.string().describe('Creation timestamp'),
           completedAt: z.string().optional().nullable().describe('Completion timestamp')
         })
@@ -38,13 +55,20 @@ export let listPredictions = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let result = await client.listPredictions({ cursor: ctx.input.cursor });
+    let result = await client.listPredictions({
+      cursor: ctx.input.cursor,
+      createdAfter: ctx.input.createdAfter,
+      createdBefore: ctx.input.createdBefore,
+      source: ctx.input.source
+    });
 
     let predictions = (result.results || []).map((p: any) => ({
       predictionId: p.id,
       model: p.model,
       version: p.version,
       status: p.status,
+      source: p.source,
+      dataRemoved: p.data_removed,
       createdAt: p.created_at,
       completedAt: p.completed_at
     }));

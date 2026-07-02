@@ -1,12 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TranscribeClient } from '../lib/client';
+import { transcribeServiceError } from '../lib/errors';
 import { spec } from '../spec';
-
-let tagSchema = z.object({
-  key: z.string().describe('Tag key'),
-  value: z.string().describe('Tag value')
-});
+import {
+  ensureExactlyOne,
+  kmsEncryptionContextSchema,
+  languageIdSettingsSchema,
+  mediaFormatSchema,
+  tagSchema,
+  validateLanguageIdSettings,
+  validateVocabularyFilterMethod
+} from './common';
 
 export let startTranscriptionJob = SlateTool.create(spec, {
   name: 'Start Transcription Job',
@@ -49,14 +54,14 @@ export let startTranscriptionJob = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Enable automatic multi-language identification'),
+      languageIdSettings: languageIdSettingsSchema,
       languageOptions: z
         .array(z.string())
         .optional()
         .describe(
           'List of expected language codes to improve language identification accuracy'
         ),
-      mediaFormat: z
-        .enum(['mp3', 'mp4', 'wav', 'flac', 'ogg', 'amr', 'webm'])
+      mediaFormat: mediaFormatSchema
         .optional()
         .describe('Format of the media file. Usually auto-detected from file extension.'),
       mediaSampleRateHertz: z
@@ -75,6 +80,7 @@ export let startTranscriptionJob = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('KMS key ID for encrypting the output'),
+      kmsEncryptionContext: kmsEncryptionContextSchema,
       settings: z
         .object({
           vocabularyName: z.string().optional().describe('Name of a custom vocabulary to use'),
@@ -146,9 +152,9 @@ export let startTranscriptionJob = SlateTool.create(spec, {
         .optional()
         .describe('Subtitle generation settings'),
       toxicityDetection: z
-        .array(z.string())
+        .array(z.enum(['ALL']))
         .optional()
-        .describe('Toxicity categories to detect (e.g., ALL)'),
+        .describe('Toxicity categories to detect. AWS currently accepts ALL.'),
       jobExecutionSettings: z
         .object({
           allowDeferredExecution: z
@@ -173,6 +179,33 @@ export let startTranscriptionJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    ensureExactlyOne(
+      [
+        ['languageCode', typeof ctx.input.languageCode === 'string'],
+        ['identifyLanguage', ctx.input.identifyLanguage === true],
+        ['identifyMultipleLanguages', ctx.input.identifyMultipleLanguages === true]
+      ],
+      'Provide exactly one language selection: languageCode, identifyLanguage, or identifyMultipleLanguages.'
+    );
+
+    if (
+      ctx.input.languageIdSettings &&
+      !ctx.input.identifyLanguage &&
+      !ctx.input.identifyMultipleLanguages
+    ) {
+      throw transcribeServiceError(
+        'languageIdSettings can only be used with identifyLanguage or identifyMultipleLanguages.'
+      );
+    }
+
+    validateLanguageIdSettings(ctx.input.languageIdSettings, ctx.input.languageOptions, {
+      allowLanguageModel: ctx.input.identifyMultipleLanguages !== true
+    });
+    validateVocabularyFilterMethod(
+      ctx.input.settings?.vocabularyFilterName,
+      ctx.input.settings?.vocabularyFilterMethod
+    );
+
     let client = new TranscribeClient({
       credentials: {
         accessKeyId: ctx.auth.accessKeyId,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AmplitudeClient } from '../lib/client';
+import { amplitudeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let eventSchema = z.object({
@@ -110,6 +111,18 @@ export let trackEventsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.events.length > 2000) {
+      throw amplitudeServiceError('Amplitude accepts at most 2000 events per request.');
+    }
+
+    for (let [index, event] of ctx.input.events.entries()) {
+      if (!event.userId && !event.deviceId) {
+        throw amplitudeServiceError(
+          `Event at index ${index} must include at least one of userId or deviceId.`
+        );
+      }
+    }
+
     let client = new AmplitudeClient({
       apiKey: ctx.auth.apiKey,
       secretKey: ctx.auth.secretKey,

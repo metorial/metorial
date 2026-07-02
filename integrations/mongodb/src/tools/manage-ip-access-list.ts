@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let accessListEntrySchema = z.object({
@@ -68,7 +69,7 @@ export let manageIpAccessListTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required');
+    if (!projectId) throw mongodbServiceError('projectId is required');
 
     let client = new AtlasClient(ctx.auth);
 
@@ -90,7 +91,7 @@ export let manageIpAccessListTool = SlateTool.create(spec, {
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.entries || ctx.input.entries.length === 0)
-        throw new Error('At least one entry is required');
+        throw mongodbServiceError('At least one entry is required');
       let result = await client.addIpAccessListEntries(projectId, ctx.input.entries);
       let entries = (result.results || []).map((e: any) => ({
         ipAddress: e.ipAddress,
@@ -107,7 +108,8 @@ export let manageIpAccessListTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.entryValue) throw new Error('entryValue is required for delete action');
+      if (!ctx.input.entryValue)
+        throw mongodbServiceError('entryValue is required for delete action');
       await client.deleteIpAccessListEntry(projectId, ctx.input.entryValue);
       return {
         output: { deleted: true },
@@ -115,6 +117,6 @@ export let manageIpAccessListTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

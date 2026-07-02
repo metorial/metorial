@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OktaClient } from '../lib/client';
+import { oktaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageGroupTool = SlateTool.create(spec, {
@@ -33,13 +34,14 @@ export let manageGroupTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OktaClient({
       domain: ctx.config.domain,
-      token: ctx.auth.token
+      token: ctx.auth.token,
+      authMethod: ctx.auth.authMethod
     });
 
     let { action, groupId, name, description } = ctx.input;
 
     if (action === 'create') {
-      if (!name) throw new Error('Group name is required for create action');
+      if (!name) throw oktaServiceError('Group name is required for create action');
       let group = await client.createGroup({ name, description });
       return {
         output: { groupId: group.id, name: group.profile.name, action, success: true },
@@ -48,7 +50,7 @@ export let manageGroupTool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!groupId) throw new Error('Group ID is required for update action');
+      if (!groupId) throw oktaServiceError('Group ID is required for update action');
       let group = await client.updateGroup(groupId, { name, description });
       return {
         output: { groupId: group.id, name: group.profile.name, action, success: true },
@@ -57,7 +59,7 @@ export let manageGroupTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!groupId) throw new Error('Group ID is required for delete action');
+      if (!groupId) throw oktaServiceError('Group ID is required for delete action');
       await client.deleteGroup(groupId);
       return {
         output: { groupId, action, success: true },
@@ -65,6 +67,6 @@ export let manageGroupTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw oktaServiceError(`Unknown action: ${action}`);
   })
   .build();

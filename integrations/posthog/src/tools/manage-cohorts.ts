@@ -26,6 +26,10 @@ Static cohorts are manually managed lists, while dynamic cohorts are automatical
 })
   .input(
     z.object({
+      basic: z
+        .boolean()
+        .optional()
+        .describe('Return a lighter cohort representation when supported'),
       limit: z.number().optional().describe('Maximum number of results'),
       offset: z.number().optional().describe('Pagination offset')
     })
@@ -39,6 +43,7 @@ Static cohorts are manually managed lists, while dynamic cohorts are automatical
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
     let data = await client.listCohorts({
+      basic: ctx.input.basic,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -135,6 +140,78 @@ export let createCohortTool = SlateTool.create(spec, {
         createdAt: c.created_at
       },
       message: `Created cohort **${c.name}** (ID: ${c.id}).`
+    };
+  })
+  .build();
+
+export let updateCohortTool = SlateTool.create(spec, {
+  name: 'Update Cohort',
+  key: 'update_cohort',
+  description: `Update an existing cohort's name, description, static state, or filter groups.`,
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      cohortId: z.string().describe('Cohort ID to update'),
+      name: z.string().optional().describe('New cohort name'),
+      description: z.string().optional().describe('New cohort description'),
+      isStatic: z.boolean().optional().describe('Whether this is a static cohort'),
+      groups: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Updated filter groups defining who is included in the cohort')
+    })
+  )
+  .output(cohortOutput)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    let payload: Record<string, any> = {};
+    if (ctx.input.name !== undefined) payload.name = ctx.input.name;
+    if (ctx.input.description !== undefined) payload.description = ctx.input.description;
+    if (ctx.input.isStatic !== undefined) payload.is_static = ctx.input.isStatic;
+    if (ctx.input.groups !== undefined) payload.groups = ctx.input.groups;
+
+    let c = await client.updateCohort(ctx.input.cohortId, payload);
+
+    return {
+      output: {
+        cohortId: String(c.id),
+        name: c.name,
+        description: c.description,
+        count: c.count,
+        isStatic: c.is_static,
+        isCalculating: c.is_calculating,
+        groups: c.groups,
+        createdAt: c.created_at
+      },
+      message: `Updated cohort **${c.name}**.`
+    };
+  })
+  .build();
+
+export let deleteCohortTool = SlateTool.create(spec, {
+  name: 'Delete Cohort',
+  key: 'delete_cohort',
+  description: `Permanently delete a cohort from PostHog.`,
+  tags: { destructive: true }
+})
+  .input(
+    z.object({
+      cohortId: z.string().describe('Cohort ID to delete')
+    })
+  )
+  .output(
+    z.object({
+      deleted: z.boolean().describe('Whether the cohort was deleted')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    await client.deleteCohort(ctx.input.cohortId);
+
+    return {
+      output: { deleted: true },
+      message: `Deleted cohort **${ctx.input.cohortId}**.`
     };
   })
   .build();

@@ -25,15 +25,15 @@ Access rights for account-level API keys include: Read (alerts, incidents, confi
 
 ### Alert Management
 
-Create, retrieve, update, close, acknowledge, and delete alerts. Alert creation, deletion, and action requests are processed asynchronously. Alerts support rich metadata including message, description, priority (P1–P5), responders (teams, users, escalations, schedules), tags, custom actions, visibility controls, and custom key-value details. Additional alert actions include snoozing, assigning ownership, adding notes, and adding tags.
+Create, retrieve, update, close, acknowledge, and delete alerts. Alert creation, deletion, and action requests are processed asynchronously, and request IDs can be checked for final status and alert IDs. Alerts support rich metadata including message, description, priority (P1–P5), responders (teams, users, escalations, schedules), tags, custom actions, visibility controls, and custom key-value details. Additional alert actions include snoozing, assigning ownership, adding notes, and adding tags.
 
 ### Incident Management
 
-The Incident API is only available to Standard and Enterprise plans. Create and manage incidents with responders, priority levels, tags, impacted services, status page entries, and stakeholder notifications. Incidents can be resolved and their associated alerts retrieved.
+The Incident API is only available to Standard and Enterprise plans. Create and manage incidents with responders, priority levels, tags, impacted services, status page entries, and stakeholder notifications. Incident create, delete, close, resolve, and note requests are asynchronous and can be checked by request ID. Incidents can be resolved and retrieved.
 
 ### On-Call Schedule Management
 
-Create, update, and delete schedules programmatically. Quickly adapt on-call personnel based on shifts or role changes. Schedules support rotations (daily, weekly, monthly, custom) with multiple participants, and overrides for temporary coverage changes. You can also query who is currently on-call and who is next on-call for a given schedule.
+Create, update, and delete schedules programmatically. Quickly adapt on-call personnel based on shifts or role changes. Schedules support rotations (daily, weekly, monthly, custom) with multiple participants, and overrides for temporary coverage changes. Overrides can be created, listed, retrieved, updated, and deleted. You can also query who is currently on-call and who is next on-call for a given schedule.
 
 ### Escalation Policy Management
 
@@ -51,13 +51,9 @@ Create, retrieve, update, and delete users. Manage user contact methods, notific
 
 The Service API is only available to Standard and Enterprise plans. Create, update, delete, and list services associated with teams, including tags and descriptions.
 
-### Integration Management
+### Deferred Admin Surfaces
 
-Programmatically create, list, update, enable/disable, and authenticate integrations. Configure integration-level access permissions (read, write, delete, configuration access) and define responders and notification suppression settings. The Integration API does not support Zendesk, Slack, and Incoming Call integrations.
-
-### Notification Rule Management
-
-Configure per-user notification rules that control how and when users receive notifications based on alert criteria, including notification steps with delays and contact method preferences.
+Opsgenie also documents integration management, contacts, notification rules, forwarding rules, reporting, heartbeats, and maintenance windows. Those surfaces are intentionally not exposed here because they are admin-heavy, account-policy-sensitive, or lower-frequency than the practical incident response and on-call workflows covered by the tools.
 
 ## Events
 

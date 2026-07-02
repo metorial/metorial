@@ -1,7 +1,15 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import {
+  assertPdfCoSuccess,
+  conversionMimeType,
+  createPdfCoAttachment,
+  downloadPdfCoOutput,
+  fileAttachmentOutputFields,
+  toFileOutput
+} from './shared';
 
 export let convertPdf = SlateTool.create(spec, {
   name: 'Convert PDF',
@@ -46,10 +54,6 @@ Use this to extract tabular data (CSV/Excel), structured content (JSON/XML), pla
         .describe('OCR language code for scanned documents, e.g. "eng", "fra", "deu"'),
       password: z.string().optional().describe('Password for protected PDF files'),
       outputFileName: z.string().optional().describe('Name for the output file'),
-      inline: z
-        .boolean()
-        .optional()
-        .describe('If true, returns content inline in the response instead of a download URL'),
       extractionRect: z
         .string()
         .optional()
@@ -62,8 +66,7 @@ Use this to extract tabular data (CSV/Excel), structured content (JSON/XML), pla
   )
   .output(
     z.object({
-      outputUrl: z.string().optional().describe('URL to download the converted file'),
-      body: z.any().optional().describe('Inline content when inline mode is used'),
+      ...fileAttachmentOutputFields,
       pageCount: z.number().describe('Number of pages in the source document'),
       creditsUsed: z.number().describe('API credits consumed'),
       remainingCredits: z.number().describe('Credits remaining on the account')
@@ -78,31 +81,24 @@ Use this to extract tabular data (CSV/Excel), structured content (JSON/XML), pla
       lang: ctx.input.lang,
       password: ctx.input.password,
       name: ctx.input.outputFileName,
-      inline: ctx.input.inline,
       rect: ctx.input.extractionRect,
       unwrap: ctx.input.unwrapLines
     });
 
-    if (result.error) {
-      throw new Error(`PDF conversion failed: ${result.message || 'Unknown error'}`);
+    result = assertPdfCoSuccess(result, 'PDF conversion failed');
+    if (!('url' in result)) {
+      throw createApiServiceError('PDF.co returned inline content instead of a file URL.');
     }
-
-    let output: any = {
-      pageCount: result.pageCount,
-      creditsUsed: result.credits,
-      remainingCredits: result.remainingCredits
-    };
-
-    if ('body' in result && result.body !== undefined) {
-      output.body = result.body;
-    }
-    if ('url' in result && result.url) {
-      output.outputUrl = result.url;
-    }
+    let file = await downloadPdfCoOutput(
+      client,
+      result,
+      conversionMimeType(ctx.input.outputFormat)
+    );
 
     return {
-      output,
-      message: `Converted PDF to **${ctx.input.outputFormat.toUpperCase()}** successfully. ${output.outputUrl ? `[Download result](${output.outputUrl})` : 'Content returned inline.'}`
+      output: toFileOutput(result, file),
+      attachments: [createPdfCoAttachment(file)],
+      message: `Converted PDF to **${ctx.input.outputFormat.toUpperCase()}** successfully and returned the file as an attachment.`
     };
   })
   .build();

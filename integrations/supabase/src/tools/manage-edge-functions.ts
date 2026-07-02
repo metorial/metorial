@@ -1,7 +1,11 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { requireProjectRef } from '../lib/errors';
 import { spec } from '../spec';
+
+let formatTimestamp = (value: unknown) =>
+  value === undefined || value === null ? undefined : String(value);
 
 export let manageEdgeFunctions = SlateTool.create(spec, {
   name: 'Manage Edge Functions',
@@ -30,10 +34,18 @@ export let manageEdgeFunctions = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Function source code (required for create, optional for update)'),
+      entrypointPath: z
+        .string()
+        .optional()
+        .describe('Entrypoint path for deploy/create action (defaults to index.ts)'),
       verifyJwt: z
         .boolean()
         .optional()
-        .describe('Whether to verify JWT tokens (default: true)')
+        .describe('Whether to verify JWT tokens (default: true)'),
+      includeBody: z
+        .boolean()
+        .optional()
+        .describe('For get action, include the function body as a Slate attachment')
     })
   )
   .output(
@@ -65,16 +77,15 @@ export let manageEdgeFunctions = SlateTool.create(spec, {
         })
         .optional()
         .describe('Function details (for get, create, update actions)'),
+      bodyIncluded: z
+        .boolean()
+        .optional()
+        .describe('Whether the function body was returned as an attachment'),
       deleted: z.boolean().optional().describe('Whether the function was deleted')
     })
   )
   .handleInvocation(async ctx => {
-    let projectRef = ctx.input.projectRef ?? ctx.config.projectRef;
-    if (!projectRef) {
-      throw new Error(
-        'projectRef is required — provide it as input or set it in the configuration'
-      );
-    }
+    let projectRef = requireProjectRef(ctx.input.projectRef ?? ctx.config.projectRef);
 
     let client = new ManagementClient(ctx.auth.token);
     let { action } = ctx.input;
@@ -87,8 +98,8 @@ export let manageEdgeFunctions = SlateTool.create(spec, {
         name: f.name ?? '',
         version: f.version,
         status: f.status,
-        createdAt: f.created_at,
-        updatedAt: f.updated_at
+        createdAt: formatTimestamp(f.created_at),
+        updatedAt: formatTimestamp(f.updated_at)
       }));
 
       return {
@@ -98,8 +109,19 @@ export let manageEdgeFunctions = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.functionSlug) throw new Error('functionSlug is required for get action');
+      if (!ctx.input.functionSlug)
+        throw createApiServiceError('functionSlug is required for get action');
       let f = await client.getEdgeFunction(projectRef, ctx.input.functionSlug);
+      let body =
+        ctx.input.includeBody === true
+          ? await client.getEdgeFunctionBody(projectRef, ctx.input.functionSlug)
+          : undefined;
+      let bodyText =
+        body === undefined
+          ? undefined
+          : typeof body === 'string'
+            ? body
+            : JSON.stringify(body);
       return {
         output: {
           functionDetails: {
@@ -109,23 +131,29 @@ export let manageEdgeFunctions = SlateTool.create(spec, {
             version: f.version,
             status: f.status,
             verifyJwt: f.verify_jwt,
-            createdAt: f.created_at,
-            updatedAt: f.updated_at
-          }
+            createdAt: formatTimestamp(f.created_at),
+            updatedAt: formatTimestamp(f.updated_at)
+          },
+          bodyIncluded: bodyText !== undefined ? true : undefined
         },
+        attachments:
+          bodyText !== undefined
+            ? [createTextAttachment(bodyText, 'application/typescript')]
+            : undefined,
         message: `Retrieved Edge Function **${f.name ?? ctx.input.functionSlug}**.`
       };
     }
 
     if (action === 'create') {
       if (!ctx.input.name || !ctx.input.slug || !ctx.input.body) {
-        throw new Error('name, slug, and body are required for create action');
+        throw createApiServiceError('name, slug, and body are required for create action');
       }
       let f = await client.createEdgeFunction(projectRef, {
         name: ctx.input.name,
         slug: ctx.input.slug,
         body: ctx.input.body,
-        verifyJwt: ctx.input.verifyJwt
+        verifyJwt: ctx.input.verifyJwt,
+        entrypointPath: ctx.input.entrypointPath
       });
       return {
         output: {
@@ -136,17 +164,17 @@ export let manageEdgeFunctions = SlateTool.create(spec, {
             version: f.version,
             status: f.status,
             verifyJwt: f.verify_jwt,
-            createdAt: f.created_at,
-            updatedAt: f.updated_at
+            createdAt: formatTimestamp(f.created_at),
+            updatedAt: formatTimestamp(f.updated_at)
           }
         },
-        message: `Created Edge Function **${ctx.input.name}** (${ctx.input.slug}).`
+        message: `Deployed Edge Function **${ctx.input.name}** (${ctx.input.slug}).`
       };
     }
 
     if (action === 'update') {
       if (!ctx.input.functionSlug)
-        throw new Error('functionSlug is required for update action');
+        throw createApiServiceError('functionSlug is required for update action');
       let f = await client.updateEdgeFunction(projectRef, ctx.input.functionSlug, {
         name: ctx.input.name,
         body: ctx.input.body,
@@ -161,8 +189,8 @@ export let manageEdgeFunctions = SlateTool.create(spec, {
             version: f.version,
             status: f.status,
             verifyJwt: f.verify_jwt,
-            createdAt: f.created_at,
-            updatedAt: f.updated_at
+            createdAt: formatTimestamp(f.created_at),
+            updatedAt: formatTimestamp(f.updated_at)
           }
         },
         message: `Updated Edge Function **${ctx.input.functionSlug}**.`
@@ -170,7 +198,8 @@ export let manageEdgeFunctions = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.functionSlug) throw new Error('functionSlug is required for delete action');
+    if (!ctx.input.functionSlug)
+      throw createApiServiceError('functionSlug is required for delete action');
     await client.deleteEdgeFunction(projectRef, ctx.input.functionSlug);
     return {
       output: { deleted: true },

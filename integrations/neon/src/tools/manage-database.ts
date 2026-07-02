@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NeonClient } from '../lib/client';
+import { neonValidationError } from '../lib/errors';
 import { spec } from '../spec';
 
 let databaseSchema = z.object({
@@ -75,6 +76,10 @@ export let createDatabase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.name === undefined && ctx.input.ownerName === undefined) {
+      throw neonValidationError('Provide a new database name or ownerName to update.');
+    }
+
     let client = new NeonClient({ token: ctx.auth.token });
     let result = await client.createDatabase(ctx.input.projectId, ctx.input.branchId, {
       name: ctx.input.name,

@@ -8,7 +8,6 @@ import {
   enrichCompany,
   enrichPerson,
   findProspects,
-  getLogo,
   nameToDomain,
   revealCompany
 } from './tools';
@@ -24,7 +23,6 @@ export let provider = Slate.create({
     findProspects,
     discoverCompanies,
     nameToDomain,
-    getLogo,
     checkRisk,
     autocompleteCompany
   ],

@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { coinbaseOAuthAuthMethods } from '../lib/auth-methods';
 import { CoinbaseClient } from '../lib/client';
+import { coinbaseServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let buySellCrypto = SlateTool.create(spec, {
@@ -16,6 +18,7 @@ export let buySellCrypto = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(coinbaseOAuthAuthMethods)
   .input(
     z.object({
       action: z.enum(['buy', 'sell']).describe('Whether to buy or sell'),
@@ -52,6 +55,13 @@ export let buySellCrypto = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new CoinbaseClient({ token: ctx.auth.token });
+
+    if (!ctx.input.amount && !ctx.input.total) {
+      throw coinbaseServiceError('Provide either amount or total.');
+    }
+    if (ctx.input.amount && ctx.input.total) {
+      throw coinbaseServiceError('Provide only one of amount or total.');
+    }
 
     let params = {
       amount: ctx.input.amount,

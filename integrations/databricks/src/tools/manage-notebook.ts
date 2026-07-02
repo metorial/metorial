@@ -1,15 +1,32 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let mimeTypeForNotebookFormat = (format?: string) => {
+  switch (format) {
+    case 'HTML':
+      return 'text/html';
+    case 'JUPYTER':
+      return 'application/x-ipynb+json';
+    case 'DBC':
+      return 'application/octet-stream';
+    default:
+      return 'text/plain';
+  }
+};
+
+let base64ByteLength = (content: string) => Buffer.from(content, 'base64').byteLength;
 
 export let manageNotebook = SlateTool.create(spec, {
   name: 'Manage Notebook',
   key: 'manage_notebook',
   description: `Import, export, or delete notebooks and create workspace directories.
-Use **import** to upload notebook content (base64-encoded). Use **export** to download a notebook. Use **delete** to remove a notebook or folder.`,
+Use **import** to upload notebook content (base64-encoded). Use **export** to download a notebook as a Slate attachment. Use **delete** to remove a notebook or folder.`,
   instructions: [
     'Content must be base64-encoded when importing.',
+    'Exported notebook bytes are returned in response attachments, not inline output fields.',
     'Supported formats: SOURCE, HTML, JUPYTER, DBC.',
     'Supported languages: PYTHON, SCALA, SQL, R.'
   ],
@@ -37,8 +54,10 @@ Use **import** to upload notebook content (base64-encoded). Use **export** to do
   .output(
     z.object({
       path: z.string().describe('The workspace path acted upon'),
-      content: z.string().optional().describe('Base64-encoded content (for export)'),
-      fileType: z.string().optional().describe('File type of the exported object')
+      fileType: z.string().optional().describe('File type of the exported object'),
+      mimeType: z.string().optional().describe('MIME type of the exported attachment'),
+      byteLength: z.number().optional().describe('Byte length of the exported attachment'),
+      attachmentCount: z.number().optional().describe('Number of returned Slate attachments')
     })
   )
   .handleInvocation(async ctx => {
@@ -49,7 +68,7 @@ Use **import** to upload notebook content (base64-encoded). Use **export** to do
 
     switch (ctx.input.action) {
       case 'import': {
-        if (!ctx.input.content) throw new Error('content is required for import');
+        if (!ctx.input.content) throw databricksServiceError('content is required for import');
         await client.importNotebook({
           path: ctx.input.path,
           content: ctx.input.content,
@@ -64,12 +83,18 @@ Use **import** to upload notebook content (base64-encoded). Use **export** to do
       }
       case 'export': {
         let result = await client.exportNotebook(ctx.input.path, ctx.input.format);
+        let mimeType = mimeTypeForNotebookFormat(ctx.input.format);
         return {
           output: {
             path: ctx.input.path,
-            content: result.content,
-            fileType: result.file_type
+            fileType: result.file_type,
+            mimeType,
+            byteLength: result.content ? base64ByteLength(result.content) : 0,
+            attachmentCount: result.content ? 1 : 0
           },
+          attachments: result.content
+            ? [createBase64Attachment(result.content, mimeType)]
+            : undefined,
           message: `Exported notebook from \`${ctx.input.path}\`.`
         };
       }

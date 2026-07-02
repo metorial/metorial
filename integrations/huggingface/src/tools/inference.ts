@@ -9,7 +9,7 @@ export let chatCompletionTool = SlateTool.create(spec, {
   description: `Run a chat completion using a model on the Hugging Face Inference API. Follows the OpenAI-compatible chat completions format. Supports conversation history with system, user, and assistant messages.`,
   instructions: [
     'The model must be hosted on Hugging Face and accessible via the Inference API.',
-    'Popular models include "meta-llama/Llama-3.1-8B-Instruct", "mistralai/Mistral-7B-Instruct-v0.3", etc.'
+    'Popular models include "openai/gpt-oss-120b:fastest", "Qwen/Qwen3-Coder-480B-A35B-Instruct:fastest", etc.'
   ],
   tags: {
     readOnly: true
@@ -128,6 +128,80 @@ export let textGenerationTool = SlateTool.create(spec, {
     return {
       output: { generatedText: typeof text === 'string' ? text : JSON.stringify(text) },
       message: `Generated text using **${ctx.input.model}**.`
+    };
+  })
+  .build();
+
+let getEmbeddingShape = (value: unknown): number[] => {
+  let shape: number[] = [];
+  let cursor = value;
+
+  while (Array.isArray(cursor)) {
+    shape.push(cursor.length);
+    cursor = cursor[0];
+  }
+
+  return shape;
+};
+
+export let featureExtractionTool = SlateTool.create(spec, {
+  name: 'Feature Extraction',
+  key: 'feature_extraction',
+  description: `Generate embeddings with a Hugging Face feature-extraction model. Use this for semantic search, RAG retrieval, clustering, and similarity workflows.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      model: z
+        .string()
+        .describe(
+          'Feature-extraction model ID (e.g. "sentence-transformers/all-MiniLM-L6-v2")'
+        ),
+      inputs: z
+        .union([z.string(), z.array(z.string())])
+        .describe('Text or list of texts to embed'),
+      normalize: z.boolean().optional().describe('Whether to normalize returned embeddings'),
+      truncate: z
+        .boolean()
+        .optional()
+        .describe('Whether to truncate inputs that exceed model limits'),
+      promptName: z
+        .string()
+        .optional()
+        .describe('Prompt name from sentence-transformers model configuration'),
+      truncationDirection: z
+        .enum(['left', 'right'])
+        .optional()
+        .describe('Direction for input truncation')
+    })
+  )
+  .output(
+    z.object({
+      embeddings: z.any().describe('Embedding vector or nested embedding vectors'),
+      shape: z.array(z.number()).describe('Shape of the returned embedding array')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new HubClient({ token: ctx.auth.token });
+
+    let embeddings = await client.featureExtraction({
+      model: ctx.input.model,
+      inputs: ctx.input.inputs,
+      normalize: ctx.input.normalize,
+      truncate: ctx.input.truncate,
+      promptName: ctx.input.promptName,
+      truncationDirection: ctx.input.truncationDirection
+    });
+    let shape = getEmbeddingShape(embeddings);
+
+    return {
+      output: {
+        embeddings,
+        shape
+      },
+      message: `Generated embeddings using **${ctx.input.model}** with shape **${shape.join(' x ') || 'unknown'}**.`
     };
   })
   .build();

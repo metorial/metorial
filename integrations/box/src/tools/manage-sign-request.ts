@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { boxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageSignRequest = SlateTool.create(spec, {
@@ -118,7 +119,7 @@ export let manageSignRequest = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!signRequestId) throw new Error('signRequestId is required for get action');
+      if (!signRequestId) throw boxServiceError('signRequestId is required for get action');
       let sr = await client.getSignRequest(signRequestId);
       return {
         output: {
@@ -136,7 +137,7 @@ export let manageSignRequest = SlateTool.create(spec, {
     }
 
     if (action === 'cancel') {
-      if (!signRequestId) throw new Error('signRequestId is required for cancel action');
+      if (!signRequestId) throw boxServiceError('signRequestId is required for cancel action');
       await client.cancelSignRequest(signRequestId);
       return {
         output: { signRequestId, cancelled: true },
@@ -146,10 +147,10 @@ export let manageSignRequest = SlateTool.create(spec, {
 
     // create
     if (!signers || signers.length === 0)
-      throw new Error('signers are required for create action');
+      throw boxServiceError('signers are required for create action');
     if (!sourceFileIds || sourceFileIds.length === 0)
-      throw new Error('sourceFileIds are required for create action');
-    if (!parentFolderId) throw new Error('parentFolderId is required for create action');
+      throw boxServiceError('sourceFileIds are required for create action');
+    if (!parentFolderId) throw boxServiceError('parentFolderId is required for create action');
 
     let sr = await client.createSignRequest({
       signers,

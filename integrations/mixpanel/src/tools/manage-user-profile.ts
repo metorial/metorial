@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import { mixpanelServiceError } from '../lib/errors';
+import {
+  createClientFromContext,
+  requireNonEmptyRecord,
+  requireNonEmptyStringArray,
+  requireProjectToken
+} from '../lib/helpers';
 import { spec } from '../spec';
 
 export let manageUserProfile = SlateTool.create(spec, {
@@ -51,43 +57,66 @@ Provide the desired operation and the corresponding data.`,
     })
   )
   .handleInvocation(async ctx => {
+    requireProjectToken(ctx);
+
     let client = createClientFromContext(ctx);
     let { distinctId, operation, properties, propertyNames } = ctx.input;
     let result: { success: boolean };
 
     switch (operation) {
       case 'set':
+        requireNonEmptyRecord(properties, 'properties');
         result = await client.setUserProperties(distinctId, properties ?? {});
         break;
       case 'setOnce':
+        requireNonEmptyRecord(properties, 'properties');
         result = await client.setUserPropertiesOnce(distinctId, properties ?? {});
         break;
       case 'increment':
+        requireNonEmptyRecord(properties, 'properties');
+        for (let [name, value] of Object.entries(properties ?? {})) {
+          if (typeof value !== 'number' || !Number.isFinite(value)) {
+            throw mixpanelServiceError(
+              `Property "${name}" must be a finite number for increment operations.`
+            );
+          }
+        }
         result = await client.incrementUserProperties(
           distinctId,
           (properties ?? {}) as Record<string, number>
         );
         break;
       case 'append':
+        requireNonEmptyRecord(properties, 'properties');
         result = await client.appendToUserListProperty(distinctId, properties ?? {});
         break;
       case 'remove':
+        requireNonEmptyRecord(properties, 'properties');
         result = await client.removeFromUserListProperty(distinctId, properties ?? {});
         break;
       case 'union':
+        requireNonEmptyRecord(properties, 'properties');
+        for (let [name, value] of Object.entries(properties ?? {})) {
+          if (!Array.isArray(value)) {
+            throw mixpanelServiceError(
+              `Property "${name}" must be an array for union operations.`
+            );
+          }
+        }
         result = await client.unionToUserListProperty(
           distinctId,
           (properties ?? {}) as Record<string, unknown[]>
         );
         break;
       case 'unset':
+        requireNonEmptyStringArray(propertyNames, 'propertyNames');
         result = await client.deleteUserProperties(distinctId, propertyNames ?? []);
         break;
       case 'deleteProfile':
         result = await client.deleteUserProfile(distinctId);
         break;
       default:
-        result = { success: false };
+        throw mixpanelServiceError(`Unsupported user profile operation: ${operation}`);
     }
 
     return {

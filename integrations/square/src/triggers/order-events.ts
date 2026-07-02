@@ -41,7 +41,7 @@ export let orderEvents = SlateTrigger.create(spec, {
       let subscription = await client.createWebhookSubscription({
         idempotencyKey: crypto.randomUUID(),
         subscription: {
-          name: 'Slates Order Events',
+          name: 'Square Order Events',
           eventTypes: ORDER_EVENT_TYPES,
           notificationUrl: ctx.input.webhookBaseUrl
         }

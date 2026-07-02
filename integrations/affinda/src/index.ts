@@ -10,10 +10,14 @@ import {
   listDocuments,
   listDocumentTypes,
   listOrganizations,
+  listValidationResults,
   listWorkspaces,
+  manageSearchIndexes,
+  manageTags,
   matchResumeToJob,
   redactResume,
   searchAndMatch,
+  updateDocument,
   uploadDocument
 } from './tools';
 import { documentEvents } from './triggers';
@@ -33,6 +37,10 @@ export let provider = Slate.create({
     deleteWorkspace,
     listAnnotations,
     batchUpdateAnnotations,
+    updateDocument,
+    manageTags,
+    manageSearchIndexes,
+    listValidationResults,
     listDocumentTypes,
     listOrganizations
   ],

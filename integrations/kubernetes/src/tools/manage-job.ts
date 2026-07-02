@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createKubeClient } from '../lib/client';
+import { kubernetesServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageJob = SlateTool.create(spec, {
@@ -75,12 +76,12 @@ export let manageJob = SlateTool.create(spec, {
       result = await client.createResource(resourceKind, ctx.input.manifest, namespace);
     } else {
       if (!ctx.input.image) {
-        throw new Error('image is required for job creation');
+        throw kubernetesServiceError('image is required for job creation');
       }
 
       if (resourceKind === 'cronjobs') {
         if (!ctx.input.schedule) {
-          throw new Error('schedule is required for CronJob creation');
+          throw kubernetesServiceError('schedule is required for CronJob creation');
         }
         let body = {
           apiVersion: 'batch/v1',

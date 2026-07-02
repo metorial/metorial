@@ -44,6 +44,43 @@ export let listAclUsers = SlateTool.create(spec, {
   })
   .build();
 
+export let getAclUser = SlateTool.create(spec, {
+  name: 'Get ACL User',
+  key: 'get_acl_user',
+  description: `Retrieve a single Redis ACL user by ID.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      aclUserId: z.number().describe('ACL user ID to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      aclUser: aclUserSchema.describe('ACL user details'),
+      raw: z.any().describe('Full API response')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new RedisCloudClient(ctx.auth);
+    let data = await client.getAclUser(ctx.input.aclUserId);
+
+    let aclUser = {
+      aclUserId: data.id,
+      name: data.name,
+      role: data.role,
+      status: data.status
+    };
+
+    return {
+      output: { aclUser, raw: data },
+      message: `ACL user **${ctx.input.aclUserId}** retrieved.`
+    };
+  })
+  .build();
+
 export let createAclUser = SlateTool.create(spec, {
   name: 'Create ACL User',
   key: 'create_acl_user',

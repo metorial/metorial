@@ -10,6 +10,7 @@ import {
   manageInventory,
   manageOrder,
   manageProduct,
+  manageProductMedia,
   searchCustomers,
   searchOrders,
   searchProducts
@@ -27,6 +28,7 @@ export let provider = Slate.create({
     manageCustomer,
     searchCustomers,
     manageInventory,
+    manageProductMedia,
     manageCart,
     manageCategory,
     manageCms,

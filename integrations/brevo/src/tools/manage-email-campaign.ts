@@ -1,7 +1,61 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { brevoServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let buildSender = (input: {
+  senderId?: number;
+  senderEmail?: string;
+  senderName?: string;
+}) => {
+  let hasSenderId = input.senderId !== undefined;
+  let hasSenderEmail = Boolean(input.senderEmail);
+
+  if (hasSenderId === hasSenderEmail) {
+    throw brevoServiceError('Provide exactly one of senderId or senderEmail.');
+  }
+
+  let sender: { name?: string; email?: string; id?: number } = {};
+  if (input.senderId !== undefined) {
+    sender.id = input.senderId;
+  } else {
+    sender.email = input.senderEmail;
+    if (input.senderName) sender.name = input.senderName;
+  }
+
+  return sender;
+};
+
+let buildRecipients = (input: {
+  recipientListIds?: number[];
+  exclusionListIds?: number[];
+}) => {
+  if (!input.recipientListIds && !input.exclusionListIds) {
+    return undefined;
+  }
+
+  return {
+    listIds: input.recipientListIds,
+    exclusionListIds: input.exclusionListIds
+  };
+};
+
+let assertSingleContentSource = (input: {
+  htmlContent?: string;
+  htmlUrl?: string;
+  templateId?: number;
+}) => {
+  let contentSources = [
+    Boolean(input.htmlContent),
+    Boolean(input.htmlUrl),
+    input.templateId !== undefined
+  ].filter(Boolean).length;
+
+  if (contentSources !== 1) {
+    throw brevoServiceError('Provide exactly one of htmlContent, htmlUrl, or templateId.');
+  }
+};
 
 export let createEmailCampaign = SlateTool.create(spec, {
   name: 'Create Email Campaign',
@@ -44,26 +98,15 @@ export let createEmailCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    assertSingleContentSource(ctx.input);
+
     let client = new Client({
       token: ctx.auth.token,
       authType: ctx.auth.authType
     });
 
-    let sender: { name?: string; email?: string; id?: number } = {};
-    if (ctx.input.senderId) {
-      sender.id = ctx.input.senderId;
-    } else {
-      if (ctx.input.senderEmail) sender.email = ctx.input.senderEmail;
-      if (ctx.input.senderName) sender.name = ctx.input.senderName;
-    }
-
-    let recipients: { listIds?: number[]; exclusionListIds?: number[] } | undefined;
-    if (ctx.input.recipientListIds || ctx.input.exclusionListIds) {
-      recipients = {
-        listIds: ctx.input.recipientListIds,
-        exclusionListIds: ctx.input.exclusionListIds
-      };
-    }
+    let sender = buildSender(ctx.input);
+    let recipients = buildRecipients(ctx.input);
 
     let result = await client.createEmailCampaign({
       name: ctx.input.name,
@@ -82,6 +125,105 @@ export let createEmailCampaign = SlateTool.create(spec, {
     return {
       output: result,
       message: `Email campaign **${ctx.input.name}** created. Campaign ID: **${result.campaignId}**`
+    };
+  });
+
+export let updateEmailCampaign = SlateTool.create(spec, {
+  name: 'Update Email Campaign',
+  key: 'update_email_campaign',
+  description: `Update an existing draft or scheduled Brevo email campaign's name, sender, subject, content, recipients, schedule, reply-to, tag, or template parameters.`,
+  instructions: [
+    'Only draft or scheduled campaigns can be modified.',
+    'If changing campaign content, provide exactly one of htmlContent, htmlUrl, or templateId.',
+    'If changing sender, provide exactly one of senderEmail or senderId.'
+  ],
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      campaignId: z.number().describe('ID of the campaign to update'),
+      name: z.string().optional().describe('New campaign name'),
+      senderEmail: z.string().optional().describe('Verified sender email address'),
+      senderName: z.string().optional().describe('Sender display name'),
+      senderId: z.number().optional().describe('Sender ID'),
+      subject: z.string().optional().describe('Email subject line'),
+      htmlContent: z.string().optional().describe('HTML email content'),
+      htmlUrl: z.string().optional().describe('URL to fetch HTML content from'),
+      templateId: z.number().optional().describe('Template ID to use'),
+      recipientListIds: z.array(z.number()).optional().describe('Contact list IDs to send to'),
+      exclusionListIds: z.array(z.number()).optional().describe('Contact list IDs to exclude'),
+      scheduledAt: z.string().optional().describe('ISO 8601 date-time to schedule sending'),
+      replyTo: z.string().optional().describe('Reply-to email address'),
+      tag: z.string().optional().describe('Campaign tag'),
+      templateParams: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Dynamic template parameters')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean().describe('Whether the update completed successfully')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let hasContentUpdate =
+      Boolean(ctx.input.htmlContent) ||
+      Boolean(ctx.input.htmlUrl) ||
+      ctx.input.templateId !== undefined;
+    if (hasContentUpdate) {
+      assertSingleContentSource(ctx.input);
+    }
+
+    if (ctx.input.senderName && ctx.input.senderId === undefined && !ctx.input.senderEmail) {
+      throw brevoServiceError('senderName can only be used with senderEmail.');
+    }
+
+    let sender =
+      ctx.input.senderId !== undefined || ctx.input.senderEmail
+        ? buildSender(ctx.input)
+        : undefined;
+    let recipients = buildRecipients(ctx.input);
+
+    if (
+      !ctx.input.name &&
+      !sender &&
+      !ctx.input.subject &&
+      !hasContentUpdate &&
+      !recipients &&
+      !ctx.input.scheduledAt &&
+      !ctx.input.replyTo &&
+      !ctx.input.tag &&
+      !ctx.input.templateParams
+    ) {
+      throw brevoServiceError('Provide at least one campaign field to update.');
+    }
+
+    let client = new Client({
+      token: ctx.auth.token,
+      authType: ctx.auth.authType
+    });
+
+    await client.updateEmailCampaign(ctx.input.campaignId, {
+      name: ctx.input.name,
+      sender,
+      subject: ctx.input.subject,
+      htmlContent: ctx.input.htmlContent,
+      htmlUrl: ctx.input.htmlUrl,
+      templateId: ctx.input.templateId,
+      scheduledAt: ctx.input.scheduledAt,
+      replyTo: ctx.input.replyTo,
+      recipients,
+      tag: ctx.input.tag,
+      params: ctx.input.templateParams
+    });
+
+    return {
+      output: { success: true },
+      message: `Email campaign **${ctx.input.campaignId}** updated successfully.`
     };
   });
 
@@ -261,5 +403,38 @@ export let sendEmailCampaignNow = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Campaign **${ctx.input.campaignId}** is now being sent.`
+    };
+  });
+
+export let deleteEmailCampaign = SlateTool.create(spec, {
+  name: 'Delete Email Campaign',
+  key: 'delete_email_campaign',
+  description: `Delete a Brevo email campaign that has not been scheduled or sent.`,
+  tags: {
+    destructive: true,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      campaignId: z.number().describe('ID of the campaign to delete')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean().describe('Whether the deletion completed successfully')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      authType: ctx.auth.authType
+    });
+
+    await client.deleteEmailCampaign(ctx.input.campaignId);
+
+    return {
+      output: { success: true },
+      message: `Email campaign **${ctx.input.campaignId}** deleted successfully.`
     };
   });

@@ -1,4 +1,4 @@
-Let me get more details on their webhooks and authentication documentation.# Slates Specification for PDF-API.io
+# Slates Specification for PDF-API.io
 
 ## Overview
 
@@ -29,7 +29,7 @@ Retrieve information about the PDF templates available in your account. You can 
 
 Generate a PDF document by providing dynamic data that populates the placeholders defined in a template. The data is sent as key-value pairs matching the template's variables, supporting both simple string values and arrays of objects for dynamic tables with repeatable rows.
 
-- **Output format**: The generated PDF can be returned as binary PDF data, a base64-encoded string (via JSON), or a temporary download URL (valid for 15 minutes).
+- **Output format**: The generated PDF can be returned as a Slate attachment or a temporary download URL (valid for 15 minutes). The provider's JSON base64 response is converted to an attachment and is not exposed inline in tool output.
 - **Accept header**: Controls whether the response is binary PDF (`application/pdf`) or JSON with base64 content (`application/json`).
 - Templates support text, images, tables, barcodes, QR codes, charts, and conditional rendering of elements.
 
@@ -37,7 +37,7 @@ Generate a PDF document by providing dynamic data that populates the placeholder
 
 Combine multiple templates into a single PDF document. Each template in the merge request can receive its own set of dynamic data. This is useful for generating multi-section documents (e.g., an invoice combined with a shipping label) in one API call.
 
-- Supports the same output options as single-template PDF generation (binary, base64, or URL).
+- Supports the same output options as single-template PDF generation (Slate attachment or URL).
 
 ## Events
 

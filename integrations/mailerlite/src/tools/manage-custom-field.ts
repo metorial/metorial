@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mailerLiteServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCustomField = SlateTool.create(spec, {
@@ -84,8 +85,10 @@ export let manageCustomField = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Field name is required for create action');
-      if (!ctx.input.fieldType) throw new Error('Field type is required for create action');
+      if (!ctx.input.name)
+        throw mailerLiteServiceError('Field name is required for create action');
+      if (!ctx.input.fieldType)
+        throw mailerLiteServiceError('Field type is required for create action');
       let result = await client.createField({
         name: ctx.input.name,
         type: ctx.input.fieldType
@@ -101,8 +104,10 @@ export let manageCustomField = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.fieldId) throw new Error('Field ID is required for update action');
-      if (!ctx.input.name) throw new Error('Field name is required for update action');
+      if (!ctx.input.fieldId)
+        throw mailerLiteServiceError('Field ID is required for update action');
+      if (!ctx.input.name)
+        throw mailerLiteServiceError('Field name is required for update action');
       let result = await client.updateField(ctx.input.fieldId, ctx.input.name);
       let f = result.data;
       return {
@@ -114,7 +119,8 @@ export let manageCustomField = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.fieldId) throw new Error('Field ID is required for delete action');
+    if (!ctx.input.fieldId)
+      throw mailerLiteServiceError('Field ID is required for delete action');
     await client.deleteField(ctx.input.fieldId);
     return {
       output: { success: true },

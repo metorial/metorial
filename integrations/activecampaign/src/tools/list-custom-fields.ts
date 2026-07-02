@@ -65,13 +65,20 @@ export let listCustomFields = SlateTool.create(spec, {
     let fields = (result[fieldsKey] || []).map((f: any) => ({
       fieldId: f.id,
       title: f.title || f.fieldLabel || undefined,
-      type: f.type || undefined,
-      options: f.options
-        ? Array.isArray(f.options)
-          ? f.options
-          : Object.values(f.options)
-        : undefined,
-      isRequired: f.isRequired === '1' || f.isRequired === 1 ? true : undefined
+      type: f.type || f.fieldType || undefined,
+      options:
+        (f.options ?? f.fieldOptions)
+          ? Array.isArray(f.options ?? f.fieldOptions)
+            ? (f.options ?? f.fieldOptions)
+            : Object.values(f.options ?? f.fieldOptions)
+          : undefined,
+      isRequired:
+        f.isRequired === '1' ||
+        f.isRequired === 1 ||
+        f.isrequired === '1' ||
+        f.isrequired === 1
+          ? true
+          : undefined
     }));
 
     return {

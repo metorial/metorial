@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { boxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageComments = SlateTool.create(spec, {
@@ -51,7 +52,7 @@ export let manageComments = SlateTool.create(spec, {
     let { action, fileId, commentId, message: msg, taggedMessage } = ctx.input;
 
     if (action === 'list') {
-      if (!fileId) throw new Error('fileId is required for list action');
+      if (!fileId) throw boxServiceError('fileId is required for list action');
       let comments = await client.getComments(fileId);
       let mapped = comments.map((c: any) => ({
         commentId: c.id,
@@ -66,9 +67,9 @@ export let manageComments = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!fileId) throw new Error('fileId is required for create action');
+      if (!fileId) throw boxServiceError('fileId is required for create action');
       if (!msg && !taggedMessage)
-        throw new Error('message or taggedMessage is required for create action');
+        throw boxServiceError('message or taggedMessage is required for create action');
       let comment = await client.addComment(fileId, msg || '', taggedMessage);
       return {
         output: {
@@ -82,8 +83,8 @@ export let manageComments = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!commentId) throw new Error('commentId is required for update action');
-      if (!msg) throw new Error('message is required for update action');
+      if (!commentId) throw boxServiceError('commentId is required for update action');
+      if (!msg) throw boxServiceError('message is required for update action');
       let comment = await client.updateComment(commentId, msg);
       return {
         output: {
@@ -97,7 +98,7 @@ export let manageComments = SlateTool.create(spec, {
     }
 
     // delete
-    if (!commentId) throw new Error('commentId is required for delete action');
+    if (!commentId) throw boxServiceError('commentId is required for delete action');
     await client.deleteComment(commentId);
     return {
       output: { commentId, deleted: true },

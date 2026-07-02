@@ -1,5 +1,7 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
+import { docparserApiError, docparserServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,24 +31,21 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let client = createAxios({
-        baseURL: 'https://api.docparser.com/v1',
-        auth: {
-          username: ctx.output.token,
-          password: ''
+      try {
+        let client = new Client({ token: ctx.output.token });
+        let response = await client.ping();
+
+        if (response.msg === 'pong') {
+          return {
+            profile: {
+              name: 'Docparser Account'
+            }
+          };
         }
-      });
 
-      let response = await client.get('/ping');
-
-      if (response.data?.msg === 'pong') {
-        return {
-          profile: {
-            name: 'Docparser Account'
-          }
-        };
+        throw docparserServiceError('Invalid Docparser API key.');
+      } catch (error) {
+        throw docparserApiError(error, 'authentication check');
       }
-
-      throw new Error('Invalid API key');
     }
   });

@@ -16,9 +16,21 @@ Retrieve your Postmark server's configuration and settings including name, color
 
 Retrieve aggregate sending statistics from your Postmark server. Get an overview of sent counts, bounces, spam complaints, open rates, and click rates. Filter by date range, tag, and message stream.
 
+### Manage Domains
+
+List, get, create, update, delete, and verify Postmark sending domains. Includes current DKIM verification, Return-Path verification, and DKIM rotation through the Domains API. Requires an Account API Token.
+
+### Manage Inbound Rules
+
+List, create, or delete inbound rule triggers that block specific email addresses or domains from sending to your Postmark inbound address.
+
 ### Manage Message Streams
 
 List, get, create, update, archive, or unarchive Postmark message streams. Message streams separate your email sending into categories (Transactional, Broadcasts, Inbound) for better organization and deliverability.
+
+### Manage Sender Signatures
+
+List, get, create, update, delete, or resend confirmation for Postmark sender signatures. Sender signatures authorize individual From addresses for sending. Requires an Account API Token.
 
 ### Manage Suppressions
 
@@ -35,6 +47,14 @@ List, get, create, update, or delete webhooks on your Postmark server. Webhooks 
 ### Search Messages
 
 Search and retrieve outbound or inbound messages processed by your Postmark server. Filter by recipient, sender, subject, tag, status, date range, and metadata. Useful for auditing, debugging delivery issues, or finding specific messages.
+
+### Send Batch Emails
+
+Send up to 500 individually addressed Postmark emails in a single batch API call. Each message can have its own sender, recipients, subject, body, headers, attachments, metadata, tracking settings, and message stream.
+
+### Send Batch Template Emails
+
+Send up to 500 Postmark template emails in one batch API call. Each message can target a template by ID or alias and pass its own template model, recipients, headers, attachments, metadata, tracking settings, and message stream.
 
 ### Send Email
 

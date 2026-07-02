@@ -1,6 +1,21 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
+import { pdfApiIoServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+let readString = (record: Record<string, unknown>, keys: string[]) => {
+  for (let key of keys) {
+    let value = record[key];
+    if (typeof value === 'string' && value.length > 0) {
+      return value;
+    }
+  }
+
+  return undefined;
+};
 
 export let pdfCreated = SlateTrigger.create(spec, {
   name: 'PDF Created',
@@ -37,21 +52,33 @@ export let pdfCreated = SlateTrigger.create(spec, {
     handleRequest: async ctx => {
       let data = (await ctx.request.json()) as Record<string, unknown>;
 
-      let templateId = (data.template_id ?? data.templateId ?? '') as string;
-      let pdfBase64 = (data.data ?? data.pdf ?? data.base64 ?? data.pdf_base64) as
-        | string
-        | undefined;
-      let pdfUrl = (data.url ?? data.pdf_url ?? data.download_url) as string | undefined;
+      if (typeof data.type === 'string' && data.type !== 'pdf.created') {
+        throw pdfApiIoServiceError(`Unsupported PDF-API.io webhook event: ${data.type}`);
+      }
 
-      // Determine what we received - base64 content or URL
-      let isUrl = typeof pdfUrl === 'string' && pdfUrl.startsWith('http');
+      let payload = isRecord(data.data) ? data.data : data;
+      let templateId = readString(payload, ['template_id', 'templateId']);
+      let legacyBase64 = typeof data.data === 'string' ? data.data : undefined;
+      let pdfBase64 =
+        legacyBase64 ?? readString(payload, ['pdf', 'base64', 'pdf_base64', 'pdfBase64']);
+      let pdfUrl = readString(payload, ['url', 'pdf_url', 'download_url', 'pdfUrl']);
+
+      if (!templateId) {
+        throw pdfApiIoServiceError('PDF-API.io webhook payload did not include template_id.');
+      }
+
+      if (!pdfBase64 && !pdfUrl) {
+        throw pdfApiIoServiceError(
+          'PDF-API.io webhook payload did not include PDF content or a download URL.'
+        );
+      }
 
       return {
         inputs: [
           {
             templateId,
-            pdfBase64: isUrl ? undefined : (pdfBase64 as string | undefined),
-            pdfUrl: isUrl ? pdfUrl : undefined
+            pdfBase64: pdfUrl ? undefined : pdfBase64,
+            pdfUrl
           }
         ]
       };

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createWixClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -36,7 +36,7 @@ Import files from external URLs into the media library. List existing files opti
 
     switch (ctx.input.action) {
       case 'import': {
-        if (!ctx.input.url) throw new Error('url is required for import action');
+        if (!ctx.input.url) throw createApiServiceError('url is required for import action');
         let result = await client.importFile(
           ctx.input.url,
           ctx.input.displayName,

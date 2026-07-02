@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrowserlessClient } from '../lib/client';
+import { browserlessServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let webSearch = SlateTool.create(spec, {
@@ -23,7 +24,12 @@ export let webSearch = SlateTool.create(spec, {
         .array(z.enum(['web', 'news', 'images']))
         .optional()
         .describe('Search sources to query'),
-      limit: z.number().optional().describe('Maximum number of results to return'),
+      limit: z
+        .number()
+        .min(1)
+        .max(20)
+        .optional()
+        .describe('Maximum number of results to return'),
       lang: z
         .string()
         .optional()
@@ -74,6 +80,10 @@ export let webSearch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.query.trim()) {
+      throw browserlessServiceError('query cannot be empty.');
+    }
+
     let client = new BrowserlessClient({
       token: ctx.auth.token,
       region: ctx.config.region

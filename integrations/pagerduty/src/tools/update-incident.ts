@@ -8,7 +8,7 @@ export let updateIncident = SlateTool.create(spec, {
   key: 'update_incident',
   description: `Update a PagerDuty incident — acknowledge, resolve, reassign, change urgency, escalation policy, priority, or add a note. Also supports snoozing and merging incidents.`,
   instructions: [
-    'To acknowledge, set **status** to "acknowledged". To resolve, set **status** to "resolved".',
+    'Set **status** to "acknowledged", "resolved", or "triggered" to change incident state.',
     'To snooze, provide **snoozeDurationSeconds** (the incident will re-trigger after the duration).',
     'To merge incidents, provide **mergeSourceIncidentIds** — the specified incidents will be merged into this one.',
     'To add a note, provide **noteContent**.'
@@ -22,7 +22,10 @@ export let updateIncident = SlateTool.create(spec, {
     z.object({
       incidentId: z.string().describe('Incident ID to update'),
       fromEmail: z.string().describe('Email of the PagerDuty user performing the update'),
-      status: z.enum(['acknowledged', 'resolved']).optional().describe('New incident status'),
+      status: z
+        .enum(['triggered', 'acknowledged', 'resolved'])
+        .optional()
+        .describe('New incident status'),
       title: z.string().optional().describe('New title'),
       urgency: z.enum(['high', 'low']).optional().describe('New urgency level'),
       escalationPolicyId: z.string().optional().describe('New escalation policy ID'),

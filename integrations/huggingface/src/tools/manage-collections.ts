@@ -1,7 +1,85 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HubClient } from '../lib/client';
+import { huggingFaceServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let collectionSummarySchema = z.object({
+  slug: z.string().describe('Collection slug'),
+  title: z.string().optional().describe('Collection title'),
+  description: z.string().optional().describe('Collection description'),
+  owner: z.string().optional().describe('Owner username or organization'),
+  private: z.boolean().optional().describe('Whether the collection is private'),
+  itemCount: z.number().optional().describe('Number of items in the collection'),
+  lastUpdated: z.string().optional().describe('Last updated timestamp')
+});
+
+let mapCollectionSummary = (collection: any) => ({
+  slug: collection.slug,
+  title: collection.title,
+  description: collection.description,
+  owner: collection.owner?.name || collection.owner,
+  private: collection.private,
+  itemCount: Array.isArray(collection.items) ? collection.items.length : collection.itemCount,
+  lastUpdated: collection.lastUpdated || collection.updatedAt
+});
+
+export let listCollectionsTool = SlateTool.create(spec, {
+  name: 'List Collections',
+  key: 'list_collections',
+  description: `List Hugging Face collections. Filter by owner, query text, or item, and page through collection discovery results.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      query: z.string().optional().describe('Search query for collection title or content'),
+      owner: z.string().optional().describe('Owner username or organization namespace'),
+      item: z
+        .string()
+        .optional()
+        .describe('Filter by contained item, for example "models/owner/model-name"'),
+      sort: z.enum(['upvotes', 'lastModified', 'trending']).optional().describe('Sort field'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      limit: z
+        .number()
+        .optional()
+        .default(10)
+        .describe('Maximum number of collections to return')
+    })
+  )
+  .output(
+    z.object({
+      collections: z.array(collectionSummarySchema).describe('Matching collections'),
+      nextCursor: z.string().optional().describe('Cursor for the next page')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new HubClient({ token: ctx.auth.token });
+    let result = await client.listCollections({
+      query: ctx.input.query,
+      owner: ctx.input.owner,
+      item: ctx.input.item,
+      sort: ctx.input.sort,
+      cursor: ctx.input.cursor,
+      limit: ctx.input.limit
+    });
+
+    let rawCollections = Array.isArray(result)
+      ? result
+      : result.collections || result.items || result.data || [];
+    let collections = rawCollections.map(mapCollectionSummary);
+
+    return {
+      output: {
+        collections,
+        nextCursor: result.nextCursor || result.cursor
+      },
+      message: `Found **${collections.length}** collection(s).`
+    };
+  })
+  .build();
 
 export let getCollectionTool = SlateTool.create(spec, {
   name: 'Get Collection',
@@ -105,6 +183,70 @@ export let createCollectionTool = SlateTool.create(spec, {
         url: result.url
       },
       message: `Created collection **"${ctx.input.title}"** in namespace **${ctx.input.namespace}**.`
+    };
+  })
+  .build();
+
+export let updateCollectionTool = SlateTool.create(spec, {
+  name: 'Update Collection',
+  key: 'update_collection',
+  description: `Update a Hugging Face collection's title, description, visibility, or theme.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      slug: z.string().describe('Collection slug to update'),
+      title: z.string().optional().describe('New collection title'),
+      description: z.string().optional().describe('New collection description'),
+      private: z.boolean().optional().describe('Whether the collection should be private'),
+      theme: z
+        .enum(['orange', 'blue', 'green', 'purple', 'pink', 'indigo'])
+        .optional()
+        .describe('Collection theme color')
+    })
+  )
+  .output(
+    z.object({
+      slug: z.string().describe('Updated collection slug'),
+      title: z.string().optional().describe('Collection title'),
+      description: z.string().optional().describe('Collection description'),
+      private: z.boolean().optional().describe('Whether the collection is private'),
+      url: z.string().optional().describe('URL to the collection')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let hasUpdates =
+      ctx.input.title !== undefined ||
+      ctx.input.description !== undefined ||
+      ctx.input.private !== undefined ||
+      ctx.input.theme !== undefined;
+
+    if (!hasUpdates) {
+      throw huggingFaceServiceError(
+        'Provide at least one of title, description, private, or theme to update a collection.'
+      );
+    }
+
+    let client = new HubClient({ token: ctx.auth.token });
+    let result = await client.updateCollection({
+      slug: ctx.input.slug,
+      title: ctx.input.title,
+      description: ctx.input.description,
+      private: ctx.input.private,
+      theme: ctx.input.theme
+    });
+
+    return {
+      output: {
+        slug: result.slug || ctx.input.slug,
+        title: result.title,
+        description: result.description,
+        private: result.private,
+        url: result.url
+      },
+      message: `Updated collection **${result.slug || ctx.input.slug}**.`
     };
   })
   .build();

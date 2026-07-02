@@ -1,5 +1,6 @@
 // Minimal Apache Thrift Binary Protocol implementation for Evernote API
 // Evernote uses Thrift binary protocol over HTTP POST
+import { evernoteServiceError } from './errors';
 
 // Thrift type IDs
 let TType = {
@@ -199,7 +200,10 @@ export class ThriftReader {
     if (version !== (0x80010000 | 0)) {
       // Check strict mode version
       if ((versionAndType & 0xffff0000) !== 0x80010000) {
-        throw new Error(`Bad Thrift version: ${version.toString(16)}`);
+        throw evernoteServiceError(
+          `Bad Thrift response version from Evernote: ${version.toString(16)}`,
+          'evernote_thrift_protocol_error'
+        );
       }
     }
     let type = versionAndType & 0x000000ff;

@@ -40,6 +40,11 @@ export let listSavedSearches = SlateTool.create(spec, {
           earliestTime: z.string().optional(),
           latestTime: z.string().optional(),
           disabled: z.any().optional(),
+          alertType: z.string().optional(),
+          alertComparator: z.string().optional(),
+          alertThreshold: z.string().optional(),
+          alertCondition: z.string().optional(),
+          alertActions: z.string().optional(),
           owner: z.string().optional(),
           app: z.string().optional()
         })
@@ -82,6 +87,19 @@ export let createSavedSearch = SlateTool.create(spec, {
       earliestTime: z.string().optional().describe('Dispatch earliest time'),
       latestTime: z.string().optional().describe('Dispatch latest time'),
       disabled: z.boolean().optional().describe('Whether the saved search is disabled'),
+      alertType: z
+        .string()
+        .optional()
+        .describe('Alert trigger type, such as "always", "number of events", or "custom"'),
+      alertComparator: z
+        .string()
+        .optional()
+        .describe('Alert comparator, such as "greater than", "less than", or "equal to"'),
+      alertThreshold: z.string().optional().describe('Alert threshold value'),
+      alertCondition: z
+        .string()
+        .optional()
+        .describe('Custom alert condition SPL expression used when alertType is "custom"'),
       alertActions: z
         .string()
         .optional()
@@ -97,6 +115,11 @@ export let createSavedSearch = SlateTool.create(spec, {
       description: z.string().optional(),
       isScheduled: z.any().optional(),
       cronSchedule: z.string().optional(),
+      alertType: z.string().optional(),
+      alertComparator: z.string().optional(),
+      alertThreshold: z.string().optional(),
+      alertCondition: z.string().optional(),
+      alertActions: z.string().optional(),
       owner: z.string().optional(),
       app: z.string().optional()
     })
@@ -112,6 +135,10 @@ export let createSavedSearch = SlateTool.create(spec, {
       earliestTime: ctx.input.earliestTime,
       latestTime: ctx.input.latestTime,
       disabled: ctx.input.disabled,
+      alertType: ctx.input.alertType,
+      alertComparator: ctx.input.alertComparator,
+      alertThreshold: ctx.input.alertThreshold,
+      alertCondition: ctx.input.alertCondition,
       alertActions: ctx.input.alertActions,
       webhookUrl: ctx.input.webhookUrl,
       namespace: ctx.input.namespace
@@ -140,6 +167,10 @@ export let updateSavedSearch = SlateTool.create(spec, {
       earliestTime: z.string().optional().describe('Updated dispatch earliest time'),
       latestTime: z.string().optional().describe('Updated dispatch latest time'),
       disabled: z.boolean().optional().describe('Whether the saved search should be disabled'),
+      alertType: z.string().optional().describe('Updated alert trigger type'),
+      alertComparator: z.string().optional().describe('Updated alert comparator'),
+      alertThreshold: z.string().optional().describe('Updated alert threshold value'),
+      alertCondition: z.string().optional().describe('Updated custom alert condition'),
       alertActions: z.string().optional().describe('Comma-separated alert actions'),
       webhookUrl: z.string().optional().describe('Updated webhook URL for alerts'),
       namespace: namespaceSchema
@@ -152,6 +183,11 @@ export let updateSavedSearch = SlateTool.create(spec, {
       description: z.string().optional(),
       isScheduled: z.any().optional(),
       cronSchedule: z.string().optional(),
+      alertType: z.string().optional(),
+      alertComparator: z.string().optional(),
+      alertThreshold: z.string().optional(),
+      alertCondition: z.string().optional(),
+      alertActions: z.string().optional(),
       owner: z.string().optional(),
       app: z.string().optional()
     })
@@ -166,6 +202,10 @@ export let updateSavedSearch = SlateTool.create(spec, {
       earliestTime: ctx.input.earliestTime,
       latestTime: ctx.input.latestTime,
       disabled: ctx.input.disabled,
+      alertType: ctx.input.alertType,
+      alertComparator: ctx.input.alertComparator,
+      alertThreshold: ctx.input.alertThreshold,
+      alertCondition: ctx.input.alertCondition,
       alertActions: ctx.input.alertActions,
       webhookUrl: ctx.input.webhookUrl,
       namespace: ctx.input.namespace

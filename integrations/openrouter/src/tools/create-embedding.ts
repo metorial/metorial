@@ -22,7 +22,23 @@ export let createEmbedding = SlateTool.create(spec, {
         .union([z.string(), z.array(z.string())])
         .describe(
           'Text to embed — a single string or an array of strings for batch processing'
-        )
+        ),
+      dimensions: z
+        .number()
+        .min(1)
+        .optional()
+        .describe('Number of dimensions for the returned embeddings, when supported'),
+      inputType: z
+        .string()
+        .optional()
+        .describe(
+          'Input type hint for supported models, such as "search_query" or "search_document"'
+        ),
+      provider: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Provider routing preferences for the embeddings request'),
+      user: z.string().optional().describe('Stable end-user identifier')
     })
   )
   .output(
@@ -54,7 +70,11 @@ export let createEmbedding = SlateTool.create(spec, {
 
     let result = await client.createEmbedding({
       model: ctx.input.model,
-      input: ctx.input.input ?? ''
+      input: ctx.input.input ?? '',
+      dimensions: ctx.input.dimensions,
+      inputType: ctx.input.inputType,
+      provider: ctx.input.provider,
+      user: ctx.input.user
     });
 
     let rawData = (result.data as Record<string, unknown>[]) || [];

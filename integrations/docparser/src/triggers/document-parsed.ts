@@ -43,6 +43,7 @@ export let documentParsed = SlateTrigger.create(spec, {
       for (let parser of parsers) {
         let results = await client.getParsedDataByParser(parser.parserId, {
           list: lastPollTime ? 'processed_after' : 'last_uploaded',
+          date: lastPollTime,
           limit: lastPollTime ? undefined : 10
         });
 

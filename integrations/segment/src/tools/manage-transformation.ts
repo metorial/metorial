@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTransformation = SlateTool.create(spec, {
@@ -93,7 +94,7 @@ export let manageTransformation = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name || !ctx.input.sourceId) {
-        throw new Error('name and sourceId are required to create a transformation');
+        throw segmentServiceError('name and sourceId are required to create a transformation');
       }
       let t = await client.createTransformation({
         name: ctx.input.name,
@@ -117,7 +118,7 @@ export let manageTransformation = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.transformationId) {
-        throw new Error('transformationId is required to update');
+        throw segmentServiceError('transformationId is required to update');
       }
       let updateData: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
@@ -143,7 +144,7 @@ export let manageTransformation = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.transformationId) {
-        throw new Error('transformationId is required to delete');
+        throw segmentServiceError('transformationId is required to delete');
       }
       await client.deleteTransformation(ctx.input.transformationId);
       return {
@@ -152,6 +153,6 @@ export let manageTransformation = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw segmentServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

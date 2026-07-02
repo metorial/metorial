@@ -20,17 +20,45 @@ Retrieve detailed information about a specific Worker version, including its bin
 
 List all Worker scripts in the account. Returns metadata for each script including handlers, compatibility settings, and deployment info.
 
+### Upload Worker Module
+
+Create or replace a Worker script by uploading code and multipart metadata. Supports bindings, compatibility settings, observability, placement, Logpush, and version annotations.
+
+### Download Worker Script Content
+
+Download a Worker's script content as a Slate attachment without exposing full file content in tool output fields.
+
+### Update Worker Script Content
+
+Replace a Worker's script content without changing its existing configuration or metadata.
+
 ### List Worker Versions
 
 List all versions of a Worker script. Optionally filter to only deployable versions. Versions are created separately from deployments—a version can exist without being deployed.
+
+### Upload Worker Version
+
+Upload a new deployable Worker version without deploying it. Use **Deploy Worker Version** afterwards to route traffic to the returned version ID.
 
 ### List Deployments
 
 List all deployments for a Worker script. The first deployment in the list is the active one serving traffic. Each deployment shows the version(s) and their traffic percentages for gradual rollouts.
 
+### Get Deployment
+
+Retrieve a specific Worker deployment, including its traffic strategy and version split.
+
+### Delete Deployment
+
+Delete a specific Worker deployment from a script.
+
 ### List Worker Domains
 
 List all custom domains attached to Workers in the account. Each domain maps a hostname on a Cloudflare zone to a specific Worker.
+
+### Get Worker Domain
+
+Retrieve a specific custom domain attachment for a Worker.
 
 ### List Worker Routes
 
@@ -43,6 +71,10 @@ Retrieve all cron trigger schedules configured for a Worker. Cron Triggers run t
 ### List Secrets
 
 List all secret bindings on a Worker script. Returns secret names and types only — secret values are never exposed after creation.
+
+### Get Secret Metadata
+
+Retrieve metadata for a secret binding on a Worker script. Secret values are not exposed in tool output.
 
 ### Get Worker Settings
 

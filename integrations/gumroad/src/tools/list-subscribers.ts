@@ -18,7 +18,8 @@ let subscriberSchema = z.object({
 export let listSubscribers = SlateTool.create(spec, {
   name: 'List Subscribers',
   key: 'list_subscribers',
-  description: `Retrieve active subscribers for a specific Gumroad product. Optionally filter by email address.`,
+  description: `Retrieve active subscribers for a specific Gumroad product. Optionally filter by email address and use cursor-based pagination.`,
+  instructions: ['Use pageKey from a previous paginated response to get the next page.'],
   tags: {
     readOnly: true
   }
@@ -26,21 +27,30 @@ export let listSubscribers = SlateTool.create(spec, {
   .input(
     z.object({
       productId: z.string().describe('The product ID to list subscribers for'),
-      email: z.string().optional().describe('Filter subscribers by email address')
+      email: z.string().optional().describe('Filter subscribers by email address'),
+      paginated: z
+        .boolean()
+        .optional()
+        .describe('Whether to return paginated results. Defaults to Gumroad API behavior.'),
+      pageKey: z.string().optional().describe('Pagination cursor from previous response')
     })
   )
   .output(
     z.object({
-      subscribers: z.array(subscriberSchema).describe('List of subscribers')
+      subscribers: z.array(subscriberSchema).describe('List of subscribers'),
+      nextPageKey: z.string().optional().describe('Cursor for next page of results'),
+      nextPageUrl: z.string().optional().describe('URL for next page of results')
     })
   )
   .handleInvocation(async ctx => {
     let client = new GumroadClient({ token: ctx.auth.token });
-    let subscribers = await client.listSubscribers(ctx.input.productId, {
-      email: ctx.input.email
+    let result = await client.listSubscribers(ctx.input.productId, {
+      email: ctx.input.email,
+      paginated: ctx.input.paginated,
+      pageKey: ctx.input.pageKey
     });
 
-    let mapped = subscribers.map((s: any) => ({
+    let mapped = result.subscribers.map((s: any) => ({
       subscriberId: s.id,
       productId: s.product_id || undefined,
       productName: s.product_name || undefined,
@@ -53,8 +63,12 @@ export let listSubscribers = SlateTool.create(spec, {
     }));
 
     return {
-      output: { subscribers: mapped },
-      message: `Found **${mapped.length}** subscriber(s) for product ${ctx.input.productId}.`
+      output: {
+        subscribers: mapped,
+        nextPageKey: result.nextPageKey,
+        nextPageUrl: result.nextPageUrl
+      },
+      message: `Found **${mapped.length}** subscriber(s) for product ${ctx.input.productId}.${result.nextPageKey ? ' More results available with pagination.' : ''}`
     };
   })
   .build();

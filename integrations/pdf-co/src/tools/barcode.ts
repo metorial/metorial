@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  createPdfCoAttachment,
+  downloadPdfCoOutput,
+  fileAttachmentOutputFields
+} from './shared';
 
 export let generateBarcode = SlateTool.create(spec, {
   name: 'Generate Barcode',
@@ -43,7 +49,7 @@ Returns a URL to the generated barcode image. Optionally embed a logo image insi
   )
   .output(
     z.object({
-      outputUrl: z.string().describe('URL to download the generated barcode image'),
+      ...fileAttachmentOutputFields,
       creditsUsed: z.number().describe('API credits consumed'),
       remainingCredits: z.number().describe('Credits remaining on the account')
     })
@@ -59,16 +65,22 @@ Returns a URL to the generated barcode image. Optionally embed a logo image insi
     });
 
     if (result.error) {
-      throw new Error(`Barcode generation failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Barcode generation failed', result);
     }
+    let file = await downloadPdfCoOutput(client, result, 'image/png');
 
     return {
       output: {
         outputUrl: result.url,
+        outputLinkValidTill: result.outputLinkValidTill,
+        mimeType: file.mimeType,
+        byteLength: file.byteLength,
+        attachmentCount: 1,
         creditsUsed: result.credits,
         remainingCredits: result.remainingCredits
       },
-      message: `Generated **${ctx.input.barcodeType || 'QRCode'}** barcode. [Download barcode image](${result.url})`
+      attachments: [createPdfCoAttachment(file)],
+      message: `Generated **${ctx.input.barcodeType || 'QRCode'}** barcode and returned it as an attachment.`
     };
   })
   .build();
@@ -128,7 +140,7 @@ Returns all detected barcodes with their values, types, confidence scores, and p
     });
 
     if (result.error) {
-      throw new Error(`Barcode reading failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Barcode reading failed', result);
     }
 
     let barcodes = result.barcodes.map(b => ({

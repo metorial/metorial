@@ -2,30 +2,23 @@
 
 ## Overview
 
-Coinbase is a cryptocurrency exchange platform that allows users to buy, sell, store, and manage digital assets. It provides APIs for trading, account management, market data access, payment processing (via Coinbase Commerce), and onchain data. The platform serves individual traders, developers, and institutions across multiple API products including Coinbase App, Advanced Trade, Exchange, and Commerce.
+Coinbase is a cryptocurrency exchange platform that allows users to buy, sell, store, and manage digital assets. This integration focuses on Coinbase App wallet APIs, Advanced Trade trading and market data APIs, and Coinbase Commerce charge management.
 
 ## Authentication
 
-Coinbase supports two primary authentication methods:
+This integration supports Coinbase App OAuth2 for Coinbase App and Advanced Trade
+tools, plus Coinbase Commerce API key authentication for Commerce charge tools.
+Coinbase also supports CDP API key JWT authentication for own-account server
+automation, but this integration's App and Advanced Trade tools are OAuth-based.
 
-### 1. CDP API Key Authentication (JWT-based)
-
-CDP API keys are used to generate a JSON Web Token (JWT), which is then set as an Authorization Bearer header to make authenticated requests.
-
-- **Setup:** Log into the Coinbase Developer Platform (CDP), navigate to Access → API keys, and configure: API key nickname, portfolio (e.g., Default), and permission level (View, Trade, Transfer).
-- The key automatically downloads as a JSON file containing the API Key Name (in the format `organizations/{org_id}/apiKeys/{key_id}`) and a Private Key (EC private key).
-- **Signature Algorithm:** When using Coinbase App SDKs, Ed25519 (EdDSA) keys are NOT supported. You must use ES256 key format (ECDSA with P-256 curve).
-- **IP Allowlisting:** For enhanced API Key security, Coinbase recommends whitelisting IP addresses permitted to make requests with a particular API Key.
-- API Key authentication should only be used to access your own account.
-
-### 2. OAuth2 ("Sign in with Coinbase")
+### 1. OAuth2 ("Sign in with Coinbase")
 
 The Sign In With Coinbase API supports the OAuth2 protocol so that developers can let Coinbase users grant a 3rd party application full or partial access to their account, without sharing the account's API key or login credentials.
 
 - **Authorization URL:** `https://login.coinbase.com/oauth2/auth`
-- **Token URL:** `https://api.coinbase.com/oauth/token`
+- **Token URL:** `https://login.coinbase.com/oauth2/token`
 - **Grant Type:** Authorization Code
-- **Scopes:** Permissions are specified via a `scope` parameter. For example, an app may only need to view accounts and transaction history. Multiple permissions are separated with commas (e.g., `&scope=wallet:accounts:read,wallet:transactions:read`). Common scopes include:
+- **Scopes:** Permissions are specified via a `scope` parameter. Multiple permissions are separated with commas (e.g., `&scope=wallet:accounts:read,wallet:transactions:read`). Common scopes used by this integration include:
   - `wallet:user:read`, `wallet:user:email` — Read user profile and email
   - `wallet:accounts:read`, `wallet:accounts:create`, `wallet:accounts:update`, `wallet:accounts:delete` — Account management
   - `wallet:transactions:read`, `wallet:transactions:send` — View and send transactions
@@ -34,7 +27,14 @@ The Sign In With Coinbase API supports the OAuth2 protocol so that developers ca
   - `wallet:deposits:read`, `wallet:deposits:create` — Deposits
   - `wallet:withdrawals:read`, `wallet:withdrawals:create` — Withdrawals
   - `wallet:addresses:read`, `wallet:addresses:create` — Wallet addresses
-- **Token Refresh:** When first authenticating, the app receives an access token and a refresh token. The access token expires after about two hours. The refresh token allows obtaining a new access/refresh token pair but can only be used once.
+  - `wallet:payment-methods:read` — Payment methods
+  - `wallet:trades:read`, `wallet:trades:create` — Advanced Trade reads, previews, and order creation
+  - `offline_access` — Return a refresh token for token renewal
+- **Token Refresh:** When first authenticating with `offline_access`, the app receives an access token and a refresh token. The access token expires in one hour. Refresh tokens can be exchanged once for a new access/refresh token pair and must be preserved after each rotation.
+
+### 2. Coinbase Commerce API Key
+
+Coinbase Commerce charges use `X-CC-Api-Key` and `X-CC-Version` headers against `https://api.commerce.coinbase.com`. Commerce tools are scoped to the `commerce_api_key` auth method and are not available under Coinbase App OAuth.
 
 ## Features
 
@@ -44,7 +44,7 @@ View and manage cryptocurrency wallets and accounts on Coinbase. List all accoun
 
 ### Trading (Advanced Trade)
 
-Automate market, limit, and stop-limit orders by building with the REST API. Supports trading in over 550 markets, including 237 USDC pairs. Manage orders (create, cancel, list), view order history, and access portfolio details. Permission levels can be set to View, Trade, or Transfer.
+Preview and automate market, limit, and stop-limit orders through the Advanced Trade REST API. Manage orders (preview, create, cancel, list, get), view fills, inspect transaction summary/fee tier data, list payment methods, and access portfolio breakdowns.
 
 ### Transactions
 
@@ -56,19 +56,11 @@ Programmatically buy and sell cryptocurrency using linked payment methods. Depos
 
 ### Market Data
 
-Market Data APIs are public and do not require authentication. Access real-time and historical prices, exchange rates, order books, and product/trading pair information. Retrieve spot prices, buy/sell prices, and currency information.
+Access real-time and historical prices, exchange rates, order books, market trades, candles, and product/trading pair information. Retrieve spot prices, buy/sell prices, and currency information.
 
 ### Coinbase Commerce (Payments)
 
-Accept cryptocurrency payments from customers. Create charges and checkouts for goods and services. Supports fixed-price and donation-style payments. Track payment status through charge lifecycle states (NEW, PENDING, COMPLETED, EXPIRED, etc.).
-
-### Onchain Data
-
-Access onchain data like balances, balance history and transaction history directly in your app. Query blockchain data across supported networks.
-
-### Real-Time Market Data (WebSocket)
-
-Coinbase provides a WebSocket feed that enables developers to stream live market data in real-time. Subscribe to channels for ticker updates, order book snapshots, trade executions, and user-level order/fill updates. Filter by product IDs (trading pairs).
+Accept cryptocurrency payments from customers with Commerce charges. Create, list, get, cancel, and resolve fixed-price or no-price charges. Track payment status through charge lifecycle states (NEW, PENDING, COMPLETED, EXPIRED, etc.).
 
 ### User Profile
 
@@ -93,12 +85,3 @@ Webhooks for crypto payment processing, notifying you of charge lifecycle events
 
 - Event types include: `charge:created`, `charge:confirmed`, `charge:failed`, `charge:pending`, `charge:delayed`, `charge:resolved`.
 - Webhook payloads are signed, and you should verify the signature to ensure the webhook is genuine. Verification uses the `X-CC-Webhook-Signature` header with HMAC-SHA256.
-
-### CDP Onchain Webhooks
-
-Real-time notifications for onchain activity such as ERC-20 transfers, NFT movements, and smart contract events on Base and other supported networks.
-
-- Primary event type: `onchain.activity.detected`.
-- Can be filtered by contract address and event name (e.g., `Transfer`).
-- Currently focused on Base with limited coverage of other networks. The event types require developers to understand contract ABIs and event signatures for filtering.
-- Subscriptions are managed programmatically via the CDP API.

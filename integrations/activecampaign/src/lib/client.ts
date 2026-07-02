@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { activeCampaignApiError, activeCampaignServiceError } from './errors';
 
 export interface PaginationParams {
   limit?: number;
@@ -39,9 +40,12 @@ export interface ListInput {
   stringid: string;
   senderUrl: string;
   senderReminder: string;
+  channel?: 'email' | 'sms';
   sendLastBroadcast?: boolean;
+  carboncopy?: string;
   subscription_notify?: string;
   unsubscription_notify?: string;
+  user?: number;
 }
 
 export interface AccountInput {
@@ -74,7 +78,24 @@ export class Client {
   private axios;
 
   constructor(params: { token: string; apiUrl: string }) {
-    let baseUrl = params.apiUrl.replace(/\/+$/, '');
+    if (!params.token?.trim()) {
+      throw activeCampaignServiceError('ActiveCampaign API key is required.');
+    }
+
+    if (!params.apiUrl?.trim()) {
+      throw activeCampaignServiceError('ActiveCampaign API URL is required.');
+    }
+
+    let baseUrl = params.apiUrl
+      .trim()
+      .replace(/\/+$/, '')
+      .replace(/\/api\/3$/i, '');
+    if (!/^https:\/\//i.test(baseUrl)) {
+      throw activeCampaignServiceError(
+        'ActiveCampaign API URL must be the full HTTPS URL from Settings > Developer.'
+      );
+    }
+
     this.axios = createAxios({
       baseURL: `${baseUrl}/api/3`,
       headers: {
@@ -82,6 +103,11 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+
+    this.axios.interceptors?.response?.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(activeCampaignApiError(error))
+    );
   }
 
   // ─── Contacts ───────────────────────────────────────────────
@@ -115,9 +141,12 @@ export class Client {
     params?: PaginationParams & {
       search?: string;
       email?: string;
+      email_like?: string;
       listid?: string;
       tagid?: string;
       status?: number;
+      id_greater?: number;
+      'orders[id]'?: string;
       orderBy?: string;
     }
   ) {
@@ -323,7 +352,24 @@ export class Client {
   // ─── Lists ─────────────────────────────────────────────────
 
   async createList(list: ListInput) {
-    let res = await this.axios.post('/lists', { list });
+    let payload: Record<string, any> = {
+      name: list.name,
+      stringid: list.stringid,
+      sender_url: list.senderUrl,
+      sender_reminder: list.senderReminder
+    };
+
+    if (list.channel) payload.channel = list.channel;
+    if (list.sendLastBroadcast !== undefined)
+      payload.send_last_broadcast = list.sendLastBroadcast;
+    if (list.carboncopy !== undefined) payload.carboncopy = list.carboncopy;
+    if (list.subscription_notify !== undefined)
+      payload.subscription_notify = list.subscription_notify;
+    if (list.unsubscription_notify !== undefined)
+      payload.unsubscription_notify = list.unsubscription_notify;
+    if (list.user !== undefined) payload.user = list.user;
+
+    let res = await this.axios.post('/lists', { list: payload });
     return res.data;
   }
 
@@ -333,7 +379,22 @@ export class Client {
   }
 
   async updateList(listId: string, list: Partial<ListInput>) {
-    let res = await this.axios.put(`/lists/${listId}`, { list });
+    let payload: Record<string, any> = {};
+    if (list.name !== undefined) payload.name = list.name;
+    if (list.stringid !== undefined) payload.stringid = list.stringid;
+    if (list.senderUrl !== undefined) payload.sender_url = list.senderUrl;
+    if (list.senderReminder !== undefined) payload.sender_reminder = list.senderReminder;
+    if (list.channel !== undefined) payload.channel = list.channel;
+    if (list.sendLastBroadcast !== undefined)
+      payload.send_last_broadcast = list.sendLastBroadcast;
+    if (list.carboncopy !== undefined) payload.carboncopy = list.carboncopy;
+    if (list.subscription_notify !== undefined)
+      payload.subscription_notify = list.subscription_notify;
+    if (list.unsubscription_notify !== undefined)
+      payload.unsubscription_notify = list.unsubscription_notify;
+    if (list.user !== undefined) payload.user = list.user;
+
+    let res = await this.axios.put(`/lists/${listId}`, { list: payload });
     return res.data;
   }
 
@@ -402,7 +463,7 @@ export class Client {
     return res.data;
   }
 
-  async listAccounts(params?: PaginationParams & { search?: string }) {
+  async listAccounts(params?: PaginationParams & { search?: string; count_deals?: boolean }) {
     let res = await this.axios.get('/accounts', { params });
     return res.data;
   }
@@ -473,10 +534,18 @@ export class Client {
 
   async listTasks(
     params?: PaginationParams & {
+      'filters[title]'?: string;
       'filters[reltype]'?: string;
       'filters[relid]'?: string;
       'filters[status]'?: number;
-      'filters[dealTasktype]'?: string;
+      'filters[note]'?: string;
+      'filters[duedate]'?: string;
+      'filters[due_after]'?: string;
+      'filters[due_before]'?: string;
+      'filters[duedate_range]'?: string;
+      'filters[d_tasktypeid]'?: string;
+      'filters[assignee_userid]'?: string;
+      'filters[outcome_id]'?: number;
     }
   ) {
     let res = await this.axios.get('/dealTasks', { params });

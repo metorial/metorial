@@ -71,7 +71,7 @@ export let imagePush = SlateTrigger.create(spec, {
         repositoryName?: string;
       };
       if (details.webhookId && details.namespace && details.repositoryName) {
-        let client = new Client({ token: ctx.auth.token });
+        let client = new Client(ctx.auth);
         await client.deleteWebhook(
           details.namespace,
           details.repositoryName,

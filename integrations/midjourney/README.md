@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/midjourney.png" height="20"> Midjourney
 
-Generate images from text prompts with configurable parameters including aspect ratio, model version, stylization, chaos, quality, and negative prompts. Create variations of generated images and upscale them to higher resolution. Blend multiple images into new compositions. Describe images to generate text prompt suggestions. Use image references, style references, character references, and omni references to influence generation. Inpaint specific regions of images using masks and new prompts. Pan and zoom to expand image canvases. Generate short videos from images. Apply personalized style profiles and use specialized anime/illustration modes. Note: Midjourney does not offer an official public API; programmatic access requires unofficial third-party providers, which may violate Midjourney's terms of service.
+Generate images from text prompts through APIFRAME's unofficial Midjourney API. Create variations, rerolls, upscales, blends, inpaints, pans, zoom-outs, seed lookups, short image-to-video tasks, and video extensions; fetch one or many asynchronous tasks; and inspect APIFRAME account credits. Note: Midjourney does not offer an official public API; programmatic access requires unofficial third-party providers, which may violate Midjourney's terms of service.
 
 ## Tools
 
@@ -16,17 +16,53 @@ Generate variations of a previously generated Midjourney image. Select one of th
 
 Analyze an image and generate text prompt suggestions that could produce similar images in Midjourney. Returns up to 4 descriptive prompts inspired by the visual content, style, and composition of the input image.
 
+### Extend Video
+
+Extend a previously generated Midjourney video using APIFRAME.
+
+### Fetch Many Tasks
+
+Check the statuses and results of multiple APIFRAME Midjourney tasks in one request.
+
 ### Fetch Task
 
-Check the status and retrieve results of a Midjourney task. Use this to poll for completion after submitting an asynchronous generation, variation, upscale, blend, or describe request.
+Check the status and retrieve results of a Midjourney task. Use this to poll for completion after submitting an asynchronous generation, variation, upscale, blend, describe, edit, seed, or video request.
 
 ### Generate Image
 
-Generate images from a text prompt using Midjourney. Submits an imagine request and optionally waits for the result. Supports Midjourney parameters like aspect ratio, model version, stylize, chaos, quality, and negative prompts directly in the prompt string (e.g. \
+Generate images from a text prompt using Midjourney. Submits an imagine request and optionally waits for the result. Supports Midjourney parameters like model version, stylize, chaos, quality, and negative prompts directly in the prompt string, plus an aspect ratio request field.
+
+### Generate Video
+
+Generate short Midjourney videos from a text prompt and a starting image URL using APIFRAME.
+
+### Get Account Info
+
+Retrieve APIFRAME account details for the configured API key, including remaining credits and plan.
+
+### Get Seed
+
+Request the seed value for a completed Midjourney image task.
+
+### Inpaint Image
+
+Redraw a selected region of a previously upscaled Midjourney image using a mask and optional prompt.
+
+### Pan Image
+
+Expand a previously upscaled Midjourney image canvas in one direction and fill the new area.
+
+### Reroll Image
+
+Create a fresh 4-image grid from a previous Midjourney imagine task, optionally with a revised prompt.
 
 ### Upscale Image
 
-Upscale a Midjourney image to higher resolution at 2x or 4x scale. Can upscale from a previous task by referencing its task ID, or upscale any image by providing its URL directly.
+Upscale a Midjourney image. Supports 1x grid selection, subtle/creative upscales, and 2x/4x high-resolution upscales.
+
+### Zoom Out Image
+
+Outpaint a previously upscaled Midjourney image by enlarging the canvas and generating surrounding content.
 
 ## License
 

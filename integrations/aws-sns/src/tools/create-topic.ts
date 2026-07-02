@@ -32,10 +32,18 @@ export let createTopic = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Enable content-based deduplication for FIFO topics'),
+      fifoThroughputScope: z
+        .enum(['Topic', 'MessageGroup'])
+        .optional()
+        .describe('FIFO throughput and deduplication scope'),
       tracingConfig: z
         .enum(['PassThrough', 'Active'])
         .optional()
         .describe('X-Ray tracing mode'),
+      archivePolicy: z
+        .string()
+        .optional()
+        .describe('JSON message retention policy for FIFO topics'),
       tags: z
         .record(z.string(), z.string())
         .optional()
@@ -64,7 +72,9 @@ export let createTopic = SlateTool.create(spec, {
         kmsMasterKeyId: ctx.input.kmsMasterKeyId,
         fifoTopic: ctx.input.fifoTopic,
         contentBasedDeduplication: ctx.input.contentBasedDeduplication,
-        tracingConfig: ctx.input.tracingConfig
+        fifoThroughputScope: ctx.input.fifoThroughputScope,
+        tracingConfig: ctx.input.tracingConfig,
+        archivePolicy: ctx.input.archivePolicy
       },
       ctx.input.tags as Record<string, string> | undefined
     );

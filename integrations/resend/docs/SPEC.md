@@ -2,7 +2,7 @@
 
 ## Overview
 
-Resend is an email API platform for sending transactional and marketing emails. It allows you to send, receive, and manage emails programmatically through an API. It provides domain management, contact/audience management, broadcast campaigns, email templates, and webhook-based event tracking.
+Resend is an email API platform for sending transactional and marketing emails. It allows you to send, receive, and manage emails programmatically through an API. It provides domain, contact property, contact, segment, topic, broadcast, automation, event, template, log, API key, and webhook APIs.
 
 ## Authentication
 
@@ -18,23 +18,29 @@ API keys are prefixed with `re_` and are shown only once at creation time.
 
 ### Email Sending
 
-Send transactional emails with HTML, plain text, or React-based content. Supports specifying recipients (to, cc, bcc), attachments, reply-to addresses, and custom headers. Includes idempotency key support to ensure the same email request is processed only once. Emails can be scheduled, updated, or cancelled before delivery. Batch sending allows sending multiple emails in a single API call.
+Send transactional emails with HTML, plain text, or published Resend templates. Supports specifying recipients (to, cc, bcc), attachments, reply-to addresses, custom headers, and metadata tags. Includes idempotency key support to ensure the same email request is processed only once. Emails can be scheduled, updated, or cancelled before delivery. Batch sending allows sending multiple emails in a single API call.
 
 ### Email Receiving
 
-Receive inbound emails on verified domains. Received emails and their attachments can be retrieved via the API.
+List sent and inbound emails on verified domains. Received and sent email attachments can be listed and downloaded; downloaded file contents are returned as Slate attachments.
 
 ### Domain Management
 
 Register and verify custom sending domains with automatic DNS record configuration (DKIM, SPF, DMARC). Domains can be created, verified, updated, listed, and deleted. Open and click tracking can be configured per domain.
 
-### Contacts and Audience Management
+### Contacts, Segments, and Topics
 
-Contacts in Resend are global entities linked to a specific email address. Contact Properties can be used to store additional information about your Contacts and then personalize Broadcasts. Contacts can be created, updated, listed, and deleted programmatically. Contacts can be organized into Segments using filter-based rules and assigned to Topics for subscription preference management.
+Contacts in Resend are global entities linked to a specific email address. Contact properties can store additional information for broadcast personalization. Contacts can be created, updated, listed, and deleted programmatically. Contacts can be added to and removed from segments for broadcast targeting, and assigned to topics for subscription preference management.
+
+Audiences are still exposed as legacy tools for accounts that use the deprecated Resend Audiences API, but new workflows should prefer contacts, segments, and topics.
+
+### Contact Properties
+
+Contact properties define typed custom fields for contacts. Properties can be created, listed, retrieved, updated with fallback values, and deleted.
 
 ### Broadcasts
 
-Broadcasts provide tools for managing your Contacts and sending personalized Broadcasts to them. Broadcasts can be sent immediately or scheduled for future delivery. Broadcasts also handle all your unsubscribe flows automatically. Broadcasts can be created, updated, sent, listed, and deleted via the API.
+Broadcasts provide tools for managing contacts and sending personalized broadcasts to them. Broadcasts can be drafted, updated, sent immediately, or scheduled for future delivery. Broadcasts also handle unsubscribe flows automatically.
 
 ### Templates
 
@@ -44,17 +50,21 @@ Create and manage reusable email templates. Templates can be created, retrieved,
 
 Topics allow you to scope broadcast sending to specific categories. When you send Broadcasts, you can optionally scope sending to a particular Topic, which allows your users to manage their preferences with more control.
 
-### Workflows (Beta)
+### Automations
 
-Create automated email workflows. Workflows can be created, updated, retrieved, listed, and deleted. Workflow runs and individual run steps can be monitored.
+Automations define graph-based email sequences. Automations can be created, updated, retrieved, listed, stopped, deleted, and inspected through automation run records.
 
-### Events (Beta)
+### Events
 
-Create and manage custom events that can be used to trigger workflows. Events can be created, sent, retrieved, listed, updated, and deleted.
+Events define and trigger named automation inputs. Events can be created with a flat payload schema, sent to a contact ID or email address, retrieved, listed, updated, and deleted.
 
 ### API Key Management
 
 Create, list, and delete API keys programmatically. Keys can be scoped to specific permissions and domains.
+
+### Logs
+
+List recent account logs and retrieve individual log entries for email and account activity.
 
 ### Webhook Management
 

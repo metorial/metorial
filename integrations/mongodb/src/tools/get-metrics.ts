@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let measurementSchema = z.object({
@@ -82,7 +83,7 @@ export let getMetricsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required');
+    if (!projectId) throw mongodbServiceError('projectId is required');
 
     let client = new AtlasClient(ctx.auth);
 
@@ -104,7 +105,7 @@ export let getMetricsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_measurements') {
-      if (!ctx.input.processId) throw new Error('processId is required');
+      if (!ctx.input.processId) throw mongodbServiceError('processId is required');
       let params: any = {
         granularity: ctx.input.granularity || 'PT1H'
       };
@@ -129,7 +130,7 @@ export let getMetricsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_disk_measurements') {
-      if (!ctx.input.processId) throw new Error('processId is required');
+      if (!ctx.input.processId) throw mongodbServiceError('processId is required');
       let partition = ctx.input.partitionName || 'data';
       let params: any = {
         granularity: ctx.input.granularity || 'PT1H'
@@ -159,6 +160,6 @@ export let getMetricsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

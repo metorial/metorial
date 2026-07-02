@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { stabilityServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  createMediaAttachment,
+  mediaAttachmentOutputSchema,
+  toMediaAttachmentOutput
+} from './shared';
 
 export let generate3D = SlateTool.create(spec, {
   name: 'Generate 3D Model',
@@ -30,45 +36,80 @@ Both models output UV-unwrapped and textured GLB files ready for use in 3D appli
       foregroundRatio: z
         .number()
         .min(0)
-        .max(1)
+        .max(2)
         .optional()
-        .describe('Ratio of the foreground object in the image (e.g. 0.85).'),
+        .describe(
+          'Foreground object ratio. stable-fast-3d supports 0.1-1.0; spar3d supports 1.0-2.0.'
+        ),
       remesh: z
         .enum(['none', 'triangle', 'quad'])
         .optional()
-        .describe('Remeshing operation for the output mesh.')
+        .describe('Remeshing operation for the output mesh.'),
+      vertexCount: z
+        .number()
+        .min(-1)
+        .max(20000)
+        .optional()
+        .describe('Target vertex count for stable-fast-3d. Use -1 for the default.'),
+      targetType: z
+        .enum(['none', 'vertex', 'face'])
+        .optional()
+        .describe('SPAR3D target type for targetCount.'),
+      targetCount: z
+        .number()
+        .min(100)
+        .max(20000)
+        .optional()
+        .describe('SPAR3D target count for vertices or faces.'),
+      guidanceScale: z.number().min(1).max(10).optional().describe('SPAR3D guidance scale.'),
+      seed: z.number().optional().describe('SPAR3D seed for reproducible results.')
     })
   )
-  .output(
-    z.object({
-      base64Model: z.string().describe('Base64-encoded GLB 3D model file.')
-    })
-  )
+  .output(mediaAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let input = ctx.input;
 
-    let result: { base64Model: string };
+    let result: any;
 
     if (input.model === 'stable-fast-3d') {
+      if (input.foregroundRatio !== undefined && input.foregroundRatio < 0.1) {
+        throw stabilityServiceError(
+          'stable-fast-3d foregroundRatio must be between 0.1 and 1.0.'
+        );
+      }
+      if (input.foregroundRatio !== undefined && input.foregroundRatio > 1) {
+        throw stabilityServiceError(
+          'stable-fast-3d foregroundRatio must be between 0.1 and 1.0.'
+        );
+      }
       result = await client.generateFast3D({
         image: input.image,
         textureResolution: input.textureResolution,
         foregroundRatio: input.foregroundRatio,
-        remesh: input.remesh
+        remesh: input.remesh,
+        vertexCount: input.vertexCount
       });
     } else {
+      if (input.foregroundRatio !== undefined && input.foregroundRatio < 1) {
+        throw stabilityServiceError('spar3d foregroundRatio must be between 1.0 and 2.0.');
+      }
       result = await client.generateSpar3D({
         image: input.image,
         textureResolution: input.textureResolution,
         foregroundRatio: input.foregroundRatio,
-        remesh: input.remesh
+        remesh: input.remesh,
+        targetType: input.targetType,
+        targetCount: input.targetCount,
+        guidanceScale: input.guidanceScale,
+        seed: input.seed
       });
     }
 
     return {
-      output: result,
-      message: `Generated 3D model using **${input.model}**. Output is a GLB file encoded in base64.`
+      output: toMediaAttachmentOutput(result),
+      attachments: [createMediaAttachment(result)],
+      message: `Generated 3D model using **${input.model}**. Attachment MIME: \`${result.mimeType}\`.`
     };
   })
   .build();

@@ -8,9 +8,17 @@ Track customer behavior and attributes, send targeted messages (email, SMS, push
 
 Delete a person from your Customer.io workspace. This removes the person and their data, but does not suppress them — they can be re-added later. Use the suppress action if you want to prevent the person from being re-added.
 
+### Get Broadcast
+
+Retrieve a Customer.io broadcast and optionally include its actions, metrics, trigger history, trigger status, and trigger errors.
+
 ### Get Campaign
 
 Retrieve detailed information about a specific campaign, including its actions, metrics, and configuration. Optionally fetch campaign metrics with configurable time periods.
+
+### Get Message
+
+Retrieve a specific Customer.io delivery record by message ID, including recipient, parent campaign/broadcast/transactional IDs, metrics, and failure information.
 
 ### Get Person
 
@@ -20,6 +28,14 @@ Look up a person in your Customer.io workspace and retrieve their attributes, se
 
 Retrieve the people who belong to a specific segment. Returns a paginated list of customer IDs in the segment.
 
+### Get Transactional Message
+
+Retrieve a Customer.io transactional message definition by ID or trigger name.
+
+### List Broadcasts
+
+Retrieve API-triggered broadcasts from your Customer.io workspace, including IDs, state, active status, tags, and message action references.
+
 ### List Campaigns
 
 Retrieve campaigns from your Customer.io workspace. Returns information about campaigns including their names, states, types, and tags.
@@ -28,9 +44,17 @@ Retrieve campaigns from your Customer.io workspace. Returns information about ca
 
 Retrieve all collections in your Customer.io workspace. Collections are sets of reusable data (promotions, events, courses, etc.) that you reference in campaigns with Liquid templates.
 
+### List Messages
+
+List recent Customer.io delivery records for troubleshooting sends, broadcasts, campaigns, and transactional messages.
+
 ### List Segments
 
 Retrieve all segments in your Customer.io workspace. Segments are named groups of people who share characteristics or behaviors. Returns both data-driven and manual segments.
+
+### List Transactional Messages
+
+List transactional message definitions in Customer.io so you can discover message IDs and trigger names before sending transactional messages.
 
 ### Manage Collection
 
@@ -40,9 +64,13 @@ Create, update, or delete a collection in your Customer.io workspace. Collection
 
 Register or remove a device for push notifications associated with a person. Use this to add mobile devices (iOS/Android) to a person for push notification targeting, or to remove a device when a user logs out or opts out.
 
+### Manage Export
+
+Create, list, inspect, or download Customer.io exports. Downloaded export file bytes are returned as Slate attachments with structured metadata only.
+
 ### Manage Manual Segment
 
-Add or remove people from a manual segment. Manual segments are static groups that you manage explicitly, unlike data-driven segments that update automatically based on criteria.
+Create or delete a manual segment, or add/remove people from one. Manual segments are static groups that you manage explicitly, unlike data-driven segments that update automatically based on criteria.
 
 ### Merge People
 
@@ -54,7 +82,7 @@ Search for people in your Customer.io workspace using complex filters. Find peop
 
 ### Send Transactional Message
 
-Send a transactional message (email, push notification, or SMS) to a person. Transactional messages are for receipts, password resets, order confirmations, and other messages your audience implicitly expects to receive. You can reference a pre-built template by its transactional message ID, or provide the full message content inline.
+Send a transactional message (email, push notification, SMS, in-app, or inbox message) to a person. Transactional messages are for receipts, password resets, order confirmations, and other messages your audience implicitly expects to receive. You can reference a pre-built template by its transactional message ID, or provide the full message content inline.
 
 ### Suppress or Unsuppress Person
 

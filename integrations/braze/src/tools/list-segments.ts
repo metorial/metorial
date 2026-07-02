@@ -116,3 +116,44 @@ export let getSegmentDetails = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let getSegmentAnalytics = SlateTool.create(spec, {
+  name: 'Get Segment Analytics',
+  key: 'get_segment_analytics',
+  description: `Retrieve daily analytics time series for a Braze segment over a specified number of days.`,
+  tags: {
+    destructive: false,
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      segmentId: z.string().describe('ID of the segment'),
+      length: z.number().describe('Number of days of data to return (max 100)')
+    })
+  )
+  .output(
+    z.object({
+      dataSeries: z
+        .array(z.record(z.string(), z.any()))
+        .describe('Daily segment analytics data points'),
+      message: z.string().describe('Response status')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new BrazeClient({
+      token: ctx.auth.token,
+      instanceUrl: ctx.config.instanceUrl
+    });
+
+    let result = await client.getSegmentAnalytics(ctx.input.segmentId, ctx.input.length);
+
+    return {
+      output: {
+        dataSeries: result.data ?? [],
+        message: result.message
+      },
+      message: `Retrieved **${(result.data ?? []).length}** days of analytics for segment **${ctx.input.segmentId}**.`
+    };
+  })
+  .build();

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageDbfs = SlateTool.create(spec, {
@@ -9,7 +10,7 @@ export let manageDbfs = SlateTool.create(spec, {
   description: `Interact with the Databricks File System (DBFS). List, read, upload, create directories, and delete files or folders.`,
   instructions: [
     'File content for upload must be base64-encoded.',
-    'Read returns base64-encoded file content.',
+    'Read returns file bytes as a Slate attachment, not an inline base64 output field.',
     'Use Unity Catalog Volumes for governed file management where possible.'
   ]
 })
@@ -18,6 +19,10 @@ export let manageDbfs = SlateTool.create(spec, {
       action: z.enum(['list', 'read', 'put', 'mkdirs', 'delete']).describe('DBFS operation'),
       path: z.string().describe('DBFS path (e.g., "/mnt/data/file.csv")'),
       content: z.string().optional().describe('Base64-encoded file content (for put)'),
+      mimeType: z
+        .string()
+        .optional()
+        .describe('MIME type to use for read attachments (default application/octet-stream)'),
       overwrite: z.boolean().optional().describe('Overwrite existing file (for put)'),
       recursive: z.boolean().optional().describe('Delete recursively (for delete)'),
       offset: z.number().optional().describe('Byte offset for read'),
@@ -36,8 +41,9 @@ export let manageDbfs = SlateTool.create(spec, {
         )
         .optional()
         .describe('Files listed at the path'),
-      content: z.string().optional().describe('Base64-encoded file content (for read)'),
       bytesRead: z.number().optional().describe('Number of bytes read'),
+      mimeType: z.string().optional().describe('MIME type of the returned attachment'),
+      attachmentCount: z.number().optional().describe('Number of returned Slate attachments'),
       success: z.boolean().describe('Whether the operation succeeded')
     })
   )
@@ -62,17 +68,22 @@ export let manageDbfs = SlateTool.create(spec, {
       }
       case 'read': {
         let result = await client.dbfsRead(ctx.input.path, ctx.input.offset, ctx.input.length);
+        let mimeType = ctx.input.mimeType ?? 'application/octet-stream';
         return {
           output: {
-            content: result.data,
             bytesRead: result.bytes_read,
+            mimeType,
+            attachmentCount: result.data ? 1 : 0,
             success: true
           },
+          attachments: result.data
+            ? [createBase64Attachment(result.data, mimeType)]
+            : undefined,
           message: `Read **${result.bytes_read ?? 0}** bytes from \`${ctx.input.path}\`.`
         };
       }
       case 'put': {
-        if (!ctx.input.content) throw new Error('content is required for put');
+        if (!ctx.input.content) throw databricksServiceError('content is required for put');
         await client.dbfsPut(ctx.input.path, ctx.input.content, ctx.input.overwrite);
         return {
           output: { success: true },

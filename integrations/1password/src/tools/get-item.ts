@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ConnectClient } from '../lib/client';
+import { createConnectClient } from '../lib/connect-tool';
 import { spec } from '../spec';
 
 let fieldSchema = z.object({
@@ -25,7 +25,7 @@ let fileSchema = z.object({
   fileId: z.string().describe('Unique identifier of the file'),
   name: z.string().describe('Filename'),
   size: z.number().describe('File size in bytes'),
-  contentPath: z.string().describe('API path to retrieve file content')
+  contentPath: z.string().optional().describe('API path to retrieve file content')
 });
 
 export let getItem = SlateTool.create(spec, {
@@ -71,14 +71,7 @@ export let getItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.config.connectServerUrl) {
-      throw new Error('Connect server URL is required. Set it in the configuration.');
-    }
-
-    let client = new ConnectClient({
-      token: ctx.auth.token,
-      serverUrl: ctx.config.connectServerUrl
-    });
+    let client = createConnectClient(ctx);
 
     ctx.progress('Fetching item details...');
     let item = await client.getItem(ctx.input.vaultId, ctx.input.itemId);
@@ -99,7 +92,7 @@ export let getItem = SlateTool.create(spec, {
       fileId: f.id,
       name: f.name,
       size: f.size,
-      contentPath: f.contentPath
+      contentPath: f.contentPath ?? f.content_path
     }));
 
     return {

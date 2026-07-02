@@ -3,6 +3,15 @@ import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
+let displayFieldValue = (value: any) => {
+  if (value && typeof value === 'object') {
+    if ('value' in value) return value.value;
+    if ('display_value' in value) return value.display_value;
+  }
+
+  return value;
+};
+
 export let manageIncident = SlateTool.create(spec, {
   name: 'Manage Incident',
   key: 'manage_incident',
@@ -104,13 +113,17 @@ export let manageIncident = SlateTool.create(spec, {
       action = 'Created';
     }
 
+    let incidentId = displayFieldValue(record.sys_id);
+    let incidentNumber = displayFieldValue(record.number);
+    let shortDescription = displayFieldValue(record.short_description);
+
     return {
       output: {
         record,
-        incidentId: record.sys_id,
-        incidentNumber: record.number?.display_value || record.number
+        incidentId,
+        incidentNumber
       },
-      message: `${action} incident **${record.number?.display_value || record.number || record.sys_id}**: ${record.short_description?.display_value || record.short_description || 'No description'}`
+      message: `${action} incident **${incidentNumber || incidentId}**: ${shortDescription || 'No description'}`
     };
   })
   .build();

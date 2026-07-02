@@ -2,9 +2,13 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createEmbeddedSigningUrl,
+  createSenderView,
+  deleteEnvelope,
   downloadDocument,
   getEnvelope,
+  getEnvelopeAuditEvents,
   getEnvelopeRecipients,
+  getTemplate,
   listEnvelopes,
   listTemplates,
   sendEnvelope,
@@ -20,10 +24,14 @@ export let provider = Slate.create({
     getEnvelope,
     listEnvelopes,
     downloadDocument,
+    getEnvelopeAuditEvents,
     listTemplates,
+    getTemplate,
     sendEnvelopeFromTemplate,
     voidEnvelope,
+    deleteEnvelope,
     createEmbeddedSigningUrl,
+    createSenderView,
     getEnvelopeRecipients
   ],
   triggers: [envelopeEvents]

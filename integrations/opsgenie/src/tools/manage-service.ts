@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageService = SlateTool.create(spec, {
@@ -43,7 +44,7 @@ export let manageService = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.name || !ctx.input.teamId) {
-          throw new Error('name and teamId are required when creating a service.');
+          throw opsgenieServiceError('name and teamId are required when creating a service.');
         }
         let service = await client.createService({
           name: ctx.input.name,
@@ -62,7 +63,9 @@ export let manageService = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.serviceId || !ctx.input.name) {
-          throw new Error('serviceId and name are required when updating a service.');
+          throw opsgenieServiceError(
+            'serviceId and name are required when updating a service.'
+          );
         }
         let updated = await client.updateService(ctx.input.serviceId, {
           name: ctx.input.name,
@@ -80,7 +83,7 @@ export let manageService = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.serviceId) {
-          throw new Error('serviceId is required when deleting a service.');
+          throw opsgenieServiceError('serviceId is required when deleting a service.');
         }
         await client.deleteService(ctx.input.serviceId);
         return {

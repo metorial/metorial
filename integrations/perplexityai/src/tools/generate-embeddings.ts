@@ -1,24 +1,34 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PerplexityClient } from '../lib/client';
+import { perplexityServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let validateDimensions = (model: string, dimensions: number | undefined) => {
+  if (dimensions === undefined) return;
+
+  let maxDimensions = model === 'pplx-embed-v1-0.6b' ? 1024 : 2560;
+  if (dimensions > maxDimensions) {
+    throw perplexityServiceError(
+      `${model} supports dimensions between 128 and ${maxDimensions}.`
+    );
+  }
+};
 
 export let generateEmbeddings = SlateTool.create(spec, {
   name: 'Generate Embeddings',
   key: 'generate_embeddings',
-  description: `Generate vector embeddings for text using Perplexity's pplx-embed models. Useful for semantic search, clustering, retrieval-augmented generation (RAG), and recommendation systems.
+  description: `Generate vector embeddings for independent texts using Perplexity's standard pplx-embed models. Useful for semantic search, clustering, retrieval-augmented generation (RAG), and recommendation systems.
 
 Available models:
 - **pplx-embed-v1-0.6b** - Lightweight, low-latency (1024 dimensions)
 - **pplx-embed-v1-4b** - Higher quality retrieval (2560 dimensions)
-- **pplx-embed-context-v1-0.6b** - Contextualized, lightweight (1024 dimensions)
-- **pplx-embed-context-v1-4b** - Contextualized, higher quality (2560 dimensions)
 
-Standard models are best for independent texts and search queries. Contextualized models are optimized for document chunks that benefit from surrounding context. All models produce INT8-quantized embeddings natively.`,
+Use generate_contextualized_embeddings for document chunks that need shared document context. Embeddings are returned as base64-encoded INT8 or binary vectors.`,
   instructions: [
     'Each text must not exceed 32K tokens, and total input must not exceed 120K tokens per request.',
     'Compare INT8 embeddings using cosine similarity.',
-    'Use contextualized models (pplx-embed-context-*) for document chunks that need surrounding context for better relevance.'
+    'Use contextualized embeddings for document chunks that need surrounding context for better relevance.'
   ],
   constraints: [
     'Maximum 32K tokens per individual text input.',
@@ -32,15 +42,20 @@ Standard models are best for independent texts and search queries. Contextualize
     z.object({
       texts: z.array(z.string()).min(1).describe('List of texts to generate embeddings for'),
       model: z
-        .enum([
-          'pplx-embed-v1-0.6b',
-          'pplx-embed-v1-4b',
-          'pplx-embed-context-v1-0.6b',
-          'pplx-embed-context-v1-4b'
-        ])
+        .enum(['pplx-embed-v1-0.6b', 'pplx-embed-v1-4b'])
         .default('pplx-embed-v1-4b')
-        .describe('Embedding model to use'),
-      dimensions: z.number().optional().describe('Custom embedding vector dimensions')
+        .describe('Standard embedding model to use'),
+      dimensions: z
+        .number()
+        .int()
+        .min(128)
+        .max(2560)
+        .optional()
+        .describe('Custom embedding vector dimensions'),
+      encodingFormat: z
+        .enum(['base64_int8', 'base64_binary'])
+        .optional()
+        .describe('Embedding encoding format')
     })
   )
   .output(
@@ -49,9 +64,7 @@ Standard models are best for independent texts and search queries. Contextualize
         .array(
           z.object({
             index: z.number().describe('Index corresponding to the input text'),
-            embedding: z
-              .union([z.string(), z.array(z.number())])
-              .describe('Embedding vector (base64-encoded INT8 or float array)')
+            embedding: z.string().describe('Base64-encoded embedding vector')
           })
         )
         .describe('Generated embeddings for each input text'),
@@ -63,19 +76,14 @@ Standard models are best for independent texts and search queries. Contextualize
   .handleInvocation(async ctx => {
     let client = new PerplexityClient(ctx.auth.token);
 
-    let isContextualized = ctx.input.model.includes('context');
+    validateDimensions(ctx.input.model, ctx.input.dimensions);
 
-    let response = isContextualized
-      ? await client.createContextualizedEmbeddings({
-          model: ctx.input.model,
-          input: ctx.input.texts,
-          dimensions: ctx.input.dimensions
-        })
-      : await client.createEmbeddings({
-          model: ctx.input.model,
-          input: ctx.input.texts,
-          dimensions: ctx.input.dimensions
-        });
+    let response = await client.createEmbeddings({
+      model: ctx.input.model,
+      input: ctx.input.texts,
+      dimensions: ctx.input.dimensions,
+      encoding_format: ctx.input.encodingFormat
+    });
 
     let embeddings = response.data.map(item => ({
       index: item.index,

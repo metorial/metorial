@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+import { notionApiError } from './errors';
 
 let NOTION_API_VERSION = '2022-06-28';
 
@@ -21,6 +22,13 @@ export class NotionClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => {
+        throw notionApiError(error);
+      }
+    );
   }
 
   // --- Pages ---
@@ -234,7 +242,9 @@ export class NotionClient {
       value => value !== undefined
     ).length;
     if (targetCount !== 1) {
-      throw new Error('Provide exactly one of parentPageId, parentBlockId, or discussionId');
+      throw createApiServiceError(
+        'Provide exactly one of parentPageId, parentBlockId, or discussionId'
+      );
     }
 
     let body: Record<string, any> = {

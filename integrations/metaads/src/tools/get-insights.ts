@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetaAdsClient } from '../lib/client';
+import { metaAdsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getInsights = SlateTool.create(spec, {
@@ -107,6 +108,10 @@ Use **objectId** to scope to a specific campaign/ad set/ad, or omit it to get ac
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.datePreset && ctx.input.timeRange) {
+      throw metaAdsServiceError('datePreset and timeRange are mutually exclusive.');
+    }
+
     let client = new MetaAdsClient({
       token: ctx.auth.token,
       adAccountId: ctx.config.adAccountId,

@@ -66,7 +66,7 @@ Supports filtering, aggregation, faceting, and time-series analysis with SQL-lik
               end: metadata.timeWindow.end?.toString()
             }
           : undefined,
-        facets: metadata?.facets
+        facets: Array.isArray(metadata?.facets) ? metadata.facets : undefined
       },
       message: `NRQL query executed successfully. Returned **${results.length}** result(s).`
     };

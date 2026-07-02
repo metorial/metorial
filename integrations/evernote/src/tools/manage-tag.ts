@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { evernoteServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTagTool = SlateTool.create(spec, {
@@ -43,7 +44,7 @@ export let manageTagTool = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) {
-        throw new Error('Tag name is required for create action');
+        throw evernoteServiceError('Tag name is required for create action.');
       }
       let tag = await client.createTag({
         name: ctx.input.name,
@@ -62,7 +63,7 @@ export let manageTagTool = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.tagGuid) {
-        throw new Error('tagGuid is required for update action');
+        throw evernoteServiceError('tagGuid is required for update action.');
       }
       await client.updateTag({
         tagGuid: ctx.input.tagGuid,
@@ -82,7 +83,7 @@ export let manageTagTool = SlateTool.create(spec, {
 
     if (ctx.input.action === 'untag_all') {
       if (!ctx.input.tagGuid) {
-        throw new Error('tagGuid is required for untag_all action');
+        throw evernoteServiceError('tagGuid is required for untag_all action.');
       }
       await client.untagAll(ctx.input.tagGuid);
       return {
@@ -94,6 +95,6 @@ export let manageTagTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw evernoteServiceError(`Unknown tag action: ${ctx.input.action}.`);
   })
   .build();

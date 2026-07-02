@@ -1,16 +1,17 @@
 {
   "name": "@metorial/flyio",
-  "description": "Provision and manage applications, virtual machines (Machines), persistent storage volumes, secrets, certificates, and networking on the Fly.io cloud platform. Create and deploy containerized workloads to specific geographic regions using fast-launching Firecracker microVMs. Control the full Machine lifecycle—create, start, stop, restart, clone, update, and destroy VMs with configurable CPU, memory, and GPU resources. Manage persistent volumes, allocate IP addresses (Anycast IPv4/IPv6), configure SSL/TLS certificates for custom domains, and set app-level secrets. Query Prometheus-compatible metrics for monitoring HTTP responses, CPU, memory, disk I/O, and network traffic. Generate OIDC tokens for external service authentication.",
+  "description": "Provision and manage applications, virtual machines (Machines), persistent storage volumes, app secrets, certificates, and networking on the Fly.io cloud platform. Create and deploy containerized workloads to specific geographic regions using fast-launching Firecracker microVMs. Control Machine lifecycle operations, inspect events, processes, versions, memory, and org-wide inventory, manage app IP assignments, configure SSL/TLS certificates for custom domains, and generate OIDC tokens for external service authentication.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "create and manage apps",
     "provision and control VMs",
     "manage persistent volumes",
-    "allocate IP addresses",
+    "inspect and manage app IP assignments",
     "manage SSL/TLS certificates",
     "manage app secrets",
-    "query Prometheus metrics",
-    "clone machines for scaling",
+    "inspect machine events and processes",
+    "list org-wide machine and volume inventory",
+    "list Fly.io regions",
     "configure VM resources",
     "generate OIDC tokens"
   ],

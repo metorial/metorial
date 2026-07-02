@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/amazon.svg" height="20"> Aws Ses
 
-Send formatted, raw, and bulk templated emails to recipients. Create and manage reusable email templates with personalization variables. Manage contact lists and topic-based subscription preferences. Verify and configure sending identities (email addresses and domains) with DKIM authentication. Create configuration sets to control delivery options, reputation monitoring, and event tracking. Manage account-level suppression lists for bounces and complaints. Organize dedicated IP addresses into pools for reputation isolation. Monitor deliverability with Virtual Deliverability Manager dashboard and sending statistics. Track email events including sends, deliveries, bounces, complaints, opens, and clicks. Process inbound emails with receipt rules and filters (v1 API).
+Send formatted, raw, and bulk templated emails to recipients, including SES v2 attachments, custom headers, tenant routing, and multi-region endpoint routing. Create and manage reusable email templates with personalization variables. Manage contact lists and topic-based subscription preferences. Verify and configure sending identities (email addresses and domains) with DKIM authentication. Create configuration sets to control delivery options, reputation monitoring, and event tracking. Manage account-level suppression lists for bounces and complaints. Organize dedicated IP addresses into pools for reputation isolation. Monitor deliverability with account status, message insights, and email address validation insights. Track email events including sends, deliveries, bounces, complaints, opens, and clicks. Process inbound emails with receipt rules and filters (v1 API).
 
 ## Tools
 
@@ -8,13 +8,17 @@ Send formatted, raw, and bulk templated emails to recipients. Create and manage 
 
 Retrieve SES account details including sending quotas, reputation status, enforcement status, and whether the account has production access. Also shows suppression and Virtual Deliverability Manager (VDM) settings.
 
+### Get Email Address Insights
+
+Analyze an email address with SES validation insights, including syntax, DNS, disposable-address, role-address, random-input, and mailbox-existence signals.
+
 ### Get Message Insights
 
 Retrieve detailed delivery insights for a specific sent email by its message ID. Shows delivery events per recipient, including delivery status, bounces, complaints, opens, and clicks. Useful for troubleshooting delivery issues and tracking individual message outcomes.
 
 ### Manage Configuration Set
 
-Create, retrieve, delete, or list SES configuration sets. Configuration sets control delivery options, reputation monitoring, click/open tracking, and suppression behavior for emails. You can also update individual options (sending, reputation, tracking, suppression) on an existing set.
+Create, retrieve, delete, or list SES configuration sets. Configuration sets control delivery options, reputation monitoring, click/open tracking, and suppression behavior for emails. You can also update individual options (delivery, sending, reputation, tracking, suppression) on an existing set.
 
 ### Manage Contact List
 
@@ -38,7 +42,7 @@ Create, update, retrieve, delete, or list SES email templates. Templates support
 
 ### Manage Event Destination
 
-Create, list, or delete event destinations on an SES configuration set. Event destinations publish email sending events (sends, deliveries, bounces, complaints, opens, clicks, etc.) to SNS topics, CloudWatch, or EventBridge for monitoring and alerting.
+Create, update, list, or delete event destinations on an SES configuration set. Event destinations publish email sending events (sends, deliveries, bounces, complaints, opens, clicks, etc.) to SNS topics, CloudWatch, Kinesis Data Firehose, Pinpoint, or EventBridge for monitoring and alerting.
 
 ### Manage Suppression List
 
@@ -46,11 +50,11 @@ Manage the account-level suppression list in SES. Add, remove, retrieve, or list
 
 ### Send Bulk Email
 
-Send a templated email to multiple recipients in bulk. Each recipient can have personalized replacement data. Uses SES email templates for consistent formatting with per-recipient customization.
+Send a templated email to multiple recipients in bulk. Each recipient can have personalized replacement data and headers. Uses SES email templates for consistent formatting with per-recipient customization and supports default attachments for every recipient.
 
 ### Send Email
 
-Send an email through AWS SES. Supports three content modes: - **Simple**: Provide subject and body (text/HTML) — SES handles MIME formatting. - **Raw**: Supply a complete MIME message for full control over headers and content. - **Template**: Use a pre-created SES template with dynamic replacement data. Emails can be sent to multiple recipients via To, Cc, and Bcc fields.
+Send an email through AWS SES. Supports three content modes: - **Simple**: Provide subject and body (text/HTML) — SES handles MIME formatting and can include custom headers and attachments. - **Raw**: Supply a complete MIME message for full control over headers and content. - **Template**: Use a pre-created SES template with dynamic replacement data, custom headers, and attachments. Emails can be sent to multiple recipients via To, Cc, and Bcc fields.
 
 ## License
 

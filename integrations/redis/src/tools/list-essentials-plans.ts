@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RedisCloudClient } from '../lib/client';
+import { redisServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let planSchema = z.object({
@@ -19,12 +20,20 @@ let planSchema = z.object({
 export let listEssentialsPlans = SlateTool.create(spec, {
   name: 'List Essentials Plans',
   key: 'list_essentials_plans',
-  description: `List available Redis Cloud Essentials plans. Use plan IDs when creating Essentials subscriptions. Plans define the cloud provider, region, pricing, and resource limits.`,
+  description: `List available Redis Cloud Essentials plans, retrieve a single plan by ID, or list plans compatible with an existing Essentials subscription. Use plan IDs when creating or updating Essentials subscriptions.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      planId: z.number().optional().describe('Specific Essentials plan ID to retrieve'),
+      subscriptionId: z
+        .number()
+        .optional()
+        .describe('Existing Essentials subscription ID to list compatible plans for')
+    })
+  )
   .output(
     z.object({
       plans: z.array(planSchema).describe('Available Essentials plans')
@@ -32,8 +41,20 @@ export let listEssentialsPlans = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new RedisCloudClient(ctx.auth);
-    let data = await client.listEssentialsPlans();
+    if (ctx.input.planId !== undefined && ctx.input.subscriptionId !== undefined) {
+      throw redisServiceError('Provide either planId or subscriptionId, not both.');
+    }
+
+    let data =
+      ctx.input.planId !== undefined
+        ? await client.getEssentialsPlan(ctx.input.planId)
+        : ctx.input.subscriptionId !== undefined
+          ? await client.listCompatibleEssentialsPlans(ctx.input.subscriptionId)
+          : await client.listEssentialsPlans();
     let rawPlans = data?.plans || data || [];
+    if (ctx.input.planId !== undefined && !Array.isArray(rawPlans)) {
+      rawPlans = [rawPlans];
+    }
     if (!Array.isArray(rawPlans)) rawPlans = [];
 
     let plans = rawPlans.map((p: any) => ({

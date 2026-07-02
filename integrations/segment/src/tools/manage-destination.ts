@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageDestination = SlateTool.create(spec, {
@@ -52,7 +53,9 @@ To create a new destination, provide the **sourceId** and **metadataId** (from t
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.sourceId || !ctx.input.metadataId) {
-        throw new Error('sourceId and metadataId are required to create a destination');
+        throw segmentServiceError(
+          'sourceId and metadataId are required to create a destination'
+        );
       }
       let dest = await client.createDestination({
         sourceId: ctx.input.sourceId,
@@ -74,7 +77,7 @@ To create a new destination, provide the **sourceId** and **metadataId** (from t
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.destinationId) {
-        throw new Error('destinationId is required to update a destination');
+        throw segmentServiceError('destinationId is required to update a destination');
       }
       let updateData: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
@@ -95,7 +98,7 @@ To create a new destination, provide the **sourceId** and **metadataId** (from t
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.destinationId) {
-        throw new Error('destinationId is required to delete a destination');
+        throw segmentServiceError('destinationId is required to delete a destination');
       }
       await client.deleteDestination(ctx.input.destinationId);
       return {
@@ -107,6 +110,6 @@ To create a new destination, provide the **sourceId** and **metadataId** (from t
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw segmentServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

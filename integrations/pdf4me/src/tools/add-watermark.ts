@@ -1,7 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdf4meServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  fileAttachment,
+  fileAttachmentOutputSchema,
+  fileOutput,
+  type Pdf4meFileResult
+} from './shared';
 
 export let addWatermark = SlateTool.create(spec, {
   name: 'Add Watermark',
@@ -70,20 +77,17 @@ Use text watermarks for labels like "DRAFT" or "CONFIDENTIAL", or image watermar
       showOnlyInPrint: z.boolean().optional().describe('Show watermark only when printing')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded PDF with watermark'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let result: { fileContent: string; fileName: string };
+    let result: Pdf4meFileResult;
 
     if (ctx.input.watermarkType === 'image') {
       if (!ctx.input.imageContent || !ctx.input.imageName) {
-        throw new Error('imageContent and imageName are required for image watermarks');
+        throw pdf4meServiceError(
+          'imageContent and imageName are required for image watermarks'
+        );
       }
       result = await client.imageStamp({
         docContent: ctx.input.fileContent,
@@ -102,7 +106,7 @@ Use text watermarks for labels like "DRAFT" or "CONFIDENTIAL", or image watermar
       });
     } else {
       if (!ctx.input.text) {
-        throw new Error('text is required for text watermarks');
+        throw pdf4meServiceError('text is required for text watermarks');
       }
       result = await client.textStamp({
         docContent: ctx.input.fileContent,
@@ -127,7 +131,8 @@ Use text watermarks for labels like "DRAFT" or "CONFIDENTIAL", or image watermar
     }
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully added ${ctx.input.watermarkType} watermark to **${result.fileName}**`
     };
   })

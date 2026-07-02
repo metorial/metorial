@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { freshserviceApiError, freshserviceServiceError } from './errors';
 
 export interface ClientConfig {
   token: string;
@@ -134,6 +135,47 @@ export interface ChangeUpdateParams {
   customFields?: Record<string, unknown>;
 }
 
+export interface ReleaseCreateParams {
+  subject: string;
+  description?: string;
+  status?: number;
+  priority?: number;
+  releaseType?: number;
+  groupId?: number;
+  agentId?: number;
+  departmentId?: number;
+  category?: string;
+  subCategory?: string;
+  itemCategory?: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  workStartDate?: string;
+  workEndDate?: string;
+  customFields?: Record<string, unknown>;
+  planningFields?: Record<string, unknown>;
+  workspaceId?: number;
+}
+
+export interface ReleaseUpdateParams {
+  subject?: string;
+  description?: string;
+  status?: number;
+  priority?: number;
+  releaseType?: number;
+  groupId?: number;
+  agentId?: number;
+  departmentId?: number;
+  category?: string;
+  subCategory?: string;
+  itemCategory?: string;
+  plannedStartDate?: string;
+  plannedEndDate?: string;
+  workStartDate?: string;
+  workEndDate?: string;
+  customFields?: Record<string, unknown>;
+  planningFields?: Record<string, unknown>;
+}
+
 export interface AssetCreateParams {
   name: string;
   assetTypeId: number;
@@ -168,18 +210,49 @@ let toSnakeCase = (str: string): string => {
   return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 };
 
+let convertValueToSnakeCase = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(item => convertValueToSnakeCase(item));
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    return convertKeysToSnakeCase(value as Record<string, unknown>);
+  }
+
+  return value;
+};
+
 let convertKeysToSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> => {
   let result: Record<string, unknown> = {};
   for (let [key, value] of Object.entries(obj)) {
     if (value === undefined || value === null) continue;
     let snakeKey = toSnakeCase(key);
-    if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
-      result[snakeKey] = convertKeysToSnakeCase(value as Record<string, unknown>);
-    } else {
-      result[snakeKey] = value;
-    }
+    result[snakeKey] = convertValueToSnakeCase(value);
   }
   return result;
+};
+
+let applyFreshserviceErrorInterceptor = (http: ReturnType<typeof createAxios>) => {
+  http.interceptors.response.use(
+    response => response,
+    error => Promise.reject(freshserviceApiError(error))
+  );
+};
+
+let normalizeSubdomain = (subdomain: string) => {
+  let normalized = subdomain
+    .trim()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/.*$/, '')
+    .replace(/\.freshservice\.com$/i, '');
+
+  if (!normalized || !/^[a-z0-9][a-z0-9-]*$/i.test(normalized)) {
+    throw freshserviceServiceError(
+      'Freshservice subdomain must be the portal subdomain before .freshservice.com.'
+    );
+  }
+
+  return normalized;
 };
 
 export class Client {
@@ -187,7 +260,7 @@ export class Client {
   private headers: Record<string, string>;
 
   constructor(clientConfig: ClientConfig) {
-    this.baseUrl = `https://${clientConfig.subdomain}.freshservice.com/api/v2`;
+    this.baseUrl = `https://${normalizeSubdomain(clientConfig.subdomain)}.freshservice.com/api/v2`;
     if (clientConfig.authType === 'api_key') {
       let encoded = Buffer.from(`${clientConfig.token}:X`).toString('base64');
       this.headers = {
@@ -203,10 +276,12 @@ export class Client {
   }
 
   private get axios() {
-    return createAxios({
+    let http = createAxios({
       baseURL: this.baseUrl,
       headers: this.headers
     });
+    applyFreshserviceErrorInterceptor(http);
+    return http;
   }
 
   // ===== Tickets =====
@@ -298,6 +373,55 @@ export class Client {
     return response.data.conversations || [];
   }
 
+  async updateTicketConversation(conversationId: number, body: string) {
+    let response = await this.axios.put(`/conversations/${conversationId}`, { body });
+    return response.data.conversation;
+  }
+
+  async deleteTicketConversation(conversationId: number) {
+    await this.axios.delete(`/conversations/${conversationId}`);
+  }
+
+  async getTicketActivities(ticketId: number, pagination?: PaginationParams) {
+    let params: Record<string, number> = {};
+    if (pagination?.page) params.page = pagination.page;
+    if (pagination?.perPage) params.per_page = pagination.perPage;
+    let response = await this.axios.get(`/tickets/${ticketId}/activities`, { params });
+    return response.data.activities || [];
+  }
+
+  async listFormFields(entity: string, pagination?: PaginationParams) {
+    let endpointByEntity: Record<string, string> = {
+      ticket: '/ticket_form_fields',
+      problem: '/problem_form_fields',
+      change: '/change_form_fields',
+      release: '/release_form_fields',
+      requester: '/requester_fields',
+      agent: '/agent_fields',
+      department: '/department_fields'
+    };
+    let endpoint = endpointByEntity[entity];
+    if (!endpoint) {
+      throw freshserviceServiceError(`Unsupported Freshservice field entity: ${entity}`);
+    }
+
+    let params: Record<string, number> = {};
+    if (pagination?.page) params.page = pagination.page;
+    if (pagination?.perPage) params.per_page = pagination.perPage;
+    let response = await this.axios.get(endpoint, { params });
+    return (
+      response.data.fields ||
+      response.data.ticket_fields ||
+      response.data.problem_fields ||
+      response.data.change_fields ||
+      response.data.release_fields ||
+      response.data.requester_fields ||
+      response.data.agent_fields ||
+      response.data.department_fields ||
+      []
+    );
+  }
+
   // ===== Problems =====
 
   async createProblem(params: ProblemCreateParams) {
@@ -327,6 +451,11 @@ export class Client {
 
   async deleteProblem(problemId: number) {
     await this.axios.delete(`/problems/${problemId}`);
+  }
+
+  async restoreProblem(problemId: number) {
+    let response = await this.axios.put(`/problems/${problemId}/restore`);
+    return response.data;
   }
 
   // ===== Changes =====
@@ -393,9 +522,14 @@ export class Client {
     await this.axios.delete(`/assets/${assetId}`);
   }
 
+  async restoreAsset(assetId: number) {
+    let response = await this.axios.put(`/assets/${assetId}/restore`);
+    return response.data;
+  }
+
   async searchAssets(query: string, page?: number) {
     let params: Record<string, string | number> = {};
-    if (query) params.query = query;
+    if (query) params.search = query;
     if (page) params.page = page;
     let response = await this.axios.get('/assets', { params });
     return { assets: response.data.assets || [] };
@@ -471,6 +605,11 @@ export class Client {
     await this.axios.delete(`/requesters/${requesterId}`);
   }
 
+  async reactivateRequester(requesterId: number) {
+    let response = await this.axios.put(`/requesters/${requesterId}/reactivate`);
+    return response.data.requester;
+  }
+
   // ===== Departments =====
 
   async getDepartment(departmentId: number) {
@@ -496,21 +635,21 @@ export class Client {
     return { categories: response.data.categories || [] };
   }
 
-  async listSolutionFolders(categoryId: number, pagination?: PaginationParams) {
+  async listSolutionFolders(categoryId?: number, pagination?: PaginationParams) {
     let params: Record<string, number> = {};
+    if (categoryId) params.category_id = categoryId;
     if (pagination?.page) params.page = pagination.page;
     if (pagination?.perPage) params.per_page = pagination.perPage;
-    let response = await this.axios.get(`/solutions/categories/${categoryId}/folders`, {
-      params
-    });
+    let response = await this.axios.get('/solutions/folders', { params });
     return { folders: response.data.folders || [] };
   }
 
-  async listSolutionArticles(folderId: number, pagination?: PaginationParams) {
+  async listSolutionArticles(folderId?: number, pagination?: PaginationParams) {
     let params: Record<string, number> = {};
+    if (folderId) params.folder_id = folderId;
     if (pagination?.page) params.page = pagination.page;
     if (pagination?.perPage) params.per_page = pagination.perPage;
-    let response = await this.axios.get(`/solutions/folders/${folderId}/articles`, { params });
+    let response = await this.axios.get('/solutions/articles', { params });
     return { articles: response.data.articles || [] };
   }
 
@@ -529,8 +668,11 @@ export class Client {
       tags?: string[];
     }
   ) {
-    let body = convertKeysToSnakeCase(params as unknown as Record<string, unknown>);
-    let response = await this.axios.post(`/solutions/folders/${folderId}/articles`, body);
+    let body = convertKeysToSnakeCase({
+      ...params,
+      folderId
+    } as unknown as Record<string, unknown>);
+    let response = await this.axios.post('/solutions/articles', body);
     return response.data.article;
   }
 
@@ -541,6 +683,15 @@ export class Client {
     let body = convertKeysToSnakeCase(params as unknown as Record<string, unknown>);
     let response = await this.axios.put(`/solutions/articles/${articleId}`, body);
     return response.data.article;
+  }
+
+  async deleteSolutionArticle(articleId: number) {
+    await this.axios.delete(`/solutions/articles/${articleId}`);
+  }
+
+  async restoreSolutionArticle(articleId: number) {
+    let response = await this.axios.put(`/solutions/articles/${articleId}/restore`);
+    return response.data;
   }
 
   // ===== Service Catalog =====
@@ -609,6 +760,11 @@ export class Client {
     return { locations: response.data.locations || [] };
   }
 
+  async getLocation(locationId: number) {
+    let response = await this.axios.get(`/locations/${locationId}`);
+    return response.data.location;
+  }
+
   // ===== Vendors =====
 
   async listVendors(pagination?: PaginationParams) {
@@ -619,20 +775,14 @@ export class Client {
     return { vendors: response.data.vendors || [] };
   }
 
+  async getVendor(vendorId: number) {
+    let response = await this.axios.get(`/vendors/${vendorId}`);
+    return response.data.vendor;
+  }
+
   // ===== Releases =====
 
-  async createRelease(params: {
-    subject: string;
-    description?: string;
-    releaseType?: number;
-    status?: number;
-    priority?: number;
-    plannedStartDate?: string;
-    plannedEndDate?: string;
-    groupId?: number;
-    agentId?: number;
-    customFields?: Record<string, unknown>;
-  }) {
+  async createRelease(params: ReleaseCreateParams) {
     let body = convertKeysToSnakeCase(params as unknown as Record<string, unknown>);
     let response = await this.axios.post('/releases', body);
     return response.data.release;
@@ -643,16 +793,22 @@ export class Client {
     return response.data.release;
   }
 
-  async listReleases(pagination?: PaginationParams) {
-    let params: Record<string, number> = {};
+  async listReleases(
+    pagination?: PaginationParams,
+    filterName?: string,
+    workspaceId?: number
+  ) {
+    let params: Record<string, string | number> = {};
     if (pagination?.page) params.page = pagination.page;
     if (pagination?.perPage) params.per_page = pagination.perPage;
+    if (filterName) params.filter_name = filterName;
+    if (workspaceId !== undefined) params.workspace_id = workspaceId;
     let response = await this.axios.get('/releases', { params });
-    return { releases: response.data.releases || [] };
+    return { releases: response.data.releases || response.data || [] };
   }
 
-  async updateRelease(releaseId: number, params: Record<string, unknown>) {
-    let body = convertKeysToSnakeCase(params);
+  async updateRelease(releaseId: number, params: ReleaseUpdateParams) {
+    let body = convertKeysToSnakeCase(params as unknown as Record<string, unknown>);
     let response = await this.axios.put(`/releases/${releaseId}`, body);
     return response.data.release;
   }
@@ -661,11 +817,16 @@ export class Client {
     await this.axios.delete(`/releases/${releaseId}`);
   }
 
+  async restoreRelease(releaseId: number) {
+    let response = await this.axios.put(`/releases/${releaseId}/restore`);
+    return response.data;
+  }
+
   // ===== Ticket Fields =====
 
   async listTicketFields() {
-    let response = await this.axios.get('/ticket_fields');
-    return response.data.ticket_fields || [];
+    let response = await this.axios.get('/ticket_form_fields');
+    return response.data.fields || response.data.ticket_fields || [];
   }
 
   // ===== Time Entries =====

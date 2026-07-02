@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let escalationRuleSchema = z.object({
@@ -95,10 +96,10 @@ export let manageEscalation = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.name) {
-          throw new Error('name is required when creating an escalation policy.');
+          throw opsgenieServiceError('name is required when creating an escalation policy.');
         }
         if (!ctx.input.rules || ctx.input.rules.length === 0) {
-          throw new Error('rules are required when creating an escalation policy.');
+          throw opsgenieServiceError('rules are required when creating an escalation policy.');
         }
         let escalation = await client.createEscalation({
           name: ctx.input.name,
@@ -118,7 +119,7 @@ export let manageEscalation = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.escalationIdentifier) {
-          throw new Error(
+          throw opsgenieServiceError(
             'escalationIdentifier is required when updating an escalation policy.'
           );
         }
@@ -144,7 +145,7 @@ export let manageEscalation = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.escalationIdentifier) {
-          throw new Error(
+          throw opsgenieServiceError(
             'escalationIdentifier is required when deleting an escalation policy.'
           );
         }

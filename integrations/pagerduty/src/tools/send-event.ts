@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PagerDutyClient } from '../lib/client';
+import { pagerDutyServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let sendEvent = SlateTool.create(spec, {
@@ -78,7 +79,8 @@ export let sendEvent = SlateTool.create(spec, {
     });
 
     if (ctx.input.eventType === 'change') {
-      if (!ctx.input.summary) throw new Error('summary is required for change events');
+      if (!ctx.input.summary)
+        throw pagerDutyServiceError('summary is required for change events');
 
       let result = await client.sendChangeEvent({
         routingKey: ctx.input.routingKey,
@@ -99,7 +101,14 @@ export let sendEvent = SlateTool.create(spec, {
     }
 
     // Alert event
-    if (!ctx.input.eventAction) throw new Error('eventAction is required for alert events');
+    if (!ctx.input.eventAction)
+      throw pagerDutyServiceError('eventAction is required for alert events');
+    if (ctx.input.eventAction === 'trigger' && !ctx.input.summary)
+      throw pagerDutyServiceError('summary is required for trigger alert events');
+    if (ctx.input.eventAction !== 'trigger' && !ctx.input.dedupKey)
+      throw pagerDutyServiceError(
+        'dedupKey is required for acknowledge and resolve alert events'
+      );
 
     let result = await client.sendEvent({
       routingKey: ctx.input.routingKey,

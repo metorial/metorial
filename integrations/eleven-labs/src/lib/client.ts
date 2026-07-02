@@ -1,4 +1,136 @@
+import { Buffer } from 'node:buffer';
 import { createAxios } from 'slates';
+import { elevenLabsApiError, elevenLabsServiceError } from './errors';
+
+export type AudioResult = {
+  contentBase64: string;
+  contentType: string;
+  byteLength: number;
+};
+
+type VoiceSettings = {
+  stability?: number;
+  similarityBoost?: number;
+  style?: number;
+  useSpeakerBoost?: boolean;
+  speed?: number;
+};
+
+type PronunciationDictionaryLocator = {
+  pronunciationDictionaryId: string;
+  versionId: string;
+};
+
+let appendFormField = (formData: FormData, name: string, value: unknown) => {
+  if (value === undefined || value === null) {
+    return;
+  }
+
+  if (Array.isArray(value) || typeof value === 'object') {
+    formData.append(name, JSON.stringify(value));
+    return;
+  }
+
+  formData.append(name, String(value));
+};
+
+let responseDataToBuffer = (data: unknown) => {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+
+  if (typeof data === 'string') {
+    return Buffer.from(data, 'binary');
+  }
+
+  throw elevenLabsServiceError('ElevenLabs returned file content in an unsupported format.');
+};
+
+let responseHeader = (headers: unknown, name: string) => {
+  if (!headers || typeof headers !== 'object') {
+    return undefined;
+  }
+
+  let record = headers as Record<string, unknown> & {
+    get?: (key: string) => unknown;
+  };
+  let value = record[name] ?? record[name.toLowerCase()] ?? record.get?.(name);
+
+  return typeof value === 'string' ? value : undefined;
+};
+
+let responseToAudio = (
+  response: { data: unknown; headers?: unknown },
+  fallbackType: string
+) => {
+  let content = responseDataToBuffer(response.data);
+  return {
+    contentBase64: content.toString('base64'),
+    contentType: responseHeader(response.headers, 'content-type') ?? fallbackType,
+    byteLength: content.byteLength
+  };
+};
+
+let decodeBase64File = (label: string, contentBase64: string) => {
+  let normalized = contentBase64.replace(/\s+/g, '');
+  let buffer = Buffer.from(normalized, 'base64');
+  let encoded = buffer.toString('base64').replace(/=+$/u, '');
+  let input = normalized.replace(/=+$/u, '');
+
+  if (!normalized || encoded !== input) {
+    throw elevenLabsServiceError(`${label} must be valid non-empty base64 data.`);
+  }
+
+  return buffer;
+};
+
+let appendBase64File = (params: {
+  formData: FormData;
+  fieldName: string;
+  contentBase64: string;
+  fileName?: string;
+  contentType?: string;
+}) => {
+  let fileBytes = decodeBase64File(params.fieldName, params.contentBase64);
+  let blob = new Blob([fileBytes], {
+    type: params.contentType ?? 'application/octet-stream'
+  });
+
+  params.formData.append(params.fieldName, blob, params.fileName ?? 'audio');
+};
+
+let mapVoiceSettings = (settings?: VoiceSettings) => {
+  if (!settings) {
+    return undefined;
+  }
+
+  let body: Record<string, unknown> = {};
+  if (settings.stability !== undefined) body.stability = settings.stability;
+  if (settings.similarityBoost !== undefined) {
+    body.similarity_boost = settings.similarityBoost;
+  }
+  if (settings.style !== undefined) body.style = settings.style;
+  if (settings.useSpeakerBoost !== undefined) {
+    body.use_speaker_boost = settings.useSpeakerBoost;
+  }
+  if (settings.speed !== undefined) body.speed = settings.speed;
+
+  return body;
+};
+
+let mapPronunciationLocators = (locators?: PronunciationDictionaryLocator[]) =>
+  locators?.map(locator => ({
+    pronunciation_dictionary_id: locator.pronunciationDictionaryId,
+    version_id: locator.versionId
+  }));
 
 export class ElevenLabsClient {
   private axios;
@@ -12,86 +144,99 @@ export class ElevenLabsClient {
     });
   }
 
-  // ── User & Account ──
+  private async request<T>(operation: string, run: () => Promise<T>) {
+    try {
+      return await run();
+    } catch (error) {
+      throw elevenLabsApiError(error, operation);
+    }
+  }
 
   async getUser() {
-    let response = await this.axios.get('/v1/user');
-    return response.data;
+    return this.request('get user', async () => {
+      let response = await this.axios.get('/v1/user');
+      return response.data;
+    });
   }
 
   async getSubscription() {
-    let response = await this.axios.get('/v1/user/subscription');
-    return response.data;
+    return this.request('get subscription', async () => {
+      let response = await this.axios.get('/v1/user/subscription');
+      return response.data;
+    });
   }
-
-  // ── Models ──
 
   async listModels() {
-    let response = await this.axios.get('/v1/models');
-    return response.data;
+    return this.request('list models', async () => {
+      let response = await this.axios.get('/v1/models');
+      return response.data;
+    });
   }
-
-  // ── Voices ──
 
   async listVoices(params?: {
     search?: string;
     voiceType?: string;
     category?: string;
+    fineTuningState?: string;
+    collectionId?: string;
+    includeTotalCount?: boolean;
+    voiceIds?: string[];
     pageSize?: number;
     nextPageToken?: string;
     sort?: string;
     sortDirection?: string;
   }) {
-    let query: Record<string, string | number> = {};
+    let query: Record<string, string | number | boolean | string[]> = {};
     if (params?.search) query.search = params.search;
     if (params?.voiceType) query.voice_type = params.voiceType;
     if (params?.category) query.category = params.category;
+    if (params?.fineTuningState) query.fine_tuning_state = params.fineTuningState;
+    if (params?.collectionId) query.collection_id = params.collectionId;
+    if (params?.includeTotalCount !== undefined) {
+      query.include_total_count = params.includeTotalCount;
+    }
+    if (params?.voiceIds?.length) query.voice_ids = params.voiceIds;
     if (params?.pageSize) query.page_size = params.pageSize;
     if (params?.nextPageToken) query.next_page_token = params.nextPageToken;
     if (params?.sort) query.sort = params.sort;
     if (params?.sortDirection) query.sort_direction = params.sortDirection;
 
-    let response = await this.axios.get('/v2/voices', { params: query });
-    return response.data;
+    return this.request('list voices', async () => {
+      let response = await this.axios.get('/v2/voices', { params: query });
+      return response.data;
+    });
   }
 
   async getVoice(voiceId: string) {
-    let response = await this.axios.get(`/v1/voices/${voiceId}`);
-    return response.data;
+    return this.request('get voice', async () => {
+      let response = await this.axios.get(`/v1/voices/${voiceId}`);
+      return response.data;
+    });
   }
 
   async deleteVoice(voiceId: string) {
-    let response = await this.axios.delete(`/v1/voices/${voiceId}`);
-    return response.data;
+    return this.request('delete voice', async () => {
+      let response = await this.axios.delete(`/v1/voices/${voiceId}`);
+      return response.data;
+    });
   }
 
   async getVoiceSettings(voiceId: string) {
-    let response = await this.axios.get(`/v1/voices/${voiceId}/settings`);
-    return response.data;
+    return this.request('get voice settings', async () => {
+      let response = await this.axios.get(`/v1/voices/${voiceId}/settings`);
+      return response.data;
+    });
   }
 
-  async editVoiceSettings(
-    voiceId: string,
-    settings: {
-      stability?: number;
-      similarityBoost?: number;
-      style?: number;
-      useSpeakerBoost?: boolean;
-    }
-  ) {
-    let body: Record<string, unknown> = {};
-    if (settings.stability !== undefined) body.stability = settings.stability;
-    if (settings.similarityBoost !== undefined)
-      body.similarity_boost = settings.similarityBoost;
-    if (settings.style !== undefined) body.style = settings.style;
-    if (settings.useSpeakerBoost !== undefined)
-      body.use_speaker_boost = settings.useSpeakerBoost;
-
-    let response = await this.axios.patch(`/v1/voices/${voiceId}/settings`, body);
-    return response.data;
+  async editVoiceSettings(voiceId: string, settings: VoiceSettings) {
+    return this.request('edit voice settings', async () => {
+      let response = await this.axios.patch(
+        `/v1/voices/${voiceId}/settings`,
+        mapVoiceSettings(settings) ?? {}
+      );
+      return response.data;
+    });
   }
-
-  // ── Text to Speech ──
 
   async textToSpeech(
     voiceId: string,
@@ -100,353 +245,373 @@ export class ElevenLabsClient {
       modelId?: string;
       languageCode?: string;
       outputFormat?: string;
-      voiceSettings?: {
-        stability?: number;
-        similarityBoost?: number;
-        style?: number;
-        useSpeakerBoost?: boolean;
-        speed?: number;
-      };
-      pronunciationDictionaryLocators?: Array<{
-        pronunciationDictionaryId: string;
-        versionId: string;
-      }>;
+      voiceSettings?: VoiceSettings;
+      pronunciationDictionaryLocators?: PronunciationDictionaryLocator[];
       seed?: number;
+      previousText?: string;
+      nextText?: string;
       applyTextNormalization?: string;
     }
-  ) {
+  ): Promise<AudioResult> {
     let body: Record<string, unknown> = {
       text: params.text
     };
     if (params.modelId) body.model_id = params.modelId;
     if (params.languageCode) body.language_code = params.languageCode;
     if (params.seed !== undefined) body.seed = params.seed;
-    if (params.applyTextNormalization)
+    if (params.previousText) body.previous_text = params.previousText;
+    if (params.nextText) body.next_text = params.nextText;
+    if (params.applyTextNormalization) {
       body.apply_text_normalization = params.applyTextNormalization;
+    }
     if (params.pronunciationDictionaryLocators) {
-      body.pronunciation_dictionary_locators = params.pronunciationDictionaryLocators.map(
-        l => ({
-          pronunciation_dictionary_id: l.pronunciationDictionaryId,
-          version_id: l.versionId
-        })
+      body.pronunciation_dictionary_locators = mapPronunciationLocators(
+        params.pronunciationDictionaryLocators
       );
     }
-    if (params.voiceSettings) {
-      let vs: Record<string, unknown> = {};
-      if (params.voiceSettings.stability !== undefined)
-        vs.stability = params.voiceSettings.stability;
-      if (params.voiceSettings.similarityBoost !== undefined)
-        vs.similarity_boost = params.voiceSettings.similarityBoost;
-      if (params.voiceSettings.style !== undefined) vs.style = params.voiceSettings.style;
-      if (params.voiceSettings.useSpeakerBoost !== undefined)
-        vs.use_speaker_boost = params.voiceSettings.useSpeakerBoost;
-      if (params.voiceSettings.speed !== undefined) vs.speed = params.voiceSettings.speed;
-      body.voice_settings = vs;
-    }
+    let voiceSettings = mapVoiceSettings(params.voiceSettings);
+    if (voiceSettings) body.voice_settings = voiceSettings;
 
     let query: Record<string, string> = {};
     if (params.outputFormat) query.output_format = params.outputFormat;
 
-    let response = await this.axios.post(`/v1/text-to-speech/${voiceId}`, body, {
-      params: query,
-      responseType: 'arraybuffer'
+    return this.request('create speech', async () => {
+      let response = await this.axios.post(`/v1/text-to-speech/${voiceId}`, body, {
+        params: query,
+        responseType: 'arraybuffer'
+      });
+
+      return responseToAudio(response, 'audio/mpeg');
     });
-
-    let audioData = response.data as ArrayBuffer;
-    let bytes = new Uint8Array(audioData);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]!);
-    }
-    let base64Audio = btoa(binary);
-
-    return {
-      audioBase64: base64Audio,
-      contentType: String(response.headers?.['content-type'] ?? 'audio/mpeg')
-    };
   }
 
-  // ── Speech to Text ──
+  async createDialogue(params: {
+    inputs: Array<{ text: string; voiceId: string }>;
+    modelId?: string;
+    languageCode?: string;
+    outputFormat?: string;
+    settings?: VoiceSettings;
+  }): Promise<AudioResult> {
+    let body: Record<string, unknown> = {
+      inputs: params.inputs.map(input => ({
+        text: input.text,
+        voice_id: input.voiceId
+      }))
+    };
+    if (params.modelId) body.model_id = params.modelId;
+    if (params.languageCode) body.language_code = params.languageCode;
+    let settings = mapVoiceSettings(params.settings);
+    if (settings) body.settings = settings;
+
+    let query: Record<string, string> = {};
+    if (params.outputFormat) query.output_format = params.outputFormat;
+
+    return this.request('create dialogue', async () => {
+      let response = await this.axios.post('/v1/text-to-dialogue', body, {
+        params: query,
+        responseType: 'arraybuffer'
+      });
+
+      return responseToAudio(response, 'audio/mpeg');
+    });
+  }
+
+  async voiceChanger(
+    voiceId: string,
+    params: {
+      fileBase64: string;
+      fileName?: string;
+      modelId?: string;
+      outputFormat?: string;
+      voiceSettings?: VoiceSettings;
+      seed?: number;
+      removeBackgroundNoise?: boolean;
+      fileFormat?: 'pcm_s16le_16' | 'other';
+    }
+  ): Promise<AudioResult> {
+    let formData = new FormData();
+    appendBase64File({
+      formData,
+      fieldName: 'audio',
+      contentBase64: params.fileBase64,
+      fileName: params.fileName
+    });
+    appendFormField(formData, 'model_id', params.modelId);
+    appendFormField(formData, 'seed', params.seed);
+    appendFormField(formData, 'remove_background_noise', params.removeBackgroundNoise);
+    appendFormField(formData, 'file_format', params.fileFormat);
+    let voiceSettings = mapVoiceSettings(params.voiceSettings);
+    if (voiceSettings) appendFormField(formData, 'voice_settings', voiceSettings);
+
+    let query: Record<string, string> = {};
+    if (params.outputFormat) query.output_format = params.outputFormat;
+
+    return this.request('voice changer', async () => {
+      let response = await this.axios.post(`/v1/speech-to-speech/${voiceId}`, formData, {
+        params: query,
+        responseType: 'arraybuffer'
+      });
+
+      return responseToAudio(response, 'audio/mpeg');
+    });
+  }
 
   async speechToText(params: {
     modelId: string;
     fileBase64?: string;
     fileName?: string;
+    sourceUrl?: string;
     cloudStorageUrl?: string;
     languageCode?: string;
     diarize?: boolean;
     numSpeakers?: number;
     timestampsGranularity?: string;
     tagAudioEvents?: boolean;
+    diarizationThreshold?: number;
+    fileFormat?: 'pcm_s16le_16' | 'other';
+    temperature?: number;
+    seed?: number;
+    useMultiChannel?: boolean;
   }) {
-    let boundary = `----SlatesBoundary${Date.now().toString(36)}`;
-    let parts: string[] = [];
+    let formData = new FormData();
+    appendFormField(formData, 'model_id', params.modelId);
+    appendFormField(formData, 'language_code', params.languageCode);
+    appendFormField(formData, 'diarize', params.diarize);
+    appendFormField(formData, 'num_speakers', params.numSpeakers);
+    appendFormField(formData, 'timestamps_granularity', params.timestampsGranularity);
+    appendFormField(formData, 'tag_audio_events', params.tagAudioEvents);
+    appendFormField(formData, 'diarization_threshold', params.diarizationThreshold);
+    appendFormField(formData, 'file_format', params.fileFormat);
+    appendFormField(formData, 'temperature', params.temperature);
+    appendFormField(formData, 'seed', params.seed);
+    appendFormField(formData, 'use_multi_channel', params.useMultiChannel);
 
-    parts.push(
-      `--${boundary}\r\nContent-Disposition: form-data; name="model_id"\r\n\r\n${params.modelId}`
-    );
-
-    if (params.cloudStorageUrl) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="cloud_storage_url"\r\n\r\n${params.cloudStorageUrl}`
-      );
+    if (params.sourceUrl) {
+      appendFormField(formData, 'source_url', params.sourceUrl);
+    } else if (params.cloudStorageUrl) {
+      appendFormField(formData, 'cloud_storage_url', params.cloudStorageUrl);
+    } else if (params.fileBase64) {
+      appendBase64File({
+        formData,
+        fieldName: 'file',
+        contentBase64: params.fileBase64,
+        fileName: params.fileName
+      });
     }
 
-    if (params.languageCode) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="language_code"\r\n\r\n${params.languageCode}`
-      );
-    }
-
-    if (params.diarize !== undefined) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="diarize"\r\n\r\n${params.diarize}`
-      );
-    }
-
-    if (params.numSpeakers !== undefined) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="num_speakers"\r\n\r\n${params.numSpeakers}`
-      );
-    }
-
-    if (params.timestampsGranularity) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="timestamps_granularity"\r\n\r\n${params.timestampsGranularity}`
-      );
-    }
-
-    if (params.tagAudioEvents !== undefined) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="tag_audio_events"\r\n\r\n${params.tagAudioEvents}`
-      );
-    }
-
-    if (params.fileBase64) {
-      let binaryStr = atob(params.fileBase64);
-      let fileName = params.fileName || 'audio.mp3';
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\nContent-Transfer-Encoding: binary\r\n\r\n${binaryStr}`
-      );
-    }
-
-    let bodyStr = `${parts.join('\r\n')}\r\n--${boundary}--`;
-
-    let response = await this.axios.post('/v1/speech-to-text', bodyStr, {
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${boundary}`
-      }
+    return this.request('create transcript', async () => {
+      let response = await this.axios.post('/v1/speech-to-text', formData);
+      return response.data;
     });
-
-    return response.data;
   }
-
-  // ── Sound Effects ──
 
   async generateSoundEffect(params: {
     text: string;
     durationSeconds?: number;
     loop?: boolean;
+    promptInfluence?: number;
+    modelId?: string;
     outputFormat?: string;
-  }) {
+  }): Promise<AudioResult> {
     let body: Record<string, unknown> = {
       text: params.text
     };
-    if (params.durationSeconds !== undefined) body.duration_seconds = params.durationSeconds;
+    if (params.durationSeconds !== undefined) {
+      body.duration_seconds = params.durationSeconds;
+    }
     if (params.loop !== undefined) body.loop = params.loop;
+    if (params.promptInfluence !== undefined) body.prompt_influence = params.promptInfluence;
+    if (params.modelId) body.model_id = params.modelId;
 
     let query: Record<string, string> = {};
     if (params.outputFormat) query.output_format = params.outputFormat;
 
-    let response = await this.axios.post('/v1/sound-generation', body, {
-      params: query,
-      responseType: 'arraybuffer'
+    return this.request('create sound effect', async () => {
+      let response = await this.axios.post('/v1/sound-generation', body, {
+        params: query,
+        responseType: 'arraybuffer'
+      });
+
+      return responseToAudio(response, 'audio/mpeg');
     });
-
-    let audioData = response.data as ArrayBuffer;
-    let bytes = new Uint8Array(audioData);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]!);
-    }
-    let base64Audio = btoa(binary);
-
-    return {
-      audioBase64: base64Audio,
-      contentType: String(response.headers?.['content-type'] ?? 'audio/mpeg')
-    };
   }
-
-  // ── Music Generation ──
 
   async composeMusic(params: {
-    prompt?: string;
+    prompt: string;
     musicLengthMs?: number;
+    modelId?: string;
+    forceInstrumental?: boolean;
     outputFormat?: string;
-  }) {
-    let body: Record<string, unknown> = {};
-    if (params.prompt) body.prompt = params.prompt;
+  }): Promise<AudioResult> {
+    let body: Record<string, unknown> = {
+      prompt: params.prompt
+    };
     if (params.musicLengthMs !== undefined) body.music_length_ms = params.musicLengthMs;
+    if (params.modelId) body.model_id = params.modelId;
+    if (params.forceInstrumental !== undefined) {
+      body.force_instrumental = params.forceInstrumental;
+    }
 
     let query: Record<string, string> = {};
     if (params.outputFormat) query.output_format = params.outputFormat;
 
-    let response = await this.axios.post('/v1/music/compose', body, {
-      params: query,
-      responseType: 'arraybuffer',
-      timeout: 300000
+    return this.request('compose music', async () => {
+      let response = await this.axios.post('/v1/music', body, {
+        params: query,
+        responseType: 'arraybuffer',
+        timeout: 300000
+      });
+
+      return responseToAudio(response, 'audio/mpeg');
     });
-
-    let audioData = response.data as ArrayBuffer;
-    let bytes = new Uint8Array(audioData);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]!);
-    }
-    let base64Audio = btoa(binary);
-
-    return {
-      audioBase64: base64Audio,
-      contentType: String(response.headers?.['content-type'] ?? 'audio/mpeg')
-    };
   }
 
-  // ── Dubbing ──
-
   async createDubbing(params: {
-    sourceUrl?: string;
+    sourceUrl: string;
     sourceLang?: string;
     targetLang: string;
+    targetAccent?: string;
     numSpeakers?: number;
     watermark?: boolean;
     name?: string;
+    startTime?: number;
+    endTime?: number;
     highestResolution?: boolean;
   }) {
-    let boundary = `----SlatesBoundary${Date.now().toString(36)}`;
-    let parts: string[] = [];
+    let formData = new FormData();
+    appendFormField(formData, 'source_url', params.sourceUrl);
+    appendFormField(formData, 'source_lang', params.sourceLang);
+    appendFormField(formData, 'target_lang', params.targetLang);
+    appendFormField(formData, 'target_accent', params.targetAccent);
+    appendFormField(formData, 'num_speakers', params.numSpeakers);
+    appendFormField(formData, 'watermark', params.watermark);
+    appendFormField(formData, 'name', params.name);
+    appendFormField(formData, 'start_time', params.startTime);
+    appendFormField(formData, 'end_time', params.endTime);
+    appendFormField(formData, 'highest_resolution', params.highestResolution);
+    appendFormField(formData, 'mode', 'automatic');
 
-    if (params.sourceUrl) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="source_url"\r\n\r\n${params.sourceUrl}`
-      );
-    }
-    if (params.sourceLang) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="source_lang"\r\n\r\n${params.sourceLang}`
-      );
-    }
-    parts.push(
-      `--${boundary}\r\nContent-Disposition: form-data; name="target_lang"\r\n\r\n${params.targetLang}`
-    );
-    if (params.numSpeakers !== undefined) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="num_speakers"\r\n\r\n${params.numSpeakers}`
-      );
-    }
-    if (params.watermark !== undefined) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="watermark"\r\n\r\n${params.watermark}`
-      );
-    }
-    if (params.name) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="name"\r\n\r\n${params.name}`
-      );
-    }
-    if (params.highestResolution !== undefined) {
-      parts.push(
-        `--${boundary}\r\nContent-Disposition: form-data; name="highest_resolution"\r\n\r\n${params.highestResolution}`
-      );
-    }
-    parts.push(
-      `--${boundary}\r\nContent-Disposition: form-data; name="mode"\r\n\r\nautomatic`
-    );
-
-    let bodyStr = `${parts.join('\r\n')}\r\n--${boundary}--`;
-
-    let response = await this.axios.post('/v1/dubbing', bodyStr, {
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${boundary}`
-      }
+    return this.request('create dubbing', async () => {
+      let response = await this.axios.post('/v1/dubbing', formData);
+      return response.data;
     });
-
-    return response.data;
   }
 
   async getDubbing(dubbingId: string) {
-    let response = await this.axios.get(`/v1/dubbing/${dubbingId}`);
-    return response.data;
-  }
-
-  // ── Audio Isolation ──
-
-  async isolateAudio(fileBase64: string, fileName?: string) {
-    let boundary = `----SlatesBoundary${Date.now().toString(36)}`;
-    let binaryStr = atob(fileBase64);
-    let fName = fileName || 'audio.mp3';
-
-    let bodyStr = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fName}"\r\nContent-Type: application/octet-stream\r\nContent-Transfer-Encoding: binary\r\n\r\n${binaryStr}\r\n--${boundary}--`;
-
-    let response = await this.axios.post('/v1/audio-isolation', bodyStr, {
-      headers: {
-        'Content-Type': `multipart/form-data; boundary=${boundary}`
-      },
-      responseType: 'arraybuffer'
+    return this.request('get dubbing', async () => {
+      let response = await this.axios.get(`/v1/dubbing/${dubbingId}`);
+      return response.data;
     });
-
-    let audioData = response.data as ArrayBuffer;
-    let bytes = new Uint8Array(audioData);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]!);
-    }
-    let base64Audio = btoa(binary);
-
-    return {
-      audioBase64: base64Audio,
-      contentType: String(response.headers?.['content-type'] ?? 'audio/mpeg')
-    };
   }
 
-  // ── History ──
+  async deleteDubbing(dubbingId: string) {
+    return this.request('delete dubbing', async () => {
+      let response = await this.axios.delete(`/v1/dubbing/${dubbingId}`);
+      return response.data;
+    });
+  }
+
+  async isolateAudio(params: {
+    fileBase64: string;
+    fileName?: string;
+    fileFormat?: 'pcm_s16le_16' | 'other';
+    previewBase64?: string;
+  }): Promise<AudioResult> {
+    let formData = new FormData();
+    appendBase64File({
+      formData,
+      fieldName: 'audio',
+      contentBase64: params.fileBase64,
+      fileName: params.fileName
+    });
+    appendFormField(formData, 'file_format', params.fileFormat);
+    appendFormField(formData, 'preview_b64', params.previewBase64);
+
+    return this.request('audio isolation', async () => {
+      let response = await this.axios.post('/v1/audio-isolation', formData, {
+        responseType: 'arraybuffer'
+      });
+
+      return responseToAudio(response, 'audio/mpeg');
+    });
+  }
+
+  async createForcedAlignment(params: {
+    fileBase64: string;
+    fileName?: string;
+    text: string;
+  }) {
+    let formData = new FormData();
+    appendBase64File({
+      formData,
+      fieldName: 'file',
+      contentBase64: params.fileBase64,
+      fileName: params.fileName
+    });
+    appendFormField(formData, 'text', params.text);
+
+    return this.request('create forced alignment', async () => {
+      let response = await this.axios.post('/v1/forced-alignment', formData);
+      return response.data;
+    });
+  }
 
   async listHistory(params?: { pageSize?: number; startAfterHistoryItemId?: string }) {
     let query: Record<string, string | number> = {};
     if (params?.pageSize) query.page_size = params.pageSize;
-    if (params?.startAfterHistoryItemId)
+    if (params?.startAfterHistoryItemId) {
       query.start_after_history_item_id = params.startAfterHistoryItemId;
+    }
 
-    let response = await this.axios.get('/v1/history', { params: query });
-    return response.data;
+    return this.request('list history', async () => {
+      let response = await this.axios.get('/v1/history', { params: query });
+      return response.data;
+    });
   }
 
   async getHistoryItem(historyItemId: string) {
-    let response = await this.axios.get(`/v1/history/${historyItemId}`);
-    return response.data;
+    return this.request('get history item', async () => {
+      let response = await this.axios.get(`/v1/history/${historyItemId}`);
+      return response.data;
+    });
   }
 
-  // ── Webhooks ──
+  async getHistoryAudio(historyItemId: string): Promise<AudioResult> {
+    return this.request('get history audio', async () => {
+      let response = await this.axios.get(`/v1/history/${historyItemId}/audio`, {
+        responseType: 'arraybuffer'
+      });
+
+      return responseToAudio(response, 'audio/mpeg');
+    });
+  }
 
   async createWebhook(params: { name: string; webhookUrl: string }) {
-    let response = await this.axios.post('/v1/workspace/webhooks', {
-      settings: {
-        auth_type: 'hmac',
-        name: params.name,
-        webhook_url: params.webhookUrl
-      }
+    return this.request('create webhook', async () => {
+      let response = await this.axios.post('/v1/workspace/webhooks', {
+        settings: {
+          auth_type: 'hmac',
+          name: params.name,
+          webhook_url: params.webhookUrl
+        }
+      });
+      return response.data;
     });
-    return response.data;
   }
 
   async listWebhooks() {
-    let response = await this.axios.get('/v1/workspace/webhooks', {
-      params: { include_usages: true }
+    return this.request('list webhooks', async () => {
+      let response = await this.axios.get('/v1/workspace/webhooks', {
+        params: { include_usages: true }
+      });
+      return response.data;
     });
-    return response.data;
   }
 
   async deleteWebhook(webhookId: string) {
-    let response = await this.axios.delete(`/v1/workspace/webhooks/${webhookId}`);
-    return response.data;
+    return this.request('delete webhook', async () => {
+      let response = await this.axios.delete(`/v1/workspace/webhooks/${webhookId}`);
+      return response.data;
+    });
   }
 }

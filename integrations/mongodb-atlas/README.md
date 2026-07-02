@@ -16,6 +16,10 @@ Retrieve performance optimization recommendations from the Atlas Performance Adv
 
 Retrieve audit events for a MongoDB Atlas project or organization. Track changes like cluster creation/deletion, user modifications, alert triggers, backup events, and other administrative operations.
 
+### List Access Logs
+
+Return MongoDB Atlas database access history for one cluster. Use this for security review, troubleshooting failed authentications, and investigating recent database connection activity.
+
 ### List Projects
 
 Lists all MongoDB Atlas projects (groups) accessible to the authenticated user. Can also retrieve details of a specific organization. Use this to discover available projects and their IDs for use with other tools.
@@ -36,9 +40,17 @@ Create, update, or retrieve MongoDB Atlas clusters. Supports dedicated (M10+), a
 
 Create, update, list, or delete database users in a MongoDB Atlas project. Configure authentication methods (SCRAM, X.509, AWS IAM, LDAP, OIDC), assign roles for fine-grained access control, and scope users to specific clusters.
 
+### Manage Flex Cluster
+
+Create, update, list, retrieve, or delete MongoDB Atlas Flex clusters. Flex clusters use the current Atlas flexClusters API for low-cost, elastic deployments separate from dedicated cluster endpoints.
+
 ### Manage IP Access List
 
 Manage the IP access list (whitelist) that controls which IP addresses can connect to Atlas clusters in a project. Add, list, or remove IP addresses, CIDR blocks, or AWS security groups.
+
+### Manage Maintenance Window
+
+Get, update, reset, or defer the MongoDB Atlas maintenance window for a project. Use this to control when Atlas applies scheduled maintenance and to defer the next maintenance window when allowed.
 
 ### Manage Network Peering
 

@@ -1,20 +1,68 @@
 # <img src="https://provider-logos.metorial-cdn.com/datadog-logo.png" height="20"> Datadog
 
-Monitor infrastructure, applications, and services across cloud environments. Submit and query metrics, create and manage monitors and alerts, build dashboards, search and analyze logs, manage incidents, track SLOs, run synthetic tests, and configure integrations with cloud providers. Create on-call schedules, automate workflows, manage users and roles, handle security monitoring and detection rules, submit DORA metrics, and retrieve usage and cost data. Supports outbound webhooks for alert notifications.
+Monitor infrastructure, applications, and services across cloud environments. Submit, discover, and query metrics; create and manage monitors and alerts; build and clean up dashboards; search and analyze logs; manage incidents; track SLOs; run synthetic tests; inspect users and hosts; and schedule or cancel monitor downtimes.
 
 ## Tools
+
+### Cancel Downtime
+
+Cancel a Datadog downtime by ID to resume normal monitor notifications for its target scope.
+
+### Delete Dashboard
+
+Delete a Datadog dashboard by ID. Use this to clean up dashboards that were created for temporary investigations or automation runs.
+
+### Delete Incident
+
+Delete a Datadog incident by ID. This is destructive and should be used only for incidents created by automation or explicit cleanup.
 
 ### Delete Monitor
 
 Delete a Datadog monitor by its ID. Optionally force-delete monitors that are referenced by other resources.
 
+### Delete SLO
+
+Delete a Datadog Service Level Objective by ID. Use this to clean up temporary or obsolete SLOs.
+
 ### Get Dashboard
 
 Get full details of a specific Datadog dashboard by ID, including all widget definitions and template variables.
 
+### Get Downtime
+
+Get details for a Datadog downtime by ID, including scope, status, monitor target, schedule, and notification settings.
+
+### Get Event
+
+Get a specific Datadog event by ID, including its title, text, tags, host, priority, and alert type.
+
+### Get Incident
+
+Get details for a Datadog incident by ID, including title, severity, state, customer impact, timestamps, and fields.
+
+### Get Metric Metadata
+
+Get Datadog metadata for a metric, including type, unit, per-unit, description, integration, and StatsD interval when available.
+
+### Get Monitor
+
+Get full details for a Datadog monitor by ID, including its query, options, tags, and current state.
+
+### Get SLO
+
+Get details for a Datadog Service Level Objective by ID, including thresholds, tags, monitors, and metric queries.
+
+### List Active Metrics
+
+List metric names actively reporting to Datadog since a Unix timestamp. Use this to discover metrics before querying or building monitors.
+
 ### List Dashboards
 
 List all Datadog dashboards in the organization. Returns a summary of each dashboard including title, layout type, and author.
+
+### List Downtimes
+
+List Datadog monitor downtimes. Use this to inspect active or scheduled notification suppression windows.
 
 ### List Events
 
@@ -74,7 +122,7 @@ Post an event to the Datadog event stream. Events represent deployments, alerts,
 
 ### Query Metrics
 
-Query timeseries metric data from Datadog. Retrieve metric values over a specified time range using Datadog's query language. Use metric queries like \
+Query timeseries metric data from Datadog. Retrieve metric values over a specified time range using Datadog's query language.
 
 ### Schedule Downtime
 
@@ -82,7 +130,7 @@ Schedule a downtime to temporarily mute monitoring notifications. Target specifi
 
 ### Search Logs
 
-Search and retrieve logs from Datadog using query syntax. Filter logs by time range, service, status, and custom attributes. Uses the Datadog log search query language, e.g. \
+Search and retrieve logs from Datadog using query syntax. Filter logs by time range, service, status, and custom attributes.
 
 ### Submit Logs
 

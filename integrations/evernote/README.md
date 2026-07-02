@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/evernote.png" height="20"> Evernote
 
-Create, read, update, and delete notes, notebooks, and tags in Evernote. Manage note content written in ENML markup, attach files and resources to notes, and share notes or notebooks with other users. Search notes by full text, title, tags, date, location, or notebook. Organize notes with tags and saved searches. Access shared and linked notebooks from other users. Set reminders on notes and store custom application-specific data. Receive webhook notifications when notes are created or updated. Supports both personal and Evernote Business accounts, including business notebooks and business-specific data.
+Create, read, update, and trash notes in Evernote. Manage note content written in ENML markup, attach resources when creating notes, download resource file contents through Slate attachments, organize notes with notebooks and tags, search by Evernote search grammar, and receive note-change notifications through Evernote webhooks or polling.
 
 ## Tools
 
@@ -10,7 +10,7 @@ Copy a note to a different notebook. Creates a new note with the same content, t
 
 ### Create Note
 
-Create a new note in Evernote. The content can be plain text or ENML (Evernote Markup Language, a subset of XHTML). If plain text or simple HTML is provided, it will be wrapped in the required ENML envelope automatically.
+Create a new note in Evernote. The content can be plain text or ENML (Evernote Markup Language, a subset of XHTML). If plain text or simple HTML is provided, it will be wrapped in the required ENML envelope automatically. Optional resources are uploaded with the note and referenced from the ENML body.
 
 ### Create Notebook
 
@@ -19,6 +19,10 @@ Create a new notebook in Evernote. Optionally assign it to a stack for organizat
 ### Delete Note
 
 Move a note to the trash. The note can be recovered from trash by the user. Permanent deletion (expunge) is not available to third-party integrations.
+
+### Download Resource
+
+Download the binary contents of an Evernote note resource. File bytes are returned as Slate attachments, while structured output contains only resource metadata.
 
 ### Get Note Content
 
@@ -32,6 +36,10 @@ Retrieve a note's full details including its ENML content, metadata, tags, and r
 
 List all notebooks in the user's Evernote account. Returns notebook names, GUIDs, stack groupings, and whether each is the default notebook. Use this to discover available notebooks before creating or moving notes.
 
+### List Saved Searches
+
+List active saved searches in the user's account. Saved searches store reusable Evernote search grammar queries.
+
 ### List Tags
 
 List all tags in the user's account, or only tags used within a specific notebook. Tags can form a hierarchy via parent-child relationships.
@@ -42,7 +50,7 @@ Create a new tag or update an existing tag's name or parent. Tags organize notes
 
 ### Search Notes
 
-Search for notes using Evernote's search grammar or filter by notebook, tags, and other criteria. Returns note metadata (title, dates, notebook, tags) without full content. Use **Get Note** to retrieve content for individual results. Supports Evernote search operators in the \
+Search for notes using Evernote's search grammar or filter by notebook, tags, and other criteria. Returns note metadata (title, dates, notebook, tags) without full content. Use **Get Note** to retrieve content for individual results.
 
 ### Update Note
 

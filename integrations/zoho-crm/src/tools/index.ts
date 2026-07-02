@@ -7,6 +7,7 @@ export * from './get-record';
 export * from './get-records';
 export * from './get-related-records';
 export * from './get-users';
+export * from './manage-attachments';
 export * from './manage-notes';
 export * from './manage-tags';
 export * from './search-records';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { lemonSqueezyServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createCheckoutTool = SlateTool.create(spec, {
@@ -62,7 +63,7 @@ export let createCheckoutTool = SlateTool.create(spec, {
     let storeId = ctx.input.storeId || ctx.config.storeId;
 
     if (!storeId) {
-      throw new Error(
+      throw lemonSqueezyServiceError(
         'Store ID is required. Provide it in the input or configure it in the provider settings.'
       );
     }

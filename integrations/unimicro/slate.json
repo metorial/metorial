@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/unimicro",
+  "description": "Connect to UniMicro accounting and ERP data. List accessible companies, customers, suppliers, products, customer invoices, supplier invoices, accounts, journal entries, projects, financial reports, and download UniMicro files as Slate attachments.",
+  "categories": ["accounting", "erp", "finance"],
+  "skills": [
+    "select UniMicro company context",
+    "sync customer and supplier master data",
+    "retrieve customer and supplier invoices",
+    "inspect products and projects",
+    "list accounts and journal entries",
+    "retrieve financial reports",
+    "download UniMicro files as attachments"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/unimicro.svg"
+}

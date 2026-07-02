@@ -13,7 +13,7 @@ export let sessionStatusChange = SlateTrigger.create(spec, {
     z.object({
       sessionId: z.string().describe('Session identifier'),
       status: z
-        .enum(['RUNNING', 'COMPLETED', 'ERROR', 'TIMED_OUT'])
+        .enum(['PENDING', 'RUNNING', 'COMPLETED', 'ERROR', 'TIMED_OUT'])
         .describe('Current session status'),
       region: z.string().describe('Session region'),
       createdAt: z.string().describe('Creation timestamp'),
@@ -49,7 +49,7 @@ export let sessionStatusChange = SlateTrigger.create(spec, {
         (ctx.state as Record<string, string> | null) || {};
       let inputs: Array<{
         sessionId: string;
-        status: 'RUNNING' | 'COMPLETED' | 'ERROR' | 'TIMED_OUT';
+        status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'ERROR' | 'TIMED_OUT';
         region: string;
         createdAt: string;
         startedAt: string;

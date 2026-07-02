@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpeakerRecognitionClient } from '../lib/client';
+import { azureSpeechServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageSpeakerProfile = SlateTool.create(spec, {
@@ -84,7 +85,9 @@ Supports text-independent speaker recognition profiles.`,
     let { action, profileType, profileId, locale } = ctx.input;
 
     if (action === 'create') {
-      if (!locale) throw new Error('locale is required for creating a profile.');
+      if (!locale) {
+        throw azureSpeechServiceError('locale is required for creating a profile.');
+      }
       ctx.info(`Creating ${profileType} profile...`);
       let result = await client.createVerificationProfile(locale);
       if (profileType === 'identification') {
@@ -107,7 +110,9 @@ Supports text-independent speaker recognition profiles.`,
     }
 
     if (action === 'get') {
-      if (!profileId) throw new Error('profileId is required for getting a profile.');
+      if (!profileId) {
+        throw azureSpeechServiceError('profileId is required for getting a profile.');
+      }
       let result = await client.getProfile(profileType, profileId);
       return {
         output: {
@@ -141,7 +146,9 @@ Supports text-independent speaker recognition profiles.`,
     }
 
     if (action === 'delete') {
-      if (!profileId) throw new Error('profileId is required for deleting a profile.');
+      if (!profileId) {
+        throw azureSpeechServiceError('profileId is required for deleting a profile.');
+      }
       ctx.info(`Deleting ${profileType} profile ${profileId}...`);
       await client.deleteProfile(profileType, profileId);
       return {
@@ -152,6 +159,6 @@ Supports text-independent speaker recognition profiles.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw azureSpeechServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listJobs = SlateTool.create(spec, {
@@ -15,7 +16,14 @@ export let listJobs = SlateTool.create(spec, {
     z.object({
       name: z.string().optional().describe('Filter by job name (substring match)'),
       limit: z.number().optional().describe('Maximum number of jobs to return (default 20)'),
-      offset: z.number().optional().describe('Offset for pagination'),
+      pageToken: z
+        .string()
+        .optional()
+        .describe('Pagination token from nextPageToken or prevPageToken'),
+      offset: z
+        .number()
+        .optional()
+        .describe('Deprecated: Jobs API 2.2 uses pageToken instead of offset'),
       expandTasks: z
         .boolean()
         .optional()
@@ -37,10 +45,16 @@ export let listJobs = SlateTool.create(spec, {
           })
         )
         .describe('List of jobs'),
-      hasMore: z.boolean().describe('Whether more results are available')
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextPageToken: z.string().optional().describe('Token for the next page of jobs'),
+      prevPageToken: z.string().optional().describe('Token for the previous page of jobs')
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.offset !== undefined) {
+      throw databricksServiceError('offset is not supported by Jobs API 2.2; use pageToken');
+    }
+
     let client = new DatabricksClient({
       workspaceUrl: ctx.config.workspaceUrl,
       token: ctx.auth.token
@@ -49,7 +63,7 @@ export let listJobs = SlateTool.create(spec, {
     let result = await client.listJobs({
       name: ctx.input.name,
       limit: ctx.input.limit,
-      offset: ctx.input.offset,
+      pageToken: ctx.input.pageToken,
       expandTasks: ctx.input.expandTasks
     });
 
@@ -66,9 +80,11 @@ export let listJobs = SlateTool.create(spec, {
     return {
       output: {
         jobs,
-        hasMore: result.has_more ?? false
+        hasMore: Boolean(result.next_page_token),
+        nextPageToken: result.next_page_token,
+        prevPageToken: result.prev_page_token
       },
-      message: `Found **${jobs.length}** job(s).${result.has_more ? ' More results available.' : ''}`
+      message: `Found **${jobs.length}** job(s).${result.next_page_token ? ' More results available.' : ''}`
     };
   })
   .build();

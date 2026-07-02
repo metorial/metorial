@@ -7,5 +7,6 @@ export * from './manage-routes';
 export * from './manage-suppressions';
 export * from './manage-templates';
 export * from './manage-webhooks';
+export * from './query-reporting';
 export * from './send-email';
 export * from './validate-email';

@@ -14,6 +14,25 @@ import type {
   SlackUserGroup
 } from './types';
 
+const SLACK_SNIPPET_TYPE_ALIASES: Record<string, string> = {
+  bash: 'shell',
+  js: 'javascript',
+  json: 'javascript',
+  md: 'markdown',
+  py: 'python',
+  rb: 'ruby',
+  sh: 'shell',
+  ts: 'typescript',
+  txt: 'text',
+  yml: 'yaml'
+};
+
+const normalizeSlackSnippetType = (filetype?: string) => {
+  let normalized = filetype?.trim().toLowerCase();
+  if (!normalized) return undefined;
+  return SLACK_SNIPPET_TYPE_ALIASES[normalized] ?? normalized;
+};
+
 export class SlackClient {
   private axios: ReturnType<typeof createAxios>;
 
@@ -506,7 +525,8 @@ export class SlackClient {
       filename: params.filename ?? params.title ?? 'upload.txt',
       length: String(content.byteLength)
     });
-    if (params.filetype) uploadBody.set('snippet_type', params.filetype);
+    let snippetType = normalizeSlackSnippetType(params.filetype);
+    if (snippetType) uploadBody.set('snippet_type', snippetType);
     let uploadResponseMetadata = await this.axios.post(
       '/files.getUploadURLExternal',
       uploadBody,

@@ -1,12 +1,24 @@
-import { createAxios } from 'slates';
+import { createAxios, pickDefined } from 'slates';
+import { squarespaceApiError } from './errors';
 
 let apiV1 = createAxios({
   baseURL: 'https://api.squarespace.com/1.0'
 });
 
-let apiV2 = createAxios({
-  baseURL: 'https://api.squarespace.com/2.0'
+let apiCurrentV1 = createAxios({
+  baseURL: 'https://api.squarespace.com/v1'
 });
+
+let apiV2 = createAxios({
+  baseURL: 'https://api.squarespace.com/v2'
+});
+
+for (let api of [apiV1, apiCurrentV1, apiV2]) {
+  api.interceptors?.response?.use(
+    response => response,
+    error => Promise.reject(squarespaceApiError(error))
+  );
+}
 
 export interface PaginationResponse {
   hasNextPage: boolean;
@@ -14,11 +26,17 @@ export interface PaginationResponse {
   nextPageUrl?: string;
 }
 
+export interface MoneyAmount {
+  currency: string;
+  value: string | number;
+}
+
 export interface ListOrdersParams {
   modifiedAfter?: string;
   modifiedBefore?: string;
   cursor?: string;
   fulfillmentStatus?: 'PENDING' | 'FULFILLED' | 'CANCELED';
+  paymentStates?: string;
   customerId?: string;
 }
 
@@ -37,54 +55,56 @@ export interface CreateOrderParams {
   channelName: string;
   externalOrderReference: string;
   createdOn: string;
-  grandTotal: {
-    currency: string;
-    value: string;
-  };
+  grandTotal: MoneyAmount;
   lineItems: Array<{
     lineItemId?: string;
+    lineItemType?: string;
     variantId?: string;
     sku?: string;
     productName?: string;
+    title?: string;
     quantity: number;
-    unitPricePaid: {
-      currency: string;
-      value: string;
-    };
+    unitPricePaid: MoneyAmount;
+    nonSaleUnitPrice?: MoneyAmount;
   }>;
   priceTaxInterpretation: 'EXCLUSIVE' | 'INCLUSIVE';
   customerEmail?: string;
   fulfillmentStatus?: 'PENDING' | 'FULFILLED' | 'CANCELED';
+  fulfilledOn?: string;
+  fulfillments?: FulfillOrderParams['shipments'];
+  inventoryBehavior?: 'DEDUCT' | 'SKIP';
+  shopperFulfillmentNotificationBehavior?: 'SEND' | 'SKIP';
   billingAddress?: Record<string, any>;
   shippingAddress?: Record<string, any>;
-  subtotal?: { currency: string; value: string };
-  shippingTotal?: { currency: string; value: string };
-  discountTotal?: { currency: string; value: string };
-  taxTotal?: { currency: string; value: string };
+  subtotal?: MoneyAmount;
+  shippingTotal?: MoneyAmount;
+  discountTotal?: MoneyAmount;
+  taxTotal?: MoneyAmount;
+  shippingLines?: Record<string, any>[];
+  discountLines?: Record<string, any>[];
 }
 
 export interface ListProductsParams {
   cursor?: string;
   modifiedAfter?: string;
   modifiedBefore?: string;
+  query?: string;
   type?: string;
+  productTypes?: Array<'PHYSICAL' | 'SERVICE' | 'GIFT_CARD' | 'DIGITAL'>;
 }
 
 export interface CreateProductParams {
-  type: 'PHYSICAL' | 'SERVICE' | 'GIFT_CARD';
+  type: 'PHYSICAL' | 'SERVICE' | 'GIFT_CARD' | 'DIGITAL';
   storePageId: string;
   name?: string;
   description?: string;
   urlSlug?: string;
   tags?: string[];
   isVisible?: boolean;
-  variants: Array<{
+  variants?: Array<{
     sku: string;
     pricing: {
-      basePrice: {
-        currency: string;
-        value: string;
-      };
+      basePrice: MoneyAmount;
     };
     attributes?: Record<string, string>;
     shippingMeasurements?: {
@@ -92,6 +112,9 @@ export interface CreateProductParams {
       dimensions?: { unit: string; length: number; width: number; height: number };
     };
   }>;
+  pricing?: {
+    basePrice: MoneyAmount;
+  };
 }
 
 export interface UpdateProductParams {
@@ -100,6 +123,36 @@ export interface UpdateProductParams {
   urlSlug?: string;
   tags?: string[];
   isVisible?: boolean;
+  productAttributeNames?: string[];
+  seoData?: {
+    title?: string;
+    description?: string;
+  };
+  pricing?: {
+    basePrice?: MoneyAmount;
+    onSale?: boolean;
+    salePrice?: MoneyAmount;
+  };
+}
+
+export interface ProductVariantParams {
+  sku: string;
+  pricing: {
+    basePrice: MoneyAmount;
+  };
+  attributes?: Record<string, string>;
+  shippingMeasurements?: Record<string, any>;
+}
+
+export interface UpdateProductVariantParams {
+  sku?: string;
+  pricing?: {
+    basePrice?: MoneyAmount;
+    onSale?: boolean;
+    salePrice?: MoneyAmount;
+  };
+  attributes?: Record<string, string>;
+  shippingMeasurements?: Record<string, any>;
 }
 
 export interface InventoryAdjustment {
@@ -113,17 +166,78 @@ export interface ListTransactionsParams {
   modifiedAfter?: string;
   modifiedBefore?: string;
   cursor?: string;
+  orderId?: string;
 }
 
 export interface ListProfilesParams {
   cursor?: string;
   filter?: string;
+  email?: string;
+  sortField?: 'createdOn' | 'id' | 'email' | 'lastName';
+  sortDirection?: 'asc' | 'dsc';
+}
+
+export interface ListContactsParams {
+  cursor?: string;
+  pageSize?: number;
+  searchString?: string;
+  sortField?: string;
+  sortDirection?: 'ASCENDING' | 'DESCENDING';
+}
+
+export interface ContactEmailInput {
+  email: string;
+  acceptsMarketing?: boolean;
+}
+
+export interface ContactInput {
+  firstName?: string;
+  lastName?: string;
+  locale?: string;
+  primaryEmail?: ContactEmailInput;
+}
+
+export interface ContactAddressInput {
+  firstName: string;
+  lastName: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  region: string;
+  countryCode: string;
+  postalCode: string;
+  phoneNumber?: string;
+}
+
+export interface AddressBookEntryInput {
+  address: ContactAddressInput;
+  defaultShipping?: boolean;
 }
 
 export interface WebhookSubscriptionParams {
   endpointUrl: string;
   topics: string[];
 }
+
+let present = <T>(value: T | undefined) =>
+  value === undefined
+    ? undefined
+    : {
+        present: true,
+        value
+      };
+
+let buildPricingUpdate = (pricing?: UpdateProductParams['pricing']) => {
+  if (!pricing) return undefined;
+
+  let payload = pickDefined({
+    basePrice: present(pricing.basePrice),
+    onSale: present(pricing.onSale),
+    salePrice: present(pricing.salePrice)
+  });
+
+  return Object.keys(payload).length > 0 ? payload : undefined;
+};
 
 export class Client {
   private headers: Record<string, string>;
@@ -155,6 +269,7 @@ export class Client {
     if (params.modifiedAfter) queryParams.modifiedAfter = params.modifiedAfter;
     if (params.modifiedBefore) queryParams.modifiedBefore = params.modifiedBefore;
     if (params.fulfillmentStatus) queryParams.fulfillmentStatus = params.fulfillmentStatus;
+    if (params.paymentStates) queryParams.paymentStates = params.paymentStates;
     if (params.customerId) queryParams.customerId = params.customerId;
 
     let response = await apiV1.get('/commerce/orders', {
@@ -196,11 +311,16 @@ export class Client {
   async listProducts(
     params: ListProductsParams = {}
   ): Promise<{ products: any[]; pagination: PaginationResponse }> {
-    let queryParams: Record<string, string> = {};
+    let queryParams: Record<string, string | string[]> = {};
     if (params.cursor) queryParams.cursor = params.cursor;
     if (params.modifiedAfter) queryParams.modifiedAfter = params.modifiedAfter;
     if (params.modifiedBefore) queryParams.modifiedBefore = params.modifiedBefore;
-    if (params.type) queryParams.type = params.type;
+    if (params.query) queryParams.query = params.query;
+    if (params.productTypes?.length) {
+      queryParams.type = params.productTypes;
+    } else if (params.type) {
+      queryParams.type = params.type;
+    }
 
     let response = await apiV2.get('/commerce/products', {
       headers: this.headers,
@@ -229,7 +349,19 @@ export class Client {
   }
 
   async updateProduct(productId: string, updates: UpdateProductParams): Promise<any> {
-    let response = await apiV2.post(`/commerce/products/${productId}`, updates, {
+    let pricing = buildPricingUpdate(updates.pricing);
+    let payload = pickDefined({
+      name: present(updates.name),
+      description: present(updates.description),
+      urlSlug: present(updates.urlSlug),
+      tags: present(updates.tags),
+      isVisible: present(updates.isVisible),
+      productAttributeNames: present(updates.productAttributeNames),
+      seoData: present(updates.seoData),
+      pricing: pricing ? present(pricing) : undefined
+    });
+
+    let response = await apiV2.post(`/commerce/products/${productId}`, payload, {
       headers: this.headers
     });
     return response.data;
@@ -243,7 +375,7 @@ export class Client {
 
   // ---- Product Variants ----
 
-  async createVariant(productId: string, variant: Record<string, any>): Promise<any> {
+  async createVariant(productId: string, variant: ProductVariantParams): Promise<any> {
     let response = await apiV2.post(`/commerce/products/${productId}/variants`, variant, {
       headers: this.headers
     });
@@ -253,11 +385,19 @@ export class Client {
   async updateVariant(
     productId: string,
     variantId: string,
-    updates: Record<string, any>
+    updates: UpdateProductVariantParams
   ): Promise<any> {
+    let pricing = buildPricingUpdate(updates.pricing);
+    let payload = pickDefined({
+      sku: present(updates.sku),
+      attributes: present(updates.attributes),
+      shippingMeasurements: present(updates.shippingMeasurements),
+      pricing: pricing ? present(pricing) : undefined
+    });
+
     let response = await apiV2.post(
       `/commerce/products/${productId}/variants/${variantId}`,
-      updates,
+      payload,
       {
         headers: this.headers
       }
@@ -345,6 +485,119 @@ export class Client {
     });
   }
 
+  // ---- Contacts ----
+
+  async listContacts(
+    params: ListContactsParams = {}
+  ): Promise<{ contacts: any[]; pagination: PaginationResponse }> {
+    let response = await apiCurrentV1.post('/contacts/query', pickDefined(params), {
+      headers: this.headers
+    });
+
+    return {
+      contacts: response.data.contacts || [],
+      pagination: response.data.pagination || { hasNextPage: false }
+    };
+  }
+
+  async getContact(contactId: string): Promise<any> {
+    let response = await apiCurrentV1.get(`/contacts/${contactId}`, {
+      headers: this.headers
+    });
+    return response.data.contact || response.data;
+  }
+
+  async createContact(contact: ContactInput): Promise<any> {
+    let response = await apiCurrentV1.post('/contacts', contact, {
+      headers: this.headers
+    });
+    return response.data.contact || response.data;
+  }
+
+  async updateContact(contactId: string, updates: ContactInput): Promise<any> {
+    let response = await apiCurrentV1.patch(`/contacts/${contactId}`, pickDefined(updates), {
+      headers: {
+        ...this.headers,
+        'Content-Type': 'application/merge-patch+json'
+      }
+    });
+    return response.data.contact || response.data;
+  }
+
+  async deleteContact(contactId: string): Promise<void> {
+    await apiCurrentV1.delete(`/contacts/${contactId}`, {
+      headers: this.headers
+    });
+  }
+
+  async listContactAddresses(
+    contactId: string,
+    cursor?: string
+  ): Promise<{ addressBook: any; pagination: PaginationResponse }> {
+    let params = cursor ? { cursor } : {};
+    let response = await apiCurrentV1.get(`/contacts/${contactId}/address-book`, {
+      headers: this.headers,
+      params
+    });
+
+    return {
+      addressBook: response.data.addressBook || {},
+      pagination: response.data.pagination || { hasNextPage: false }
+    };
+  }
+
+  async getContactAddress(contactId: string, addressBookEntryId: string): Promise<any> {
+    let response = await apiCurrentV1.get(
+      `/contacts/${contactId}/address-book/${addressBookEntryId}`,
+      {
+        headers: this.headers
+      }
+    );
+    return response.data.addressBookEntry || response.data;
+  }
+
+  async createContactAddress(contactId: string, entry: AddressBookEntryInput): Promise<any> {
+    let response = await apiCurrentV1.post(`/contacts/${contactId}/address-book`, entry, {
+      headers: this.headers
+    });
+    return response.data.addressBookEntry || response.data;
+  }
+
+  async replaceContactAddress(
+    contactId: string,
+    addressBookEntryId: string,
+    entry: AddressBookEntryInput
+  ): Promise<any> {
+    let response = await apiCurrentV1.put(
+      `/contacts/${contactId}/address-book/${addressBookEntryId}`,
+      entry,
+      {
+        headers: this.headers
+      }
+    );
+    return response.data.addressBookEntry || response.data;
+  }
+
+  async deleteContactAddress(contactId: string, addressBookEntryId: string): Promise<void> {
+    await apiCurrentV1.delete(`/contacts/${contactId}/address-book/${addressBookEntryId}`, {
+      headers: this.headers
+    });
+  }
+
+  async getContactTransactionSummaries(contactIds: string[]): Promise<any[]> {
+    let response = await apiCurrentV1.post(
+      '/analytics/transaction-summaries',
+      {
+        contactIds,
+        groupBy: 'contactId'
+      },
+      {
+        headers: this.headers
+      }
+    );
+    return response.data.transactionsSummaryWrappers || [];
+  }
+
   // ---- Profiles ----
 
   async listProfiles(
@@ -353,6 +606,9 @@ export class Client {
     let queryParams: Record<string, string> = {};
     if (params.cursor) queryParams.cursor = params.cursor;
     if (params.filter) queryParams.filter = params.filter;
+    if (params.email) queryParams.email = params.email;
+    if (params.sortField) queryParams.sortField = params.sortField;
+    if (params.sortDirection) queryParams.sortDirection = params.sortDirection;
 
     let response = await apiV1.get('/profiles', {
       headers: this.headers,
@@ -381,6 +637,7 @@ export class Client {
     if (params.cursor) queryParams.cursor = params.cursor;
     if (params.modifiedAfter) queryParams.modifiedAfter = params.modifiedAfter;
     if (params.modifiedBefore) queryParams.modifiedBefore = params.modifiedBefore;
+    if (params.orderId) queryParams.orderId = params.orderId;
 
     let response = await apiV1.get('/commerce/transactions', {
       headers: this.headers,

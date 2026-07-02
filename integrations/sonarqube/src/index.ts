@@ -1,0 +1,63 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  getComponentTool,
+  getComputeTaskTool,
+  getDuplicationsTool,
+  getHotspotTool,
+  getIssueChangelogTool,
+  getIssueTool,
+  getProjectAnalysisStatusTool,
+  getProjectMeasuresTool,
+  getQualityGateStatusTool,
+  getRuleTool,
+  getScmInfoTool,
+  getSourceTool,
+  getSystemStatusTool,
+  listComponentTreeTool,
+  listLanguagesTool,
+  listMetricsTool,
+  listProjectBranchesTool,
+  listProjectPullRequestsTool,
+  listQualityGatesTool,
+  manageHotspotTool,
+  manageIssueTool,
+  searchHotspotsTool,
+  searchIssuesTool,
+  searchMeasureHistoryTool,
+  searchProjectsTool,
+  searchRulesTool
+} from './tools';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    searchProjectsTool,
+    getComponentTool,
+    listComponentTreeTool,
+    listProjectBranchesTool,
+    listProjectPullRequestsTool,
+    getComputeTaskTool,
+    getProjectAnalysisStatusTool,
+    listMetricsTool,
+    getProjectMeasuresTool,
+    searchMeasureHistoryTool,
+    getQualityGateStatusTool,
+    listQualityGatesTool,
+    listLanguagesTool,
+    getSystemStatusTool,
+    searchIssuesTool,
+    getIssueTool,
+    getIssueChangelogTool,
+    manageIssueTool,
+    searchHotspotsTool,
+    getHotspotTool,
+    manageHotspotTool,
+    searchRulesTool,
+    getRuleTool,
+    getSourceTool,
+    getScmInfoTool,
+    getDuplicationsTool
+  ],
+  triggers: []
+});

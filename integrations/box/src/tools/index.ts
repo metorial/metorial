@@ -1,3 +1,4 @@
+export * from './download-file';
 export * from './get-download-url';
 export * from './get-file-info';
 export * from './list-folder-items';

@@ -11,7 +11,7 @@ export let sendMessage = SlateTool.create(spec, {
     'For FIFO queues, messageGroupId is required.',
     'For FIFO queues without content-based deduplication enabled, messageDeduplicationId is also required.'
   ],
-  constraints: ['Message body size limit is 256 KB.', 'Delay range is 0-900 seconds.'],
+  constraints: ['Message body size limit is 1 MiB.', 'Delay range is 0-900 seconds.'],
   tags: {
     destructive: false,
     readOnly: false
@@ -53,6 +53,10 @@ export let sendMessage = SlateTool.create(spec, {
       md5OfMessageBody: z
         .string()
         .describe('MD5 digest of the message body for integrity verification'),
+      md5OfMessageAttributes: z
+        .string()
+        .optional()
+        .describe('MD5 digest of the message attributes when attributes were sent'),
       sequenceNumber: z.string().optional().describe('Sequence number for FIFO queues')
     })
   )

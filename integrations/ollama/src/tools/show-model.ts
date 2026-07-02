@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let showModel = SlateTool.create(spec, {
   name: 'Show Model',
   key: 'show_model',
-  description: `Retrieve detailed information about a specific model, including its Modelfile, template, system prompt, parameters, license, and architecture details.`,
+  description: `Retrieve detailed information about a specific model, including template, system prompt, parameters, license, capabilities, architecture details, and verbose metadata.`,
   tags: {
     readOnly: true
   }
@@ -24,11 +24,16 @@ export let showModel = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      modelfile: z.string().describe('The Modelfile content for the model.'),
-      parameters: z.string().describe('Model parameters.'),
-      template: z.string().describe('Prompt template used by the model.'),
-      system: z.string().describe('System prompt configured for the model.'),
-      license: z.string().describe('License information.'),
+      modelfile: z.string().optional().describe('The Modelfile content for the model.'),
+      parameters: z.string().optional().describe('Model parameters.'),
+      template: z.string().optional().describe('Prompt template used by the model.'),
+      system: z.string().optional().describe('System prompt configured for the model.'),
+      license: z.string().optional().describe('License information.'),
+      modifiedAt: z.string().optional().describe('ISO 8601 timestamp of last modification.'),
+      capabilities: z
+        .array(z.string())
+        .optional()
+        .describe('Model capabilities such as completion, vision, or tools.'),
       details: z
         .object({
           parentModel: z.string().optional().describe('Parent model this was derived from.'),
@@ -57,10 +62,13 @@ export let showModel = SlateTool.create(spec, {
     let sizeInfo = result.details.parameterSize
       ? `, ${result.details.parameterSize} parameters`
       : '';
+    let capabilityInfo = result.capabilities?.length
+      ? ` Capabilities: ${result.capabilities.join(', ')}.`
+      : '';
 
     return {
       output: result,
-      message: `Model **${ctx.input.modelName}**${familyInfo}${sizeInfo}.`
+      message: `Model **${ctx.input.modelName}**${familyInfo}${sizeInfo}.${capabilityInfo}`
     };
   })
   .build();

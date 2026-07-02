@@ -13,6 +13,8 @@ Use this to discover which events are available for querying, filtering, and ana
   .input(
     z.object({
       search: z.string().optional().describe('Search event names'),
+      excludeHidden: z.boolean().optional().describe('Exclude hidden event definitions'),
+      excludeStale: z.boolean().optional().describe('Exclude stale event definitions'),
       limit: z.number().optional().describe('Maximum number of results'),
       offset: z.number().optional().describe('Pagination offset')
     })
@@ -39,6 +41,8 @@ Use this to discover which events are available for querying, filtering, and ana
     let client = createClient(ctx.config, ctx.auth);
     let data = await client.listEventDefinitions({
       search: ctx.input.search,
+      excludeHidden: ctx.input.excludeHidden,
+      excludeStale: ctx.input.excludeStale,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -70,7 +74,7 @@ Use this to discover available properties for filtering, grouping, and analysis.
     z.object({
       search: z.string().optional().describe('Search property names'),
       propertyType: z
-        .enum(['event', 'person', 'group'])
+        .enum(['event', 'person', 'group', 'session'])
         .optional()
         .describe('Filter by property type'),
       limit: z.number().optional().describe('Maximum number of results'),

@@ -1,4 +1,8 @@
-import { createLocalSlateTestClient, expectSlateContract } from '@slates/test';
+import {
+  createLocalSlateTestClient,
+  describeMcpCompatibleToolSchemas,
+  expectSlateContract
+} from '@slates/test';
 import { describe, expect, it } from 'vitest';
 import { provider } from './index';
 import { gmailActionScopes, gmailScopes } from './scopes';
@@ -17,9 +21,11 @@ describe('gmail provider contract', () => {
         'search_messages',
         'get_message',
         'modify_message',
+        'delete_messages_permanently',
         'manage_draft',
         'manage_labels',
         'manage_thread',
+        'delete_thread_permanently',
         'manage_settings',
         'get_attachment',
         'list_google_contacts',
@@ -33,9 +39,11 @@ describe('gmail provider contract', () => {
         { id: 'search_messages', readOnly: true, destructive: false },
         { id: 'get_message', readOnly: true, destructive: false },
         { id: 'modify_message', readOnly: false, destructive: true },
+        { id: 'delete_messages_permanently', readOnly: false, destructive: true },
         { id: 'manage_draft', readOnly: false, destructive: false },
         { id: 'manage_labels', readOnly: false, destructive: false },
         { id: 'manage_thread', readOnly: false, destructive: false },
+        { id: 'delete_thread_permanently', readOnly: false, destructive: true },
         { id: 'manage_settings', readOnly: false, destructive: false },
         { id: 'get_attachment', readOnly: true, destructive: false },
         { id: 'list_google_contacts', readOnly: true, destructive: false },
@@ -48,7 +56,7 @@ describe('gmail provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(14);
+    expect(contract.actions).toHaveLength(16);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['userId']);
 
     let expectedScopes = {
@@ -56,21 +64,25 @@ describe('gmail provider contract', () => {
       search_messages: gmailActionScopes.searchMessages,
       get_message: gmailActionScopes.getMessage,
       modify_message: gmailActionScopes.modifyMessage,
+      delete_messages_permanently: gmailActionScopes.deleteMessagesPermanently,
       manage_draft: gmailActionScopes.manageDraft,
       manage_labels: gmailActionScopes.manageLabels,
       manage_thread: gmailActionScopes.manageThread,
+      delete_thread_permanently: gmailActionScopes.deleteThreadPermanently,
       manage_settings: gmailActionScopes.manageSettings,
       get_attachment: gmailActionScopes.getAttachment,
       list_google_contacts: gmailActionScopes.listGoogleContacts,
       search_google_contacts: gmailActionScopes.searchGoogleContacts,
       get_google_contact: gmailActionScopes.getGoogleContact,
-      mailbox_changes: gmailActionScopes.mailboxChanges,
-      inbound_webhook: gmailActionScopes.inboundWebhook
+      mailbox_changes: gmailActionScopes.mailboxChanges
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {
       expect(contract.actions.find(action => action.id === actionId)?.scopes).toEqual(scopes);
     }
+    expect(
+      contract.actions.find(action => action.id === 'inbound_webhook')?.scopes
+    ).toBeUndefined();
 
     let oauth = await client.getAuthMethod('google_oauth');
     expect(oauth.authenticationMethod.type).toBe('auth.oauth');
@@ -89,7 +101,7 @@ describe('gmail provider contract', () => {
     );
     expect(contactScope).toMatchObject({
       title: 'Google Contacts (Read-only)',
-      defaultChecked: false
+      defaultChecked: true
     });
 
     let otherContactScope = (oauth.authenticationMethod.scopes ?? []).find(
@@ -100,4 +112,54 @@ describe('gmail provider contract', () => {
       defaultChecked: false
     });
   });
+
+  it('exposes exact Gmail scopes for sensitive action groups', () => {
+    let expectedReadBodyScopes = {
+      AND: [
+        {
+          OR: [gmailScopes.gmailReadonly, gmailScopes.gmailModify, gmailScopes.fullMail]
+        }
+      ]
+    };
+    let expectedDraftScopes = {
+      AND: [
+        {
+          OR: [gmailScopes.gmailCompose, gmailScopes.gmailModify, gmailScopes.fullMail]
+        }
+      ]
+    };
+    let expectedModifyScopes = {
+      AND: [
+        {
+          OR: [gmailScopes.gmailModify, gmailScopes.fullMail]
+        }
+      ]
+    };
+    let expectedSettingsScopes = {
+      AND: [
+        {
+          OR: [gmailScopes.gmailSettingsBasic]
+        }
+      ]
+    };
+    let expectedPermanentDeleteScopes = {
+      AND: [
+        {
+          OR: [gmailScopes.fullMail]
+        }
+      ]
+    };
+
+    expect(gmailActionScopes.searchMessages).toEqual(expectedReadBodyScopes);
+    expect(gmailActionScopes.getMessage).toEqual(expectedReadBodyScopes);
+    expect(gmailActionScopes.getAttachment).toEqual(expectedReadBodyScopes);
+    expect(gmailActionScopes.manageDraft).toEqual(expectedDraftScopes);
+    expect(gmailActionScopes.manageSettings).toEqual(expectedSettingsScopes);
+    expect(gmailActionScopes.modifyMessage).toEqual(expectedModifyScopes);
+    expect(gmailActionScopes.manageThread).toEqual(expectedModifyScopes);
+    expect(gmailActionScopes.deleteMessagesPermanently).toEqual(expectedPermanentDeleteScopes);
+    expect(gmailActionScopes.deleteThreadPermanently).toEqual(expectedPermanentDeleteScopes);
+  });
 });
+
+describeMcpCompatibleToolSchemas('Gmail tool input schemas', provider.actions);

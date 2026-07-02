@@ -3,17 +3,21 @@ import { spec } from './spec';
 import {
   cancelEmbedJobTool,
   chatTool,
+  createDatasetTool,
   createEmbedJobTool,
   deleteDatasetTool,
   detokenizeTool,
   embedTool,
   getDatasetTool,
+  getDatasetUsageTool,
   getEmbedJobTool,
+  getModelTool,
   listDatasetsTool,
   listEmbedJobsTool,
   listModelsTool,
   rerankTool,
-  tokenizeTool
+  tokenizeTool,
+  transcribeAudioTool
 } from './tools';
 
 import { inboundWebhook } from './triggers/inbound-webhook';
@@ -27,13 +31,17 @@ export let provider = Slate.create({
     tokenizeTool,
     detokenizeTool,
     listModelsTool,
+    getModelTool,
+    createDatasetTool,
     listDatasetsTool,
+    getDatasetUsageTool,
     getDatasetTool,
     deleteDatasetTool,
     createEmbedJobTool,
     listEmbedJobsTool,
     getEmbedJobTool,
-    cancelEmbedJobTool
+    cancelEmbedJobTool,
+    transcribeAudioTool
   ],
   triggers: [inboundWebhook]
 });

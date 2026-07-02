@@ -8,6 +8,7 @@ let segmentSchema = z.object({
   start: z.number().describe('Start time in milliseconds.'),
   end: z.number().describe('End time in milliseconds.'),
   confidence: z.number().describe('Confidence score.'),
+  speaker: z.string().optional().nullable().describe('Speaker label if available.'),
   words: z
     .array(
       z.object({
@@ -69,6 +70,7 @@ Choose "sentences" or "paragraphs" segmentation depending on how granular you ne
       start: s.start,
       end: s.end,
       confidence: s.confidence,
+      speaker: s.speaker ?? null,
       words: s.words
     }));
 

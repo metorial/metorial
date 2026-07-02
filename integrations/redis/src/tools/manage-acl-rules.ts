@@ -47,6 +47,43 @@ export let listAclRules = SlateTool.create(spec, {
   })
   .build();
 
+export let getAclRule = SlateTool.create(spec, {
+  name: 'Get ACL Rule',
+  key: 'get_acl_rule',
+  description: `Retrieve a single Redis ACL rule by ID.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      ruleId: z.number().describe('ACL rule ID to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      rule: aclRuleSchema.describe('ACL rule details'),
+      raw: z.any().describe('Full API response')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new RedisCloudClient(ctx.auth);
+    let data = await client.getAclRule(ctx.input.ruleId);
+
+    let rule = {
+      ruleId: data.id,
+      name: data.name,
+      acl: data.acl,
+      isDefault: data.isDefault
+    };
+
+    return {
+      output: { rule, raw: data },
+      message: `ACL rule **${ctx.input.ruleId}** retrieved.`
+    };
+  })
+  .build();
+
 export let createAclRule = SlateTool.create(spec, {
   name: 'Create ACL Rule',
   key: 'create_acl_rule',

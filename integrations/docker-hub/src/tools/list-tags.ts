@@ -55,7 +55,7 @@ export let listTags = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let ns = ctx.input.namespace || ctx.config.namespace || ctx.auth.username;
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listTags(ns, ctx.input.repositoryName, {
       page: ctx.input.page,
       pageSize: ctx.input.pageSize

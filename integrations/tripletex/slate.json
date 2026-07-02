@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/tripletex",
+  "description": "Connect to Tripletex accounting and ERP data. Inspect session context, list and upsert customers, suppliers, products, and projects, list orders and invoices, create orders and invoices with explicit send controls, retrieve supplier invoices, vouchers, ledger postings, balance sheet accounts, download accounting PDFs as attachments, and manage Tripletex webhook subscriptions.",
+  "categories": ["accounting", "erp", "finance"],
+  "skills": [
+    "sync customer and supplier master data",
+    "retrieve invoices and invoice PDFs",
+    "create orders and invoices",
+    "retrieve supplier invoices and voucher PDFs",
+    "list ledger postings by date",
+    "review balance sheet account movements",
+    "manage product and project records",
+    "manage webhook subscriptions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tripletex.svg"
+}

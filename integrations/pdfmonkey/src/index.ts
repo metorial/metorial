@@ -4,12 +4,15 @@ import {
   createTemplate,
   deleteDocument,
   deleteTemplate,
+  downloadDocument,
   generateDocument,
   getAccountInfo,
   getDocument,
   getTemplate,
   listDocuments,
+  listEngines,
   listTemplates,
+  updateDocument,
   updateTemplate
 } from './tools';
 import { documentGenerated } from './triggers';
@@ -18,6 +21,8 @@ export let provider = Slate.create({
   spec,
   tools: [
     generateDocument,
+    downloadDocument,
+    updateDocument,
     getDocument,
     listDocuments,
     deleteDocument,
@@ -26,6 +31,7 @@ export let provider = Slate.create({
     createTemplate,
     updateTemplate,
     deleteTemplate,
+    listEngines,
     getAccountInfo
   ],
   triggers: [documentGenerated]

@@ -1,6 +1,6 @@
 # <img src="logo.jpeg" height="20"> Lemon Squeezy
 
-Manage digital product sales, subscriptions, and license keys. Create and retrieve stores, products, variants, and customers. Generate custom checkout URLs with pre-filled data, discounts, and custom metadata. Process and refund orders. Create, update, cancel, pause, resume, and upgrade/downgrade subscriptions. Issue and manage discount codes with percentage or fixed-amount rules. Generate, validate, activate, and deactivate software license keys. Manage digital file delivery. Configure webhooks to receive events for orders, subscriptions, payments, license keys, and affiliates.
+Manage digital product sales, subscriptions, customers, discounts, webhooks, and license keys. Retrieve stores, products, variants, prices, files, checkouts, webhooks, orders, order items, subscription invoices, subscription items, customers, discounts, discount redemptions, and license keys. Generate custom checkout URLs with pre-filled data, discounts, and custom metadata. Create and archive customers, issue and delete discount codes, refund orders, update license key settings, and create, update, or delete webhooks for Lemon Squeezy event delivery.
 
 ## License
 

@@ -301,6 +301,10 @@ export class Client {
     style?: string;
     user?: string;
   }): Promise<any> {
+    let usesGptImageModelOrOptions =
+      params.model?.startsWith('gpt-image-') ||
+      ['low', 'medium', 'high', 'auto'].includes(params.quality ?? '');
+
     let body: Record<string, any> = {
       prompt: params.prompt
     };
@@ -308,7 +312,9 @@ export class Client {
     if (params.model !== undefined) body.model = params.model;
     if (params.n !== undefined) body.n = params.n;
     if (params.quality !== undefined) body.quality = params.quality;
-    if (params.responseFormat !== undefined) body.response_format = params.responseFormat;
+    if (params.responseFormat !== undefined && !usesGptImageModelOrOptions) {
+      body.response_format = params.responseFormat;
+    }
     if (params.size !== undefined) body.size = params.size;
     if (params.style !== undefined) body.style = params.style;
     if (params.user !== undefined) body.user = params.user;
@@ -606,7 +612,13 @@ export class Client {
   }
 
   async cancelBatch(batchId: string): Promise<any> {
-    let response = await this.axios.post(`/batches/${batchId}/cancel`);
+    let response = await this.axios.post(
+      `/batches/${batchId}/cancel`,
+      {},
+      {
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
     return response.data;
   }
 

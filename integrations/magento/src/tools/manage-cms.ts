@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MagentoClient } from '../lib/client';
+import { magentoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let pageOutputSchema = z.object({
@@ -114,7 +115,8 @@ export let manageCms = SlateTool.create(spec, {
 
     if (ctx.input.resourceType === 'page') {
       if (ctx.input.action === 'get') {
-        if (!ctx.input.resourceId) throw new Error('resourceId is required for get action');
+        if (!ctx.input.resourceId)
+          throw magentoServiceError('resourceId is required for get action');
         let page = await client.getCmsPage(ctx.input.resourceId);
         return {
           output: { page: mapPage(page) },
@@ -137,7 +139,8 @@ export let manageCms = SlateTool.create(spec, {
       }
 
       if (ctx.input.action === 'delete') {
-        if (!ctx.input.resourceId) throw new Error('resourceId is required for delete action');
+        if (!ctx.input.resourceId)
+          throw magentoServiceError('resourceId is required for delete action');
         await client.deleteCmsPage(ctx.input.resourceId);
         return {
           output: { deleted: true },
@@ -168,7 +171,8 @@ export let manageCms = SlateTool.create(spec, {
       }
 
       // update
-      if (!ctx.input.resourceId) throw new Error('resourceId is required for update action');
+      if (!ctx.input.resourceId)
+        throw magentoServiceError('resourceId is required for update action');
       let page = await client.updateCmsPage(ctx.input.resourceId, pageData);
       return {
         output: { page: mapPage(page) },
@@ -178,7 +182,8 @@ export let manageCms = SlateTool.create(spec, {
 
     // block
     if (ctx.input.action === 'get') {
-      if (!ctx.input.resourceId) throw new Error('resourceId is required for get action');
+      if (!ctx.input.resourceId)
+        throw magentoServiceError('resourceId is required for get action');
       let block = await client.getCmsBlock(ctx.input.resourceId);
       return {
         output: { block: mapBlock(block) },
@@ -201,7 +206,8 @@ export let manageCms = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.resourceId) throw new Error('resourceId is required for delete action');
+      if (!ctx.input.resourceId)
+        throw magentoServiceError('resourceId is required for delete action');
       await client.deleteCmsBlock(ctx.input.resourceId);
       return {
         output: { deleted: true },
@@ -224,7 +230,8 @@ export let manageCms = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.resourceId) throw new Error('resourceId is required for update action');
+    if (!ctx.input.resourceId)
+      throw magentoServiceError('resourceId is required for update action');
     let block = await client.updateCmsBlock(ctx.input.resourceId, blockData);
     return {
       output: { block: mapBlock(block) },

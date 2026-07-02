@@ -1,57 +1,58 @@
-# <img src="https://provider-logos.metorial-cdn.com/Dynamics%20365%20Icon.svg" height="20"> Dynamics 365
+# Dynamics 365
 
-Create, read, update, and delete CRM and ERP records across Dynamics 365 entities including accounts, contacts, leads, opportunities, and cases. Query data with advanced filtering, sorting, pagination, and FetchXML aggregation. Manage relationships between entities by associating and disassociating records. Discover and inspect metadata, schema definitions, and entity attributes. Invoke built-in and custom functions and actions (e.g., WhoAmI, InitializeFrom). Detect duplicate records using configurable rules. Search across multiple entities with full-text relevance search. Upload and download files and images attached to entity columns. Receive real-time webhook notifications on record create, update, delete, assign, and status change events.
+Unified Microsoft Dynamics 365 connector for Dataverse, Sales, Customer Service,
+Field Service, Contact Center, Customer Insights, Finance, Supply Chain, Project
+Operations, Commerce, Human Resources, and Business Central.
 
-## Tools
+The provider key is `dynamics-365`. The public tool surface is intentionally new
+and explicit: every tool ID starts with its subservice prefix, such as
+`dataverse_list_records`, `finance_list_customers`,
+`business_central_list_customers`, or `commerce_manage_customers`.
 
-### Create Record
+## Authentication
 
-Create a new record in any Dynamics 365 entity (e.g., accounts, contacts, leads, opportunities, cases, or custom entities). Supports duplicate detection when enabled. Use **@odata.bind** annotations in the record data to associate new records with existing ones during creation.
+The integration exposes four auth methods:
 
-### Delete Record
+- `oauth_common`: Work & Personal delegated Microsoft OAuth for configured
+  Dataverse, Finance and Operations, and Business Central resources.
+- `oauth_organizations`: Work Only delegated Microsoft OAuth for configured
+  Dataverse, Finance and Operations, and Business Central resources.
+- `microsoft_client_credentials`: app-only tokens for configured Dataverse,
+  Finance and Operations, and Commerce Retail Server resources.
+- `commerce_access_token`: direct Commerce Retail Server bearer-token setup.
 
-Permanently delete a record from any Dynamics 365 entity. This action cannot be undone.
+There is no discovery fallback and no legacy auth aliasing. Configure exact
+resource fields such as `dataverseInstanceUrl`, `finOpsBaseUrl`,
+`businessCentralEnvironmentName`, `retailServerUrl`, and
+`commerceServerResourceId` for the resources you want to enable. Business
+Central OAuth can use the common Business Central endpoint without
+`businessCentralTenantId`; set `businessCentralTenantId` only when you need a
+direct-tenant Business Central URL segment. If every OAuth resource input is
+left blank during setup, the integration defaults to Business Central
+`production`.
 
-### FetchXML Query
+## Tool Families
 
-Execute a FetchXML query against a Dynamics 365 entity. FetchXML is a proprietary query language that supports aggregation, grouping, and complex joins that are not possible with standard OData queries.
+- `dataverse_*`: generic Dataverse records, metadata, search, relationships,
+  actions/functions, file columns, batch requests, and Dataverse triggers.
+- `sales_*`, `customer_service_*`, `field_service_*`, `contact_center_*`, and
+  `customer_insights_*`: Dataverse-backed product workflows and records.
+- `finance_*`, `supply_chain_*`, and `human_resources_*`: Finance and Operations
+  OData resources and Data Management status checks.
+- `project_operations_*`: Project Operations Dataverse records, schedule API
+  OperationSets, and Finance handoff status checks.
+- `commerce_*`: Commerce Retail Server channels, catalogs, products, customers,
+  carts, orders, and metadata.
+- `business_central_*`: Business Central companies, customers, vendors,
+  invoices, items, accounts, general ledger entries, journals, and document
+  attachments.
 
-### List Entity Definitions
+## File Outputs
 
-List all entity (table) definitions in the Dynamics 365 environment. Returns metadata about available entities including their logical names, display names, and entity set names. Useful for discovering which entities are available and their OData entity set names.
-
-### Get Record
-
-Retrieve a single record by its ID from any Dynamics 365 entity. Supports selecting specific columns and expanding related records via navigation properties.
-
-### Invoke Function
-
-Invoke an unbound function in Dynamics 365. Functions are read-only operations that return data without side effects. Common functions include **WhoAmI**, **RetrieveCurrentOrganization**, and **RetrieveTotalRecordCount**.
-
-### List Records
-
-Query and list records from any Dynamics 365 entity with support for OData filtering, sorting, column selection, pagination, and expanding related records. Use this to retrieve multiple records based on criteria. Supports standard OData query options.
-
-### Associate Records
-
-Create an association (relationship) between two existing Dynamics 365 records using a navigation property. Used for linking records through many-to-one, one-to-many, or many-to-many relationships.
-
-### Search Records
-
-Perform a full-text relevance search across multiple Dynamics 365 entities using the Dataverse Search API. Returns results ranked by relevance, useful for finding records when you don't know the exact entity or field to query.
-
-### Update Record
-
-Update an existing record in any Dynamics 365 entity. Only the fields included in the update data will be modified; other fields remain unchanged.
-
-### Who Am I
-
-Retrieve information about the currently authenticated user, including user ID, organization ID, and business unit ID. Useful for verifying connection and getting the current user context.
+Download/export tools return bytes as Slate attachments. Structured output is
+limited to metadata such as MIME type, size, ids, and attachment count.
 
 ## License
 
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+This integration is licensed under the
+[FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

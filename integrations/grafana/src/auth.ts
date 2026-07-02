@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { grafanaApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -34,19 +35,23 @@ export let auth = SlateAuth.create()
     }) => {
       let baseUrl = ctx.input.instanceUrl.replace(/\/+$/, '');
       let axios = createAxios();
-      let response = await axios.get(`${baseUrl}/api/org`, {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      try {
+        let response = await axios.get(`${baseUrl}/api/org`, {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`,
+            'Content-Type': 'application/json'
+          }
+        });
 
-      return {
-        profile: {
-          id: String(response.data.id),
-          name: response.data.name
-        }
-      };
+        return {
+          profile: {
+            id: String(response.data.id),
+            name: response.data.name
+          }
+        };
+      } catch (error) {
+        throw grafanaApiError(error, 'profile lookup');
+      }
     }
   })
   .addCustomAuth({
@@ -76,19 +81,23 @@ export let auth = SlateAuth.create()
     }) => {
       let baseUrl = ctx.input.instanceUrl.replace(/\/+$/, '');
       let axios = createAxios();
-      let response = await axios.get(`${baseUrl}/api/user`, {
-        headers: {
-          Authorization: ctx.output.token,
-          'Content-Type': 'application/json'
-        }
-      });
+      try {
+        let response = await axios.get(`${baseUrl}/api/user`, {
+          headers: {
+            Authorization: ctx.output.token,
+            'Content-Type': 'application/json'
+          }
+        });
 
-      return {
-        profile: {
-          id: String(response.data.id),
-          email: response.data.email,
-          name: response.data.name || response.data.login
-        }
-      };
+        return {
+          profile: {
+            id: String(response.data.id),
+            email: response.data.email,
+            name: response.data.name || response.data.login
+          }
+        };
+      } catch (error) {
+        throw grafanaApiError(error, 'profile lookup');
+      }
     }
   });

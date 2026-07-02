@@ -1,4 +1,6 @@
+import { Buffer } from 'node:buffer';
 import { createAxios } from 'slates';
+import { amplitudeApiError, amplitudeServiceError } from './errors';
 
 export type AmplitudeRegion = 'US' | 'EU';
 
@@ -14,6 +16,10 @@ let getApiBaseUrl = (region: AmplitudeRegion) => {
 
 let getIngestionBaseUrl = (region: AmplitudeRegion) => {
   return region === 'EU' ? 'https://api.eu.amplitude.com' : 'https://api2.amplitude.com';
+};
+
+let getUserMappingBaseUrl = (region: AmplitudeRegion) => {
+  return region === 'EU' ? 'https://api.eu.amplitude.com' : 'https://api.amplitude.com';
 };
 
 let getProfileBaseUrl = (region: AmplitudeRegion) => {
@@ -73,12 +79,67 @@ export class AmplitudeClient {
     this.config = config;
   }
 
+  private withErrorHandling(ax: ReturnType<typeof createAxios>) {
+    ax.interceptors.response.use(
+      response => response,
+      error => Promise.reject(amplitudeApiError(error))
+    );
+    return ax;
+  }
+
+  private getIngestionAxios() {
+    return this.withErrorHandling(
+      createAxios({
+        baseURL: getIngestionBaseUrl(this.config.region)
+      })
+    );
+  }
+
+  private getUserMappingAxios() {
+    return this.withErrorHandling(
+      createAxios({
+        baseURL: getUserMappingBaseUrl(this.config.region)
+      })
+    );
+  }
+
+  private getAnalyticsAxios() {
+    return this.withErrorHandling(
+      createAxios({
+        baseURL: getApiBaseUrl(this.config.region),
+        headers: {
+          Authorization: `Basic ${this.config.token}`
+        }
+      })
+    );
+  }
+
+  private getProfileAxios() {
+    return this.withErrorHandling(
+      createAxios({
+        baseURL: getProfileBaseUrl(this.config.region),
+        headers: {
+          Authorization: `Api-Key ${this.config.secretKey}`
+        }
+      })
+    );
+  }
+
+  private getExportAxios() {
+    return this.withErrorHandling(
+      createAxios({
+        baseURL: getBaseUrl(this.config.region),
+        headers: {
+          Authorization: `Basic ${this.config.token}`
+        }
+      })
+    );
+  }
+
   // --- Event Ingestion ---
 
   async trackEvents(events: AmplitudeEvent[], options?: { minIdLength?: number }) {
-    let ax = createAxios({
-      baseURL: getIngestionBaseUrl(this.config.region)
-    });
+    let ax = this.getIngestionAxios();
 
     let body: Record<string, any> = {
       api_key: this.config.apiKey,
@@ -94,9 +155,7 @@ export class AmplitudeClient {
   }
 
   async batchTrackEvents(events: AmplitudeEvent[], options?: { minIdLength?: number }) {
-    let ax = createAxios({
-      baseURL: getIngestionBaseUrl(this.config.region)
-    });
+    let ax = this.getIngestionAxios();
 
     let body: Record<string, any> = {
       api_key: this.config.apiKey,
@@ -158,9 +217,7 @@ export class AmplitudeClient {
     deviceId?: string;
     userProperties: Record<string, any>;
   }) {
-    let ax = createAxios({
-      baseURL: getIngestionBaseUrl(this.config.region)
-    });
+    let ax = this.getIngestionAxios();
 
     let identifyPayload = {
       user_id: identification.userId,
@@ -182,9 +239,7 @@ export class AmplitudeClient {
     groupValue: string,
     groupProperties: Record<string, any>
   ) {
-    let ax = createAxios({
-      baseURL: getIngestionBaseUrl(this.config.region)
-    });
+    let ax = this.getIngestionAxios();
 
     let identifyPayload = {
       group_type: groupType,
@@ -204,9 +259,7 @@ export class AmplitudeClient {
   // --- User Mapping (Aliasing) ---
 
   async mapUserIdentities(mapping: { userId: string; globalUserId: string }) {
-    let ax = createAxios({
-      baseURL: getIngestionBaseUrl(this.config.region)
-    });
+    let ax = this.getUserMappingAxios();
 
     let response = await ax.post('/usermap', null, {
       params: {
@@ -221,15 +274,6 @@ export class AmplitudeClient {
   }
 
   // --- Dashboard REST API ---
-
-  private getAnalyticsAxios() {
-    return createAxios({
-      baseURL: getApiBaseUrl(this.config.region),
-      headers: {
-        Authorization: `Basic ${this.config.token}`
-      }
-    });
-  }
 
   async getActiveAndNewUserCounts(params: {
     start: string;
@@ -307,19 +351,28 @@ export class AmplitudeClient {
 
   async getChartResults(chartId: string) {
     let ax = this.getAnalyticsAxios();
-    let response = await ax.get(`/3/chart/${chartId}/query`);
-    return response.data;
+    let response = await ax.get(`/3/chart/${chartId}/csv`, {
+      responseType: 'text'
+    });
+    let content =
+      typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+    let contentTypeHeader = response.headers?.['content-type'];
+    let contentType =
+      typeof contentTypeHeader === 'string'
+        ? contentTypeHeader.split(';')[0]?.trim()
+        : undefined;
+
+    return {
+      content,
+      contentType: contentType || 'text/csv',
+      byteLength: Buffer.byteLength(content)
+    };
   }
 
   // --- User Profile API ---
 
   async getUserProfile(params: { userId?: string; amplitudeId?: number }) {
-    let ax = createAxios({
-      baseURL: getProfileBaseUrl(this.config.region),
-      headers: {
-        Authorization: `Api-Key ${this.config.secretKey}`
-      }
-    });
+    let ax = this.getProfileAxios();
 
     let queryParams: Record<string, any> = {};
     if (params.userId) queryParams.user_id = params.userId;
@@ -338,9 +391,18 @@ export class AmplitudeClient {
   }
 
   async getCohort(cohortId: string) {
-    let ax = this.getAnalyticsAxios();
-    let response = await ax.get(`/3/cohorts/${cohortId}`);
-    return response.data;
+    let result = await this.listCohorts();
+    let cohorts = Array.isArray(result) ? result : (result.cohorts ?? []);
+    let cohort = cohorts.find((item: any) => {
+      let id = item.id ?? item.cohort_id;
+      return id !== undefined && String(id) === cohortId;
+    });
+
+    if (!cohort) {
+      throw amplitudeServiceError(`Amplitude cohort "${cohortId}" was not found.`);
+    }
+
+    return cohort;
   }
 
   async downloadCohort(cohortId: string, props?: boolean) {
@@ -353,7 +415,7 @@ export class AmplitudeClient {
 
   async getCohortDownloadStatus(requestId: string) {
     let ax = this.getAnalyticsAxios();
-    let response = await ax.get(`/5/cohorts/request/status/${requestId}`);
+    let response = await ax.get(`/5/cohorts/request-status/${requestId}`);
     return response.data;
   }
 
@@ -363,6 +425,10 @@ export class AmplitudeClient {
     idType: 'BY_AMP_ID' | 'BY_USER_ID';
     ids: string[];
     owner?: string;
+    published?: boolean;
+    skipSave?: boolean;
+    skipInvalidIds?: boolean;
+    countGroup?: string;
     existingCohortId?: string;
   }) {
     let ax = this.getAnalyticsAxios();
@@ -373,9 +439,45 @@ export class AmplitudeClient {
       ids: params.ids
     };
     if (params.owner) body.owner = params.owner;
+    if (params.published !== undefined) body.published = params.published;
+    if (params.skipSave !== undefined) body.skip_save = params.skipSave;
+    if (params.skipInvalidIds !== undefined) body.skip_invalid_ids = params.skipInvalidIds;
+    if (params.countGroup) body.cg = params.countGroup;
     if (params.existingCohortId) body.existing_cohort_id = params.existingCohortId;
 
     let response = await ax.post('/3/cohorts/upload', body);
+    return response.data;
+  }
+
+  async getCohortUsage() {
+    let ax = this.getAnalyticsAxios();
+    let response = await ax.get('/3/cohorts/usage');
+    return response.data;
+  }
+
+  async updateCohortMembership(params: {
+    cohortId: string;
+    memberships: Array<{
+      ids: string[];
+      idType: 'BY_ID' | 'BY_NAME';
+      operation: 'ADD' | 'REMOVE';
+    }>;
+    countGroup?: string;
+    skipInvalidIds?: boolean;
+  }) {
+    let ax = this.getAnalyticsAxios();
+    let body: Record<string, any> = {
+      cohort_id: params.cohortId,
+      memberships: params.memberships.map(membership => ({
+        ids: membership.ids,
+        id_type: membership.idType,
+        operation: membership.operation
+      }))
+    };
+    if (params.countGroup) body.count_group = params.countGroup;
+    if (params.skipInvalidIds !== undefined) body.skip_invalid_ids = params.skipInvalidIds;
+
+    let response = await ax.post('/3/cohorts/membership', body);
     return response.data;
   }
 
@@ -599,25 +701,35 @@ export class AmplitudeClient {
 
   async listAnnotations() {
     let ax = this.getAnalyticsAxios();
-    let response = await ax.get('/2/annotations');
+    let response = await ax.get('/3/annotations');
     return response.data;
   }
 
   async getAnnotation(annotationId: string) {
     let ax = this.getAnalyticsAxios();
-    let response = await ax.get(`/2/annotations/${annotationId}`);
+    let response = await ax.get(`/3/annotations/${annotationId}`);
     return response.data;
   }
 
-  async createAnnotation(params: { label: string; date: string; details?: string }) {
+  async createAnnotation(params: {
+    label: string;
+    start: string;
+    details?: string;
+    end?: string;
+    category?: string;
+    chartId?: string;
+  }) {
     let ax = this.getAnalyticsAxios();
     let body: Record<string, any> = {
       label: params.label,
-      date: params.date
+      start: params.start
     };
     if (params.details) body.details = params.details;
+    if (params.end) body.end = params.end;
+    if (params.category) body.category = params.category;
+    if (params.chartId) body.chart_id = params.chartId;
 
-    let response = await ax.post('/2/annotations', body);
+    let response = await ax.post('/3/annotations', body);
     return response.data;
   }
 
@@ -625,39 +737,53 @@ export class AmplitudeClient {
     annotationId: string,
     params: {
       label?: string;
-      date?: string;
+      start?: string;
       details?: string;
+      end?: string | null;
+      category?: string;
+      chartId?: string | null;
     }
   ) {
     let ax = this.getAnalyticsAxios();
     let body: Record<string, any> = {};
     if (params.label) body.label = params.label;
-    if (params.date) body.date = params.date;
-    if (params.details) body.details = params.details;
+    if (params.start) body.start = params.start;
+    if (params.details !== undefined) body.details = params.details;
+    if (params.end !== undefined) body.end = params.end;
+    if (params.category) body.category = params.category;
+    if (params.chartId !== undefined) body.chart_id = params.chartId;
 
-    let response = await ax.put(`/2/annotations/${annotationId}`, body);
+    let response = await ax.put(`/3/annotations/${annotationId}`, body);
     return response.data;
   }
 
   async deleteAnnotation(annotationId: string) {
     let ax = this.getAnalyticsAxios();
-    let response = await ax.delete(`/2/annotations/${annotationId}`);
+    let response = await ax.delete(`/3/annotations/${annotationId}`);
     return response.data;
   }
 
   // --- Export API ---
 
   async exportEvents(params: { start: string; end: string }) {
-    let ax = createAxios({
-      baseURL: getBaseUrl(this.config.region),
-      headers: {
-        Authorization: `Basic ${this.config.token}`
-      }
-    });
+    let ax = this.getExportAxios();
     let response = await ax.get('/api/2/export', {
-      params: { start: params.start, end: params.end }
+      params: { start: params.start, end: params.end },
+      responseType: 'arraybuffer'
     });
-    return response.data;
+
+    let buffer = Buffer.isBuffer(response.data) ? response.data : Buffer.from(response.data);
+    let contentTypeHeader = response.headers?.['content-type'];
+    let contentType =
+      typeof contentTypeHeader === 'string'
+        ? contentTypeHeader.split(';')[0]?.trim()
+        : undefined;
+
+    return {
+      contentBase64: buffer.toString('base64'),
+      contentType: contentType || 'application/zip',
+      byteLength: buffer.byteLength
+    };
   }
 
   // --- User Privacy / Deletion ---

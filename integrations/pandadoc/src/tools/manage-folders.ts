@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listDocumentFolders = SlateTool.create(spec, {
   name: 'List Document Folders',
   key: 'list_document_folders',
-  description: `List document folders in the PandaDoc workspace. Optionally create a new folder or move a document into a folder.`,
+  description: `List document folders in the PandaDoc workspace.`,
   tags: {
     readOnly: true
   }
@@ -98,25 +98,24 @@ export let createDocumentFolder = SlateTool.create(spec, {
   })
   .build();
 
-export let moveDocumentToFolder = SlateTool.create(spec, {
-  name: 'Move Document to Folder',
-  key: 'move_document_to_folder',
-  description: `Move a PandaDoc document into a specific folder.`,
+export let renameDocumentFolder = SlateTool.create(spec, {
+  name: 'Rename Document Folder',
+  key: 'rename_document_folder',
+  description: `Rename an existing PandaDoc document folder.`,
   tags: {
     readOnly: false
   }
 })
   .input(
     z.object({
-      documentId: z.string().describe('UUID of the document to move'),
-      folderId: z.string().describe('UUID of the destination folder')
+      folderId: z.string().describe('UUID of the document folder to rename'),
+      folderName: z.string().describe('New folder name')
     })
   )
   .output(
     z.object({
-      moved: z.boolean().describe('Whether the document was successfully moved'),
-      documentId: z.string().describe('Document UUID'),
-      folderId: z.string().describe('Destination folder UUID')
+      folderId: z.string().describe('UUID of the renamed folder'),
+      folderName: z.string().describe('Updated folder name')
     })
   )
   .handleInvocation(async ctx => {
@@ -125,15 +124,16 @@ export let moveDocumentToFolder = SlateTool.create(spec, {
       authType: ctx.auth.authType
     });
 
-    await client.moveDocumentToFolder(ctx.input.documentId, ctx.input.folderId);
+    let result = await client.renameDocumentFolder(ctx.input.folderId, {
+      name: ctx.input.folderName
+    });
 
     return {
       output: {
-        moved: true,
-        documentId: ctx.input.documentId,
-        folderId: ctx.input.folderId
+        folderId: result.uuid || result.id || ctx.input.folderId,
+        folderName: result.name || ctx.input.folderName
       },
-      message: `Moved document \`${ctx.input.documentId}\` to folder \`${ctx.input.folderId}\`.`
+      message: `Renamed folder \`${ctx.input.folderId}\` to **${result.name || ctx.input.folderName}**.`
     };
   })
   .build();

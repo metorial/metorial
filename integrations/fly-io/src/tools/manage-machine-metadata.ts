@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { flyIoServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -49,8 +50,9 @@ export let manageMachineMetadata = SlateTool.create(spec, {
         };
       }
       case 'set': {
-        if (!ctx.input.key) throw new Error('key is required for set action');
-        if (ctx.input.value === undefined) throw new Error('value is required for set action');
+        if (!ctx.input.key) throw flyIoServiceError('key is required for set action');
+        if (ctx.input.value === undefined)
+          throw flyIoServiceError('value is required for set action');
         await client.setMachineMetadata(appName, machineId, ctx.input.key, ctx.input.value);
         return {
           output: { updated: true },
@@ -58,7 +60,7 @@ export let manageMachineMetadata = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.key) throw new Error('key is required for delete action');
+        if (!ctx.input.key) throw flyIoServiceError('key is required for delete action');
         await client.deleteMachineMetadata(appName, machineId, ctx.input.key);
         return {
           output: { deleted: true },

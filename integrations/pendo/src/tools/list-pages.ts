@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PendoClient } from '../lib/client';
 import { spec } from '../spec';
+import { createPendoClient, validateMultiAppFilter } from './helpers';
 
 export let listPages = SlateTool.create(spec, {
   name: 'List Pages',
@@ -16,7 +16,11 @@ export let listPages = SlateTool.create(spec, {
       appId: z
         .string()
         .optional()
-        .describe('Application ID to filter pages for a specific app')
+        .describe('Application ID to filter pages for a specific app'),
+      expandAll: z
+        .boolean()
+        .optional()
+        .describe('Set to true to return pages from all apps in a multi-app subscription')
     })
   )
   .output(
@@ -34,15 +38,16 @@ export let listPages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PendoClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
+    validateMultiAppFilter(ctx.input);
+    let client = createPendoClient(ctx);
+
+    let pages = await client.listPages({
+      appId: ctx.input.appId,
+      expandAll: ctx.input.expandAll
     });
 
-    let pages = await client.listPages(ctx.input.appId);
-
     let mappedPages = (Array.isArray(pages) ? pages : []).map((p: any) => ({
-      pageId: p.id || '',
+      pageId: p.id || p.pageId || '',
       name: p.name || '',
       raw: p
     }));

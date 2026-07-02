@@ -1,8 +1,16 @@
 # <img src="https://provider-logos.metorial-cdn.com/assembly-ai.png" height="20"> Assembly Ai
 
-Transcribe pre-recorded and live audio/video to text with support for 99+ languages, speaker diarization, and multichannel audio. Apply audio intelligence models to extract summaries, sentiment analysis, entity detection, topic detection, key phrases, and content moderation from transcripts. Redact personally identifiable information from text and audio. Generate SRT/VTT subtitles and segment transcripts into paragraphs, sentences, or auto-chapters. Stream real-time speech-to-text via WebSocket connections. Upload audio/video files for processing. Manage and delete transcripts. Access an LLM gateway to apply large language models (Claude, GPT, Gemini) to transcribed speech data for summarization, Q&A, and custom analysis. Translate transcripts across 99+ languages. Receive webhook notifications when transcriptions complete or fail.
+Transcribe pre-recorded and live audio/video to text with support for 99+ languages, speaker diarization, code switching, and multichannel audio. Apply audio intelligence models to extract sentiment analysis, entity detection, topic detection, key phrases, and content moderation from transcripts. Redact personally identifiable information from text and audio. Generate SRT/VTT subtitles and segment transcripts into paragraphs or sentences. Upload audio/video files for processing. Manage and delete transcripts. Use AssemblyAI's LLM Gateway for transcript-aware summarization, Q&A, and custom analysis, and Speech Understanding for transcript translation, speaker identification, and custom formatting. Stream real-time speech-to-text via WebSocket connections with temporary tokens. Receive webhook notifications when transcriptions complete or fail.
 
 ## Tools
+
+### Create Chat Completion
+
+Create a completion with AssemblyAI's LLM Gateway. Use prompt for a simple request, or messages for a conversation. Provide transcriptId to inject an AssemblyAI transcript into the first {{ transcript }} tag in the prompt.
+
+### Create Speech Understanding
+
+Apply AssemblyAI Speech Understanding to a completed transcript. Supports translation, advanced speaker identification, and custom formatting in one request.
 
 ### Create Streaming Token
 
@@ -14,7 +22,7 @@ Delete a transcript by removing its data and marking it as deleted. The transcri
 
 ### Get Redacted Audio
 
-Retrieve the URL for a PII-redacted audio file. The original transcription must have been submitted with PII audio redaction enabled (\
+Retrieve the URL for a PII-redacted audio file. The original transcription must have been submitted with PII audio redaction enabled.
 
 ### Get Subtitles
 
@@ -28,10 +36,6 @@ Retrieve a completed transcript's text segmented into sentences or paragraphs. T
 
 Retrieve a transcript by its ID. Returns the full transcript object including text, words with timestamps, speaker labels, and any enabled audio intelligence results (summary, sentiment, entities, topics, chapters, content safety, key phrases). Use this to poll for completion after submitting a transcription, or to retrieve results of a completed transcript.
 
-### LeMUR Task
-
-Apply a large language model to one or more transcripts using AssemblyAI's LeMUR framework. Submit a custom prompt along with transcript IDs or raw text input, and receive an LLM-generated response. Use this for summarizing transcripts, extracting insights, answering questions about audio content, generating action items, or any custom analysis task. Supports multiple LLM providers including Claude, GPT, and Gemini models.
-
 ### List Transcripts
 
 List transcripts with pagination and optional filters. Returns transcript summaries sorted from newest to oldest. Supports filtering by status and creation date, and cursor-based pagination using before/after IDs.
@@ -42,7 +46,11 @@ Search through a completed transcript for specific keywords. You can search for 
 
 ### Submit Transcription
 
-Submit an audio or video file for asynchronous transcription. Provide a publicly accessible URL to the media file. Optionally enable audio intelligence features like summarization, sentiment analysis, entity detection, topic detection, content moderation, key phrases, auto chapters, and PII redaction. Returns the transcript object with a status of "queued" — poll using the **Get Transcript** tool to check for completion.
+Submit an audio or video file for asynchronous transcription. Provide a publicly accessible media URL or an AssemblyAI upload URL from Upload Media File. Optionally enable current transcription features like code switching, speech model priority routing, keyterms prompting, sentiment analysis, entity detection, topic detection, content moderation, and PII redaction. Returns the transcript object with a status of "queued" — poll using the **Get Transcript** tool to check for completion.
+
+### Upload Media File
+
+Upload local audio or video bytes to AssemblyAI and receive an AssemblyAI-only upload URL. Use the returned uploadUrl as audioUrl in Submit Transcription when the media is not already publicly accessible.
 
 ## License
 

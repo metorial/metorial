@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RedisCloudClient } from '../lib/client';
 import { spec } from '../spec';
+import { requireInputFields, subscriptionTypeSchema } from './common';
 
 export let createDatabase = SlateTool.create(spec, {
   name: 'Create Database',
@@ -19,7 +20,7 @@ export let createDatabase = SlateTool.create(spec, {
   .input(
     z.object({
       subscriptionId: z.number().describe('Subscription ID to create the database in'),
-      type: z.enum(['pro', 'essentials']).default('pro').describe('Subscription type'),
+      type: subscriptionTypeSchema,
       name: z.string().describe('Database name (alphanumeric and hyphens only)'),
       dryRun: z
         .boolean()
@@ -86,6 +87,14 @@ export let createDatabase = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new RedisCloudClient(ctx.auth);
+
+    if (ctx.input.type === 'pro') {
+      requireInputFields(
+        ctx.input,
+        ['datasetSizeInGb'],
+        'datasetSizeInGb is required when creating a Pro database.'
+      );
+    }
 
     let body: Record<string, any> = { name: ctx.input.name };
     if (ctx.input.dryRun) body.dryRun = true;

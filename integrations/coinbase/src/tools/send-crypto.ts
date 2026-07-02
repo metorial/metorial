@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { coinbaseOAuthAuthMethods } from '../lib/auth-methods';
 import { CoinbaseClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -17,6 +18,7 @@ export let sendCrypto = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(coinbaseOAuthAuthMethods)
   .input(
     z.object({
       accountId: z.string().describe('Source account ID to send from'),

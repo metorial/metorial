@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient, extractPaginationCursor } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -49,7 +50,7 @@ Use this to see who is in a particular audience.`,
     let client = createClient(ctx);
 
     if (!ctx.input.listId && !ctx.input.segmentId) {
-      throw new Error('Either listId or segmentId must be provided');
+      throw klaviyoServiceError('Either listId or segmentId must be provided');
     }
 
     let result: any;

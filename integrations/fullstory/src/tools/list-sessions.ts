@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fullStoryServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listSessions = SlateTool.create(spec, {
@@ -9,7 +10,8 @@ export let listSessions = SlateTool.create(spec, {
   description: `Retrieve a list of recorded sessions for a user. Lookup by uid or email address. Returns session replay URLs that can be embedded in support tools or other applications.`,
   instructions: [
     'Provide either uid or email (at least one is required).',
-    'If both are provided, FullStory returns the union of results.'
+    'If both are provided, FullStory returns the union of results.',
+    'Pagination is not currently supported by FullStory for this endpoint.'
   ],
   tags: {
     readOnly: true
@@ -31,13 +33,17 @@ export let listSessions = SlateTool.create(spec, {
         z.object({
           userId: z.string().describe('FullStory user ID'),
           sessionId: z.string().describe('Session ID'),
-          createdTime: z.string().describe('When the session was created (unix timestamp)'),
+          createdTime: z.string().describe('When the session was created (ISO 8601)'),
           replayUrl: z.string().describe('URL to replay this session in FullStory')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.uid && !ctx.input.email) {
+      throw fullStoryServiceError('Provide uid or email to list FullStory sessions.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     let sessions = await client.listSessions({
@@ -46,12 +52,16 @@ export let listSessions = SlateTool.create(spec, {
       limit: ctx.input.limit
     });
 
-    let mapped = sessions.map(s => ({
-      userId: s.userId,
-      sessionId: s.sessionId,
-      createdTime: s.createdTime,
-      replayUrl: s.fsUrl
-    }));
+    let mapped = sessions.map(s => {
+      let [userId = ''] = s.sessionId.split(':');
+
+      return {
+        userId,
+        sessionId: s.sessionId,
+        createdTime: s.createdTime,
+        replayUrl: s.fsUrl
+      };
+    });
 
     return {
       output: {

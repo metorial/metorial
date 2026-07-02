@@ -18,7 +18,15 @@ export let createBoardTool = SlateTool.create(spec, {
       description: z.string().optional().describe('Board description'),
       workspaceId: z.string().optional().describe('Workspace ID to create the board in'),
       folderId: z.string().optional().describe('Folder ID to place the board in'),
-      templateId: z.string().optional().describe('Template board ID to duplicate from')
+      templateId: z.string().optional().describe('Template board ID to duplicate from'),
+      empty: z
+        .boolean()
+        .optional()
+        .describe('Create an empty board without monday.com default items'),
+      prompt: z
+        .string()
+        .optional()
+        .describe('2026-04 AI prompt to generate board structure and content')
     })
   )
   .output(
@@ -39,7 +47,9 @@ export let createBoardTool = SlateTool.create(spec, {
       description: ctx.input.description,
       workspaceId: ctx.input.workspaceId,
       folderId: ctx.input.folderId,
-      templateId: ctx.input.templateId
+      templateId: ctx.input.templateId,
+      empty: ctx.input.empty,
+      prompt: ctx.input.prompt
     });
 
     return {

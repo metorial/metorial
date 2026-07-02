@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { cognitoApiError } from './errors';
 import { signRequest } from './signing';
 
 export interface CognitoClientConfig {
@@ -45,8 +46,12 @@ export class CognitoClient {
       baseURL: `https://${host}`
     });
 
-    let response = await ax.post('/', bodyStr, { headers });
-    return response.data;
+    try {
+      let response = await ax.post('/', bodyStr, { headers });
+      return response.data;
+    } catch (error) {
+      throw cognitoApiError(error, action);
+    }
   }
 
   // ---- User Pool Operations ----
@@ -324,6 +329,27 @@ export class CognitoClient {
     return this.request('DeleteResourceServer', {
       UserPoolId: userPoolId,
       Identifier: identifier
+    });
+  }
+
+  // ---- User Pool Domain Operations ----
+
+  async createUserPoolDomain(params: Record<string, any>): Promise<any> {
+    return this.request('CreateUserPoolDomain', params);
+  }
+
+  async describeUserPoolDomain(domain: string): Promise<any> {
+    return this.request('DescribeUserPoolDomain', { Domain: domain });
+  }
+
+  async updateUserPoolDomain(params: Record<string, any>): Promise<any> {
+    return this.request('UpdateUserPoolDomain', params);
+  }
+
+  async deleteUserPoolDomain(userPoolId: string, domain: string): Promise<any> {
+    return this.request('DeleteUserPoolDomain', {
+      UserPoolId: userPoolId,
+      Domain: domain
     });
   }
 }

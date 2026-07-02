@@ -1,16 +1,22 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  checkSmsOptOut,
   confirmSubscription,
   createTopic,
   deleteTopic,
+  getSmsStatus,
+  getSubscription,
   getTopic,
+  listOriginationNumbers,
   listSubscriptions,
   listTopics,
+  publishBatch,
   publishMessage,
   sendSms,
   subscribeToTopic,
   unsubscribeFromTopic,
+  updateSmsSettings,
   updateSubscription,
   updateTopic
 } from './tools';
@@ -25,12 +31,18 @@ export let provider = Slate.create({
     getTopic,
     updateTopic,
     publishMessage,
+    publishBatch,
     subscribeToTopic,
     unsubscribeFromTopic,
+    getSubscription,
     listSubscriptions,
     updateSubscription,
     confirmSubscription,
-    sendSms
+    sendSms,
+    getSmsStatus,
+    updateSmsSettings,
+    checkSmsOptOut,
+    listOriginationNumbers
   ],
   triggers: [topicNotification]
 });

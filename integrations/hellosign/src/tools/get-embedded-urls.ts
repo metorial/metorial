@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { hellosignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getEmbeddedUrls = SlateTool.create(spec, {
@@ -51,7 +52,7 @@ export let getEmbeddedUrls = SlateTool.create(spec, {
 
     if (ctx.input.type === 'sign') {
       if (!ctx.input.signatureId) {
-        throw new Error('signatureId is required for embedded signing URLs');
+        throw hellosignServiceError('signatureId is required for embedded signing URLs.');
       }
 
       let result = await client.getEmbeddedSignUrl(ctx.input.signatureId);
@@ -66,7 +67,7 @@ export let getEmbeddedUrls = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.templateId) {
-        throw new Error('templateId is required for embedded editing URLs');
+        throw hellosignServiceError('templateId is required for embedded editing URLs.');
       }
 
       let result = await client.getEmbeddedEditUrl(ctx.input.templateId, {

@@ -47,7 +47,7 @@ export let invoiceEvents = SlateTrigger.create(spec, {
       let subscription = await client.createWebhookSubscription({
         idempotencyKey: crypto.randomUUID(),
         subscription: {
-          name: 'Slates Invoice Events',
+          name: 'Square Invoice Events',
           eventTypes: INVOICE_EVENT_TYPES,
           notificationUrl: ctx.input.webhookBaseUrl
         }

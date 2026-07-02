@@ -343,45 +343,45 @@ export let writeNote = (w: ThriftWriter, note: EvernoteNote) => {
     w.writeString(note.content);
   }
   if (note.created !== undefined) {
-    w.writeFieldBegin(TType.I64, 5);
+    w.writeFieldBegin(TType.I64, 6);
     w.writeI64(note.created);
   }
   if (note.updated !== undefined) {
-    w.writeFieldBegin(TType.I64, 6);
+    w.writeFieldBegin(TType.I64, 7);
     w.writeI64(note.updated);
   }
   if (note.deleted !== undefined) {
-    w.writeFieldBegin(TType.I64, 7);
+    w.writeFieldBegin(TType.I64, 8);
     w.writeI64(note.deleted);
   }
   if (note.active !== undefined) {
-    w.writeFieldBegin(TType.BOOL, 8);
+    w.writeFieldBegin(TType.BOOL, 9);
     w.writeBool(note.active);
   }
   if (note.notebookGuid !== undefined) {
-    w.writeFieldBegin(TType.STRING, 10);
+    w.writeFieldBegin(TType.STRING, 11);
     w.writeString(note.notebookGuid);
   }
   if (note.tagGuids !== undefined) {
-    w.writeFieldBegin(TType.LIST, 11);
+    w.writeFieldBegin(TType.LIST, 12);
     w.writeListBegin(TType.STRING, note.tagGuids.length);
     for (let guid of note.tagGuids) {
       w.writeString(guid);
     }
   }
   if (note.resources !== undefined) {
-    w.writeFieldBegin(TType.LIST, 12);
+    w.writeFieldBegin(TType.LIST, 13);
     w.writeListBegin(TType.STRUCT, note.resources.length);
     for (let resource of note.resources) {
       writeResource(w, resource);
     }
   }
   if (note.attributes !== undefined) {
-    w.writeFieldBegin(TType.STRUCT, 13);
+    w.writeFieldBegin(TType.STRUCT, 14);
     writeNoteAttributes(w, note.attributes);
   }
   if (note.tagNames !== undefined) {
-    w.writeFieldBegin(TType.LIST, 14);
+    w.writeFieldBegin(TType.LIST, 15);
     w.writeListBegin(TType.STRING, note.tagNames.length);
     for (let name of note.tagNames) {
       w.writeString(name);
@@ -401,12 +401,16 @@ export let writeNotebook = (w: ThriftWriter, notebook: EvernoteNotebook) => {
     w.writeFieldBegin(TType.STRING, 2);
     w.writeString(notebook.name);
   }
+  if (notebook.updateSequenceNum !== undefined) {
+    w.writeFieldBegin(TType.I32, 5);
+    w.writeI32(notebook.updateSequenceNum);
+  }
   if (notebook.defaultNotebook !== undefined) {
-    w.writeFieldBegin(TType.BOOL, 5);
+    w.writeFieldBegin(TType.BOOL, 6);
     w.writeBool(notebook.defaultNotebook);
   }
   if (notebook.stack !== undefined) {
-    w.writeFieldBegin(TType.STRING, 10);
+    w.writeFieldBegin(TType.STRING, 12);
     w.writeString(notebook.stack);
   }
   w.writeFieldStop();
@@ -695,18 +699,18 @@ export let readNotebook = (r: ThriftReader): EvernoteNotebook => {
         notebook.name = r.readString();
         break;
       case 5:
-        notebook.defaultNotebook = r.readBool();
-        break;
-      case 6:
-        notebook.serviceCreated = r.readI64();
-        break;
-      case 7:
-        notebook.serviceUpdated = r.readI64();
-        break;
-      case 8:
         notebook.updateSequenceNum = r.readI32();
         break;
-      case 10:
+      case 6:
+        notebook.defaultNotebook = r.readBool();
+        break;
+      case 7:
+        notebook.serviceCreated = r.readI64();
+        break;
+      case 8:
+        notebook.serviceUpdated = r.readI64();
+        break;
+      case 12:
         notebook.stack = r.readString();
         break;
       default:

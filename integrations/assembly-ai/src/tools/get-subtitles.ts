@@ -1,4 +1,5 @@
-import { SlateTool } from 'slates';
+import { Buffer } from 'node:buffer';
+import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -25,8 +26,10 @@ Optionally limit the number of characters per caption line.`,
   )
   .output(
     z.object({
-      subtitleContent: z.string().describe('The subtitle content in the requested format.'),
-      format: z.string().describe('The subtitle format (srt or vtt).')
+      format: z.string().describe('The subtitle format (srt or vtt).'),
+      contentType: z.string().describe('MIME type of the returned subtitle attachment.'),
+      byteLength: z.number().describe('UTF-8 byte length of the subtitle attachment.'),
+      attachmentCount: z.number().describe('Number of subtitle attachments returned.')
     })
   )
   .handleInvocation(async ctx => {
@@ -42,12 +45,16 @@ Optionally limit the number of characters per caption line.`,
     );
 
     let content = typeof result === 'string' ? result : JSON.stringify(result);
+    let contentType = ctx.input.subtitleFormat === 'srt' ? 'application/x-subrip' : 'text/vtt';
 
     return {
       output: {
-        subtitleContent: content,
-        format: ctx.input.subtitleFormat
+        format: ctx.input.subtitleFormat,
+        contentType,
+        byteLength: Buffer.byteLength(content, 'utf8'),
+        attachmentCount: 1
       },
+      attachments: [createTextAttachment(content, contentType)],
       message: `Generated **${ctx.input.subtitleFormat.toUpperCase()}** subtitles for transcript **${ctx.input.transcriptId}**.`
     };
   })

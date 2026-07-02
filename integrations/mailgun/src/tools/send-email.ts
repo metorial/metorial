@@ -1,7 +1,34 @@
-import { SlateTool } from 'slates';
+import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailgunClient } from '../lib/client';
+import { mailgunServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let getStoredMessageString = (message: Record<string, unknown>, key: string) => {
+  let value = message[key];
+  return typeof value === 'string' ? value : undefined;
+};
+
+let messageFileSchema = z.object({
+  filename: z.string().describe('Filename Mailgun should use for the attachment'),
+  contentBase64: z.string().describe('Base64-encoded file content'),
+  contentType: z
+    .string()
+    .optional()
+    .describe('MIME type for the file, defaulting to application/octet-stream')
+});
+
+let assertValidBase64Files = (
+  files: Array<{ filename: string; contentBase64: string }> | undefined,
+  label: string
+) => {
+  for (let [index, file] of (files ?? []).entries()) {
+    let buffer = Buffer.from(file.contentBase64, 'base64');
+    if (buffer.length === 0) {
+      throw mailgunServiceError(`${label}[${index}] must contain non-empty base64 content.`);
+    }
+  }
+};
 
 export let sendEmail = SlateTool.create(spec, {
   name: 'Send Email',
@@ -69,7 +96,15 @@ Supports scheduling, tracking options, tags for analytics, custom headers, and r
         .optional()
         .describe('Per-recipient personalization variables keyed by email address'),
       sendingIp: z.string().optional().describe('Specific IP address to send from'),
-      sendingIpPool: z.string().optional().describe('IP pool ID to send from')
+      sendingIpPool: z.string().optional().describe('IP pool ID to send from'),
+      attachments: z
+        .array(messageFileSchema)
+        .optional()
+        .describe('Files to attach to the message'),
+      inlineAttachments: z
+        .array(messageFileSchema)
+        .optional()
+        .describe('Files to attach with inline disposition for CID references')
     })
   )
   .output(
@@ -79,6 +114,28 @@ Supports scheduling, tracking options, tags for analytics, custom headers, and r
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.text && !ctx.input.html && !ctx.input.template) {
+      throw mailgunServiceError('At least one of text, html, or template must be provided.');
+    }
+
+    let recipientCount =
+      ctx.input.to.length + (ctx.input.cc?.length || 0) + (ctx.input.bcc?.length || 0);
+
+    if (recipientCount < 1) {
+      throw mailgunServiceError('At least one recipient is required.');
+    }
+
+    if (recipientCount > 1000) {
+      throw mailgunServiceError('Mailgun supports at most 1,000 recipients per send.');
+    }
+
+    if ((ctx.input.tags?.length ?? 0) > 10) {
+      throw mailgunServiceError('Mailgun supports at most 10 tags per message.');
+    }
+
+    assertValidBase64Files(ctx.input.attachments, 'attachments');
+    assertValidBase64Files(ctx.input.inlineAttachments, 'inlineAttachments');
+
     let client = new MailgunClient({
       token: ctx.auth.token,
       region: ctx.config.region
@@ -107,11 +164,10 @@ Supports scheduling, tracking options, tags for analytics, custom headers, and r
       customVariables: ctx.input.customVariables,
       recipientVariables: ctx.input.recipientVariables,
       sendingIp: ctx.input.sendingIp,
-      sendingIpPool: ctx.input.sendingIpPool
+      sendingIpPool: ctx.input.sendingIpPool,
+      attachments: ctx.input.attachments,
+      inlineAttachments: ctx.input.inlineAttachments
     });
-
-    let recipientCount =
-      ctx.input.to.length + (ctx.input.cc?.length || 0) + (ctx.input.bcc?.length || 0);
 
     return {
       output: {
@@ -119,6 +175,57 @@ Supports scheduling, tracking options, tags for analytics, custom headers, and r
         status: result.message
       },
       message: `Email queued for delivery to **${recipientCount}** recipient(s). Message ID: \`${result.id}\``
+    };
+  })
+  .build();
+
+export let getStoredMessage = SlateTool.create(spec, {
+  name: 'Get Stored Message',
+  key: 'get_stored_message',
+  description: `Retrieve a message stored by Mailgun from a storage key found in events, logs, or inbound route store actions. The stored message payload is returned as a JSON attachment, with metadata in the tool output.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Domain that stored the message'),
+      storageKey: z.string().describe('Mailgun storage key for the stored message')
+    })
+  )
+  .output(
+    z.object({
+      domain: z.string().describe('Domain used for retrieval'),
+      storageKey: z.string().describe('Storage key used for retrieval'),
+      subject: z.string().optional().describe('Stored message subject if present'),
+      sender: z.string().optional().describe('Stored message sender if present'),
+      recipients: z.string().optional().describe('Stored message recipients if present'),
+      attachmentCount: z.number().describe('Number of Slate attachments returned'),
+      byteLength: z.number().describe('UTF-8 byte length of the JSON attachment')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new MailgunClient({
+      token: ctx.auth.token,
+      region: ctx.config.region
+    });
+
+    let message = await client.getStoredMessage(ctx.input.domain, ctx.input.storageKey);
+    let content = JSON.stringify(message, null, 2);
+
+    return {
+      output: {
+        domain: ctx.input.domain,
+        storageKey: ctx.input.storageKey,
+        subject: getStoredMessageString(message, 'Subject'),
+        sender:
+          getStoredMessageString(message, 'From') ?? getStoredMessageString(message, 'sender'),
+        recipients:
+          getStoredMessageString(message, 'To') ??
+          getStoredMessageString(message, 'recipients'),
+        attachmentCount: 1,
+        byteLength: Buffer.byteLength(content, 'utf8')
+      },
+      attachments: [createTextAttachment(content, 'application/json')],
+      message: `Retrieved stored Mailgun message **${ctx.input.storageKey}** as a JSON attachment.`
     };
   })
   .build();

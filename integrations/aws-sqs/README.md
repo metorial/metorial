@@ -6,7 +6,7 @@ Create, configure, list, and delete message queues (standard and FIFO). Send mes
 
 ### Change Message Visibility
 
-Change the visibility timeout of a received message. Use this to extend the processing window when you need more time, or to make the message immediately available again by setting the timeout to 0.
+Change the visibility timeout of one or more received messages. Use this to extend the processing window when you need more time, or to make messages immediately available again by setting the timeout to 0.
 
 ### Create Queue
 
@@ -24,6 +24,10 @@ Permanently delete an SQS queue and all its messages. The deletion process takes
 
 Look up the URL of an SQS queue by its name. Useful when you know the queue name but need the full URL for other operations. Can also look up queues owned by other AWS accounts.
 
+### List Dead-Letter Source Queues
+
+List source queues whose RedrivePolicy targets a specified dead-letter queue. Useful for auditing DLQ wiring and cleanup before redrive operations.
+
 ### List Queues
 
 List SQS queues in the configured AWS region. Optionally filter by queue name prefix and paginate through results.
@@ -34,7 +38,7 @@ Start, list, or cancel message move tasks. Message move tasks are used to move m
 
 ### Manage Queue
 
-Get or update SQS queue attributes, and manage queue tags. Use this to inspect queue configuration, modify settings like visibility timeout, configure dead-letter queues, enable encryption, or manage cost allocation tags.
+Get or update SQS queue attributes, manage queue tags, and add or remove generated queue permissions. Use this to inspect queue configuration, modify settings like visibility timeout, configure dead-letter queues, enable encryption, manage cost allocation tags, or share queue access with AWS accounts.
 
 ### Purge Queue
 
@@ -50,7 +54,7 @@ Send up to 10 messages to an SQS queue in a single batch request. Each message c
 
 ### Send Message
 
-Send a message to an SQS queue. Supports optional delay, custom message attributes, and FIFO queue parameters (message group ID and deduplication ID).
+Send a message to an SQS queue. Supports optional delay, custom message attributes, and FIFO queue parameters (message group ID and deduplication ID). Message bodies can be up to 1 MiB.
 
 ## License
 

@@ -8,6 +8,10 @@ export let clearCells = SlateTool.create(spec, {
   name: 'Clear Cells',
   key: 'clear_cells',
   description: `Clears all values from a specified range in a spreadsheet while preserving formatting. Use this to remove cell contents without deleting the cells themselves.`,
+  instructions: [
+    'Use A1 notation for ranges, e.g., "Sheet1!A1:D10".',
+    'Quote sheet names that contain spaces or special characters, e.g., "\'Draft summary\'!A1:Z80".'
+  ],
   tags: {
     destructive: true,
     readOnly: false
@@ -17,7 +21,11 @@ export let clearCells = SlateTool.create(spec, {
   .input(
     z.object({
       spreadsheetId: z.string().describe('Unique ID of the spreadsheet'),
-      range: z.string().describe('Range to clear in A1 notation (e.g., "Sheet1!A1:D10")')
+      range: z
+        .string()
+        .describe(
+          'Range to clear in A1 notation (e.g., "Sheet1!A1:D10" or "\'Draft summary\'!A1:Z80")'
+        )
     })
   )
   .output(

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requirePostmarkNumber } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getBounces = SlateTool.create(spec, {
@@ -111,16 +112,14 @@ export let getBounces = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'reactivate') {
-      if (!ctx.input.bounceId) {
-        throw new Error('bounceId is required for reactivation');
-      }
-      let result = await client.activateBounce(ctx.input.bounceId);
+      let bounceId = requirePostmarkNumber(ctx.input.bounceId, 'bounceId', 'reactivate');
+      let result = await client.activateBounce(bounceId);
       return {
         output: {
           reactivated: true,
           reactivationMessage: result.Message
         },
-        message: `Bounce **${ctx.input.bounceId}** reactivated: ${result.Message}`
+        message: `Bounce **${bounceId}** reactivated: ${result.Message}`
       };
     }
 

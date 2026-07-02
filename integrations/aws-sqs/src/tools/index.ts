@@ -3,6 +3,7 @@ export * from './create-queue';
 export * from './delete-message';
 export * from './delete-queue';
 export * from './get-queue-url';
+export * from './list-dead-letter-source-queues';
 export * from './list-queues';
 export * from './manage-message-move-task';
 export * from './manage-queue';

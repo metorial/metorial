@@ -40,11 +40,11 @@
   },
   "dependencies": {
     "@lowerdeck/testing-tools": "latest",
-    "@slates/client": "1.0.0-rc.12",
-    "@slates/profiles": "1.0.0-rc.10"
+    "@slates/client": "1.0.0-rc.13",
+    "@slates/profiles": "1.0.0-rc.11"
   },
   "devDependencies": {
-    "@slates/provider": "1.0.0-rc.15",
+    "@slates/provider": "1.0.0-rc.16",
     "@slates/tsconfig": "1.0.0-rc.1",
     "typescript": "5.8.2",
     "vitest": "^3.1.2",

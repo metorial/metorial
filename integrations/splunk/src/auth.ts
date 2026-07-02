@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { splunkApiError, splunkServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -80,18 +81,24 @@ export let auth = SlateAuth.create()
     }) => {
       let baseURL = `${ctx.input.scheme}://${ctx.input.host}:${ctx.input.managementPort}`;
       let axiosInstance = createAxios({ baseURL });
-      let response = await axiosInstance.post(
-        '/services/auth/login',
-        `username=${encodeURIComponent(ctx.input.username)}&password=${encodeURIComponent(ctx.input.password)}&output_mode=json`,
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+      let response: any;
+      try {
+        response = await axiosInstance.post(
+          '/services/auth/login',
+          `username=${encodeURIComponent(ctx.input.username)}&password=${encodeURIComponent(ctx.input.password)}&output_mode=json`,
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw splunkApiError(error, 'authentication login');
+      }
+
       let sessionKey = response.data?.sessionKey;
       if (!sessionKey) {
-        throw new Error('Failed to obtain session key from Splunk');
+        throw splunkServiceError('Failed to obtain session key from Splunk.');
       }
       return {
         output: {

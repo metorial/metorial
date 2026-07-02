@@ -76,6 +76,10 @@ export let updateTask = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Task GIDs that depend on this task'),
+      removeDependentIds: z
+        .array(z.string())
+        .optional()
+        .describe('Dependent task GIDs to remove'),
       parentId: z
         .string()
         .nullable()
@@ -148,6 +152,9 @@ export let updateTask = SlateTool.create(spec, {
     }
     if (ctx.input.addDependentIds?.length) {
       operations.push(client.addDependentsToTask(taskId, ctx.input.addDependentIds));
+    }
+    if (ctx.input.removeDependentIds?.length) {
+      operations.push(client.removeDependentsFromTask(taskId, ctx.input.removeDependentIds));
     }
     if (ctx.input.parentId !== undefined) {
       operations.push(client.setParentForTask(taskId, ctx.input.parentId));

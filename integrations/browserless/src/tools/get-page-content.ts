@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrowserlessClient } from '../lib/client';
 import { spec } from '../spec';
+import { gotoOptionsSchema, requireExactlyOneSource, waitForSelectorSchema } from './shared';
 
 export let getPageContent = SlateTool.create(spec, {
   name: 'Get Page Content',
@@ -18,23 +19,8 @@ export let getPageContent = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Raw HTML to render in the browser instead of navigating to a URL'),
-      gotoOptions: z
-        .object({
-          waitUntil: z
-            .enum(['load', 'domcontentloaded', 'networkidle0', 'networkidle2'])
-            .optional(),
-          timeout: z.number().optional()
-        })
-        .optional()
-        .describe('Navigation options'),
-      waitForSelector: z
-        .object({
-          selector: z.string(),
-          timeout: z.number().optional(),
-          visible: z.boolean().optional()
-        })
-        .optional()
-        .describe('Wait for a CSS selector before capturing content'),
+      gotoOptions: gotoOptionsSchema,
+      waitForSelector: waitForSelectorSchema,
       waitForTimeout: z.number().optional().describe('Wait a fixed number of milliseconds'),
       bestAttempt: z
         .boolean()
@@ -50,6 +36,8 @@ export let getPageContent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireExactlyOneSource(ctx.input);
+
     let client = new BrowserlessClient({
       token: ctx.auth.token,
       region: ctx.config.region

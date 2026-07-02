@@ -1,32 +1,146 @@
 import { createAxios } from 'slates';
+import { buildDigestHeader, parseDigestChallenge } from './digest';
+import { mongodbApiError, mongodbServiceError } from './errors';
 
 let ATLAS_API_VERSION = '2025-03-12';
 let ACCEPT_HEADER = `application/vnd.atlas.${ATLAS_API_VERSION}+json`;
+let ATLAS_API_PREFIX = '/api/atlas/v2';
+let BASE_URL = 'https://cloud.mongodb.com';
+
+type AtlasAuthConfig = {
+  token: string;
+  authMethod: string;
+  publicKey?: string;
+  privateKey?: string;
+};
+
+let appendParam = (params: URLSearchParams, key: string, value: unknown) => {
+  if (value === undefined || value === null) return;
+
+  if (Array.isArray(value)) {
+    for (let item of value) appendParam(params, key, item);
+    return;
+  }
+
+  params.append(key, String(value));
+};
+
+let normalizeAtlasUrl = (url: string) => {
+  if (/^https?:\/\//i.test(url)) return url;
+  let path = url.startsWith('/') ? url : `/${url}`;
+  return path.startsWith(ATLAS_API_PREFIX) ? path : `${ATLAS_API_PREFIX}${path}`;
+};
+
+let appendParamsToUrl = (url: string, params?: Record<string, unknown>) => {
+  if (!params) return url;
+
+  let [rawPath, query = ''] = url.split('?');
+  let path = rawPath ?? '';
+  let searchParams = new URLSearchParams(query);
+
+  for (let [key, value] of Object.entries(params)) {
+    appendParam(searchParams, key, value);
+  }
+
+  let queryString = searchParams.toString();
+  return queryString ? `${path}?${queryString}` : path;
+};
+
+let requestUri = (url: string) => {
+  if (!/^https?:\/\//i.test(url)) return url;
+
+  let parsed = new URL(url);
+  return `${parsed.pathname}${parsed.search}`;
+};
 
 export class AtlasClient {
   private axios;
+  private authConfig: AtlasAuthConfig;
 
-  constructor(authConfig: {
-    token: string;
-    authMethod: string;
-    publicKey?: string;
-    privateKey?: string;
-  }) {
-    let headers: Record<string, string> = {
-      Accept: ACCEPT_HEADER,
-      'Content-Type': 'application/json'
-    };
-
-    if (authConfig.authMethod === 'oauth') {
-      headers.Authorization = `Bearer ${authConfig.token}`;
-    } else {
-      headers.Authorization = `Basic ${authConfig.token}`;
-    }
+  constructor(authConfig: AtlasAuthConfig) {
+    this.authConfig = authConfig;
 
     this.axios = createAxios({
-      baseURL: 'https://cloud.mongodb.com/api/atlas/v2',
-      headers
+      baseURL: BASE_URL
     });
+
+    this.axios.interceptors.request.use((config: any) => {
+      let url = normalizeAtlasUrl(String(config.url || ''));
+      url = appendParamsToUrl(url, config.params);
+
+      config.url = url;
+      config.params = undefined;
+      config.headers = {
+        ...config.headers,
+        Accept: ACCEPT_HEADER,
+        'Content-Type': 'application/json'
+      };
+
+      if (this.authConfig.authMethod === 'oauth') {
+        config.headers.Authorization = `Bearer ${this.authConfig.token}`;
+      }
+
+      return config;
+    });
+
+    this.axios.interceptors.response.use(
+      (response: any) => response,
+      async (error: any) => {
+        let response = error?.response;
+        let config = error?.config;
+
+        if (
+          this.authConfig.authMethod === 'digest' &&
+          response?.status === 401 &&
+          config &&
+          !config.__mongodbDigestRetry
+        ) {
+          try {
+            let publicKey = this.authConfig.publicKey;
+            let privateKey = this.authConfig.privateKey;
+
+            if (!publicKey || !privateKey) {
+              throw mongodbServiceError(
+                'MongoDB Atlas API key authentication requires publicKey and privateKey.'
+              );
+            }
+
+            let wwwAuthenticate =
+              response.headers?.['www-authenticate'] ??
+              response.headers?.get?.('www-authenticate');
+            let challenge = parseDigestChallenge(String(wwwAuthenticate || ''));
+
+            if (!challenge) {
+              throw mongodbServiceError(
+                'MongoDB Atlas did not return a usable digest authentication challenge.'
+              );
+            }
+
+            let method = String(config.method || 'GET').toUpperCase();
+            config.__mongodbDigestRetry = true;
+            config.headers = {
+              ...config.headers,
+              Authorization: buildDigestHeader({
+                method,
+                uri: requestUri(String(config.url || '')),
+                username: publicKey,
+                password: privateKey,
+                challenge
+              })
+            };
+
+            return await this.axios.request(config);
+          } catch (digestError) {
+            throw mongodbApiError(digestError, 'digest authentication');
+          }
+        }
+
+        throw mongodbApiError(
+          error,
+          `${String(config?.method || 'request').toUpperCase()} ${String(config?.url || '')}`
+        );
+      }
+    );
   }
 
   // ==================== Organizations ====================

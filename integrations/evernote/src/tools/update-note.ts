@@ -1,11 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { buildEnmlContent } from '../lib/note-content';
 import { spec } from '../spec';
-
-let wrapInEnml = (content: string): string => {
-  return `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE en-note SYSTEM "http://xml.evernote.com/pub/enml2.dtd"><en-note>${content}</en-note>`;
-};
 
 export let updateNoteTool = SlateTool.create(spec, {
   name: 'Update Note',
@@ -47,10 +44,7 @@ export let updateNoteTool = SlateTool.create(spec, {
       noteStoreUrl: ctx.auth.noteStoreUrl
     });
 
-    let content = ctx.input.content;
-    if (content && !content.startsWith('<?xml')) {
-      content = wrapInEnml(content);
-    }
+    let content = ctx.input.content ? buildEnmlContent(ctx.input.content) : undefined;
 
     let note = await client.updateNote({
       noteGuid: ctx.input.noteGuid,

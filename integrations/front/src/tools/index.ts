@@ -5,6 +5,7 @@ export * from './knowledge-base';
 export * from './list-conversations';
 export * from './list-events';
 export * from './manage-accounts';
+export * from './manage-channels';
 export * from './manage-contacts';
 export * from './manage-inboxes';
 export * from './manage-links';

@@ -1,9 +1,22 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { kitApiError } from './lib/errors';
 
 let httpClient = createAxios({
   baseURL: 'https://api.kit.com/v4'
 });
+
+httpClient.interceptors.response.use(
+  response => response,
+  error => {
+    throw kitApiError(error, 'auth request');
+  }
+);
 
 export let auth = SlateAuth.create()
   .output(
@@ -52,37 +65,42 @@ export let auth = SlateAuth.create()
         redirect_uri: ctx.redirectUri
       });
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let token = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Kit',
+        operation: 'token exchange'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
+          token: token.token,
+          refreshToken: token.refreshToken,
+          expiresAt: token.expiresAt
         }
       };
     },
 
     handleTokenRefresh: async (ctx: any) => {
+      if (!ctx.output.refreshToken) {
+        throw createApiServiceError('Kit refresh token is missing; reconnect the account.');
+      }
+
       let response = await httpClient.post('/oauth/token', {
         grant_type: 'refresh_token',
         refresh_token: ctx.output.refreshToken,
         client_id: ctx.clientId
       });
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let token = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Kit',
+        operation: 'token refresh',
+        previousRefreshToken: ctx.output.refreshToken
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
+          token: token.token,
+          refreshToken: token.refreshToken,
+          expiresAt: token.expiresAt
         }
       };
     },

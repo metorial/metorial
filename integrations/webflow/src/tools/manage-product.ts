@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WebflowClient } from '../lib/client';
 import { spec } from '../spec';
@@ -8,7 +8,7 @@ export let manageProduct = SlateTool.create(spec, {
   key: 'manage_product',
   description: `Create or update an ecommerce product. Provide product details and optional SKU/variant data. When updating, only the fields you provide will be changed.`,
   instructions: [
-    'To **create** a new product, provide siteId and product data (omit productId).',
+    'To **create** a new product, provide siteId, product data, and default SKU data (omit productId).',
     'To **update** an existing product, provide siteId, productId, and the fields to update.'
   ]
 })
@@ -41,7 +41,13 @@ export let manageProduct = SlateTool.create(spec, {
           weight: z.number().optional().describe('Weight for shipping')
         })
         .optional()
-        .describe('Default SKU data')
+        .describe('Default SKU data'),
+      publishStatus: z
+        .enum(['staging', 'live'])
+        .optional()
+        .describe(
+          'Whether created or updated product changes should remain staged or publish live'
+        )
     })
   )
   .output(
@@ -53,11 +59,11 @@ export let manageProduct = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new WebflowClient(ctx.auth.token);
-    let { siteId, productId, product, sku } = ctx.input;
+    let { siteId, productId, product, sku, publishStatus } = ctx.input;
 
-    let productPayload: any = {};
+    let productPayload: any | undefined;
     if (product) {
-      productPayload.fieldData = {};
+      productPayload = { fieldData: {} };
       if (product.name) productPayload.fieldData.name = product.name;
       if (product.slug) productPayload.fieldData.slug = product.slug;
       if (product.description) productPayload.fieldData.description = product.description;
@@ -83,16 +89,27 @@ export let manageProduct = SlateTool.create(spec, {
 
     let result: any;
     if (productId) {
-      result = await client.updateProduct(siteId, productId, {
-        product: productPayload,
-        sku: skuPayload
-      });
+      let updatePayload: any = {};
+      if (productPayload) updatePayload.product = productPayload;
+      if (skuPayload) updatePayload.sku = skuPayload;
+      if (publishStatus) updatePayload.publishStatus = publishStatus;
+
+      if (Object.keys(updatePayload).length === 0) {
+        throw createApiServiceError('Provide product, sku, or publishStatus to update.');
+      }
+
+      result = await client.updateProduct(siteId, productId, updatePayload);
     } else {
-      if (!product?.name)
-        throw new Error('Product name is required when creating a new product');
+      if (!product?.name) {
+        throw createApiServiceError('Product name is required when creating a new product.');
+      }
+      if (!skuPayload) {
+        throw createApiServiceError('sku is required when creating a new product.');
+      }
       result = await client.createProduct(siteId, {
         product: productPayload,
-        sku: skuPayload
+        sku: skuPayload,
+        publishStatus
       });
     }
 

@@ -27,14 +27,22 @@ export let listDocumentTypes = SlateTool.create(spec, {
               .describe(
                 'Type identifier used in API calls (e.g., "invoice", "bank_statements")'
               ),
-            canUpload: z.boolean().describe('Whether uploads are enabled for this type'),
-            isDefault: z.boolean().describe('Whether this is a default document type'),
+            canUpload: z
+              .boolean()
+              .optional()
+              .describe('Whether uploads are enabled for this type, when returned'),
+            isDefault: z
+              .boolean()
+              .optional()
+              .describe('Whether this is a default document type, when returned'),
+            category: z.string().optional().describe('Docsumo document type category'),
             docCounts: z
               .object({
                 all: z.number().describe('Total document count'),
                 processed: z.number().describe('Number of processed documents'),
                 reviewing: z.number().describe('Number of documents in review')
               })
+              .optional()
               .describe('Document counts by status'),
             uploadEmail: z
               .string()
@@ -47,7 +55,7 @@ export let listDocumentTypes = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    let documentTypes = await client.getDocumentsSummary();
+    let documentTypes = await client.listEnabledDocumentTypes();
 
     return {
       output: { documentTypes },

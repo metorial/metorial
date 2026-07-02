@@ -130,3 +130,62 @@ export let getCanvasDetails = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let getCanvasAnalytics = SlateTool.create(spec, {
+  name: 'Get Canvas Analytics',
+  key: 'get_canvas_analytics',
+  description: `Retrieve daily analytics time series for a Braze Canvas, optionally including variant and step breakdowns.`,
+  tags: {
+    destructive: false,
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      canvasId: z.string().describe('ID of the Canvas'),
+      length: z.number().describe('Number of days of data to return (max 100)'),
+      endingAt: z
+        .string()
+        .optional()
+        .describe('End date for the data series in ISO 8601 format'),
+      includeVariantBreakdown: z
+        .boolean()
+        .optional()
+        .describe('Include analytics broken down by Canvas variant'),
+      includeStepBreakdown: z
+        .boolean()
+        .optional()
+        .describe('Include analytics broken down by Canvas step')
+    })
+  )
+  .output(
+    z.object({
+      dataSeries: z
+        .array(z.record(z.string(), z.any()))
+        .describe('Daily Canvas analytics data points'),
+      message: z.string().describe('Response status')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new BrazeClient({
+      token: ctx.auth.token,
+      instanceUrl: ctx.config.instanceUrl
+    });
+
+    let result = await client.getCanvasAnalytics(
+      ctx.input.canvasId,
+      ctx.input.length,
+      ctx.input.endingAt,
+      ctx.input.includeVariantBreakdown,
+      ctx.input.includeStepBreakdown
+    );
+
+    return {
+      output: {
+        dataSeries: result.data ?? [],
+        message: result.message
+      },
+      message: `Retrieved **${(result.data ?? []).length}** days of analytics for Canvas **${ctx.input.canvasId}**.`
+    };
+  })
+  .build();

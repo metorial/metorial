@@ -5,7 +5,9 @@ import { spec } from '../spec';
 
 let embeddingDataSchema = z.object({
   index: z.number().describe('Index of the embedding in the input array'),
-  embedding: z.array(z.number()).describe('Dense vector representation')
+  embedding: z
+    .any()
+    .describe('Dense vector representation, or base64-encoded embedding when requested')
 });
 
 export let createEmbeddingsTool = SlateTool.create(spec, {
@@ -37,7 +39,12 @@ export let createEmbeddingsTool = SlateTool.create(spec, {
       outputDimension: z
         .number()
         .optional()
-        .describe('Custom embedding dimensionality (if supported by model)')
+        .describe('Custom embedding dimensionality (if supported by model)'),
+      outputDtype: z
+        .enum(['float', 'int8', 'uint8', 'binary', 'ubinary'])
+        .optional()
+        .describe('Embedding data type when supported by the model'),
+      metadata: z.record(z.string(), z.any()).optional().describe('Request metadata')
     })
   )
   .output(
@@ -57,7 +64,9 @@ export let createEmbeddingsTool = SlateTool.create(spec, {
       model: ctx.input.model,
       input: ctx.input.input,
       encodingFormat: ctx.input.encodingFormat,
-      outputDimension: ctx.input.outputDimension
+      outputDimension: ctx.input.outputDimension,
+      outputDtype: ctx.input.outputDtype,
+      metadata: ctx.input.metadata
     });
 
     let embeddings = (result.data || []).map((d: any) => ({

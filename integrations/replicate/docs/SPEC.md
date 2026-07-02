@@ -23,6 +23,8 @@ Run any public or private AI model by providing inputs and receiving outputs. Th
 
 - Supports synchronous mode (holding the connection open and waiting for results) and asynchronous mode (creating a prediction and polling or using webhooks).
 - A maximum lifetime can be set — the maximum time the prediction can run before it is automatically canceled, measured from when the prediction is created.
+- Synchronous mode is requested with the `Prefer` header. Automatic cancellation is requested with the `Cancel-After` header.
+- The request body `stream` field is deprecated; supported models return a stream URL in `urls.stream` automatically.
 - Input and output (including any files) are automatically deleted after an hour for any predictions created through the API.
 
 ### Streaming Output
@@ -38,6 +40,7 @@ Create, list, search, update, and delete models on Replicate. Models on Replicat
 - Models can be public or private.
 - Each model can have multiple versions, representing different iterations of the model.
 - Models expose their input/output schema via OpenAPI.
+- Model README content and saved example predictions can be retrieved through the API.
 
 ### Model Training (Fine-tuning)
 
@@ -67,7 +70,7 @@ Some models accept files as input, like images, audio, or video, zip files, PDFs
 
 - Files uploaded to Replicate expire after 24 hours.
 - The maximum size for uploaded files is 100MiB.
-- Files can be listed, uploaded, retrieved, downloaded, and deleted.
+- Files can be listed, uploaded, retrieved, downloaded through signed download URLs, and deleted.
 
 ### Hardware Discovery
 

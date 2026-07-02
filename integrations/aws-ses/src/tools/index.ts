@@ -1,4 +1,5 @@
 export * from './get-account';
+export * from './get-email-address-insights';
 export * from './get-message-insights';
 export * from './manage-configuration-set';
 export * from './manage-contact';

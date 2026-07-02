@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { mistralApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -26,11 +27,15 @@ export let auth = SlateAuth.create()
         baseURL: 'https://api.mistral.ai/v1'
       });
 
-      await axios.get('/models', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      try {
+        await axios.get('/models', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+      } catch (error) {
+        throw mistralApiError(error, 'profile validation');
+      }
 
       return {
         profile: {

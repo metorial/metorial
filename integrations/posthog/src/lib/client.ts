@@ -1,5 +1,10 @@
 import { createAxios } from 'slates';
+import { postHogApiError, postHogServiceError } from './errors';
 import { getPrivateBaseUrl, getPublicBaseUrl } from './urls';
+
+type JsonRecord = Record<string, any>;
+type QueryParams = Record<string, string>;
+type RequestConfig = { params?: QueryParams };
 
 export class PostHogClient {
   private privateHttp: ReturnType<typeof createAxios>;
@@ -31,33 +36,93 @@ export class PostHogClient {
     });
   }
 
-  private envPath(path: string): string {
-    return `/api/environments/${this.projectId}${path}`;
+  private requireProjectId(operation: string): string {
+    if (!this.projectId) {
+      throw postHogServiceError(
+        `PostHog projectId is required to ${operation}. Set projectId in the integration config.`
+      );
+    }
+
+    return this.projectId;
   }
 
-  // ── Event Capture ────────────────────────────────────────────────────
+  private envPath(path: string, operation: string): string {
+    return `/api/environments/${this.requireProjectId(operation)}${path}`;
+  }
+
+  private projectPath(path: string, operation: string): string {
+    return `/api/projects/${this.requireProjectId(operation)}${path}`;
+  }
+
+  private async privateGet(path: string, operation: string, config?: RequestConfig) {
+    try {
+      let response = await this.privateHttp.get(path, config);
+      return response.data;
+    } catch (error) {
+      throw postHogApiError(error, operation);
+    }
+  }
+
+  private async privatePost(path: string, body: JsonRecord, operation: string) {
+    try {
+      let response = await this.privateHttp.post(path, body);
+      return response.data;
+    } catch (error) {
+      throw postHogApiError(error, operation);
+    }
+  }
+
+  private async privatePatch(path: string, body: JsonRecord, operation: string) {
+    try {
+      let response = await this.privateHttp.patch(path, body);
+      return response.data;
+    } catch (error) {
+      throw postHogApiError(error, operation);
+    }
+  }
+
+  private async privateDelete(path: string, operation: string) {
+    try {
+      let response = await this.privateHttp.delete(path);
+      return response.data;
+    } catch (error) {
+      throw postHogApiError(error, operation);
+    }
+  }
+
+  private async publicPost(path: string, body: JsonRecord, operation: string) {
+    try {
+      let response = await this.publicHttp.post(path, body);
+      return response.data;
+    } catch (error) {
+      throw postHogApiError(error, operation);
+    }
+  }
+
+  // Event Capture
 
   async captureEvent(params: {
     apiKey: string;
     distinctId: string;
     event: string;
-    properties?: Record<string, any>;
+    properties?: JsonRecord;
     timestamp?: string;
-    set?: Record<string, any>;
-    setOnce?: Record<string, any>;
+    set?: JsonRecord;
+    setOnce?: JsonRecord;
   }) {
-    let body: Record<string, any> = {
+    let properties: JsonRecord = { ...(params.properties || {}) };
+    if (params.set) properties.$set = params.set;
+    if (params.setOnce) properties.$set_once = params.setOnce;
+
+    let body: JsonRecord = {
       api_key: params.apiKey,
       distinct_id: params.distinctId,
       event: params.event,
-      properties: params.properties || {}
+      properties
     };
     if (params.timestamp) body.timestamp = params.timestamp;
-    if (params.set) body.$set = params.set;
-    if (params.setOnce) body.$set_once = params.setOnce;
 
-    let response = await this.publicHttp.post('/i/v0/e', body);
-    return response.data;
+    return this.publicPost('/i/v0/e/', body, 'capture event');
   }
 
   async captureBatch(params: {
@@ -65,25 +130,37 @@ export class PostHogClient {
     events: Array<{
       distinctId: string;
       event: string;
-      properties?: Record<string, any>;
+      properties?: JsonRecord;
       timestamp?: string;
+      set?: JsonRecord;
+      setOnce?: JsonRecord;
     }>;
   }) {
-    let batch = params.events.map(e => ({
-      distinct_id: e.distinctId,
-      event: e.event,
-      properties: e.properties || {},
-      ...(e.timestamp ? { timestamp: e.timestamp } : {})
-    }));
+    let batch = params.events.map(e => {
+      let properties: JsonRecord = { ...(e.properties || {}) };
+      if (properties.distinct_id === undefined) properties.distinct_id = e.distinctId;
+      if (e.set) properties.$set = e.set;
+      if (e.setOnce) properties.$set_once = e.setOnce;
 
-    let response = await this.publicHttp.post('/batch', {
-      api_key: params.apiKey,
-      batch
+      return {
+        distinct_id: e.distinctId,
+        event: e.event,
+        properties,
+        ...(e.timestamp ? { timestamp: e.timestamp } : {})
+      };
     });
-    return response.data;
+
+    return this.publicPost(
+      '/batch/',
+      {
+        api_key: params.apiKey,
+        batch
+      },
+      'capture event batch'
+    );
   }
 
-  // ── Persons ──────────────────────────────────────────────────────────
+  // Persons
 
   async listPersons(params?: {
     search?: string;
@@ -91,144 +168,215 @@ export class PostHogClient {
     limit?: number;
     offset?: number;
   }) {
-    let queryParams: Record<string, string> = {};
+    let queryParams: QueryParams = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
     if (params?.properties) queryParams.properties = JSON.stringify(params.properties);
 
-    let response = await this.privateHttp.get(this.envPath('/persons/'), {
+    return this.privateGet(this.envPath('/persons/', 'list persons'), 'list persons', {
       params: queryParams
     });
-    return response.data;
   }
 
   async getPerson(personId: string) {
-    let response = await this.privateHttp.get(this.envPath(`/persons/${personId}/`));
-    return response.data;
+    return this.privateGet(
+      this.envPath(`/persons/${personId}/`, 'get a person'),
+      'get person'
+    );
   }
 
   async deletePerson(personId: string) {
-    await this.privateHttp.delete(this.envPath(`/persons/${personId}/`));
+    return this.privatePost(
+      this.envPath('/persons/bulk_delete/', 'delete persons'),
+      { ids: [personId] },
+      'delete person'
+    );
   }
 
-  // ── Feature Flags ────────────────────────────────────────────────────
+  // Feature Flags
 
-  async listFeatureFlags(params?: { limit?: number; offset?: number; search?: string }) {
-    let queryParams: Record<string, string> = {};
+  async listFeatureFlags(params?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    active?: 'STALE' | 'false' | 'true';
+    type?: 'boolean' | 'experiment' | 'multivariant' | 'remote_config';
+  }) {
+    let queryParams: QueryParams = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
+    if (params?.active) queryParams.active = params.active;
+    if (params?.type) queryParams.type = params.type;
 
-    let response = await this.privateHttp.get(this.envPath('/feature_flags/'), {
-      params: queryParams
-    });
-    return response.data;
+    return this.privateGet(
+      this.projectPath('/feature_flags/', 'list feature flags'),
+      'list feature flags',
+      { params: queryParams }
+    );
   }
 
   async getFeatureFlag(flagId: string) {
-    let response = await this.privateHttp.get(this.envPath(`/feature_flags/${flagId}/`));
-    return response.data;
-  }
-
-  async createFeatureFlag(data: Record<string, any>) {
-    let response = await this.privateHttp.post(this.envPath('/feature_flags/'), data);
-    return response.data;
-  }
-
-  async updateFeatureFlag(flagId: string, data: Record<string, any>) {
-    let response = await this.privateHttp.patch(
-      this.envPath(`/feature_flags/${flagId}/`),
-      data
+    return this.privateGet(
+      this.projectPath(`/feature_flags/${flagId}/`, 'get a feature flag'),
+      'get feature flag'
     );
-    return response.data;
+  }
+
+  async createFeatureFlag(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/feature_flags/', 'create a feature flag'),
+      data,
+      'create feature flag'
+    );
+  }
+
+  async updateFeatureFlag(flagId: string, data: JsonRecord) {
+    return this.privatePatch(
+      this.projectPath(`/feature_flags/${flagId}/`, 'update a feature flag'),
+      data,
+      'update feature flag'
+    );
   }
 
   async deleteFeatureFlag(flagId: string) {
-    await this.privateHttp.delete(this.envPath(`/feature_flags/${flagId}/`));
+    return this.privateDelete(
+      this.projectPath(`/feature_flags/${flagId}/`, 'delete a feature flag'),
+      'delete feature flag'
+    );
   }
 
   async evaluateFeatureFlags(params: {
     apiKey: string;
     distinctId: string;
-    personProperties?: Record<string, any>;
-    groupProperties?: Record<string, Record<string, any>>;
+    groups?: Record<string, string>;
+    personProperties?: JsonRecord;
+    groupProperties?: Record<string, JsonRecord>;
+    evaluationContexts?: string[];
+    includeConfig?: boolean;
   }) {
-    let body: Record<string, any> = {
+    let body: JsonRecord = {
       api_key: params.apiKey,
       distinct_id: params.distinctId
     };
+    if (params.groups) body.groups = params.groups;
     if (params.personProperties) body.person_properties = params.personProperties;
     if (params.groupProperties) body.group_properties = params.groupProperties;
+    if (params.evaluationContexts) body.evaluation_contexts = params.evaluationContexts;
 
-    let response = await this.publicHttp.post('/flags/?v=2', body);
-    return response.data;
+    return this.publicPost(
+      `/flags/?v=2${params.includeConfig ? '&config=true' : ''}`,
+      body,
+      'evaluate feature flags'
+    );
   }
 
-  // ── Experiments ──────────────────────────────────────────────────────
+  // Experiments
 
-  async listExperiments(params?: { limit?: number; offset?: number }) {
-    let queryParams: Record<string, string> = {};
+  async listExperiments(params?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    status?: string;
+    archived?: boolean;
+  }) {
+    let queryParams: QueryParams = {};
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
+    if (params?.search) queryParams.search = params.search;
+    if (params?.status) queryParams.status = params.status;
+    if (params?.archived !== undefined) queryParams.archived = String(params.archived);
 
-    let response = await this.privateHttp.get(this.envPath('/experiments/'), {
-      params: queryParams
-    });
-    return response.data;
+    return this.privateGet(
+      this.projectPath('/experiments/', 'list experiments'),
+      'list experiments',
+      { params: queryParams }
+    );
   }
 
   async getExperiment(experimentId: string) {
-    let response = await this.privateHttp.get(this.envPath(`/experiments/${experimentId}/`));
-    return response.data;
-  }
-
-  async createExperiment(data: Record<string, any>) {
-    let response = await this.privateHttp.post(this.envPath('/experiments/'), data);
-    return response.data;
-  }
-
-  async updateExperiment(experimentId: string, data: Record<string, any>) {
-    let response = await this.privateHttp.patch(
-      this.envPath(`/experiments/${experimentId}/`),
-      data
+    return this.privateGet(
+      this.projectPath(`/experiments/${experimentId}/`, 'get an experiment'),
+      'get experiment'
     );
-    return response.data;
   }
 
-  // ── Surveys ──────────────────────────────────────────────────────────
+  async createExperiment(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/experiments/', 'create an experiment'),
+      data,
+      'create experiment'
+    );
+  }
 
-  async listSurveys(params?: { limit?: number; offset?: number }) {
-    let queryParams: Record<string, string> = {};
+  async updateExperiment(experimentId: string, data: JsonRecord) {
+    return this.privatePatch(
+      this.projectPath(`/experiments/${experimentId}/`, 'update an experiment'),
+      data,
+      'update experiment'
+    );
+  }
+
+  async deleteExperiment(experimentId: string) {
+    return this.privateDelete(
+      this.projectPath(`/experiments/${experimentId}/`, 'delete an experiment'),
+      'delete experiment'
+    );
+  }
+
+  // Surveys
+
+  async listSurveys(params?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    archived?: boolean;
+    type?: string;
+  }) {
+    let queryParams: QueryParams = {};
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
+    if (params?.search) queryParams.search = params.search;
+    if (params?.archived !== undefined) queryParams.archived = String(params.archived);
+    if (params?.type) queryParams.type = params.type;
 
-    let response = await this.privateHttp.get(this.envPath('/surveys/'), {
+    return this.privateGet(this.projectPath('/surveys/', 'list surveys'), 'list surveys', {
       params: queryParams
     });
-    return response.data;
   }
 
   async getSurvey(surveyId: string) {
-    let response = await this.privateHttp.get(this.envPath(`/surveys/${surveyId}/`));
-    return response.data;
+    return this.privateGet(
+      this.projectPath(`/surveys/${surveyId}/`, 'get a survey'),
+      'get survey'
+    );
   }
 
-  async createSurvey(data: Record<string, any>) {
-    let response = await this.privateHttp.post(this.envPath('/surveys/'), data);
-    return response.data;
+  async createSurvey(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/surveys/', 'create a survey'),
+      data,
+      'create survey'
+    );
   }
 
-  async updateSurvey(surveyId: string, data: Record<string, any>) {
-    let response = await this.privateHttp.patch(this.envPath(`/surveys/${surveyId}/`), data);
-    return response.data;
+  async updateSurvey(surveyId: string, data: JsonRecord) {
+    return this.privatePatch(
+      this.projectPath(`/surveys/${surveyId}/`, 'update a survey'),
+      data,
+      'update survey'
+    );
   }
 
   async deleteSurvey(surveyId: string) {
-    await this.privateHttp.delete(this.envPath(`/surveys/${surveyId}/`));
+    return this.privateDelete(
+      this.projectPath(`/surveys/${surveyId}/`, 'delete a survey'),
+      'delete survey'
+    );
   }
 
-  // ── Insights ─────────────────────────────────────────────────────────
+  // Insights
 
   async listInsights(params?: {
     limit?: number;
@@ -236,137 +384,295 @@ export class PostHogClient {
     search?: string;
     savedOnly?: boolean;
   }) {
-    let queryParams: Record<string, string> = {};
+    let queryParams: QueryParams = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
     if (params?.savedOnly) queryParams.saved = 'true';
 
-    let response = await this.privateHttp.get(this.envPath('/insights/'), {
+    return this.privateGet(this.envPath('/insights/', 'list insights'), 'list insights', {
       params: queryParams
     });
-    return response.data;
   }
 
   async getInsight(insightId: string) {
-    let response = await this.privateHttp.get(this.envPath(`/insights/${insightId}/`));
-    return response.data;
+    return this.privateGet(
+      this.envPath(`/insights/${insightId}/`, 'get an insight'),
+      'get insight'
+    );
   }
 
-  // ── Dashboards ───────────────────────────────────────────────────────
+  // Dashboards
 
   async listDashboards(params?: { limit?: number; offset?: number; search?: string }) {
-    let queryParams: Record<string, string> = {};
+    let queryParams: QueryParams = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
 
-    let response = await this.privateHttp.get(this.envPath('/dashboards/'), {
-      params: queryParams
-    });
-    return response.data;
+    return this.privateGet(
+      this.envPath('/dashboards/', 'list dashboards'),
+      'list dashboards',
+      { params: queryParams }
+    );
   }
 
   async getDashboard(dashboardId: string) {
-    let response = await this.privateHttp.get(this.envPath(`/dashboards/${dashboardId}/`));
-    return response.data;
-  }
-
-  async createDashboard(data: Record<string, any>) {
-    let response = await this.privateHttp.post(this.envPath('/dashboards/'), data);
-    return response.data;
-  }
-
-  async updateDashboard(dashboardId: string, data: Record<string, any>) {
-    let response = await this.privateHttp.patch(
-      this.envPath(`/dashboards/${dashboardId}/`),
-      data
+    return this.privateGet(
+      this.envPath(`/dashboards/${dashboardId}/`, 'get a dashboard'),
+      'get dashboard'
     );
-    return response.data;
+  }
+
+  async createDashboard(data: JsonRecord) {
+    return this.privatePost(
+      this.envPath('/dashboards/', 'create a dashboard'),
+      data,
+      'create dashboard'
+    );
+  }
+
+  async updateDashboard(dashboardId: string, data: JsonRecord) {
+    return this.privatePatch(
+      this.envPath(`/dashboards/${dashboardId}/`, 'update a dashboard'),
+      data,
+      'update dashboard'
+    );
   }
 
   async deleteDashboard(dashboardId: string) {
-    await this.privateHttp.delete(this.envPath(`/dashboards/${dashboardId}/`));
+    return this.privateDelete(
+      this.envPath(`/dashboards/${dashboardId}/`, 'delete a dashboard'),
+      'delete dashboard'
+    );
   }
 
-  // ── Cohorts ──────────────────────────────────────────────────────────
+  // Cohorts
 
-  async listCohorts(params?: { limit?: number; offset?: number }) {
-    let queryParams: Record<string, string> = {};
+  async listCohorts(params?: { limit?: number; offset?: number; basic?: boolean }) {
+    let queryParams: QueryParams = {};
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
+    if (params?.basic !== undefined) queryParams.basic = String(params.basic);
 
-    let response = await this.privateHttp.get(this.envPath('/cohorts/'), {
+    return this.privateGet(this.projectPath('/cohorts/', 'list cohorts'), 'list cohorts', {
       params: queryParams
     });
-    return response.data;
   }
 
   async getCohort(cohortId: string) {
-    let response = await this.privateHttp.get(this.envPath(`/cohorts/${cohortId}/`));
-    return response.data;
+    return this.privateGet(
+      this.projectPath(`/cohorts/${cohortId}/`, 'get a cohort'),
+      'get cohort'
+    );
   }
 
-  async createCohort(data: Record<string, any>) {
-    let response = await this.privateHttp.post(this.envPath('/cohorts/'), data);
-    return response.data;
+  async createCohort(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/cohorts/', 'create a cohort'),
+      data,
+      'create cohort'
+    );
   }
 
-  async updateCohort(cohortId: string, data: Record<string, any>) {
-    let response = await this.privateHttp.patch(this.envPath(`/cohorts/${cohortId}/`), data);
-    return response.data;
+  async updateCohort(cohortId: string, data: JsonRecord) {
+    return this.privatePatch(
+      this.projectPath(`/cohorts/${cohortId}/`, 'update a cohort'),
+      data,
+      'update cohort'
+    );
   }
 
-  // ── Annotations ──────────────────────────────────────────────────────
+  async deleteCohort(cohortId: string) {
+    return this.privateDelete(
+      this.projectPath(`/cohorts/${cohortId}/`, 'delete a cohort'),
+      'delete cohort'
+    );
+  }
+
+  // Annotations
 
   async listAnnotations(params?: { limit?: number; offset?: number; search?: string }) {
-    let queryParams: Record<string, string> = {};
+    let queryParams: QueryParams = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
 
-    let response = await this.privateHttp.get(this.envPath('/annotations/'), {
-      params: queryParams
-    });
-    return response.data;
-  }
-
-  async createAnnotation(data: Record<string, any>) {
-    let response = await this.privateHttp.post(this.envPath('/annotations/'), data);
-    return response.data;
-  }
-
-  async updateAnnotation(annotationId: string, data: Record<string, any>) {
-    let response = await this.privateHttp.patch(
-      this.envPath(`/annotations/${annotationId}/`),
-      data
+    return this.privateGet(
+      this.projectPath('/annotations/', 'list annotations'),
+      'list annotations',
+      { params: queryParams }
     );
-    return response.data;
+  }
+
+  async getAnnotation(annotationId: string) {
+    return this.privateGet(
+      this.projectPath(`/annotations/${annotationId}/`, 'get an annotation'),
+      'get annotation'
+    );
+  }
+
+  async createAnnotation(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/annotations/', 'create an annotation'),
+      data,
+      'create annotation'
+    );
+  }
+
+  async updateAnnotation(annotationId: string, data: JsonRecord) {
+    return this.privatePatch(
+      this.projectPath(`/annotations/${annotationId}/`, 'update an annotation'),
+      data,
+      'update annotation'
+    );
   }
 
   async deleteAnnotation(annotationId: string) {
-    await this.privateHttp.delete(this.envPath(`/annotations/${annotationId}/`));
+    return this.privateDelete(
+      this.projectPath(`/annotations/${annotationId}/`, 'delete an annotation'),
+      'delete annotation'
+    );
   }
 
-  // ── Actions ──────────────────────────────────────────────────────────
+  // Actions
 
-  async listActions(params?: { limit?: number; offset?: number }) {
-    let queryParams: Record<string, string> = {};
+  async listActions(params?: { limit?: number; offset?: number; search?: string }) {
+    let queryParams: QueryParams = {};
+    if (params?.search) queryParams.search = params.search;
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
 
-    let response = await this.privateHttp.get(this.envPath('/actions/'), {
+    return this.privateGet(this.projectPath('/actions/', 'list actions'), 'list actions', {
       params: queryParams
     });
-    return response.data;
   }
 
   async getAction(actionId: string) {
-    let response = await this.privateHttp.get(this.envPath(`/actions/${actionId}/`));
-    return response.data;
+    return this.privateGet(
+      this.projectPath(`/actions/${actionId}/`, 'get an action'),
+      'get action'
+    );
   }
 
-  // ── Session Recordings ───────────────────────────────────────────────
+  async createAction(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/actions/', 'create an action'),
+      data,
+      'create action'
+    );
+  }
+
+  async updateAction(actionId: string, data: JsonRecord) {
+    return this.privatePatch(
+      this.projectPath(`/actions/${actionId}/`, 'update an action'),
+      data,
+      'update action'
+    );
+  }
+
+  async deleteAction(actionId: string) {
+    return this.privateDelete(
+      this.projectPath(`/actions/${actionId}/`, 'delete an action'),
+      'delete action'
+    );
+  }
+
+  // Groups
+
+  async listGroupTypes() {
+    return this.privateGet(
+      this.projectPath('/groups_types/', 'list group types'),
+      'list group types'
+    );
+  }
+
+  async listGroups(params: {
+    groupTypeIndex: number;
+    groupKey?: string;
+    search?: string;
+    cursor?: string;
+  }) {
+    let queryParams: QueryParams = {
+      group_type_index: String(params.groupTypeIndex)
+    };
+    if (params.groupKey) queryParams.group_key = params.groupKey;
+    if (params.search) queryParams.search = params.search;
+    if (params.cursor) queryParams.cursor = params.cursor;
+
+    return this.privateGet(this.projectPath('/groups/', 'list groups'), 'list groups', {
+      params: queryParams
+    });
+  }
+
+  async findGroup(params: {
+    groupTypeIndex: number;
+    groupKey: string;
+    skipCreateNotebook?: boolean;
+  }) {
+    let queryParams: QueryParams = {
+      group_type_index: String(params.groupTypeIndex),
+      group_key: params.groupKey
+    };
+    if (params.skipCreateNotebook !== undefined) {
+      queryParams.skip_create_notebook = String(params.skipCreateNotebook);
+    }
+
+    let data = await this.privateGet(
+      this.projectPath('/groups/find/', 'find a group'),
+      'find group',
+      {
+        params: queryParams
+      }
+    );
+    if (
+      data &&
+      typeof data === 'object' &&
+      (data as Record<string, unknown>).group_key !== undefined
+    ) {
+      return data;
+    }
+
+    let listed = await this.listGroups({
+      groupTypeIndex: params.groupTypeIndex,
+      groupKey: params.groupKey
+    });
+    let results = Array.isArray(listed) ? listed : listed.results || [];
+    let group = results[0];
+    if (!group) {
+      throw postHogServiceError(
+        `PostHog group ${params.groupKey} was not found for group type ${params.groupTypeIndex}.`
+      );
+    }
+
+    return group;
+  }
+
+  async createGroup(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/groups/', 'create a group'),
+      data,
+      'create group'
+    );
+  }
+
+  async updateGroupProperty(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/groups/update_property/', 'update a group property'),
+      data,
+      'update group property'
+    );
+  }
+
+  async deleteGroupProperty(data: JsonRecord) {
+    return this.privatePost(
+      this.projectPath('/groups/delete_property/', 'delete a group property'),
+      data,
+      'delete group property'
+    );
+  }
+
+  // Session Recordings
 
   async listSessionRecordings(params?: {
     limit?: number;
@@ -375,48 +681,59 @@ export class PostHogClient {
     dateFrom?: string;
     dateTo?: string;
   }) {
-    let queryParams: Record<string, string> = {};
+    let queryParams: QueryParams = {};
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
     if (params?.personId) queryParams.person_id = params.personId;
     if (params?.dateFrom) queryParams.date_from = params.dateFrom;
     if (params?.dateTo) queryParams.date_to = params.dateTo;
 
-    let response = await this.privateHttp.get(this.envPath('/session_recordings/'), {
-      params: queryParams
-    });
-    return response.data;
+    return this.privateGet(
+      this.envPath('/session_recordings/', 'list session recordings'),
+      'list session recordings',
+      { params: queryParams }
+    );
   }
 
   async getSessionRecording(recordingId: string) {
-    let response = await this.privateHttp.get(
-      this.envPath(`/session_recordings/${recordingId}/`)
+    return this.privateGet(
+      this.envPath(`/session_recordings/${recordingId}/`, 'get a session recording'),
+      'get session recording'
     );
-    return response.data;
   }
 
-  // ── Query (HogQL) ───────────────────────────────────────────────────
+  // Query (HogQL)
 
-  async runQuery(query: Record<string, any>) {
-    let response = await this.privateHttp.post(this.envPath('/query/'), { query });
-    return response.data;
+  async runQuery(query: JsonRecord) {
+    return this.privatePost(this.envPath('/query/', 'run a query'), { query }, 'run query');
   }
 
-  // ── Event Definitions ────────────────────────────────────────────────
+  // Event Definitions
 
-  async listEventDefinitions(params?: { limit?: number; offset?: number; search?: string }) {
-    let queryParams: Record<string, string> = {};
+  async listEventDefinitions(params?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    excludeHidden?: boolean;
+    excludeStale?: boolean;
+  }) {
+    let queryParams: QueryParams = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
+    if (params?.excludeHidden !== undefined)
+      queryParams.exclude_hidden = String(params.excludeHidden);
+    if (params?.excludeStale !== undefined)
+      queryParams.exclude_stale = String(params.excludeStale);
 
-    let response = await this.privateHttp.get(this.envPath('/event_definitions/'), {
-      params: queryParams
-    });
-    return response.data;
+    return this.privateGet(
+      this.projectPath('/event_definitions/', 'list event definitions'),
+      'list event definitions',
+      { params: queryParams }
+    );
   }
 
-  // ── Property Definitions ─────────────────────────────────────────────
+  // Property Definitions
 
   async listPropertyDefinitions(params?: {
     limit?: number;
@@ -424,32 +741,58 @@ export class PostHogClient {
     search?: string;
     type?: string;
   }) {
-    let queryParams: Record<string, string> = {};
+    let queryParams: QueryParams = {};
     if (params?.search) queryParams.search = params.search;
     if (params?.limit) queryParams.limit = String(params.limit);
     if (params?.offset) queryParams.offset = String(params.offset);
     if (params?.type) queryParams.type = params.type;
 
-    let response = await this.privateHttp.get(this.envPath('/property_definitions/'), {
-      params: queryParams
-    });
-    return response.data;
+    return this.privateGet(
+      this.projectPath('/property_definitions/', 'list property definitions'),
+      'list property definitions',
+      { params: queryParams }
+    );
   }
 
-  // ── Projects ─────────────────────────────────────────────────────────
+  // Projects and account context
 
-  async listProjects() {
-    let response = await this.privateHttp.get('/api/projects/');
-    return response.data;
+  async listOrganizations(params?: { limit?: number; offset?: number }) {
+    let queryParams: QueryParams = {};
+    if (params?.limit) queryParams.limit = String(params.limit);
+    if (params?.offset) queryParams.offset = String(params.offset);
+
+    return this.privateGet('/api/organizations/', 'list organizations', {
+      params: queryParams
+    });
+  }
+
+  async listProjects(params?: {
+    organizationId?: string;
+    limit?: number;
+    offset?: number;
+    search?: string;
+  }) {
+    let queryParams: QueryParams = {};
+    if (params?.limit) queryParams.limit = String(params.limit);
+    if (params?.offset) queryParams.offset = String(params.offset);
+    if (params?.search) queryParams.search = params.search;
+
+    if (params?.organizationId) {
+      return this.privateGet(
+        `/api/organizations/${params.organizationId}/projects/`,
+        'list organization projects',
+        { params: queryParams }
+      );
+    }
+
+    return this.privateGet('/api/projects/', 'list projects', { params: queryParams });
   }
 
   async getProject(projectId: string) {
-    let response = await this.privateHttp.get(`/api/projects/${projectId}/`);
-    return response.data;
+    return this.privateGet(`/api/projects/${projectId}/`, 'get project');
   }
 
   async getCurrentUser() {
-    let response = await this.privateHttp.get('/api/users/@me/');
-    return response.data;
+    return this.privateGet('/api/users/@me/', 'get current user');
   }
 }

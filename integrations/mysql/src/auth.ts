@@ -1,5 +1,7 @@
+import { ServiceError } from '@lowerdeck/error';
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { mysqlServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -10,6 +12,11 @@ export let auth = SlateAuth.create()
       username: z.string().describe('Database username'),
       password: z.string().describe('Database password'),
       sslMode: z.enum(['disabled', 'preferred', 'required']).describe('SSL connection mode'),
+      sslCa: z.string().optional().describe('PEM-encoded CA certificate for SSL connections'),
+      sslRejectUnauthorized: z
+        .boolean()
+        .optional()
+        .describe('Whether SSL connections must reject unauthorized certificates'),
       connectionString: z.string().describe('Full MySQL connection URI')
     })
   )
@@ -38,6 +45,8 @@ export let auth = SlateAuth.create()
           username: parsed.username,
           password: parsed.password,
           sslMode: parsed.sslMode,
+          sslCa: parsed.sslCa,
+          sslRejectUnauthorized: parsed.sslRejectUnauthorized,
           connectionString: connStr
         }
       };
@@ -57,11 +66,18 @@ export let auth = SlateAuth.create()
       sslMode: z
         .enum(['disabled', 'preferred', 'required'])
         .default('preferred')
-        .describe('SSL connection mode')
+        .describe('SSL connection mode'),
+      sslCa: z.string().optional().describe('PEM-encoded CA certificate for SSL connections'),
+      sslRejectUnauthorized: z
+        .boolean()
+        .optional()
+        .default(true)
+        .describe('Reject unauthorized SSL certificates when SSL is enabled')
     }),
 
     getOutput: async ctx => {
-      let { host, port, database, username, password, sslMode } = ctx.input;
+      let { host, port, database, username, password, sslMode, sslCa, sslRejectUnauthorized } =
+        ctx.input;
       let encodedPassword = encodeURIComponent(password);
       let encodedUsername = encodeURIComponent(username);
       let sslParam = sslMode !== 'disabled' ? `?ssl=${sslMode}` : '';
@@ -75,6 +91,8 @@ export let auth = SlateAuth.create()
           username,
           password,
           sslMode,
+          sslCa,
+          sslRejectUnauthorized,
           connectionString
         }
       };
@@ -90,23 +108,35 @@ let parseConnectionString = (
   username: string;
   password: string;
   sslMode: 'disabled' | 'preferred' | 'required';
+  sslCa?: string;
+  sslRejectUnauthorized: boolean;
 } => {
   let url: URL;
-  try {
-    // Replace mysql:// with http:// for URL parsing
-    let normalized = connStr.replace(/^mysql:\/\//, 'http://');
-    url = new URL(normalized);
-  } catch {
-    throw new Error(
+  if (!/^mysql:\/\//i.test(connStr)) {
+    throw mysqlServiceError(
       'Invalid MySQL connection string format. Expected: mysql://user:password@host:port/dbname'
     );
   }
 
-  let sslParam = url.searchParams.get('ssl') || url.searchParams.get('sslmode') || 'preferred';
-  let validSslModes = ['disabled', 'preferred', 'required'] as const;
-  let sslMode: (typeof validSslModes)[number] = validSslModes.includes(sslParam as any)
-    ? (sslParam as (typeof validSslModes)[number])
-    : 'preferred';
+  try {
+    let normalized = connStr.replace(/^mysql:\/\//i, 'http://');
+    url = new URL(normalized);
+  } catch (error) {
+    if (error instanceof ServiceError) throw error;
+    throw mysqlServiceError(
+      'Invalid MySQL connection string format. Expected: mysql://user:password@host:port/dbname'
+    );
+  }
+
+  let sslMode = parseSslMode(
+    url.searchParams.get('ssl') || url.searchParams.get('sslmode') || 'preferred'
+  );
+  let sslRejectUnauthorized = parseBooleanParam(
+    url.searchParams.get('sslRejectUnauthorized') ||
+      url.searchParams.get('sslrejectunauthorized'),
+    true,
+    'sslRejectUnauthorized'
+  );
 
   return {
     host: url.hostname || 'localhost',
@@ -114,6 +144,26 @@ let parseConnectionString = (
     database: url.pathname.replace(/^\//, '') || '',
     username: decodeURIComponent(url.username || 'root'),
     password: decodeURIComponent(url.password || ''),
-    sslMode
+    sslMode,
+    sslCa: url.searchParams.get('sslCa') || url.searchParams.get('sslca') || undefined,
+    sslRejectUnauthorized
   };
+};
+
+let parseSslMode = (value: string): 'disabled' | 'preferred' | 'required' => {
+  let normalized = value.trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1') return 'required';
+  if (normalized === 'false' || normalized === '0') return 'disabled';
+  if (['disabled', 'preferred', 'required'].includes(normalized)) {
+    return normalized as 'disabled' | 'preferred' | 'required';
+  }
+  throw mysqlServiceError('ssl must be one of disabled, preferred, required, true, or false.');
+};
+
+let parseBooleanParam = (value: string | null, defaultValue: boolean, label: string) => {
+  if (value === null) return defaultValue;
+  let normalized = value.trim().toLowerCase();
+  if (['true', '1', 'yes'].includes(normalized)) return true;
+  if (['false', '0', 'no'].includes(normalized)) return false;
+  throw mysqlServiceError(`${label} must be true or false.`);
 };

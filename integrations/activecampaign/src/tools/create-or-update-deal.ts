@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { activeCampaignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createOrUpdateDeal = SlateTool.create(spec, {
@@ -86,6 +87,19 @@ export let createOrUpdateDeal = SlateTool.create(spec, {
     if (ctx.input.dealId) {
       result = await client.updateDeal(ctx.input.dealId, dealInput);
     } else {
+      if (!ctx.input.title) {
+        throw activeCampaignServiceError('title is required when creating a deal');
+      }
+      if (!ctx.input.contactId && !ctx.input.accountId) {
+        throw activeCampaignServiceError(
+          'contactId or accountId is required when creating a deal'
+        );
+      }
+      if (!ctx.input.pipelineId && !ctx.input.stageId) {
+        throw activeCampaignServiceError(
+          'pipelineId or stageId is required when creating a deal'
+        );
+      }
       result = await client.createDeal(dealInput);
     }
 

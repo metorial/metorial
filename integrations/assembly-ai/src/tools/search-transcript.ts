@@ -3,6 +3,20 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let mapTimestamp = (timestamp: any) => {
+  if (Array.isArray(timestamp)) {
+    return {
+      start: timestamp[0],
+      end: timestamp[1]
+    };
+  }
+
+  return {
+    start: timestamp.start,
+    end: timestamp.end
+  };
+};
+
 export let searchTranscript = SlateTool.create(spec, {
   name: 'Search Transcript',
   key: 'search_transcript',
@@ -18,6 +32,7 @@ Returns match counts and timestamps for each keyword found.`,
       transcriptId: z.string().describe('The unique transcript ID.'),
       words: z
         .array(z.string())
+        .min(1)
         .describe('Keywords or phrases to search for (each up to 5 words).')
     })
   )
@@ -55,10 +70,7 @@ Returns match counts and timestamps for each keyword found.`,
     let matches = (result.matches || []).map((m: any) => ({
       text: m.text,
       count: m.count,
-      timestamps: (m.timestamps || []).map((t: any) => ({
-        start: t.start,
-        end: t.end
-      })),
+      timestamps: (m.timestamps || []).map(mapTimestamp),
       indexes: m.indexes || []
     }));
 

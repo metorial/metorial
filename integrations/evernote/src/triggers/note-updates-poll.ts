@@ -120,7 +120,12 @@ export let noteUpdatesPollTrigger = SlateTrigger.create(spec, {
       // Fetch full note metadata
       let note: { createdAt?: string; tagGuids?: string[] } = {};
       try {
-        let fullNote = await client.getNote(ctx.input.noteGuid, false, false, false, false);
+        let fullNote = await client.getNoteWithResultSpec(ctx.input.noteGuid, {
+          includeContent: false,
+          includeResourcesData: false,
+          includeResourcesRecognition: false,
+          includeResourcesAlternateData: false
+        });
         note.createdAt = fullNote.created
           ? new Date(fullNote.created).toISOString()
           : undefined;

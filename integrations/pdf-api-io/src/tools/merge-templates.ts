@@ -1,15 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfApiIoServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  outputOptionForDelivery,
+  pdfAttachments,
+  pdfDeliverySchema,
+  pdfOutput,
+  pdfOutputSchema,
+  requireNonEmptyString
+} from './shared';
 
 export let mergeTemplates = SlateTool.create(spec, {
   name: 'Merge Templates',
   key: 'merge_templates',
-  description: `Combine multiple PDF templates into a single PDF document. Each template receives its own set of dynamic data. Useful for generating multi-section documents such as an invoice combined with a shipping label in one API call. Returns either a base64-encoded PDF or a temporary download URL.`,
+  description: `Combine multiple PDF templates into a single PDF document. Each template receives its own set of dynamic data. Useful for generating multi-section documents such as an invoice combined with a shipping label in one API call. Returns either a Slate PDF attachment or a temporary download URL.`,
   instructions: [
     'Provide at least two templates to merge.',
-    'Each template entry requires its own template ID and data object with the appropriate variables.'
+    'Each template entry requires its own template ID and data object with the appropriate variables.',
+    'Use outputFormat="attachment" when you need the generated PDF file bytes. The file is returned as a Slate attachment, not inline base64.'
   ],
   constraints: [
     'Rate limit: 60 requests per minute by default.',
@@ -27,48 +37,44 @@ export let mergeTemplates = SlateTool.create(spec, {
               .describe("Key-value pairs matching this template's variables")
           })
         )
-        .min(1)
-        .describe('Array of templates to merge, each with its own dynamic data'),
-      outputFormat: z
-        .enum(['base64', 'url'])
-        .default('base64')
-        .describe(
-          'Output format: "base64" for base64-encoded PDF, "url" for a temporary download URL valid for 15 minutes'
-        )
+        .describe('Array of at least two templates to merge, each with its own dynamic data'),
+      outputFormat: pdfDeliverySchema
     })
   )
   .output(
-    z.object({
-      base64: z
-        .string()
-        .optional()
-        .describe('Base64-encoded merged PDF content (when outputFormat is "base64")'),
-      downloadUrl: z
-        .string()
-        .optional()
-        .describe(
-          'Temporary download URL for the merged PDF, valid for 15 minutes (when outputFormat is "url")'
-        )
+    pdfOutputSchema.extend({
+      templateCount: z.number().describe('Number of templates included in the merge')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let outputOption = ctx.input.outputFormat === 'url' ? ('url' as const) : ('pdf' as const);
+    if (ctx.input.templates.length < 2) {
+      throw pdfApiIoServiceError('merge_templates requires at least two template entries.');
+    }
 
     let mergeEntries = ctx.input.templates.map(t => ({
-      id: t.templateId,
+      id: requireNonEmptyString(t.templateId, 'templateId'),
       data: t.templateData
     }));
 
-    let result = await client.mergeTemplates(mergeEntries, { output: outputOption });
+    let result = await client.mergeTemplates(mergeEntries, {
+      output: outputOptionForDelivery(ctx.input.outputFormat)
+    });
+
+    let output = {
+      templateCount: ctx.input.templates.length,
+      ...pdfOutput(result)
+    };
 
     return {
-      output: {
-        base64: result.base64,
-        downloadUrl: result.url
-      },
-      message: `Merged **${ctx.input.templates.length}** template(s) into a single PDF. ${ctx.input.outputFormat === 'url' ? 'Download URL provided (expires in 15 minutes).' : 'Returned as base64-encoded content.'}`
+      output,
+      attachments: pdfAttachments(result),
+      message: `Merged **${ctx.input.templates.length}** template(s) into a single PDF. ${
+        output.delivery === 'url'
+          ? 'Download URL provided (expires in 15 minutes).'
+          : `Returned as a Slate attachment (${output.byteLength} bytes).`
+      }`
     };
   })
   .build();

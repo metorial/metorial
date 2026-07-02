@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bigcommerceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCoupon = SlateTool.create(spec, {
@@ -76,7 +77,8 @@ export let manageCoupon = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.couponId) throw new Error('couponId is required for delete');
+      if (!ctx.input.couponId)
+        throw bigcommerceServiceError('couponId is required for delete');
       await client.deleteCoupon(ctx.input.couponId);
       return {
         output: { deleted: true },
@@ -110,7 +112,7 @@ export let manageCoupon = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.couponId) throw new Error('couponId is required for update');
+    if (!ctx.input.couponId) throw bigcommerceServiceError('couponId is required for update');
     let coupon = await client.updateCoupon(ctx.input.couponId, data);
     return {
       output: { coupon },

@@ -28,7 +28,8 @@ export let listTransactions = SlateTool.create(spec, {
         .describe(
           'ISO 8601 UTC datetime — only return transactions modified before this date'
         ),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      orderId: z.string().optional().describe('Only return transactions for a specific order')
     })
   )
   .output(
@@ -44,7 +45,8 @@ export let listTransactions = SlateTool.create(spec, {
     let result = await client.listTransactions({
       modifiedAfter: ctx.input.modifiedAfter,
       modifiedBefore: ctx.input.modifiedBefore,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      orderId: ctx.input.orderId
     });
 
     return {

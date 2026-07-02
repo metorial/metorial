@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { railwayServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getServiceTool = SlateTool.create(spec, {
@@ -50,7 +51,7 @@ export let getServiceTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let service = await client.getService(ctx.input.serviceId);
 
     let instance: any = null;
@@ -116,8 +117,14 @@ export let createServiceTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let source: { repo?: string; image?: string } | undefined;
+    if (ctx.input.repo && ctx.input.image) {
+      throw railwayServiceError(
+        'Provide either repo or image when creating a Railway service, not both.'
+      );
+    }
+
     if (ctx.input.repo) {
       source = { repo: ctx.input.repo };
     } else if (ctx.input.image) {
@@ -175,17 +182,19 @@ export let updateServiceTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
 
     let serviceMetaUpdate: { name?: string; icon?: string } = {};
     if (ctx.input.name) serviceMetaUpdate.name = ctx.input.name;
     if (ctx.input.icon) serviceMetaUpdate.icon = ctx.input.icon;
 
     let serviceName = ctx.input.name || ctx.input.serviceId;
+    let updated = false;
 
     if (Object.keys(serviceMetaUpdate).length > 0) {
       let result = await client.updateService(ctx.input.serviceId, serviceMetaUpdate);
       serviceName = result.name;
+      updated = true;
     }
 
     if (ctx.input.environmentId) {
@@ -210,7 +219,14 @@ export let updateServiceTool = SlateTool.create(spec, {
           ctx.input.environmentId,
           instanceUpdate
         );
+        updated = true;
       }
+    }
+
+    if (!updated) {
+      throw railwayServiceError(
+        'Provide at least one service metadata field or an environmentId with environment-specific settings to update.'
+      );
     }
 
     return {
@@ -243,7 +259,7 @@ export let deleteServiceTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     await client.deleteService(ctx.input.serviceId);
 
     return {

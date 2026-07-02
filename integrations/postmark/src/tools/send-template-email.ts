@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { postmarkServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let sendTemplateEmail = SlateTool.create(spec, {
@@ -35,6 +36,29 @@ export let sendTemplateEmail = SlateTool.create(spec, {
         .optional()
         .describe('Link tracking mode.'),
       messageStream: z.string().optional().describe('Message stream to send through.'),
+      headers: z
+        .array(
+          z.object({
+            name: z.string().describe('Header name.'),
+            value: z.string().describe('Header value.')
+          })
+        )
+        .optional()
+        .describe('Custom email headers.'),
+      attachments: z
+        .array(
+          z.object({
+            name: z.string().describe('Attachment filename.'),
+            content: z.string().describe('Base64-encoded attachment content.'),
+            contentType: z.string().describe('MIME type of the attachment.'),
+            contentId: z
+              .string()
+              .optional()
+              .describe('Content ID for inline/embedded attachments.')
+          })
+        )
+        .optional()
+        .describe('File attachments.'),
       metadata: z
         .record(z.string(), z.string())
         .optional()
@@ -51,6 +75,10 @@ export let sendTemplateEmail = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.templateId && !ctx.input.templateAlias) {
+      throw postmarkServiceError('templateId or templateAlias is required.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       accountToken: ctx.auth.accountToken
@@ -69,6 +97,8 @@ export let sendTemplateEmail = SlateTool.create(spec, {
       trackOpens: ctx.input.trackOpens,
       trackLinks: ctx.input.trackLinks,
       messageStream: ctx.input.messageStream,
+      headers: ctx.input.headers,
+      attachments: ctx.input.attachments,
       metadata: ctx.input.metadata
     });
 

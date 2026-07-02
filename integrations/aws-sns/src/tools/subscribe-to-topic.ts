@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SnsClient } from '../lib/client';
+import { snsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let subscribeToTopic = SlateTool.create(spec, {
@@ -53,6 +54,10 @@ export let subscribeToTopic = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('JSON dead-letter queue policy for undeliverable messages'),
+      replayPolicy: z
+        .string()
+        .optional()
+        .describe('JSON FIFO replay policy for replaying archived messages'),
       subscriptionRoleArn: z
         .string()
         .optional()
@@ -69,6 +74,10 @@ export let subscribeToTopic = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.protocol === 'firehose' && !ctx.input.subscriptionRoleArn) {
+      throw snsServiceError('subscriptionRoleArn is required for Firehose subscriptions.');
+    }
+
     let client = new SnsClient({
       accessKeyId: ctx.auth.accessKeyId,
       secretAccessKey: ctx.auth.secretAccessKey,
@@ -83,6 +92,7 @@ export let subscribeToTopic = SlateTool.create(spec, {
     if (ctx.input.rawMessageDelivery !== undefined)
       attributes.RawMessageDelivery = String(ctx.input.rawMessageDelivery);
     if (ctx.input.redrivePolicy) attributes.RedrivePolicy = ctx.input.redrivePolicy;
+    if (ctx.input.replayPolicy) attributes.ReplayPolicy = ctx.input.replayPolicy;
     if (ctx.input.subscriptionRoleArn)
       attributes.SubscriptionRoleArn = ctx.input.subscriptionRoleArn;
 

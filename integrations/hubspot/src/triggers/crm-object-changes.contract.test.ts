@@ -27,7 +27,7 @@ vi.mock('../lib/client', () => ({
 
 let createHubSpotTriggerTestClient = () =>
   createLocalSlateTestClient({
-    slate: provider,
+    slate: provider as any,
     state: {
       config: {},
       auth: {

@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let addBarcodeToPdf = SlateTool.create(spec, {
   name: 'Add Barcode to PDF',
@@ -44,12 +45,7 @@ Configure position, size, opacity, and text display options.`,
       isTextAbove: z.boolean().optional().describe('Position text above the barcode')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded PDF with barcode'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -72,7 +68,8 @@ Configure position, size, opacity, and text display options.`,
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully added **${ctx.input.barcodeType}** barcode to **${result.fileName}**`
     };
   })
@@ -95,12 +92,7 @@ export let createBarcodeImage = SlateTool.create(spec, {
       hideText: z.boolean().optional().describe('Hide barcode text in the image')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded barcode image content'),
-      fileName: z.string().describe('Barcode image file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -111,7 +103,8 @@ export let createBarcodeImage = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result),
+      attachments: [fileAttachment(result)],
       message: `Successfully created **${ctx.input.barcodeType}** barcode image`
     };
   })

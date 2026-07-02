@@ -1,7 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Api2PdfClient } from '../lib/client';
+import { api2PdfServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  api2PdfFileOutputSchema,
+  fetchApi2PdfAttachment,
+  fileAttachment,
+  fileOutput
+} from './shared';
 
 export let convertDocument = SlateTool.create(spec, {
   name: 'Convert Document',
@@ -35,17 +42,7 @@ export let convertDocument = SlateTool.create(spec, {
         .describe('Extra HTTP headers when fetching the source URL')
     })
   )
-  .output(
-    z.object({
-      responseId: z
-        .string()
-        .describe('Unique ID for this request, can be used to delete the file later'),
-      fileUrl: z.string().describe('URL to download the converted document'),
-      mbOut: z.number().describe('Size of the generated file in megabytes'),
-      cost: z.number().describe('Cost of this API call in USD'),
-      seconds: z.number().describe('Processing time in seconds')
-    })
-  )
+  .output(api2PdfFileOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Api2PdfClient({
       token: ctx.auth.token,
@@ -56,7 +53,7 @@ export let convertDocument = SlateTool.create(spec, {
 
     if (ctx.input.outputFormat === 'pdf') {
       if (!ctx.input.url) {
-        throw new Error('A url is required for PDF conversion');
+        throw api2PdfServiceError('A url is required for PDF conversion');
       }
       result = await client.libreOfficeAnyToPdf({
         url: ctx.input.url,
@@ -66,41 +63,36 @@ export let convertDocument = SlateTool.create(spec, {
       });
     } else if (ctx.input.outputFormat === 'docx') {
       if (!ctx.input.html && !ctx.input.url) {
-        throw new Error('Either html or url is required for DOCX conversion');
+        throw api2PdfServiceError('Either html or url is required for DOCX conversion');
       }
       result = await client.libreOfficeHtmlToDocx({
         html: ctx.input.html,
         url: ctx.input.url,
         fileName: ctx.input.fileName,
+        inline: ctx.input.inline,
         extraHTTPHeaders: ctx.input.extraHttpHeaders
       });
     } else {
       if (!ctx.input.html && !ctx.input.url) {
-        throw new Error('Either html or url is required for XLSX conversion');
+        throw api2PdfServiceError('Either html or url is required for XLSX conversion');
       }
       result = await client.libreOfficeHtmlToXlsx({
         html: ctx.input.html,
         url: ctx.input.url,
         fileName: ctx.input.fileName,
+        inline: ctx.input.inline,
         extraHTTPHeaders: ctx.input.extraHttpHeaders
       });
     }
 
-    if (!result.success) {
-      throw new Error(result.error || 'Document conversion failed');
-    }
+    let file = await fetchApi2PdfAttachment(client, result, 'Document conversion failed');
 
     let formatLabel = ctx.input.outputFormat.toUpperCase();
 
     return {
-      output: {
-        responseId: result.responseId,
-        fileUrl: result.fileUrl,
-        mbOut: result.mbOut,
-        cost: result.cost,
-        seconds: result.seconds
-      },
-      message: `Converted document to ${formatLabel} (${result.mbOut} MB, ${result.seconds}s). [Download](${result.fileUrl})`
+      output: fileOutput(result, file),
+      attachments: [fileAttachment(file)],
+      message: `Converted document to ${formatLabel} (${result.mbOut} MB, ${result.seconds}s) and returned it as a Slate attachment.`
     };
   })
   .build();

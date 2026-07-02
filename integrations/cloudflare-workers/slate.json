@@ -4,6 +4,7 @@
   "categories": ["apis-and-http-requests", "code-execution"],
   "skills": [
     "manage Worker scripts",
+    "upload and download Worker code",
     "deploy Worker versions",
     "configure bindings and settings",
     "manage secrets",

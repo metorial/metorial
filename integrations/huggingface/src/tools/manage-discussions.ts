@@ -256,7 +256,7 @@ export let updateDiscussionStatusTool = SlateTool.create(spec, {
       repoType: ctx.input.repoType,
       repoId: ctx.input.repoId,
       discussionNum: ctx.input.discussionNum,
-      status: ctx.input.action as 'open' | 'closed',
+      status: ctx.input.action === 'close' ? 'closed' : 'open',
       comment: ctx.input.comment
     });
 

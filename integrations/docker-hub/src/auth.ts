@@ -1,11 +1,47 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { createDockerHubBearerToken } from './lib/client';
+import { dockerHubApiError } from './lib/errors';
+
+let getProfile = async (ctx: {
+  output: { token: string; username: string };
+  input: Record<string, unknown>;
+}) => {
+  let http = createAxios({ baseURL: 'https://hub.docker.com' });
+
+  try {
+    let response = await http.get(`/v2/user/`, {
+      headers: {
+        Authorization: `Bearer ${ctx.output.token}`
+      }
+    });
+
+    return {
+      profile: {
+        id: response.data.id,
+        name: response.data.full_name || response.data.username,
+        email: response.data.email,
+        imageUrl: response.data.gravatar_url
+      }
+    };
+  } catch (error) {
+    throw dockerHubApiError(error, 'profile request');
+  }
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
-      username: z.string()
+      username: z.string(),
+      identifier: z
+        .string()
+        .optional()
+        .describe('Docker Hub username or organization identifier used for token renewal.'),
+      secret: z
+        .string()
+        .optional()
+        .describe('Docker Hub password, personal access token, or organization access token.')
     })
   )
   .addCustomAuth({
@@ -19,42 +55,22 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let http = createAxios({ baseURL: 'https://hub.docker.com' });
-
-      let response = await http.post('/v2/users/login', {
-        username: ctx.input.username,
-        password: ctx.input.password
+      let token = await createDockerHubBearerToken({
+        identifier: ctx.input.username,
+        secret: ctx.input.password
       });
 
       return {
         output: {
-          token: response.data.token as string,
-          username: ctx.input.username
+          token,
+          username: ctx.input.username,
+          identifier: ctx.input.username,
+          secret: ctx.input.password
         }
       };
     },
 
-    getProfile: async (ctx: {
-      output: { token: string; username: string };
-      input: { username: string; password: string };
-    }) => {
-      let http = createAxios({ baseURL: 'https://hub.docker.com' });
-
-      let response = await http.get(`/v2/user/`, {
-        headers: {
-          Authorization: `JWT ${ctx.output.token}`
-        }
-      });
-
-      return {
-        profile: {
-          id: response.data.id,
-          name: response.data.full_name || response.data.username,
-          email: response.data.email,
-          imageUrl: response.data.gravatar_url
-        }
-      };
-    }
+    getProfile
   })
   .addTokenAuth({
     type: 'auth.token',
@@ -67,40 +83,20 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let http = createAxios({ baseURL: 'https://hub.docker.com' });
-
-      let response = await http.post('/v2/users/login', {
-        username: ctx.input.username,
-        password: ctx.input.token
+      let token = await createDockerHubBearerToken({
+        identifier: ctx.input.username,
+        secret: ctx.input.token
       });
 
       return {
         output: {
-          token: response.data.token as string,
-          username: ctx.input.username
+          token,
+          username: ctx.input.username,
+          identifier: ctx.input.username,
+          secret: ctx.input.token
         }
       };
     },
 
-    getProfile: async (ctx: {
-      output: { token: string; username: string };
-      input: { username: string; token: string };
-    }) => {
-      let http = createAxios({ baseURL: 'https://hub.docker.com' });
-
-      let response = await http.get(`/v2/user/`, {
-        headers: {
-          Authorization: `JWT ${ctx.output.token}`
-        }
-      });
-
-      return {
-        profile: {
-          id: response.data.id,
-          name: response.data.full_name || response.data.username,
-          email: response.data.email,
-          imageUrl: response.data.gravatar_url
-        }
-      };
-    }
+    getProfile
   });

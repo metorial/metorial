@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createRegulation = SlateTool.create(spec, {
@@ -81,7 +82,7 @@ export let createRegulation = SlateTool.create(spec, {
     }
 
     if (!ctx.input.regulationType || !ctx.input.subjectType || !ctx.input.subjectIds?.length) {
-      throw new Error(
+      throw segmentServiceError(
         'regulationType, subjectType, and subjectIds are required to create a regulation'
       );
     }

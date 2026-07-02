@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { coinbaseOAuthAuthMethods } from '../lib/auth-methods';
 import { CoinbaseClient } from '../lib/client';
+import { coinbaseServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageAccounts = SlateTool.create(spec, {
@@ -12,6 +14,7 @@ export let manageAccounts = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(coinbaseOAuthAuthMethods)
   .input(
     z.object({
       action: z
@@ -64,7 +67,9 @@ export let manageAccounts = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) {
+        throw coinbaseServiceError('name is required for create action');
+      }
       let account = await client.createAccount(ctx.input.name);
       return {
         output: {
@@ -82,7 +87,9 @@ export let manageAccounts = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.accountId) throw new Error('accountId is required for get action');
+      if (!ctx.input.accountId) {
+        throw coinbaseServiceError('accountId is required for get action');
+      }
       let account = await client.getAccount(ctx.input.accountId);
       return {
         output: {
@@ -100,8 +107,12 @@ export let manageAccounts = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.accountId) throw new Error('accountId is required for update action');
-      if (!ctx.input.name) throw new Error('name is required for update action');
+      if (!ctx.input.accountId) {
+        throw coinbaseServiceError('accountId is required for update action');
+      }
+      if (!ctx.input.name) {
+        throw coinbaseServiceError('name is required for update action');
+      }
       let account = await client.updateAccount(ctx.input.accountId, ctx.input.name);
       return {
         output: {
@@ -119,7 +130,9 @@ export let manageAccounts = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.accountId) throw new Error('accountId is required for delete action');
+      if (!ctx.input.accountId) {
+        throw coinbaseServiceError('accountId is required for delete action');
+      }
       await client.deleteAccount(ctx.input.accountId);
       return {
         output: {

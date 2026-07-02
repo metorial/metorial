@@ -1,4 +1,6 @@
+import * as mysql from 'mysql2';
 import { type ConnectionConfig, MySQLClient } from './client';
+import { mysqlServiceError } from './errors';
 
 export interface AuthOutput {
   host: string;
@@ -7,6 +9,8 @@ export interface AuthOutput {
   username: string;
   password: string;
   sslMode: 'disabled' | 'preferred' | 'required';
+  sslCa?: string;
+  sslRejectUnauthorized?: boolean;
   connectionString: string;
 }
 
@@ -24,19 +28,19 @@ export let createClient = (auth: AuthOutput, config: ConfigOutput): MySQLClient 
     username: auth.username,
     password: auth.password,
     sslMode: auth.sslMode,
+    sslCa: auth.sslCa,
+    sslRejectUnauthorized: auth.sslRejectUnauthorized ?? true,
     queryTimeout: config.queryTimeout
   };
   return new MySQLClient(connectionConfig);
 };
 
-// Escape an identifier (table name, column name, etc.) for safe use in MySQL SQL
 export let escapeIdentifier = (name: string): string => {
-  return `\`${name.replace(/`/g, '``')}\``;
+  return mysql.escapeId(name);
 };
 
-// Escape a literal value for safe use in MySQL SQL
 export let escapeLiteral = (value: string): string => {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\0/g, '\\0')}'`;
+  return mysql.escape(value);
 };
 
 // Build a qualified table name with optional database prefix
@@ -50,8 +54,18 @@ export let qualifiedTableName = (tableName: string, databaseName?: string): stri
 // Format a value for SQL insertion
 export let formatValue = (val: any): string => {
   if (val === null || val === undefined) return 'NULL';
-  if (typeof val === 'number') return String(val);
-  if (typeof val === 'boolean') return val ? '1' : '0';
-  if (typeof val === 'object') return escapeLiteral(JSON.stringify(val));
-  return escapeLiteral(String(val));
+  if (typeof val === 'object' && !(val instanceof Date) && !Buffer.isBuffer(val)) {
+    return mysql.escape(JSON.stringify(val));
+  }
+  return mysql.escape(val);
+};
+
+export let validateSqlOptionName = (value: string, label: string) => {
+  let trimmed = value.trim();
+  if (!/^[A-Za-z0-9_$]+$/.test(trimmed)) {
+    throw mysqlServiceError(
+      `${label} may contain only letters, numbers, underscores, or dollar signs.`
+    );
+  }
+  return trimmed;
 };

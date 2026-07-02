@@ -5,5 +5,6 @@ export * from './manage-domain';
 export * from './manage-environment';
 export * from './manage-project';
 export * from './manage-service';
+export * from './manage-tcp-proxy';
 export * from './manage-variables';
 export * from './manage-volume';

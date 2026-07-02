@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DropboxClient } from '../lib/client';
+import { dropboxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let shareFolder = SlateTool.create(spec, {
@@ -69,14 +70,13 @@ export let shareFolder = SlateTool.create(spec, {
     let client = new DropboxClient(ctx.auth.token);
 
     if (ctx.input.action === 'share') {
-      if (!ctx.input.path) throw new Error('Path is required to share a folder');
+      if (!ctx.input.path) {
+        throw dropboxServiceError('path is required to share a folder.');
+      }
       let result = await client.shareFolder(ctx.input.path);
       return {
         output: {
-          sharedFolderId:
-            result.shared_folder_id || result['.tag'] === 'complete'
-              ? result.shared_folder_id
-              : undefined,
+          sharedFolderId: result.shared_folder_id ?? result.metadata?.shared_folder_id,
           success: true
         },
         message: `Shared folder **${ctx.input.path}**.`
@@ -84,9 +84,11 @@ export let shareFolder = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'add_member') {
-      if (!ctx.input.sharedFolderId) throw new Error('Shared folder ID is required');
+      if (!ctx.input.sharedFolderId) {
+        throw dropboxServiceError('sharedFolderId is required.');
+      }
       if (!ctx.input.members || ctx.input.members.length === 0)
-        throw new Error('At least one member is required');
+        throw dropboxServiceError('At least one member is required.');
 
       await client.addFolderMember(
         ctx.input.sharedFolderId,
@@ -102,8 +104,12 @@ export let shareFolder = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'remove_member') {
-      if (!ctx.input.sharedFolderId) throw new Error('Shared folder ID is required');
-      if (!ctx.input.memberEmail) throw new Error('Member email is required');
+      if (!ctx.input.sharedFolderId) {
+        throw dropboxServiceError('sharedFolderId is required.');
+      }
+      if (!ctx.input.memberEmail) {
+        throw dropboxServiceError('memberEmail is required.');
+      }
 
       await client.removeFolderMember(ctx.input.sharedFolderId, ctx.input.memberEmail);
 
@@ -114,7 +120,9 @@ export let shareFolder = SlateTool.create(spec, {
     }
 
     // list_members
-    if (!ctx.input.sharedFolderId) throw new Error('Shared folder ID is required');
+    if (!ctx.input.sharedFolderId) {
+      throw dropboxServiceError('sharedFolderId is required.');
+    }
     let result = await client.listFolderMembers(ctx.input.sharedFolderId);
 
     let members = (result.users || []).map((user: any) => ({

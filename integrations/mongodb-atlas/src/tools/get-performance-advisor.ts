@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { invalidAction, resolveProjectId } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getPerformanceAdvisorTool = SlateTool.create(spec, {
@@ -61,8 +62,7 @@ export let getPerformanceAdvisorTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
     let { action, processId } = ctx.input;
 
@@ -107,6 +107,6 @@ export let getPerformanceAdvisorTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

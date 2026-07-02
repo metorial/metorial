@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createKubeClient } from '../lib/client';
+import { kubernetesServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageAutoscaler = SlateTool.create(spec, {
@@ -78,8 +79,10 @@ export let manageAutoscaler = SlateTool.create(spec, {
         result = await client.applyResource(ctx.input.manifest, namespace);
       }
     } else if (action === 'create') {
-      if (!ctx.input.targetRef || !ctx.input.maxReplicas) {
-        throw new Error('targetRef and maxReplicas are required for creating an HPA');
+      if (!ctx.input.targetRef || ctx.input.maxReplicas === undefined) {
+        throw kubernetesServiceError(
+          'targetRef and maxReplicas are required for creating an HPA'
+        );
       }
 
       let metrics: any[] = [];

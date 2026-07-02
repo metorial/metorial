@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { segmentApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -45,7 +46,13 @@ export let auth = SlateAuth.create()
         }
       });
 
-      let response = await http.get('/v1/workspace');
+      let response: any;
+      try {
+        response = await http.get('/v1/workspace');
+      } catch (error) {
+        throw segmentApiError(error, 'get workspace profile');
+      }
+
       let workspace = response.data?.data?.workspace;
 
       return {

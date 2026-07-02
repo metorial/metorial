@@ -1,6 +1,6 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { KlaviyoClient } from '../lib/client';
+import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 let generateSecretKey = (): string => {
@@ -57,10 +57,7 @@ export let webhookEvents = SlateTrigger.create(spec, {
   )
   .webhook({
     autoRegisterWebhook: async ctx => {
-      let client = new KlaviyoClient({
-        token: ctx.auth.token,
-        revision: ctx.config.revision
-      });
+      let client = createClient(ctx);
 
       let secretKey = generateSecretKey();
 
@@ -105,10 +102,7 @@ export let webhookEvents = SlateTrigger.create(spec, {
     },
 
     autoUnregisterWebhook: async ctx => {
-      let client = new KlaviyoClient({
-        token: ctx.auth.token,
-        revision: ctx.config.revision
-      });
+      let client = createClient(ctx);
 
       let details = ctx.input.registrationDetails as { webhookId?: string };
       if (details?.webhookId) {

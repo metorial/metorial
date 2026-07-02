@@ -2,7 +2,7 @@
 
 ## Overview
 
-Stability AI provides a REST API for AI-powered generative media creation, including image generation and editing (via Stable Diffusion models), audio generation (via Stable Audio), and 3D asset generation. Their API offers image generation from text prompts, image-to-image transformations, and various editing capabilities. The platform also includes audio generation via Stable Audio and 3D model generation via SPAR3D.
+Stability AI provides a REST API for AI-powered generative media creation, including image generation and editing (via Stable Diffusion models), audio generation and transformation (via Stable Audio), and 3D asset generation. The integration targets the current REST v2beta media APIs for generation, editing, control, upscaling, audio, and 3D endpoints, while account/profile endpoints remain on the documented v1 user APIs.
 
 ## Authentication
 
@@ -19,11 +19,11 @@ Stability AI uses **API Key** authentication exclusively.
 
 ### Image Generation
 
-Generate images from text prompts using various Stable Diffusion models. Available model tiers include Stable Image Core (speed and affordability), and Stable Image Ultra (top-tier quality powered by Stable Diffusion 3.5). Key parameters include prompt, negative prompt, dimensions, seed, style preset, CFG scale, and output format (PNG, JPEG, WebP).
+Generate images from text prompts using Stable Image Core, Stable Image Ultra, and the Stable Diffusion 3.5 model suite. Key parameters include prompt, negative prompt, aspect ratio, seed, style preset, CFG scale for SD3.5, image-to-image reference image for supported models, and output format (PNG, JPEG, WebP).
 
 ### Image Editing
 
-A suite of editing tools including: erasing unwanted elements, outpainting (extending image boundaries), inpainting (editing specific masked areas), search-and-replace (swapping objects via text), search-and-recolor (changing colors of specific objects), and background removal. Each tool accepts an input image and typically a mask or text prompt describing the desired edit.
+A suite of editing tools including: erasing unwanted elements, outpainting (extending image boundaries), inpainting (editing specific masked areas), search-and-replace (swapping objects via text), search-and-recolor (changing colors of specific objects), and background removal. The grouped tool validates operation-specific required fields locally and returns generated media as Slate attachments.
 
 ### Image Upscaling
 
@@ -31,7 +31,7 @@ Conservative Upscale takes images up to 4K resolution while preserving all aspec
 
 ### Style Transfer
 
-Style Transfer applies the visual aesthetic of one existing image to another, useful for maintaining brand consistency and unifying visual content. This is distinct from the Style Guide feature, which generates new content based on a style.
+Style Guide generates new content in the style of a reference image. Style Transfer applies visual characteristics from a separate style image to an existing init image while preserving composition, useful for maintaining brand consistency and unifying visual content.
 
 ### Image Control
 
@@ -43,11 +43,11 @@ Allows replacing the background of a subject image with a new scene described by
 
 ### Audio Generation
 
-Stable Audio supports text-to-audio, audio-to-audio, and audio inpainting workflows with strong prompt adherence for genre and style control. Generates audio at 44.1 kHz stereo with coherent musical structures and supports melodies, sound effects, and various audio styles. Audio-to-audio mode maintains structural fidelity from input audio for seamless style transfers, supporting durations up to 3 minutes.
+Stable Audio 3 supports text-to-audio, audio-to-audio, and audio inpainting workflows with strong prompt adherence for genre and style control. It generates 44.1 kHz stereo audio and supports durations up to 380 seconds. Stable Audio 2.5 and Stable Audio 2 remain available through the current Stable Audio 2 endpoints with durations up to 190 seconds.
 
 ### 3D Generation
 
-Stable Point Aware 3D (SPAR3D) provides real-time editing and complete 3D object generation from a single image in under a second, combining point cloud sampling with mesh generation. Stable Fast 3D generates high-quality 3D assets from a single image in 0.5 seconds.
+Stable Point Aware 3D (SPAR3D) provides complete 3D object generation from a single image, combining point cloud sampling with mesh generation and controls for target type/count, guidance scale, and seed. Stable Fast 3D generates GLB 3D assets from a single image with texture resolution, foreground ratio, remesh, and vertex count controls. Generated GLB files are returned as Slate attachments.
 
 ### Account Management
 

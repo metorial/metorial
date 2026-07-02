@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SqsClient } from '../lib/client';
+import { sqsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageQueue = SlateTool.create(spec, {
@@ -11,6 +12,7 @@ export let manageQueue = SlateTool.create(spec, {
     'To get queue attributes, provide "queueUrl" and optionally "attributeNames".',
     'To update attributes, provide "queueUrl" and "setAttributes".',
     'To manage tags, provide "addTags" to add/update or "removeTagKeys" to remove tags.',
+    'To manage generated queue permissions, provide "addPermission" or "removePermissionLabel".',
     'Changes typically propagate within 60 seconds.'
   ],
   tags: {
@@ -69,7 +71,15 @@ export let manageQueue = SlateTool.create(spec, {
           contentBasedDeduplication: z
             .string()
             .optional()
-            .describe('Enable/disable content-based deduplication for FIFO ("true"/"false")')
+            .describe('Enable/disable content-based deduplication for FIFO ("true"/"false")'),
+          deduplicationScope: z
+            .string()
+            .optional()
+            .describe('FIFO high-throughput deduplication scope: "messageGroup" or "queue"'),
+          fifoThroughputLimit: z
+            .string()
+            .optional()
+            .describe('FIFO throughput quota mode: "perQueue" or "perMessageGroupId"')
         })
         .optional()
         .describe('Attributes to update on the queue'),
@@ -80,7 +90,29 @@ export let manageQueue = SlateTool.create(spec, {
       removeTagKeys: z
         .array(z.string())
         .optional()
-        .describe('Tag keys to remove from the queue')
+        .describe('Tag keys to remove from the queue'),
+      addPermission: z
+        .object({
+          label: z
+            .string()
+            .describe(
+              'Unique permission label, up to 80 alphanumeric/hyphen/underscore chars'
+            ),
+          awsAccountIds: z
+            .array(z.string())
+            .describe('AWS account IDs that receive the permission'),
+          actions: z
+            .array(z.string())
+            .describe('SQS action names to allow, such as "SendMessage" or "*"')
+        })
+        .optional()
+        .describe(
+          'Generated queue permission statement to add with AddPermission. Supports AWS account principals only.'
+        ),
+      removePermissionLabel: z
+        .string()
+        .optional()
+        .describe('Permission label to remove with RemovePermission')
     })
   )
   .output(
@@ -93,7 +125,13 @@ export let manageQueue = SlateTool.create(spec, {
         .record(z.string(), z.string())
         .optional()
         .describe('Current queue tags (returned when tags are modified)'),
-      updated: z.boolean().describe('Whether any attributes or tags were updated')
+      permissionsUpdated: z
+        .boolean()
+        .optional()
+        .describe('Whether queue permission statements were added or removed'),
+      updated: z
+        .boolean()
+        .describe('Whether any attributes, tags, or permissions were updated')
     })
   )
   .handleInvocation(async ctx => {
@@ -124,7 +162,9 @@ export let manageQueue = SlateTool.create(spec, {
         KmsMasterKeyId: ctx.input.setAttributes.kmsMasterKeyId,
         KmsDataKeyReusePeriodSeconds: ctx.input.setAttributes.kmsDataKeyReusePeriodSeconds,
         SqsManagedSseEnabled: ctx.input.setAttributes.sqsManagedSseEnabled,
-        ContentBasedDeduplication: ctx.input.setAttributes.contentBasedDeduplication
+        ContentBasedDeduplication: ctx.input.setAttributes.contentBasedDeduplication,
+        DeduplicationScope: ctx.input.setAttributes.deduplicationScope,
+        FifoThroughputLimit: ctx.input.setAttributes.fifoThroughputLimit
       };
 
       for (let [key, val] of Object.entries(attrMap)) {
@@ -154,6 +194,35 @@ export let manageQueue = SlateTool.create(spec, {
       messages.push(`Removed **${ctx.input.removeTagKeys.length}** tag(s)`);
     }
 
+    let permissionsUpdated = false;
+    if (ctx.input.addPermission) {
+      if (ctx.input.addPermission.awsAccountIds.length === 0) {
+        throw sqsServiceError(
+          'addPermission.awsAccountIds must include at least one AWS account ID.'
+        );
+      }
+      if (ctx.input.addPermission.actions.length === 0) {
+        throw sqsServiceError('addPermission.actions must include at least one SQS action.');
+      }
+
+      await client.addPermission(
+        ctx.input.queueUrl,
+        ctx.input.addPermission.label,
+        ctx.input.addPermission.awsAccountIds,
+        ctx.input.addPermission.actions
+      );
+      updated = true;
+      permissionsUpdated = true;
+      messages.push(`Added permission **${ctx.input.addPermission.label}**`);
+    }
+
+    if (ctx.input.removePermissionLabel) {
+      await client.removePermission(ctx.input.queueUrl, ctx.input.removePermissionLabel);
+      updated = true;
+      permissionsUpdated = true;
+      messages.push(`Removed permission **${ctx.input.removePermissionLabel}**`);
+    }
+
     // Get attributes
     let attributes = await client.getQueueAttributes(
       ctx.input.queueUrl,
@@ -174,6 +243,7 @@ export let manageQueue = SlateTool.create(spec, {
       output: {
         attributes,
         tags,
+        permissionsUpdated: permissionsUpdated || undefined,
         updated
       },
       message: messages.join('. ')

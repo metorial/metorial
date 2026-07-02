@@ -41,7 +41,7 @@ export let refundEvents = SlateTrigger.create(spec, {
       let subscription = await client.createWebhookSubscription({
         idempotencyKey: crypto.randomUUID(),
         subscription: {
-          name: 'Slates Refund Events',
+          name: 'Square Refund Events',
           eventTypes: REFUND_EVENT_TYPES,
           notificationUrl: ctx.input.webhookBaseUrl
         }

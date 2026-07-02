@@ -1,278 +1,419 @@
-import { createAxios } from 'slates';
+import {
+  createAuthenticatedAxios,
+  getResponseHeaderValue,
+  requestAxios,
+  requestAxiosData
+} from 'slates';
+import { apifyApiError, apifyValidationError } from './errors';
+
+export type ApifyRecord = Record<string, any>;
+
+export type ApifyListResult<T = ApifyRecord> = {
+  items: T[];
+  total: number;
+  offset: number;
+  limit: number;
+  count: number;
+};
+
+export type ApifyBinaryContent = {
+  contentBase64: string;
+  contentText?: string;
+  contentType: string;
+  byteLength: number;
+};
+
+export type ApifyKeyValueRecord = ApifyBinaryContent & {
+  isJson: boolean;
+  jsonValue?: unknown;
+};
+
+type ApifyEnvelope<T> = {
+  data?: T;
+};
+
+let compactParams = (params: Record<string, unknown> = {}) =>
+  Object.fromEntries(Object.entries(params).filter(([, value]) => value !== undefined));
+
+let boolParam = (value: boolean | undefined) =>
+  value === undefined ? undefined : value ? '1' : '0';
+
+let encodeWebhooks = (webhooks: ApifyRecord[] | undefined) =>
+  webhooks === undefined
+    ? undefined
+    : Buffer.from(JSON.stringify(webhooks), 'utf-8').toString('base64');
+
+let pathId = (id: string) => encodeURIComponent(id);
+
+let apifyList = <T = ApifyRecord>(data: any): ApifyListResult<T> => ({
+  items: Array.isArray(data?.items) ? data.items : [],
+  total: typeof data?.total === 'number' ? data.total : 0,
+  offset: typeof data?.offset === 'number' ? data.offset : 0,
+  limit: typeof data?.limit === 'number' ? data.limit : 0,
+  count: typeof data?.count === 'number' ? data.count : 0
+});
+
+let normalizeContentType = (headers: unknown, fallback = 'application/octet-stream') => {
+  let value = getResponseHeaderValue(headers, 'content-type') ?? fallback;
+  return value.split(';')[0]?.trim().toLowerCase() || fallback;
+};
+
+let bufferFromResponse = (data: unknown) => {
+  if (Buffer.isBuffer(data)) return data;
+  if (data instanceof ArrayBuffer) return Buffer.from(data);
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+  if (typeof data === 'string') return Buffer.from(data, 'utf-8');
+  return Buffer.from(JSON.stringify(data ?? ''), 'utf-8');
+};
+
+let runOptionsQuery = (params?: {
+  timeout?: number;
+  memory?: number;
+  build?: string;
+  waitForFinish?: number;
+  maxItems?: number;
+  maxTotalChargeUsd?: number;
+  restartOnError?: boolean;
+  webhooks?: ApifyRecord[];
+}) =>
+  compactParams({
+    timeout: params?.timeout,
+    memory: params?.memory,
+    build: params?.build,
+    waitForFinish: params?.waitForFinish,
+    maxItems: params?.maxItems,
+    maxTotalChargeUsd: params?.maxTotalChargeUsd,
+    restartOnError: boolParam(params?.restartOnError),
+    webhooks: encodeWebhooks(params?.webhooks)
+  });
+
+let storageQuery = (params?: {
+  offset?: number;
+  limit?: number;
+  desc?: boolean;
+  unnamed?: boolean;
+}) =>
+  compactParams({
+    offset: params?.offset,
+    limit: params?.limit,
+    desc: boolParam(params?.desc),
+    unnamed: boolParam(params?.unnamed)
+  });
 
 export class ApifyClient {
-  private axios: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string }) {
-    this.axios = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL: 'https://api.apify.com/v2',
+      authHeader: { value: `Bearer ${config.token}` },
       headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+        Accept: 'application/json'
       }
     });
   }
 
-  // ---- User ----
-
-  async getUser(): Promise<Record<string, any>> {
-    let response = await this.axios.get('/users/me');
-    return response.data?.data;
+  private async wrapped<T>(operation: string, request: () => Promise<any>): Promise<T> {
+    let response = await requestAxiosData<ApifyEnvelope<T>>(operation, request, apifyApiError);
+    return response.data as T;
   }
 
-  // ---- Actors ----
+  private async list<T = ApifyRecord>(operation: string, request: () => Promise<any>) {
+    let data = await this.wrapped<unknown>(operation, request);
+    return apifyList<T>(data);
+  }
 
-  async listActors(params?: {
-    offset?: number;
+  async getUser(): Promise<ApifyRecord> {
+    return this.wrapped('get current user', () => this.http.get('/users/me'));
+  }
+
+  async searchStoreActors(params?: {
+    search?: string;
+    category?: string;
+    username?: string;
     limit?: number;
-    desc?: boolean;
-    my?: boolean;
-  }): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-    if (params?.my !== undefined) queryParams.my = params.my ? '1' : '0';
-
-    let response = await this.axios.get('/acts', { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
+    offset?: number;
+  }) {
+    return this.list('search Store actors', () =>
+      this.http.get('/store', {
+        params: compactParams({
+          search: params?.search,
+          category: params?.category,
+          username: params?.username,
+          limit: params?.limit,
+          offset: params?.offset
+        })
+      })
+    );
   }
 
-  async getActor(actorId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/acts/${actorId}`);
-    return response.data?.data;
+  async listActors(params?: { offset?: number; limit?: number; desc?: boolean }) {
+    return this.list('list actors', () =>
+      this.http.get('/acts', {
+        params: compactParams({
+          offset: params?.offset,
+          limit: params?.limit,
+          desc: boolParam(params?.desc),
+          my: '1'
+        })
+      })
+    );
   }
 
-  async createActor(actorData: Record<string, any>): Promise<Record<string, any>> {
-    let response = await this.axios.post('/acts', actorData);
-    return response.data?.data;
+  async getActor(actorId: string): Promise<ApifyRecord> {
+    return this.wrapped('get actor', () => this.http.get(`/acts/${pathId(actorId)}`));
   }
 
-  async updateActor(
-    actorId: string,
-    actorData: Record<string, any>
-  ): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/acts/${actorId}`, actorData);
-    return response.data?.data;
+  async createActor(actorData: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('create actor', () => this.http.post('/acts', actorData));
+  }
+
+  async updateActor(actorId: string, actorData: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('update actor', () =>
+      this.http.put(`/acts/${pathId(actorId)}`, actorData)
+    );
   }
 
   async deleteActor(actorId: string): Promise<void> {
-    await this.axios.delete(`/acts/${actorId}`);
+    await requestAxios(
+      'delete actor',
+      () => this.http.delete(`/acts/${pathId(actorId)}`),
+      apifyApiError
+    );
   }
 
-  // ---- Actor Runs ----
+  async listActorVersions(actorId: string, params?: { offset?: number; limit?: number }) {
+    return this.list('list actor versions', () =>
+      this.http.get(`/acts/${pathId(actorId)}/versions`, {
+        params: compactParams({ offset: params?.offset, limit: params?.limit })
+      })
+    );
+  }
+
+  async getActorVersion(actorId: string, versionNumber: string): Promise<ApifyRecord> {
+    return this.wrapped('get actor version', () =>
+      this.http.get(`/acts/${pathId(actorId)}/versions/${pathId(versionNumber)}`)
+    );
+  }
+
+  async createActorVersion(actorId: string, body: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('create actor version', () =>
+      this.http.post(`/acts/${pathId(actorId)}/versions`, body)
+    );
+  }
+
+  async updateActorVersion(
+    actorId: string,
+    versionNumber: string,
+    body: ApifyRecord
+  ): Promise<ApifyRecord> {
+    return this.wrapped('update actor version', () =>
+      this.http.put(`/acts/${pathId(actorId)}/versions/${pathId(versionNumber)}`, body)
+    );
+  }
+
+  async deleteActorVersion(actorId: string, versionNumber: string): Promise<void> {
+    await requestAxios(
+      'delete actor version',
+      () => this.http.delete(`/acts/${pathId(actorId)}/versions/${pathId(versionNumber)}`),
+      apifyApiError
+    );
+  }
 
   async runActor(
     actorId: string,
     params?: {
-      input?: any;
+      input?: unknown;
       timeout?: number;
       memory?: number;
       build?: string;
-      webhooks?: Record<string, any>[];
+      waitForFinish?: number;
+      maxItems?: number;
+      maxTotalChargeUsd?: number;
+      restartOnError?: boolean;
+      webhooks?: ApifyRecord[];
     }
-  ): Promise<Record<string, any>> {
-    let queryParams: Record<string, string> = {};
-    if (params?.timeout !== undefined) queryParams.timeout = String(params.timeout);
-    if (params?.memory !== undefined) queryParams.memory = String(params.memory);
-    if (params?.build !== undefined) queryParams.build = params.build;
-    if (params?.webhooks !== undefined)
-      queryParams.webhooks = btoa(JSON.stringify(params.webhooks));
-
-    let response = await this.axios.post(`/acts/${actorId}/runs`, params?.input || {}, {
-      params: queryParams
-    });
-    return response.data?.data;
+  ): Promise<ApifyRecord> {
+    return this.wrapped('run actor', () =>
+      this.http.post(`/acts/${pathId(actorId)}/runs`, params?.input ?? {}, {
+        params: runOptionsQuery(params)
+      })
+    );
   }
 
   async runActorSync(
     actorId: string,
     params?: {
-      input?: any;
+      input?: unknown;
       timeout?: number;
       memory?: number;
       build?: string;
+      maxItems?: number;
+      maxTotalChargeUsd?: number;
+      webhooks?: ApifyRecord[];
     }
-  ): Promise<Record<string, any>> {
-    let queryParams: Record<string, string> = {};
-    if (params?.timeout !== undefined) queryParams.timeout = String(params.timeout);
-    if (params?.memory !== undefined) queryParams.memory = String(params.memory);
-    if (params?.build !== undefined) queryParams.build = params.build;
-
-    let response = await this.axios.post(
-      `/acts/${actorId}/run-sync-get-dataset-items`,
-      params?.input || {},
-      {
-        params: queryParams
-      }
+  ): Promise<ApifyRecord[]> {
+    let data = await requestAxiosData<unknown>(
+      'run actor synchronously',
+      () =>
+        this.http.post(
+          `/acts/${pathId(actorId)}/run-sync-get-dataset-items`,
+          params?.input ?? {},
+          {
+            params: runOptionsQuery(params)
+          }
+        ),
+      apifyApiError
     );
-    return response.data;
+    return Array.isArray(data) ? (data as ApifyRecord[]) : [];
   }
 
-  async getRun(runId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/actor-runs/${runId}`);
-    return response.data?.data;
+  async getRun(runId: string): Promise<ApifyRecord> {
+    return this.wrapped('get actor run', () => this.http.get(`/actor-runs/${runId}`));
   }
 
-  async listRuns(
-    actorId: string,
-    params?: {
-      offset?: number;
-      limit?: number;
-      desc?: boolean;
-      status?: string;
-    }
-  ): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-    if (params?.status !== undefined) queryParams.status = params.status;
-
-    let response = await this.axios.get(`/acts/${actorId}/runs`, { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
+  async listRuns(params?: {
+    actorId?: string;
+    offset?: number;
+    limit?: number;
+    desc?: boolean;
+    status?: string;
+  }) {
+    let path = params?.actorId ? `/acts/${pathId(params.actorId)}/runs` : '/actor-runs';
+    return this.list('list actor runs', () =>
+      this.http.get(path, {
+        params: compactParams({
+          offset: params?.offset,
+          limit: params?.limit,
+          desc: boolParam(params?.desc),
+          status: params?.status
+        })
+      })
+    );
   }
 
-  async abortRun(runId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/actor-runs/${runId}/abort`);
-    return response.data?.data;
+  async abortRun(runId: string, params?: { gracefully?: boolean }): Promise<ApifyRecord> {
+    return this.wrapped('abort actor run', () =>
+      this.http.post(`/actor-runs/${runId}/abort`, undefined, {
+        params: compactParams({ gracefully: boolParam(params?.gracefully) })
+      })
+    );
   }
 
-  async resurrectRun(actorId: string, runId: string): Promise<Record<string, any>> {
-    let response = await this.axios.post(`/acts/${actorId}/runs/${runId}/resurrect`);
-    return response.data?.data;
+  async resurrectRun(runId: string): Promise<ApifyRecord> {
+    return this.wrapped('resurrect actor run', () =>
+      this.http.post(`/actor-runs/${runId}/resurrect`)
+    );
   }
 
-  // ---- Actor Tasks ----
-
-  async listTasks(params?: { offset?: number; limit?: number; desc?: boolean }): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-
-    let response = await this.axios.get('/actor-tasks', { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
+  async rebootRun(runId: string): Promise<ApifyRecord> {
+    return this.wrapped('reboot actor run', () =>
+      this.http.post(`/actor-runs/${runId}/reboot`)
+    );
   }
 
-  async getTask(taskId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/actor-tasks/${taskId}`);
-    return response.data?.data;
+  async updateRun(runId: string, body: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('update actor run', () => this.http.put(`/actor-runs/${runId}`, body));
   }
 
-  async createTask(taskData: Record<string, any>): Promise<Record<string, any>> {
-    let response = await this.axios.post('/actor-tasks', taskData);
-    return response.data?.data;
+  async deleteRun(runId: string): Promise<void> {
+    await requestAxios(
+      'delete actor run',
+      () => this.http.delete(`/actor-runs/${runId}`),
+      apifyApiError
+    );
   }
 
-  async updateTask(
-    taskId: string,
-    taskData: Record<string, any>
-  ): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/actor-tasks/${taskId}`, taskData);
-    return response.data?.data;
+  async listTasks(params?: { offset?: number; limit?: number; desc?: boolean }) {
+    return this.list('list actor tasks', () =>
+      this.http.get('/actor-tasks', {
+        params: compactParams({
+          offset: params?.offset,
+          limit: params?.limit,
+          desc: boolParam(params?.desc)
+        })
+      })
+    );
+  }
+
+  async getTask(taskId: string): Promise<ApifyRecord> {
+    return this.wrapped('get actor task', () => this.http.get(`/actor-tasks/${taskId}`));
+  }
+
+  async createTask(taskData: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('create actor task', () => this.http.post('/actor-tasks', taskData));
+  }
+
+  async updateTask(taskId: string, taskData: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('update actor task', () =>
+      this.http.put(`/actor-tasks/${taskId}`, taskData)
+    );
   }
 
   async deleteTask(taskId: string): Promise<void> {
-    await this.axios.delete(`/actor-tasks/${taskId}`);
+    await requestAxios(
+      'delete actor task',
+      () => this.http.delete(`/actor-tasks/${taskId}`),
+      apifyApiError
+    );
   }
 
   async runTask(
     taskId: string,
     params?: {
-      input?: any;
+      input?: unknown;
       timeout?: number;
       memory?: number;
       build?: string;
-      webhooks?: Record<string, any>[];
+      waitForFinish?: number;
+      maxItems?: number;
+      maxTotalChargeUsd?: number;
+      restartOnError?: boolean;
+      webhooks?: ApifyRecord[];
     }
-  ): Promise<Record<string, any>> {
-    let queryParams: Record<string, string> = {};
-    if (params?.timeout !== undefined) queryParams.timeout = String(params.timeout);
-    if (params?.memory !== undefined) queryParams.memory = String(params.memory);
-    if (params?.build !== undefined) queryParams.build = params.build;
-    if (params?.webhooks !== undefined)
-      queryParams.webhooks = btoa(JSON.stringify(params.webhooks));
-
-    let response = await this.axios.post(`/actor-tasks/${taskId}/runs`, params?.input || {}, {
-      params: queryParams
-    });
-    return response.data?.data;
+  ): Promise<ApifyRecord> {
+    return this.wrapped('run actor task', () =>
+      this.http.post(`/actor-tasks/${taskId}/runs`, params?.input ?? {}, {
+        params: runOptionsQuery(params)
+      })
+    );
   }
-
-  // ---- Datasets ----
 
   async listDatasets(params?: {
     offset?: number;
     limit?: number;
     desc?: boolean;
     unnamed?: boolean;
-  }): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-    if (params?.unnamed !== undefined) queryParams.unnamed = params.unnamed ? '1' : '0';
-
-    let response = await this.axios.get('/datasets', { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
+  }) {
+    return this.list('list datasets', () =>
+      this.http.get('/datasets', { params: storageQuery(params) })
+    );
   }
 
-  async getDataset(datasetId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/datasets/${datasetId}`);
-    return response.data?.data;
+  async getDataset(datasetId: string): Promise<ApifyRecord> {
+    return this.wrapped('get dataset', () => this.http.get(`/datasets/${datasetId}`));
+  }
+
+  async createDataset(params?: { name?: string }): Promise<ApifyRecord> {
+    return this.wrapped('create dataset', () =>
+      this.http.post('/datasets', undefined, {
+        params: compactParams({ name: params?.name })
+      })
+    );
+  }
+
+  async updateDataset(datasetId: string, body: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('update dataset', () => this.http.put(`/datasets/${datasetId}`, body));
+  }
+
+  async deleteDataset(datasetId: string): Promise<void> {
+    await requestAxios(
+      'delete dataset',
+      () => this.http.delete(`/datasets/${datasetId}`),
+      apifyApiError
+    );
   }
 
   async getDatasetItems(
@@ -284,329 +425,428 @@ export class ApifyClient {
       omit?: string[];
       desc?: boolean;
       clean?: boolean;
+      unwind?: string[];
+      skipHeaderRow?: boolean;
+      skipHidden?: boolean;
+      flatten?: string[];
     }
-  ): Promise<Record<string, any>[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.fields !== undefined) queryParams.fields = params.fields.join(',');
-    if (params?.omit !== undefined) queryParams.omit = params.omit.join(',');
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-    if (params?.clean !== undefined) queryParams.clean = params.clean ? '1' : '0';
-    queryParams.format = 'json';
-
-    let response = await this.axios.get(`/datasets/${datasetId}/items`, {
-      params: queryParams
-    });
-    return response.data || [];
+  ): Promise<ApifyRecord[]> {
+    let data = await requestAxiosData<unknown>(
+      'get dataset items',
+      () =>
+        this.http.get(`/datasets/${datasetId}/items`, {
+          params: compactParams({
+            offset: params?.offset,
+            limit: params?.limit,
+            fields: params?.fields?.join(','),
+            omit: params?.omit?.join(','),
+            desc: boolParam(params?.desc),
+            clean: boolParam(params?.clean),
+            unwind: params?.unwind?.join(','),
+            skipHeaderRow: boolParam(params?.skipHeaderRow),
+            skipHidden: boolParam(params?.skipHidden),
+            flatten: params?.flatten?.join(','),
+            format: 'json'
+          })
+        }),
+      apifyApiError
+    );
+    return Array.isArray(data) ? (data as ApifyRecord[]) : [];
   }
 
-  async pushDatasetItems(datasetId: string, items: Record<string, any>[]): Promise<void> {
-    await this.axios.post(`/datasets/${datasetId}/items`, items);
+  async exportDatasetItems(
+    datasetId: string,
+    params: {
+      format: string;
+      offset?: number;
+      limit?: number;
+      fields?: string[];
+      omit?: string[];
+      desc?: boolean;
+      clean?: boolean;
+      unwind?: string[];
+      skipHeaderRow?: boolean;
+      skipHidden?: boolean;
+      flatten?: string[];
+    }
+  ): Promise<ApifyBinaryContent> {
+    let response = await requestAxios(
+      'export dataset items',
+      () =>
+        this.http.get(`/datasets/${datasetId}/items`, {
+          responseType: 'arraybuffer',
+          transformResponse: value => value,
+          params: compactParams({
+            offset: params.offset,
+            limit: params.limit,
+            fields: params.fields?.join(','),
+            omit: params.omit?.join(','),
+            desc: boolParam(params.desc),
+            clean: boolParam(params.clean),
+            unwind: params.unwind?.join(','),
+            skipHeaderRow: boolParam(params.skipHeaderRow),
+            skipHidden: boolParam(params.skipHidden),
+            flatten: params.flatten?.join(','),
+            format: params.format
+          })
+        }),
+      apifyApiError
+    );
+
+    let buffer = bufferFromResponse(response.data);
+    let contentType = normalizeContentType(response.headers);
+    return {
+      contentBase64: buffer.toString('base64'),
+      contentText: buffer.toString('utf-8'),
+      contentType,
+      byteLength: buffer.byteLength
+    };
   }
 
-  // ---- Key-Value Stores ----
+  async pushDatasetItems(datasetId: string, items: ApifyRecord[]): Promise<void> {
+    await requestAxios(
+      'push dataset items',
+      () => this.http.post(`/datasets/${datasetId}/items`, items),
+      apifyApiError
+    );
+  }
 
   async listKeyValueStores(params?: {
     offset?: number;
     limit?: number;
     desc?: boolean;
     unnamed?: boolean;
-  }): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-    if (params?.unnamed !== undefined) queryParams.unnamed = params.unnamed ? '1' : '0';
+  }) {
+    return this.list('list key-value stores', () =>
+      this.http.get('/key-value-stores', { params: storageQuery(params) })
+    );
+  }
 
-    let response = await this.axios.get('/key-value-stores', { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
+  async getKeyValueStore(storeId: string): Promise<ApifyRecord> {
+    return this.wrapped('get key-value store', () =>
+      this.http.get(`/key-value-stores/${storeId}`)
+    );
+  }
+
+  async createKeyValueStore(params?: { name?: string }): Promise<ApifyRecord> {
+    return this.wrapped('create key-value store', () =>
+      this.http.post('/key-value-stores', undefined, {
+        params: compactParams({ name: params?.name })
+      })
+    );
+  }
+
+  async updateKeyValueStore(storeId: string, body: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('update key-value store', () =>
+      this.http.put(`/key-value-stores/${storeId}`, body)
+    );
+  }
+
+  async deleteKeyValueStore(storeId: string): Promise<void> {
+    await requestAxios(
+      'delete key-value store',
+      () => this.http.delete(`/key-value-stores/${storeId}`),
+      apifyApiError
+    );
   }
 
   async listKeyValueStoreKeys(
     storeId: string,
-    params?: {
-      exclusiveStartKey?: string;
-      limit?: number;
-    }
+    params?: { exclusiveStartKey?: string; limit?: number }
   ): Promise<{
     items: Array<{ key: string; size: number }>;
     isTruncated: boolean;
     nextExclusiveStartKey?: string;
   }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.exclusiveStartKey !== undefined)
-      queryParams.exclusiveStartKey = params.exclusiveStartKey;
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
+    let data = await this.wrapped<any>('list key-value store keys', () =>
+      this.http.get(`/key-value-stores/${storeId}/keys`, {
+        params: compactParams({
+          exclusiveStartKey: params?.exclusiveStartKey,
+          limit: params?.limit
+        })
+      })
+    );
 
-    let response = await this.axios.get(`/key-value-stores/${storeId}/keys`, {
-      params: queryParams
-    });
-    let data = response.data?.data;
     return {
-      items: data?.items || [],
-      isTruncated: data?.isTruncated || false,
-      nextExclusiveStartKey: data?.nextExclusiveStartKey
+      items: Array.isArray(data?.items) ? data.items : [],
+      isTruncated: Boolean(data?.isTruncated),
+      nextExclusiveStartKey:
+        typeof data?.nextExclusiveStartKey === 'string'
+          ? data.nextExclusiveStartKey
+          : undefined
     };
   }
 
-  async getKeyValueStoreRecord(storeId: string, recordKey: string): Promise<any> {
-    let response = await this.axios.get(`/key-value-stores/${storeId}/records/${recordKey}`);
-    return response.data;
+  async getKeyValueStoreRecord(
+    storeId: string,
+    recordKey: string
+  ): Promise<ApifyKeyValueRecord> {
+    let response = await requestAxios(
+      'get key-value store record',
+      () =>
+        this.http.get(
+          `/key-value-stores/${storeId}/records/${encodeURIComponent(recordKey)}`,
+          {
+            responseType: 'arraybuffer',
+            transformResponse: value => value
+          }
+        ),
+      apifyApiError
+    );
+    let buffer = bufferFromResponse(response.data);
+    let contentType = normalizeContentType(response.headers);
+    let text = buffer.toString('utf-8');
+    let isJson = contentType.includes('json');
+    let jsonValue: unknown;
+
+    if (isJson) {
+      try {
+        jsonValue = JSON.parse(text);
+      } catch {
+        throw apifyValidationError(
+          `Record "${recordKey}" is marked as JSON but could not be parsed.`
+        );
+      }
+    }
+
+    return {
+      contentBase64: buffer.toString('base64'),
+      contentText: text,
+      contentType,
+      byteLength: buffer.byteLength,
+      isJson,
+      jsonValue
+    };
   }
 
-  async setKeyValueStoreRecord(
-    storeId: string,
-    recordKey: string,
-    value: any,
-    contentType?: string
-  ): Promise<void> {
-    let headers: Record<string, string> = {};
-    if (contentType) headers['Content-Type'] = contentType;
-    await this.axios.put(`/key-value-stores/${storeId}/records/${recordKey}`, value, {
-      headers
-    });
+  async setKeyValueStoreRecord(params: {
+    storeId: string;
+    recordKey: string;
+    value: unknown;
+    contentType: string;
+  }): Promise<void> {
+    await requestAxios(
+      'set key-value store record',
+      () =>
+        this.http.put(
+          `/key-value-stores/${params.storeId}/records/${encodeURIComponent(params.recordKey)}`,
+          params.value,
+          {
+            headers: { 'Content-Type': params.contentType }
+          }
+        ),
+      apifyApiError
+    );
   }
 
   async deleteKeyValueStoreRecord(storeId: string, recordKey: string): Promise<void> {
-    await this.axios.delete(`/key-value-stores/${storeId}/records/${recordKey}`);
-  }
-
-  // ---- Schedules ----
-
-  async listSchedules(params?: { offset?: number; limit?: number; desc?: boolean }): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-
-    let response = await this.axios.get('/schedules', { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
-  }
-
-  async getSchedule(scheduleId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/schedules/${scheduleId}`);
-    return response.data?.data;
-  }
-
-  async createSchedule(scheduleData: Record<string, any>): Promise<Record<string, any>> {
-    let response = await this.axios.post('/schedules', scheduleData);
-    return response.data?.data;
-  }
-
-  async updateSchedule(
-    scheduleId: string,
-    scheduleData: Record<string, any>
-  ): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/schedules/${scheduleId}`, scheduleData);
-    return response.data?.data;
-  }
-
-  async deleteSchedule(scheduleId: string): Promise<void> {
-    await this.axios.delete(`/schedules/${scheduleId}`);
-  }
-
-  // ---- Webhooks ----
-
-  async listWebhooks(params?: { offset?: number; limit?: number; desc?: boolean }): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-
-    let response = await this.axios.get('/webhooks', { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
-  }
-
-  async getWebhook(webhookId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/webhooks/${webhookId}`);
-    return response.data?.data;
-  }
-
-  async createWebhook(webhookData: {
-    eventTypes: string[];
-    requestUrl: string;
-    condition?: {
-      actorId?: string;
-      actorTaskId?: string;
-      actorRunId?: string;
-    };
-    payloadTemplate?: string;
-    headersTemplate?: string;
-    description?: string;
-    ignoreSslErrors?: boolean;
-    doNotRetry?: boolean;
-    isAdHoc?: boolean;
-    idempotencyKey?: string;
-    shouldInterpolateStrings?: boolean;
-  }): Promise<Record<string, any>> {
-    let body: Record<string, any> = {
-      eventTypes: webhookData.eventTypes,
-      requestUrl: webhookData.requestUrl
-    };
-    if (webhookData.condition !== undefined) body.condition = webhookData.condition;
-    if (webhookData.payloadTemplate !== undefined)
-      body.payloadTemplate = webhookData.payloadTemplate;
-    if (webhookData.headersTemplate !== undefined)
-      body.headersTemplate = webhookData.headersTemplate;
-    if (webhookData.description !== undefined) body.description = webhookData.description;
-    if (webhookData.ignoreSslErrors !== undefined)
-      body.ignoreSslErrors = webhookData.ignoreSslErrors;
-    if (webhookData.doNotRetry !== undefined) body.doNotRetry = webhookData.doNotRetry;
-    if (webhookData.isAdHoc !== undefined) body.isAdHoc = webhookData.isAdHoc;
-    if (webhookData.idempotencyKey !== undefined)
-      body.idempotencyKey = webhookData.idempotencyKey;
-    if (webhookData.shouldInterpolateStrings !== undefined)
-      body.shouldInterpolateStrings = webhookData.shouldInterpolateStrings;
-
-    let response = await this.axios.post('/webhooks', body);
-    return response.data?.data;
-  }
-
-  async updateWebhook(
-    webhookId: string,
-    webhookData: Record<string, any>
-  ): Promise<Record<string, any>> {
-    let response = await this.axios.put(`/webhooks/${webhookId}`, webhookData);
-    return response.data?.data;
-  }
-
-  async deleteWebhook(webhookId: string): Promise<void> {
-    await this.axios.delete(`/webhooks/${webhookId}`);
-  }
-
-  // ---- Builds ----
-
-  async buildActor(
-    actorId: string,
-    params?: {
-      version?: string;
-      tag?: string;
-      useCache?: boolean;
-      betaPackages?: boolean;
-    }
-  ): Promise<Record<string, any>> {
-    let queryParams: Record<string, string> = {};
-    if (params?.version !== undefined) queryParams.version = params.version;
-    if (params?.tag !== undefined) queryParams.tag = params.tag;
-    if (params?.useCache !== undefined) queryParams.useCache = params.useCache ? '1' : '0';
-    if (params?.betaPackages !== undefined)
-      queryParams.betaPackages = params.betaPackages ? '1' : '0';
-
-    let response = await this.axios.post(
-      `/acts/${actorId}/builds`,
-      {},
-      { params: queryParams }
+    await requestAxios(
+      'delete key-value store record',
+      () =>
+        this.http.delete(
+          `/key-value-stores/${storeId}/records/${encodeURIComponent(recordKey)}`
+        ),
+      apifyApiError
     );
-    return response.data?.data;
   }
-
-  async getBuild(buildId: string): Promise<Record<string, any>> {
-    let response = await this.axios.get(`/actor-builds/${buildId}`);
-    return response.data?.data;
-  }
-
-  async listBuilds(
-    actorId: string,
-    params?: {
-      offset?: number;
-      limit?: number;
-      desc?: boolean;
-    }
-  ): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-
-    let response = await this.axios.get(`/acts/${actorId}/builds`, { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
-  }
-
-  // ---- Request Queues ----
 
   async listRequestQueues(params?: {
     offset?: number;
     limit?: number;
     desc?: boolean;
     unnamed?: boolean;
-  }): Promise<{
-    items: Record<string, any>[];
-    total: number;
-    offset: number;
-    limit: number;
-    count: number;
-  }> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.desc !== undefined) queryParams.desc = params.desc ? '1' : '0';
-    if (params?.unnamed !== undefined) queryParams.unnamed = params.unnamed ? '1' : '0';
-
-    let response = await this.axios.get('/request-queues', { params: queryParams });
-    let data = response.data?.data;
-    return {
-      items: data?.items || [],
-      total: data?.total || 0,
-      offset: data?.offset || 0,
-      limit: data?.limit || 0,
-      count: data?.count || 0
-    };
+  }) {
+    return this.list('list request queues', () =>
+      this.http.get('/request-queues', { params: storageQuery(params) })
+    );
   }
 
-  // ---- Run Dataset Items (shortcut) ----
+  async getRequestQueue(queueId: string): Promise<ApifyRecord> {
+    return this.wrapped('get request queue', () =>
+      this.http.get(`/request-queues/${queueId}`)
+    );
+  }
+
+  async createRequestQueue(params?: { name?: string }): Promise<ApifyRecord> {
+    return this.wrapped('create request queue', () =>
+      this.http.post('/request-queues', undefined, {
+        params: compactParams({ name: params?.name })
+      })
+    );
+  }
+
+  async updateRequestQueue(queueId: string, body: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('update request queue', () =>
+      this.http.put(`/request-queues/${queueId}`, body)
+    );
+  }
+
+  async deleteRequestQueue(queueId: string): Promise<void> {
+    await requestAxios(
+      'delete request queue',
+      () => this.http.delete(`/request-queues/${queueId}`),
+      apifyApiError
+    );
+  }
+
+  async listRequestQueueHead(queueId: string, params?: { limit?: number }) {
+    let data = await this.wrapped<any>('list request queue head', () =>
+      this.http.get(`/request-queues/${queueId}/head`, {
+        params: compactParams({ limit: params?.limit })
+      })
+    );
+    return Array.isArray(data?.items) ? data.items : [];
+  }
+
+  async addRequestToQueue(
+    queueId: string,
+    request: ApifyRecord,
+    params?: { forefront?: boolean }
+  ) {
+    return this.wrapped<ApifyRecord>('add request to queue', () =>
+      this.http.post(`/request-queues/${queueId}/requests`, request, {
+        params: compactParams({ forefront: boolParam(params?.forefront) })
+      })
+    );
+  }
+
+  async getRequestQueueRequest(queueId: string, requestId: string) {
+    return this.wrapped<ApifyRecord>('get request queue request', () =>
+      this.http.get(`/request-queues/${queueId}/requests/${requestId}`)
+    );
+  }
+
+  async updateRequestQueueRequest(queueId: string, requestId: string, request: ApifyRecord) {
+    return this.wrapped<ApifyRecord>('update request queue request', () =>
+      this.http.put(`/request-queues/${queueId}/requests/${requestId}`, request)
+    );
+  }
+
+  async deleteRequestQueueRequest(queueId: string, requestId: string): Promise<void> {
+    await requestAxios(
+      'delete request queue request',
+      () => this.http.delete(`/request-queues/${queueId}/requests/${requestId}`),
+      apifyApiError
+    );
+  }
+
+  async listSchedules(params?: { offset?: number; limit?: number; desc?: boolean }) {
+    return this.list('list schedules', () =>
+      this.http.get('/schedules', {
+        params: compactParams({
+          offset: params?.offset,
+          limit: params?.limit,
+          desc: boolParam(params?.desc)
+        })
+      })
+    );
+  }
+
+  async getSchedule(scheduleId: string): Promise<ApifyRecord> {
+    return this.wrapped('get schedule', () => this.http.get(`/schedules/${scheduleId}`));
+  }
+
+  async createSchedule(scheduleData: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('create schedule', () => this.http.post('/schedules', scheduleData));
+  }
+
+  async updateSchedule(scheduleId: string, scheduleData: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('update schedule', () =>
+      this.http.put(`/schedules/${scheduleId}`, scheduleData)
+    );
+  }
+
+  async deleteSchedule(scheduleId: string): Promise<void> {
+    await requestAxios(
+      'delete schedule',
+      () => this.http.delete(`/schedules/${scheduleId}`),
+      apifyApiError
+    );
+  }
+
+  async listWebhooks(params?: { offset?: number; limit?: number; desc?: boolean }) {
+    return this.list('list webhooks', () =>
+      this.http.get('/webhooks', {
+        params: compactParams({
+          offset: params?.offset,
+          limit: params?.limit,
+          desc: boolParam(params?.desc)
+        })
+      })
+    );
+  }
+
+  async getWebhook(webhookId: string): Promise<ApifyRecord> {
+    return this.wrapped('get webhook', () => this.http.get(`/webhooks/${webhookId}`));
+  }
+
+  async createWebhook(webhookData: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('create webhook', () => this.http.post('/webhooks', webhookData));
+  }
+
+  async updateWebhook(webhookId: string, webhookData: ApifyRecord): Promise<ApifyRecord> {
+    return this.wrapped('update webhook', () =>
+      this.http.put(`/webhooks/${webhookId}`, webhookData)
+    );
+  }
+
+  async testWebhook(webhookId: string): Promise<ApifyRecord> {
+    return this.wrapped('test webhook', () => this.http.post(`/webhooks/${webhookId}/test`));
+  }
+
+  async deleteWebhook(webhookId: string): Promise<void> {
+    await requestAxios(
+      'delete webhook',
+      () => this.http.delete(`/webhooks/${webhookId}`),
+      apifyApiError
+    );
+  }
+
+  async buildActor(
+    actorId: string,
+    params: {
+      version: string;
+      tag?: string;
+      useCache?: boolean;
+      betaPackages?: boolean;
+      waitForFinish?: number;
+    }
+  ): Promise<ApifyRecord> {
+    return this.wrapped('build actor', () =>
+      this.http.post(
+        `/acts/${pathId(actorId)}/builds`,
+        {},
+        {
+          params: compactParams({
+            version: params.version,
+            tag: params.tag,
+            useCache: boolParam(params.useCache),
+            betaPackages: boolParam(params.betaPackages),
+            waitForFinish: params.waitForFinish
+          })
+        }
+      )
+    );
+  }
+
+  async getBuild(buildId: string): Promise<ApifyRecord> {
+    return this.wrapped('get actor build', () => this.http.get(`/actor-builds/${buildId}`));
+  }
+
+  async listBuilds(
+    actorId: string,
+    params?: { offset?: number; limit?: number; desc?: boolean }
+  ) {
+    return this.list('list actor builds', () =>
+      this.http.get(`/acts/${pathId(actorId)}/builds`, {
+        params: compactParams({
+          offset: params?.offset,
+          limit: params?.limit,
+          desc: boolParam(params?.desc)
+        })
+      })
+    );
+  }
 
   async getRunDatasetItems(
     runId: string,
@@ -616,28 +856,46 @@ export class ApifyClient {
       fields?: string[];
       omit?: string[];
       clean?: boolean;
+      desc?: boolean;
     }
-  ): Promise<Record<string, any>[]> {
-    let queryParams: Record<string, string> = {};
-    if (params?.offset !== undefined) queryParams.offset = String(params.offset);
-    if (params?.limit !== undefined) queryParams.limit = String(params.limit);
-    if (params?.fields !== undefined) queryParams.fields = params.fields.join(',');
-    if (params?.omit !== undefined) queryParams.omit = params.omit.join(',');
-    if (params?.clean !== undefined) queryParams.clean = params.clean ? '1' : '0';
-    queryParams.format = 'json';
-
-    let response = await this.axios.get(`/actor-runs/${runId}/dataset/items`, {
-      params: queryParams
-    });
-    return response.data || [];
+  ): Promise<ApifyRecord[]> {
+    let data = await requestAxiosData<unknown>(
+      'get run dataset items',
+      () =>
+        this.http.get(`/actor-runs/${runId}/dataset/items`, {
+          params: compactParams({
+            offset: params?.offset,
+            limit: params?.limit,
+            fields: params?.fields?.join(','),
+            omit: params?.omit?.join(','),
+            clean: boolParam(params?.clean),
+            desc: boolParam(params?.desc),
+            format: 'json'
+          })
+        }),
+      apifyApiError
+    );
+    return Array.isArray(data) ? (data as ApifyRecord[]) : [];
   }
 
-  // ---- Run Log (shortcut) ----
+  async getLog(buildOrRunId: string): Promise<ApifyBinaryContent> {
+    let response = await requestAxios(
+      'get run or build log',
+      () =>
+        this.http.get(`/logs/${buildOrRunId}`, {
+          headers: { Accept: 'text/plain' },
+          responseType: 'arraybuffer',
+          transformResponse: value => value
+        }),
+      apifyApiError
+    );
 
-  async getLog(buildOrRunId: string): Promise<string> {
-    let response = await this.axios.get(`/logs/${buildOrRunId}`, {
-      headers: { Accept: 'text/plain' }
-    });
-    return response.data;
+    let buffer = bufferFromResponse(response.data);
+    return {
+      contentBase64: buffer.toString('base64'),
+      contentText: buffer.toString('utf-8'),
+      contentType: normalizeContentType(response.headers, 'text/plain'),
+      byteLength: buffer.byteLength
+    };
   }
 }

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { dynamoDbServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -69,14 +70,16 @@ Supports up to 25 put/delete operations per batch. Does not support update opera
 
     let requestItems: Record<string, any[]> = {};
     for (let [tableName, ops] of Object.entries(ctx.input.operations)) {
-      requestItems[tableName] = ops.map(op => {
+      requestItems[tableName] = ops.map((op, index) => {
+        if ((op.putItem ? 1 : 0) + (op.deleteKey ? 1 : 0) !== 1) {
+          throw dynamoDbServiceError(
+            `Operation ${index + 1} for table ${tableName} must include exactly one of putItem or deleteKey.`
+          );
+        }
         if (op.putItem) {
           return { PutRequest: { Item: op.putItem } };
         }
-        if (op.deleteKey) {
-          return { DeleteRequest: { Key: op.deleteKey } };
-        }
-        return {};
+        return { DeleteRequest: { Key: op.deleteKey } };
       });
     }
 

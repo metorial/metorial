@@ -12,3 +12,6 @@ export * from './manage-settings';
 export * from './manage-subdomain';
 export * from './manage-tails';
 export * from './query-telemetry';
+export * from './script-content';
+export * from './upload-version';
+export * from './upload-worker-module';

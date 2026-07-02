@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { splunkServiceError } from '../lib/errors';
 import { createSplunkClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -270,6 +271,6 @@ export let deleteKVStoreRecords = SlateTool.create(spec, {
       };
     }
 
-    throw new Error('Either recordKey or query must be provided to delete records.');
+    throw splunkServiceError('Either recordKey or query must be provided to delete records.');
   })
   .build();

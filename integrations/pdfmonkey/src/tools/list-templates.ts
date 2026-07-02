@@ -8,7 +8,7 @@ export let listTemplates = SlateTool.create(spec, {
   key: 'list_templates',
   description: `List available document templates in a workspace. Returns paginated template cards that can be filtered by folder and sorted.`,
   instructions: [
-    'The workspaceId is required. Use the Get Account Info tool to discover your workspace ID.'
+    'The workspaceId is required. It is the PDFMonkey workspace/app ID shown in template responses as app_id.'
   ],
   tags: {
     destructive: false,
@@ -39,6 +39,10 @@ export let listTemplates = SlateTool.create(spec, {
             templateId: z.string().describe('ID of the template'),
             identifier: z.string().describe('Human-readable name'),
             workspaceId: z.string().describe('Workspace ID'),
+            editionMode: z.string().nullable().describe('Template editor mode'),
+            outputType: z.string().nullable().describe('Template output type'),
+            pdfEngineName: z.string().nullable().describe('PDF engine name'),
+            isDraft: z.boolean().nullable().describe('Whether the template has draft changes'),
             createdAt: z.string().describe('Creation timestamp'),
             updatedAt: z.string().describe('Last update timestamp')
           })
@@ -64,6 +68,10 @@ export let listTemplates = SlateTool.create(spec, {
       templateId: String(tmpl.id),
       identifier: String(tmpl.identifier),
       workspaceId: String(tmpl.app_id),
+      editionMode: tmpl.edition_mode ? String(tmpl.edition_mode) : null,
+      outputType: tmpl.output_type ? String(tmpl.output_type) : null,
+      pdfEngineName: tmpl.pdf_engine_name ? String(tmpl.pdf_engine_name) : null,
+      isDraft: tmpl.is_draft == null ? null : Boolean(tmpl.is_draft),
       createdAt: String(tmpl.created_at),
       updatedAt: String(tmpl.updated_at)
     }));

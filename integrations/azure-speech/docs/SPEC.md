@@ -2,7 +2,7 @@
 
 ## Overview
 
-Azure Speech (now part of Azure AI Foundry Tools) is a cloud-based speech processing service from Microsoft. It provides speech-to-text, text-to-speech, speech translation, and other capabilities. It also offers APIs for speaker recognition.
+Azure Speech (now part of Azure AI Foundry Tools) is a cloud-based speech processing service from Microsoft. This integration covers short-audio recognition, fast transcription, batch transcription, text-to-speech, pronunciation assessment, and text-independent speaker recognition. It intentionally avoids SDK-only, deprecated, or niche surfaces such as REST speech translation and avatar video generation.
 
 ## Authentication
 
@@ -34,11 +34,12 @@ The OAuth scope for obtaining the Entra token is `https://cognitiveservices.azur
 
 ### Speech-to-Text
 
-Supports both real-time and batch transcription, providing versatile solutions for converting audio streams into text.
+Supports short-audio recognition, fast transcription, and batch transcription for converting audio into text.
 
 - **Real-time transcription**: Instant transcription with intermediate results for live audio inputs.
-- **Fast transcription**: Fastest synchronous output for situations with predictable latency. Suitable for quick file transcription, captions, and editing workflows.
+- **Fast transcription**: Synchronous output for single audio files with predictable latency. Suitable for quick file transcription, captions, and editing workflows.
 - **Batch transcription**: Efficient processing for large volumes of prerecorded audio. Transcribes audio files as a batch from multiple URLs or an Azure container.
+- **REST API version**: Fast and batch transcription use the generally available Speech-to-text REST API version `2025-10-15`.
 - **Diarization**: Distinguishes and separates different speakers in an audio recording, useful for transcribing conversations, meetings, or any multi-speaker content. The service can identify up to 35 different speakers.
 - **Custom Speech**: Allows evaluating and improving the accuracy of speech recognition for specific applications and products. You can upload training data with custom vocabulary or domain-specific terms.
 - **Language Identification**: Identifies languages spoken in audio by comparing against a list of supported languages. Can be used standalone, with speech-to-text recognition, or with speech translation.
@@ -53,19 +54,12 @@ Converts text into synthesized speech and provides a list of supported voices fo
 - **Personal Voice**: Create a voice that sounds like a specific person using a short audio sample, requiring user consent. The resulting speaker profile ID can be used for synthesis.
 - **Multiple output formats**: Supports 48-kHz, 24-kHz, 16-kHz, and 8-kHz audio outputs in various codecs and container formats.
 
-### Text-to-Speech Avatar
-
-Converts text into a digital video of a photorealistic human speaking with a natural-sounding voice. The video can be synthesized asynchronously or in real time.
-
-- Choose from a range of standard avatars or create custom ones.
-- Language support is the same as for text-to-speech.
-
 ### Speech Translation
 
 Enables real-time, multilingual translation of speech to your applications, tools, and devices. Supports speech-to-speech and speech-to-text translation.
 
 - Configure source and target languages.
-- Available via the Speech SDK (not supported via REST API for short audio).
+- Available via the Speech SDK, not this REST-focused integration.
 
 ### Speaker Recognition
 
@@ -90,4 +84,4 @@ Delivers improved quality, deep contextual understanding, multilingual support, 
 
 ## Events
 
-The provider does not support events. Azure Speech does not offer webhooks or purpose-built polling mechanisms for event subscriptions. Batch transcription jobs can be monitored by checking their status, but there is no native webhook or event notification system.
+Azure Speech batch transcription jobs can be monitored by polling their status. The Speech-to-text REST API also has webhook operations for batch/custom-speech resources, but this integration currently exposes polling rather than webhook lifecycle management.

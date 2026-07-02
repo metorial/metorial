@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RedisCloudClient } from '../lib/client';
 import { spec } from '../spec';
+import { requireInputFields } from './common';
 
 export let createSubscription = SlateTool.create(spec, {
   name: 'Create Subscription',
@@ -106,6 +107,12 @@ Returns a task ID to track the asynchronous creation process.`,
     let result: any;
 
     if (ctx.input.type === 'essentials') {
+      requireInputFields(
+        ctx.input,
+        ['planId'],
+        'planId is required when creating an Essentials subscription.'
+      );
+
       let body: Record<string, any> = {
         name: ctx.input.name
       };
@@ -116,6 +123,12 @@ Returns a task ID to track the asynchronous creation process.`,
 
       result = await client.createEssentialsSubscription(body);
     } else {
+      requireInputFields(
+        ctx.input,
+        ['cloudProviders', 'databases'],
+        'cloudProviders and databases are required when creating a Pro subscription.'
+      );
+
       let body: Record<string, any> = {
         name: ctx.input.name
       };

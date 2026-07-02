@@ -1,6 +1,6 @@
 {
   "name": "@atlassian/opsgenie",
-  "description": "Create, manage, and resolve alerts and incidents with priority levels, responders, and rich metadata. Configure on-call schedules with rotations and overrides, and query who is currently on-call. Define escalation policies to notify responders in order when alerts go unacknowledged. Manage teams, users, services, and integrations. Set up per-user notification rules with contact method preferences. Receive webhook notifications for alert activity such as creation, acknowledgment, and closure.",
+  "description": "Create, manage, and resolve alerts and incidents with priority levels, responders, and rich metadata. Track asynchronous request status. Configure on-call schedules with rotations and overrides, and query who is currently on-call. Define escalation policies to notify responders in order when alerts go unacknowledged. Manage teams, users, and services. Receive webhook notifications for alert activity such as creation, acknowledgment, and closure.",
   "categories": ["apis-and-http-requests", "email-and-messaging"],
   "skills": [
     "create and manage alerts",
@@ -10,9 +10,8 @@
     "manage teams and members",
     "manage users and roles",
     "query on-call responders",
-    "configure notification rules",
-    "manage services",
-    "manage integrations"
+    "manage schedule overrides",
+    "manage services"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/opsgenie.png"
 }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageReverseEtl = SlateTool.create(spec, {
@@ -83,7 +84,7 @@ export let manageReverseEtl = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.modelId) throw new Error('modelId is required');
+      if (!ctx.input.modelId) throw segmentServiceError('modelId is required');
       let m = await client.getReverseEtlModel(ctx.input.modelId);
       return {
         output: {
@@ -103,7 +104,7 @@ export let manageReverseEtl = SlateTool.create(spec, {
         !ctx.input.queryIdentifierColumn ||
         !ctx.input.scheduleStrategy
       ) {
-        throw new Error(
+        throw segmentServiceError(
           'sourceId, name, query, queryIdentifierColumn, and scheduleStrategy are required'
         );
       }
@@ -128,7 +129,7 @@ export let manageReverseEtl = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.modelId) throw new Error('modelId is required');
+      if (!ctx.input.modelId) throw segmentServiceError('modelId is required');
       let updateData: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
       if (ctx.input.description !== undefined) updateData.description = ctx.input.description;
@@ -153,7 +154,7 @@ export let manageReverseEtl = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.modelId) throw new Error('modelId is required');
+      if (!ctx.input.modelId) throw segmentServiceError('modelId is required');
       await client.deleteReverseEtlModel(ctx.input.modelId);
       return {
         output: { modelId: ctx.input.modelId, deleted: true },
@@ -161,6 +162,6 @@ export let manageReverseEtl = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw segmentServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

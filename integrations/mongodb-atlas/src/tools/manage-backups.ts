@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import {
+  failValidation,
+  invalidAction,
+  requireString,
+  resolveProjectId
+} from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageBackupsTool = SlateTool.create(spec, {
@@ -66,10 +72,10 @@ export let manageBackupsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
-    let { action, clusterName } = ctx.input;
+    let { action } = ctx.input;
+    let clusterName = requireString(ctx.input.clusterName, 'clusterName');
 
     if (action === 'list_snapshots') {
       let result = await client.listBackupSnapshots(projectId, clusterName);
@@ -81,15 +87,11 @@ export let manageBackupsTool = SlateTool.create(spec, {
     }
 
     if (action === 'get_snapshot') {
-      if (!ctx.input.snapshotId) throw new Error('snapshotId is required.');
-      let snapshot = await client.getBackupSnapshot(
-        projectId,
-        clusterName,
-        ctx.input.snapshotId
-      );
+      let snapshotId = requireString(ctx.input.snapshotId, 'snapshotId');
+      let snapshot = await client.getBackupSnapshot(projectId, clusterName, snapshotId);
       return {
         output: { snapshot },
-        message: `Retrieved snapshot **${ctx.input.snapshotId}** (status: ${snapshot.status}).`
+        message: `Retrieved snapshot **${snapshotId}** (status: ${snapshot.status}).`
       };
     }
 
@@ -115,10 +117,13 @@ export let manageBackupsTool = SlateTool.create(spec, {
     }
 
     if (action === 'create_restore_job') {
-      if (!ctx.input.deliveryType)
-        throw new Error('deliveryType is required for restore jobs.');
+      let deliveryType = requireString(
+        ctx.input.deliveryType,
+        'deliveryType',
+        'for restore jobs'
+      );
       let data: any = {
-        deliveryType: ctx.input.deliveryType
+        deliveryType
       };
       if (ctx.input.snapshotId) data.snapshotId = ctx.input.snapshotId;
       if (ctx.input.targetClusterName) data.targetClusterName = ctx.input.targetClusterName;
@@ -131,7 +136,7 @@ export let manageBackupsTool = SlateTool.create(spec, {
       let restoreJob = await client.createBackupRestoreJob(projectId, clusterName, data);
       return {
         output: { restoreJob },
-        message: `Restore job created for cluster **${clusterName}** (type: ${ctx.input.deliveryType}).`
+        message: `Restore job created for cluster **${clusterName}** (type: ${deliveryType}).`
       };
     }
 
@@ -145,7 +150,7 @@ export let manageBackupsTool = SlateTool.create(spec, {
 
     if (action === 'update_schedule') {
       if (!ctx.input.scheduleData)
-        throw new Error('scheduleData is required for update_schedule.');
+        failValidation('scheduleData is required for update_schedule.');
       let schedule = await client.updateBackupSchedule(
         projectId,
         clusterName,
@@ -157,6 +162,6 @@ export let manageBackupsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Midjourney is an independent research lab that produces a proprietary artificial intelligence program that creates images from textual descriptions, similar to OpenAI's DALL-E or Stable Diffusion. As of 2026, Midjourney has transitioned from a niche Discord-based tool to a comprehensive creative suite offering web interfaces, enterprise APIs, and multimodal capabilities including video and 3D asset generation. As of early 2026, Midjourney does not offer an official public developer API, REST endpoint, SDK, webhook interface, or documented API key system that you can obtain directly from Midjourney for programmatic use.
+Midjourney is an independent research lab that produces a proprietary artificial intelligence program that creates images from textual descriptions, similar to OpenAI's DALL-E or Stable Diffusion. As of early 2026, Midjourney does not offer an official public developer API, REST endpoint, SDK, webhook interface, or documented API key system that you can obtain directly from Midjourney for programmatic use. This integration targets APIFRAME's documented Midjourney Original API by default (`https://api.apiframe.pro`) because the existing authentication and endpoint contract are APIFRAME-based.
 
 ## Authentication
 
@@ -20,7 +20,7 @@ There are two general approaches for programmatic access through unofficial thir
 
 Using these unofficial Midjourney APIs comes with the risk of having your Midjourney account banned, as such usage violates Midjourney's terms of service.
 
-**Note on Enterprise API:** Midjourney is considering launching an enterprise API, but the release date is still unknown. One source mentions enterprise access with SSO, seat management, and API access, with API keys generated from a Developer Dashboard, but this has not been broadly confirmed and may not be publicly available.
+**Note on APIFRAME API families:** APIFRAME documents both a newer Pro Midjourney API and the Original API. The Original API is still documented as supported, but APIFRAME recommends the Pro API for faster Midjourney-only generation. This integration preserves the existing Original API default and exposes the high-value Original API actions.
 
 ## Features
 
@@ -28,7 +28,7 @@ Since there is no official API, the features below reflect the capabilities of M
 
 ### Text-to-Image Generation
 
-Generate up to 4 images from a natural language text prompt (equivalent to the `/imagine` command). Supports parameters such as:
+Generate up to 4 images from a natural language text prompt (equivalent to the `/imagine` command). APIFRAME accepts a `prompt`, optional `aspect_ratio`, and webhook fields. Midjourney prompt parameters can still be included in the prompt, such as:
 
 - **Aspect Ratio (`--ar`):** Control the width-to-height ratio of generated images.
 - **Model Version (`--v`):** Select a specific Midjourney model version (e.g., V6, V6.1, V7).
@@ -40,7 +40,7 @@ Generate up to 4 images from a natural language text prompt (equivalent to the `
 
 ### Image Variations and Upscaling
 
-After generating an initial image grid, create variations of individual images or upscale them to higher resolution. Supports parameters like `--iw` (image weight for image prompts). Variations (V1-V4) enable generating variations of an existing image.
+After generating an initial image grid, create variations of individual images, reroll the full grid, select a single image with 1x upscale, run subtle/creative upscales from a selected image, or run 2x/4x high-resolution upscales from a task or direct image URL.
 
 ### Image Blending
 
@@ -59,11 +59,15 @@ Use Describe to turn your own images into inspiring prompt ideas. Provide an ima
 
 ### Inpainting (Vary Region)
 
-Selectively modify portions of a generated image by specifying a mask area and a new prompt, while keeping the rest of the image unchanged.
+Selectively modify portions of a generated image by specifying a base64 mask area and a new prompt, while keeping the rest of the image unchanged.
 
 ### Pan and Zoom
 
 Expand the canvas of an image in any direction (pan) or zoom out to reveal more of the scene around an existing generation.
+
+### Task and Account Operations
+
+APIFRAME tasks are asynchronous. Fetch a single task, fetch 2-20 tasks in one request, request the seed for a completed image task, and retrieve APIFRAME account details such as remaining credits, total images, and plan.
 
 ### Personalization
 
@@ -75,7 +79,7 @@ V7 introduces Draft Mode, which enables faster, lower-cost image generation for 
 
 ### Video Generation
 
-Turn your images into captivating 5 second videos.
+Turn your images into short videos and extend previously generated videos.
 
 ### Niji Mode
 

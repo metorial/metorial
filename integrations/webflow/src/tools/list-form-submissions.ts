@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { WebflowClient } from '../lib/client';
 import { spec } from '../spec';
@@ -83,7 +83,7 @@ export let listFormSubmissions = SlateTool.create(spec, {
     }
 
     if (!ctx.input.siteId) {
-      throw new Error('Either siteId or formId must be provided');
+      throw createApiServiceError('Either siteId or formId must be provided.');
     }
 
     let data = await client.listForms(ctx.input.siteId, {

@@ -25,7 +25,7 @@ export let getMessages = SlateTool.create(spec, {
       messages: z
         .array(
           z.object({
-            fingerprint: z.string().optional().describe('Unique message fingerprint'),
+            fingerprint: z.number().optional().describe('Unique message fingerprint'),
             type: z.string().optional().describe('Message type (text, note, file, etc.)'),
             from: z.string().optional().describe('Sender: operator or user'),
             origin: z.string().optional().describe('Origin channel'),
@@ -41,7 +41,11 @@ export let getMessages = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+    let client = new Client({
+      token: ctx.auth.token,
+      websiteId: ctx.config.websiteId,
+      tier: ctx.auth.tier
+    });
     let results = await client.getMessagesInConversation(
       ctx.input.sessionId,
       ctx.input.timestampBefore

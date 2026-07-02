@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { coinbaseOAuthAuthMethods } from '../lib/auth-methods';
 import { CoinbaseClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -12,6 +13,7 @@ export let depositWithdraw = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(coinbaseOAuthAuthMethods)
   .input(
     z.object({
       action: z.enum(['deposit', 'withdraw']).describe('Whether to deposit or withdraw'),

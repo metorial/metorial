@@ -42,11 +42,11 @@ The Table API allows access to ServiceNow records across various tables, such as
 
 ### Incident, Problem, and Change Management
 
-ServiceNow provides incident, problem, change, and request management to streamline IT processes. Through the API you can create, update, assign, escalate, and resolve these ITSM records. This includes managing work notes, comments, priorities, states, and assignments.
+ServiceNow provides incident, problem, change, and request management to streamline IT processes. Through the API you can create, update, assign, escalate, and resolve these ITSM records. This includes managing work notes, comments, priorities, states, assignment, root-cause, workaround, and closure details.
 
 ### Configuration Management Database (CMDB)
 
-The CMDB in ServiceNow is a key component that underpins multiple services. A dedicated CMDB Instance API allows managing Configuration Items (CIs) such as servers, applications, network devices, and their relationships. The CMDB Instance API provides parameters unique to the CMDB, such as "className," for specialized operations and integrates with the Identification and Reconciliation Engine to prevent duplicate records.
+The CMDB in ServiceNow is a key component that underpins multiple services. A dedicated CMDB Instance API allows managing Configuration Items (CIs) such as servers, applications, network devices, and their relationships. The integration exposes CMDB Instance API list, get, create, and update operations using the CMDB class name and attribute payload expected by ServiceNow.
 
 ### Service Catalog
 
@@ -58,7 +58,7 @@ ServiceNow allows for the creation and sharing of documentation and knowledge ba
 
 ### Attachment Management
 
-The Attachment API supports uploading and querying file attachments associated with any record in ServiceNow.
+The Attachment API supports uploading, querying, downloading, and deleting file attachments associated with any record in ServiceNow. Downloaded file contents are returned through Slate attachments with metadata in structured output fields.
 
 ### Import Sets
 

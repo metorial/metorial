@@ -16,11 +16,29 @@ export let getCampaignReport = SlateTool.create(spec, {
     z.object({
       campaignId: z.string().describe('ID of the campaign'),
       activityType: z
-        .enum(['opens', 'clicks', 'unsubscribes', 'bounces', 'junks', 'forwards'])
+        .enum([
+          'opened',
+          'unopened',
+          'clicked',
+          'unsubscribed',
+          'forwarded',
+          'hardbounced',
+          'softbounced',
+          'junk'
+        ])
         .optional()
         .describe('Filter subscriber activity by type'),
+      search: z.string().optional().describe('Filter subscriber activity by subscriber email'),
       limit: z.number().optional().describe('Number of activity records per page'),
-      page: z.number().optional().describe('Page number')
+      page: z.number().optional().describe('Page number'),
+      sort: z
+        .enum(['id', 'updated_at', 'clicks_count', 'opens_count'])
+        .optional()
+        .describe('Sort subscriber activity by MailerLite-supported field'),
+      includeSubscriberGroups: z
+        .boolean()
+        .optional()
+        .describe('Include subscriber.groups in campaign activity records')
     })
   )
   .output(
@@ -53,8 +71,11 @@ export let getCampaignReport = SlateTool.create(spec, {
     if (campaign.status === 'sent') {
       let activityResult = await client.getCampaignSubscriberActivity(ctx.input.campaignId, {
         type: ctx.input.activityType,
+        search: ctx.input.search,
         limit: ctx.input.limit,
-        page: ctx.input.page
+        page: ctx.input.page,
+        sort: ctx.input.sort,
+        include: ctx.input.includeSubscriberGroups ? 'subscriber.groups' : 'subscriber'
       });
       activities = (activityResult.data || []).map((a: any) => ({
         subscriberEmail: a.subscriber?.email || a.email,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -60,7 +61,9 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Tag name is required for create');
+      if (!ctx.input.name) {
+        throw kitServiceError('Tag name is required for create');
+      }
       let data = await client.createTag(ctx.input.name);
       return {
         output: {
@@ -75,8 +78,12 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.tagId) throw new Error('Tag ID is required for update');
-      if (!ctx.input.name) throw new Error('Tag name is required for update');
+      if (!ctx.input.tagId) {
+        throw kitServiceError('Tag ID is required for update');
+      }
+      if (!ctx.input.name) {
+        throw kitServiceError('Tag name is required for update');
+      }
       let data = await client.updateTag(ctx.input.tagId, ctx.input.name);
       return {
         output: {
@@ -91,7 +98,9 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.tagId) throw new Error('Tag ID is required for delete');
+      if (!ctx.input.tagId) {
+        throw kitServiceError('Tag ID is required for delete');
+      }
       await client.deleteTag(ctx.input.tagId);
       return {
         output: { deleted: true },
@@ -99,6 +108,6 @@ export let manageTags = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw kitServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

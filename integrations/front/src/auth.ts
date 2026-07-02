@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { frontApiError, frontServiceError } from './lib/errors';
 
 let oauthAxios = createAxios({
   baseURL: 'https://app.frontapp.com'
@@ -36,61 +37,145 @@ export let auth = SlateAuth.create()
 
     scopes: [
       {
-        title: 'Read Shared',
+        title: 'Read conversations',
+        description: 'Read Front conversations and conversation metadata',
+        scope: 'conversations:read'
+      },
+      {
+        title: 'Write conversations',
         description:
-          'Read access to shared workspace resources (conversations, inboxes, tags, etc.)',
-        scope: 'shared:resources:read'
+          'Update conversation status, assignment, tags, followers, links, and reminders',
+        scope: 'conversations:write'
       },
       {
-        title: 'Write Shared',
-        description: 'Write access to shared workspace resources',
-        scope: 'shared:resources:write'
+        title: 'Read messages',
+        description: 'Read messages in conversations',
+        scope: 'messages:read'
       },
       {
-        title: 'Delete Shared',
-        description: 'Delete access to shared workspace resources',
-        scope: 'shared:resources:delete'
+        title: 'Send messages',
+        description: 'Send new messages and replies from Front channels',
+        scope: 'messages:send'
       },
       {
-        title: 'Send Shared',
-        description: 'Send messages from shared inboxes',
-        scope: 'shared:resources:send'
+        title: 'Read contacts',
+        description: 'Read Front contacts',
+        scope: 'contacts:read'
       },
       {
-        title: 'Read Global',
-        description:
-          'Read access to global/company-level resources (teams, accounts, company rules)',
-        scope: 'global:resources:read'
+        title: 'Write contacts',
+        description: 'Create, update, merge, and manage Front contact handles',
+        scope: 'contacts:write'
       },
       {
-        title: 'Write Global',
-        description: 'Write access to global/company-level resources',
-        scope: 'global:resources:write'
+        title: 'Delete contacts',
+        description: 'Delete Front contacts',
+        scope: 'contacts:delete'
       },
       {
-        title: 'Delete Global',
-        description: 'Delete access to global/company-level resources',
-        scope: 'global:resources:delete'
+        title: 'Read accounts',
+        description: 'Read Front accounts',
+        scope: 'accounts:read'
       },
       {
-        title: 'Read Private',
-        description: 'Read access to private/individual teammate resources',
-        scope: 'private:resources:read'
+        title: 'Write accounts',
+        description: 'Create and update Front accounts',
+        scope: 'accounts:write'
       },
       {
-        title: 'Write Private',
-        description: 'Write access to private/individual teammate resources',
-        scope: 'private:resources:write'
+        title: 'Delete accounts',
+        description: 'Delete Front accounts',
+        scope: 'accounts:delete'
       },
       {
-        title: 'Delete Private',
-        description: 'Delete access to private/individual teammate resources',
-        scope: 'private:resources:delete'
+        title: 'Read inboxes and channels',
+        description: 'Read Front inboxes and channels',
+        scope: 'inboxes:read'
       },
       {
-        title: 'Send Private',
-        description: 'Send messages from private inboxes',
-        scope: 'private:resources:send'
+        title: 'Read channels',
+        description: 'Read Front channel metadata used for sending messages',
+        scope: 'channels:read'
+      },
+      {
+        title: 'Read tags',
+        description: 'Read Front tags',
+        scope: 'tags:read'
+      },
+      {
+        title: 'Write tags',
+        description: 'Create and update Front tags',
+        scope: 'tags:write'
+      },
+      {
+        title: 'Delete tags',
+        description: 'Delete Front tags',
+        scope: 'tags:delete'
+      },
+      {
+        title: 'Write comments',
+        description: 'Add internal comments to Front conversations',
+        scope: 'comments:write'
+      },
+      {
+        title: 'Read teammates',
+        description: 'Read Front teammate metadata',
+        scope: 'teammates:read'
+      },
+      {
+        title: 'Write teammates',
+        description: 'Update Front teammate metadata and availability',
+        scope: 'teammates:write'
+      },
+      {
+        title: 'Read teams',
+        description: 'Read Front teams',
+        scope: 'teams:read'
+      },
+      {
+        title: 'Write teams',
+        description: 'Manage Front team membership',
+        scope: 'teams:write'
+      },
+      {
+        title: 'Read links',
+        description: 'Read Front links that connect conversations to external resources',
+        scope: 'links:read'
+      },
+      {
+        title: 'Write links',
+        description: 'Create and update Front links',
+        scope: 'links:write'
+      },
+      {
+        title: 'Read message templates',
+        description: 'Read reusable Front message templates',
+        scope: 'message_templates:read'
+      },
+      {
+        title: 'Write message templates',
+        description: 'Create and update reusable Front message templates',
+        scope: 'message_templates:write'
+      },
+      {
+        title: 'Delete message templates',
+        description: 'Delete reusable Front message templates',
+        scope: 'message_templates:delete'
+      },
+      {
+        title: 'Read analytics',
+        description: 'Create and inspect Front analytics reports and exports',
+        scope: 'analytics:read'
+      },
+      {
+        title: 'Read knowledge bases',
+        description: 'Read Front knowledge bases, categories, and articles',
+        scope: 'knowledge_bases:read'
+      },
+      {
+        title: 'Read events',
+        description: 'Read Front events and conversation activity',
+        scope: 'events:*:read'
       }
     ],
 
@@ -110,58 +195,84 @@ export let auth = SlateAuth.create()
     handleCallback: async ctx => {
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
-      let response = await oauthAxios.post(
-        '/oauth/token',
-        {
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          grant_type: 'authorization_code'
-        },
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/json'
+      try {
+        let response = await oauthAxios.post(
+          '/oauth/token',
+          {
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri,
+            grant_type: 'authorization_code'
+          },
+          {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
 
-      let data = response.data;
+        let data = response.data;
 
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_at ? String(data.expires_at) : undefined
+        if (!data.access_token) {
+          throw frontServiceError(
+            'Front OAuth token response did not include an access token.'
+          );
         }
-      };
+
+        return {
+          output: {
+            token: data.access_token,
+            refreshToken: data.refresh_token,
+            expiresAt: data.expires_at ? String(data.expires_at) : undefined
+          }
+        };
+      } catch (error) {
+        throw frontApiError(error, 'OAuth token exchange');
+      }
     },
 
     handleTokenRefresh: async (ctx: any) => {
+      if (!ctx.output.refreshToken) {
+        throw frontServiceError(
+          'Front OAuth refresh token is missing. Reconnect the account.'
+        );
+      }
+
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
-      let response = await oauthAxios.post(
-        '/oauth/token',
-        {
-          refresh_token: ctx.output.refreshToken,
-          grant_type: 'refresh_token'
-        },
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/json'
+      try {
+        let response = await oauthAxios.post(
+          '/oauth/token',
+          {
+            refresh_token: ctx.output.refreshToken,
+            grant_type: 'refresh_token'
+          },
+          {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
 
-      let data = response.data;
+        let data = response.data;
 
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt: data.expires_at ? String(data.expires_at) : undefined
+        if (!data.access_token) {
+          throw frontServiceError(
+            'Front OAuth refresh response did not include an access token.'
+          );
         }
-      };
+
+        return {
+          output: {
+            token: data.access_token,
+            refreshToken: data.refresh_token || ctx.output.refreshToken,
+            expiresAt: data.expires_at ? String(data.expires_at) : undefined
+          }
+        };
+      } catch (error) {
+        throw frontApiError(error, 'OAuth token refresh');
+      }
     },
 
     getProfile: async (ctx: {
@@ -169,20 +280,24 @@ export let auth = SlateAuth.create()
       input: {};
       scopes: string[];
     }) => {
-      let response = await apiAxios.get('/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      try {
+        let response = await apiAxios.get('/me', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
 
-      let data = response.data;
+        let data = response.data;
 
-      return {
-        profile: {
-          id: data.id,
-          name: data.name
-        }
-      };
+        return {
+          profile: {
+            id: data.id,
+            name: data.name
+          }
+        };
+      } catch (error) {
+        throw frontApiError(error, 'profile lookup');
+      }
     }
   })
   .addTokenAuth({
@@ -208,19 +323,23 @@ export let auth = SlateAuth.create()
       output: { token: string; refreshToken?: string; expiresAt?: string };
       input: { apiToken: string };
     }) => {
-      let response = await apiAxios.get('/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      try {
+        let response = await apiAxios.get('/me', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
 
-      let data = response.data;
+        let data = response.data;
 
-      return {
-        profile: {
-          id: data.id,
-          name: data.name
-        }
-      };
+        return {
+          profile: {
+            id: data.id,
+            name: data.name
+          }
+        };
+      } catch (error) {
+        throw frontApiError(error, 'profile lookup');
+      }
     }
   });

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MistralClient } from '../lib/client';
+import { mistralServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let pageSchema = z.object({
@@ -19,6 +20,25 @@ let pageSchema = z.object({
     .optional()
     .describe('Page dimensions')
 });
+
+let mimeTypeFromImageId = (imageId: unknown) => {
+  if (typeof imageId !== 'string') {
+    return 'image/jpeg';
+  }
+
+  let lower = imageId.toLowerCase();
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  return 'image/jpeg';
+};
+
+let stripDataUrlPrefix = (content: string) => {
+  let commaIndex = content.indexOf(',');
+  return content.slice(0, 32).includes(';base64,') && commaIndex >= 0
+    ? content.slice(commaIndex + 1)
+    : content;
+};
 
 export let extractDocumentTool = SlateTool.create(spec, {
   name: 'Extract Document (OCR)',
@@ -62,7 +82,23 @@ export let extractDocumentTool = SlateTool.create(spec, {
         .optional()
         .describe('Format for extracted tables'),
       extractHeader: z.boolean().optional().describe('Extract page headers separately'),
-      extractFooter: z.boolean().optional().describe('Extract page footers separately')
+      extractFooter: z.boolean().optional().describe('Extract page footers separately'),
+      bboxAnnotationFormat: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('JSON schema response format for extracted bounding boxes/images'),
+      documentAnnotationFormat: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('JSON schema response format for the entire document'),
+      documentAnnotationPrompt: z
+        .string()
+        .optional()
+        .describe('Prompt for document-level structured extraction'),
+      confidenceScoresGranularity: z
+        .enum(['word', 'page'])
+        .optional()
+        .describe('Granularity for OCR confidence scores')
     })
   )
   .output(
@@ -70,7 +106,15 @@ export let extractDocumentTool = SlateTool.create(spec, {
       model: z.string().describe('Model used'),
       pages: z.array(pageSchema).describe('Extracted pages'),
       pagesProcessed: z.number().describe('Number of pages processed'),
-      documentSizeBytes: z.number().optional().describe('Document size in bytes')
+      documentSizeBytes: z.number().optional().describe('Document size in bytes'),
+      documentAnnotation: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Document-level structured annotation when requested'),
+      imageAttachmentCount: z
+        .number()
+        .describe('Number of extracted image attachments returned separately')
     })
   )
   .handleInvocation(async ctx => {
@@ -78,11 +122,26 @@ export let extractDocumentTool = SlateTool.create(spec, {
 
     let document: any;
     if (ctx.input.documentType === 'document_url') {
+      if (!ctx.input.documentUrl) {
+        throw mistralServiceError('documentUrl is required for document_url OCR input');
+      }
       document = { type: 'document_url', document_url: ctx.input.documentUrl };
     } else if (ctx.input.documentType === 'image_url') {
+      if (!ctx.input.imageUrl) {
+        throw mistralServiceError('imageUrl is required for image_url OCR input');
+      }
       document = { type: 'image_url', image_url: ctx.input.imageUrl };
     } else {
+      if (!ctx.input.fileId) {
+        throw mistralServiceError('fileId is required for file OCR input');
+      }
       document = { type: 'file', file_id: ctx.input.fileId };
+    }
+
+    if (ctx.input.documentAnnotationPrompt && !ctx.input.documentAnnotationFormat) {
+      throw mistralServiceError(
+        'documentAnnotationFormat is required when documentAnnotationPrompt is provided'
+      );
     }
 
     let result = await client.ocr({
@@ -94,13 +153,29 @@ export let extractDocumentTool = SlateTool.create(spec, {
       imageMinSize: ctx.input.imageMinSize,
       tableFormat: ctx.input.tableFormat,
       extractHeader: ctx.input.extractHeader,
-      extractFooter: ctx.input.extractFooter
+      extractFooter: ctx.input.extractFooter,
+      bboxAnnotationFormat: ctx.input.bboxAnnotationFormat,
+      documentAnnotationFormat: ctx.input.documentAnnotationFormat,
+      documentAnnotationPrompt: ctx.input.documentAnnotationPrompt,
+      confidenceScoresGranularity: ctx.input.confidenceScoresGranularity
     });
 
+    let attachments: ReturnType<typeof createBase64Attachment>[] = [];
     let pages = (result.pages || []).map((p: any) => ({
       index: p.index,
       markdown: p.markdown || '',
-      images: p.images,
+      images: p.images?.map((image: any) => {
+        let { image_base64, ...metadata } = image;
+        if (typeof image_base64 === 'string' && image_base64.length > 0) {
+          attachments.push(
+            createBase64Attachment(
+              stripDataUrlPrefix(image_base64),
+              mimeTypeFromImageId(image.id)
+            )
+          );
+        }
+        return metadata;
+      }),
       tables: p.tables,
       header: p.header,
       footer: p.footer,
@@ -112,8 +187,11 @@ export let extractDocumentTool = SlateTool.create(spec, {
         model: result.model,
         pages,
         pagesProcessed: result.usage_info?.pages_processed || pages.length,
-        documentSizeBytes: result.usage_info?.doc_size_bytes
+        documentSizeBytes: result.usage_info?.doc_size_bytes,
+        documentAnnotation: result.document_annotation,
+        imageAttachmentCount: attachments.length
       },
+      attachments,
       message: `Extracted ${pages.length} page(s) from document using **${result.model}**.`
     };
   })

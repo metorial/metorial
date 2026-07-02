@@ -15,7 +15,7 @@ export let createDatabase = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Name for the new database'),
-      clusterSize: z.string().optional().describe('Cluster size, e.g. PS_10, PS_20, PS_40'),
+      clusterSize: z.string().describe('Cluster size, e.g. PS_10, PS_20, PS_40'),
       region: z
         .string()
         .optional()
@@ -25,7 +25,15 @@ export let createDatabase = SlateTool.create(spec, {
         .enum(['mysql', 'postgresql'])
         .optional()
         .describe('Database engine type (default: mysql)'),
-      majorVersion: z.string().optional().describe('Major version for PostgreSQL databases')
+      majorVersion: z.string().optional().describe('Major version for PostgreSQL databases'),
+      minimumStorageBytes: z
+        .number()
+        .optional()
+        .describe('Minimum storage size in bytes for databases that support storage bounds'),
+      maximumStorageBytes: z
+        .number()
+        .optional()
+        .describe('Maximum storage size in bytes for databases that support storage bounds')
     })
   )
   .output(
@@ -52,7 +60,11 @@ export let createDatabase = SlateTool.create(spec, {
       region: ctx.input.region,
       replicas: ctx.input.replicas,
       kind: ctx.input.kind,
-      majorVersion: ctx.input.majorVersion
+      majorVersion: ctx.input.majorVersion,
+      storage: {
+        minimumStorageBytes: ctx.input.minimumStorageBytes,
+        maximumStorageBytes: ctx.input.maximumStorageBytes
+      }
     });
 
     return {

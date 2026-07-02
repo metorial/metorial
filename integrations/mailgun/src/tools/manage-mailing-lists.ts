@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailgunClient } from '../lib/client';
+import { mailgunServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let mailingListSchema = z.object({
@@ -59,6 +60,45 @@ export let listMailingLists = SlateTool.create(spec, {
     return {
       output: { mailingLists },
       message: `Found **${mailingLists.length}** mailing list(s).`
+    };
+  })
+  .build();
+
+// ==================== Get Mailing List ====================
+
+export let getMailingList = SlateTool.create(spec, {
+  name: 'Get Mailing List',
+  key: 'get_mailing_list',
+  description: `Get one Mailgun mailing list by address, including access level, reply preference, and member count.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      listAddress: z.string().describe('Email address of the mailing list')
+    })
+  )
+  .output(
+    z.object({
+      mailingList: mailingListSchema
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.getMailingList(ctx.input.listAddress);
+
+    return {
+      output: {
+        mailingList: {
+          address: result.list.address,
+          name: result.list.name,
+          description: result.list.description,
+          accessLevel: result.list.access_level,
+          replyPreference: result.list.reply_preference,
+          membersCount: result.list.members_count,
+          createdAt: result.list.created_at
+        }
+      },
+      message: `Retrieved mailing list **${result.list.address}**.`
     };
   })
   .build();
@@ -243,6 +283,46 @@ export let listMailingListMembers = SlateTool.create(spec, {
   })
   .build();
 
+// ==================== Get Member ====================
+
+export let getMailingListMember = SlateTool.create(spec, {
+  name: 'Get Mailing List Member',
+  key: 'get_mailing_list_member',
+  description: `Get a specific member from a Mailgun mailing list, including subscription status and custom variables.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      listAddress: z.string().describe('Email address of the mailing list'),
+      memberAddress: z.string().describe('Email address of the member to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      member: memberSchema
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.getMailingListMember(
+      ctx.input.listAddress,
+      ctx.input.memberAddress
+    );
+
+    return {
+      output: {
+        member: {
+          address: result.member.address,
+          name: result.member.name,
+          subscribed: result.member.subscribed,
+          vars: result.member.vars
+        }
+      },
+      message: `Retrieved member **${result.member.address}** from **${ctx.input.listAddress}**.`
+    };
+  })
+  .build();
+
 // ==================== Add/Update Member ====================
 
 export let addMailingListMember = SlateTool.create(spec, {
@@ -295,6 +375,65 @@ export let addMailingListMember = SlateTool.create(spec, {
         }
       },
       message: `Member **${result.member.address}** added to list **${ctx.input.listAddress}**.`
+    };
+  })
+  .build();
+
+// ==================== Update Member ====================
+
+export let updateMailingListMember = SlateTool.create(spec, {
+  name: 'Update Mailing List Member',
+  key: 'update_mailing_list_member',
+  description: `Update a Mailgun mailing list member's display name, custom variables, or subscription status.`,
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      listAddress: z.string().describe('Email address of the mailing list'),
+      memberAddress: z.string().describe('Email address of the member to update'),
+      name: z.string().optional().describe('Updated display name'),
+      vars: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Updated custom member variables'),
+      subscribed: z.boolean().optional().describe('Updated subscription status')
+    })
+  )
+  .output(
+    z.object({
+      member: memberSchema
+    })
+  )
+  .handleInvocation(async ctx => {
+    if (
+      ctx.input.name === undefined &&
+      ctx.input.vars === undefined &&
+      ctx.input.subscribed === undefined
+    ) {
+      throw mailgunServiceError('Provide at least one member field to update.');
+    }
+
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.updateMailingListMember(
+      ctx.input.listAddress,
+      ctx.input.memberAddress,
+      {
+        name: ctx.input.name,
+        vars: ctx.input.vars,
+        subscribed: ctx.input.subscribed
+      }
+    );
+
+    return {
+      output: {
+        member: {
+          address: result.member.address,
+          name: result.member.name,
+          subscribed: result.member.subscribed,
+          vars: result.member.vars
+        }
+      },
+      message: `Updated member **${result.member.address}** in **${ctx.input.listAddress}**.`
     };
   })
   .build();

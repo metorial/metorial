@@ -51,6 +51,8 @@ The hashing method is configured server-side and is typically transparent to the
 
 Execute SQL queries to read, insert, update, and delete data. Supports complex queries with joins, subqueries, aggregations, window functions, common table expressions (CTEs), and full-text search.
 
+Read-only data retrieval is exposed separately through a SELECT-only query tool. The read-only query path accepts SELECT and read-only CTE statements, rejects non-SELECT SQL, and runs inside a PostgreSQL READ ONLY transaction to prevent accidental mutations.
+
 ### Schema Management
 
 Create and alter databases, schemas, tables, columns, indexes, constraints, and sequences. Supports a rich type system including JSON/JSONB, arrays, enums, geometric types, network address types, and user-defined types.

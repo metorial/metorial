@@ -28,8 +28,7 @@ Provide the reference ID of the original scan along with corrected field values.
         .string()
         .optional()
         .describe('Corrected currency code (e.g. "USD", "EUR")'),
-      date: z.string().optional().describe('Corrected date in ISO 8601 format'),
-      masterCategory: z.string().optional().describe('Corrected spending category')
+      date: z.string().optional().describe('Corrected date in ISO 8601 format')
     })
   )
   .output(
@@ -46,8 +45,7 @@ Provide the reference ID of the original scan along with corrected field values.
       taxAmount: ctx.input.taxAmount,
       merchantName: ctx.input.merchantName,
       currencyCode: ctx.input.currencyCode,
-      date: ctx.input.date,
-      masterCategory: ctx.input.masterCategory
+      date: ctx.input.date
     });
 
     return {

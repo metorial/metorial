@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { IterableClient } from '../lib/client';
+import { requireUserIdentity } from '../lib/validation';
 import { spec } from '../spec';
 
 export let trackEvent = SlateTool.create(spec, {
@@ -43,6 +44,8 @@ export let trackEvent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireUserIdentity(ctx.input);
+
     let client = new IterableClient({
       token: ctx.auth.token,
       dataCenter: ctx.config.dataCenter

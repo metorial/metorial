@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let memberSchema = z.object({
@@ -58,7 +59,7 @@ export let manageTeam = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.name) {
-          throw new Error('name is required when creating a team.');
+          throw opsgenieServiceError('name is required when creating a team.');
         }
         let team = await client.createTeam({
           name: ctx.input.name,
@@ -76,7 +77,7 @@ export let manageTeam = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.teamId) {
-          throw new Error('teamId is required when updating a team.');
+          throw opsgenieServiceError('teamId is required when updating a team.');
         }
         let updated = await client.updateTeam(ctx.input.teamId, {
           name: ctx.input.name,
@@ -95,7 +96,9 @@ export let manageTeam = SlateTool.create(spec, {
       case 'delete': {
         let identifier = ctx.input.teamIdentifier ?? ctx.input.teamId;
         if (!identifier) {
-          throw new Error('teamIdentifier or teamId is required when deleting a team.');
+          throw opsgenieServiceError(
+            'teamIdentifier or teamId is required when deleting a team.'
+          );
         }
         await client.deleteTeam(identifier, ctx.input.identifierType ?? 'id');
         return {

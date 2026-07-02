@@ -1,4 +1,4 @@
-Let me get more details on the specific features like synchronous generation, share links, PDF forms, and image generation.# Slates Specification for PDFMonkey
+# Slates Specification for PDFMonkey
 
 ## Overview
 
@@ -28,15 +28,15 @@ No OAuth or additional scopes are required. A single API key per workspace provi
 
 ### Document Generation
 
-Create PDF documents by specifying a template ID, a JSON payload of dynamic data, and optional metadata. A synchronous generation mode is available via a dedicated endpoint that waits for the generation to either succeed or fail before responding, as an alternative to the default asynchronous mode. Documents can be created in draft status for preview, or set to pending to immediately queue generation. Custom filenames can be set via the `_filename` key in the metadata object.
+Create PDF or image documents by specifying a template ID, a JSON payload of dynamic data, and optional metadata. A synchronous generation mode is available via a dedicated endpoint that waits for the generation to either succeed or fail before responding, as an alternative to the default asynchronous mode. Documents can be set to pending to immediately queue generation. Custom filenames can be set via the `_filename` key in the metadata object, password-protected PDFs via `_password`, and image generation options via `_type`, `_width`, `_height`, and `_quality`.
 
 ### Template Management
 
-Create, update, and publish templates using the API. Templates consist of an HTML body, SCSS styles, sample data, and settings for page layout (paper format, orientation, margins, headers/footers). Templates have separate published and draft versions, allowing changes to be previewed before publishing. Templates can be organized into folders and configured with different PDF engines.
+Create, update, retrieve, list, and delete templates using the API. Templates consist of an HTML body, SCSS styles, sample data, output type, PDF engine IDs, TTL, and settings for page layout (paper format, orientation, margins, headers/footers). Templates have separate published and draft versions, allowing changes to be previewed before publishing. Templates can be organized into existing folders and configured with available PDF engines.
 
 ### Document Retrieval and Management
 
-Fetch document details including status, download URL, and preview URL. Download URLs are valid for 1 hour; after that, you need to fetch the document's details again to get a fresh URL. Documents can also be deleted via the API.
+Fetch document details including status, metadata, output type, download URL, and preview URL. Download URLs are valid for 1 hour; after that, fetch the document's details again to get a fresh URL. Documents can be updated, deleted, and downloaded as Slate attachments once generation succeeds.
 
 ### Automatic Deletion (TTL)
 
@@ -54,9 +54,9 @@ When a Document is successfully generated, it will expose a `public_share_link` 
 
 Templates can be configured to generate password-protected PDF documents.
 
-### Snippets
+### PDF Engines
 
-If you need to share code between Templates, you can define snippets. The name you give a Snippet is how you will refer to it later on in your Templates.
+List available PDF engines before setting `pdfEngineId` or `pdfEngineDraftId` on templates. PDFMonkey recommends using the newest non-deprecated engine for current template workflows.
 
 ### Current User
 

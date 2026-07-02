@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { zohoCrmServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getRecords = SlateTool.create(spec, {
@@ -24,11 +25,32 @@ Use **module** to specify which CRM module to query, and optionally filter or so
       fields: z
         .array(z.string())
         .optional()
-        .describe('Specific field API names to include in the response'),
+        .describe(
+          'Field API names to include in the response. Required by Zoho CRM V8 for list-style record fetches.'
+        ),
+      customViewId: z
+        .string()
+        .optional()
+        .describe('Custom view ID to filter records. Cannot be combined with sortBy.'),
       sortBy: z.string().optional().describe('Field API name to sort results by'),
       sortOrder: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
       page: z.number().optional().describe('Page number for pagination (starts at 1)'),
-      perPage: z.number().optional().describe('Number of records per page (max 200)')
+      perPage: z.number().optional().describe('Number of records per page (max 200)'),
+      pageToken: z
+        .string()
+        .optional()
+        .describe(
+          'Zoho next_page_token for fetching beyond the first 2,000 records. Cannot be combined with page.'
+        ),
+      converted: z
+        .enum(['true', 'false', 'both'])
+        .optional()
+        .describe('Lead conversion filter for modules that support converted records.'),
+      territoryId: z.string().optional().describe('Territory ID to filter records.'),
+      includeChildTerritories: z
+        .boolean()
+        .optional()
+        .describe('Include child territory records when territoryId is provided.')
     })
   )
   .output(
@@ -37,7 +59,13 @@ Use **module** to specify which CRM module to query, and optionally filter or so
       moreRecords: z
         .boolean()
         .optional()
-        .describe('Whether more records are available for pagination')
+        .describe('Whether more records are available for pagination'),
+      nextPageToken: z
+        .string()
+        .optional()
+        .describe('Token to use in pageToken for the next page when Zoho returns one.'),
+      previousPageToken: z.string().optional().describe('Previous page token, when returned.'),
+      count: z.number().optional().describe('Number of records returned in this page.')
     })
   )
   .handleInvocation(async ctx => {
@@ -46,20 +74,41 @@ Use **module** to specify which CRM module to query, and optionally filter or so
       apiBaseUrl: ctx.auth.apiBaseUrl
     });
 
+    if (!ctx.input.fields?.length) {
+      throw zohoCrmServiceError('fields is required when listing Zoho CRM records in V8.');
+    }
+    if (ctx.input.page && ctx.input.pageToken) {
+      throw zohoCrmServiceError('Use either page or pageToken, not both.');
+    }
+    if (ctx.input.customViewId && ctx.input.sortBy) {
+      throw zohoCrmServiceError('Use either customViewId or sortBy, not both.');
+    }
+
     let result = await client.getRecords(ctx.input.module, {
       ids: ctx.input.recordIds,
       fields: ctx.input.fields,
+      customViewId: ctx.input.customViewId,
       sortBy: ctx.input.sortBy,
       sortOrder: ctx.input.sortOrder,
       page: ctx.input.page,
-      perPage: ctx.input.perPage
+      perPage: ctx.input.perPage,
+      pageToken: ctx.input.pageToken,
+      converted: ctx.input.converted,
+      territoryId: ctx.input.territoryId,
+      includeChildTerritories: ctx.input.includeChildTerritories
     });
 
     let records = result?.data || [];
     let moreRecords = result?.info?.more_records || false;
 
     return {
-      output: { records, moreRecords },
+      output: {
+        records,
+        moreRecords,
+        nextPageToken: result?.info?.next_page_token ?? undefined,
+        previousPageToken: result?.info?.previous_page_token ?? undefined,
+        count: result?.info?.count
+      },
       message: `Retrieved **${records.length}** record(s) from **${ctx.input.module}**.${moreRecords ? ' More records are available.' : ''}`
     };
   })

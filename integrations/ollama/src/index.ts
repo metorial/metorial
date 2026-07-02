@@ -7,6 +7,7 @@ import {
   deleteModel,
   generateEmbeddings,
   generateText,
+  getVersion,
   listModels,
   pullModel,
   pushModel,
@@ -19,6 +20,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     generateText,
+    getVersion,
     chat,
     generateEmbeddings,
     listModels,

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { wordpressServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -50,6 +51,94 @@ export let getSiteInfoTool = SlateTool.create(spec, {
     return {
       output: result,
       message: `Site: **${result.siteName}** — ${result.siteDescription}\nURL: ${result.siteUrl}`
+    };
+  })
+  .build();
+
+export let getSiteSettingsTool = SlateTool.create(spec, {
+  name: 'Get Site Settings',
+  key: 'get_site_settings',
+  description: `Retrieve editable WordPress site settings such as title, description, timezone, date format, time format, and default content settings.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(z.object({}))
+  .output(
+    z.object({
+      settings: z.record(z.string(), z.any()).describe('Raw WordPress site settings')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    let settings = await client.getSiteSettings();
+
+    return {
+      output: {
+        settings
+      },
+      message: `Retrieved editable settings for **${settings.title ?? settings.name ?? ctx.config.siteUrl}**.`
+    };
+  })
+  .build();
+
+export let updateSiteSettingsTool = SlateTool.create(spec, {
+  name: 'Update Site Settings',
+  key: 'update_site_settings',
+  description: `Update common editable WordPress site settings. Only provided fields are changed.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      siteTitle: z.string().optional().describe('New site title'),
+      siteDescription: z.string().optional().describe('New site tagline or description'),
+      timezone: z
+        .string()
+        .optional()
+        .describe('Timezone identifier, such as "America/New_York"'),
+      dateFormat: z.string().optional().describe('Date format string'),
+      timeFormat: z.string().optional().describe('Time format string'),
+      startOfWeek: z.number().optional().describe('Start-of-week day number, 0 for Sunday'),
+      defaultCategory: z.number().optional().describe('Default post category ID'),
+      defaultPostFormat: z.string().optional().describe('Default post format')
+    })
+  )
+  .output(
+    z.object({
+      settings: z.record(z.string(), z.any()).describe('Updated WordPress site settings')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let updates: Record<string, any> = {};
+    if (ctx.input.siteTitle !== undefined) updates.title = ctx.input.siteTitle;
+    if (ctx.input.siteDescription !== undefined)
+      updates.description = ctx.input.siteDescription;
+    if (ctx.input.timezone !== undefined) updates.timezone = ctx.input.timezone;
+    if (ctx.input.dateFormat !== undefined) updates.date_format = ctx.input.dateFormat;
+    if (ctx.input.timeFormat !== undefined) updates.time_format = ctx.input.timeFormat;
+    if (ctx.input.startOfWeek !== undefined) updates.start_of_week = ctx.input.startOfWeek;
+    if (ctx.input.defaultCategory !== undefined) {
+      updates.default_category = ctx.input.defaultCategory;
+    }
+    if (ctx.input.defaultPostFormat !== undefined) {
+      updates.default_post_format = ctx.input.defaultPostFormat;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      throw wordpressServiceError('Provide at least one site setting to update.');
+    }
+
+    let client = createClient(ctx.config, ctx.auth);
+    let settings = await client.updateSiteSettings(updates);
+
+    return {
+      output: {
+        settings
+      },
+      message: 'Updated WordPress site settings.'
     };
   })
   .build();

@@ -1,3 +1,5 @@
+export * from './delete-messages-permanently';
+export * from './delete-thread-permanently';
 export * from './get-attachment';
 export * from './get-google-contact';
 export * from './get-message';

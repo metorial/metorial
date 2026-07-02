@@ -1,7 +1,23 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { adobeSignServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let collectParticipantIds = (members: any) => {
+  let sets = [...(members.nextParticipantSets || []), ...(members.participantSets || [])];
+  let ids: string[] = [];
+
+  for (let set of sets) {
+    for (let member of set.memberInfos || []) {
+      if (typeof member.id === 'string' && !ids.includes(member.id)) {
+        ids.push(member.id);
+      }
+    }
+  }
+
+  return ids;
+};
 
 export let sendReminder = SlateTool.create(spec, {
   name: 'Send Reminder',
@@ -32,7 +48,7 @@ export let sendReminder = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe(
-          'Specific participant IDs to send reminders to. If omitted, sends to all pending participants.'
+          'Specific participant IDs to send reminders to. If omitted, the tool uses the agreement member list to target pending participants.'
         ),
       firstReminderDelay: z
         .number()
@@ -42,7 +58,12 @@ export let sendReminder = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      reminderId: z.string().describe('ID of the created reminder')
+      agreementId: z.string().describe('ID of the agreement'),
+      reminderId: z.string().optional().describe('ID of the created reminder, if returned'),
+      recipientParticipantIds: z
+        .array(z.string())
+        .describe('Participant IDs targeted by the reminder'),
+      status: z.string().describe('Requested reminder status')
     })
   )
   .handleInvocation(async ctx => {
@@ -52,16 +73,33 @@ export let sendReminder = SlateTool.create(spec, {
       shard: ctx.auth.shard
     });
 
+    let recipientParticipantIds = ctx.input.recipientParticipantIds;
+    if (!recipientParticipantIds || recipientParticipantIds.length === 0) {
+      let members = await client.getAgreementMembers(ctx.input.agreementId);
+      recipientParticipantIds = collectParticipantIds(members);
+    }
+
+    if (recipientParticipantIds.length === 0) {
+      throw adobeSignServiceError(
+        'No participant IDs were available for this reminder. Provide recipientParticipantIds explicitly.'
+      );
+    }
+
     let result = await client.createReminder({
       agreementId: ctx.input.agreementId,
       comment: ctx.input.comment,
       frequency: ctx.input.frequency,
-      recipientParticipantIds: ctx.input.recipientParticipantIds,
+      recipientParticipantIds,
       firstReminderDelay: ctx.input.firstReminderDelay
     });
 
     return {
-      output: { reminderId: result.id },
+      output: {
+        agreementId: ctx.input.agreementId,
+        reminderId: result?.reminderId || result?.id,
+        recipientParticipantIds,
+        status: result?.status || 'ACTIVE'
+      },
       message: `Reminder sent for agreement \`${ctx.input.agreementId}\` with frequency **${ctx.input.frequency || 'ONCE'}**.`
     };
   });

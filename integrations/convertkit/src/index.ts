@@ -3,13 +3,18 @@ import { spec } from './spec';
 import {
   createPurchase,
   getAccount,
+  getAccountInsights,
   listEmailTemplates,
   listSegments,
   listSubscribers,
   manageBroadcasts,
   manageCustomFields,
   manageForms,
+  managePosts,
+  managePurchases,
+  manageSequenceEmails,
   manageSequences,
+  manageSnippets,
   manageSubscriber,
   manageTags
 } from './tools';
@@ -35,8 +40,13 @@ export let provider = Slate.create({
     manageBroadcasts.build(),
     manageCustomFields.build(),
     createPurchase.build(),
+    managePurchases.build(),
+    getAccountInsights.build(),
     listSegments.build(),
-    listEmailTemplates.build()
+    listEmailTemplates.build(),
+    managePosts.build(),
+    manageSnippets.build(),
+    manageSequenceEmails.build()
   ],
   triggers: [
     subscriberEvent.build(),

@@ -4,16 +4,23 @@ import {
   chatWithAssistantTool,
   configureIndexTool,
   createIndexTool,
+  createIntegratedIndexTool,
   deleteVectorsTool,
   describeIndexStatsTool,
+  fetchVectorsByMetadataTool,
   fetchVectorsTool,
   generateEmbeddingsTool,
+  getAssistantContextTool,
   listIndexesTool,
   listVectorIdsTool,
+  manageAssistantFilesTool,
   manageAssistantTool,
+  manageNamespacesTool,
   queryVectorsTool,
   rerankTool,
+  searchRecordsTool,
   updateVectorTool,
+  upsertTextRecordsTool,
   upsertVectorsTool
 } from './tools';
 
@@ -24,10 +31,15 @@ export let provider = Slate.create({
   tools: [
     listIndexesTool,
     createIndexTool,
+    createIntegratedIndexTool,
     configureIndexTool,
+    manageNamespacesTool,
     upsertVectorsTool,
+    upsertTextRecordsTool,
     queryVectorsTool,
+    searchRecordsTool,
     fetchVectorsTool,
+    fetchVectorsByMetadataTool,
     updateVectorTool,
     deleteVectorsTool,
     describeIndexStatsTool,
@@ -35,6 +47,8 @@ export let provider = Slate.create({
     generateEmbeddingsTool,
     rerankTool,
     chatWithAssistantTool,
+    getAssistantContextTool,
+    manageAssistantFilesTool,
     manageAssistantTool
   ],
   triggers: [inboundWebhook]

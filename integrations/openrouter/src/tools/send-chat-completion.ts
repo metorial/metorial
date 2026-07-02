@@ -38,6 +38,8 @@ let toolDefinitionSchema = z.object({
 let providerPreferencesSchema = z
   .object({
     order: z.array(z.string()).optional().describe('Ordered list of provider names to prefer'),
+    only: z.array(z.string()).optional().describe('Only route to these provider names'),
+    ignore: z.array(z.string()).optional().describe('Do not route to these provider names'),
     allow_fallbacks: z
       .boolean()
       .optional()
@@ -53,7 +55,12 @@ let providerPreferencesSchema = z
     data_collection: z
       .enum(['allow', 'deny'])
       .optional()
-      .describe('Data collection policy for providers')
+      .describe('Data collection policy for providers'),
+    sort: z
+      .enum(['price', 'throughput', 'latency'])
+      .optional()
+      .describe('Provider sorting preference'),
+    zdr: z.boolean().optional().describe('Require zero data retention providers')
   })
   .describe('Provider routing preferences');
 
@@ -73,13 +80,28 @@ let responseFormatSchema = z
 
 let pluginSchema = z
   .object({
-    id: z.string().describe('Plugin ID (e.g., "web-search")'),
+    id: z
+      .string()
+      .describe(
+        'Plugin ID (e.g., "web", "file-parser", "response-healing", "context-compression")'
+      ),
+    enabled: z.boolean().optional().describe('Whether this plugin is enabled'),
     config: z
       .record(z.string(), z.unknown())
       .optional()
       .describe('Plugin-specific configuration')
   })
   .describe('Plugin to enable for this request');
+
+let reasoningSchema = z
+  .object({
+    effort: z
+      .enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh'])
+      .optional()
+      .describe('Reasoning effort for models that support extended thinking'),
+    max_tokens: z.number().optional().describe('Maximum reasoning tokens')
+  })
+  .describe('Reasoning configuration');
 
 export let sendChatCompletion = SlateTool.create(spec, {
   name: 'Send Chat Completion',
@@ -112,12 +134,24 @@ export let sendChatCompletion = SlateTool.create(spec, {
         .max(2)
         .optional()
         .describe('Sampling temperature (0-2). Higher values make output more random.'),
-      maxTokens: z.number().optional().describe('Maximum number of tokens to generate'),
+      maxTokens: z
+        .number()
+        .optional()
+        .describe('Deprecated OpenRouter max_tokens field; prefer maxCompletionTokens'),
+      maxCompletionTokens: z
+        .number()
+        .optional()
+        .describe('Maximum number of tokens to generate in the completion'),
       topP: z.number().min(0).max(1).optional().describe('Nucleus sampling threshold (0-1)'),
       topK: z
         .number()
         .optional()
         .describe('Top-K sampling: limits token selection to K most likely tokens'),
+      topA: z.number().optional().describe('Top-A sampling threshold for supported providers'),
+      minP: z
+        .number()
+        .optional()
+        .describe('Minimum probability threshold for supported providers'),
       frequencyPenalty: z
         .number()
         .optional()
@@ -142,6 +176,10 @@ export let sendChatCompletion = SlateTool.create(spec, {
         .describe(
           'Controls tool selection: "auto", "none", "required", or force a specific function'
         ),
+      parallelToolCalls: z
+        .boolean()
+        .optional()
+        .describe('Whether the model may produce multiple tool calls in one response'),
       responseFormat: responseFormatSchema
         .optional()
         .describe('Enforce structured JSON output'),
@@ -157,11 +195,42 @@ export let sendChatCompletion = SlateTool.create(spec, {
       transforms: z
         .array(z.string())
         .optional()
-        .describe('Request transforms (e.g., ["middle-out"] for context compression)'),
+        .describe('Legacy request transforms; prefer the context-compression plugin'),
       plugins: z
         .array(pluginSchema)
         .optional()
-        .describe('Plugins to enable (e.g., web search, PDF processing)')
+        .describe('Plugins to enable (e.g., web search, PDF processing)'),
+      reasoning: reasoningSchema.optional().describe('Reasoning model configuration'),
+      reasoningEffort: z
+        .enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh'])
+        .optional()
+        .describe('Shorthand for reasoning.effort'),
+      modalities: z
+        .array(z.enum(['text', 'image', 'audio']))
+        .optional()
+        .describe('Requested output modalities for supported models'),
+      metadata: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Metadata for the request, up to 16 key-value pairs'),
+      serviceTier: z.string().optional().describe('Service tier to use for routing'),
+      sessionId: z
+        .string()
+        .optional()
+        .describe('Stable session identifier for provider stickiness and observability'),
+      trace: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe('Observability trace metadata'),
+      user: z
+        .string()
+        .optional()
+        .describe('Stable end-user identifier used to help detect and prevent abuse'),
+      logprobs: z.boolean().optional().describe('Return token log probabilities'),
+      topLogprobs: z
+        .number()
+        .optional()
+        .describe('Number of top log probabilities to return, when supported')
     })
   )
   .output(
@@ -234,8 +303,11 @@ export let sendChatCompletion = SlateTool.create(spec, {
       }>;
       temperature?: number;
       maxTokens?: number;
+      maxCompletionTokens?: number;
       topP?: number;
       topK?: number;
+      topA?: number;
+      minP?: number;
       frequencyPenalty?: number;
       presencePenalty?: number;
       repetitionPenalty?: number;
@@ -243,12 +315,23 @@ export let sendChatCompletion = SlateTool.create(spec, {
       seed?: number;
       tools?: Record<string, unknown>[];
       toolChoice?: string | Record<string, unknown>;
+      parallelToolCalls?: boolean;
       responseFormat?: Record<string, unknown>;
       models?: string[];
       route?: string;
       provider?: Record<string, unknown>;
       transforms?: string[];
       plugins?: Record<string, unknown>[];
+      reasoning?: Record<string, unknown>;
+      reasoningEffort?: string;
+      modalities?: string[];
+      metadata?: Record<string, string>;
+      serviceTier?: string;
+      sessionId?: string;
+      trace?: Record<string, unknown>;
+      user?: string;
+      logprobs?: boolean;
+      topLogprobs?: number;
     } = {
       model: ctx.input.model,
       messages: ctx.input.messages.map(m => ({
@@ -260,8 +343,13 @@ export let sendChatCompletion = SlateTool.create(spec, {
       })),
       ...(ctx.input.temperature !== undefined ? { temperature: ctx.input.temperature } : {}),
       ...(ctx.input.maxTokens !== undefined ? { maxTokens: ctx.input.maxTokens } : {}),
+      ...(ctx.input.maxCompletionTokens !== undefined
+        ? { maxCompletionTokens: ctx.input.maxCompletionTokens }
+        : {}),
       ...(ctx.input.topP !== undefined ? { topP: ctx.input.topP } : {}),
       ...(ctx.input.topK !== undefined ? { topK: ctx.input.topK } : {}),
+      ...(ctx.input.topA !== undefined ? { topA: ctx.input.topA } : {}),
+      ...(ctx.input.minP !== undefined ? { minP: ctx.input.minP } : {}),
       ...(ctx.input.frequencyPenalty !== undefined
         ? { frequencyPenalty: ctx.input.frequencyPenalty }
         : {}),
@@ -275,6 +363,9 @@ export let sendChatCompletion = SlateTool.create(spec, {
       ...(ctx.input.seed !== undefined ? { seed: ctx.input.seed } : {}),
       ...(ctx.input.tools !== undefined ? { tools: ctx.input.tools } : {}),
       ...(ctx.input.toolChoice !== undefined ? { toolChoice: ctx.input.toolChoice } : {}),
+      ...(ctx.input.parallelToolCalls !== undefined
+        ? { parallelToolCalls: ctx.input.parallelToolCalls }
+        : {}),
       ...(ctx.input.responseFormat !== undefined
         ? { responseFormat: ctx.input.responseFormat }
         : {}),
@@ -282,7 +373,19 @@ export let sendChatCompletion = SlateTool.create(spec, {
       ...(ctx.input.route !== undefined ? { route: ctx.input.route } : {}),
       ...(ctx.input.provider !== undefined ? { provider: ctx.input.provider } : {}),
       ...(ctx.input.transforms !== undefined ? { transforms: ctx.input.transforms } : {}),
-      ...(ctx.input.plugins !== undefined ? { plugins: ctx.input.plugins } : {})
+      ...(ctx.input.plugins !== undefined ? { plugins: ctx.input.plugins } : {}),
+      ...(ctx.input.reasoning !== undefined ? { reasoning: ctx.input.reasoning } : {}),
+      ...(ctx.input.reasoningEffort !== undefined
+        ? { reasoningEffort: ctx.input.reasoningEffort }
+        : {}),
+      ...(ctx.input.modalities !== undefined ? { modalities: ctx.input.modalities } : {}),
+      ...(ctx.input.metadata !== undefined ? { metadata: ctx.input.metadata } : {}),
+      ...(ctx.input.serviceTier !== undefined ? { serviceTier: ctx.input.serviceTier } : {}),
+      ...(ctx.input.sessionId !== undefined ? { sessionId: ctx.input.sessionId } : {}),
+      ...(ctx.input.trace !== undefined ? { trace: ctx.input.trace } : {}),
+      ...(ctx.input.user !== undefined ? { user: ctx.input.user } : {}),
+      ...(ctx.input.logprobs !== undefined ? { logprobs: ctx.input.logprobs } : {}),
+      ...(ctx.input.topLogprobs !== undefined ? { topLogprobs: ctx.input.topLogprobs } : {})
     };
 
     let result = await client.createChatCompletion(request);

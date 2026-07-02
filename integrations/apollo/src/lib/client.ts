@@ -4,12 +4,14 @@ import type {
   ApolloAccount,
   ApolloContact,
   ApolloDeal,
+  ApolloNewsArticle,
   ApolloOrganization,
   ApolloPerson,
   ApolloSequence,
   ApolloTask,
   ApolloUser,
   BulkPersonEnrichmentParams,
+  NewsArticleSearchFilters,
   OrganizationSearchFilters,
   PeopleSearchFilters,
   PersonEnrichmentParams
@@ -285,6 +287,28 @@ export class Client {
           response.data.organization_job_postings ||
           response.data.jobs ||
           [],
+        pagination: response.data.pagination || {}
+      };
+    });
+  }
+
+  async searchNewsArticles(
+    filters: NewsArticleSearchFilters
+  ): Promise<{ newsArticles: ApolloNewsArticle[]; pagination: any }> {
+    return await this.request('search news articles', async () => {
+      let response = await this.axios.post('/news_articles/search', undefined, {
+        params: compact({
+          'organization_ids[]': filters.organizationIds,
+          'categories[]': filters.categories,
+          'published_at[min]': filters.publishedAtMin,
+          'published_at[max]': filters.publishedAtMax,
+          page: filters.page || 1,
+          per_page: filters.perPage || 10
+        })
+      });
+
+      return {
+        newsArticles: response.data.news_articles || response.data.articles || [],
         pagination: response.data.pagination || {}
       };
     });

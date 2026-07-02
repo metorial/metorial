@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { woocommerceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -74,7 +75,7 @@ export let manageProductCategories = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) throw woocommerceServiceError('name is required for create action');
 
       let data: Record<string, any> = { name: ctx.input.name };
       if (ctx.input.slug) data.slug = ctx.input.slug;
@@ -91,7 +92,8 @@ export let manageProductCategories = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for update action');
+      if (!ctx.input.categoryId)
+        throw woocommerceServiceError('categoryId is required for update action');
 
       let data: Record<string, any> = {};
       if (ctx.input.name) data.name = ctx.input.name;
@@ -109,7 +111,8 @@ export let manageProductCategories = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for delete action');
+      if (!ctx.input.categoryId)
+        throw woocommerceServiceError('categoryId is required for delete action');
 
       await client.deleteProductCategory(ctx.input.categoryId, ctx.input.force);
 
@@ -119,7 +122,7 @@ export let manageProductCategories = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw woocommerceServiceError(`Unknown action: ${action}`);
   })
   .build();
 

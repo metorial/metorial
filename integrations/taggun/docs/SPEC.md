@@ -1,94 +1,91 @@
-Now let me check the Taggun API reference for more details on features and input methods.Now I have enough information to write the specification.
-
 # Slates Specification for Taggun
 
 ## Overview
 
-Taggun is a receipt and invoice OCR API that extracts structured data from receipt and invoice images using machine learning. It supports multi-language and multi-region receipt processing, fraud detection, and purchase validation for use cases like expense management, loyalty campaigns, and accounting automation.
+Taggun is a receipt and invoice OCR API. It extracts structured data from receipt
+or invoice images, supports validation campaigns for purchase validation, accepts
+manually verified feedback for training, and exposes account-level product
+category import/export endpoints for purchase categorization.
+
+Official docs used for this implementation:
+
+- Documentation index: https://developers.taggun.io/llms.txt
+- API base URL and authentication: https://developers.taggun.io/docs/obtaining-api-key
+- Receipt extraction endpoints: https://developers.taggun.io/reference/encoded-file-verbose
+- Validation campaign setup: https://developers.taggun.io/docs/definitions-for-create-campaign-settings
+- Receipt validation: https://developers.taggun.io/docs/definitions-for-validate-receipts
+- Product categories: https://developers.taggun.io/reference/export-product-categories
 
 ## Authentication
 
-Taggun uses API key authentication. Users create a Taggun account at taggun.io/sign-up, and after signing in, an API key is sent to the registered email inbox.
+Taggun uses API key authentication. The API key is sent in the `apikey` request
+header. There are no OAuth flows or scopes.
 
-The API key must be passed as a custom HTTP header named `apikey` with every request:
-
-```
+```http
 apikey: YOUR_API_KEY
 ```
 
-The base URL for all API calls is `https://api.taggun.io`.
+## Tools
 
-There are no OAuth flows, scopes, or additional credentials required. Taggun uses API keys for authentication as the sole method.
+### Extract Receipt Data
 
-## Features
+Extract structured receipt or invoice data from either a public HTTPS URL or
+base64-encoded file content. The tool supports Taggun's simple and verbose JSON
+endpoints:
 
-### Receipt and Invoice Data Extraction
+- `POST /api/receipt/v1/simple/encoded`
+- `POST /api/receipt/v1/simple/url`
+- `POST /api/receipt/v1/verbose/encoded`
+- `POST /api/receipt/v1/verbose/url`
 
-Extract key information from receipt and invoice images, including total amount, tax amount, date of purchase, merchant information, and line item amounts. Documents can be submitted as file uploads (JPG, PNG, PDF, GIF, HEIF), base64-encoded content, or via URL. Supported formats include PDF, JPG, PNG, GIF, and HEIF.
+Verbose mode can return line items, raw OCR text, receipt/invoice identifiers,
+tax fields, and account-enabled fraud or categorization fields.
 
-- Two response detail levels are available: **simple** (core fields only) and **verbose** (includes line items, invoice/receipt numbers, discount amounts, and additional metadata).
-- Each extracted field includes a confidence score indicating extraction accuracy.
-- Taggun automatically detects the language of any receipt or invoice.
-- An `incognito` mode can be enabled to prevent receipt data from being stored.
-- A `refresh` parameter can force re-processing of a previously submitted receipt.
+### Validate Receipt
 
-### Fraud Detection
+Validate a receipt against existing campaign settings. The URL path sends JSON
+to `POST /api/validation/v1/campaign/receipt-validation/url`; the base64 input
+path sends multipart file content to
+`POST /api/validation/v1/campaign/receipt-validation/file`.
 
-The fraud detection suite can identify duplicate receipts, detect tampered receipts, fake digital or AI-generated receipts, and perform similarity checks across submissions.
+Validation supports campaign ID, reference ID, user ID, sub-account ID, language,
+incognito storage behavior, IP address, and geographic merchant hints.
 
-- **Duplicate and Similarity Check**: Identifies potential duplicate receipts based on previously scanned documents. Returns similarity scores.
-- **Digital Tampering Detection**: Detects Photoshop edits, AI-generated receipts, and other digital alterations. Returns a tamper score.
-- **Handwritten Receipt Detection**: Flags receipts containing handwritten elements and provides a handwriting score.
-- **Digital Receipt Detection**: Identifies whether a receipt is a digital/electronic receipt vs. a physical one.
-- Fraud detection is a modular add-on that must be enabled by contacting Taggun.
+### Manage Campaign
 
-### Purchase Validation Campaigns
+Create, retrieve, update, list, and delete campaign settings:
 
-Taggun's Receipt Validation APIs allow running promotions by automatically validating purchases with receipts or invoices, including setting up and managing campaigns for automating promotions, rewards, and warranty programs.
+- `GET /api/validation/v1/campaign/settings/list`
+- `GET /api/validation/v1/campaign/settings/{campaignId}`
+- `POST /api/validation/v1/campaign/settings/create/{campaignId}`
+- `PUT /api/validation/v1/campaign/settings/update/{campaignId}`
+- `DELETE /api/validation/v1/campaign/settings/delete/{campaignId}`
 
-- Campaign rules can define promotional periods, participating merchants, and eligible products.
-- Uses Levenshtein Distance of keywords to accurately determine the validity of a receipt for a rebate campaign.
-- Campaigns can be created, updated, and managed via the API.
-- Requires contacting Taggun to enable this feature.
+Campaign settings use Taggun's current nested request shape: `date`,
+`merchantNames`, `productCodes`, `productLineItems`, `balanceOwing`,
+`fraudDetection`, and `smartValidate`.
 
-### Merchant Intelligence
+### Manage Product Categories
 
-Standardizes and enriches merchant data extracted from receipts.
+Export or upload product category definitions:
 
-- **Merchant Name Normalization**: Standardizes merchant names across receipts for consistent reporting.
-- Merchant intelligence standardises merchant names and verifies locations for accurate reporting.
-- **Location Matching and Verification**: Verifies merchant locations against known data.
+- `GET /api/account/v1/product-categories/export`
+- `POST /api/account/v1/product-categories/import`
 
-### Purchase Categorisation
+If Taggun returns file bytes for export, the tool returns them as a Slate
+attachment. Upload accepts CSV or TSV content as base64 input.
 
-Classifies purchases by merchant and product for spending insights.
+### Submit Feedback
 
-- **Receipt-Level Categorisation**: Categorizes the overall purchase based on merchant type.
-- **Product-Level Categorisation**: Categorizes individual line items by product type.
+Submit manually verified field corrections for a previously scanned receipt by
+`referenceId`:
 
-### Tax Intelligence
+- `POST /api/account/v1/feedback`
 
-Extracts tax details like VAT numbers and rates, supporting global tax systems.
+Supported correction fields are total amount, tax amount, merchant name,
+currency code, and date.
 
-- **Multi-Tier Tax**: Handles receipts with multiple tax types and rates.
-- **VAT Number Verification**: Validates VAT numbers via VIES for EU receipts.
-- Extracts merchant tax IDs and IBAN information where applicable.
+## Triggers
 
-### QR Code Extraction
-
-Extracts data from QR codes found on receipts and invoices, enriching the data extraction capabilities of the API.
-
-- Particularly useful for Brazilian fiscal receipts (SEFAZ compliance).
-- Currently an opt-in feature requiring contact with Taggun to enable.
-
-### Serial Number Validation
-
-Validates serial numbers and barcodes found on receipts, useful for warranty and return verification workflows.
-
-### SmartValidate
-
-An advanced validation feature that combines OCR extraction with intelligent validation logic, designed for complex campaign validation scenarios.
-
-## Events
-
-The provider does not support events. Taggun is a request-response API where receipt data is extracted synchronously upon submission. There are no webhooks, event subscriptions, or built-in polling mechanisms.
+Taggun does not document webhook or event subscription APIs. This integration
+does not expose triggers.

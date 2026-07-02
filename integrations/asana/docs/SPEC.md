@@ -42,7 +42,7 @@ OAuth is a mechanism for applications to access the Asana API on behalf of a use
 - `teams:read`
 - `time_tracking_entries:read`
 - `timesheet_approval_statuses:read`, `timesheet_approval_statuses:write`
-- `workspace.typeahead:read`
+- `workspaces.typeahead:read`
 - `users:read`
 - `webhooks:read`, `webhooks:write`, `webhooks:delete`
 - `workspaces:read`

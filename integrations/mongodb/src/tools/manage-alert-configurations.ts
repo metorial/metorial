@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let notificationSchema = z
@@ -125,7 +126,7 @@ export let manageAlertConfigurationsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required');
+    if (!projectId) throw mongodbServiceError('projectId is required');
 
     let client = new AtlasClient(ctx.auth);
 
@@ -151,7 +152,7 @@ export let manageAlertConfigurationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.alertConfigId) throw new Error('alertConfigId is required');
+      if (!ctx.input.alertConfigId) throw mongodbServiceError('alertConfigId is required');
       let c = await client.getAlertConfiguration(projectId, ctx.input.alertConfigId);
       return {
         output: { alertConfig: mapConfig(c) },
@@ -160,7 +161,7 @@ export let manageAlertConfigurationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.eventTypeName) throw new Error('eventTypeName is required');
+      if (!ctx.input.eventTypeName) throw mongodbServiceError('eventTypeName is required');
       let payload: any = {
         eventTypeName: ctx.input.eventTypeName,
         enabled: ctx.input.enabled ?? true
@@ -178,7 +179,7 @@ export let manageAlertConfigurationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.alertConfigId) throw new Error('alertConfigId is required');
+      if (!ctx.input.alertConfigId) throw mongodbServiceError('alertConfigId is required');
       let payload: any = {};
       if (ctx.input.eventTypeName) payload.eventTypeName = ctx.input.eventTypeName;
       if (ctx.input.enabled !== undefined) payload.enabled = ctx.input.enabled;
@@ -199,7 +200,7 @@ export let manageAlertConfigurationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.alertConfigId) throw new Error('alertConfigId is required');
+      if (!ctx.input.alertConfigId) throw mongodbServiceError('alertConfigId is required');
       await client.deleteAlertConfiguration(projectId, ctx.input.alertConfigId);
       return {
         output: { deleted: true },
@@ -207,6 +208,6 @@ export let manageAlertConfigurationsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

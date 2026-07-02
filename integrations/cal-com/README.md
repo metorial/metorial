@@ -28,6 +28,10 @@ Retrieve detailed information about a specific booking by its UID. For recurring
 
 Retrieve busy time windows across all connected calendars for a date range. Useful for understanding availability conflicts before scheduling.
 
+### Get Event Type
+
+Retrieve a specific event type by ID, including booking URL, duration, locations, schedule, booking fields, and host details.
+
 ### Get Profile
 
 Retrieve the authenticated user's profile information including name, email, time zone, and other account details.
@@ -46,11 +50,19 @@ Retrieve all event types for the authenticated user. Returns event type details 
 
 ### Manage Booking
 
-Perform lifecycle actions on an existing booking: cancel, reschedule, confirm, decline, mark as no-show, reassign to another host, or add guests. Select the desired action and provide the required parameters.
+Perform lifecycle actions on an existing booking: cancel, reschedule, request a reschedule, confirm, decline, mark absence, reassign to another host, add guests, or update the booking location.
+
+### Manage Out Of Office
+
+List, create, update, or delete out-of-office entries for the authenticated Cal.com user.
 
 ### Manage Schedule
 
-Create, update, or delete an availability schedule. Schedules define when a user can be booked. Each user can have multiple schedules with one set as default. Use action "create" to make a new schedule, "update" to modify an existing one, "delete" to remove one, or "list" to view all schedules.
+Create, update, delete, retrieve, or list availability schedules. Schedules define when a user can be booked. Each user can have multiple schedules with one set as default.
+
+### Manage Slot Reservation
+
+Reserve, retrieve, update, or delete a temporary slot reservation for a Cal.com event type before creating a booking.
 
 ### Update Event Type
 

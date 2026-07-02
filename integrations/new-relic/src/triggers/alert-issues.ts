@@ -3,6 +3,14 @@ import { z } from 'zod';
 import { NerdGraphClient } from '../lib/client';
 import { spec } from '../spec';
 
+let issueTitle = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return value.filter((item): item is string => typeof item === 'string').join('; ');
+  }
+
+  return typeof value === 'string' ? value : undefined;
+};
+
 export let alertIssues = SlateTrigger.create(spec, {
   name: 'Alert Issues',
   key: 'alert_issues',
@@ -13,12 +21,12 @@ export let alertIssues = SlateTrigger.create(spec, {
     z.object({
       issueId: z.string().describe('Alert issue ID'),
       title: z.string().optional().describe('Issue title'),
-      state: z.string().describe('Issue state: ACTIVATED, ACKNOWLEDGED, CLOSED'),
+      state: z.string().describe('Issue state: CREATED, ACTIVATED, DEACTIVATED, CLOSED'),
       priority: z.string().optional().describe('Issue priority'),
-      activatedAt: z.string().optional().describe('When the issue was first activated'),
-      closedAt: z.string().optional().describe('When the issue was closed'),
-      acknowledgedAt: z.string().optional().describe('When the issue was acknowledged'),
-      updatedAt: z.string().optional().describe('When the issue was last updated'),
+      activatedAt: z.number().optional().describe('When the issue was first activated'),
+      closedAt: z.number().optional().describe('When the issue was closed'),
+      acknowledgedAt: z.number().optional().describe('When the issue was acknowledged'),
+      updatedAt: z.number().optional().describe('When the issue was last updated'),
       entityGuids: z
         .array(z.string())
         .optional()
@@ -27,13 +35,13 @@ export let alertIssues = SlateTrigger.create(spec, {
         .array(z.string())
         .optional()
         .describe('Entity names associated with this issue'),
-      conditionName: z
-        .string()
+      entityTypes: z
+        .array(z.string())
         .optional()
-        .describe('Alert condition that triggered this issue'),
-      policyName: z.string().optional().describe('Alert policy name'),
+        .describe('Entity types associated with this issue'),
       previousState: z
         .string()
+        .nullable()
         .optional()
         .describe('Previous state of the issue (for change detection)')
     })
@@ -44,10 +52,10 @@ export let alertIssues = SlateTrigger.create(spec, {
       title: z.string().optional().describe('Issue title'),
       state: z.string().describe('Current issue state'),
       priority: z.string().optional().describe('Issue priority'),
-      activatedAt: z.string().optional().describe('When the issue was activated'),
-      closedAt: z.string().optional().describe('When the issue was closed'),
-      acknowledgedAt: z.string().optional().describe('When the issue was acknowledged'),
-      updatedAt: z.string().optional().describe('When the issue was last updated'),
+      activatedAt: z.number().optional().describe('When the issue was activated'),
+      closedAt: z.number().optional().describe('When the issue was closed'),
+      acknowledgedAt: z.number().optional().describe('When the issue was acknowledged'),
+      updatedAt: z.number().optional().describe('When the issue was last updated'),
       entityGuids: z
         .array(z.string())
         .optional()
@@ -56,11 +64,10 @@ export let alertIssues = SlateTrigger.create(spec, {
         .array(z.string())
         .optional()
         .describe('Entity names associated with this issue'),
-      conditionName: z
-        .string()
+      entityTypes: z
+        .array(z.string())
         .optional()
-        .describe('Alert condition that triggered this issue'),
-      policyName: z.string().optional().describe('Alert policy name')
+        .describe('Entity types associated with this issue')
     })
   )
   .polling({
@@ -91,7 +98,7 @@ export let alertIssues = SlateTrigger.create(spec, {
         if (!previousState || previousState !== currentState) {
           inputs.push({
             issueId: issue.issueId,
-            title: issue.title,
+            title: issueTitle(issue.title),
             state: currentState,
             priority: issue.priority,
             activatedAt: issue.activatedAt,
@@ -100,8 +107,7 @@ export let alertIssues = SlateTrigger.create(spec, {
             updatedAt: issue.updatedAt,
             entityGuids: issue.entityGuids,
             entityNames: issue.entityNames,
-            conditionName: issue.conditionName,
-            policyName: issue.policyName,
+            entityTypes: issue.entityTypes,
             previousState: previousState || null
           });
         }
@@ -130,8 +136,6 @@ export let alertIssues = SlateTrigger.create(spec, {
         eventType = 'issue.activated';
       } else if (state === 'CLOSED' && previousState !== 'CLOSED') {
         eventType = 'issue.closed';
-      } else if (state === 'ACKNOWLEDGED' && previousState !== 'ACKNOWLEDGED') {
-        eventType = 'issue.acknowledged';
       }
 
       // Dedupe ID includes state so each state change is unique
@@ -151,8 +155,7 @@ export let alertIssues = SlateTrigger.create(spec, {
           updatedAt: ctx.input.updatedAt,
           entityGuids: ctx.input.entityGuids,
           entityNames: ctx.input.entityNames,
-          conditionName: ctx.input.conditionName,
-          policyName: ctx.input.policyName
+          entityTypes: ctx.input.entityTypes
         }
       };
     }

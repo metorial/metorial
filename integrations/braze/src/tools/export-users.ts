@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrazeClient } from '../lib/client';
+import { brazeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let exportUsers = SlateTool.create(spec, {
@@ -23,9 +24,10 @@ export let exportUsers = SlateTool.create(spec, {
   .input(
     z.object({
       externalIds: z.array(z.string()).optional().describe('External user IDs to export'),
-      brazeIds: z.array(z.string()).optional().describe('Braze internal user IDs to export'),
-      emails: z.array(z.string()).optional().describe('Email addresses to look up'),
-      phones: z.array(z.string()).optional().describe('Phone numbers to look up'),
+      brazeId: z.string().optional().describe('Single Braze internal user ID to export'),
+      deviceId: z.string().optional().describe('Single device ID to export'),
+      email: z.string().optional().describe('Single email address to look up'),
+      phone: z.string().optional().describe('Single phone number in E.164 format to look up'),
       userAliases: z
         .array(
           z.object({
@@ -56,11 +58,43 @@ export let exportUsers = SlateTool.create(spec, {
       instanceUrl: ctx.config.instanceUrl
     });
 
+    let externalIdentifierCount =
+      (ctx.input.externalIds?.length ?? 0) + (ctx.input.userAliases?.length ?? 0);
+    let singleIdentifiers = [
+      ctx.input.brazeId,
+      ctx.input.deviceId,
+      ctx.input.email,
+      ctx.input.phone
+    ].filter(Boolean);
+
+    if (externalIdentifierCount === 0 && singleIdentifiers.length === 0) {
+      throw brazeServiceError(
+        'Provide externalIds, userAliases, brazeId, deviceId, email, or phone.'
+      );
+    }
+
+    if (
+      (ctx.input.externalIds?.length ?? 0) > 50 ||
+      (ctx.input.userAliases?.length ?? 0) > 50
+    ) {
+      throw brazeServiceError('externalIds and userAliases can include at most 50 values.');
+    }
+
+    if (
+      singleIdentifiers.length > 1 ||
+      (singleIdentifiers.length === 1 && externalIdentifierCount > 0)
+    ) {
+      throw brazeServiceError(
+        'Use only one singular identifier (brazeId, deviceId, email, or phone), and do not combine it with externalIds or userAliases.'
+      );
+    }
+
     let result = await client.exportUsersByIds({
       externalIds: ctx.input.externalIds,
-      brazeIds: ctx.input.brazeIds,
-      emails: ctx.input.emails,
-      phones: ctx.input.phones,
+      brazeId: ctx.input.brazeId,
+      deviceId: ctx.input.deviceId,
+      email: ctx.input.email,
+      phone: ctx.input.phone,
       userAliases: ctx.input.userAliases,
       fieldsToExport: ctx.input.fieldsToExport
     });

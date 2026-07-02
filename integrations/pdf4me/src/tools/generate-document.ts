@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let generateDocument = SlateTool.create(spec, {
   name: 'Generate Document',
@@ -40,12 +41,7 @@ Use for automating contracts, invoices, reports, and other data-driven documents
         .describe('Keep PDF form fields editable in the output')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded generated document'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -62,7 +58,8 @@ Use for automating contracts, invoices, reports, and other data-driven documents
     });
 
     return {
-      output: result,
+      output: fileOutput(result),
+      attachments: [fileAttachment(result)],
       message: `Successfully generated ${ctx.input.outputType} document: **${result.fileName}**`
     };
   })

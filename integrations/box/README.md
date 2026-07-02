@@ -1,12 +1,16 @@
 # <img src="https://provider-logos.metorial-cdn.com/box.svg" height="20"> Box
 
-Upload, download, copy, move, rename, lock, and delete files and folders in Box. Manage file versions, shared links, and collaborations with configurable roles. Search content by full text, metadata, file type, and date ranges. Create and manage e-signature requests via Box Sign. Apply custom metadata templates to files and folders. Add comments and task assignments to files. Generate documents from templates with merged data. Use Box AI to ask questions about file content, generate text, and extract structured data. Manage enterprise users, groups, retention policies, legal holds, and security classifications. Monitor file, folder, collaboration, comment, shared link, metadata, task, sign request, and document generation events via webhooks.
+Upload, download, copy, move, rename, lock, and delete files and folders in Box. Manage file versions, shared links, and collaborations with configurable roles. Search content by full text, metadata, file type, and date ranges. Create and manage e-signature requests via Box Sign. Apply custom metadata templates to files. Add comments and task assignments to files. Create and manage web link bookmarks. List the current Box user or enterprise users when the authenticated account has access. Monitor file, folder, collaboration, comment, shared link, metadata, task, and sign request events via webhooks.
 
 ## Tools
 
 ### Get Download URL
 
 Get a temporary download URL for a Box file. The URL can be used to download the file content directly.
+
+### Download File
+
+Download a Box file and return the file content as a Slate attachment, with structured output limited to file metadata.
 
 ### Get File Info
 

@@ -1,14 +1,25 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { railwayApiError, railwayServiceError } from './lib/errors';
 
 let httpClient = createAxios({
   baseURL: 'https://backboard.railway.com'
 });
 
+let authorizationHeaders = (token: string, tokenHeader?: string) =>
+  tokenHeader === 'project-access-token'
+    ? {
+        'Project-Access-Token': token
+      }
+    : {
+        Authorization: `Bearer ${token}`
+      };
+
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      tokenHeader: z.enum(['authorization', 'project-access-token']).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -87,20 +98,25 @@ export let auth = SlateAuth.create()
     handleCallback: async ctx => {
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
-      let response = await httpClient.post(
-        '/oauth/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
+      let response: any;
+      try {
+        response = await httpClient.post(
+          '/oauth/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri
+          }).toString(),
+          {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw railwayApiError(error, 'OAuth callback');
+      }
 
       let data = response.data;
       let expiresAt = data.expires_in
@@ -118,24 +134,31 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        throw railwayServiceError(
+          'Railway OAuth token refresh failed: no refresh token is available. Reconnect Railway with the offline_access scope.'
+        );
       }
 
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
-      let response = await httpClient.post(
-        '/oauth/token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
+      let response: any;
+      try {
+        response = await httpClient.post(
+          '/oauth/token',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken
+          }).toString(),
+          {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw railwayApiError(error, 'OAuth token refresh');
+      }
 
       let data = response.data;
       let expiresAt = data.expires_in
@@ -156,11 +179,16 @@ export let auth = SlateAuth.create()
       input: Record<string, never>;
       scopes: string[];
     }) => {
-      let response = await httpClient.get('/oauth/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+      try {
+        response = await httpClient.get('/oauth/me', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+      } catch (error) {
+        throw railwayApiError(error, 'OAuth profile');
+      }
 
       let data = response.data;
 
@@ -180,38 +208,76 @@ export let auth = SlateAuth.create()
     key: 'api_token',
 
     inputSchema: z.object({
-      token: z.string().describe('Railway API token (Account or Workspace token)')
+      token: z.string().describe('Railway API token'),
+      tokenType: z
+        .enum(['account_or_workspace', 'project'])
+        .optional()
+        .default('account_or_workspace')
+        .describe(
+          'Use "project" for Railway project tokens, which require the Project-Access-Token header. Account and workspace tokens use Authorization: Bearer.'
+        )
     }),
 
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          tokenHeader:
+            ctx.input.tokenType === 'project' ? 'project-access-token' : 'authorization'
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await httpClient.post(
-        '/graphql/v2',
-        {
-          query: `query { me { id name email } }`
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${ctx.output.token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+    getProfile: async (ctx: {
+      output: { token: string; tokenHeader?: string };
+      input: { token: string; tokenType?: 'account_or_workspace' | 'project' };
+    }) => {
+      let isProjectToken = ctx.output.tokenHeader === 'project-access-token';
+      let response: any;
 
-      let me = response.data?.data?.me;
+      try {
+        response = await httpClient.post(
+          '/graphql/v2',
+          {
+            query: isProjectToken
+              ? `query { projectToken { id name projectId environmentId } }`
+              : `query { apiToken { workspaces { id name } } }`
+          },
+          {
+            headers: {
+              ...authorizationHeaders(ctx.output.token, ctx.output.tokenHeader),
+              'Content-Type': 'application/json'
+            }
+          }
+        );
+      } catch (error) {
+        throw railwayApiError(error, 'API token profile');
+      }
+
+      if (response.data?.errors?.length > 0) {
+        let message = response.data.errors.map((error: any) => error.message).join(', ');
+        throw railwayServiceError(`Railway API token profile failed: ${message}`);
+      }
+
+      if (isProjectToken) {
+        let token = response.data?.data?.projectToken;
+
+        return {
+          profile: {
+            id:
+              token?.id ?? `${token?.projectId ?? 'project'}:${token?.environmentId ?? 'env'}`,
+            name: token?.name ?? 'Railway Project Token'
+          }
+        };
+      }
+
+      let workspaces = response.data?.data?.apiToken?.workspaces ?? [];
+      let workspace = Array.isArray(workspaces) ? workspaces[0] : undefined;
 
       return {
         profile: {
-          id: me?.id,
-          email: me?.email,
-          name: me?.name
+          id: workspace?.id ?? 'railway-api-token',
+          name: workspace?.name ?? 'Railway API Token'
         }
       };
     }

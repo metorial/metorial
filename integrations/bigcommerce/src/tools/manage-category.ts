@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bigcommerceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCategory = SlateTool.create(spec, {
@@ -59,7 +60,8 @@ export let manageCategory = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for delete');
+      if (!ctx.input.categoryId)
+        throw bigcommerceServiceError('categoryId is required for delete');
       await client.deleteCategory(ctx.input.categoryId);
       return {
         output: { deleted: true },
@@ -87,7 +89,8 @@ export let manageCategory = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.categoryId) throw new Error('categoryId is required for update');
+    if (!ctx.input.categoryId)
+      throw bigcommerceServiceError('categoryId is required for update');
     categoryData.category_id = ctx.input.categoryId;
     let result = await client.updateCategory(categoryData);
     let cat = Array.isArray(result.data) ? result.data[0] : result.data;

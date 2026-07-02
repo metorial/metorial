@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SesClient } from '../lib/client';
+import { requireAwsSesString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageConfigurationSet = SlateTool.create(spec, {
@@ -20,6 +21,7 @@ export let manageConfigurationSet = SlateTool.create(spec, {
           'get',
           'delete',
           'list',
+          'updateDelivery',
           'updateSending',
           'updateReputation',
           'updateTracking',
@@ -51,6 +53,10 @@ export let manageConfigurationSet = SlateTool.create(spec, {
         .enum(['REQUIRE', 'OPTIONAL'])
         .optional()
         .describe('TLS policy for email delivery'),
+      maxDeliverySeconds: z
+        .number()
+        .optional()
+        .describe('Maximum time in seconds SES attempts delivery (300 to 50400)'),
       nextToken: z.string().optional().describe('Pagination token for "list"'),
       pageSize: z.number().optional().describe('Number of results per page')
     })
@@ -61,7 +67,8 @@ export let manageConfigurationSet = SlateTool.create(spec, {
       deliveryOptions: z
         .object({
           sendingPoolName: z.string().optional(),
-          tlsPolicy: z.string().optional()
+          tlsPolicy: z.string().optional(),
+          maxDeliverySeconds: z.number().optional()
         })
         .optional(),
       reputationOptions: z
@@ -103,11 +110,22 @@ export let manageConfigurationSet = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      let configurationSetName = requireAwsSesString(
+        ctx.input.configurationSetName,
+        'configurationSetName',
+        action
+      );
       await client.createConfigurationSet({
-        configurationSetName: ctx.input.configurationSetName!,
+        configurationSetName,
         deliveryOptions:
-          ctx.input.sendingPoolName || ctx.input.tlsPolicy
-            ? { sendingPoolName: ctx.input.sendingPoolName, tlsPolicy: ctx.input.tlsPolicy }
+          ctx.input.sendingPoolName ||
+          ctx.input.tlsPolicy ||
+          ctx.input.maxDeliverySeconds !== undefined
+            ? {
+                sendingPoolName: ctx.input.sendingPoolName,
+                tlsPolicy: ctx.input.tlsPolicy,
+                maxDeliverySeconds: ctx.input.maxDeliverySeconds
+              }
             : undefined,
         reputationOptions:
           ctx.input.reputationMetricsEnabled !== undefined
@@ -125,13 +143,18 @@ export let manageConfigurationSet = SlateTool.create(spec, {
           : undefined
       });
       return {
-        output: { configurationSetName: ctx.input.configurationSetName },
-        message: `Configuration set **${ctx.input.configurationSetName}** created.`
+        output: { configurationSetName },
+        message: `Configuration set **${configurationSetName}** created.`
       };
     }
 
     if (action === 'get') {
-      let result = await client.getConfigurationSet(ctx.input.configurationSetName!);
+      let configurationSetName = requireAwsSesString(
+        ctx.input.configurationSetName,
+        'configurationSetName',
+        action
+      );
+      let result = await client.getConfigurationSet(configurationSetName);
       return {
         output: result,
         message: `Retrieved configuration set **${result.configurationSetName}**.`
@@ -139,10 +162,15 @@ export let manageConfigurationSet = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteConfigurationSet(ctx.input.configurationSetName!);
+      let configurationSetName = requireAwsSesString(
+        ctx.input.configurationSetName,
+        'configurationSetName',
+        action
+      );
+      await client.deleteConfigurationSet(configurationSetName);
       return {
-        output: { configurationSetName: ctx.input.configurationSetName },
-        message: `Configuration set **${ctx.input.configurationSetName}** deleted.`
+        output: { configurationSetName },
+        message: `Configuration set **${configurationSetName}** deleted.`
       };
     }
 
@@ -160,47 +188,93 @@ export let manageConfigurationSet = SlateTool.create(spec, {
       };
     }
 
+    if (action === 'updateDelivery') {
+      let configurationSetName = requireAwsSesString(
+        ctx.input.configurationSetName,
+        'configurationSetName',
+        action
+      );
+      if (
+        ctx.input.sendingPoolName === undefined &&
+        ctx.input.tlsPolicy === undefined &&
+        ctx.input.maxDeliverySeconds === undefined
+      ) {
+        throw createApiServiceError(
+          'sendingPoolName, tlsPolicy, or maxDeliverySeconds is required for "updateDelivery".'
+        );
+      }
+      await client.putConfigurationSetDeliveryOptions(configurationSetName, {
+        sendingPoolName: ctx.input.sendingPoolName,
+        tlsPolicy: ctx.input.tlsPolicy,
+        maxDeliverySeconds: ctx.input.maxDeliverySeconds
+      });
+      return {
+        output: { configurationSetName },
+        message: `Delivery options updated for **${configurationSetName}**.`
+      };
+    }
+
     if (action === 'updateSending') {
+      let configurationSetName = requireAwsSesString(
+        ctx.input.configurationSetName,
+        'configurationSetName',
+        action
+      );
       await client.putConfigurationSetSendingOptions(
-        ctx.input.configurationSetName!,
+        configurationSetName,
         ctx.input.sendingEnabled ?? true
       );
       return {
-        output: { configurationSetName: ctx.input.configurationSetName },
-        message: `Sending ${ctx.input.sendingEnabled ? 'enabled' : 'disabled'} for **${ctx.input.configurationSetName}**.`
+        output: { configurationSetName },
+        message: `Sending ${(ctx.input.sendingEnabled ?? true) ? 'enabled' : 'disabled'} for **${configurationSetName}**.`
       };
     }
 
     if (action === 'updateReputation') {
+      let configurationSetName = requireAwsSesString(
+        ctx.input.configurationSetName,
+        'configurationSetName',
+        action
+      );
       await client.putConfigurationSetReputationOptions(
-        ctx.input.configurationSetName!,
+        configurationSetName,
         ctx.input.reputationMetricsEnabled ?? true
       );
       return {
-        output: { configurationSetName: ctx.input.configurationSetName },
-        message: `Reputation metrics ${ctx.input.reputationMetricsEnabled ? 'enabled' : 'disabled'} for **${ctx.input.configurationSetName}**.`
+        output: { configurationSetName },
+        message: `Reputation metrics ${(ctx.input.reputationMetricsEnabled ?? true) ? 'enabled' : 'disabled'} for **${configurationSetName}**.`
       };
     }
 
     if (action === 'updateTracking') {
+      let configurationSetName = requireAwsSesString(
+        ctx.input.configurationSetName,
+        'configurationSetName',
+        action
+      );
       await client.putConfigurationSetTrackingOptions(
-        ctx.input.configurationSetName!,
+        configurationSetName,
         ctx.input.customRedirectDomain
       );
       return {
-        output: { configurationSetName: ctx.input.configurationSetName },
-        message: `Tracking options updated for **${ctx.input.configurationSetName}**.`
+        output: { configurationSetName },
+        message: `Tracking options updated for **${configurationSetName}**.`
       };
     }
 
     if (action === 'updateSuppression') {
+      let configurationSetName = requireAwsSesString(
+        ctx.input.configurationSetName,
+        'configurationSetName',
+        action
+      );
       await client.putConfigurationSetSuppressionOptions(
-        ctx.input.configurationSetName!,
+        configurationSetName,
         ctx.input.suppressedReasons
       );
       return {
-        output: { configurationSetName: ctx.input.configurationSetName },
-        message: `Suppression options updated for **${ctx.input.configurationSetName}**.`
+        output: { configurationSetName },
+        message: `Suppression options updated for **${configurationSetName}**.`
       };
     }
 

@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  downloadFile,
   getDownloadUrl,
   getFileInfo,
   listFolderItems,
@@ -33,6 +34,7 @@ export let provider = Slate.create({
   tools: [
     getFileInfo,
     uploadFile,
+    downloadFile,
     manageFile,
     getDownloadUrl,
     listFolderItems,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let offerCodeSchema = z.object({
@@ -87,7 +88,7 @@ export let manageOfferCodes = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!offerCodeId) throw new Error('offerCodeId is required for get action');
+      if (!offerCodeId) throw gumroadServiceError('offerCodeId is required for get action.');
       let code = await client.getOfferCode(productId, offerCodeId);
       return {
         output: {
@@ -105,9 +106,9 @@ export let manageOfferCodes = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) throw gumroadServiceError('name is required for create action.');
       if (ctx.input.amountOff === undefined)
-        throw new Error('amountOff is required for create action');
+        throw gumroadServiceError('amountOff is required for create action.');
       let code = await client.createOfferCode(productId, {
         name: ctx.input.name,
         amountOff: ctx.input.amountOff,
@@ -131,7 +132,8 @@ export let manageOfferCodes = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!offerCodeId) throw new Error('offerCodeId is required for update action');
+      if (!offerCodeId)
+        throw gumroadServiceError('offerCodeId is required for update action.');
       let code = await client.updateOfferCode(productId, offerCodeId, {
         maxPurchaseCount: ctx.input.maxPurchaseCount
       });
@@ -151,7 +153,8 @@ export let manageOfferCodes = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!offerCodeId) throw new Error('offerCodeId is required for delete action');
+      if (!offerCodeId)
+        throw gumroadServiceError('offerCodeId is required for delete action.');
       await client.deleteOfferCode(productId, offerCodeId);
       return {
         output: { deleted: true },
@@ -159,6 +162,6 @@ export let manageOfferCodes = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw gumroadServiceError(`Unknown action: ${action}`);
   })
   .build();

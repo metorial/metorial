@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/visma-net",
+  "description": "Connect to Visma Net ERP using the official Visma.net ERP API. List and inspect customers, suppliers, accounts, customer invoices, supplier invoices, projects, inventory items, and sales orders; download Visma attachment/blob content as Slate attachments; and check asynchronous background API operations.",
+  "categories": ["accounting-and-finance", "crm-and-sales-tools"],
+  "skills": [
+    "look up ERP customers",
+    "review supplier records",
+    "inspect chart of accounts",
+    "search customer invoices",
+    "search supplier invoices",
+    "review project accounting records",
+    "inspect inventory items",
+    "review sales orders",
+    "download ERP attachments",
+    "check background API operations"
+  ],
+  "logoUrl": "https://cdn.prod.website-files.com/642284f33fc26c8faad516ef/691f1ae913577db612387a5f_Visma%20Net-logo_rgb_Ubuntu_Visma%20Net-logo-main-inline-black-Ubuntu.svg"
+}

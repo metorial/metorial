@@ -38,11 +38,11 @@ Register and manage applications that use Auth0 for authentication. Configure ap
 
 ### Roles and Permissions (RBAC)
 
-Define roles with associated permissions and assign them to users. Permissions are scoped to specific APIs (Resource Servers). Supports role-based access control for fine-grained authorization.
+Define roles with associated permissions and assign them to users. Permissions are scoped to specific APIs (Resource Servers). Supports role-based access control for fine-grained authorization. The integration supports role CRUD, user-role assignment, role-permission assignment, and direct user-permission assignment.
 
 ### Organizations
 
-Manage multi-tenant B2B scenarios by grouping users into organizations. Configure organization-specific connections, branding, and member roles. Invite users to organizations.
+Manage multi-tenant B2B scenarios by grouping users into organizations. Configure organization-specific connections, branding, and member roles. Invite users to organizations. The integration supports organization CRUD, organization member add/remove/list, and organization-scoped member roles.
 
 ### Multi-Factor Authentication (MFA)
 
@@ -75,6 +75,10 @@ Customize the look and feel of the Universal Login page, including colors, logos
 ### Client Grants
 
 Manage which applications are authorized to request access tokens for specific APIs, along with the permitted scopes.
+
+### Log Streams
+
+Create, update, delete, retrieve, and list log streams for delivering tenant log events to HTTP webhooks and supported event destinations.
 
 ### Jobs (Bulk Operations)
 

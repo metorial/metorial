@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailgunClient } from '../lib/client';
+import { mailgunServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let templateSchema = z.object({
@@ -19,6 +20,15 @@ let templateSchema = z.object({
     })
     .optional()
     .describe('Active template version')
+});
+
+let templateVersionSchema = z.object({
+  tag: z.string().describe('Version tag'),
+  content: z.string().optional().describe('Template content'),
+  engine: z.string().optional().describe('Template engine'),
+  active: z.boolean().optional().describe('Whether this version is active'),
+  comment: z.string().optional().describe('Version comment'),
+  createdAt: z.string().optional().describe('Version creation timestamp')
 });
 
 // ==================== List Templates ====================
@@ -192,6 +202,43 @@ Templates support Handlebars variable substitution with helpers like \`if\`, \`u
   })
   .build();
 
+// ==================== Update Template ====================
+
+export let updateTemplate = SlateTool.create(spec, {
+  name: 'Update Template',
+  key: 'update_template',
+  description: `Update a domain-level Mailgun template's metadata. Use template version tools to update content or active version.`,
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Domain name'),
+      templateName: z.string().describe('Name of the template to update'),
+      description: z.string().optional().describe('Updated template description')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    if (ctx.input.description === undefined) {
+      throw mailgunServiceError('Provide a description to update the template metadata.');
+    }
+
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    await client.updateTemplate(ctx.input.domain, ctx.input.templateName, {
+      description: ctx.input.description
+    });
+
+    return {
+      output: { success: true },
+      message: `Updated template **${ctx.input.templateName}**.`
+    };
+  })
+  .build();
+
 // ==================== Delete Template ====================
 
 export let deleteTemplate = SlateTool.create(spec, {
@@ -257,6 +304,192 @@ export let createTemplateVersion = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Version **${ctx.input.tag}** created for template **${ctx.input.templateName}**.`
+    };
+  })
+  .build();
+
+// ==================== List Template Versions ====================
+
+export let listTemplateVersions = SlateTool.create(spec, {
+  name: 'List Template Versions',
+  key: 'list_template_versions',
+  description: `List versions for a domain-level Mailgun template. Use before selecting, updating, activating, or deleting a specific version.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Domain name'),
+      templateName: z.string().describe('Name of the template'),
+      page: z
+        .enum(['first', 'last', 'next', 'previous'])
+        .optional()
+        .describe('Page to retrieve'),
+      limit: z.number().optional().describe('Number of versions to retrieve (max 100)'),
+      pivot: z.string().optional().describe('Pagination pivot token')
+    })
+  )
+  .output(
+    z.object({
+      versions: z.array(templateVersionSchema)
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.listTemplateVersions(ctx.input.domain, ctx.input.templateName, {
+      page: ctx.input.page,
+      limit: ctx.input.limit,
+      pivot: ctx.input.pivot
+    });
+
+    let versions = (result.template.versions || []).map(version => ({
+      tag: version.tag,
+      content: version.template,
+      engine: version.engine,
+      active: version.active,
+      comment: version.comment,
+      createdAt: version.createdAt
+    }));
+
+    return {
+      output: { versions },
+      message: `Found **${versions.length}** version(s) for template **${ctx.input.templateName}**.`
+    };
+  })
+  .build();
+
+// ==================== Get Template Version ====================
+
+export let getTemplateVersion = SlateTool.create(spec, {
+  name: 'Get Template Version',
+  key: 'get_template_version',
+  description: `Get a specific version of a domain-level Mailgun template, including its content and active status.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Domain name'),
+      templateName: z.string().describe('Name of the template'),
+      tag: z.string().describe('Version tag')
+    })
+  )
+  .output(
+    z.object({
+      version: templateVersionSchema
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.getTemplateVersion(
+      ctx.input.domain,
+      ctx.input.templateName,
+      ctx.input.tag
+    );
+    let version = result.template.version;
+
+    if (!version) {
+      throw mailgunServiceError(
+        `Mailgun did not return version ${ctx.input.tag} for template ${ctx.input.templateName}.`
+      );
+    }
+
+    return {
+      output: {
+        version: {
+          tag: version.tag,
+          content: version.template,
+          engine: version.engine,
+          active: version.active,
+          comment: version.comment,
+          createdAt: version.createdAt
+        }
+      },
+      message: `Retrieved version **${ctx.input.tag}** for template **${ctx.input.templateName}**.`
+    };
+  })
+  .build();
+
+// ==================== Update Template Version ====================
+
+export let updateTemplateVersion = SlateTool.create(spec, {
+  name: 'Update Template Version',
+  key: 'update_template_version',
+  description: `Update a domain-level Mailgun template version's content, comment, or active status.`,
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Domain name'),
+      templateName: z.string().describe('Name of the template'),
+      tag: z.string().describe('Version tag to update'),
+      content: z.string().optional().describe('Updated template content'),
+      comment: z.string().optional().describe('Updated version comment'),
+      active: z.boolean().optional().describe('Whether this version should be active')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    if (
+      ctx.input.content === undefined &&
+      ctx.input.comment === undefined &&
+      ctx.input.active === undefined
+    ) {
+      throw mailgunServiceError('Provide at least one template version field to update.');
+    }
+
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    await client.updateTemplateVersion(
+      ctx.input.domain,
+      ctx.input.templateName,
+      ctx.input.tag,
+      {
+        template: ctx.input.content,
+        comment: ctx.input.comment,
+        active: ctx.input.active
+      }
+    );
+
+    return {
+      output: { success: true },
+      message: `Updated version **${ctx.input.tag}** for template **${ctx.input.templateName}**.`
+    };
+  })
+  .build();
+
+// ==================== Delete Template Version ====================
+
+export let deleteTemplateVersion = SlateTool.create(spec, {
+  name: 'Delete Template Version',
+  key: 'delete_template_version',
+  description: `Delete a specific version from a Mailgun domain-level template.`,
+  tags: { destructive: true }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Domain name'),
+      templateName: z.string().describe('Name of the template'),
+      tag: z.string().describe('Version tag to delete')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    await client.deleteTemplateVersion(
+      ctx.input.domain,
+      ctx.input.templateName,
+      ctx.input.tag
+    );
+
+    return {
+      output: { success: true },
+      message: `Deleted version **${ctx.input.tag}** from template **${ctx.input.templateName}**.`
     };
   })
   .build();

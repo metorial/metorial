@@ -5,6 +5,20 @@ export interface GraphListResponse<T> {
   value: T[];
 }
 
+export interface UserProfile {
+  id: string;
+  displayName?: string | null;
+  givenName?: string | null;
+  surname?: string | null;
+  mail?: string | null;
+  userPrincipalName?: string | null;
+  jobTitle?: string | null;
+  mobilePhone?: string | null;
+  businessPhones?: string[] | null;
+  officeLocation?: string | null;
+  preferredLanguage?: string | null;
+}
+
 export interface EmailAddress {
   name?: string;
   address: string;

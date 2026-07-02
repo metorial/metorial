@@ -8,9 +8,12 @@ import {
   manageGroup,
   manageGroupMembership,
   manageIdentityPool,
+  manageIdentityPoolRoles,
   manageIdentityProvider,
+  manageResourceServer,
   manageUser,
-  manageUserPool
+  manageUserPool,
+  manageUserPoolDomain
 } from './tools';
 import { groupChanges, inboundWebhook, userChanges } from './triggers';
 
@@ -26,7 +29,10 @@ export let provider = Slate.create({
     manageGroupMembership,
     manageIdentityProvider,
     manageAppClient,
-    manageIdentityPool
+    manageIdentityPool,
+    manageIdentityPoolRoles,
+    manageResourceServer,
+    manageUserPoolDomain
   ],
   triggers: [inboundWebhook, userChanges, groupChanges]
 });

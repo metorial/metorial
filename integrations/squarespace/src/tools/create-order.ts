@@ -41,11 +41,19 @@ export let createOrder = SlateTool.create(spec, {
       lineItems: z
         .array(
           z.object({
+            lineItemType: z
+              .string()
+              .optional()
+              .describe('Squarespace line item type, e.g. PHYSICAL_PRODUCT'),
             variantId: z.string().optional().describe('Squarespace variant ID'),
             sku: z.string().optional().describe('Product SKU'),
             productName: z.string().optional().describe('Display name of the product'),
+            title: z.string().optional().describe('Line item title for imported orders'),
             quantity: z.number().describe('Number of items ordered'),
-            unitPricePaid: moneySchema.describe('Price per unit')
+            unitPricePaid: moneySchema.describe('Price per unit'),
+            nonSaleUnitPrice: moneySchema
+              .optional()
+              .describe('Original unit price before discounts')
           })
         )
         .describe('Items in the order'),
@@ -54,6 +62,30 @@ export let createOrder = SlateTool.create(spec, {
         .enum(['PENDING', 'FULFILLED', 'CANCELED'])
         .optional()
         .describe('Initial fulfillment status'),
+      fulfilledOn: z
+        .string()
+        .optional()
+        .describe('ISO 8601 UTC timestamp when the order was fulfilled'),
+      inventoryBehavior: z
+        .enum(['DEDUCT', 'SKIP'])
+        .optional()
+        .describe('Whether to deduct stock when creating the order'),
+      shopperFulfillmentNotificationBehavior: z
+        .enum(['SEND', 'SKIP'])
+        .optional()
+        .describe('Whether to notify the shopper about provided fulfillments'),
+      fulfillments: z
+        .array(
+          z.object({
+            shipDate: z.string().describe('ISO 8601 UTC ship date'),
+            carrierName: z.string().describe('Shipping carrier name'),
+            service: z.string().describe('Shipping service name'),
+            trackingNumber: z.string().describe('Tracking number'),
+            trackingUrl: z.string().optional().describe('Tracking URL')
+          })
+        )
+        .optional()
+        .describe('Fulfillment shipment records for the imported order'),
       billingAddress: z
         .record(z.string(), z.any())
         .optional()
@@ -65,7 +97,15 @@ export let createOrder = SlateTool.create(spec, {
       subtotal: moneySchema.optional().describe('Order subtotal before shipping/tax'),
       shippingTotal: moneySchema.optional().describe('Shipping cost'),
       discountTotal: moneySchema.optional().describe('Total discounts applied'),
-      taxTotal: moneySchema.optional().describe('Total tax amount')
+      taxTotal: moneySchema.optional().describe('Total tax amount'),
+      shippingLines: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Shipping line details'),
+      discountLines: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Discount line details')
     })
   )
   .output(
@@ -90,12 +130,19 @@ export let createOrder = SlateTool.create(spec, {
         lineItems: ctx.input.lineItems,
         customerEmail: ctx.input.customerEmail,
         fulfillmentStatus: ctx.input.fulfillmentStatus,
+        fulfilledOn: ctx.input.fulfilledOn,
+        inventoryBehavior: ctx.input.inventoryBehavior,
+        shopperFulfillmentNotificationBehavior:
+          ctx.input.shopperFulfillmentNotificationBehavior,
+        fulfillments: ctx.input.fulfillments,
         billingAddress: ctx.input.billingAddress,
         shippingAddress: ctx.input.shippingAddress,
         subtotal: ctx.input.subtotal,
         shippingTotal: ctx.input.shippingTotal,
         discountTotal: ctx.input.discountTotal,
-        taxTotal: ctx.input.taxTotal
+        taxTotal: ctx.input.taxTotal,
+        shippingLines: ctx.input.shippingLines,
+        discountLines: ctx.input.discountLines
       },
       ctx.input.idempotencyKey
     );

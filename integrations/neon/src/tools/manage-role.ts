@@ -7,6 +7,7 @@ let roleSchema = z.object({
   branchId: z.string().describe('Branch the role belongs to'),
   name: z.string().describe('Name of the role'),
   protected: z.boolean().optional().describe('Whether the role is protected from deletion'),
+  authenticationMethod: z.string().optional().describe('Configured authentication method'),
   createdAt: z.string().describe('Timestamp when the role was created'),
   updatedAt: z.string().describe('Timestamp when the role was last updated')
 });
@@ -38,6 +39,7 @@ export let listRoles = SlateTool.create(spec, {
       branchId: r.branch_id,
       name: r.name,
       protected: r.protected,
+      authenticationMethod: r.authentication_method,
       createdAt: r.created_at,
       updatedAt: r.updated_at
     }));

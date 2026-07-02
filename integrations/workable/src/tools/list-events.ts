@@ -6,28 +6,33 @@ import { spec } from '../spec';
 export let listEventsTool = SlateTool.create(spec, {
   name: 'List Scheduled Events',
   key: 'list_events',
-  description: `Retrieve scheduled events such as interviews from Workable. Filter by event type, candidate, job, team member, or date range. Use this to review upcoming interviews, audit scheduling, or track interview activity.`,
+  description: `Retrieve scheduled Workable events such as calls, interviews, and meetings. Filter by event type, candidate, job shortcode, member, date range, or token context.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      type: z.string().optional().describe('Filter by event type (e.g., "interview")'),
+      type: z.string().optional().describe('Filter by event type'),
       candidateId: z.string().optional().describe('Filter by candidate ID'),
       jobShortcode: z.string().optional().describe('Filter by job shortcode'),
       memberId: z.string().optional().describe('Filter by team member ID'),
       startDate: z
         .string()
         .optional()
-        .describe('Filter events on or after this date (ISO 8601)'),
+        .describe('Filter events scheduled after this ISO 8601 timestamp'),
       endDate: z
         .string()
         .optional()
-        .describe('Filter events on or before this date (ISO 8601)'),
-      context: z.string().optional().describe('Event context filter'),
+        .describe('Filter events scheduled before this ISO 8601 timestamp'),
+      context: z
+        .enum(['user', 'team', 'all'])
+        .optional()
+        .describe('Event context for user tokens'),
+      includeCancelled: z.boolean().optional().describe('Include cancelled events'),
       limit: z.number().optional().describe('Maximum number of events to return'),
-      sinceId: z.string().optional().describe('Return events after this ID for pagination')
+      sinceId: z.string().optional().describe('Return events with ID greater than this ID'),
+      maxId: z.string().optional().describe('Return events with ID less than this ID')
     })
   )
   .output(
@@ -39,22 +44,14 @@ export let listEventsTool = SlateTool.create(spec, {
             title: z.string().optional().describe('Event title'),
             description: z.string().optional().describe('Event description'),
             type: z.string().optional().describe('Event type'),
-            startTime: z.string().optional().describe('Start time (ISO 8601)'),
-            endTime: z.string().optional().describe('End time (ISO 8601)'),
+            startsAt: z.string().optional().describe('Start time'),
+            endsAt: z.string().optional().describe('End time'),
             cancelled: z.boolean().optional().describe('Whether the event is cancelled'),
             jobShortcode: z.string().optional().describe('Associated job shortcode'),
             jobTitle: z.string().optional().describe('Associated job title'),
             candidateId: z.string().optional().describe('Associated candidate ID'),
             candidateName: z.string().optional().describe('Associated candidate name'),
-            members: z
-              .array(
-                z.object({
-                  memberId: z.string().optional(),
-                  name: z.string().optional()
-                })
-              )
-              .optional()
-              .describe('Team members in the event'),
+            members: z.array(z.any()).optional().describe('Team members in the event'),
             conference: z.any().optional().describe('Video conference details')
           })
         )
@@ -75,32 +72,35 @@ export let listEventsTool = SlateTool.create(spec, {
     let result = await client.listEvents({
       type: ctx.input.type,
       candidate_id: ctx.input.candidateId,
-      job_shortcode: ctx.input.jobShortcode,
+      shortcode: ctx.input.jobShortcode,
       member_id: ctx.input.memberId,
       start_date: ctx.input.startDate,
       end_date: ctx.input.endDate,
       context: ctx.input.context,
+      include_cancelled: ctx.input.includeCancelled,
       limit: ctx.input.limit,
-      since_id: ctx.input.sinceId
+      since_id: ctx.input.sinceId,
+      max_id: ctx.input.maxId
     });
 
-    let events = (result.events || []).map((e: any) => ({
-      eventId: e.id,
-      title: e.title,
-      description: e.description,
-      type: e.type,
-      startTime: e.start_time || e.start,
-      endTime: e.end_time || e.end,
-      cancelled: e.cancelled,
-      jobShortcode: e.job?.shortcode,
-      jobTitle: e.job?.title,
-      candidateId: e.candidate?.id,
-      candidateName: e.candidate?.name,
-      members: e.members?.map((m: any) => ({
-        memberId: m.id,
-        name: m.name
+    let events = (result.events || []).map((event: any) => ({
+      eventId: event.id,
+      title: event.title,
+      description: event.description,
+      type: event.type,
+      startsAt: event.starts_at,
+      endsAt: event.ends_at,
+      cancelled: event.cancelled,
+      jobShortcode: event.job?.shortcode,
+      jobTitle: event.job?.title,
+      candidateId: event.candidate?.id,
+      candidateName: event.candidate?.name,
+      members: event.members?.map((member: any) => ({
+        memberId: member.id,
+        name: member.name,
+        status: member.status
       })),
-      conference: e.conference
+      conference: event.conference
     }));
 
     return {

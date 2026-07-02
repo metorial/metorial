@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { requireProjectRef } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageStorageBuckets = SlateTool.create(spec, {
@@ -64,12 +65,7 @@ export let manageStorageBuckets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectRef = ctx.input.projectRef ?? ctx.config.projectRef;
-    if (!projectRef) {
-      throw new Error(
-        'projectRef is required — provide it as input or set it in the configuration'
-      );
-    }
+    let projectRef = requireProjectRef(ctx.input.projectRef ?? ctx.config.projectRef);
 
     let client = new ManagementClient(ctx.auth.token);
     let { action } = ctx.input;
@@ -94,7 +90,8 @@ export let manageStorageBuckets = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.bucketId) throw new Error('bucketId is required for get action');
+      if (!ctx.input.bucketId)
+        throw createApiServiceError('bucketId is required for get action');
       let b = await client.getStorageBucket(projectRef, ctx.input.bucketId);
       return {
         output: { bucket: mapBucket(b) },
@@ -103,7 +100,7 @@ export let manageStorageBuckets = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create action');
       let b = await client.createStorageBucket(projectRef, {
         name: ctx.input.name,
         public: ctx.input.isPublic,
@@ -123,7 +120,8 @@ export let manageStorageBuckets = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.bucketId) throw new Error('bucketId is required for update action');
+      if (!ctx.input.bucketId)
+        throw createApiServiceError('bucketId is required for update action');
       let b = await client.updateStorageBucket(projectRef, ctx.input.bucketId, {
         public: ctx.input.isPublic,
         fileSizeLimit: ctx.input.fileSizeLimit,
@@ -136,7 +134,8 @@ export let manageStorageBuckets = SlateTool.create(spec, {
     }
 
     if (action === 'empty') {
-      if (!ctx.input.bucketId) throw new Error('bucketId is required for empty action');
+      if (!ctx.input.bucketId)
+        throw createApiServiceError('bucketId is required for empty action');
       await client.emptyStorageBucket(projectRef, ctx.input.bucketId);
       return {
         output: { emptied: true },
@@ -145,7 +144,8 @@ export let manageStorageBuckets = SlateTool.create(spec, {
     }
 
     // delete
-    if (!ctx.input.bucketId) throw new Error('bucketId is required for delete action');
+    if (!ctx.input.bucketId)
+      throw createApiServiceError('bucketId is required for delete action');
     await client.deleteStorageBucket(projectRef, ctx.input.bucketId);
     return {
       output: { deleted: true },

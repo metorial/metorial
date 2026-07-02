@@ -8,4 +8,8 @@ export * from './get-session-logs';
 export * from './get-session-recording';
 export * from './list-sessions';
 export * from './manage-context';
+export * from './manage-downloads';
 export * from './manage-extension';
+export * from './upload-extension';
+export * from './upload-session-file';
+export * from './web-search';

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { slackUserAuthMethods } from '../lib/auth-methods';
 import { SlackClient } from '../lib/client';
 import { missingRequiredFieldError, userTokenRequiredError } from '../lib/errors';
 import { slackActionScopes } from '../lib/scopes';
@@ -24,6 +25,7 @@ export let manageReminders = SlateTool.create(spec, {
   }
 })
   .scopes(slackActionScopes.reminders)
+  .authMethods(slackUserAuthMethods)
   .input(
     z.object({
       action: z

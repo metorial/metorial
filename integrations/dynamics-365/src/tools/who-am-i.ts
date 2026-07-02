@@ -1,7 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DynamicsClient } from '../lib/client';
-import { resolveDynamicsInstanceUrl } from '../lib/resolve-instance-url';
+import { createDynamicsClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let whoAmI = SlateTool.create(spec, {
@@ -22,18 +21,22 @@ export let whoAmI = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new DynamicsClient({
-      token: ctx.auth.token,
-      instanceUrl: resolveDynamicsInstanceUrl(ctx)
-    });
+    let client = createDynamicsClient(ctx);
 
-    let result = await client.whoAmI();
+    let result = (await client.invokeOperation({
+      operationType: 'function',
+      operationName: 'WhoAmI'
+    })) as {
+      UserId?: string;
+      OrganizationId?: string;
+      BusinessUnitId?: string;
+    };
 
     return {
       output: {
-        userId: result.UserId,
-        organizationId: result.OrganizationId,
-        businessUnitId: result.BusinessUnitId
+        userId: result.UserId ?? '',
+        organizationId: result.OrganizationId ?? '',
+        businessUnitId: result.BusinessUnitId ?? ''
       },
       message: `Authenticated as user **${result.UserId}** in organization **${result.OrganizationId}**.`
     };

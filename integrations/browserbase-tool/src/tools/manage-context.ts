@@ -78,6 +78,46 @@ export let getContext = SlateTool.create(spec, {
   })
   .build();
 
+export let updateContext = SlateTool.create(spec, {
+  name: 'Update Context',
+  key: 'update_context',
+  description: `Refresh upload credentials for a persistent browser context so a new encrypted user-data-directory can be uploaded.`,
+  tags: {
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      contextId: z.string().describe('The context ID to update')
+    })
+  )
+  .output(
+    z.object({
+      contextId: z.string().describe('Context identifier'),
+      uploadUrl: z.string().describe('URL to upload custom user-data-directory'),
+      publicKey: z.string().describe('Public key for encrypting user-data-directory'),
+      cipherAlgorithm: z.string().describe('Encryption algorithm'),
+      initializationVectorSize: z.number().describe('IV size for encryption')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+
+    let context = await client.updateContext(ctx.input.contextId);
+
+    return {
+      output: {
+        contextId: context.contextId,
+        uploadUrl: context.uploadUrl,
+        publicKey: context.publicKey,
+        cipherAlgorithm: context.cipherAlgorithm,
+        initializationVectorSize: context.initializationVectorSize
+      },
+      message: `Updated context **${context.contextId}** upload credentials.`
+    };
+  })
+  .build();
+
 export let deleteContext = SlateTool.create(spec, {
   name: 'Delete Context',
   key: 'delete_context',

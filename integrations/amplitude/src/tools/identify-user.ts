@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AmplitudeClient } from '../lib/client';
+import { amplitudeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let identifyUserTool = SlateTool.create(spec, {
@@ -62,6 +63,28 @@ export let identifyUserTool = SlateTool.create(spec, {
 
     let actions: string[] = [];
 
+    if (ctx.input.userProperties && !ctx.input.userId && !ctx.input.deviceId) {
+      throw amplitudeServiceError(
+        'userId or deviceId is required when setting userProperties.'
+      );
+    }
+
+    if (
+      ctx.input.groupType !== undefined ||
+      ctx.input.groupValue !== undefined ||
+      ctx.input.groupProperties !== undefined
+    ) {
+      if (!ctx.input.groupType || !ctx.input.groupValue || !ctx.input.groupProperties) {
+        throw amplitudeServiceError(
+          'groupType, groupValue, and groupProperties are all required for group identification.'
+        );
+      }
+    }
+
+    if (ctx.input.mapToGlobalUserId && !ctx.input.userId) {
+      throw amplitudeServiceError('userId is required when mapToGlobalUserId is provided.');
+    }
+
     if (ctx.input.userProperties && (ctx.input.userId || ctx.input.deviceId)) {
       await client.identify({
         userId: ctx.input.userId,
@@ -88,6 +111,12 @@ export let identifyUserTool = SlateTool.create(spec, {
         globalUserId: ctx.input.mapToGlobalUserId
       });
       actions.push(`user mapped to global ID "${ctx.input.mapToGlobalUserId}"`);
+    }
+
+    if (actions.length === 0) {
+      throw amplitudeServiceError(
+        'Provide userProperties, group identification fields, or mapToGlobalUserId.'
+      );
     }
 
     return {

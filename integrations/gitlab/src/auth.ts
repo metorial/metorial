@@ -1,4 +1,4 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createAxios, SlateAuth, type SlateAuthDocsReference } from 'slates';
 import { z } from 'zod';
 import { gitLabApiError, gitLabServiceError } from './lib/errors';
 
@@ -110,7 +110,7 @@ function createGitlabOauth(opts: {
         name: 'OAuth scopes',
         url: 'https://docs.gitlab.com/ee/integration/oauth_provider.html#authorized-applications'
       }
-    ],
+    ] satisfies SlateAuthDocsReference[],
     scopes,
     inputSchema,
 

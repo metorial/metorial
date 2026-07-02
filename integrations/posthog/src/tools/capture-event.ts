@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireProjectToken } from '../lib/helpers';
 import { spec } from '../spec';
 
 let eventSchema = z.object({
@@ -51,7 +51,7 @@ Person properties can be set or updated via the \`set\` and \`setOnce\` fields.`
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
-    let apiKey = ctx.auth.projectToken || ctx.auth.token;
+    let apiKey = requireProjectToken(ctx.auth);
 
     if (ctx.input.events.length === 1) {
       let evt = ctx.input.events[0]!;
@@ -71,7 +71,9 @@ Person properties can be set or updated via the \`set\` and \`setOnce\` fields.`
           distinctId: e.distinctId,
           event: e.event,
           properties: e.properties,
-          timestamp: e.timestamp
+          timestamp: e.timestamp,
+          set: e.set,
+          setOnce: e.setOnce
         }))
       });
     }

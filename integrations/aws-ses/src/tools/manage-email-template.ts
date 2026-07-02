@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SesClient } from '../lib/client';
+import { requireAwsSesString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageEmailTemplate = SlateTool.create(spec, {
@@ -71,20 +72,23 @@ Use the **testRender** action to preview how a template renders with sample data
     let { action } = ctx.input;
 
     if (action === 'create') {
+      let templateName = requireAwsSesString(ctx.input.templateName, 'templateName', action);
+      let subject = requireAwsSesString(ctx.input.subject, 'subject', action);
       await client.createEmailTemplate({
-        templateName: ctx.input.templateName!,
-        subject: ctx.input.subject!,
+        templateName,
+        subject,
         html: ctx.input.html,
         text: ctx.input.text
       });
       return {
-        output: { templateName: ctx.input.templateName },
-        message: `Template **${ctx.input.templateName}** created successfully.`
+        output: { templateName },
+        message: `Template **${templateName}** created successfully.`
       };
     }
 
     if (action === 'get') {
-      let template = await client.getEmailTemplate(ctx.input.templateName!);
+      let templateName = requireAwsSesString(ctx.input.templateName, 'templateName', action);
+      let template = await client.getEmailTemplate(templateName);
       return {
         output: template,
         message: `Retrieved template **${template.templateName}**.`
@@ -92,23 +96,26 @@ Use the **testRender** action to preview how a template renders with sample data
     }
 
     if (action === 'update') {
+      let templateName = requireAwsSesString(ctx.input.templateName, 'templateName', action);
+      let subject = requireAwsSesString(ctx.input.subject, 'subject', action);
       await client.updateEmailTemplate({
-        templateName: ctx.input.templateName!,
-        subject: ctx.input.subject!,
+        templateName,
+        subject,
         html: ctx.input.html,
         text: ctx.input.text
       });
       return {
-        output: { templateName: ctx.input.templateName },
-        message: `Template **${ctx.input.templateName}** updated successfully.`
+        output: { templateName },
+        message: `Template **${templateName}** updated successfully.`
       };
     }
 
     if (action === 'delete') {
-      await client.deleteEmailTemplate(ctx.input.templateName!);
+      let templateName = requireAwsSesString(ctx.input.templateName, 'templateName', action);
+      await client.deleteEmailTemplate(templateName);
       return {
-        output: { templateName: ctx.input.templateName },
-        message: `Template **${ctx.input.templateName}** deleted.`
+        output: { templateName },
+        message: `Template **${templateName}** deleted.`
       };
     }
 
@@ -127,16 +134,17 @@ Use the **testRender** action to preview how a template renders with sample data
     }
 
     if (action === 'testRender') {
+      let templateName = requireAwsSesString(ctx.input.templateName, 'templateName', action);
       let result = await client.testRenderEmailTemplate(
-        ctx.input.templateName!,
+        templateName,
         ctx.input.templateData || '{}'
       );
       return {
         output: {
-          templateName: ctx.input.templateName,
+          templateName,
           renderedTemplate: result.renderedTemplate
         },
-        message: `Template **${ctx.input.templateName}** rendered successfully.`
+        message: `Template **${templateName}** rendered successfully.`
       };
     }
 

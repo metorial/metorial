@@ -26,7 +26,7 @@ export let completeSession = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let session = await client.completeSession(ctx.input.sessionId, ctx.config.projectId);
+    let session = await client.completeSession(ctx.input.sessionId);
 
     return {
       output: {

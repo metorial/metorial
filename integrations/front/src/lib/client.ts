@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { frontApiError } from './errors';
 import type {
   FrontAccount,
   FrontAnalyticsExport,
@@ -33,6 +34,10 @@ export class Client {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json'
       }
+    });
+
+    this.axios.interceptors.response.use(undefined, (error: unknown) => {
+      throw frontApiError(error);
     });
   }
 
@@ -77,17 +82,22 @@ export class Client {
   async updateConversation(
     conversationId: string,
     data: {
-      assignee_id?: string;
+      assignee_id?: string | null;
       inbox_id?: string;
       status?: 'archived' | 'open' | 'deleted' | 'spam';
-      subject?: string;
+      status_id?: string;
       tag_ids?: string[];
+      description?: string | null;
+      custom_fields?: Record<string, string>;
     }
   ): Promise<void> {
     await this.axios.patch(`/conversations/${conversationId}`, data);
   }
 
-  async updateConversationAssignee(conversationId: string, assigneeId: string): Promise<void> {
+  async updateConversationAssignee(
+    conversationId: string,
+    assigneeId: string | null
+  ): Promise<void> {
     await this.axios.put(`/conversations/${conversationId}/assignee`, {
       assignee_id: assigneeId
     });
@@ -151,15 +161,19 @@ export class Client {
     });
   }
 
-  async addConversationLink(conversationId: string, linkId: string): Promise<void> {
-    await this.axios.post(`/conversations/${conversationId}/links`, {
-      link_ids: [linkId]
-    });
+  async addConversationLinks(
+    conversationId: string,
+    data: {
+      link_ids?: string[];
+      link_external_urls?: string[];
+    }
+  ): Promise<void> {
+    await this.axios.post(`/conversations/${conversationId}/links`, data);
   }
 
-  async removeConversationLink(conversationId: string, linkId: string): Promise<void> {
+  async removeConversationLinks(conversationId: string, linkIds: string[]): Promise<void> {
     await this.axios.delete(`/conversations/${conversationId}/links`, {
-      data: { link_ids: [linkId] }
+      data: { link_ids: linkIds }
     });
   }
 
@@ -167,7 +181,8 @@ export class Client {
     conversationId: string,
     data: {
       teammate_id: string;
-      scheduled_at: number;
+      scheduled_at: number | null;
+      status_id?: string;
     }
   ): Promise<void> {
     await this.axios.patch(`/conversations/${conversationId}/reminders`, data);
@@ -177,13 +192,15 @@ export class Client {
 
   async createMessage(data: {
     author_id?: string;
-    to: string[];
+    to?: string[];
     cc?: string[];
     bcc?: string[];
     sender_name?: string;
     subject?: string;
     body: string;
-    body_format?: 'html' | 'markdown';
+    text?: string;
+    signature_id?: string;
+    should_add_default_signature?: boolean;
     channel_id?: string;
     options?: Record<string, any>;
     metadata?: Record<string, any>;
@@ -196,13 +213,15 @@ export class Client {
     channelId: string,
     data: {
       author_id?: string;
-      to: string[];
+      to?: string[];
       cc?: string[];
       bcc?: string[];
       sender_name?: string;
       subject?: string;
       body: string;
-      body_format?: 'html' | 'markdown';
+      text?: string;
+      signature_id?: string;
+      should_add_default_signature?: boolean;
       options?: Record<string, any>;
       metadata?: Record<string, any>;
     }
@@ -221,8 +240,11 @@ export class Client {
       sender_name?: string;
       subject?: string;
       body: string;
-      body_format?: 'html' | 'markdown';
+      text?: string;
+      quote_body?: string;
       channel_id?: string;
+      signature_id?: string;
+      should_add_default_signature?: boolean;
       options?: Record<string, any>;
       metadata?: Record<string, any>;
     }
@@ -277,6 +299,7 @@ export class Client {
     is_spammer?: boolean;
     links?: string[];
     group_names?: string[];
+    list_names?: string[];
     handles?: { handle: string; source: string }[];
     custom_fields?: Record<string, string>;
   }): Promise<FrontContact> {
@@ -292,6 +315,7 @@ export class Client {
       is_spammer?: boolean;
       links?: string[];
       group_names?: string[];
+      list_names?: string[];
       custom_fields?: Record<string, string>;
     }
   ): Promise<FrontContact> {
@@ -612,6 +636,7 @@ export class Client {
     data: {
       author_id?: string;
       body: string;
+      is_pinned?: boolean;
     }
   ): Promise<FrontComment> {
     let response = await this.axios.post(`/conversations/${conversationId}/comments`, data);
@@ -728,6 +753,7 @@ export class Client {
     timezone?: string;
     filters?: Record<string, any>;
     type: string;
+    columns: string[];
   }): Promise<FrontAnalyticsExport> {
     let response = await this.axios.post('/analytics/exports', data);
     return response.data;

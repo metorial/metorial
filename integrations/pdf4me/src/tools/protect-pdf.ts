@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let protectPdf = SlateTool.create(spec, {
   name: 'Protect PDF',
@@ -31,12 +32,7 @@ export let protectPdf = SlateTool.create(spec, {
         .describe('Permission level for the protected document')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded protected PDF content'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -48,7 +44,8 @@ export let protectPdf = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully protected PDF with **${ctx.input.permission}** permissions: **${result.fileName}**`
     };
   })
@@ -69,12 +66,7 @@ export let unlockPdf = SlateTool.create(spec, {
       password: z.string().describe('Current password of the protected PDF')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded unlocked PDF content'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -85,7 +77,8 @@ export let unlockPdf = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully removed password protection from **${result.fileName}**`
     };
   })

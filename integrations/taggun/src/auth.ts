@@ -15,7 +15,7 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Your Taggun API key. Sign up at taggun.io/sign-up, and the key will be sent to your registered email.'
+          'Your Taggun API key. Sign up at taggun.io/register, and the key will be sent to your registered email.'
         )
     }),
     getOutput: async ctx => ({

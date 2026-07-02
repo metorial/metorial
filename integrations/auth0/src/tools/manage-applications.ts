@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Auth0Client } from '../lib/client';
+import { auth0ServiceError, requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageApplicationsTool = SlateTool.create(spec, {
@@ -98,8 +99,8 @@ export let manageApplicationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for get action');
-      let app = await client.getClient(ctx.input.clientId);
+      let clientId = requireField(ctx.input.clientId, 'clientId', 'get');
+      let app = await client.getClient(clientId);
       return {
         output: { application: mapApp(app) },
         message: `Retrieved application **${app.name}**.`
@@ -107,9 +108,9 @@ export let manageApplicationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      let name = requireField(ctx.input.name, 'name', 'create');
       let app = await client.createClient({
-        name: ctx.input.name,
+        name,
         appType: ctx.input.appType,
         description: ctx.input.description,
         callbacks: ctx.input.callbacks,
@@ -125,8 +126,8 @@ export let manageApplicationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for update action');
-      let app = await client.updateClient(ctx.input.clientId, {
+      let clientId = requireField(ctx.input.clientId, 'clientId', 'update');
+      let app = await client.updateClient(clientId, {
         name: ctx.input.name,
         appType: ctx.input.appType,
         description: ctx.input.description,
@@ -143,14 +144,14 @@ export let manageApplicationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for delete action');
-      await client.deleteClient(ctx.input.clientId);
+      let clientId = requireField(ctx.input.clientId, 'clientId', 'delete');
+      await client.deleteClient(clientId);
       return {
         output: { deleted: true },
-        message: `Deleted application **${ctx.input.clientId}**.`
+        message: `Deleted application **${clientId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw auth0ServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OpsGenieClient } from '../lib/client';
+import { opsgenieServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let rotationSchema = z.object({
@@ -72,7 +73,7 @@ export let manageSchedule = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.name) {
-          throw new Error('name is required when creating a schedule.');
+          throw opsgenieServiceError('name is required when creating a schedule.');
         }
         let schedule = await client.createSchedule({
           name: ctx.input.name,
@@ -93,7 +94,9 @@ export let manageSchedule = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.scheduleIdentifier) {
-          throw new Error('scheduleIdentifier is required when updating a schedule.');
+          throw opsgenieServiceError(
+            'scheduleIdentifier is required when updating a schedule.'
+          );
         }
         let updated = await client.updateSchedule(
           ctx.input.scheduleIdentifier,
@@ -118,7 +121,9 @@ export let manageSchedule = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.scheduleIdentifier) {
-          throw new Error('scheduleIdentifier is required when deleting a schedule.');
+          throw opsgenieServiceError(
+            'scheduleIdentifier is required when deleting a schedule.'
+          );
         }
         await client.deleteSchedule(
           ctx.input.scheduleIdentifier,

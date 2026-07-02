@@ -1,10 +1,19 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
+import { klaviyoApiError } from './lib/errors';
+
+const KLAVIYO_API_REVISION = '2026-04-15';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      authType: z.enum(['oauth', 'private_api_key']).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -91,11 +100,6 @@ export let auth = SlateAuth.create()
         title: 'Forms Read',
         description: 'Read forms and form versions',
         scope: 'forms:read'
-      },
-      {
-        title: 'Forms Write',
-        description: 'Create and delete forms',
-        scope: 'forms:write'
       },
       {
         title: 'Images Read',
@@ -223,29 +227,36 @@ export let auth = SlateAuth.create()
         client_secret: ctx.clientSecret
       });
 
-      let response = await axios.post('https://a.klaviyo.com/oauth/token', body.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
+      let response = await axios
+        .post('https://a.klaviyo.com/oauth/token', body.toString(), {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        })
+        .catch(error => {
+          throw klaviyoApiError(error, 'OAuth token exchange');
+        });
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let token = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Klaviyo',
+        operation: 'token exchange'
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? undefined,
-          expiresAt
+          token: token.token,
+          authType: 'oauth' as const,
+          refreshToken: token.refreshToken,
+          expiresAt: token.expiresAt
         }
       };
     },
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        throw createApiServiceError(
+          'Klaviyo OAuth token refresh requires a stored refresh token. Reconnect the account.'
+        );
       }
 
       let axios = createAxios();
@@ -257,22 +268,28 @@ export let auth = SlateAuth.create()
         client_secret: ctx.clientSecret
       });
 
-      let response = await axios.post('https://a.klaviyo.com/oauth/token', body.toString(), {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
+      let response = await axios
+        .post('https://a.klaviyo.com/oauth/token', body.toString(), {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        })
+        .catch(error => {
+          throw klaviyoApiError(error, 'OAuth token refresh');
+        });
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let token = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Klaviyo',
+        operation: 'token refresh',
+        previousRefreshToken: ctx.output.refreshToken
+      });
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt
+          token: token.token,
+          authType: 'oauth' as const,
+          refreshToken: token.refreshToken,
+          expiresAt: token.expiresAt
         }
       };
     },
@@ -282,12 +299,14 @@ export let auth = SlateAuth.create()
         baseURL: 'https://a.klaviyo.com/api',
         headers: {
           Authorization: `Bearer ${ctx.output.token}`,
-          revision: '2025-01-15',
+          revision: KLAVIYO_API_REVISION,
           Accept: 'application/vnd.api+json'
         }
       });
 
-      let response = await axios.get('/accounts/');
+      let response = await axios.get('/accounts/').catch(error => {
+        throw klaviyoApiError(error, 'account profile lookup');
+      });
       let account = response.data?.data?.[0];
 
       return {
@@ -311,7 +330,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.token
+          token: ctx.input.token,
+          authType: 'private_api_key' as const
         }
       };
     },
@@ -321,12 +341,14 @@ export let auth = SlateAuth.create()
         baseURL: 'https://a.klaviyo.com/api',
         headers: {
           Authorization: `Klaviyo-API-Key ${ctx.output.token}`,
-          revision: '2025-01-15',
+          revision: KLAVIYO_API_REVISION,
           Accept: 'application/vnd.api+json'
         }
       });
 
-      let response = await axios.get('/accounts/');
+      let response = await axios.get('/accounts/').catch(error => {
+        throw klaviyoApiError(error, 'account profile lookup');
+      });
       let account = response.data?.data?.[0];
 
       return {

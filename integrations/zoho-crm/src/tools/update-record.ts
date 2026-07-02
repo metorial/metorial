@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { zohoCrmServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateRecord = SlateTool.create(spec, {
@@ -34,9 +35,19 @@ Optionally control which workflow triggers fire upon update.`,
         .optional()
         .describe('Array of record objects each with an "id" field for bulk updates'),
       triggers: z
-        .array(z.enum(['approval', 'workflow', 'blueprint']))
+        .array(z.enum(['approval', 'workflow', 'blueprint', 'pathfinder', 'orchestration']))
         .optional()
-        .describe('Workflow triggers to fire on update')
+        .describe(
+          'Automation triggers to fire on update. Pass an empty array to suppress automation triggers.'
+        ),
+      applyFeatureExecution: z
+        .array(z.enum(['layout_rules', 'criteria_validation_rule']))
+        .optional()
+        .describe('CRM feature executions to apply during record update.'),
+      skipFeatureExecution: z
+        .array(z.enum(['cadences']))
+        .optional()
+        .describe('CRM feature executions to skip during record update.')
     })
   )
   .output(
@@ -66,19 +77,26 @@ Optionally control which workflow triggers fire upon update.`,
         ctx.input.module,
         ctx.input.recordId,
         ctx.input.recordData,
-        ctx.input.triggers
+        {
+          triggers: ctx.input.triggers,
+          applyFeatureExecution: ctx.input.applyFeatureExecution,
+          skipFeatureExecution: ctx.input.skipFeatureExecution
+        }
       );
     } else if (ctx.input.records?.length) {
       result = await client.updateRecords(
         ctx.input.module,
         ctx.input.records as Array<{ id: string } & Record<string, any>>,
-        ctx.input.triggers
+        {
+          triggers: ctx.input.triggers,
+          applyFeatureExecution: ctx.input.applyFeatureExecution,
+          skipFeatureExecution: ctx.input.skipFeatureExecution
+        }
       );
     } else {
-      return {
-        output: { results: [] },
-        message: 'No records to update. Provide either recordId+recordData or records array.'
-      };
+      throw zohoCrmServiceError(
+        'Provide either recordId and recordData for a single update, or records for a bulk update.'
+      );
     }
 
     let results = (result?.data || []).map((item: any) => ({

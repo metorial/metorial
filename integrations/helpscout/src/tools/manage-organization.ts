@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HelpScoutClient } from '../lib/client';
+import { helpscoutServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageOrganization = SlateTool.create(spec, {
@@ -69,7 +70,8 @@ export let manageOrganization = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.organizationId) throw new Error('Organization ID is required');
+      if (!ctx.input.organizationId)
+        throw helpscoutServiceError('Organization ID is required');
       let data = await client.getOrganization(ctx.input.organizationId);
       return {
         output: {
@@ -86,7 +88,7 @@ export let manageOrganization = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Organization name is required');
+      if (!ctx.input.name) throw helpscoutServiceError('Organization name is required');
       let _result = await client.createOrganization({ name: ctx.input.name });
       return {
         output: { success: true },
@@ -95,7 +97,9 @@ export let manageOrganization = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.organizationId) throw new Error('Organization ID is required');
+      if (!ctx.input.organizationId)
+        throw helpscoutServiceError('Organization ID is required');
+      if (!ctx.input.name) throw helpscoutServiceError('Organization name is required');
       await client.updateOrganization(ctx.input.organizationId, { name: ctx.input.name });
       return {
         output: { success: true },
@@ -104,7 +108,8 @@ export let manageOrganization = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.organizationId) throw new Error('Organization ID is required');
+      if (!ctx.input.organizationId)
+        throw helpscoutServiceError('Organization ID is required');
       await client.deleteOrganization(ctx.input.organizationId);
       return {
         output: { success: true },

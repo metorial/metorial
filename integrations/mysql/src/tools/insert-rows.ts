@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { mysqlServiceError } from '../lib/errors';
 import {
   createClient,
   escapeIdentifier,
@@ -65,6 +66,10 @@ Supports inserting multiple rows in a single operation and handling duplicate ke
     }
     let columns = Array.from(columnSet);
 
+    if (columns.length === 0) {
+      throw mysqlServiceError('At least one column is required in each inserted row.');
+    }
+
     // Build values list
     let valueClauses: string[] = [];
     for (let row of ctx.input.rows) {
@@ -81,9 +86,12 @@ Supports inserting multiple rows in a single operation and handling duplicate ke
       let setClauses = updateCols.map(
         c => `${escapeIdentifier(c)} = VALUES(${escapeIdentifier(c)})`
       );
-      if (setClauses.length > 0) {
-        sql += ` ON DUPLICATE KEY UPDATE ${setClauses.join(', ')}`;
+      if (setClauses.length === 0) {
+        throw mysqlServiceError(
+          'updateColumns must include at least one column when onDuplicateKey is "update".'
+        );
       }
+      sql += ` ON DUPLICATE KEY UPDATE ${setClauses.join(', ')}`;
     }
 
     ctx.info(`Inserting ${ctx.input.rows.length} row(s) into ${fullTableName}`);

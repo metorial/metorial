@@ -6,22 +6,22 @@ Crisp is a multichannel customer messaging platform that provides live chat, sha
 
 ## Authentication
 
-Crisp uses **HTTP Basic Authentication** with a plugin token keypair (identifier and key).
+Crisp uses **HTTP Basic Authentication** with an API token keypair (identifier and key). The `X-Crisp-Tier` header must match the token tier: `plugin`, `website`, or `user`.
 
 ### How to obtain credentials:
 
-1. Register an account on the Crisp Marketplace to create a plugin and generate your token.
-2. A Development token allows you to easily generate a token key/identifier pair which can be used on all plugin tier routes without any scope restriction. Ideal for development and testing purposes, this token however has lower quotas and can only be used on your trusted website (your Crisp workspace).
-3. A Production token can be requested once you are ready to deploy your plugin into production. This token requires you to submit the scopes of the routes used by your plugin and allows you to request customizable quotas to fit your needs.
+1. Use a plugin token for marketplace/plugin integrations.
+2. Use a website token for private single-workspace automations.
+3. Use a user token only when a required route is documented as user-tier only.
 
 ### How to authenticate:
 
-You can authenticate by adding an Authorization header to all your HTTP calls. The Authorization header is formatted as such: `Authorization: Basic BASE64(identifier:key)`. Also, include the `X-Crisp-Tier` header in your HTTP requests, with the value `plugin`. This lets the REST API know that the token you are using is a plugin token, and not a regular user token.
+You can authenticate by adding an Authorization header to all your HTTP calls. The Authorization header is formatted as such: `Authorization: Basic BASE64(identifier:key)`. Also, include the `X-Crisp-Tier` header in your HTTP requests, with the tier value that matches the token.
 
 - **Base URL**: `https://api.crisp.chat/v1/`
 - **Headers required**:
   - `Authorization: Basic BASE64(identifier:key)`
-  - `X-Crisp-Tier: plugin`
+  - `X-Crisp-Tier: plugin`, `website`, or `user`
 
 ### Scopes:
 

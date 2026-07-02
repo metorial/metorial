@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PendoClient } from '../lib/client';
 import { spec } from '../spec';
+import { createPendoClient, firstPendoRecord } from './helpers';
 
 export let getGuide = SlateTool.create(spec, {
   name: 'Get Guide',
@@ -37,12 +37,9 @@ export let getGuide = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PendoClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createPendoClient(ctx);
 
-    let guide = await client.getGuide(ctx.input.guideId);
+    let guide = firstPendoRecord(await client.getGuide(ctx.input.guideId));
 
     let steps = (guide.steps || []).map((s: any) => ({
       stepId: s.id,
@@ -52,15 +49,15 @@ export let getGuide = SlateTool.create(spec, {
 
     return {
       output: {
-        guideId: guide.id || ctx.input.guideId,
-        name: guide.name || '',
-        state: guide.state,
+        guideId: guide.id || guide.guideId || ctx.input.guideId,
+        name: guide.name || guide.guideName || '',
+        state: guide.state || guide.status,
         launchMethod: guide.launchMethod,
         steps,
         segment: guide.audienceUiHint || guide.segment,
         raw: guide
       },
-      message: `Retrieved guide **${guide.name || ctx.input.guideId}** (state: ${guide.state || 'unknown'}).`
+      message: `Retrieved guide **${guide.name || guide.guideName || ctx.input.guideId}** (state: ${guide.state || guide.status || 'unknown'}).`
     };
   })
   .build();

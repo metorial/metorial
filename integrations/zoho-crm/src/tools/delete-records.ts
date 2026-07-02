@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { zohoCrmServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let deleteRecords = SlateTool.create(spec, {
@@ -19,7 +20,11 @@ Permanently removes the specified records. This action cannot be undone.`,
   .input(
     z.object({
       module: z.string().describe('API name of the CRM module'),
-      recordIds: z.array(z.string()).min(1).describe('IDs of the records to delete')
+      recordIds: z.array(z.string()).min(1).describe('IDs of the records to delete'),
+      workflowTrigger: z
+        .boolean()
+        .optional()
+        .describe('Whether Zoho CRM workflow rules should run on deletion. Default: true.')
     })
   )
   .output(
@@ -42,7 +47,13 @@ Permanently removes the specified records. This action cannot be undone.`,
       apiBaseUrl: ctx.auth.apiBaseUrl
     });
 
-    let result = await client.deleteRecords(ctx.input.module, ctx.input.recordIds);
+    if (ctx.input.recordIds.length > 100) {
+      throw zohoCrmServiceError('Zoho CRM can delete at most 100 records per request.');
+    }
+
+    let result = await client.deleteRecords(ctx.input.module, ctx.input.recordIds, {
+      workflowTrigger: ctx.input.workflowTrigger
+    });
 
     let results = (result?.data || []).map((item: any) => ({
       recordId: item?.details?.id,

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { woocommerceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -139,7 +140,8 @@ export let manageProductVariations = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.variationId) throw new Error('variationId is required for update action');
+      if (!ctx.input.variationId)
+        throw woocommerceServiceError('variationId is required for update action');
 
       let data: Record<string, any> = {};
       if (ctx.input.sku !== undefined) data.sku = ctx.input.sku;
@@ -168,7 +170,8 @@ export let manageProductVariations = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.variationId) throw new Error('variationId is required for delete action');
+      if (!ctx.input.variationId)
+        throw woocommerceServiceError('variationId is required for delete action');
 
       await client.deleteProductVariation(productId, ctx.input.variationId, ctx.input.force);
 
@@ -178,7 +181,7 @@ export let manageProductVariations = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw woocommerceServiceError(`Unknown action: ${action}`);
   })
   .build();
 

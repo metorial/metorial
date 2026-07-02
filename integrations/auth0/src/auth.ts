@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { auth0ApiError, auth0ServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -20,18 +21,30 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let domain = ctx.input.domain;
+      let domain = ctx.input.domain
+        .trim()
+        .replace(/^https?:\/\//, '')
+        .replace(/\/+$/, '');
+
+      if (!domain) {
+        throw auth0ServiceError('Auth0 tenant domain is required.');
+      }
 
       let http = createAxios({
         baseURL: `https://${domain}`
       });
 
-      let response = await http.post('/oauth/token', {
-        grant_type: 'client_credentials',
-        client_id: ctx.input.clientId,
-        client_secret: ctx.input.clientSecret,
-        audience: `https://${domain}/api/v2/`
-      });
+      let response: any;
+      try {
+        response = await http.post('/oauth/token', {
+          grant_type: 'client_credentials',
+          client_id: ctx.input.clientId,
+          client_secret: ctx.input.clientSecret,
+          audience: `https://${domain}/api/v2/`
+        });
+      } catch (error) {
+        throw auth0ApiError(error, 'exchange client credentials token');
+      }
 
       return {
         output: {

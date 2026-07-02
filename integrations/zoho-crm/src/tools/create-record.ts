@@ -28,9 +28,19 @@ Optionally control which workflow triggers fire upon creation.`,
         .min(1)
         .describe('Array of record objects with field API names as keys'),
       triggers: z
-        .array(z.enum(['approval', 'workflow', 'blueprint']))
+        .array(z.enum(['approval', 'workflow', 'blueprint', 'pathfinder', 'orchestration']))
         .optional()
-        .describe('Workflow triggers to fire on creation')
+        .describe(
+          'Automation triggers to fire on creation. Pass an empty array to suppress automation triggers.'
+        ),
+      applyFeatureExecution: z
+        .array(z.enum(['layout_rules', 'criteria_validation_rule']))
+        .optional()
+        .describe('CRM feature executions to apply during record creation.'),
+      skipFeatureExecution: z
+        .array(z.enum(['cadences']))
+        .optional()
+        .describe('CRM feature executions to skip during record creation.')
     })
   )
   .output(
@@ -53,11 +63,11 @@ Optionally control which workflow triggers fire upon creation.`,
       apiBaseUrl: ctx.auth.apiBaseUrl
     });
 
-    let result = await client.createRecords(
-      ctx.input.module,
-      ctx.input.records,
-      ctx.input.triggers
-    );
+    let result = await client.createRecords(ctx.input.module, ctx.input.records, {
+      triggers: ctx.input.triggers,
+      applyFeatureExecution: ctx.input.applyFeatureExecution,
+      skipFeatureExecution: ctx.input.skipFeatureExecution
+    });
 
     let results = (result?.data || []).map((item: any) => ({
       recordId: item?.details?.id,

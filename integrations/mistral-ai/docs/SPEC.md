@@ -52,9 +52,9 @@ Mistral Embed is a model that generates dense vector representations of text, us
 
 Mistral OCR is an Optical Character Recognition API. It comprehends each element of documents—media, text, tables, equations. It takes images and PDFs as input and extracts content in ordered interleaved text and images. Supports configurable table format output (markdown or HTML), and options for extracting headers, footers, and hyperlinks.
 
-### Audio Transcription
+### Audio Transcription and Speech
 
-Mistral offers audio input models fine-tuned and optimized for live transcription purposes. Supports speaker diarization for clear attribution between speakers.
+Mistral offers audio input models fine-tuned and optimized for transcription. Supports speaker diarization for clear attribution between speakers. The API also supports speech generation from text using a saved voice or a reference audio clip; generated audio must be returned through Slate attachments rather than inline base64.
 
 ### Content Moderation
 
@@ -66,7 +66,7 @@ Mistral offers specialized models for code generation through models like Codest
 
 ### Agents
 
-The Agents API combines Mistral's language models with built-in connectors for code execution, web search, image generation, and MCP tools, persistent memory across conversations, and agentic orchestration capabilities. Key capabilities include:
+The current API reference exposes new beta Agents and Conversations endpoints. The legacy `/v1/agents/completions` endpoint is marked deprecated by Mistral; this integration keeps the existing agent completion tool for compatibility but does not expand deprecated agent-completion behavior. Key beta capabilities include:
 
 - Code execution connector for running Python code in a secure sandboxed environment, enabling mathematical calculations, data visualization, and scientific computing.
 - Image generation connector powered by Black Forest Lab FLUX1.1.
@@ -78,11 +78,11 @@ The Agents API combines Mistral's language models with built-in connectors for c
 
 ### Fine-Tuning
 
-Mistral AI provides a fine-tuning API through La Plateforme, making it easy to fine-tune open-source and commercial models. Users upload training data (in JSONL format), create fine-tuning jobs with configurable hyperparameters (training steps, learning rate), and can monitor jobs and retrieve the resulting fine-tuned model. Mistral uses LoRA adapters under the hood. Supports integration with Weights & Biases for monitoring training metrics.
+Mistral AI still exposes fine-tuning job endpoints in the API reference, but they are currently tagged deprecated. Existing tools remain available for compatibility with current workspaces; new work should prefer non-deprecated model and file workflows unless Mistral publishes a replacement fine-tuning surface.
 
 ### File Management
 
-Files can be uploaded to Mistral's platform for use with fine-tuning (training/validation datasets) and other services. Files can be listed, retrieved, and deleted.
+Files can be uploaded to Mistral's platform for use with OCR, batch inference, fine-tuning datasets, and transcription. Files can be listed, retrieved, downloaded through Slate attachments, signed with temporary URLs, and deleted.
 
 ### Model Listing
 

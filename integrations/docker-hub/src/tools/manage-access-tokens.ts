@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { dockerHubServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listAccessTokens = SlateTool.create(spec, {
@@ -30,13 +31,18 @@ export let listAccessTokens = SlateTool.create(spec, {
           lastUsed: z
             .string()
             .nullable()
-            .describe('ISO timestamp of the last use, or null if never used.')
+            .describe('ISO timestamp of the last use, or null if never used.'),
+          expiresAt: z
+            .string()
+            .nullable()
+            .optional()
+            .describe('ISO timestamp when the token expires, or null for no expiration.')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listAccessTokens({
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
@@ -51,7 +57,8 @@ export let listAccessTokens = SlateTool.create(spec, {
           scopes: t.scopes || [],
           isActive: t.is_active,
           createdAt: t.created_at,
-          lastUsed: t.last_used
+          lastUsed: t.last_used,
+          expiresAt: t.expires_at
         }))
       },
       message: `Found **${result.count}** personal access tokens.`
@@ -75,7 +82,12 @@ export let createAccessToken = SlateTool.create(spec, {
         .describe('Display label for the token (e.g., "CI/CD Pipeline", "Dev Machine").'),
       scopes: z
         .array(z.string())
-        .describe('Permission scopes for the token (e.g., ["repo:read"]).')
+        .min(1)
+        .describe('Permission scopes for the token (e.g., ["repo:read"]).'),
+      expiresAt: z
+        .string()
+        .optional()
+        .describe('Optional expiration date for the token in ISO 8601 format.')
     })
   )
   .output(
@@ -85,14 +97,20 @@ export let createAccessToken = SlateTool.create(spec, {
         .string()
         .describe('The generated token value. Store securely - this is only shown once.'),
       label: z.string().describe('Display label of the token.'),
-      scopes: z.array(z.string()).describe('Permission scopes of the token.')
+      scopes: z.array(z.string()).describe('Permission scopes of the token.'),
+      expiresAt: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('ISO timestamp when the token expires, or null for no expiration.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let pat = await client.createAccessToken({
       token_label: ctx.input.label,
-      scopes: ctx.input.scopes
+      scopes: ctx.input.scopes,
+      expires_at: ctx.input.expiresAt
     });
 
     return {
@@ -100,7 +118,8 @@ export let createAccessToken = SlateTool.create(spec, {
         tokenUuid: pat.uuid,
         tokenValue: pat.token,
         label: pat.token_label,
-        scopes: pat.scopes || []
+        scopes: pat.scopes || [],
+        expiresAt: pat.expires_at
       },
       message: `Created access token **${pat.token_label}**. Store the token value securely - it won't be shown again.`
     };
@@ -130,7 +149,11 @@ export let updateAccessToken = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    if (ctx.input.label === undefined && ctx.input.isActive === undefined) {
+      throw dockerHubServiceError('Provide label or isActive to update the access token.');
+    }
+
+    let client = new Client(ctx.auth);
     let pat = await client.updateAccessToken(ctx.input.tokenUuid, {
       token_label: ctx.input.label,
       is_active: ctx.input.isActive
@@ -143,6 +166,56 @@ export let updateAccessToken = SlateTool.create(spec, {
         isActive: pat.is_active
       },
       message: `Updated access token **${pat.token_label}** (${pat.is_active ? 'active' : 'inactive'}).`
+    };
+  })
+  .build();
+
+export let getAccessToken = SlateTool.create(spec, {
+  name: 'Get Access Token',
+  key: 'get_access_token',
+  description: `Get metadata for a personal access token (PAT) by UUID. Docker Hub does not return the token secret after creation.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      tokenUuid: z.string().describe('UUID of the token to retrieve.')
+    })
+  )
+  .output(
+    z.object({
+      tokenUuid: z.string().describe('UUID of the token.'),
+      label: z.string().describe('Display label for the token.'),
+      scopes: z.array(z.string()).describe('Permission scopes of the token.'),
+      isActive: z.boolean().describe('Whether the token is active.'),
+      createdAt: z.string().describe('ISO timestamp when the token was created.'),
+      lastUsed: z
+        .string()
+        .nullable()
+        .describe('ISO timestamp of the last use, or null if never used.'),
+      expiresAt: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('ISO timestamp when the token expires, or null for no expiration.')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client(ctx.auth);
+    let pat = await client.getAccessToken(ctx.input.tokenUuid);
+
+    return {
+      output: {
+        tokenUuid: pat.uuid,
+        label: pat.token_label,
+        scopes: pat.scopes || [],
+        isActive: pat.is_active,
+        createdAt: pat.created_at,
+        lastUsed: pat.last_used,
+        expiresAt: pat.expires_at
+      },
+      message: `Retrieved access token **${pat.token_label}**.`
     };
   })
   .build();
@@ -166,7 +239,7 @@ export let deleteAccessToken = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteAccessToken(ctx.input.tokenUuid);
 
     return {

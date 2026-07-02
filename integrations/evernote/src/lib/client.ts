@@ -1,5 +1,6 @@
 // Evernote API Client - communicates via Thrift Binary Protocol over HTTP
 import { axios } from 'slates';
+import { EvernoteError, evernoteApiError } from './errors';
 import {
   readEDAMNotFoundException,
   readEDAMSystemException,
@@ -7,6 +8,7 @@ import {
   readNote,
   readNotebook,
   readNotesMetadataList,
+  readResource,
   readSavedSearch,
   readSyncState,
   readTag,
@@ -14,6 +16,7 @@ import {
   writeNote,
   writeNotebook,
   writeNoteFilter,
+  writeNoteResultSpec,
   writeNotesMetadataResultSpec,
   writeSavedSearch,
   writeTag
@@ -23,8 +26,10 @@ import type {
   EvernoteNote,
   EvernoteNotebook,
   EvernoteNoteFilter,
+  EvernoteNoteResultSpec,
   EvernoteNotesMetadataList,
   EvernoteNotesMetadataResultSpec,
+  EvernoteResource,
   EvernoteSavedSearch,
   EvernoteSyncState,
   EvernoteTag,
@@ -53,25 +58,6 @@ let EDAMErrorCode: Record<number, string> = {
   18: 'TAKEN_DOWN',
   19: 'RATE_LIMIT_REACHED'
 };
-
-export class EvernoteError extends Error {
-  errorCode: number;
-  parameter?: string;
-  rateLimitDuration?: number;
-
-  constructor(
-    message: string,
-    errorCode: number,
-    parameter?: string,
-    rateLimitDuration?: number
-  ) {
-    super(message);
-    this.name = 'EvernoteError';
-    this.errorCode = errorCode;
-    this.parameter = parameter;
-    this.rateLimitDuration = rateLimitDuration;
-  }
-}
 
 export class Client {
   private token: string;
@@ -108,13 +94,18 @@ export class Client {
 
     let payload = w.toUint8Array();
 
-    let response = await axios.post(this.noteStoreUrl, payload, {
-      headers: {
-        'Content-Type': 'application/x-thrift',
-        Accept: 'application/x-thrift'
-      },
-      responseType: 'arraybuffer'
-    });
+    let response: any;
+    try {
+      response = await axios.post(this.noteStoreUrl, payload, {
+        headers: {
+          'Content-Type': 'application/x-thrift',
+          Accept: 'application/x-thrift'
+        },
+        responseType: 'arraybuffer'
+      });
+    } catch (error) {
+      throw evernoteApiError(error, `NoteStore.${method}`);
+    }
 
     let responseData = new Uint8Array(response.data);
     let reader = new ThriftReader(responseData);
@@ -166,13 +157,18 @@ export class Client {
 
     let payload = w.toUint8Array();
 
-    let response = await axios.post(userStoreUrl, payload, {
-      headers: {
-        'Content-Type': 'application/x-thrift',
-        Accept: 'application/x-thrift'
-      },
-      responseType: 'arraybuffer'
-    });
+    let response: any;
+    try {
+      response = await axios.post(userStoreUrl, payload, {
+        headers: {
+          'Content-Type': 'application/x-thrift',
+          Accept: 'application/x-thrift'
+        },
+        responseType: 'arraybuffer'
+      });
+    } catch (error) {
+      throw evernoteApiError(error, `UserStore.${method}`);
+    }
 
     let responseData = new Uint8Array(response.data);
     let reader = new ThriftReader(responseData);
@@ -370,17 +366,23 @@ export class Client {
     withResourcesRecognition: boolean,
     withResourcesAlternateData: boolean
   ): Promise<EvernoteNote> {
-    let reader = await this.callNoteStore('getNote', w => {
+    return await this.getNoteWithResultSpec(noteGuid, {
+      includeContent: withContent,
+      includeResourcesData: withResourcesData,
+      includeResourcesRecognition: withResourcesRecognition,
+      includeResourcesAlternateData: withResourcesAlternateData
+    });
+  }
+
+  async getNoteWithResultSpec(
+    noteGuid: string,
+    resultSpec: EvernoteNoteResultSpec
+  ): Promise<EvernoteNote> {
+    let reader = await this.callNoteStore('getNoteWithResultSpec', w => {
       w.writeFieldBegin(TType.STRING, 2);
       w.writeString(noteGuid);
-      w.writeFieldBegin(TType.BOOL, 3);
-      w.writeBool(withContent);
-      w.writeFieldBegin(TType.BOOL, 4);
-      w.writeBool(withResourcesData);
-      w.writeFieldBegin(TType.BOOL, 5);
-      w.writeBool(withResourcesRecognition);
-      w.writeFieldBegin(TType.BOOL, 6);
-      w.writeBool(withResourcesAlternateData);
+      w.writeFieldBegin(TType.STRUCT, 3);
+      writeNoteResultSpec(w, resultSpec);
     });
     return this.parseResultStruct(reader, readNote);
   }
@@ -425,6 +427,33 @@ export class Client {
       }
       return names;
     });
+  }
+
+  async getResource(
+    resourceGuid: string,
+    withData = false,
+    withRecognition = false,
+    withAlternateData = false
+  ): Promise<EvernoteResource> {
+    let reader = await this.callNoteStore('getResource', w => {
+      w.writeFieldBegin(TType.STRING, 2);
+      w.writeString(resourceGuid);
+      w.writeFieldBegin(TType.BOOL, 3);
+      w.writeBool(withData);
+      w.writeFieldBegin(TType.BOOL, 4);
+      w.writeBool(withRecognition);
+      w.writeFieldBegin(TType.BOOL, 5);
+      w.writeBool(withAlternateData);
+    });
+    return this.parseResultStruct(reader, readResource);
+  }
+
+  async getResourceData(resourceGuid: string): Promise<Uint8Array> {
+    let reader = await this.callNoteStore('getResourceData', w => {
+      w.writeFieldBegin(TType.STRING, 2);
+      w.writeString(resourceGuid);
+    });
+    return this.parseResultStruct(reader, r => r.readBinary());
   }
 
   async listTags(): Promise<EvernoteTag[]> {
@@ -504,6 +533,14 @@ export class Client {
       writeSavedSearch(w, search);
     });
     return this.parseResultStruct(reader, readSavedSearch);
+  }
+
+  async updateSearch(search: EvernoteSavedSearch): Promise<number> {
+    let reader = await this.callNoteStore('updateSearch', w => {
+      w.writeFieldBegin(TType.STRUCT, 2);
+      writeSavedSearch(w, search);
+    });
+    return this.parseI32Result(reader);
   }
 
   async getSyncState(): Promise<EvernoteSyncState> {

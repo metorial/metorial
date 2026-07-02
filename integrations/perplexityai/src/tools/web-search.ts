@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PerplexityClient } from '../lib/client';
+import { perplexityServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let webSearch = SlateTool.create(spec, {
@@ -10,12 +11,13 @@ export let webSearch = SlateTool.create(spec, {
 
 Unlike chat completions, this returns **raw search results** without AI-generated summaries, giving you full control over how results are processed and presented.
 
-Supports domain filtering, date filtering, recency filtering, language filtering, and location-based search.`,
+Supports domain filtering, date filtering, recency filtering, language filtering, People Search routing, and location-based search.`,
   instructions: [
     'Use this tool when you need raw search results rather than AI-synthesized answers.',
     'You can pass multiple queries in a single request for batch searching.',
     'Domain filters support up to 20 entries in either allowlist or denylist mode (prefix with - to exclude).',
-    'Date filters use MM/DD/YYYY format.'
+    'Date filters use MM/DD/YYYY format.',
+    'Use searchContextSize for coarse snippet length control, or maxTokens/maxTokensPerPage for manual budgets; do not combine them.'
   ],
   tags: {
     readOnly: true
@@ -43,14 +45,26 @@ Supports domain filtering, date filtering, recency filtering, language filtering
         .describe('Maximum tokens for context across all results'),
       maxTokensPerPage: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Maximum tokens per individual page snippet'),
+      searchContextSize: z
+        .enum(['low', 'medium', 'high'])
+        .optional()
+        .describe('Coarse context size for extracted page content'),
+      searchType: z
+        .enum(['web', 'people'])
+        .optional()
+        .describe('Use "people" to search public professional/person results'),
       searchDomainFilter: z
         .array(z.string())
+        .max(20)
         .optional()
         .describe('Limit to specific domains (prefix with - to exclude, max 20)'),
       searchLanguageFilter: z
         .array(z.string())
+        .max(20)
         .optional()
         .describe('Filter by language (ISO 639-1 codes, max 20)'),
       searchRecencyFilter: z
@@ -86,7 +100,8 @@ Supports domain filtering, date filtering, recency filtering, language filtering
             url: z.string().describe('Page URL'),
             snippet: z.string().describe('Relevant text snippet from the page'),
             date: z.string().optional().describe('Publication date'),
-            lastUpdated: z.string().optional().describe('Last updated date')
+            lastUpdated: z.string().optional().describe('Last updated date'),
+            source: z.string().optional().describe('Result source type')
           })
         )
         .describe('Ranked search results'),
@@ -94,6 +109,15 @@ Supports domain filtering, date filtering, recency filtering, language filtering
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.searchContextSize &&
+      (ctx.input.maxTokens !== undefined || ctx.input.maxTokensPerPage !== undefined)
+    ) {
+      throw perplexityServiceError(
+        'searchContextSize cannot be combined with maxTokens or maxTokensPerPage.'
+      );
+    }
+
     let client = new PerplexityClient(ctx.auth.token);
 
     let response = await client.search({
@@ -102,6 +126,8 @@ Supports domain filtering, date filtering, recency filtering, language filtering
       max_results: ctx.input.maxResults,
       max_tokens: ctx.input.maxTokens,
       max_tokens_per_page: ctx.input.maxTokensPerPage,
+      search_context_size: ctx.input.searchContextSize,
+      search_type: ctx.input.searchType,
       search_domain_filter: ctx.input.searchDomainFilter,
       search_language_filter: ctx.input.searchLanguageFilter,
       search_recency_filter: ctx.input.searchRecencyFilter,
@@ -116,7 +142,8 @@ Supports domain filtering, date filtering, recency filtering, language filtering
       url: r.url,
       snippet: r.snippet,
       date: r.date ?? undefined,
-      lastUpdated: r.last_updated ?? undefined
+      lastUpdated: r.last_updated ?? undefined,
+      source: r.source ?? undefined
     }));
 
     let queryPreview = Array.isArray(ctx.input.query)

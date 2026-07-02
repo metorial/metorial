@@ -1,24 +1,27 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageBroadcasts = SlateTool.create(spec, {
   name: 'Manage Broadcasts',
   key: 'manage_broadcasts',
-  description: `Create, update, get, list, or delete email broadcasts. Broadcasts are one-time email sends to your subscribers. Set a \`sendAt\` time to schedule sending.`,
+  description: `Create, update, get, list, delete, or inspect analytics for email broadcasts. Broadcasts are one-time email sends to your subscribers. Set a \`sendAt\` time to schedule sending.`,
   instructions: [
     'Use action "list" to see all broadcasts.',
     'Use action "get" to fetch a specific broadcast by ID.',
     'Use action "create" to draft a new broadcast. Provide at least subject and content.',
     'Use action "update" to modify a draft broadcast.',
-    'Use action "delete" to remove a draft broadcast. Broadcasts already sending cannot be deleted.'
+    'Use action "delete" to remove a draft broadcast. Broadcasts already sending cannot be deleted.',
+    'Use action "get_stats" to retrieve delivery and engagement stats for a broadcast.',
+    'Use action "list_clicks" to retrieve tracked link click stats for a broadcast.'
   ]
 })
   .input(
     z.object({
       action: z
-        .enum(['list', 'get', 'create', 'update', 'delete'])
+        .enum(['list', 'get', 'create', 'update', 'delete', 'get_stats', 'list_clicks'])
         .describe('Action to perform'),
       broadcastId: z
         .number()
@@ -35,8 +38,8 @@ export let manageBroadcasts = SlateTool.create(spec, {
       emailAddress: z.string().optional().describe('Sender email address override'),
       thumbnailUrl: z.string().optional().describe('Thumbnail image URL'),
       thumbnailAlt: z.string().optional().describe('Thumbnail alt text'),
-      perPage: z.number().optional().describe('Results per page (for list)'),
-      cursor: z.string().optional().describe('Pagination cursor (for list)')
+      perPage: z.number().optional().describe('Results per page (for list or list_clicks)'),
+      cursor: z.string().optional().describe('Pagination cursor (for list or list_clicks)')
     })
   )
   .output(
@@ -71,12 +74,40 @@ export let manageBroadcasts = SlateTool.create(spec, {
         })
         .optional()
         .describe('Single broadcast (for get, create, update)'),
+      stats: z
+        .object({
+          recipients: z.number(),
+          openRate: z.number(),
+          emailsOpened: z.number(),
+          clickRate: z.number(),
+          unsubscribeRate: z.number(),
+          unsubscribes: z.number(),
+          totalClicks: z.number(),
+          showTotalClicks: z.boolean(),
+          status: z.string(),
+          progress: z.number(),
+          openTrackingDisabled: z.boolean(),
+          clickTrackingDisabled: z.boolean()
+        })
+        .optional()
+        .describe('Broadcast analytics (for get_stats action)'),
+      clicks: z
+        .array(
+          z.object({
+            url: z.string(),
+            uniqueClicks: z.number(),
+            clickToDeliveryRate: z.number(),
+            clickToOpenRate: z.number()
+          })
+        )
+        .optional()
+        .describe('Tracked link click stats (for list_clicks action)'),
       hasNextPage: z.boolean().optional(),
       nextCursor: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx.auth);
     let input = ctx.input;
 
     if (input.action === 'list') {
@@ -104,7 +135,7 @@ export let manageBroadcasts = SlateTool.create(spec, {
     }
 
     if (input.action === 'get') {
-      if (!input.broadcastId) throw new Error('broadcastId is required for get');
+      if (!input.broadcastId) throw kitServiceError('broadcastId is required for get');
       let b = await client.getBroadcast(input.broadcastId);
       return {
         output: {
@@ -161,7 +192,7 @@ export let manageBroadcasts = SlateTool.create(spec, {
     }
 
     if (input.action === 'update') {
-      if (!input.broadcastId) throw new Error('broadcastId is required for update');
+      if (!input.broadcastId) throw kitServiceError('broadcastId is required for update');
       let b = await client.updateBroadcast(input.broadcastId, {
         subject: input.subject,
         content: input.content,
@@ -196,7 +227,7 @@ export let manageBroadcasts = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.broadcastId) throw new Error('broadcastId is required for delete');
+      if (!input.broadcastId) throw kitServiceError('broadcastId is required for delete');
       await client.deleteBroadcast(input.broadcastId);
       return {
         output: {},
@@ -204,5 +235,51 @@ export let manageBroadcasts = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    if (input.action === 'get_stats') {
+      if (!input.broadcastId) throw kitServiceError('broadcastId is required for get_stats');
+      let stats = await client.getBroadcastStats(input.broadcastId);
+      return {
+        output: {
+          stats: {
+            recipients: stats.recipients,
+            openRate: stats.open_rate,
+            emailsOpened: stats.emails_opened,
+            clickRate: stats.click_rate,
+            unsubscribeRate: stats.unsubscribe_rate,
+            unsubscribes: stats.unsubscribes,
+            totalClicks: stats.total_clicks,
+            showTotalClicks: stats.show_total_clicks,
+            status: stats.status,
+            progress: stats.progress,
+            openTrackingDisabled: stats.open_tracking_disabled,
+            clickTrackingDisabled: stats.click_tracking_disabled
+          }
+        },
+        message: `Retrieved stats for broadcast #${input.broadcastId}.`
+      };
+    }
+
+    if (input.action === 'list_clicks') {
+      if (!input.broadcastId) throw kitServiceError('broadcastId is required for list_clicks');
+      let result = await client.getBroadcastClicks(input.broadcastId, {
+        perPage: input.perPage,
+        after: input.cursor
+      });
+      let clicks = result.clicks.map(click => ({
+        url: click.url,
+        uniqueClicks: click.unique_clicks,
+        clickToDeliveryRate: click.click_to_delivery_rate,
+        clickToOpenRate: click.click_to_open_rate
+      }));
+      return {
+        output: {
+          clicks,
+          hasNextPage: result.pagination.has_next_page,
+          nextCursor: result.pagination.end_cursor
+        },
+        message: `Found **${clicks.length}** tracked link(s) for broadcast #${input.broadcastId}.`
+      };
+    }
+
+    throw kitServiceError(`Unknown action: ${input.action}`);
   });

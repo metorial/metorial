@@ -2,7 +2,7 @@
 
 ## Overview
 
-Fly.io is a cloud platform that runs applications on fast-launching Firecracker microVMs in data centers around the world. It provides a REST API (Machines API) and a GraphQL API for provisioning and managing applications, virtual machines, persistent storage volumes, and networking. Users can deploy containerized workloads to specific geographic regions with fine-grained control over VM lifecycle, resources, and placement.
+Fly.io is a cloud platform that runs applications on fast-launching Firecracker microVMs in data centers around the world. It provides a REST API (Machines API) for provisioning and managing applications, virtual machines, persistent storage volumes, networking, certificates, secrets, OIDC tokens, and operational diagnostics. Users can deploy containerized workloads to specific geographic regions with fine-grained control over VM lifecycle, resources, and placement.
 
 ## Authentication
 
@@ -39,7 +39,11 @@ Use the correct scheme based on token type: `Bearer <token>` for `flyctl auth to
 
 ### App Management
 
-Create, list, retrieve, and delete Fly Apps. A Fly App can be a web app, or a database, or a bunch of task Machines, or whatever you want to deploy. Apps serve as named collections that group Machines, volumes, networking configuration, and secrets. Apps can be segmented into isolated networks.
+Create, list, retrieve, and delete Fly Apps. A Fly App can be a web app, database, or group of task Machines. Apps serve as named collections that group Machines, volumes, networking configuration, and secrets. Apps can be segmented into isolated networks.
+
+### Region and Organization Inventory
+
+List platform regions, organization-wide Machines, and organization-wide volumes to support discovery, inventory, and polling workflows across apps.
 
 ### Machine Lifecycle Management
 
@@ -48,8 +52,9 @@ You can use the Machines resource to create, stop, start, update, and delete Fly
 - Create Machines from container images in specific regions.
 - Configure CPU, memory, and GPU resources per Machine.
 - Start, stop, restart, and destroy individual Machines.
-- Clone existing Machines to scale horizontally.
+- Send Unix signals to running Machines.
 - Wait for Machines to reach specific states.
+- Inspect Machine event history, current processes, config versions, and memory limits.
 - Attach services and configure networking (ports, protocols, proxy behavior).
 - Set metadata on Machines and filter by metadata.
 
@@ -59,7 +64,7 @@ Create and manage persistent storage volumes for your Machines. Fly Volumes are 
 
 ### Secrets Management
 
-Manage sensitive environment variables (secrets) at the app level. Machines inherit secrets from the app. Secrets are exposed as environment variables in VMs.
+Manage sensitive environment variables (secrets) at the app level. Machines inherit secrets from the app. Secrets are exposed as environment variables in VMs and values are not returned by default.
 
 ### SSL/TLS Certificate Management
 
@@ -67,11 +72,7 @@ Manage SSL/TLS certificates for custom domains.
 
 ### Networking and IP Allocation
 
-Allocate IP addresses (Anycast IPv4, IPv6) for apps to make them publicly accessible. Configure private networking between Machines within an organization via WireGuard. Currently this is done using flyctl or the Fly.io GraphQL API. This offers your app automatic, global routing via Anycast.
-
-### Metrics and Monitoring
-
-Query Prometheus-compatible metrics for your organization's apps via a dedicated endpoint at `https://api.fly.io/prometheus/<org-slug>/`. Includes built-in metrics for HTTP responses, instance CPU, memory, disk I/O, and network traffic.
+List, assign, and remove app IP assignments using the Machines API. Configure Machine services and app private-network segmentation for routing behavior.
 
 ### OIDC Token Generation
 

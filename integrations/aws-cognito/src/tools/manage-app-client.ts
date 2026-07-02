@@ -1,13 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { cognitoServiceError } from '../lib/errors';
 import { createCognitoClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 let tokenValidityUnitsSchema = z
   .object({
-    accessToken: z.enum(['seconds', 'minutes', 'hours']).optional(),
-    idToken: z.enum(['seconds', 'minutes', 'hours']).optional(),
+    accessToken: z.enum(['seconds', 'minutes', 'hours', 'days']).optional(),
+    idToken: z.enum(['seconds', 'minutes', 'hours', 'days']).optional(),
     refreshToken: z.enum(['seconds', 'minutes', 'hours', 'days']).optional()
+  })
+  .optional();
+
+let refreshTokenRotationSchema = z
+  .object({
+    feature: z.enum(['ENABLED', 'DISABLED']).describe('Refresh token rotation state'),
+    retryGracePeriodSeconds: z
+      .number()
+      .min(0)
+      .max(60)
+      .optional()
+      .describe('Grace period for token replay during rotation, in seconds')
   })
   .optional();
 
@@ -35,10 +48,16 @@ export let manageAppClient = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Generate a client secret (for create only)'),
+      clientSecret: z
+        .string()
+        .optional()
+        .describe('Custom client secret for create. Do not combine with generateSecret.'),
       explicitAuthFlows: z
         .array(z.string())
         .optional()
-        .describe('Allowed auth flows (e.g., ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH)'),
+        .describe(
+          'Allowed auth flows, including current ALLOW_* values such as ALLOW_USER_AUTH, ALLOW_USER_SRP_AUTH, ALLOW_USER_PASSWORD_AUTH, and ALLOW_REFRESH_TOKEN_AUTH'
+        ),
       allowedOAuthFlows: z
         .array(z.enum(['code', 'implicit', 'client_credentials']))
         .optional(),
@@ -60,8 +79,21 @@ export let manageAppClient = SlateTool.create(spec, {
       accessTokenValidity: z.number().optional(),
       idTokenValidity: z.number().optional(),
       refreshTokenValidity: z.number().optional(),
+      authSessionValidity: z
+        .number()
+        .min(3)
+        .max(15)
+        .optional()
+        .describe('Authentication flow session validity in minutes (3-15)'),
       tokenValidityUnits: tokenValidityUnitsSchema,
+      refreshTokenRotation: refreshTokenRotationSchema,
       enableTokenRevocation: z.boolean().optional(),
+      enablePropagateAdditionalUserContextData: z
+        .boolean()
+        .optional()
+        .describe(
+          'Allow additional user context data such as source IP for threat protection'
+        ),
       preventUserExistenceErrors: z.enum(['ENABLED', 'LEGACY']).optional(),
       readAttributes: z.array(z.string()).optional(),
       writeAttributes: z.array(z.string()).optional(),
@@ -84,6 +116,13 @@ export let manageAppClient = SlateTool.create(spec, {
       accessTokenValidity: z.number().optional(),
       idTokenValidity: z.number().optional(),
       refreshTokenValidity: z.number().optional(),
+      authSessionValidity: z.number().optional(),
+      refreshTokenRotationFeature: z.string().optional(),
+      refreshTokenRotationRetryGracePeriodSeconds: z.number().optional(),
+      enableTokenRevocation: z.boolean().optional(),
+      enablePropagateAdditionalUserContextData: z.boolean().optional(),
+      preventUserExistenceErrors: z.string().optional(),
+      defaultRedirectUri: z.string().optional(),
       creationDate: z.number().optional(),
       lastModifiedDate: z.number().optional(),
       clients: z
@@ -117,6 +156,14 @@ export let manageAppClient = SlateTool.create(spec, {
       accessTokenValidity: c.AccessTokenValidity,
       idTokenValidity: c.IdTokenValidity,
       refreshTokenValidity: c.RefreshTokenValidity,
+      authSessionValidity: c.AuthSessionValidity,
+      refreshTokenRotationFeature: c.RefreshTokenRotation?.Feature,
+      refreshTokenRotationRetryGracePeriodSeconds:
+        c.RefreshTokenRotation?.RetryGracePeriodSeconds,
+      enableTokenRevocation: c.EnableTokenRevocation,
+      enablePropagateAdditionalUserContextData: c.EnablePropagateAdditionalUserContextData,
+      preventUserExistenceErrors: c.PreventUserExistenceErrors,
+      defaultRedirectUri: c.DefaultRedirectURI,
       creationDate: c.CreationDate,
       lastModifiedDate: c.LastModifiedDate
     });
@@ -125,8 +172,12 @@ export let manageAppClient = SlateTool.create(spec, {
       let params: Record<string, any> = { UserPoolId: userPoolId };
       if (ctx.input.clientName) params.ClientName = ctx.input.clientName;
       if (ctx.input.clientId) params.ClientId = ctx.input.clientId;
+      if (ctx.input.generateSecret === true && ctx.input.clientSecret) {
+        throw cognitoServiceError('clientSecret cannot be combined with generateSecret');
+      }
       if (ctx.input.generateSecret !== undefined)
         params.GenerateSecret = ctx.input.generateSecret;
+      if (ctx.input.clientSecret) params.ClientSecret = ctx.input.clientSecret;
       if (ctx.input.explicitAuthFlows) params.ExplicitAuthFlows = ctx.input.explicitAuthFlows;
       if (ctx.input.allowedOAuthFlows) params.AllowedOAuthFlows = ctx.input.allowedOAuthFlows;
       if (ctx.input.allowedOAuthScopes)
@@ -145,6 +196,8 @@ export let manageAppClient = SlateTool.create(spec, {
         params.IdTokenValidity = ctx.input.idTokenValidity;
       if (ctx.input.refreshTokenValidity !== undefined)
         params.RefreshTokenValidity = ctx.input.refreshTokenValidity;
+      if (ctx.input.authSessionValidity !== undefined)
+        params.AuthSessionValidity = ctx.input.authSessionValidity;
       if (ctx.input.tokenValidityUnits) {
         params.TokenValidityUnits = {
           AccessToken: ctx.input.tokenValidityUnits.accessToken,
@@ -152,8 +205,18 @@ export let manageAppClient = SlateTool.create(spec, {
           RefreshToken: ctx.input.tokenValidityUnits.refreshToken
         };
       }
+      if (ctx.input.refreshTokenRotation) {
+        params.RefreshTokenRotation = {
+          Feature: ctx.input.refreshTokenRotation.feature,
+          RetryGracePeriodSeconds: ctx.input.refreshTokenRotation.retryGracePeriodSeconds
+        };
+      }
       if (ctx.input.enableTokenRevocation !== undefined)
         params.EnableTokenRevocation = ctx.input.enableTokenRevocation;
+      if (ctx.input.enablePropagateAdditionalUserContextData !== undefined) {
+        params.EnablePropagateAdditionalUserContextData =
+          ctx.input.enablePropagateAdditionalUserContextData;
+      }
       if (ctx.input.preventUserExistenceErrors)
         params.PreventUserExistenceErrors = ctx.input.preventUserExistenceErrors;
       if (ctx.input.readAttributes) params.ReadAttributes = ctx.input.readAttributes;
@@ -180,7 +243,9 @@ export let manageAppClient = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.clientName) throw new Error('clientName is required for create');
+      if (!ctx.input.clientName) {
+        throw cognitoServiceError('clientName is required for create');
+      }
       let result = await client.createUserPoolClient(buildClientParams());
       return {
         output: mapClient(result.UserPoolClient),
@@ -189,7 +254,9 @@ export let manageAppClient = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for get');
+      if (!ctx.input.clientId) {
+        throw cognitoServiceError('clientId is required for get');
+      }
       let result = await client.describeUserPoolClient(userPoolId, ctx.input.clientId);
       return {
         output: mapClient(result.UserPoolClient),
@@ -198,7 +265,9 @@ export let manageAppClient = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for update');
+      if (!ctx.input.clientId) {
+        throw cognitoServiceError('clientId is required for update');
+      }
       let result = await client.updateUserPoolClient(buildClientParams());
       return {
         output: mapClient(result.UserPoolClient),
@@ -207,7 +276,9 @@ export let manageAppClient = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for delete');
+      if (!ctx.input.clientId) {
+        throw cognitoServiceError('clientId is required for delete');
+      }
       await client.deleteUserPoolClient(userPoolId, ctx.input.clientId);
       return {
         output: { clientId: ctx.input.clientId, deleted: true },
@@ -215,6 +286,6 @@ export let manageAppClient = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw cognitoServiceError(`Unknown action: ${action}`);
   })
   .build();

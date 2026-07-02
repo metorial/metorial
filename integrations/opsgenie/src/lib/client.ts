@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { opsgenieApiError } from './errors';
 
 let BASE_URLS: Record<string, string> = {
   us: 'https://api.opsgenie.com',
@@ -17,6 +18,11 @@ export class OpsGenieClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(opsgenieApiError(error))
+    );
   }
 
   // ─── Alerts ──────────────────────────────────────────────────
@@ -344,7 +350,7 @@ export class OpsGenieClient {
 
   async getAlertRequestStatus(requestId: string) {
     let response = await this.http.get(`/v2/alerts/requests/${requestId}`);
-    return response.data.data;
+    return response.data;
   }
 
   async listAlertLogs(
@@ -459,6 +465,11 @@ export class OpsGenieClient {
     return response.data;
   }
 
+  async getIncidentRequestStatus(requestId: string) {
+    let response = await this.http.get(`/v1/incidents/requests/${requestId}`);
+    return response.data;
+  }
+
   // ─── Schedules ──────────────────────────────────────────────
 
   async createSchedule(data: {
@@ -560,6 +571,81 @@ export class OpsGenieClient {
       {
         params
       }
+    );
+    return response.data.data;
+  }
+
+  // ─── Schedule Overrides ─────────────────────────────────────
+
+  async createScheduleOverride(
+    scheduleIdentifier: string,
+    params: { scheduleIdentifierType?: string },
+    data: {
+      alias?: string;
+      user: { type: string; id?: string; username?: string };
+      startDate: string;
+      endDate: string;
+      rotations?: Array<{ id?: string; name?: string }>;
+    }
+  ) {
+    let response = await this.http.post(
+      `/v2/schedules/${encodeURIComponent(scheduleIdentifier)}/overrides`,
+      data,
+      { params }
+    );
+    return response.data;
+  }
+
+  async getScheduleOverride(
+    scheduleIdentifier: string,
+    alias: string,
+    params: { scheduleIdentifierType?: string } = {}
+  ) {
+    let response = await this.http.get(
+      `/v2/schedules/${encodeURIComponent(scheduleIdentifier)}/overrides/${encodeURIComponent(alias)}`,
+      { params }
+    );
+    return response.data.data;
+  }
+
+  async updateScheduleOverride(
+    scheduleIdentifier: string,
+    alias: string,
+    params: { scheduleIdentifierType?: string },
+    data: {
+      user: { type: string; id?: string; username?: string };
+      startDate: string;
+      endDate: string;
+      rotations?: Array<{ id?: string; name?: string }>;
+    }
+  ) {
+    let response = await this.http.put(
+      `/v2/schedules/${encodeURIComponent(scheduleIdentifier)}/overrides/${encodeURIComponent(alias)}`,
+      data,
+      { params }
+    );
+    return response.data;
+  }
+
+  async deleteScheduleOverride(
+    scheduleIdentifier: string,
+    alias: string,
+    params: { scheduleIdentifierType?: string } = {}
+  ) {
+    let response = await this.http.delete(
+      `/v2/schedules/${encodeURIComponent(scheduleIdentifier)}/overrides/${encodeURIComponent(alias)}`,
+      { params }
+    );
+    return response.data;
+  }
+
+  async listScheduleOverrides(
+    scheduleIdentifier: string,
+    params: { scheduleIdentifierType?: string } = {}
+  ) {
+    let response = await this.http.get(
+      `/v2/schedules/${encodeURIComponent(scheduleIdentifier)}/overrides`,
+      { params }
     );
     return response.data.data;
   }

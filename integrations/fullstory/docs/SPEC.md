@@ -32,7 +32,11 @@ Event data can be created with the Events API. Send custom server-side events to
 
 ### Session Retrieval
 
-Retrieve a list of sessions for a user using the Sessions API. Sessions can be looked up by user ID or email, and the API returns session replay URLs that can be embedded into support tools or other applications.
+Retrieve a list of sessions for a user using the Sessions API. Sessions can be looked up by uid or email, and the API returns canonical session IDs, creation timestamps, and replay URLs that can be embedded into support tools or other applications. Current Anywhere: Activation APIs can also return raw session events or AI-ready context data for a known session ID.
+
+### Organization Quotas
+
+Retrieve session and server-event quota usage for the current billing cycle from the Organization API. This helps teams understand API/event ingestion limits before creating additional server-side events.
 
 ### Segments
 

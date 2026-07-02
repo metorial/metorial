@@ -18,9 +18,26 @@ export let getSubscriberActivity = SlateTool.create(spec, {
       type: z
         .enum(['opens', 'clicks', 'junks', 'bounces', 'unsubscribes', 'forwards', 'sent'])
         .optional()
-        .describe('Filter by activity type'),
+        .describe(
+          'Deprecated activity filter. Use activityLogName for current MailerLite log names.'
+        ),
+      activityLogName: z
+        .enum([
+          'campaign_send',
+          'automation_email_sent',
+          'email_open',
+          'link_click',
+          'email_bounce',
+          'spam_complaint',
+          'unsubscribed',
+          'email_forward',
+          'marketing_preferences_change',
+          'preference_center'
+        ])
+        .optional()
+        .describe('Filter by current MailerLite activity log_name value'),
       limit: z.number().optional().describe('Number of activity records to return'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+      page: z.number().optional().describe('Page number for pagination')
     })
   )
   .output(
@@ -41,15 +58,28 @@ export let getSubscriberActivity = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    let legacyLogNameMap: Record<string, string> = {
+      opens: 'email_open',
+      clicks: 'link_click',
+      junks: 'spam_complaint',
+      bounces: 'email_bounce',
+      unsubscribes: 'unsubscribed',
+      forwards: 'email_forward',
+      sent: 'campaign_send'
+    };
+    let logName =
+      ctx.input.activityLogName ??
+      (ctx.input.type ? legacyLogNameMap[ctx.input.type] : undefined);
+
     let result = await client.getSubscriberActivity(ctx.input.subscriberId, {
-      type: ctx.input.type,
+      logName,
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      page: ctx.input.page
     });
 
     let activities = (result.data || []).map((a: any) => ({
       activityId: a.id,
-      type: a.type,
+      type: a.log_name,
       timestamp: a.created_at || a.timestamp,
       details: a
     }));
@@ -57,7 +87,7 @@ export let getSubscriberActivity = SlateTool.create(spec, {
     return {
       output: {
         activities,
-        nextCursor: result.meta?.next_cursor || null
+        nextCursor: null
       },
       message: `Retrieved **${activities.length}** activity records for subscriber **${ctx.input.subscriberId}**.`
     };

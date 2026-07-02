@@ -6,7 +6,7 @@ export interface Session {
   startedAt: string;
   endedAt: string | null;
   expiresAt: string;
-  status: 'RUNNING' | 'ERROR' | 'TIMED_OUT' | 'COMPLETED';
+  status: 'PENDING' | 'RUNNING' | 'ERROR' | 'TIMED_OUT' | 'COMPLETED';
   proxyBytes: number;
   keepAlive: boolean;
   contextId: string | null;
@@ -129,6 +129,8 @@ export interface ContextCreateResponse {
   initializationVectorSize: number;
 }
 
+export type ContextUpdateResponse = ContextCreateResponse;
+
 export interface Extension {
   extensionId: string;
   createdAt: string;
@@ -152,18 +154,87 @@ export interface ProjectUsage {
   proxyBytes: number;
 }
 
+export type FetchFormat = 'raw' | 'markdown' | 'json';
+
 export interface FetchPageParams {
   url: string;
   allowRedirects?: boolean;
   allowInsecureSsl?: boolean;
   proxies?: boolean;
+  format?: FetchFormat;
+  schema?: Record<string, unknown>;
 }
 
 export interface FetchPageResponse {
   fetchId: string;
   statusCode: number;
   headers: Record<string, string>;
-  content: string;
+  content: unknown;
   contentType: string;
   encoding: string;
+}
+
+export interface WebSearchParams {
+  query: string;
+  numResults?: number;
+}
+
+export interface WebSearchResult {
+  resultId: string;
+  url: string;
+  title: string;
+  author?: string;
+  publishedDate?: string;
+  image?: string;
+  favicon?: string;
+}
+
+export interface WebSearchResponse {
+  requestId: string;
+  query: string;
+  results: WebSearchResult[];
+}
+
+export interface SessionUploadResponse {
+  message: string;
+}
+
+export interface UploadFileParams {
+  fileName: string;
+  contentBase64: string;
+  mimeType?: string;
+}
+
+export interface Download {
+  downloadId: string;
+  sessionId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  checksum: string;
+  createdAt: string;
+}
+
+export interface ListDownloadsParams {
+  sessionId: string;
+  filename?: string;
+  mimeType?: string;
+  minSize?: number;
+  maxSize?: number;
+  createdAfter?: string;
+  createdBefore?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ListDownloadsResponse {
+  downloads: Download[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface DownloadContent extends Download {
+  contentBase64: string;
+  byteLength: number;
 }

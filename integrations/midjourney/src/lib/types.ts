@@ -28,8 +28,65 @@ export interface DescribeRequest {
 export interface UpscaleRequest {
   parentTaskId?: string;
   imageUrl?: string;
-  type: '2x' | '4x';
+  type: '1x' | '2x' | '4x' | 'subtle' | 'creative';
   index?: string;
+  webhookUrl?: string;
+  webhookSecret?: string;
+}
+
+export interface RerollRequest {
+  parentTaskId: string;
+  prompt?: string;
+  aspectRatio?: string;
+  webhookUrl?: string;
+  webhookSecret?: string;
+}
+
+export interface PanRequest {
+  parentTaskId: string;
+  direction: 'up' | 'down' | 'left' | 'right';
+  prompt?: string;
+  webhookUrl?: string;
+  webhookSecret?: string;
+}
+
+export interface OutpaintRequest {
+  parentTaskId: string;
+  zoomRatio: number;
+  aspectRatio?: string;
+  prompt?: string;
+  webhookUrl?: string;
+  webhookSecret?: string;
+}
+
+export interface InpaintRequest {
+  parentTaskId: string;
+  mask: string;
+  prompt?: string;
+  webhookUrl?: string;
+  webhookSecret?: string;
+}
+
+export interface SeedRequest {
+  taskId: string;
+  webhookUrl?: string;
+  webhookSecret?: string;
+}
+
+export interface ImagineVideoRequest {
+  prompt: string;
+  imageUrl: string;
+  motion?: 'low' | 'high';
+  webhookUrl?: string;
+  webhookSecret?: string;
+}
+
+export interface ExtendVideoRequest {
+  parentTaskId: string;
+  index: string;
+  prompt: string;
+  imageUrl?: string;
+  motion?: 'low' | 'high';
   webhookUrl?: string;
   webhookSecret?: string;
 }
@@ -83,12 +140,30 @@ export interface UpscaleTaskResult {
   image_url?: string;
 }
 
+export interface VideoTaskResult {
+  task_id: string;
+  task_type: string;
+  status?: string;
+  percentage?: string;
+  video_urls?: string[];
+}
+
+export interface SeedTaskResult {
+  task_id: string;
+  task_type: 'seed';
+  status?: string;
+  percentage?: string;
+  seed?: string;
+}
+
 export type TaskResult =
   | ImagineTaskResult
   | VariationsTaskResult
   | BlendTaskResult
   | DescribeTaskResult
-  | UpscaleTaskResult;
+  | UpscaleTaskResult
+  | VideoTaskResult
+  | SeedTaskResult;
 
 export interface FetchTaskResponse {
   task_id: string;
@@ -98,7 +173,20 @@ export interface FetchTaskResponse {
   original_image_url?: string;
   image_urls?: string[];
   image_url?: string;
+  video_urls?: string[];
   content?: string[];
   sref?: string;
+  seed?: string;
   error?: string;
+}
+
+export interface FetchManyResponse {
+  tasks: FetchTaskResponse[];
+}
+
+export interface AccountInfoResponse {
+  email?: string;
+  credits?: number;
+  total_images?: number;
+  plan?: string;
 }

@@ -228,3 +228,87 @@ export let updateRequester = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let deleteRequester = SlateTool.create(spec, {
+  name: 'Deactivate Requester',
+  key: 'delete_requester',
+  description: `Deactivate a requester/contact in Freshservice. Deactivated requesters can be reactivated.`,
+  tags: {
+    destructive: true,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      requesterId: z.number().describe('ID of the requester to deactivate')
+    })
+  )
+  .output(
+    z.object({
+      requesterId: z.number().describe('ID of the deactivated requester'),
+      deleted: z.boolean().describe('Whether deactivation was accepted')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      subdomain: ctx.config.subdomain,
+      authType: ctx.auth.authType
+    });
+
+    await client.deleteRequester(ctx.input.requesterId);
+
+    return {
+      output: {
+        requesterId: ctx.input.requesterId,
+        deleted: true
+      },
+      message: `Deactivated requester **#${ctx.input.requesterId}**`
+    };
+  })
+  .build();
+
+export let reactivateRequester = SlateTool.create(spec, {
+  name: 'Reactivate Requester',
+  key: 'reactivate_requester',
+  description: `Reactivate a deactivated requester/contact in Freshservice.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      requesterId: z.number().describe('ID of the requester to reactivate')
+    })
+  )
+  .output(
+    z.object({
+      requesterId: z.number().describe('ID of the reactivated requester'),
+      firstName: z.string().describe('First name'),
+      lastName: z.string().nullable().describe('Last name'),
+      email: z.string().nullable().describe('Primary email'),
+      active: z.boolean().nullable().describe('Whether the requester is active')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      subdomain: ctx.config.subdomain,
+      authType: ctx.auth.authType
+    });
+
+    let requester = await client.reactivateRequester(ctx.input.requesterId);
+
+    return {
+      output: {
+        requesterId: requester.id,
+        firstName: requester.first_name,
+        lastName: requester.last_name,
+        email: requester.primary_email,
+        active: requester.active ?? null
+      },
+      message: `Reactivated requester **#${requester.id}**`
+    };
+  })
+  .build();

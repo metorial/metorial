@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { iterableApiError } from './errors';
 
 export class IterableClient {
   private axios: ReturnType<typeof createAxios>;
@@ -18,6 +19,15 @@ export class IterableClient {
     });
   }
 
+  private async request<T>(operation: string, run: () => Promise<{ data: T }>): Promise<T> {
+    try {
+      let response = await run();
+      return response.data;
+    } catch (error) {
+      throw iterableApiError(error, operation);
+    }
+  }
+
   // ─── Users ──────────────────────────────────────────────────────
 
   async updateUser(params: {
@@ -28,8 +38,7 @@ export class IterableClient {
     mergeNestedObjects?: boolean;
     createNewFields?: boolean;
   }): Promise<any> {
-    let response = await this.axios.post('/users/update', params);
-    return response.data;
+    return await this.request('update user', () => this.axios.post('/users/update', params));
   }
 
   async bulkUpdateUsers(
@@ -41,35 +50,41 @@ export class IterableClient {
       mergeNestedObjects?: boolean;
     }[]
   ): Promise<any> {
-    let response = await this.axios.post('/users/bulkUpdate', { users });
-    return response.data;
+    return await this.request('bulk update users', () =>
+      this.axios.post('/users/bulkUpdate', { users })
+    );
   }
 
   async getUser(params: { email?: string; userId?: string }): Promise<any> {
     if (params.userId) {
-      let response = await this.axios.get('/users/byUserId', {
-        params: { userId: params.userId }
-      });
-      return response.data;
+      return await this.request('get user by userId', () =>
+        this.axios.get('/users/byUserId', {
+          params: { userId: params.userId }
+        })
+      );
     }
-    let response = await this.axios.get(`/users/${encodeURIComponent(params.email!)}`, {});
-    return response.data;
+    return await this.request('get user by email', () =>
+      this.axios.get('/users/getByEmail', {
+        params: { email: params.email }
+      })
+    );
   }
 
   async deleteUser(params: { email?: string; userId?: string }): Promise<any> {
     if (params.userId) {
-      let response = await this.axios.delete('/users/byUserId', {
-        params: { userId: params.userId }
-      });
-      return response.data;
+      return await this.request('delete user by userId', () =>
+        this.axios.delete('/users/byUserId', {
+          params: { userId: params.userId }
+        })
+      );
     }
-    let response = await this.axios.delete(`/users/${encodeURIComponent(params.email!)}`, {});
-    return response.data;
+    return await this.request('delete user by email', () =>
+      this.axios.delete(`/users/${encodeURIComponent(params.email!)}`, {})
+    );
   }
 
   async getUserFields(): Promise<any> {
-    let response = await this.axios.get('/users/fields');
-    return response.data;
+    return await this.request('get user fields', () => this.axios.get('/users/getFields'));
   }
 
   async mergeUsers(params: {
@@ -83,8 +98,7 @@ export class IterableClient {
     if (params.sourceUserId) body.sourceUserId = params.sourceUserId;
     if (params.destinationEmail) body.destinationEmail = params.destinationEmail;
     if (params.destinationUserId) body.destinationUserId = params.destinationUserId;
-    let response = await this.axios.post('/users/merge', body);
-    return response.data;
+    return await this.request('merge users', () => this.axios.post('/users/merge', body));
   }
 
   // ─── Events ─────────────────────────────────────────────────────
@@ -99,8 +113,7 @@ export class IterableClient {
     templateId?: number;
     createNewFields?: boolean;
   }): Promise<any> {
-    let response = await this.axios.post('/events/track', params);
-    return response.data;
+    return await this.request('track event', () => this.axios.post('/events/track', params));
   }
 
   async trackBulkEvents(
@@ -114,15 +127,17 @@ export class IterableClient {
       templateId?: number;
     }[]
   ): Promise<any> {
-    let response = await this.axios.post('/events/bulkTrack', { events });
-    return response.data;
+    return await this.request('bulk track events', () =>
+      this.axios.post('/events/bulkTrack', { events })
+    );
   }
 
   async getUserEvents(email: string, limit?: number): Promise<any> {
-    let response = await this.axios.get('/events', {
-      params: { email, limit: limit || 30 }
-    });
-    return response.data;
+    return await this.request('get user events', () =>
+      this.axios.get(`/events/${encodeURIComponent(email)}`, {
+        params: { limit: limit || 30 }
+      })
+    );
   }
 
   // ─── Commerce ───────────────────────────────────────────────────
@@ -149,8 +164,9 @@ export class IterableClient {
     createdAt?: number;
     createNewFields?: boolean;
   }): Promise<any> {
-    let response = await this.axios.post('/commerce/trackPurchase', params);
-    return response.data;
+    return await this.request('track purchase', () =>
+      this.axios.post('/commerce/trackPurchase', params)
+    );
   }
 
   async updateCart(params: {
@@ -170,76 +186,98 @@ export class IterableClient {
     }[];
     createNewFields?: boolean;
   }): Promise<any> {
-    let response = await this.axios.post('/commerce/updateCart', params);
-    return response.data;
+    return await this.request('update cart', () =>
+      this.axios.post('/commerce/updateCart', params)
+    );
   }
 
   // ─── Lists ──────────────────────────────────────────────────────
 
   async getLists(): Promise<any> {
-    let response = await this.axios.get('/lists');
-    return response.data;
+    return await this.request('list lists', () => this.axios.get('/lists'));
   }
 
   async createList(name: string): Promise<any> {
-    let response = await this.axios.post('/lists', { name });
-    return response.data;
+    return await this.request('create list', () => this.axios.post('/lists', { name }));
   }
 
   async deleteList(listId: number): Promise<any> {
-    let response = await this.axios.delete(`/lists/${listId}`);
-    return response.data;
+    return await this.request('delete list', () => this.axios.delete(`/lists/${listId}`));
   }
 
   async getListUsers(listId: number): Promise<any> {
-    let response = await this.axios.get(`/lists/getUsers`, {
-      params: { listId }
-    });
-    return response.data;
+    return await this.request('get list users', () =>
+      this.axios.get(`/lists/getUsers`, {
+        params: { listId },
+        responseType: 'text'
+      })
+    );
   }
 
   async subscribeToList(
     listId: number,
     subscribers: { email?: string; userId?: string; dataFields?: Record<string, any> }[]
   ): Promise<any> {
-    let response = await this.axios.post('/lists/subscribe', {
-      listId,
-      subscribers
-    });
-    return response.data;
+    return await this.request('subscribe users to list', () =>
+      this.axios.post('/lists/subscribe', {
+        listId,
+        subscribers
+      })
+    );
   }
 
   async unsubscribeFromList(
     listId: number,
     subscribers: { email?: string; userId?: string }[]
   ): Promise<any> {
-    let response = await this.axios.post('/lists/unsubscribe', {
-      listId,
-      subscribers
-    });
-    return response.data;
+    return await this.request('unsubscribe users from list', () =>
+      this.axios.post('/lists/unsubscribe', {
+        listId,
+        subscribers
+      })
+    );
   }
 
   // ─── Campaigns ──────────────────────────────────────────────────
 
-  async getCampaigns(): Promise<any> {
-    let response = await this.axios.get('/campaigns');
-    return response.data;
+  async getCampaigns(params?: {
+    page?: number;
+    pageSize?: number;
+    sort?: string;
+    campaignState?: string[];
+  }): Promise<any> {
+    return await this.request('list campaigns', () =>
+      this.axios.get('/campaigns', { params })
+    );
   }
 
   async createCampaign(params: {
     name: string;
-    listIds: number[];
+    listIds?: number[];
     templateId: number;
     suppressionListIds?: number[];
     sendAt?: string;
+    scheduleSend?: boolean;
     sendMode?: string;
     startTimeZone?: string;
     defaultTimeZone?: string;
     dataFields?: Record<string, any>;
   }): Promise<any> {
-    let response = await this.axios.post('/campaigns/create', params);
-    return response.data;
+    return await this.request('create campaign', () =>
+      this.axios.post('/campaigns/create', params)
+    );
+  }
+
+  async getCampaign(campaignId: number): Promise<any> {
+    return await this.request('get campaign', () =>
+      this.axios.get(`/campaigns/${campaignId}`)
+    );
+  }
+
+  async archiveCampaigns(campaignIds: number[]): Promise<any> {
+    return await this.request('archive campaigns', () =>
+      this.axios.post('/campaigns/archive', { campaignIds })
+    );
   }
 
   async getCampaignMetrics(
@@ -250,8 +288,9 @@ export class IterableClient {
     let params: Record<string, any> = { campaignId };
     if (startDateTime) params.startDateTime = startDateTime;
     if (endDateTime) params.endDateTime = endDateTime;
-    let response = await this.axios.get('/campaigns/metrics', { params });
-    return response.data;
+    return await this.request('get campaign metrics', () =>
+      this.axios.get('/campaigns/metrics', { params, responseType: 'text' })
+    );
   }
 
   // ─── Templates ──────────────────────────────────────────────────
@@ -261,16 +300,21 @@ export class IterableClient {
     messageMedium?: string;
     startDateTime?: string;
     endDateTime?: string;
+    page?: number;
+    pageSize?: number;
+    sort?: string;
   }): Promise<any> {
-    let response = await this.axios.get('/templates', { params });
-    return response.data;
+    return await this.request('list templates', () =>
+      this.axios.get('/templates', { params })
+    );
   }
 
   async getEmailTemplate(templateId: number): Promise<any> {
-    let response = await this.axios.get(`/templates/email/get`, {
-      params: { templateId }
-    });
-    return response.data;
+    return await this.request('get email template', () =>
+      this.axios.get(`/templates/email/get`, {
+        params: { templateId }
+      })
+    );
   }
 
   async updateEmailTemplate(params: {
@@ -285,29 +329,33 @@ export class IterableClient {
     plainText?: string;
     metadata?: Record<string, any>;
   }): Promise<any> {
-    let response = await this.axios.post('/templates/email/update', params);
-    return response.data;
+    return await this.request('update email template', () =>
+      this.axios.post('/templates/email/update', params)
+    );
   }
 
   async getPushTemplate(templateId: number): Promise<any> {
-    let response = await this.axios.get('/templates/push/get', {
-      params: { templateId }
-    });
-    return response.data;
+    return await this.request('get push template', () =>
+      this.axios.get('/templates/push/get', {
+        params: { templateId }
+      })
+    );
   }
 
   async getSmsTemplate(templateId: number): Promise<any> {
-    let response = await this.axios.get('/templates/sms/get', {
-      params: { templateId }
-    });
-    return response.data;
+    return await this.request('get sms template', () =>
+      this.axios.get('/templates/sms/get', {
+        params: { templateId }
+      })
+    );
   }
 
   async getInAppTemplate(templateId: number): Promise<any> {
-    let response = await this.axios.get('/templates/inapp/get', {
-      params: { templateId }
-    });
-    return response.data;
+    return await this.request('get in-app template', () =>
+      this.axios.get('/templates/inapp/get', {
+        params: { templateId }
+      })
+    );
   }
 
   // ─── Email ──────────────────────────────────────────────────────
@@ -321,8 +369,7 @@ export class IterableClient {
     allowRepeatMarketingSends?: boolean;
     metadata?: Record<string, any>;
   }): Promise<any> {
-    let response = await this.axios.post('/email/target', params);
-    return response.data;
+    return await this.request('send email', () => this.axios.post('/email/target', params));
   }
 
   // ─── Push ───────────────────────────────────────────────────────
@@ -336,8 +383,7 @@ export class IterableClient {
     allowRepeatMarketingSends?: boolean;
     metadata?: Record<string, any>;
   }): Promise<any> {
-    let response = await this.axios.post('/push/target', params);
-    return response.data;
+    return await this.request('send push', () => this.axios.post('/push/target', params));
   }
 
   // ─── SMS ────────────────────────────────────────────────────────
@@ -351,8 +397,7 @@ export class IterableClient {
     allowRepeatMarketingSends?: boolean;
     metadata?: Record<string, any>;
   }): Promise<any> {
-    let response = await this.axios.post('/sms/target', params);
-    return response.data;
+    return await this.request('send sms', () => this.axios.post('/sms/target', params));
   }
 
   // ─── In-App ─────────────────────────────────────────────────────
@@ -366,8 +411,7 @@ export class IterableClient {
     allowRepeatMarketingSends?: boolean;
     metadata?: Record<string, any>;
   }): Promise<any> {
-    let response = await this.axios.post('/inApp/target', params);
-    return response.data;
+    return await this.request('send in-app', () => this.axios.post('/inApp/target', params));
   }
 
   // ─── Web Push ───────────────────────────────────────────────────
@@ -381,47 +425,56 @@ export class IterableClient {
     allowRepeatMarketingSends?: boolean;
     metadata?: Record<string, any>;
   }): Promise<any> {
-    let response = await this.axios.post('/webPush/target', params);
-    return response.data;
+    return await this.request('send web push', () =>
+      this.axios.post('/webPush/target', params)
+    );
   }
 
   // ─── Channels & Message Types ───────────────────────────────────
 
   async getChannels(): Promise<any> {
-    let response = await this.axios.get('/channels');
-    return response.data;
+    return await this.request('get channels', () => this.axios.get('/channels'));
   }
 
   async getMessageTypes(): Promise<any> {
-    let response = await this.axios.get('/messageTypes');
-    return response.data;
+    return await this.request('get message types', () => this.axios.get('/messageTypes'));
   }
 
   // ─── Catalogs ───────────────────────────────────────────────────
 
   async getCatalogs(): Promise<any> {
-    let response = await this.axios.get('/catalogs');
-    return response.data;
+    return await this.request('list catalogs', () => this.axios.get('/catalogs'));
   }
 
   async createCatalog(catalogName: string): Promise<any> {
-    let response = await this.axios.post('/catalogs', { catalogName });
-    return response.data;
+    return await this.request('create catalog', () =>
+      this.axios.post(`/catalogs/${encodeURIComponent(catalogName)}`)
+    );
   }
 
   async deleteCatalog(catalogName: string): Promise<any> {
-    let response = await this.axios.delete(`/catalogs/${encodeURIComponent(catalogName)}`);
-    return response.data;
+    return await this.request('delete catalog', () =>
+      this.axios.delete(`/catalogs/${encodeURIComponent(catalogName)}`)
+    );
   }
 
   async getCatalogItems(
     catalogName: string,
     params?: { page?: number; pageSize?: number }
   ): Promise<any> {
-    let response = await this.axios.get(`/catalogs/${encodeURIComponent(catalogName)}/items`, {
-      params
-    });
-    return response.data;
+    return await this.request('list catalog items', () =>
+      this.axios.get(`/catalogs/${encodeURIComponent(catalogName)}/items`, {
+        params
+      })
+    );
+  }
+
+  async getCatalogItem(catalogName: string, itemId: string): Promise<any> {
+    return await this.request('get catalog item', () =>
+      this.axios.get(
+        `/catalogs/${encodeURIComponent(catalogName)}/items/${encodeURIComponent(itemId)}`
+      )
+    );
   }
 
   async bulkUploadCatalogItems(
@@ -432,66 +485,77 @@ export class IterableClient {
     let body: Record<string, any> = { documents: items };
     if (replaceUploadedFieldsOnly !== undefined)
       body.replaceUploadedFieldsOnly = replaceUploadedFieldsOnly;
-    let response = await this.axios.post(
-      `/catalogs/${encodeURIComponent(catalogName)}/items`,
-      body
+    return await this.request('bulk upload catalog items', () =>
+      this.axios.post(`/catalogs/${encodeURIComponent(catalogName)}/items`, body)
     );
-    return response.data;
   }
 
   async deleteCatalogItems(catalogName: string, itemIds: string[]): Promise<any> {
-    let response = await this.axios.delete(
-      `/catalogs/${encodeURIComponent(catalogName)}/items`,
-      {
+    return await this.request('delete catalog items', () =>
+      this.axios.delete(`/catalogs/${encodeURIComponent(catalogName)}/items`, {
         data: { itemIds }
-      }
+      })
     );
-    return response.data;
   }
 
   // ─── Snippets ───────────────────────────────────────────────────
 
   async getSnippets(): Promise<any> {
-    let response = await this.axios.get('/snippets');
-    return response.data;
+    return await this.request('list snippets', () => this.axios.get('/snippets'));
   }
 
   async createSnippet(params: { name: string; content: string }): Promise<any> {
-    let response = await this.axios.post('/snippets', params);
-    return response.data;
+    return await this.request('create snippet', () => this.axios.post('/snippets', params));
+  }
+
+  async getSnippet(name: string): Promise<any> {
+    return await this.request('get snippet', () =>
+      this.axios.get(`/snippets/${encodeURIComponent(name)}`)
+    );
   }
 
   async updateSnippet(params: { name: string; content: string }): Promise<any> {
-    let response = await this.axios.post('/snippets/update', params);
-    return response.data;
+    return await this.request('update snippet', () =>
+      this.axios.put(`/snippets/${encodeURIComponent(params.name)}`, {
+        content: params.content
+      })
+    );
   }
 
   async deleteSnippet(name: string): Promise<any> {
-    let response = await this.axios.post('/snippets/delete', { name });
-    return response.data;
+    return await this.request('delete snippet', () =>
+      this.axios.delete(`/snippets/${encodeURIComponent(name)}`)
+    );
   }
 
   // ─── Export ─────────────────────────────────────────────────────
 
   async exportData(params: {
+    format: 'csv' | 'json';
     dataTypeName: string;
     range?: string;
     startDateTime?: string;
     endDateTime?: string;
     delimiter?: string;
+    omitFields?: string;
+    onlyFields?: string[];
     campaignId?: number;
-  }): Promise<any> {
-    let response = await this.axios.post('/export/data', params);
-    return response.data;
+  }): Promise<string> {
+    let { format, ...query } = params;
+    let path = format === 'csv' ? '/export/data.csv' : '/export/data.json';
+    return await this.request(`export data ${format}`, () =>
+      this.axios.get(path, { params: query, responseType: 'text' })
+    );
   }
 
   async exportUserEvents(params: {
     email?: string;
     userId?: string;
     includeCustomEvents?: boolean;
-  }): Promise<any> {
-    let response = await this.axios.get('/export/userEvents', { params });
-    return response.data;
+  }): Promise<string> {
+    return await this.request('export user events', () =>
+      this.axios.get('/export/userEvents', { params, responseType: 'text' })
+    );
   }
 
   // ─── Subscriptions ──────────────────────────────────────────────
@@ -505,14 +569,25 @@ export class IterableClient {
     campaignId?: number;
     templateId?: number;
   }): Promise<any> {
-    let response = await this.axios.post('/users/updateSubscriptions', params);
-    return response.data;
+    return await this.request('update subscriptions', () =>
+      this.axios.post('/users/updateSubscriptions', params)
+    );
   }
 
   // ─── Webhooks ───────────────────────────────────────────────────
 
   async getWebhooks(): Promise<any> {
-    let response = await this.axios.get('/webhooks');
-    return response.data;
+    return await this.request('get webhooks', () => this.axios.get('/webhooks'));
+  }
+
+  // ─── Journeys ───────────────────────────────────────────────────
+
+  async getJourneys(params?: {
+    page?: number;
+    pageSize?: number;
+    sort?: string;
+    state?: string[];
+  }): Promise<any> {
+    return await this.request('list journeys', () => this.axios.get('/journeys', { params }));
   }
 }

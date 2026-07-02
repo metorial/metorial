@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { flyIoServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -76,7 +77,7 @@ export let manageMachineLease = SlateTool.create(spec, {
 
     // release
     if (!ctx.input.nonce) {
-      throw new Error('Nonce is required to release a lease');
+      throw flyIoServiceError('Nonce is required to release a lease');
     }
     await client.releaseLease(appName, machineId, ctx.input.nonce);
     return {

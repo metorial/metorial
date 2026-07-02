@@ -9,6 +9,7 @@ import {
   getContact,
   getEvent,
   getMessage,
+  getMyProfile,
   listCalendars,
   listContacts,
   listEvents,
@@ -28,6 +29,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     sendMessage,
+    getMyProfile,
     listMessages,
     getMessage,
     manageMessage,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { docsumoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let documentSchema = z.object({
@@ -78,7 +79,7 @@ export let uploadDocument = SlateTool.create(spec, {
 
     if (ctx.input.source === 'url') {
       if (!ctx.input.fileUrl) {
-        throw new Error('fileUrl is required when source is "url"');
+        throw docsumoServiceError('fileUrl is required when source is "url".');
       }
       documents = await client.uploadFromUrl({
         fileUrl: ctx.input.fileUrl,
@@ -91,10 +92,10 @@ export let uploadDocument = SlateTool.create(spec, {
       });
     } else {
       if (!ctx.input.base64Content) {
-        throw new Error('base64Content is required when source is "base64"');
+        throw docsumoServiceError('base64Content is required when source is "base64".');
       }
       if (!ctx.input.filename) {
-        throw new Error('filename is required when source is "base64"');
+        throw docsumoServiceError('filename is required when source is "base64".');
       }
       documents = await client.uploadFromBase64({
         base64Content: ctx.input.base64Content,

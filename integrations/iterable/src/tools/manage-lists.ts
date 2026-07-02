@@ -1,7 +1,25 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { IterableClient } from '../lib/client';
+import { requireArrayField, requireField, requireUserIdentity } from '../lib/validation';
 import { spec } from '../spec';
+
+let parseListUsers = (result: unknown) => {
+  if (typeof result === 'string') {
+    return result
+      .split(/\r?\n|,/)
+      .map(user => user.trim())
+      .filter(Boolean);
+  }
+
+  let value = result as any;
+  let users = value?.users || value?.params?.users || value?.emails || [];
+  if (!Array.isArray(users)) {
+    return [];
+  }
+
+  return users.map(user => String(user)).filter(Boolean);
+};
 
 export let manageLists = SlateTool.create(spec, {
   name: 'Manage Lists',
@@ -15,9 +33,9 @@ export let manageLists = SlateTool.create(spec, {
   .input(
     z.object({
       action: z
-        .enum(['list', 'create', 'delete', 'subscribe', 'unsubscribe'])
+        .enum(['list', 'create', 'delete', 'getUsers', 'subscribe', 'unsubscribe'])
         .describe(
-          'Operation to perform: list all lists, create a new list, delete a list, subscribe users to a list, or unsubscribe users from a list'
+          'Operation to perform: list all lists, create a new list, delete a list, get users in a list, subscribe users to a list, or unsubscribe users from a list'
         ),
       listName: z.string().optional().describe('Name for a new list (required for create)'),
       listId: z
@@ -61,6 +79,8 @@ export let manageLists = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Number of failed subscribe/unsubscribe operations'),
+      users: z.array(z.string()).optional().describe('Users returned by getUsers'),
+      userCount: z.number().optional().describe('Number of users returned by getUsers'),
       message: z.string().describe('Result message')
     })
   )
@@ -88,56 +108,83 @@ export let manageLists = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      let result = await client.createList(ctx.input.listName!);
+      let listName = requireField(ctx.input.listName, 'listName');
+      let result = await client.createList(listName);
       return {
         output: {
           listId: result.listId,
-          message: `List "${ctx.input.listName}" created.`
+          message: `List "${listName}" created.`
         },
-        message: `Created list **${ctx.input.listName}** with ID **${result.listId}**.`
+        message: `Created list **${listName}** with ID **${result.listId}**.`
       };
     }
 
     if (ctx.input.action === 'delete') {
-      await client.deleteList(ctx.input.listId!);
+      let listId = requireField(ctx.input.listId, 'listId');
+      await client.deleteList(listId);
       return {
         output: {
-          message: `List ${ctx.input.listId} deleted.`
+          message: `List ${listId} deleted.`
         },
-        message: `Deleted list **${ctx.input.listId}**.`
+        message: `Deleted list **${listId}**.`
+      };
+    }
+
+    if (ctx.input.action === 'getUsers') {
+      let listId = requireField(ctx.input.listId, 'listId');
+      let users = parseListUsers(await client.getListUsers(listId));
+      return {
+        output: {
+          users,
+          userCount: users.length,
+          message: `Found ${users.length} user(s) in list ${listId}.`
+        },
+        message: `Retrieved **${users.length}** user(s) from list **${listId}**.`
       };
     }
 
     if (ctx.input.action === 'subscribe') {
-      let subs = (ctx.input.subscribers || []).map(s => ({
+      let listId = requireField(ctx.input.listId, 'listId');
+      let subscribers = requireArrayField(ctx.input.subscribers, 'subscribers');
+      for (let subscriber of subscribers) {
+        requireUserIdentity(subscriber, 'subscriber');
+      }
+
+      let subs = subscribers.map(s => ({
         email: s.email,
         userId: s.userId,
         dataFields: s.subscriberFields
       }));
-      let result = await client.subscribeToList(ctx.input.listId!, subs);
+      let result = await client.subscribeToList(listId, subs);
       return {
         output: {
           successCount: result.successCount,
           failCount: result.failCount,
-          message: `Subscribed ${result.successCount || subs.length} user(s) to list ${ctx.input.listId}.`
+          message: `Subscribed ${result.successCount || subs.length} user(s) to list ${listId}.`
         },
-        message: `Subscribed **${result.successCount || subs.length}** user(s) to list **${ctx.input.listId}**.`
+        message: `Subscribed **${result.successCount || subs.length}** user(s) to list **${listId}**.`
       };
     }
 
     // unsubscribe
-    let subs = (ctx.input.subscribers || []).map(s => ({
+    let listId = requireField(ctx.input.listId, 'listId');
+    let subscribers = requireArrayField(ctx.input.subscribers, 'subscribers');
+    for (let subscriber of subscribers) {
+      requireUserIdentity(subscriber, 'subscriber');
+    }
+
+    let subs = subscribers.map(s => ({
       email: s.email,
       userId: s.userId
     }));
-    let result = await client.unsubscribeFromList(ctx.input.listId!, subs);
+    let result = await client.unsubscribeFromList(listId, subs);
     return {
       output: {
         successCount: result.successCount,
         failCount: result.failCount,
-        message: `Unsubscribed ${result.successCount || subs.length} user(s) from list ${ctx.input.listId}.`
+        message: `Unsubscribed ${result.successCount || subs.length} user(s) from list ${listId}.`
       },
-      message: `Unsubscribed **${result.successCount || subs.length}** user(s) from list **${ctx.input.listId}**.`
+      message: `Unsubscribed **${result.successCount || subs.length}** user(s) from list **${listId}**.`
     };
   })
   .build();

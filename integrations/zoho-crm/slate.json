@@ -1,6 +1,6 @@
 {
   "name": "@metorial/zoho-crm",
-  "description": "Manage CRM data including leads, contacts, accounts, deals, tasks, events, campaigns, products, quotes, invoices, and custom modules. Create, read, update, and delete records across all modules. Search and query records using COQL or criteria-based search. Send emails from CRM and manage email templates. Upload and download file attachments. Manage users, roles, territories, and record sharing rules. Organize records with tags and notes. Interact with blueprints to move records through business processes. Enroll and unenroll records in automated cadences. Perform bulk data import and export operations. Subscribe to record change notifications for create, update, and delete events.",
+  "description": "Manage Zoho CRM records across standard and custom modules with the current V8 APIs. Create, read, update, delete, search, and query records; discover module fields, layouts, custom views, and related lists; manage notes, tags, and record attachments; send CRM emails; inspect users and organization metadata; and subscribe to record change notifications.",
   "categories": ["crm-and-sales-tools", "task-and-project-management"],
   "skills": [
     "manage leads and contacts",
@@ -8,10 +8,9 @@
     "search and query records",
     "send CRM emails",
     "manage file attachments",
-    "bulk data import export",
-    "manage users and roles",
+    "discover module metadata",
+    "manage users",
     "organize records with tags",
-    "automate cadence enrollment",
     "subscribe to record notifications"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/zoho-crm.svg",

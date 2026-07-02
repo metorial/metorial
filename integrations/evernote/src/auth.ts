@@ -1,6 +1,7 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
 import { Client } from './lib/client';
+import { evernoteServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -36,7 +37,7 @@ export let auth = SlateAuth.create()
       // For OAuth 1.0a, this shouldn't be called directly in the standard flow
       // but the framework requires it. The actual token exchange happens via the OAuth flow.
       // If user already has a token, they can use the developer token auth method instead.
-      throw new Error(
+      throw evernoteServiceError(
         'OAuth 1.0a requires the full OAuth flow. Use the Developer Token auth method for direct token access.'
       );
     }

@@ -1,9 +1,15 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { boxApiError, boxServiceError } from './lib/errors';
 
 let authAxios = createAxios({
   baseURL: 'https://api.box.com'
 });
+
+authAxios.interceptors.response.use(
+  response => response,
+  error => Promise.reject(boxApiError(error, 'authentication request'))
+);
 
 export let auth = SlateAuth.create()
   .output(
@@ -116,7 +122,7 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw boxServiceError('No refresh token available');
       }
 
       let response = await authAxios.post(

@@ -36,6 +36,14 @@ Create, update, delete, or list client grants. Client grants authorize applicati
 
 Create, update, delete, or list identity provider connections. Connections define how users authenticate — database, social (Google, Facebook), enterprise (SAML, OIDC), or passwordless (SMS, email).
 
+### Manage Log Streams
+
+Create, update, delete, get, or list Auth0 log streams for delivering tenant logs to HTTP webhooks and supported event destinations.
+
+### Manage Organization Member Roles
+
+List, assign, or remove roles for a user inside a specific Auth0 Organization membership.
+
 ### Manage Organization Members
 
 List, add, or remove members from an organization. Members are Auth0 users associated with an organization for multi-tenant B2B scenarios.
@@ -44,6 +52,10 @@ List, add, or remove members from an organization. Members are Auth0 users assoc
 
 Create, update, delete, or list organizations for multi-tenant B2B scenarios. Organizations group users and can have their own connections, branding, and member roles.
 
+### Manage Role Permissions
+
+List, assign, or remove permissions granted to an Auth0 role. Permissions reference API resource-server identifiers and scope names.
+
 ### Manage Resource Servers
 
 Create, update, delete, or list API resource servers. Resource servers represent APIs protected by Auth0, with defined scopes/permissions and token settings.
@@ -51,6 +63,10 @@ Create, update, delete, or list API resource servers. Resource servers represent
 ### Manage Roles
 
 Create, update, delete, or list roles. Roles define sets of permissions that can be assigned to users for role-based access control (RBAC).
+
+### Manage User Permissions
+
+List, assign, or remove direct Auth0 permissions for a user. Permissions reference API resource-server identifiers and scope names.
 
 ### Manage User Roles
 

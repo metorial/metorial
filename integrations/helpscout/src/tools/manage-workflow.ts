@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HelpScoutClient } from '../lib/client';
+import { helpscoutServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageWorkflow = SlateTool.create(spec, {
@@ -64,7 +65,7 @@ export let manageWorkflow = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'activate') {
-      if (!ctx.input.workflowId) throw new Error('Workflow ID is required');
+      if (!ctx.input.workflowId) throw helpscoutServiceError('Workflow ID is required');
       await client.activateWorkflow(ctx.input.workflowId);
       return {
         output: { success: true },
@@ -73,7 +74,7 @@ export let manageWorkflow = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'deactivate') {
-      if (!ctx.input.workflowId) throw new Error('Workflow ID is required');
+      if (!ctx.input.workflowId) throw helpscoutServiceError('Workflow ID is required');
       await client.deactivateWorkflow(ctx.input.workflowId);
       return {
         output: { success: true },
@@ -82,8 +83,9 @@ export let manageWorkflow = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'run') {
-      if (!ctx.input.workflowId) throw new Error('Workflow ID is required');
-      if (!ctx.input.conversationIds?.length) throw new Error('Conversation IDs are required');
+      if (!ctx.input.workflowId) throw helpscoutServiceError('Workflow ID is required');
+      if (!ctx.input.conversationIds?.length)
+        throw helpscoutServiceError('Conversation IDs are required');
       await client.runWorkflowOnConversations(ctx.input.workflowId, ctx.input.conversationIds);
       return {
         output: { success: true },

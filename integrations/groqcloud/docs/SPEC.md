@@ -58,7 +58,11 @@ User prompts can include harmful or policy-violating content, and safeguard mode
 
 ### Batch Processing
 
-The Batch API allows processing large-scale workloads asynchronously by submitting thousands of API requests as a batch, with 50% lower cost, no impact to standard rate limits, and a 24-hour to 7-day processing window. Supports chat completions, audio transcriptions, and audio translations. Input is provided as a JSONL file.
+The Batch API allows processing large-scale workloads asynchronously by submitting many chat completion requests as a batch, with 50% lower cost, no impact to standard rate limits, and a 24-hour to 7-day processing window. Input is provided as a JSONL file uploaded through the Files API. Completed batches expose output and error file IDs that can be downloaded through the Files API.
+
+### Files
+
+GroqCloud exposes an OpenAI-compatible Files API for Batch API workflows. Files can be uploaded with purpose `batch`, listed, retrieved by ID, deleted, and downloaded. Downloaded file contents are returned as Slate attachments instead of inline output.
 
 ### Model Listing
 

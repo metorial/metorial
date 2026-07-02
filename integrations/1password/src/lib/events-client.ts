@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { onePasswordApiError } from './errors';
 
 let EVENTS_API_BASE_URLS: Record<string, string> = {
   us: 'https://events.1password.com',
@@ -142,24 +143,36 @@ export class EventsClient {
 
   async getAuditEvents(params: EventsCursorRequest): Promise<EventsResponse<AuditEvent>> {
     let body = this.buildRequestBody(params);
-    let res = await this.http.post('/auditevents', body);
-    return res.data;
+    try {
+      let res = await this.http.post('/auditevents', body);
+      return res.data;
+    } catch (error) {
+      throw onePasswordApiError(error, 'get audit events');
+    }
   }
 
   async getItemUsageEvents(
     params: EventsCursorRequest
   ): Promise<EventsResponse<ItemUsageEvent>> {
     let body = this.buildRequestBody(params);
-    let res = await this.http.post('/itemusages', body);
-    return res.data;
+    try {
+      let res = await this.http.post('/itemusages', body);
+      return res.data;
+    } catch (error) {
+      throw onePasswordApiError(error, 'get item usage events');
+    }
   }
 
   async getSignInAttemptEvents(
     params: EventsCursorRequest
   ): Promise<EventsResponse<SignInAttemptEvent>> {
     let body = this.buildRequestBody(params);
-    let res = await this.http.post('/signinattempts', body);
-    return res.data;
+    try {
+      let res = await this.http.post('/signinattempts', body);
+      return res.data;
+    } catch (error) {
+      throw onePasswordApiError(error, 'get sign-in attempt events');
+    }
   }
 
   private buildRequestBody(params: EventsCursorRequest): Record<string, unknown> {

@@ -28,8 +28,12 @@ export let getProject = SlateTool.create(spec, {
       apiKeys: z
         .array(
           z.object({
+            keyId: z.string().optional().describe('API key ID'),
             name: z.string().describe('Key name (e.g., anon, service_role)'),
-            keyValue: z.string().describe('The API key value')
+            type: z.string().optional().describe('API key type (legacy, publishable, secret)'),
+            prefix: z.string().optional().describe('API key prefix'),
+            keyValue: z.string().describe('The revealed API key value when available'),
+            createdAt: z.string().optional().describe('Creation timestamp')
           })
         )
         .optional()
@@ -45,8 +49,12 @@ export let getProject = SlateTool.create(spec, {
     ]);
 
     let keys = (Array.isArray(apiKeys) ? apiKeys : []).map((k: any) => ({
+      keyId: k.id ?? undefined,
       name: k.name ?? '',
-      keyValue: k.api_key ?? ''
+      type: k.type ?? undefined,
+      prefix: k.prefix ?? undefined,
+      keyValue: k.api_key ?? '',
+      createdAt: k.inserted_at ?? undefined
     }));
 
     return {

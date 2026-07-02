@@ -1,4 +1,5 @@
 export * from './barcode';
+export * from './compress-pdf';
 export * from './convert-pdf';
 export * from './edit-pdf';
 export * from './extract-data';

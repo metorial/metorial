@@ -3,6 +3,7 @@
   "description": "Query, insert, update, and delete data in PostgreSQL relational databases. Explore schemas and tables, manage schemas, tables, indexes, views, materialized views, and database roles, and poll tables for row changes using timestamp or incrementing columns.",
   "categories": ["apis-and-http-requests"],
   "skills": [
+    "run read-only select queries",
     "execute SQL queries",
     "manage database schemas",
     "insert and update data",

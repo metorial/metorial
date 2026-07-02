@@ -1,22 +1,35 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DeepgramClient } from '../lib/client';
+import { deepgramServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let customModeSchema = z
+  .enum(['strict', 'extended'])
+  .describe('How Deepgram should match custom topics or intents.');
 
 let transcriptionOptionsSchema = z.object({
   model: z
     .string()
     .optional()
     .describe(
-      'Model to use for transcription (e.g., "nova-3", "nova-2", "whisper-large"). Defaults to the latest general model.'
+      'Model to use for transcription (for example, "nova-3", "nova-2", or "whisper-large"). Defaults to the latest general model.'
     ),
+  version: z
+    .string()
+    .optional()
+    .describe('Specific model version to use, or "latest" for the latest model version.'),
   language: z
     .string()
     .optional()
     .describe(
-      'BCP-47 language code (e.g., "en", "es", "fr"). If not set, automatic language detection is used.'
+      'BCP-47 language code (for example, "en", "es", or "fr"). Leave unset when using detectLanguage.'
     ),
   detectLanguage: z.boolean().optional().describe('Enable automatic language detection.'),
+  detectEntities: z
+    .boolean()
+    .optional()
+    .describe('Extract named entities from submitted audio when supported.'),
   punctuate: z.boolean().optional().describe('Add punctuation to the transcript.'),
   smartFormat: z
     .boolean()
@@ -25,16 +38,54 @@ let transcriptionOptionsSchema = z.object({
   diarize: z
     .boolean()
     .optional()
-    .describe('Identify and label different speakers in the audio.'),
+    .describe('Deprecated Deepgram diarization flag. Prefer diarizeModel.'),
+  diarizeModel: z
+    .enum(['latest', 'v1', 'v2'])
+    .optional()
+    .describe('Enable diarization with a specific Deepgram diarization model version.'),
   utterances: z
     .boolean()
     .optional()
-    .describe('Segment transcript into utterances (speaker turns).'),
+    .describe('Segment transcript into utterances, typically speaker turns.'),
+  dictation: z
+    .boolean()
+    .optional()
+    .describe('Enable dictated formatting commands when supported by the selected model.'),
+  encoding: z
+    .string()
+    .optional()
+    .describe(
+      'Expected input audio encoding, for example "linear16", "flac", "mulaw", or "opus".'
+    ),
+  fillerWords: z
+    .boolean()
+    .optional()
+    .describe('Include filler words such as "uh" and "um" when supported.'),
+  measurements: z
+    .boolean()
+    .optional()
+    .describe('Convert spoken measurements to abbreviations when supported.'),
+  multichannel: z
+    .boolean()
+    .optional()
+    .describe('Transcribe each audio channel independently.'),
+  numerals: z
+    .boolean()
+    .optional()
+    .describe('Convert written numbers to numerical format when supported.'),
   keywords: z
     .array(z.string())
     .optional()
-    .describe('Keywords to boost recognition for (e.g., ["Deepgram", "AI"]).'),
+    .describe('Keywords to boost recognition for supported models.'),
+  keyterms: z
+    .array(z.string())
+    .optional()
+    .describe('Key term prompting values for Nova-3; sent as Deepgram keyterm parameters.'),
   search: z.array(z.string()).optional().describe('Terms to search for in the transcript.'),
+  replace: z
+    .array(z.string())
+    .optional()
+    .describe('Search/replace terms to apply using Deepgram replace query values.'),
   summarize: z.boolean().optional().describe('Generate a summary of the transcript.'),
   topics: z.boolean().optional().describe('Detect topics discussed in the audio.'),
   intents: z.boolean().optional().describe('Detect intents in the audio.'),
@@ -43,8 +94,32 @@ let transcriptionOptionsSchema = z.object({
   redact: z
     .array(z.string())
     .optional()
-    .describe('Types of information to redact (e.g., ["pci", "ssn", "numbers"]).'),
-  tag: z.string().optional().describe('Tag for tracking the request in usage reports.')
+    .describe('Types of information to redact, such as "pci", "ssn", or "numbers".'),
+  customTopics: z
+    .array(z.string())
+    .optional()
+    .describe('Custom topics to look for when topics is enabled.'),
+  customTopicMode: customModeSchema.optional(),
+  customIntents: z
+    .array(z.string())
+    .optional()
+    .describe('Custom intents to look for when intents is enabled.'),
+  customIntentMode: customModeSchema.optional(),
+  profanityFilter: z.boolean().optional().describe('Replace profanity in transcripts.'),
+  uttSplit: z
+    .number()
+    .optional()
+    .describe('Seconds of silence before Deepgram splits utterances.'),
+  mipOptOut: z.boolean().optional().describe('Opt out of model improvement processing.'),
+  tag: z.string().optional().describe('Tag for tracking the request in usage reports.'),
+  callbackUrl: z
+    .string()
+    .optional()
+    .describe('Optional callback URL for asynchronous transcription results.'),
+  callbackMethod: z
+    .enum(['POST', 'PUT'])
+    .optional()
+    .describe('HTTP method Deepgram should use for callback delivery.')
 });
 
 let wordSchema = z.object({
@@ -72,13 +147,39 @@ let channelSchema = z.object({
   detectedLanguage: z.string().optional()
 });
 
+let validateCustomOptions = (input: z.infer<typeof transcriptionOptionsSchema>) => {
+  if ((input.customTopics?.length ?? 0) > 0 && !input.topics) {
+    throw deepgramServiceError('customTopics requires topics=true.');
+  }
+
+  if (input.customTopicMode && (input.customTopics?.length ?? 0) === 0) {
+    throw deepgramServiceError('customTopicMode requires at least one customTopics value.');
+  }
+
+  if ((input.customIntents?.length ?? 0) > 0 && !input.intents) {
+    throw deepgramServiceError('customIntents requires intents=true.');
+  }
+
+  if (input.customIntentMode && (input.customIntents?.length ?? 0) === 0) {
+    throw deepgramServiceError('customIntentMode requires at least one customIntents value.');
+  }
+
+  if (input.callbackMethod && !input.callbackUrl) {
+    throw deepgramServiceError('callbackMethod requires callbackUrl.');
+  }
+
+  if (input.diarize && input.diarizeModel) {
+    throw deepgramServiceError('Use either diarize or diarizeModel, not both.');
+  }
+};
+
 export let transcribeAudioTool = SlateTool.create(spec, {
   name: 'Transcribe Audio',
   key: 'transcribe_audio',
-  description: `Transcribe pre-recorded audio to text. Supports audio from a URL or raw audio data (base64-encoded). Provides options for model selection, language detection, speaker diarization, smart formatting, keyword boosting, and text intelligence features (summarization, topic detection, sentiment analysis). Returns the full transcript with word-level timestamps and confidence scores.`,
+  description: `Transcribe pre-recorded audio to text from a URL or base64-encoded audio file. Supports model selection, language detection, diarization, smart formatting, keyword or keyterm prompting, callbacks, redaction, and Deepgram text intelligence features such as summarization, topic detection, intent detection, and sentiment analysis.`,
   instructions: [
-    'Provide either an audioUrl OR audioData+mimetype, not both.',
-    'For best results with smart formatting, use the "nova-3" model.',
+    'Provide either audioUrl or audioData+mimetype, not both.',
+    'Use callbackUrl for asynchronous transcription; callback requests return a requestId instead of transcript results.',
     'Enable diarize=true and utterances=true together for speaker-attributed transcripts.'
   ],
   tags: {
@@ -90,7 +191,7 @@ export let transcribeAudioTool = SlateTool.create(spec, {
       audioUrl: z
         .string()
         .optional()
-        .describe('URL of the audio file to transcribe. Use this OR audioData, not both.'),
+        .describe('URL of the audio file to transcribe. Use this or audioData, not both.'),
       audioData: z
         .string()
         .optional()
@@ -99,7 +200,7 @@ export let transcribeAudioTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'MIME type of the audio data (e.g., "audio/wav", "audio/mp3"). Required when using audioData.'
+          'MIME type of the audio data, for example "audio/wav" or "audio/mpeg". Required when using audioData.'
         ),
       ...transcriptionOptionsSchema.shape
     })
@@ -107,6 +208,10 @@ export let transcribeAudioTool = SlateTool.create(spec, {
   .output(
     z.object({
       requestId: z.string().optional().describe('Unique request identifier.'),
+      callbackSubmitted: z
+        .boolean()
+        .optional()
+        .describe('True when Deepgram accepted an asynchronous callback request.'),
       transcript: z
         .string()
         .describe('Full transcript text from the primary channel/alternative.'),
@@ -159,56 +264,81 @@ export let transcribeAudioTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new DeepgramClient(ctx.auth.token);
 
-    if (!ctx.input.audioUrl && !ctx.input.audioData) {
-      throw new Error('Either audioUrl or audioData must be provided.');
+    let hasAudioUrl = Boolean(ctx.input.audioUrl);
+    let hasAudioData = Boolean(ctx.input.audioData);
+
+    if (hasAudioUrl === hasAudioData) {
+      throw deepgramServiceError('Provide exactly one of audioUrl or audioData.');
     }
 
-    let result: any;
+    if (hasAudioData && !ctx.input.mimetype) {
+      throw deepgramServiceError('mimetype is required when providing audioData.');
+    }
 
-    if (ctx.input.audioUrl) {
-      result = await client.transcribeUrl({
-        url: ctx.input.audioUrl,
-        model: ctx.input.model,
-        language: ctx.input.language,
-        detectLanguage: ctx.input.detectLanguage,
-        punctuate: ctx.input.punctuate,
-        smartFormat: ctx.input.smartFormat,
-        diarize: ctx.input.diarize,
-        utterances: ctx.input.utterances,
-        keywords: ctx.input.keywords,
-        search: ctx.input.search,
-        summarize: ctx.input.summarize,
-        topics: ctx.input.topics,
-        intents: ctx.input.intents,
-        sentiment: ctx.input.sentiment,
-        paragraphs: ctx.input.paragraphs,
-        redact: ctx.input.redact,
-        tag: ctx.input.tag
-      });
-    } else {
-      if (!ctx.input.mimetype) {
-        throw new Error('mimetype is required when providing audioData.');
-      }
-      result = await client.transcribeAudio({
-        audioData: ctx.input.audioData!,
-        mimetype: ctx.input.mimetype,
-        model: ctx.input.model,
-        language: ctx.input.language,
-        detectLanguage: ctx.input.detectLanguage,
-        punctuate: ctx.input.punctuate,
-        smartFormat: ctx.input.smartFormat,
-        diarize: ctx.input.diarize,
-        utterances: ctx.input.utterances,
-        keywords: ctx.input.keywords,
-        search: ctx.input.search,
-        summarize: ctx.input.summarize,
-        topics: ctx.input.topics,
-        intents: ctx.input.intents,
-        sentiment: ctx.input.sentiment,
-        paragraphs: ctx.input.paragraphs,
-        redact: ctx.input.redact,
-        tag: ctx.input.tag
-      });
+    validateCustomOptions(ctx.input);
+
+    let commonParams = {
+      model: ctx.input.model,
+      version: ctx.input.version,
+      language: ctx.input.language,
+      detectLanguage: ctx.input.detectLanguage,
+      detectEntities: ctx.input.detectEntities,
+      punctuate: ctx.input.punctuate,
+      smartFormat: ctx.input.smartFormat,
+      diarize: ctx.input.diarize,
+      diarizeModel: ctx.input.diarizeModel,
+      utterances: ctx.input.utterances,
+      dictation: ctx.input.dictation,
+      encoding: ctx.input.encoding,
+      fillerWords: ctx.input.fillerWords,
+      measurements: ctx.input.measurements,
+      multichannel: ctx.input.multichannel,
+      numerals: ctx.input.numerals,
+      keywords: ctx.input.keywords,
+      keyterms: ctx.input.keyterms,
+      search: ctx.input.search,
+      replace: ctx.input.replace,
+      summarize: ctx.input.summarize,
+      topics: ctx.input.topics,
+      intents: ctx.input.intents,
+      sentiment: ctx.input.sentiment,
+      paragraphs: ctx.input.paragraphs,
+      redact: ctx.input.redact,
+      customTopics: ctx.input.customTopics,
+      customTopicMode: ctx.input.customTopicMode,
+      customIntents: ctx.input.customIntents,
+      customIntentMode: ctx.input.customIntentMode,
+      profanityFilter: ctx.input.profanityFilter,
+      uttSplit: ctx.input.uttSplit,
+      mipOptOut: ctx.input.mipOptOut,
+      tag: ctx.input.tag,
+      callback: ctx.input.callbackUrl,
+      callbackMethod: ctx.input.callbackMethod
+    };
+
+    let result: any = hasAudioUrl
+      ? await client.transcribeUrl({
+          url: ctx.input.audioUrl!,
+          ...commonParams
+        })
+      : await client.transcribeAudio({
+          audioData: ctx.input.audioData!,
+          mimetype: ctx.input.mimetype!,
+          ...commonParams
+        });
+
+    let requestId = result.metadata?.request_id || result.request_id;
+
+    if (ctx.input.callbackUrl && !result.results) {
+      return {
+        output: {
+          requestId,
+          callbackSubmitted: true,
+          transcript: '',
+          metadata: result.metadata ?? result
+        },
+        message: `Submitted asynchronous Deepgram transcription request${requestId ? ` **${requestId}**` : ''}.`
+      };
     }
 
     let firstChannel = result.results?.channels?.[0];
@@ -268,7 +398,8 @@ export let transcribeAudioTool = SlateTool.create(spec, {
 
     return {
       output: {
-        requestId: result.metadata?.request_id,
+        requestId,
+        callbackSubmitted: false,
         transcript,
         confidence: firstAlt?.confidence,
         words,

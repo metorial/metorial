@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RedisCloudClient } from '../lib/client';
 import { spec } from '../spec';
+import { subscriptionTypeSchema } from './common';
 
 export let backupDatabase = SlateTool.create(spec, {
   name: 'Backup Database',
@@ -17,7 +18,11 @@ export let backupDatabase = SlateTool.create(spec, {
     z.object({
       subscriptionId: z.number().describe('Subscription ID containing the database'),
       databaseId: z.number().describe('Database ID to back up'),
-      type: z.enum(['pro', 'essentials']).default('pro').describe('Subscription type'),
+      type: subscriptionTypeSchema,
+      regionName: z
+        .string()
+        .optional()
+        .describe('Region name for Pro Active-Active database backups'),
       adhocBackupPath: z
         .string()
         .optional()
@@ -33,6 +38,9 @@ export let backupDatabase = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new RedisCloudClient(ctx.auth);
     let body: Record<string, any> = {};
+    if (ctx.input.type === 'pro' && ctx.input.regionName) {
+      body.regionName = ctx.input.regionName;
+    }
     if (ctx.input.adhocBackupPath) body.adhocBackupPath = ctx.input.adhocBackupPath;
 
     let result: any;

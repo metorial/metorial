@@ -39,7 +39,7 @@ export let getProjectTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let project = await client.getProject(ctx.input.projectId);
 
     return {

@@ -1,34 +1,59 @@
 import { createAxios } from 'slates';
+import { railwayApiError, railwayServiceError } from './errors';
 
 let httpClient = createAxios({
   baseURL: 'https://backboard.railway.com/graphql/v2'
 });
 
+export type RailwayTokenHeader = 'authorization' | 'project-access-token';
+
 export class Client {
   private token: string;
+  private tokenHeader: RailwayTokenHeader;
 
-  constructor(config: { token: string }) {
+  constructor(config: { token: string; tokenHeader?: RailwayTokenHeader }) {
     this.token = config.token;
+    this.tokenHeader = config.tokenHeader ?? 'authorization';
+  }
+
+  private authHeaders() {
+    if (this.tokenHeader === 'project-access-token') {
+      return {
+        'Project-Access-Token': this.token
+      };
+    }
+
+    return {
+      Authorization: `Bearer ${this.token}`
+    };
   }
 
   private async graphql<T = any>(query: string, variables?: Record<string, any>): Promise<T> {
-    let response = await httpClient.post(
-      '',
-      {
-        query,
-        variables
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${this.token}`,
-          'Content-Type': 'application/json'
+    let response: any;
+
+    try {
+      response = await httpClient.post(
+        '',
+        {
+          query,
+          variables
+        },
+        {
+          headers: {
+            ...this.authHeaders(),
+            'Content-Type': 'application/json'
+          }
         }
-      }
-    );
+      );
+    } catch (error) {
+      throw railwayApiError(error, 'GraphQL request');
+    }
 
     if (response.data.errors && response.data.errors.length > 0) {
       let errorMessage = response.data.errors.map((e: any) => e.message).join(', ');
-      throw new Error(`GraphQL error: ${errorMessage}`);
+      let error = railwayServiceError(`Railway API GraphQL request failed: ${errorMessage}`);
+      error.data.reason = 'railway_graphql_error';
+      throw error;
     }
 
     return response.data.data as T;
@@ -116,6 +141,34 @@ export class Client {
       { id: projectId }
     );
     return true;
+  }
+
+  async getProjectMembers(projectId: string): Promise<any[]> {
+    let data = await this.graphql<{ projectMembers: any[] }>(
+      `
+      query($projectId: String!) {
+        projectMembers(projectId: $projectId) {
+          id name email avatar role
+        }
+      }
+    `,
+      { projectId }
+    );
+    return data.projectMembers;
+  }
+
+  async listRegions(projectId?: string): Promise<any[]> {
+    let data = await this.graphql<{ regions: any[] }>(
+      `
+      query($projectId: String) {
+        regions(projectId: $projectId) {
+          id name region country location workspaceId
+        }
+      }
+    `,
+      { projectId }
+    );
+    return data.regions;
   }
 
   // ─── Services ───
@@ -226,6 +279,26 @@ export class Client {
     return true;
   }
 
+  async deployService(input: {
+    serviceId: string;
+    environmentId: string;
+    commitSha?: string;
+  }): Promise<string> {
+    let data = await this.graphql<{ serviceInstanceDeployV2: string }>(
+      `
+      mutation($serviceId: String!, $environmentId: String!, $commitSha: String) {
+        serviceInstanceDeployV2(
+          serviceId: $serviceId
+          environmentId: $environmentId
+          commitSha: $commitSha
+        )
+      }
+    `,
+      input
+    );
+    return data.serviceInstanceDeployV2;
+  }
+
   // ─── Deployments ───
 
   async listDeployments(
@@ -315,6 +388,16 @@ export class Client {
     return true;
   }
 
+  async stopDeployment(deploymentId: string): Promise<boolean> {
+    await this.graphql(
+      `
+      mutation($id: String!) { deploymentStop(id: $id) }
+    `,
+      { id: deploymentId }
+    );
+    return true;
+  }
+
   async getBuildLogs(deploymentId: string, limit: number = 100): Promise<any[]> {
     let data = await this.graphql<{ buildLogs: any[] }>(
       `
@@ -341,6 +424,39 @@ export class Client {
       { deploymentId, limit }
     );
     return data.deploymentLogs;
+  }
+
+  async getHttpLogs(input: {
+    deploymentId: string;
+    limit?: number;
+    filter?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<any[]> {
+    let data = await this.graphql<{ httpLogs: any[] }>(
+      `
+      query(
+        $deploymentId: String!
+        $limit: Int
+        $filter: String
+        $startDate: String
+        $endDate: String
+      ) {
+        httpLogs(
+          deploymentId: $deploymentId
+          limit: $limit
+          filter: $filter
+          startDate: $startDate
+          endDate: $endDate
+        ) {
+          timestamp requestId method path host httpStatus responseDetails
+          totalDuration upstreamRqDuration rxBytes txBytes srcIp clientUa edgeRegion
+        }
+      }
+    `,
+      input
+    );
+    return data.httpLogs;
   }
 
   // ─── Environments ───
@@ -393,6 +509,18 @@ export class Client {
     return data.environmentCreate;
   }
 
+  async renameEnvironment(environmentId: string, name: string): Promise<any> {
+    let data = await this.graphql<{ environmentRename: any }>(
+      `
+      mutation($id: String!, $input: EnvironmentRenameInput!) {
+        environmentRename(id: $id, input: $input) { id name createdAt updatedAt }
+      }
+    `,
+      { id: environmentId, input: { name } }
+    );
+    return data.environmentRename;
+  }
+
   async deleteEnvironment(environmentId: string): Promise<boolean> {
     await this.graphql(
       `
@@ -401,6 +529,32 @@ export class Client {
       { id: environmentId }
     );
     return true;
+  }
+
+  async getEnvironmentLogs(input: {
+    environmentId: string;
+    limit?: number;
+    filter?: string;
+  }): Promise<any[]> {
+    let data = await this.graphql<{ environmentLogs: any[] }>(
+      `
+      query($environmentId: String!, $beforeLimit: Int, $filter: String) {
+        environmentLogs(
+          environmentId: $environmentId
+          beforeLimit: $beforeLimit
+          filter: $filter
+        ) {
+          timestamp message severity
+        }
+      }
+    `,
+      {
+        environmentId: input.environmentId,
+        beforeLimit: input.limit,
+        filter: input.filter
+      }
+    );
+    return data.environmentLogs;
   }
 
   // ─── Variables ───
@@ -495,6 +649,34 @@ export class Client {
     return data.domains;
   }
 
+  async checkCustomDomainAvailability(domain: string): Promise<any> {
+    let data = await this.graphql<{ customDomainAvailable: any }>(
+      `
+      query($domain: String!) {
+        customDomainAvailable(domain: $domain) { available message }
+      }
+    `,
+      { domain }
+    );
+    return data.customDomainAvailable;
+  }
+
+  async getDomainStatus(domainId: string, projectId: string): Promise<any> {
+    let data = await this.graphql<{ domainStatus: any }>(
+      `
+      query($id: String!, $projectId: String!) {
+        domainStatus(id: $id, projectId: $projectId) {
+          cdnProvider certificateStatus certificateStatusDetailed
+          certificateErrorMessage certificateErrorType certificateRetryable
+          dnsRecords { hostlabel requiredValue currentValue status }
+        }
+      }
+    `,
+      { id: domainId, projectId }
+    );
+    return data.domainStatus;
+  }
+
   async createServiceDomain(input: {
     serviceId: string;
     environmentId: string;
@@ -552,6 +734,26 @@ export class Client {
     return true;
   }
 
+  async updateCustomDomain(input: {
+    domainId: string;
+    environmentId: string;
+    targetPort?: number;
+  }): Promise<boolean> {
+    await this.graphql(
+      `
+      mutation($id: String!, $environmentId: String!, $targetPort: Int) {
+        customDomainUpdate(id: $id, environmentId: $environmentId, targetPort: $targetPort)
+      }
+    `,
+      {
+        id: input.domainId,
+        environmentId: input.environmentId,
+        targetPort: input.targetPort
+      }
+    );
+    return true;
+  }
+
   // ─── Volumes ───
 
   async listVolumes(projectId: string): Promise<any[]> {
@@ -585,6 +787,21 @@ export class Client {
     return data.volumeCreate;
   }
 
+  async getVolumeInstance(volumeInstanceId: string): Promise<any> {
+    let data = await this.graphql<{ volumeInstance: any }>(
+      `
+      query($id: String!) {
+        volumeInstance(id: $id) {
+          id volumeId serviceId environmentId mountPath region
+          state sizeMB currentSizeMB externalId createdAt
+        }
+      }
+    `,
+      { id: volumeInstanceId }
+    );
+    return data.volumeInstance;
+  }
+
   async updateVolume(volumeId: string, input: { name?: string }): Promise<any> {
     let data = await this.graphql<{ volumeUpdate: any }>(
       `
@@ -607,6 +824,34 @@ export class Client {
     return true;
   }
 
+  async listVolumeBackups(volumeInstanceId: string): Promise<any[]> {
+    let data = await this.graphql<{ volumeInstanceBackupList: any[] }>(
+      `
+      query($volumeInstanceId: String!) {
+        volumeInstanceBackupList(volumeInstanceId: $volumeInstanceId) {
+          id name createdAt expiresAt usedMB referencedMB volumeInstanceSizeMB
+        }
+      }
+    `,
+      { volumeInstanceId }
+    );
+    return data.volumeInstanceBackupList;
+  }
+
+  async createVolumeBackup(volumeInstanceId: string, name?: string): Promise<any> {
+    let data = await this.graphql<{ volumeInstanceBackupCreate: any }>(
+      `
+      mutation($volumeInstanceId: String!, $name: String) {
+        volumeInstanceBackupCreate(volumeInstanceId: $volumeInstanceId, name: $name) {
+          workflowId
+        }
+      }
+    `,
+      { volumeInstanceId, name }
+    );
+    return data.volumeInstanceBackupCreate;
+  }
+
   // ─── TCP Proxies ───
 
   async getTcpProxies(serviceId: string, environmentId: string): Promise<any[]> {
@@ -621,5 +866,33 @@ export class Client {
       { serviceId, environmentId }
     );
     return data.tcpProxies;
+  }
+
+  async createTcpProxy(input: {
+    serviceId: string;
+    environmentId: string;
+    applicationPort: number;
+  }): Promise<any> {
+    let data = await this.graphql<{ tcpProxyCreate: any }>(
+      `
+      mutation($input: TCPProxyCreateInput!) {
+        tcpProxyCreate(input: $input) {
+          id domain proxyPort applicationPort serviceId environmentId syncStatus createdAt
+        }
+      }
+    `,
+      { input }
+    );
+    return data.tcpProxyCreate;
+  }
+
+  async deleteTcpProxy(tcpProxyId: string): Promise<boolean> {
+    await this.graphql(
+      `
+      mutation($id: String!) { tcpProxyDelete(id: $id) }
+    `,
+      { id: tcpProxyId }
+    );
+    return true;
   }
 }

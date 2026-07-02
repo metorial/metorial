@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PineconeDataPlaneClient } from '../lib/client';
+import { pineconeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let deleteVectorsTool = SlateTool.create(spec, {
@@ -22,6 +23,7 @@ export let deleteVectorsTool = SlateTool.create(spec, {
       namespace: z.string().optional().describe('Namespace to delete from'),
       vectorIds: z
         .array(z.string())
+        .max(1000)
         .optional()
         .describe('Specific vector IDs to delete (max 1000)'),
       filter: z
@@ -37,6 +39,18 @@ export let deleteVectorsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let methodCount = [
+      ctx.input.vectorIds && ctx.input.vectorIds.length > 0,
+      ctx.input.filter,
+      ctx.input.deleteAll
+    ].filter(Boolean).length;
+
+    if (methodCount !== 1) {
+      throw pineconeServiceError(
+        'Provide exactly one delete method: vectorIds, filter, or deleteAll.'
+      );
+    }
+
     let client = new PineconeDataPlaneClient({
       token: ctx.auth.token,
       indexHost: ctx.input.indexHost

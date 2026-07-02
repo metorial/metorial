@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { activeCampaignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -65,7 +66,9 @@ export let manageTags = SlateTool.create(spec, {
     switch (ctx.input.action) {
       case 'create': {
         if (!ctx.input.tagName || !ctx.input.tagType) {
-          throw new Error('tagName and tagType are required for creating a tag');
+          throw activeCampaignServiceError(
+            'tagName and tagType are required for creating a tag'
+          );
         }
         let result = await client.createTag({
           tag: ctx.input.tagName,
@@ -87,7 +90,7 @@ export let manageTags = SlateTool.create(spec, {
       }
       case 'update': {
         if (!ctx.input.tagId) {
-          throw new Error('tagId is required for updating a tag');
+          throw activeCampaignServiceError('tagId is required for updating a tag');
         }
         let updatePayload: Record<string, any> = {};
         if (ctx.input.tagName) updatePayload.tag = ctx.input.tagName;
@@ -111,7 +114,7 @@ export let manageTags = SlateTool.create(spec, {
       }
       case 'delete': {
         if (!ctx.input.tagId) {
-          throw new Error('tagId is required for deleting a tag');
+          throw activeCampaignServiceError('tagId is required for deleting a tag');
         }
         await client.deleteTag(ctx.input.tagId);
         return {

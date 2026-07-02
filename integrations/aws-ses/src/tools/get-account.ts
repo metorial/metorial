@@ -17,6 +17,22 @@ export let getAccount = SlateTool.create(spec, {
       dedicatedIpAutoWarmupEnabled: z
         .boolean()
         .describe('Whether automatic IP warmup is enabled'),
+      details: z
+        .object({
+          additionalContactEmailAddresses: z.array(z.string()).optional(),
+          contactLanguage: z.string().optional(),
+          mailType: z.string().optional(),
+          reviewDetails: z
+            .object({
+              caseId: z.string().optional(),
+              status: z.string().optional()
+            })
+            .optional(),
+          useCaseDescription: z.string().optional(),
+          websiteUrl: z.string().optional()
+        })
+        .optional()
+        .describe('SES account details and production access review status'),
       enforcementStatus: z
         .string()
         .describe('Account enforcement status (HEALTHY, PROBATION, SHUTDOWN)'),
@@ -33,7 +49,21 @@ export let getAccount = SlateTool.create(spec, {
         .describe('Sending quota and usage'),
       suppressionAttributes: z
         .object({
-          suppressedReasons: z.array(z.string())
+          suppressedReasons: z.array(z.string()),
+          validationAttributes: z
+            .object({
+              conditionThreshold: z
+                .object({
+                  conditionThresholdEnabled: z.string().optional(),
+                  overallConfidenceThreshold: z
+                    .object({
+                      confidenceVerdictThreshold: z.string().optional()
+                    })
+                    .optional()
+                })
+                .optional()
+            })
+            .optional()
         })
         .optional()
         .describe('Account suppression settings'),

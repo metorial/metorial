@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { woocommerceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -97,7 +98,7 @@ export let manageShippingZones = SlateTool.create(spec, {
     }
 
     if (action === 'get_zone') {
-      if (!zoneId && zoneId !== 0) throw new Error('zoneId is required');
+      if (!zoneId && zoneId !== 0) throw woocommerceServiceError('zoneId is required');
       let zone = await client.getShippingZone(zoneId);
       return {
         output: { zone: { zoneId: zone.id, name: zone.name, order: zone.order || 0 } },
@@ -106,7 +107,7 @@ export let manageShippingZones = SlateTool.create(spec, {
     }
 
     if (action === 'create_zone') {
-      if (!ctx.input.name) throw new Error('name is required for create_zone');
+      if (!ctx.input.name) throw woocommerceServiceError('name is required for create_zone');
       let data: Record<string, any> = { name: ctx.input.name };
       if (ctx.input.order !== undefined) data.order = ctx.input.order;
       let zone = await client.createShippingZone(data);
@@ -117,7 +118,7 @@ export let manageShippingZones = SlateTool.create(spec, {
     }
 
     if (action === 'update_zone') {
-      if (!zoneId && zoneId !== 0) throw new Error('zoneId is required');
+      if (!zoneId && zoneId !== 0) throw woocommerceServiceError('zoneId is required');
       let data: Record<string, any> = {};
       if (ctx.input.name) data.name = ctx.input.name;
       if (ctx.input.order !== undefined) data.order = ctx.input.order;
@@ -129,13 +130,13 @@ export let manageShippingZones = SlateTool.create(spec, {
     }
 
     if (action === 'delete_zone') {
-      if (!zoneId && zoneId !== 0) throw new Error('zoneId is required');
+      if (!zoneId && zoneId !== 0) throw woocommerceServiceError('zoneId is required');
       await client.deleteShippingZone(zoneId);
       return { output: { deleted: true }, message: `Deleted shipping zone (ID: ${zoneId}).` };
     }
 
     if (action === 'list_methods') {
-      if (!zoneId && zoneId !== 0) throw new Error('zoneId is required');
+      if (!zoneId && zoneId !== 0) throw woocommerceServiceError('zoneId is required');
       let methods = await client.listShippingZoneMethods(zoneId);
       let mapped = methods.map((m: any) => ({
         instanceId: m.instance_id,
@@ -152,8 +153,9 @@ export let manageShippingZones = SlateTool.create(spec, {
     }
 
     if (action === 'add_method') {
-      if (!zoneId && zoneId !== 0) throw new Error('zoneId is required');
-      if (!ctx.input.methodId) throw new Error('methodId is required for add_method');
+      if (!zoneId && zoneId !== 0) throw woocommerceServiceError('zoneId is required');
+      if (!ctx.input.methodId)
+        throw woocommerceServiceError('methodId is required for add_method');
       let method = await client.addShippingZoneMethod(zoneId, {
         method_id: ctx.input.methodId
       });
@@ -173,7 +175,7 @@ export let manageShippingZones = SlateTool.create(spec, {
     }
 
     if (action === 'list_locations') {
-      if (!zoneId && zoneId !== 0) throw new Error('zoneId is required');
+      if (!zoneId && zoneId !== 0) throw woocommerceServiceError('zoneId is required');
       let locations = await client.listShippingZoneLocations(zoneId);
       let mapped = locations.map((l: any) => ({ code: l.code, type: l.type }));
       return {
@@ -183,8 +185,9 @@ export let manageShippingZones = SlateTool.create(spec, {
     }
 
     if (action === 'update_locations') {
-      if (!zoneId && zoneId !== 0) throw new Error('zoneId is required');
-      if (!ctx.input.locations) throw new Error('locations is required for update_locations');
+      if (!zoneId && zoneId !== 0) throw woocommerceServiceError('zoneId is required');
+      if (!ctx.input.locations)
+        throw woocommerceServiceError('locations is required for update_locations');
       let locations = await client.updateShippingZoneLocations(zoneId, ctx.input.locations);
       let mapped = locations.map((l: any) => ({ code: l.code, type: l.type }));
       return {
@@ -193,6 +196,6 @@ export let manageShippingZones = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw woocommerceServiceError(`Unknown action: ${action}`);
   })
   .build();

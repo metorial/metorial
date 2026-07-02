@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { metaAdsApiError } from './errors';
 
 export class MetaAdsClient {
   private token: string;
@@ -14,12 +15,19 @@ export class MetaAdsClient {
   }
 
   private get axios() {
-    return createAxios({
+    let axios = createAxios({
       baseURL: this.baseUrl,
       params: {
         access_token: this.token
       }
     });
+
+    axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(metaAdsApiError(error))
+    );
+
+    return axios;
   }
 
   private get accountPath() {
@@ -395,17 +403,28 @@ export class MetaAdsClient {
 
   // ---- Product Catalogs ----
 
-  async getCatalogs(params?: { fields?: string; limit?: number; after?: string }) {
-    let response = await this.axios.get(
-      `/${this.adAccountId.replace('act_', '')}/owned_product_catalogs`,
-      {
-        params: {
-          fields: params?.fields || 'id,name,product_count,vertical',
-          limit: params?.limit || 25,
-          after: params?.after
-        }
+  async getBusinesses(params?: { fields?: string; limit?: number; after?: string }) {
+    let response = await this.axios.get('/me/businesses', {
+      params: {
+        fields: params?.fields || 'id,name,created_time,verification_status',
+        limit: params?.limit || 25,
+        after: params?.after
       }
-    );
+    });
+    return response.data;
+  }
+
+  async getCatalogs(
+    businessId: string,
+    params?: { fields?: string; limit?: number; after?: string }
+  ) {
+    let response = await this.axios.get(`/${businessId}/owned_product_catalogs`, {
+      params: {
+        fields: params?.fields || 'id,name,product_count,vertical,is_catalog_segment',
+        limit: params?.limit || 25,
+        after: params?.after
+      }
+    });
     return response.data;
   }
 
@@ -433,19 +452,25 @@ export class MetaAdsClient {
 
   // ---- Generic helpers ----
 
-  async getAdAccounts(fields?: string) {
+  async getAdAccounts(params?: { fields?: string; limit?: number; after?: string }) {
     let response = await this.axios.get('/me/adaccounts', {
       params: {
-        fields: fields || 'id,name,account_status,currency,timezone_name,business'
+        fields:
+          params?.fields ||
+          'id,account_id,name,account_status,currency,timezone_name,business',
+        limit: params?.limit || 25,
+        after: params?.after
       }
     });
     return response.data;
   }
 
-  async getPages(fields?: string) {
+  async getPages(params?: { fields?: string; limit?: number; after?: string }) {
     let response = await this.axios.get('/me/accounts', {
       params: {
-        fields: fields || 'id,name,access_token,category'
+        fields: params?.fields || 'id,name,category,tasks,instagram_business_account',
+        limit: params?.limit || 25,
+        after: params?.after
       }
     });
     return response.data;

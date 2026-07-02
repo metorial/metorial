@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { trelloApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -36,13 +37,18 @@ export let auth = SlateAuth.create()
         baseURL: 'https://api.trello.com/1'
       });
 
-      let response = await http.get('/members/me', {
-        params: {
-          key: ctx.output.apiKey,
-          token: ctx.output.token,
-          fields: 'id,fullName,username,email,avatarUrl'
-        }
-      });
+      let response: any;
+      try {
+        response = await http.get('/members/me', {
+          params: {
+            key: ctx.output.apiKey,
+            token: ctx.output.token,
+            fields: 'id,fullName,username,email,avatarUrl'
+          }
+        });
+      } catch (error) {
+        throw trelloApiError(error, 'get profile');
+      }
 
       let member = response.data as {
         id: string;

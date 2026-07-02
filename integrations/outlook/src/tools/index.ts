@@ -6,6 +6,7 @@ export { findMeetingTimes } from './find-meeting-times';
 export { getContact } from './get-contact';
 export { getEvent } from './get-event';
 export { getMessage } from './get-message';
+export { getMyProfile } from './get-my-profile';
 export { listCalendars } from './list-calendars';
 export { listContacts } from './list-contacts';
 export { listEvents } from './list-events';

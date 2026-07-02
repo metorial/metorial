@@ -1,24 +1,32 @@
 # <img src="https://provider-logos.metorial-cdn.com/pinecone-logo.svg" height="20"> Pinecone
 
-Manage vector database indexes and perform vector operations for AI applications. Create, configure, and delete serverless or pod-based indexes. Upsert, query, fetch, update, and delete vector embeddings with metadata filtering and namespace partitioning. Generate embeddings and rerank results using hosted inference models. Upload documents and chat with an AI assistant for RAG-based Q&A with citations. Bulk import data from cloud storage, create backups and collections, and manage organizational resources like projects, API keys, and service accounts.
+Manage Pinecone vector database indexes and records for AI applications. Create and configure serverless, BYOC, integrated-embedding, and legacy pod indexes. Upsert, search, fetch, update, list, and delete vectors with metadata filtering and namespace partitioning. Work with integrated-embedding text records, hosted embedding/reranking models, and Pinecone Assistants with files, context retrieval, and grounded chat.
 
 ## Tools
 
 ### Chat with Assistant
 
-Ask questions to a Pinecone Assistant and receive context-aware answers grounded in uploaded documents, with inline citations. Supports multi-turn conversations, metadata-based document filtering, and LLM model selection (GPT-4o or Claude 3.5 Sonnet).
+Ask questions to a Pinecone Assistant and receive context-aware answers grounded in uploaded files, with citations and optional retrieval controls.
 
 ### Configure Index
 
-Update the configuration of an existing Pinecone index. Modify deletion protection, tags, and pod-based index settings like replicas. Can also be used to describe or delete an index.
+Describe, update, or delete an existing Pinecone index. Update deletion protection, tags, legacy pod replicas, or integrated embedding field/read/write parameters.
 
 ### Create Index
 
-Create a new Pinecone vector index. Supports serverless indexes (auto-scaling, specify cloud and region) and pod-based indexes (dedicated resources, specify environment and pod type). Configure dimension, distance metric, vector type, and optional deletion protection.
+Create a new Pinecone vector index. Supports serverless indexes, BYOC environments, and legacy pod-based indexes. Configure dense or sparse vector type, dimension, metric, deletion protection, tags, and serverless read capacity.
+
+### Create Integrated Index
+
+Create a serverless index with integrated embedding so source text records can be upserted and searched without generating vectors outside Pinecone.
 
 ### Delete Vectors
 
 Remove vectors from a Pinecone index. Delete specific vectors by ID, delete by metadata filter, or delete all vectors in a namespace. Useful for cleaning up data, removing outdated records, or clearing entire namespaces.
+
+### Fetch Records by Metadata
+
+Fetch complete vector records from a namespace by metadata filter when you do not know their record IDs.
 
 ### Index Stats
 
@@ -30,7 +38,11 @@ Retrieve specific vectors by their IDs from a Pinecone index. Returns the full v
 
 ### Generate Embeddings
 
-Generate vector embeddings from text using Pinecone's hosted embedding models. Returns dense or sparse vectors that can be stored in an index or used for queries. Available models include \
+Generate vector embeddings from text using Pinecone's hosted embedding models. Returns dense or sparse vectors that can be stored in an index or used for search.
+
+### Get Assistant Context
+
+Retrieve context snippets from a Pinecone Assistant without generating an answer. Use this for RAG workflows that pass retrieved snippets to another model or agent.
 
 ### List Indexes
 
@@ -42,7 +54,15 @@ List vector IDs in a Pinecone serverless index with optional namespace and prefi
 
 ### Manage Assistant
 
-Create, list, describe, or delete Pinecone Assistants. Assistants provide RAG-based document Q&A powered by uploaded documents. Can be deployed in US or EU regions.
+Create, list, describe, update, or delete Pinecone Assistants. Assistants provide RAG-based Q&A powered by uploaded files.
+
+### Manage Assistant Files
+
+List, upload, upsert, describe, or delete files in a Pinecone Assistant, and inspect asynchronous assistant file operations.
+
+### Manage Namespaces
+
+Create, list, describe, or delete namespaces in a Pinecone serverless index. Namespaces partition records for multitenancy and targeted search.
 
 ### Query Vectors
 
@@ -50,11 +70,19 @@ Search for the most similar vectors in a Pinecone index. Query by providing a de
 
 ### Rerank
 
-Rerank a list of documents by relevance to a query using Pinecone's hosted reranking models (e.g. \
+Rerank a list of documents by relevance to a query using Pinecone's hosted reranking models.
+
+### Search Records
+
+Search a namespace with text, a vector, or a record ID. Supports integrated-embedding text search and optional reranking.
 
 ### Update Vector
 
 Update an existing vector's values, sparse values, or metadata in a Pinecone index. Use this to modify a single vector without needing to re-upsert the entire record.
+
+### Upsert Text Records
+
+Upsert text records into a Pinecone integrated-embedding index. Pinecone converts the configured text field to vectors automatically and stores other fields as metadata.
 
 ### Upsert Vectors
 

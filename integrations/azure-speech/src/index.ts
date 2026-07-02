@@ -3,6 +3,8 @@ import { spec } from './spec';
 import {
   createBatchTranscription,
   deleteBatchTranscription,
+  enrollSpeakerProfile,
+  fastTranscribeAudio,
   getBatchTranscription,
   identifySpeaker,
   listBatchTranscriptions,
@@ -19,6 +21,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     synthesizeSpeech,
+    fastTranscribeAudio,
     listVoices,
     recognizeSpeech,
     createBatchTranscription,
@@ -27,6 +30,7 @@ export let provider = Slate.create({
     deleteBatchTranscription,
     listSpeechModels,
     manageSpeakerProfile,
+    enrollSpeakerProfile,
     verifySpeaker,
     identifySpeaker
   ],

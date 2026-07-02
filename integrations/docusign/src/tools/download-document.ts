@@ -9,6 +9,7 @@ export let downloadDocument = SlateTool.create(spec, {
   description: `Downloads a document from a DocuSign envelope as an attachment. Can download individual documents by ID, all documents combined, or list available documents in the envelope.`,
   instructions: [
     'Use documentId "combined" to download all documents merged into a single PDF.',
+    'Use documentId "archive" to download all documents as a ZIP archive.',
     'Use documentId "certificate" to download the certificate of completion.',
     'Use the listOnly option to see available documents before downloading.'
   ],
@@ -24,7 +25,7 @@ export let downloadDocument = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'ID of the specific document to download. Use "combined" for all documents, "certificate" for the certificate of completion.'
+          'ID of the specific document to download. Use "combined" for one merged PDF, "archive" for a ZIP archive, or "certificate" for the certificate of completion.'
         ),
       listOnly: z
         .boolean()
@@ -47,7 +48,10 @@ export let downloadDocument = SlateTool.create(spec, {
         .optional()
         .describe('List of available documents in the envelope'),
       documentId: z.string().optional().describe('ID of the downloaded document'),
-      documentName: z.string().optional().describe('Name of the downloaded document')
+      documentName: z.string().optional().describe('Name of the downloaded document'),
+      mimeType: z.string().optional().describe('MIME type of the attachment'),
+      byteLength: z.number().optional().describe('Attachment size in bytes'),
+      attachmentCount: z.number().optional().describe('Number of attachments returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -73,24 +77,30 @@ export let downloadDocument = SlateTool.create(spec, {
     }
 
     let targetId = ctx.input.documentId || 'combined';
-    let documentBase64 = await client.getDocument(ctx.input.envelopeId, targetId);
+    let document = await client.getDocument(ctx.input.envelopeId, targetId);
 
     let targetDoc = documents.find((d: any) => d.documentId === targetId);
     let docName =
+      document.fileName ||
       targetDoc?.name ||
       (targetId === 'combined'
         ? 'Combined Documents'
-        : targetId === 'certificate'
-          ? 'Certificate of Completion'
-          : `Document ${targetId}`);
+        : targetId === 'archive'
+          ? 'Document Archive'
+          : targetId === 'certificate'
+            ? 'Certificate of Completion'
+            : `Document ${targetId}`);
 
     return {
       output: {
         documents,
         documentId: targetId,
-        documentName: docName
+        documentName: docName,
+        mimeType: document.mimeType,
+        byteLength: document.byteLength,
+        attachmentCount: 1
       },
-      attachments: [createBase64Attachment(documentBase64, 'application/pdf')],
+      attachments: [createBase64Attachment(document.contentBase64, document.mimeType)],
       message: `Downloaded document "**${docName}**" from envelope ${ctx.input.envelopeId}.`
     };
   })

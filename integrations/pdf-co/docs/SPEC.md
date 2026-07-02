@@ -36,7 +36,11 @@ Add text, images, and signatures to existing PDFs. Fill PDF form fields and crea
 
 ### PDF Merging & Splitting
 
-Merge documents into a single PDF file, where source documents can be of different formats such as PDF, DOC, text, Excel, or ZIP. Split PDFs by page ranges or by text search/barcode content.
+Merge documents into a single PDF file, where source documents can be of different formats such as PDF, DOC, text, Excel, or ZIP. Split PDFs by 1-based page ranges or by text search/barcode content.
+
+### PDF Compression
+
+Compress PDF files with PDF.co's current v2 compression API. The integration exposes common image quality and downsampling options while allowing an advanced raw compression config for users who need the full PDF.co v2 configuration surface.
 
 ### Data Extraction
 
@@ -66,7 +70,7 @@ Extract email attachments with basic email information. Decode email files and s
 
 ### File Management
 
-Upload files to PDF.co's temporary storage (via direct upload or presigned URLs) for use with other API operations. Download processed result files. Supports asynchronous processing mode for large files with background job status checking.
+Generated and converted files are downloaded from PDF.co temporary output URLs and returned as Slate attachments. Structured tool output includes metadata such as output URL, expiry, MIME type, byte length, page count, and attachment count.
 
 ### PDF Info
 

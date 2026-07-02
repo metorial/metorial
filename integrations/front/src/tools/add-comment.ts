@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { frontServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let addComment = SlateTool.create(spec, {
@@ -20,7 +21,11 @@ export let addComment = SlateTool.create(spec, {
         .optional()
         .describe('Comment ID to reply to (for threaded comments)'),
       authorId: z.string().optional().describe('Teammate ID of the comment author'),
-      body: z.string().describe('Comment body text. Use @mentions to notify teammates.')
+      body: z.string().describe('Comment body text. Use @mentions to notify teammates.'),
+      isPinned: z
+        .boolean()
+        .optional()
+        .describe('Whether to pin the new comment. Only applies when conversationId is used.')
     })
   )
   .output(
@@ -36,6 +41,12 @@ export let addComment = SlateTool.create(spec, {
 
     let comment: any;
     if (ctx.input.parentCommentId) {
+      if (ctx.input.isPinned !== undefined) {
+        throw frontServiceError(
+          'isPinned can only be used when adding a comment to a conversation.'
+        );
+      }
+
       comment = await client.replyToComment(ctx.input.parentCommentId, {
         author_id: ctx.input.authorId,
         body: ctx.input.body
@@ -43,10 +54,11 @@ export let addComment = SlateTool.create(spec, {
     } else if (ctx.input.conversationId) {
       comment = await client.addComment(ctx.input.conversationId, {
         author_id: ctx.input.authorId,
-        body: ctx.input.body
+        body: ctx.input.body,
+        is_pinned: ctx.input.isPinned
       });
     } else {
-      throw new Error('Either conversationId or parentCommentId must be provided.');
+      throw frontServiceError('Either conversationId or parentCommentId must be provided.');
     }
 
     return {

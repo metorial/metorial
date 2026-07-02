@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { bigQueryApiError, bigQueryServiceError } from './errors';
 
 export class BigQueryClient {
   private http: ReturnType<typeof createAxios>;
@@ -15,6 +16,11 @@ export class BigQueryClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(bigQueryApiError(error))
+    );
   }
 
   // ── Datasets ──────────────────────────────────────────────────────────
@@ -188,6 +194,51 @@ export class BigQueryClient {
   async deleteTable(datasetId: string, tableId: string) {
     await this.http.delete(
       `/projects/${this.projectId}/datasets/${datasetId}/tables/${tableId}`
+    );
+  }
+
+  // ── Models ────────────────────────────────────────────────────────────
+
+  async listModels(datasetId: string, params?: { maxResults?: number; pageToken?: string }) {
+    let response = await this.http.get(
+      `/projects/${this.projectId}/datasets/${datasetId}/models`,
+      {
+        params: {
+          maxResults: params?.maxResults,
+          pageToken: params?.pageToken
+        }
+      }
+    );
+    return response.data;
+  }
+
+  async getModel(datasetId: string, modelId: string) {
+    let response = await this.http.get(
+      `/projects/${this.projectId}/datasets/${datasetId}/models/${modelId}`
+    );
+    return response.data;
+  }
+
+  async updateModel(
+    datasetId: string,
+    modelId: string,
+    updates: {
+      friendlyName?: string;
+      description?: string;
+      expirationTime?: string;
+      labels?: Record<string, string>;
+    }
+  ) {
+    let response = await this.http.patch(
+      `/projects/${this.projectId}/datasets/${datasetId}/models/${modelId}`,
+      updates
+    );
+    return response.data;
+  }
+
+  async deleteModel(datasetId: string, modelId: string) {
+    await this.http.delete(
+      `/projects/${this.projectId}/datasets/${datasetId}/models/${modelId}`
     );
   }
 
@@ -563,6 +614,6 @@ export class BigQueryClient {
       }
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
-    throw new Error(`Job ${jobId} did not complete within ${timeoutMs}ms`);
+    throw bigQueryServiceError(`Job ${jobId} did not complete within ${timeoutMs}ms.`);
   }
 }

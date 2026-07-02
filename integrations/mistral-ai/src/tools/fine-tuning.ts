@@ -74,7 +74,11 @@ export let createFineTuningJobTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Validate configuration without starting training'),
-      autoStart: z.boolean().optional().describe('Automatically start the job when created')
+      autoStart: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Automatically start the job when created')
     })
   )
   .output(jobSchema)

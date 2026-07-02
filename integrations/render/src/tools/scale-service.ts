@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -38,7 +38,7 @@ export let scaleService = SlateTool.create(spec, {
 
     if (mode === 'manual') {
       if (ctx.input.numInstances === undefined)
-        throw new Error('numInstances is required for manual scaling');
+        throw createApiServiceError('numInstances is required for manual scaling');
       await client.scaleService(serviceId, ctx.input.numInstances);
       return {
         output: { serviceId, mode: 'manual', success: true },

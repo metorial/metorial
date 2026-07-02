@@ -1,7 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  createPdfCoAttachment,
+  downloadPdfCoOutput,
+  fileAttachmentOutputFields,
+  toFileOutput
+} from './shared';
 
 export let generatePdf = SlateTool.create(spec, {
   name: 'Generate PDF',
@@ -59,7 +66,7 @@ Supports configurable paper size, margins, orientation, and custom headers/foote
   )
   .output(
     z.object({
-      outputUrl: z.string().describe('URL to download the generated PDF'),
+      ...fileAttachmentOutputFields,
       pageCount: z.number().describe('Number of pages in the generated PDF'),
       creditsUsed: z.number().describe('API credits consumed'),
       remainingCredits: z.number().describe('Credits remaining on the account')
@@ -71,7 +78,7 @@ Supports configurable paper size, margins, orientation, and custom headers/foote
 
     if (ctx.input.sourceType === 'html') {
       if (!ctx.input.html) {
-        throw new Error('HTML content is required when sourceType is "html"');
+        throw createApiServiceError('HTML content is required when sourceType is "html".');
       }
       result = await client.convertHtmlToPdf({
         html: ctx.input.html,
@@ -86,7 +93,7 @@ Supports configurable paper size, margins, orientation, and custom headers/foote
       });
     } else if (ctx.input.sourceType === 'url') {
       if (!ctx.input.sourceUrl) {
-        throw new Error('Source URL is required when sourceType is "url"');
+        throw createApiServiceError('Source URL is required when sourceType is "url".');
       }
       result = await client.convertUrlToPdf({
         url: ctx.input.sourceUrl,
@@ -102,7 +109,7 @@ Supports configurable paper size, margins, orientation, and custom headers/foote
       });
     } else if (ctx.input.sourceType === 'document') {
       if (!ctx.input.sourceUrl) {
-        throw new Error('Source URL is required when sourceType is "document"');
+        throw createApiServiceError('Source URL is required when sourceType is "document".');
       }
       result = await client.convertDocumentToPdf({
         url: ctx.input.sourceUrl,
@@ -110,7 +117,7 @@ Supports configurable paper size, margins, orientation, and custom headers/foote
       });
     } else {
       if (!ctx.input.sourceUrl) {
-        throw new Error('Source URL is required when sourceType is "image"');
+        throw createApiServiceError('Source URL is required when sourceType is "image".');
       }
       result = await client.convertImageToPdf({
         url: ctx.input.sourceUrl,
@@ -119,17 +126,14 @@ Supports configurable paper size, margins, orientation, and custom headers/foote
     }
 
     if (result.error) {
-      throw new Error(`PDF generation failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('PDF generation failed', result);
     }
+    let file = await downloadPdfCoOutput(client, result, 'application/pdf');
 
     return {
-      output: {
-        outputUrl: result.url,
-        pageCount: result.pageCount,
-        creditsUsed: result.credits,
-        remainingCredits: result.remainingCredits
-      },
-      message: `Generated PDF from **${ctx.input.sourceType}** source — ${result.pageCount} page(s). [Download PDF](${result.url})`
+      output: toFileOutput(result, file),
+      attachments: [createPdfCoAttachment(file)],
+      message: `Generated PDF from **${ctx.input.sourceType}** source — ${result.pageCount} page(s), returned as an attachment.`
     };
   })
   .build();

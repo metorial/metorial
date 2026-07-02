@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
+import { bigQueryServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let readTableData = SlateTool.create(spec, {
@@ -144,6 +145,16 @@ export let insertRows = SlateTool.create(spec, {
 
     let errorCount = insertErrors?.length || 0;
     let insertedCount = ctx.input.rows.length - errorCount;
+
+    if (errorCount > 0 && ctx.input.skipInvalidRows !== true) {
+      let serviceError = bigQueryServiceError(
+        `BigQuery rejected ${errorCount} row(s) for ${ctx.input.datasetId}.${ctx.input.tableId}.`
+      );
+      serviceError.data.reason = 'bigquery_insert_rows_failed';
+      serviceError.data.insertErrors = insertErrors;
+      serviceError.data.insertedCount = insertedCount;
+      throw serviceError;
+    }
 
     return {
       output: {

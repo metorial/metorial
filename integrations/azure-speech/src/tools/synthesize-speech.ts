@@ -1,14 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TextToSpeechClient } from '../lib/client';
+import { azureSpeechServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import { audioAttachment, audioOutput, audioOutputSchema } from './shared';
 
 export let synthesizeSpeech = SlateTool.create(spec, {
   name: 'Synthesize Speech',
   key: 'synthesize_speech',
   description: `Converts text into natural-sounding synthesized speech audio using Azure neural voices.
 Provide either plain text (which will be wrapped in SSML automatically) or custom SSML for fine-grained control over pronunciation, prosody, speaking styles, pauses, and other speech characteristics.
-Returns the synthesized audio as a base64-encoded string.`,
+Returns the synthesized audio as a Slate attachment.`,
   instructions: [
     'When providing plain text, specify a voiceName to select the desired voice. Use the **List Voices** tool to discover available voices.',
     'For advanced control (e.g., speaking styles, emphasis, breaks), provide custom SSML directly in the ssml field instead of text.',
@@ -16,7 +18,7 @@ Returns the synthesized audio as a base64-encoded string.`,
   ],
   constraints: [
     'Audio output is truncated to 10 minutes maximum.',
-    'The audio is returned as base64, which increases payload size by ~33%.'
+    'Generated audio is returned as an attachment; tool output only includes metadata.'
   ],
   tags: {
     destructive: false,
@@ -57,17 +59,16 @@ Returns the synthesized audio as a base64-encoded string.`,
         )
     })
   )
-  .output(
-    z.object({
-      audioBase64: z.string().describe('Base64-encoded audio data of the synthesized speech'),
-      contentType: z.string().describe('MIME content type of the audio response')
-    })
-  )
+  .output(audioOutputSchema)
   .handleInvocation(async ctx => {
     let { text, ssml, voiceName, language, outputFormat } = ctx.input;
 
     if (!text && !ssml) {
-      throw new Error('Either text or ssml must be provided.');
+      throw azureSpeechServiceError('Either text or ssml must be provided.');
+    }
+
+    if (text && ssml) {
+      throw azureSpeechServiceError('text and ssml are mutually exclusive.');
     }
 
     let finalSsml: string;
@@ -75,7 +76,7 @@ Returns the synthesized audio as a base64-encoded string.`,
       finalSsml = ssml;
     } else {
       if (!voiceName) {
-        throw new Error('voiceName is required when using plain text input.');
+        throw azureSpeechServiceError('voiceName is required when using plain text input.');
       }
       let escapedText = text!
         .replace(/&/g, '&amp;')
@@ -97,10 +98,8 @@ Returns the synthesized audio as a base64-encoded string.`,
     });
 
     return {
-      output: {
-        audioBase64: result.audioBase64,
-        contentType: result.contentType
-      },
+      output: audioOutput(result),
+      attachments: [audioAttachment(result)],
       message: `Successfully synthesized speech. Audio format: **${outputFormat}**, content type: ${result.contentType}.`
     };
   })

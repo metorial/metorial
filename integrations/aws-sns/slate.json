@@ -1,6 +1,6 @@
 {
   "name": "@amazon/aws-sns",
-  "description": "Create and manage SNS topics (standard and FIFO) for pub/sub messaging. Publish messages to topics or directly to endpoints such as SMS phone numbers, email addresses, HTTP/HTTPS endpoints, SQS queues, Lambda functions, and mobile push devices. Subscribe and unsubscribe endpoints using various protocols. Configure message filtering policies so subscribers receive only relevant notifications. Send SMS text messages to 200+ countries. Manage mobile push platform applications and device endpoints for iOS, Android, and other platforms. Configure topic attributes including delivery policies, server-side encryption with KMS, and access policies. Archive and replay messages on FIFO topics for up to 365 days.",
+  "description": "Create and manage SNS topics (standard and FIFO) for pub/sub messaging. Publish messages or message batches to topics, directly to SMS phone numbers, or to existing mobile platform endpoints. Subscribe and unsubscribe endpoints using various protocols. Configure message filtering policies so subscribers receive only relevant notifications. Send SMS text messages, inspect SMS account status, manage SMS defaults, check opt-out status, and list origination numbers. Configure topic attributes including delivery policies, server-side encryption with KMS, FIFO throughput scope, access policies, archive policies, replay policies, and tags.",
   "categories": [
     "apis-and-http-requests",
     "email-and-messaging",
@@ -9,8 +9,13 @@
   "skills": [
     "create and manage topics",
     "publish messages to topics",
+    "publish message batches",
     "manage topic subscriptions",
     "send SMS text messages",
+    "inspect SMS account status",
+    "manage SMS account settings",
+    "check SMS opt-out status",
+    "list SMS origination numbers",
     "send mobile push notifications",
     "configure message filtering",
     "send email notifications",

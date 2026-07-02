@@ -32,7 +32,7 @@ export let catalogEvents = SlateTrigger.create(spec, {
       let subscription = await client.createWebhookSubscription({
         idempotencyKey: crypto.randomUUID(),
         subscription: {
-          name: 'Slates Catalog Events',
+          name: 'Square Catalog Events',
           eventTypes: CATALOG_EVENT_TYPES,
           notificationUrl: ctx.input.webhookBaseUrl
         }

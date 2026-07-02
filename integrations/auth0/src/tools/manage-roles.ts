@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Auth0Client } from '../lib/client';
+import { auth0ServiceError, requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageRolesTool = SlateTool.create(spec, {
@@ -76,8 +77,8 @@ export let manageRolesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.roleId) throw new Error('roleId is required for get action');
-      let role = await client.getRole(ctx.input.roleId);
+      let roleId = requireField(ctx.input.roleId, 'roleId', 'get');
+      let role = await client.getRole(roleId);
       return {
         output: { role: mapRole(role) },
         message: `Retrieved role **${role.name}**.`
@@ -85,9 +86,9 @@ export let manageRolesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      let name = requireField(ctx.input.name, 'name', 'create');
       let role = await client.createRole({
-        name: ctx.input.name,
+        name,
         description: ctx.input.description
       });
       return {
@@ -97,8 +98,8 @@ export let manageRolesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.roleId) throw new Error('roleId is required for update action');
-      let role = await client.updateRole(ctx.input.roleId, {
+      let roleId = requireField(ctx.input.roleId, 'roleId', 'update');
+      let role = await client.updateRole(roleId, {
         name: ctx.input.name,
         description: ctx.input.description
       });
@@ -109,14 +110,14 @@ export let manageRolesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.roleId) throw new Error('roleId is required for delete action');
-      await client.deleteRole(ctx.input.roleId);
+      let roleId = requireField(ctx.input.roleId, 'roleId', 'delete');
+      await client.deleteRole(roleId);
       return {
         output: { deleted: true },
-        message: `Deleted role **${ctx.input.roleId}**.`
+        message: `Deleted role **${roleId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw auth0ServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

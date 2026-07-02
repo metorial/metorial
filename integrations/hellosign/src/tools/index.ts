@@ -1,3 +1,5 @@
+export * from './bulk-send-template-request';
+export * from './create-report';
 export * from './download-files';
 export * from './get-account';
 export * from './get-embedded-urls';
@@ -5,6 +7,7 @@ export * from './get-signature-request';
 export * from './get-template';
 export * from './list-signature-requests';
 export * from './list-templates';
+export * from './manage-bulk-send-jobs';
 export * from './manage-signature-request';
 export * from './manage-team';
 export * from './manage-template';

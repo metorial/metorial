@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient, extractPaginationCursor } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -121,7 +122,7 @@ Also supports listing item variants and browsing categories.`,
     }
 
     if (action === 'get') {
-      if (!itemId) throw new Error('itemId is required');
+      if (!itemId) throw klaviyoServiceError('itemId is required');
       let result = await client.getCatalogItem(itemId);
       let i = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -169,7 +170,7 @@ Also supports listing item variants and browsing categories.`,
     }
 
     if (action === 'update') {
-      if (!itemId) throw new Error('itemId is required');
+      if (!itemId) throw klaviyoServiceError('itemId is required');
       let attributes: Record<string, any> = {};
       if (ctx.input.title) attributes.title = ctx.input.title;
       if (ctx.input.description) attributes.description = ctx.input.description;
@@ -186,7 +187,7 @@ Also supports listing item variants and browsing categories.`,
     }
 
     if (action === 'delete') {
-      if (!itemId) throw new Error('itemId is required');
+      if (!itemId) throw klaviyoServiceError('itemId is required');
       await client.deleteCatalogItem(itemId);
       return {
         output: { success: true },
@@ -195,7 +196,7 @@ Also supports listing item variants and browsing categories.`,
     }
 
     if (action === 'list_variants') {
-      if (!itemId) throw new Error('itemId is required');
+      if (!itemId) throw klaviyoServiceError('itemId is required');
       let result = await client.getCatalogVariants(itemId, { pageCursor, pageSize });
       let variants = result.data.map(v => ({
         variantId: v.id ?? '',
@@ -224,6 +225,6 @@ Also supports listing item variants and browsing categories.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw klaviyoServiceError(`Unknown action: ${action}`);
   })
   .build();

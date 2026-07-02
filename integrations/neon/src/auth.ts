@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { neonApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -29,11 +30,17 @@ export let auth = SlateAuth.create()
         baseURL: 'https://console.neon.tech/api/v2'
       });
 
-      let response = await axios.get('/users/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+
+      try {
+        response = await axios.get('/users/me', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+      } catch (error) {
+        throw neonApiError(error, 'profile lookup');
+      }
 
       return {
         profile: {

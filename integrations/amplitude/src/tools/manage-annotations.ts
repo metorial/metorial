@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AmplitudeClient } from '../lib/client';
+import { amplitudeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageAnnotationsTool = SlateTool.create(spec, {
@@ -29,8 +30,20 @@ export let manageAnnotationsTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Date for the annotation in MM-DD-YYYY format. Required for "create", optional for "update".'
+          'Deprecated legacy date field. Prefer start. Used as start when start is omitted.'
         ),
+      start: z
+        .string()
+        .optional()
+        .describe(
+          'Annotation start time in ISO 8601 format. Required for "create", optional for "update".'
+        ),
+      end: z.string().optional().describe('Optional annotation end time in ISO 8601 format.'),
+      category: z.string().optional().describe('Optional annotation category.'),
+      chartId: z
+        .string()
+        .optional()
+        .describe('Optional Amplitude chart ID to associate with the annotation.'),
       details: z
         .string()
         .optional()
@@ -44,7 +57,10 @@ export let manageAnnotationsTool = SlateTool.create(spec, {
           z.object({
             annotationId: z.string().optional(),
             label: z.string().optional(),
-            date: z.string().optional(),
+            start: z.string().optional(),
+            end: z.string().optional(),
+            category: z.string().optional(),
+            chartId: z.string().optional(),
             details: z.string().optional()
           })
         )
@@ -68,14 +84,26 @@ export let manageAnnotationsTool = SlateTool.create(spec, {
       region: ctx.config.region
     });
 
+    let normalizeAnnotation = (annotation: any) => ({
+      annotationId: annotation.id !== undefined ? String(annotation.id) : undefined,
+      label: annotation.label,
+      start: annotation.start ?? annotation.date,
+      end: annotation.end,
+      category: annotation.category,
+      chartId: annotation.chart_id !== undefined ? String(annotation.chart_id) : undefined,
+      details: annotation.details
+    });
+
     if (ctx.input.action === 'list') {
       let result = await client.listAnnotations();
-      let annotations = (result.data ?? result ?? []).map((a: any) => ({
-        annotationId: String(a.id),
-        label: a.label,
-        date: a.date,
-        details: a.details
-      }));
+      let rawAnnotations = Array.isArray(result.data)
+        ? result.data
+        : Array.isArray(result.annotations)
+          ? result.annotations
+          : Array.isArray(result)
+            ? result
+            : [];
+      let annotations = rawAnnotations.map(normalizeAnnotation);
       return {
         output: { annotations },
         message: `Found **${annotations.length}** annotation(s).`
@@ -83,8 +111,9 @@ export let manageAnnotationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.annotationId)
-        throw new Error('annotationId is required for "get" action.');
+      if (!ctx.input.annotationId) {
+        throw amplitudeServiceError('annotationId is required for "get" action.');
+      }
       let result = await client.getAnnotation(ctx.input.annotationId);
       return {
         output: { annotation: result.data ?? result },
@@ -93,26 +122,35 @@ export let manageAnnotationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.label || !ctx.input.date)
-        throw new Error('label and date are required for "create" action.');
+      let start = ctx.input.start ?? ctx.input.date;
+      if (!ctx.input.label || !start) {
+        throw amplitudeServiceError('label and start are required for "create" action.');
+      }
       let result = await client.createAnnotation({
         label: ctx.input.label,
-        date: ctx.input.date,
-        details: ctx.input.details
+        start,
+        details: ctx.input.details,
+        end: ctx.input.end,
+        category: ctx.input.category,
+        chartId: ctx.input.chartId
       });
       return {
         output: { annotation: result.data ?? result },
-        message: `Created annotation "${ctx.input.label}" on ${ctx.input.date}.`
+        message: `Created annotation "${ctx.input.label}" starting ${start}.`
       };
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.annotationId)
-        throw new Error('annotationId is required for "update" action.');
+      if (!ctx.input.annotationId) {
+        throw amplitudeServiceError('annotationId is required for "update" action.');
+      }
       let result = await client.updateAnnotation(ctx.input.annotationId, {
         label: ctx.input.label,
-        date: ctx.input.date,
-        details: ctx.input.details
+        start: ctx.input.start ?? ctx.input.date,
+        details: ctx.input.details,
+        end: ctx.input.end,
+        category: ctx.input.category,
+        chartId: ctx.input.chartId
       });
       return {
         output: { annotation: result.data ?? result },
@@ -121,8 +159,9 @@ export let manageAnnotationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.annotationId)
-        throw new Error('annotationId is required for "delete" action.');
+      if (!ctx.input.annotationId) {
+        throw amplitudeServiceError('annotationId is required for "delete" action.');
+      }
       await client.deleteAnnotation(ctx.input.annotationId);
       return {
         output: { success: true },
@@ -130,6 +169,6 @@ export let manageAnnotationsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw amplitudeServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

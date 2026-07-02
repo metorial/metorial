@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -61,7 +62,7 @@ export let manageTags = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx.auth);
     let input = ctx.input;
 
     if (input.action === 'list') {
@@ -82,7 +83,7 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (input.action === 'create') {
-      if (!input.tagName) throw new Error('tagName is required for create');
+      if (!input.tagName) throw kitServiceError('tagName is required for create');
       let tag = await client.createTag(input.tagName);
       return {
         output: {
@@ -93,8 +94,8 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (input.action === 'update') {
-      if (!input.tagId) throw new Error('tagId is required for update');
-      if (!input.tagName) throw new Error('tagName is required for update');
+      if (!input.tagId) throw kitServiceError('tagId is required for update');
+      if (!input.tagName) throw kitServiceError('tagName is required for update');
       let tag = await client.updateTag(input.tagId, input.tagName);
       return {
         output: {
@@ -105,7 +106,7 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (input.action === 'add_to_subscriber') {
-      if (!input.tagId) throw new Error('tagId is required for add_to_subscriber');
+      if (!input.tagId) throw kitServiceError('tagId is required for add_to_subscriber');
       if (input.subscriberId) {
         await client.tagSubscriberById(input.tagId, input.subscriberId);
         return {
@@ -119,13 +120,15 @@ export let manageTags = SlateTool.create(spec, {
           message: `Added tag #${input.tagId} to subscriber **${input.subscriberEmail}**`
         };
       }
-      throw new Error('subscriberId or subscriberEmail is required for add_to_subscriber');
+      throw kitServiceError(
+        'subscriberId or subscriberEmail is required for add_to_subscriber'
+      );
     }
 
     if (input.action === 'remove_from_subscriber') {
-      if (!input.tagId) throw new Error('tagId is required for remove_from_subscriber');
+      if (!input.tagId) throw kitServiceError('tagId is required for remove_from_subscriber');
       if (!input.subscriberId)
-        throw new Error('subscriberId is required for remove_from_subscriber');
+        throw kitServiceError('subscriberId is required for remove_from_subscriber');
       await client.untagSubscriberById(input.tagId, input.subscriberId);
       return {
         output: {},
@@ -133,5 +136,5 @@ export let manageTags = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw kitServiceError(`Unknown action: ${input.action}`);
   });

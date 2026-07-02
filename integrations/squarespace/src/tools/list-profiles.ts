@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listProfiles = SlateTool.create(spec, {
   name: 'List Profiles',
   key: 'list_profiles',
-  description: `Retrieve customer profiles from a Squarespace merchant site. Profiles include customers, mailing list subscribers, and donors with their contact information and commerce transaction summaries.`,
+  description: `Retrieve legacy customer profiles from a Squarespace merchant site. Profiles are in maintenance mode in Squarespace's current API docs; use the Contacts tools for new contact workflows.`,
   tags: {
     readOnly: true
   }
@@ -14,7 +14,16 @@ export let listProfiles = SlateTool.create(spec, {
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
-      filter: z.string().optional().describe('Filter expression to narrow results')
+      filter: z
+        .string()
+        .optional()
+        .describe('Semicolon-separated profile filters such as isCustomer or hasAccount'),
+      email: z.string().optional().describe('Email address filter'),
+      sortField: z
+        .enum(['createdOn', 'id', 'email', 'lastName'])
+        .optional()
+        .describe('Profile field to sort by'),
+      sortDirection: z.enum(['asc', 'dsc']).optional().describe('Sort direction: asc or dsc')
     })
   )
   .output(
@@ -29,7 +38,10 @@ export let listProfiles = SlateTool.create(spec, {
 
     let result = await client.listProfiles({
       cursor: ctx.input.cursor,
-      filter: ctx.input.filter
+      filter: ctx.input.filter,
+      email: ctx.input.email,
+      sortField: ctx.input.sortField,
+      sortDirection: ctx.input.sortDirection
     });
 
     return {

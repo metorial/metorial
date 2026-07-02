@@ -24,6 +24,10 @@ Create a new task in a Microsoft To Do task list. Supports title, body, due date
 
 Find available meeting time slots based on attendee availability and time constraints. Suggests optimal times when all or most attendees are free. Useful for scheduling meetings with multiple participants.
 
+### Get My Profile
+
+Retrieve the authenticated Outlook user's Microsoft Graph profile, including name, email address, job title, phone numbers, office location, and preferred language.
+
 ### Get Contact
 
 Retrieve the full details of a specific contact by ID, including all email addresses, phone numbers, addresses, company information, and personal notes.

@@ -1,8 +1,14 @@
 import { createAxios } from 'slates';
+import { postmarkApiError, postmarkServiceError } from './errors';
 
 let postmarkAxios = createAxios({
   baseURL: 'https://api.postmarkapp.com'
 });
+
+postmarkAxios.interceptors?.response?.use(
+  response => response,
+  error => Promise.reject(postmarkApiError(error))
+);
 
 export interface PostmarkAttachment {
   Name: string;
@@ -162,6 +168,55 @@ export interface SuppressionRecord {
   CreatedAt: string;
 }
 
+export interface DomainRecord {
+  ID: number;
+  Name: string;
+  SPFVerified?: boolean;
+  SPFHost?: string;
+  SPFTextValue?: string;
+  DKIMVerified?: boolean;
+  WeakDKIM?: boolean;
+  DKIMHost?: string;
+  DKIMTextValue?: string;
+  DKIMPendingHost?: string;
+  DKIMPendingTextValue?: string;
+  DKIMRevokedHost?: string;
+  DKIMRevokedTextValue?: string;
+  SafeToRemoveRevokedKeyFromDNS?: boolean;
+  DKIMUpdateStatus?: string;
+  ReturnPathDomain?: string;
+  ReturnPathDomainVerified?: boolean;
+  ReturnPathDomainCNAMEValue?: string;
+}
+
+export interface SenderSignatureRecord {
+  ID: number;
+  Domain: string;
+  EmailAddress: string;
+  ReplyToEmailAddress: string;
+  Name: string;
+  Confirmed: boolean;
+  SPFVerified?: boolean;
+  DKIMVerified?: boolean;
+  WeakDKIM?: boolean;
+  DKIMHost?: string;
+  DKIMTextValue?: string;
+  DKIMPendingHost?: string;
+  DKIMPendingTextValue?: string;
+  DKIMRevokedHost?: string;
+  DKIMRevokedTextValue?: string;
+  SafeToRemoveRevokedKeyFromDNS?: boolean;
+  DKIMUpdateStatus?: string;
+  ReturnPathDomain?: string;
+  ReturnPathDomainVerified?: boolean;
+  ReturnPathDomainCNAMEValue?: string;
+}
+
+export interface InboundRuleRecord {
+  ID: number;
+  Rule: string;
+}
+
 export class Client {
   private serverToken: string;
   private accountToken?: string;
@@ -176,6 +231,20 @@ export class Client {
       Accept: 'application/json',
       'Content-Type': 'application/json',
       'X-Postmark-Server-Token': this.serverToken
+    };
+  }
+
+  private accountHeaders() {
+    if (!this.accountToken) {
+      throw postmarkServiceError(
+        'An account API token is required for this Postmark account-level operation.'
+      );
+    }
+
+    return {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-Postmark-Account-Token': this.accountToken
     };
   }
 
@@ -668,6 +737,40 @@ export class Client {
     return response.data;
   }
 
+  // ── Inbound Rules ──
+
+  async listInboundRules(params?: {
+    count?: number;
+    offset?: number;
+  }): Promise<{ TotalCount: number; InboundRules: InboundRuleRecord[] }> {
+    let response = await postmarkAxios.get('/triggers/inboundrules', {
+      headers: this.serverHeaders(),
+      params: {
+        count: params?.count,
+        offset: params?.offset
+      }
+    });
+    return response.data;
+  }
+
+  async createInboundRule(rule: string): Promise<InboundRuleRecord> {
+    let response = await postmarkAxios.post(
+      '/triggers/inboundrules',
+      { Rule: rule },
+      {
+        headers: this.serverHeaders()
+      }
+    );
+    return response.data;
+  }
+
+  async deleteInboundRule(ruleId: number): Promise<{ ErrorCode: number; Message: string }> {
+    let response = await postmarkAxios.delete(`/triggers/inboundrules/${ruleId}`, {
+      headers: this.serverHeaders()
+    });
+    return response.data;
+  }
+
   // ── Messages ──
 
   async searchOutboundMessages(params: {
@@ -893,6 +996,184 @@ export class Client {
     let response = await postmarkAxios.put('/server', params, {
       headers: this.serverHeaders()
     });
+    return response.data;
+  }
+
+  // ── Account Domains ──
+
+  async listDomains(params: {
+    count: number;
+    offset: number;
+  }): Promise<{ TotalCount: number; Domains: DomainRecord[] }> {
+    let response = await postmarkAxios.get('/domains', {
+      headers: this.accountHeaders(),
+      params: {
+        count: params.count,
+        offset: params.offset
+      }
+    });
+    return response.data;
+  }
+
+  async getDomain(domainId: number): Promise<DomainRecord> {
+    let response = await postmarkAxios.get(`/domains/${domainId}`, {
+      headers: this.accountHeaders()
+    });
+    return response.data;
+  }
+
+  async createDomain(params: { name: string; returnPathDomain?: string }) {
+    let body: Record<string, any> = {
+      Name: params.name
+    };
+
+    if (params.returnPathDomain) body.ReturnPathDomain = params.returnPathDomain;
+
+    let response = await postmarkAxios.post('/domains', body, {
+      headers: this.accountHeaders()
+    });
+    return response.data as DomainRecord;
+  }
+
+  async editDomain(domainId: number, params: { returnPathDomain?: string }) {
+    let body: Record<string, any> = {};
+
+    if (params.returnPathDomain !== undefined) {
+      body.ReturnPathDomain = params.returnPathDomain;
+    }
+
+    let response = await postmarkAxios.put(`/domains/${domainId}`, body, {
+      headers: this.accountHeaders()
+    });
+    return response.data as DomainRecord;
+  }
+
+  async deleteDomain(domainId: number): Promise<{ ErrorCode: number; Message: string }> {
+    let response = await postmarkAxios.delete(`/domains/${domainId}`, {
+      headers: this.accountHeaders()
+    });
+    return response.data;
+  }
+
+  async verifyDomainDkim(domainId: number): Promise<DomainRecord> {
+    let response = await postmarkAxios.post(
+      `/domains/${domainId}/verifydkim`,
+      {},
+      {
+        headers: this.accountHeaders()
+      }
+    );
+    return response.data;
+  }
+
+  async verifyDomainReturnPath(domainId: number): Promise<DomainRecord> {
+    let response = await postmarkAxios.post(
+      `/domains/${domainId}/verifyreturnpath`,
+      {},
+      {
+        headers: this.accountHeaders()
+      }
+    );
+    return response.data;
+  }
+
+  async rotateDomainDkim(domainId: number): Promise<DomainRecord> {
+    let response = await postmarkAxios.post(
+      `/domains/${domainId}/rotatedkim`,
+      {},
+      {
+        headers: this.accountHeaders()
+      }
+    );
+    return response.data;
+  }
+
+  // ── Account Sender Signatures ──
+
+  async listSenderSignatures(params: {
+    count: number;
+    offset: number;
+  }): Promise<{ TotalCount: number; SenderSignatures: SenderSignatureRecord[] }> {
+    let response = await postmarkAxios.get('/senders', {
+      headers: this.accountHeaders(),
+      params: {
+        count: params.count,
+        offset: params.offset
+      }
+    });
+    return response.data;
+  }
+
+  async getSenderSignature(senderId: number): Promise<SenderSignatureRecord> {
+    let response = await postmarkAxios.get(`/senders/${senderId}`, {
+      headers: this.accountHeaders()
+    });
+    return response.data;
+  }
+
+  async createSenderSignature(params: {
+    fromEmail: string;
+    name: string;
+    replyToEmail?: string;
+    confirmationPersonalNote?: string;
+  }): Promise<SenderSignatureRecord> {
+    let body: Record<string, any> = {
+      FromEmail: params.fromEmail,
+      Name: params.name
+    };
+
+    if (params.replyToEmail) body.ReplyToEmail = params.replyToEmail;
+    if (params.confirmationPersonalNote) {
+      body.ConfirmationPersonalNote = params.confirmationPersonalNote;
+    }
+
+    let response = await postmarkAxios.post('/senders', body, {
+      headers: this.accountHeaders()
+    });
+    return response.data;
+  }
+
+  async editSenderSignature(
+    senderId: number,
+    params: {
+      name?: string;
+      replyToEmail?: string;
+      confirmationPersonalNote?: string;
+    }
+  ): Promise<SenderSignatureRecord> {
+    let body: Record<string, any> = {};
+
+    if (params.name !== undefined) body.Name = params.name;
+    if (params.replyToEmail !== undefined) body.ReplyToEmail = params.replyToEmail;
+    if (params.confirmationPersonalNote !== undefined) {
+      body.ConfirmationPersonalNote = params.confirmationPersonalNote;
+    }
+
+    let response = await postmarkAxios.put(`/senders/${senderId}`, body, {
+      headers: this.accountHeaders()
+    });
+    return response.data;
+  }
+
+  async deleteSenderSignature(
+    senderId: number
+  ): Promise<{ ErrorCode: number; Message: string }> {
+    let response = await postmarkAxios.delete(`/senders/${senderId}`, {
+      headers: this.accountHeaders()
+    });
+    return response.data;
+  }
+
+  async resendSenderSignatureConfirmation(
+    senderId: number
+  ): Promise<{ ErrorCode: number; Message: string }> {
+    let response = await postmarkAxios.post(
+      `/senders/${senderId}/resend`,
+      {},
+      {
+        headers: this.accountHeaders()
+      }
+    );
     return response.data;
   }
 

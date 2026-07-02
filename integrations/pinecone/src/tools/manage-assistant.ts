@@ -1,19 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PineconeControlPlaneClient } from '../lib/client';
+import { pineconeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageAssistantTool = SlateTool.create(spec, {
   name: 'Manage Assistant',
   key: 'manage_assistant',
-  description: `Create, list, describe, or delete Pinecone Assistants. Assistants provide RAG-based document Q&A powered by uploaded documents. Can be deployed in US or EU regions.`,
+  description: `Create, list, describe, update, or delete Pinecone Assistants. Assistants provide RAG-based document Q&A powered by uploaded documents. Can be deployed in US or EU regions.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'describe', 'delete']).describe('Action to perform'),
+      action: z
+        .enum(['list', 'create', 'describe', 'update', 'delete'])
+        .describe('Action to perform'),
       assistantName: z
         .string()
         .optional()
@@ -21,11 +24,11 @@ export let manageAssistantTool = SlateTool.create(spec, {
       instructions: z
         .string()
         .optional()
-        .describe('Custom instructions for the assistant (for create)'),
+        .describe('Custom instructions for the assistant (for create or update)'),
       metadata: z
         .record(z.string(), z.any())
         .optional()
-        .describe('Metadata for the assistant (for create)'),
+        .describe('Metadata for the assistant (for create or update)'),
       region: z
         .enum(['us', 'eu'])
         .optional()
@@ -72,7 +75,9 @@ export let manageAssistantTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.assistantName) throw new Error('assistantName is required for create');
+      if (!ctx.input.assistantName) {
+        throw pineconeServiceError('assistantName is required for create.');
+      }
       let result = await client.createAssistant({
         name: ctx.input.assistantName,
         instructions: ctx.input.instructions,
@@ -98,7 +103,9 @@ export let manageAssistantTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'describe') {
-      if (!ctx.input.assistantName) throw new Error('assistantName is required for describe');
+      if (!ctx.input.assistantName) {
+        throw pineconeServiceError('assistantName is required for describe.');
+      }
       let result = await client.describeAssistant(ctx.input.assistantName);
       return {
         output: {
@@ -118,8 +125,41 @@ export let manageAssistantTool = SlateTool.create(spec, {
       };
     }
 
+    if (ctx.input.action === 'update') {
+      if (!ctx.input.assistantName) {
+        throw pineconeServiceError('assistantName is required for update.');
+      }
+      if (!ctx.input.instructions && !ctx.input.metadata) {
+        throw pineconeServiceError(
+          'Provide instructions or metadata when updating an assistant.'
+        );
+      }
+      let result = await client.updateAssistant(ctx.input.assistantName, {
+        instructions: ctx.input.instructions,
+        metadata: ctx.input.metadata
+      });
+      return {
+        output: {
+          assistants: [
+            {
+              assistantName: result.name,
+              instructions: result.instructions || undefined,
+              metadata: result.metadata || undefined,
+              status: result.status,
+              host: result.host,
+              createdAt: result.created_at,
+              updatedAt: result.updated_at
+            }
+          ]
+        },
+        message: `Updated assistant \`${result.name}\`. Status: ${result.status}.`
+      };
+    }
+
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.assistantName) throw new Error('assistantName is required for delete');
+      if (!ctx.input.assistantName) {
+        throw pineconeServiceError('assistantName is required for delete.');
+      }
       await client.deleteAssistant(ctx.input.assistantName);
       return {
         output: { deleted: true },
@@ -127,6 +167,6 @@ export let manageAssistantTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw pineconeServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

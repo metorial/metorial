@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { replicateServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createModel = SlateTool.create(spec, {
@@ -79,7 +80,11 @@ export let updateModel = SlateTool.create(spec, {
       githubUrl: z.string().optional().describe('Updated GitHub URL'),
       paperUrl: z.string().optional().describe('Updated paper URL'),
       licenseUrl: z.string().optional().describe('Updated license URL'),
-      coverImageUrl: z.string().optional().describe('Updated cover image URL')
+      coverImageUrl: z.string().optional().describe('Updated cover image URL'),
+      weightsUrl: z
+        .string()
+        .optional()
+        .describe('Updated model weights URL for supported models')
     })
   )
   .output(
@@ -91,6 +96,18 @@ export let updateModel = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.description === undefined &&
+      ctx.input.readme === undefined &&
+      ctx.input.githubUrl === undefined &&
+      ctx.input.paperUrl === undefined &&
+      ctx.input.licenseUrl === undefined &&
+      ctx.input.coverImageUrl === undefined &&
+      ctx.input.weightsUrl === undefined
+    ) {
+      throw replicateServiceError('Provide at least one model field to update.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
     let result = await client.updateModel(ctx.input.owner, ctx.input.modelName, {
       description: ctx.input.description,
@@ -98,7 +115,8 @@ export let updateModel = SlateTool.create(spec, {
       githubUrl: ctx.input.githubUrl,
       paperUrl: ctx.input.paperUrl,
       licenseUrl: ctx.input.licenseUrl,
-      coverImageUrl: ctx.input.coverImageUrl
+      coverImageUrl: ctx.input.coverImageUrl,
+      weightsUrl: ctx.input.weightsUrl
     });
 
     return {

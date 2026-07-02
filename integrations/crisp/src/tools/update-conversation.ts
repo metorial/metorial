@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { crispServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateConversation = SlateTool.create(spec, {
@@ -39,6 +40,11 @@ export let updateConversation = SlateTool.create(spec, {
         .optional()
         .describe('Assign conversation to operator by user ID'),
       unassign: z.boolean().optional().describe('Unassign the conversation from any operator'),
+      inboxId: z.string().optional().describe('Move the conversation to this inbox ID'),
+      moveToMainInbox: z
+        .boolean()
+        .optional()
+        .describe('Move the conversation back to the main inbox'),
       blocked: z.boolean().optional().describe('Block or unblock the visitor')
     })
   )
@@ -49,9 +55,21 @@ export let updateConversation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+    let client = new Client({
+      token: ctx.auth.token,
+      websiteId: ctx.config.websiteId,
+      tier: ctx.auth.tier
+    });
     let updated: string[] = [];
     let { sessionId } = ctx.input;
+
+    if (ctx.input.assignToOperatorId !== undefined && ctx.input.unassign) {
+      throw crispServiceError('Provide either assignToOperatorId or unassign, not both.');
+    }
+
+    if (ctx.input.inboxId !== undefined && ctx.input.moveToMainInbox) {
+      throw crispServiceError('Provide either inboxId or moveToMainInbox, not both.');
+    }
 
     // Update meta if any meta fields provided
     let meta: Record<string, any> = {};
@@ -84,9 +102,21 @@ export let updateConversation = SlateTool.create(spec, {
       updated.push('routing');
     }
 
+    if (ctx.input.inboxId !== undefined) {
+      await client.updateConversationInbox(sessionId, ctx.input.inboxId);
+      updated.push('inbox');
+    } else if (ctx.input.moveToMainInbox) {
+      await client.updateConversationInbox(sessionId, null);
+      updated.push('inbox');
+    }
+
     if (ctx.input.blocked !== undefined) {
       await client.updateConversationBlock(sessionId, ctx.input.blocked);
       updated.push('block');
+    }
+
+    if (updated.length === 0) {
+      throw crispServiceError('Provide at least one conversation field to update.');
     }
 
     return {

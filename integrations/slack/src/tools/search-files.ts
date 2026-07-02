@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { slackUserAuthMethods } from '../lib/auth-methods';
 import { SlackClient } from '../lib/client';
 import { slackActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
@@ -29,6 +30,7 @@ export let searchFiles = SlateTool.create(spec, {
   }
 })
   .scopes(slackActionScopes.search)
+  .authMethods(slackUserAuthMethods)
   .input(
     z.object({
       query: z

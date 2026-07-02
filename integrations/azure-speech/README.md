@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/azure-speech.png" height="20"> Azure Speech
 
-Transcribe audio to text using real-time, fast, or batch transcription modes with speaker diarization and language identification. Convert text to synthesized speech using neural, custom, or personal voices with SSML control over pronunciation and prosody. Generate photorealistic avatar videos from text. Translate speech across multiple languages. Verify and identify speakers by voice characteristics. Assess pronunciation accuracy, fluency, completeness, and prosody for language learning. Supports custom speech models trained on domain-specific data and LLM-enhanced transcription for captions, meeting summaries, and call center assistance.
+Transcribe short audio, fast single files, or batch audio URLs with Azure AI Speech. Convert text or SSML to neural speech audio attachments, list available voices and base speech models, assess pronunciation on short audio, and manage text-independent speaker profiles for enrollment, verification, and identification.
 
 ## Tools
 
@@ -11,6 +11,14 @@ Submits a batch transcription job to process one or more audio files asynchronou
 ### Delete Batch Transcription
 
 Deletes a batch transcription job and its associated result data. Use this to clean up completed transcriptions after retrieving their results, or to cancel transcriptions that are no longer needed.
+
+### Enroll Speaker Profile
+
+Adds a voice enrollment sample to a text-independent speaker verification or identification profile. Use this after creating a profile and before verifying or identifying speakers.
+
+### Fast Transcribe Audio
+
+Synchronously transcribes one audio file with Azure Speech fast transcription. Use this for quick file transcription with predictable latency when the audio is too large for short-audio recognition or when phrase/channel/diarization detail is needed.
 
 ### Get Batch Transcription
 
@@ -42,7 +50,7 @@ Performs real-time speech-to-text recognition on short audio (up to 60 seconds).
 
 ### Synthesize Speech
 
-Converts text into natural-sounding synthesized speech audio using Azure neural voices. Provide either plain text (which will be wrapped in SSML automatically) or custom SSML for fine-grained control over pronunciation, prosody, speaking styles, pauses, and other speech characteristics. Returns the synthesized audio as a base64-encoded string.
+Converts text into natural-sounding synthesized speech audio using Azure neural voices. Provide either plain text (which will be wrapped in SSML automatically) or custom SSML for fine-grained control over pronunciation, prosody, speaking styles, pauses, and other speech characteristics. Returns the synthesized audio as a Slate attachment.
 
 ### Verify Speaker
 

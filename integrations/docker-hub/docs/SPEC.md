@@ -6,17 +6,17 @@ Docker Hub is a cloud-based container image registry that allows users to store,
 
 ## Authentication
 
-Docker Hub uses a **credential-based authentication** flow to obtain a short-lived JWT (JSON Web Token) for API access.
+Docker Hub uses a **credential-based authentication** flow to obtain a short-lived bearer token for API access.
 
-**Obtaining a JWT Token:**
+**Obtaining a bearer token:**
 
-Authenticate by sending a POST request with your username and password (or Personal Access Token) to `https://hub.docker.com/v2/users/login/`, which returns a JWT token. Include this token in subsequent requests via the `Authorization: JWT <token>` header.
+Authenticate by sending a POST request with an identifier and secret to `https://hub.docker.com/v2/auth/token`, which returns a short-lived access token. Include this token in subsequent requests via the `Authorization: Bearer <token>` header.
 
 **Personal Access Tokens (PATs):**
 
 Personal access tokens (PATs) provide a secure alternative to passwords for Docker CLI authentication. Use PATs to authenticate automated systems, CI/CD pipelines, and development tools without exposing your Docker Hub password.
 
-PATs can be used in place of your password when obtaining a JWT. Pro and Team plan members have access to 4 scopes: Read, write, delete (full repo access); Read, write; Read only; and Public repo read only. Free users can continue to use their single read, write, delete token.
+PATs can be used in place of your password when obtaining a bearer token. Pro and Team plan members have access to 4 scopes: Read, write, delete (full repo access); Read, write; Read only; and Public repo read only. Free users can continue to use their single read, write, delete token.
 
 **Organization Access Tokens (OATs):**
 
@@ -48,7 +48,15 @@ In Docker Hub, an organization is a collection of teams. Image repositories can 
 
 ### Access Token Management
 
-You can manage your tokens through the Hub APIs. This includes creating, listing, updating, and revoking both personal and organization access tokens programmatically.
+You can manage tokens through the Hub APIs. This includes creating, listing, reading, updating, and revoking both personal and organization access tokens programmatically. Organization access tokens can be scoped to organization or repository resources.
+
+### Repository Team Access
+
+Docker Hub teams can be granted repository access with read, write, or admin permission. This integration supports assigning a team to a repository after listing or creating the team.
+
+### Immutable Tags
+
+Docker Hub supports immutable tag settings on repositories. Immutable tag rules can be updated and verified so repository administrators can prevent matching tags from being overwritten.
 
 ### Audit Logs
 
@@ -59,14 +67,6 @@ You can view activity logs using the Docker Hub API via the Audit logs endpoints
 ### Webhook Management
 
 You can create and manage webhooks on repositories via the API. Webhooks trigger an action in another service in response to a push event in the repository. You can list, create, and delete webhooks and their associated hook URLs for repositories you own.
-
-### SCIM Provisioning
-
-With SCIM, you can manage users within your identity provider (IdP). Docker Hub exposes a SCIM API that supports automatic user provisioning and de-provisioning through identity providers like Okta and Microsoft Entra ID (Azure AD). This is available for Docker Business subscriptions.
-
-### Repository Categories
-
-You can tag Docker Hub repositories with categories to improve discoverability and organization.
 
 ## Events
 

@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { magentoApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -42,21 +43,25 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
-      let axios = createAxios({
-        baseURL: ctx.input.storeUrl.replace(/\/+$/, '')
-      });
+      try {
+        let axios = createAxios({
+          baseURL: ctx.input.storeUrl.replace(/\/+$/, '')
+        });
 
-      let response = await axios.post('/rest/V1/integration/admin/token', {
-        username: ctx.input.username,
-        password: ctx.input.password
-      });
+        let response = await axios.post('/rest/V1/integration/admin/token', {
+          username: ctx.input.username,
+          password: ctx.input.password
+        });
 
-      let token = response.data as string;
+        let token = response.data as string;
 
-      return {
-        output: {
-          token
-        }
-      };
+        return {
+          output: {
+            token
+          }
+        };
+      } catch (error) {
+        throw magentoApiError(error, 'authenticate admin credentials');
+      }
     }
   });

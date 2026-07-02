@@ -33,7 +33,7 @@ export let deleteRepository = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let ns = ctx.input.namespace || ctx.config.namespace || ctx.auth.username;
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteRepository(ns, ctx.input.repositoryName);
 
     return {

@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let addHeaderFooter = SlateTool.create(spec, {
   name: 'Add Header/Footer',
@@ -31,12 +32,7 @@ export let addHeaderFooter = SlateTool.create(spec, {
       marginBottomPx: z.string().optional().describe('Bottom margin in pixels')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded PDF with header/footer'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -54,7 +50,8 @@ export let addHeaderFooter = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Added ${ctx.input.location} to **${result.fileName}**`
     };
   })

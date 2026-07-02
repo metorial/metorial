@@ -26,37 +26,37 @@ There are no OAuth flows or scopes. A single API key provides full access to all
 
 ### Document Parser Management
 
-List all Document Parsers in your account along with their IDs and labels. You can also list Model Layouts (templates) configured within a specific parser. Parser IDs are required for most other API operations.
+List all Document Parsers in your account along with their IDs and labels. You can also list Model Layouts (templates) configured within a specific parser through `GET /v1/parser/models/<PARSER_ID>`. Parser IDs are required for most other API operations.
 
 ### Document Import
 
 Import documents into a specific Document Parser for processing. Three import methods are supported:
 
-- **File upload:** Upload a file directly via multipart form-data.
-- **Base64 content:** Send file content as base64-encoded data along with an optional filename.
-- **Fetch from URL:** Provide a publicly accessible URL from which Docparser will retrieve the document.
+- **File upload:** Upload a file directly to `POST /v1/document/upload/<PARSER_ID>` via multipart form-data field `file`.
+- **Base64 content:** Send base64-encoded content to `POST /v1/document/upload/<PARSER_ID>` via multipart form-data field `file_content` and optional `file_name`.
+- **Fetch from URL:** Provide a publicly accessible URL to `POST /v2/document/fetch/<PARSER_ID>` via multipart form-data field `url`.
 
 All import methods accept an optional `remote_id` parameter — an arbitrary string that stays associated with the document through processing and is included when retrieving parsed data, useful for correlating results with records in your own system.
 
 ### Document Status Tracking
 
-Check the processing status of a specific document, including timestamps for upload, import, OCR, preprocessing, parsing, and webhook dispatch. Failed processing jobs are listed in the response.
+Check the processing status of a specific document with `GET /v2/document/status/<PARSER_ID>/<DOCUMENT_ID>`, including timestamps and state flags for import, processing, and webhook dispatch. Failed processing jobs are listed in the response.
 
 ### Parsed Data Retrieval
 
 Retrieve structured data extracted from documents. Data can be fetched for a single document or for multiple documents from a parser. Results include parsed fields, metadata (filename, page count, timestamps), media links, and the optional `remote_id`.
 
 - **Format options:** Results can be returned as nested JSON objects or as flat key/value pairs.
-- **Filtering:** Results for multiple documents can be filtered by upload date, processing date, or `remote_id`.
-- **Sorting:** Results can be sorted by various timestamp fields in ascending or descending order.
-- **Child documents:** If a document was split during preprocessing, child document data can be included.
+- **Filtering:** Results for multiple documents can be filtered by `list`, `date`, `remote_id`, and whether the processing queue should be included. The `date` parameter is required when `list` is `uploaded_after` or `processed_after`.
+- **Sorting:** Results can be sorted by documented timestamp fields with `sort_by` and `sort_order`.
+- **Child documents:** If a document was split during preprocessing, child document data can be included when fetching one document.
 
 ### Re-Parse and Re-Integrate
 
 - **Re-parse:** Schedule previously imported documents to be parsed again (e.g., after updating parsing rules).
 - **Re-integrate:** Schedule documents to be re-sent through configured integrations and webhooks.
 
-Both operations accept an array of document IDs.
+Both operations accept an array of document IDs sent as repeated `document_ids[]` form fields.
 
 ## Events
 

@@ -72,7 +72,7 @@ export let getProjectTool = SlateTool.create(spec, {
 export let updateProjectTool = SlateTool.create(spec, {
   name: 'Update Project',
   key: 'update_project',
-  description: `Update a Deepgram project's name or company. Provide the fields you want to change.`,
+  description: `Update a Deepgram project's name.`,
   tags: {
     destructive: false
   }
@@ -80,8 +80,7 @@ export let updateProjectTool = SlateTool.create(spec, {
   .input(
     z.object({
       projectId: z.string().describe('ID of the project to update.'),
-      name: z.string().optional().describe('New project name.'),
-      company: z.string().optional().describe('New company name.')
+      name: z.string().describe('New project name.')
     })
   )
   .output(
@@ -91,13 +90,12 @@ export let updateProjectTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new DeepgramClient(ctx.auth.token);
-    await client.updateProject(ctx.input.projectId, {
-      name: ctx.input.name,
-      company: ctx.input.company
+    let result = await client.updateProject(ctx.input.projectId, {
+      name: ctx.input.name
     });
 
     return {
-      output: { message: 'Project updated successfully.' },
+      output: { message: result.message ?? 'Project updated successfully.' },
       message: `Updated project **${ctx.input.projectId}**.`
     };
   })

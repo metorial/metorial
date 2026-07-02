@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetaAdsClient } from '../lib/client';
+import { metaAdsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let userDataSchema = z
@@ -109,7 +110,21 @@ Events are sent to a dataset/pixel ID and used for ad optimization, targeting, a
       apiVersion: ctx.config.apiVersion
     });
 
-    let formattedEvents = ctx.input.events.map(event => {
+    let formattedEvents = ctx.input.events.map((event, index) => {
+      if (event.actionSource === 'website') {
+        if (!event.eventSourceUrl) {
+          throw metaAdsServiceError(
+            `events[${index}].eventSourceUrl is required for website conversion events.`
+          );
+        }
+
+        if (!event.userData.clientUserAgent) {
+          throw metaAdsServiceError(
+            `events[${index}].userData.clientUserAgent is required for website conversion events.`
+          );
+        }
+      }
+
       let formatted: Record<string, any> = {
         event_name: event.eventName,
         event_time: event.eventTime,
@@ -138,6 +153,12 @@ Events are sent to a dataset/pixel ID and used for ad optimization, targeting, a
         if (formatted.user_data[key] === undefined) {
           delete formatted.user_data[key];
         }
+      }
+
+      if (Object.keys(formatted.user_data).length === 0) {
+        throw metaAdsServiceError(
+          `events[${index}].userData must include at least one matching identifier.`
+        );
       }
 
       if (event.eventId) formatted.event_id = event.eventId;

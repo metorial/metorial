@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  controlSearchJob,
   createIndex,
   createKVStoreCollection,
   createSavedSearch,
@@ -12,6 +13,7 @@ import {
   getIndex,
   getSearchResults,
   getServerInfo,
+  listApps,
   listFiredAlerts,
   listIndexes,
   listKVStoreCollections,
@@ -31,6 +33,7 @@ export let provider = Slate.create({
   tools: [
     runSearch,
     getSearchResults,
+    controlSearchJob,
     listSavedSearches,
     createSavedSearch,
     updateSavedSearch,
@@ -47,6 +50,7 @@ export let provider = Slate.create({
     queryKVStoreRecords,
     upsertKVStoreRecord,
     deleteKVStoreRecords,
+    listApps,
     listUsers,
     getCurrentUser,
     getServerInfo,

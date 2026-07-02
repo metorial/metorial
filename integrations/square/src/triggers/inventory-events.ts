@@ -35,7 +35,7 @@ export let inventoryEvents = SlateTrigger.create(spec, {
       let subscription = await client.createWebhookSubscription({
         idempotencyKey: crypto.randomUUID(),
         subscription: {
-          name: 'Slates Inventory Events',
+          name: 'Square Inventory Events',
           eventTypes: INVENTORY_EVENT_TYPES,
           notificationUrl: ctx.input.webhookBaseUrl
         }

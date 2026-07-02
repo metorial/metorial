@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { ConnectClient, type PatchOperation } from '../lib/client';
+import type { PatchOperation } from '../lib/client';
+import { createConnectClient } from '../lib/connect-tool';
 import { spec } from '../spec';
 
 export let updateItem = SlateTool.create(spec, {
@@ -63,14 +64,7 @@ export let updateItem = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.config.connectServerUrl) {
-      throw new Error('Connect server URL is required. Set it in the configuration.');
-    }
-
-    let client = new ConnectClient({
-      token: ctx.auth.token,
-      serverUrl: ctx.config.connectServerUrl
-    });
+    let client = createConnectClient(ctx);
 
     let hasConvenienceUpdates =
       ctx.input.title !== undefined ||
@@ -113,8 +107,8 @@ export let updateItem = SlateTool.create(spec, {
       }));
       result = await client.patchItem(ctx.input.vaultId, ctx.input.itemId, ops);
     } else {
-      throw new Error(
-        'No updates provided. Specify at least one of: title, tags, favorite, urls, or patchOperations.'
+      throw createApiServiceError(
+        'No updates provided. Specify at least one of title, tags, favorite, urls, or patchOperations.'
       );
     }
 

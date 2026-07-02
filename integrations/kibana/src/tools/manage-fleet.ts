@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { kibanaServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -102,7 +103,7 @@ export let manageAgentPolicy = SlateTool.create(spec, {
     let { action, policyId, name, description, namespace, monitoringEnabled } = ctx.input;
 
     if (action === 'get') {
-      if (!policyId) throw new Error('policyId is required for get action');
+      if (!policyId) throw kibanaServiceError('policyId is required for get action');
       let result = await client.getAgentPolicy(policyId);
       let p = result.item ?? result;
       return {
@@ -121,7 +122,7 @@ export let manageAgentPolicy = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
+      if (!name) throw kibanaServiceError('name is required for create action');
       let result = await client.createAgentPolicy({
         name,
         description,
@@ -144,7 +145,7 @@ export let manageAgentPolicy = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!policyId) throw new Error('policyId is required for update action');
+      if (!policyId) throw kibanaServiceError('policyId is required for update action');
       let updateParams: Record<string, any> = {};
       if (name !== undefined) updateParams.name = name;
       if (description !== undefined) updateParams.description = description;
@@ -168,7 +169,7 @@ export let manageAgentPolicy = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!policyId) throw new Error('policyId is required for delete action');
+      if (!policyId) throw kibanaServiceError('policyId is required for delete action');
       await client.deleteAgentPolicy(policyId);
       return {
         output: {
@@ -180,7 +181,7 @@ export let manageAgentPolicy = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw kibanaServiceError(`Unknown action: ${action}`);
   })
   .build();
 

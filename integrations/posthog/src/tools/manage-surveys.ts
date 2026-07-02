@@ -26,6 +26,12 @@ export let listSurveysTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      search: z.string().optional().describe('Search by survey name'),
+      archived: z.boolean().optional().describe('Filter by archival state'),
+      surveyType: z
+        .enum(['api', 'external_survey', 'popover', 'widget'])
+        .optional()
+        .describe('Filter by survey type'),
       limit: z.number().optional().describe('Maximum number of results'),
       offset: z.number().optional().describe('Pagination offset')
     })
@@ -39,6 +45,9 @@ export let listSurveysTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
     let data = await client.listSurveys({
+      search: ctx.input.search,
+      archived: ctx.input.archived,
+      type: ctx.input.surveyType,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });

@@ -2,18 +2,70 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  ensureAtLeastOne,
+  paginationInput,
+  pickDefined,
+  requireArray,
+  requireString,
+  validateRunOptions
+} from './shared';
+
+let scheduleActionSchema = z.object({
+  type: z.enum(['RUN_ACTOR', 'RUN_ACTOR_TASK']).describe('Scheduled action type'),
+  actorId: z.string().optional().describe('Actor ID; required for RUN_ACTOR'),
+  actorTaskId: z.string().optional().describe('Task ID; required for RUN_ACTOR_TASK'),
+  input: z.any().optional().describe('Run input override'),
+  build: z.string().optional().describe('Build tag or number'),
+  timeout: z.number().optional().describe('Run timeout in seconds'),
+  memory: z.number().optional().describe('Run memory in MB')
+});
+
+let mapSchedule = (schedule: Record<string, any>) => ({
+  scheduleId: schedule.id,
+  name: schedule.name,
+  cronExpression: schedule.cronExpression,
+  timezone: schedule.timezone,
+  isEnabled: schedule.isEnabled,
+  isExclusive: schedule.isExclusive,
+  description: schedule.description,
+  createdAt: schedule.createdAt,
+  modifiedAt: schedule.modifiedAt,
+  nextRunAt: schedule.nextRunAt ?? undefined,
+  actions: schedule.actions
+});
+
+let toScheduleActions = (actions: z.infer<typeof scheduleActionSchema>[] | undefined) => {
+  if (!actions) return undefined;
+
+  return requireArray(actions, 'actions').map((action, index) => {
+    validateRunOptions(action);
+    if (action.type === 'RUN_ACTOR') {
+      requireString(action.actorId, `actions[${index}].actorId`, 'RUN_ACTOR');
+    } else {
+      requireString(action.actorTaskId, `actions[${index}].actorTaskId`, 'RUN_ACTOR_TASK');
+    }
+
+    let runOptions = pickDefined({
+      build: action.build,
+      timeoutSecs: action.timeout,
+      memoryMbytes: action.memory
+    });
+
+    return pickDefined({
+      type: action.type,
+      actorId: action.actorId,
+      actorTaskId: action.actorTaskId,
+      input: action.input,
+      runOptions: Object.keys(runOptions).length > 0 ? runOptions : undefined
+    });
+  });
+};
 
 export let manageSchedule = SlateTool.create(spec, {
   name: 'Manage Schedule',
   key: 'manage_schedule',
-  description: `Create, get, update, delete, or list schedules. Schedules automatically start Actors or Tasks at specified times using cron expressions. Each schedule supports up to 10 Actors and 10 Tasks.`,
-  instructions: [
-    'Use action "list" to list all schedules.',
-    'Use action "get" with scheduleId to get schedule details.',
-    'Use action "create" with name, cronExpression, and actions to create a new schedule.',
-    'Use action "update" with scheduleId and fields to update.',
-    'Use action "delete" with scheduleId to delete a schedule.'
-  ],
+  description: `Create, get, update, delete, or list Apify schedules that run Actors or Actor Tasks on a cron expression.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -24,67 +76,36 @@ export let manageSchedule = SlateTool.create(spec, {
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete'])
         .describe('Action to perform'),
-      scheduleId: z
-        .string()
-        .optional()
-        .describe('Schedule ID (required for get/update/delete)'),
-      name: z.string().optional().describe('Schedule name (required for create)'),
-      cronExpression: z
-        .string()
-        .optional()
-        .describe('Cron expression (e.g. "0 0 * * *" for daily at midnight)'),
-      timezone: z.string().optional().describe('Timezone (e.g. "America/New_York")'),
+      scheduleId: z.string().optional().describe('Schedule ID for get/update/delete'),
+      name: z.string().optional().describe('Schedule name; required for create'),
+      cronExpression: z.string().optional().describe('Cron expression for create/update'),
+      timezone: z.string().optional().describe('Timezone, for example America/New_York'),
       isEnabled: z.boolean().optional().describe('Whether the schedule is active'),
       isExclusive: z
         .boolean()
         .optional()
-        .describe('If true, skip scheduled runs if previous is still running'),
+        .describe('Skip scheduled runs when a previous run is still active'),
       description: z.string().optional().describe('Schedule description'),
-      actions: z
-        .array(
-          z.object({
-            type: z.enum(['RUN_ACTOR', 'RUN_ACTOR_TASK']).describe('Action type'),
-            actorId: z.string().optional().describe('Actor ID (for RUN_ACTOR)'),
-            actorTaskId: z.string().optional().describe('Task ID (for RUN_ACTOR_TASK)'),
-            input: z.any().optional().describe('Override input for the run'),
-            build: z.string().optional().describe('Build tag'),
-            timeout: z.number().optional().describe('Timeout in seconds'),
-            memory: z.number().optional().describe('Memory in MB')
-          })
-        )
-        .optional()
-        .describe('Scheduled actions (Actors and Tasks to run)'),
-      limit: z.number().optional().default(25).describe('Max items for list'),
-      offset: z.number().optional().default(0).describe('Pagination offset for list')
+      actions: z.array(scheduleActionSchema).optional().describe('Scheduled actions'),
+      ...paginationInput
     })
   )
   .output(
     z.object({
       scheduleId: z.string().optional().describe('Schedule ID'),
-      name: z.string().optional().describe('Schedule name'),
-      cronExpression: z.string().optional().describe('Cron expression'),
-      timezone: z.string().optional().describe('Timezone'),
-      isEnabled: z.boolean().optional().describe('Whether enabled'),
-      isExclusive: z.boolean().optional().describe('Whether exclusive'),
-      description: z.string().optional().describe('Description'),
-      createdAt: z.string().optional().describe('Creation timestamp'),
-      modifiedAt: z.string().optional().describe('Last modification timestamp'),
-      nextRunAt: z.string().optional().describe('Next scheduled run time'),
-      actions: z.array(z.record(z.string(), z.any())).optional().describe('Scheduled actions'),
-      schedules: z
-        .array(
-          z.object({
-            scheduleId: z.string().describe('Schedule ID'),
-            name: z.string().optional().describe('Schedule name'),
-            cronExpression: z.string().optional().describe('Cron expression'),
-            isEnabled: z.boolean().optional().describe('Whether enabled'),
-            nextRunAt: z.string().optional().describe('Next run time')
-          })
-        )
-        .optional()
-        .describe('Schedule list (for list action)'),
-      total: z.number().optional().describe('Total schedules'),
-      deleted: z.boolean().optional().describe('Whether deleted')
+      name: z.string().optional(),
+      cronExpression: z.string().optional(),
+      timezone: z.string().optional(),
+      isEnabled: z.boolean().optional(),
+      isExclusive: z.boolean().optional(),
+      description: z.string().optional(),
+      createdAt: z.string().optional(),
+      modifiedAt: z.string().optional(),
+      nextRunAt: z.string().optional(),
+      actions: z.array(z.record(z.string(), z.any())).optional(),
+      schedules: z.array(z.record(z.string(), z.any())).optional(),
+      total: z.number().optional(),
+      deleted: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -93,17 +114,10 @@ export let manageSchedule = SlateTool.create(spec, {
     if (ctx.input.action === 'list') {
       let result = await client.listSchedules({
         limit: ctx.input.limit,
-        offset: ctx.input.offset
+        offset: ctx.input.offset,
+        desc: ctx.input.descending
       });
-
-      let schedules = result.items.map(item => ({
-        scheduleId: item.id,
-        name: item.name,
-        cronExpression: item.cronExpression,
-        isEnabled: item.isEnabled,
-        nextRunAt: item.nextRunAt
-      }));
-
+      let schedules = result.items.map(mapSchedule);
       return {
         output: { schedules, total: result.total },
         message: `Found **${result.total}** schedule(s), showing **${schedules.length}**.`
@@ -111,106 +125,57 @@ export let manageSchedule = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      let schedule = await client.getSchedule(ctx.input.scheduleId!);
+      let scheduleId = requireString(ctx.input.scheduleId, 'scheduleId', 'get');
+      let schedule = await client.getSchedule(scheduleId);
       return {
-        output: {
-          scheduleId: schedule.id,
-          name: schedule.name,
-          cronExpression: schedule.cronExpression,
-          timezone: schedule.timezone,
-          isEnabled: schedule.isEnabled,
-          isExclusive: schedule.isExclusive,
-          description: schedule.description,
-          createdAt: schedule.createdAt,
-          modifiedAt: schedule.modifiedAt,
-          nextRunAt: schedule.nextRunAt,
-          actions: schedule.actions
-        },
-        message: `Retrieved schedule **${schedule.name}** (\`${schedule.id}\`).`
+        output: mapSchedule(schedule),
+        message: `Retrieved schedule **${schedule.name ?? scheduleId}** (\`${schedule.id ?? scheduleId}\`).`
       };
     }
 
     if (ctx.input.action === 'create') {
-      let body: Record<string, any> = {
-        name: ctx.input.name,
-        cronExpression: ctx.input.cronExpression
-      };
-      if (ctx.input.timezone !== undefined) body.timezone = ctx.input.timezone;
-      if (ctx.input.isEnabled !== undefined) body.isEnabled = ctx.input.isEnabled;
-      if (ctx.input.isExclusive !== undefined) body.isExclusive = ctx.input.isExclusive;
-      if (ctx.input.description !== undefined) body.description = ctx.input.description;
-      if (ctx.input.actions !== undefined) {
-        body.actions = ctx.input.actions.map(a => {
-          let action: Record<string, any> = { type: a.type };
-          if (a.actorId !== undefined) action.actorId = a.actorId;
-          if (a.actorTaskId !== undefined) action.actorTaskId = a.actorTaskId;
-          if (a.input !== undefined) action.input = a.input;
-          if (a.build !== undefined) action.build = a.build;
-          if (a.timeout !== undefined) action.timeoutSecs = a.timeout;
-          if (a.memory !== undefined) action.memoryMbytes = a.memory;
-          return action;
-        });
-      }
-
+      let name = requireString(ctx.input.name, 'name', 'create');
+      let cronExpression = requireString(ctx.input.cronExpression, 'cronExpression', 'create');
+      let body = pickDefined({
+        name,
+        cronExpression,
+        timezone: ctx.input.timezone,
+        isEnabled: ctx.input.isEnabled,
+        isExclusive: ctx.input.isExclusive,
+        description: ctx.input.description,
+        actions: toScheduleActions(ctx.input.actions)
+      });
       let schedule = await client.createSchedule(body);
       return {
-        output: {
-          scheduleId: schedule.id,
-          name: schedule.name,
-          cronExpression: schedule.cronExpression,
-          timezone: schedule.timezone,
-          isEnabled: schedule.isEnabled,
-          isExclusive: schedule.isExclusive,
-          createdAt: schedule.createdAt,
-          actions: schedule.actions
-        },
-        message: `Created schedule **${schedule.name}** (\`${schedule.id}\`).`
+        output: mapSchedule(schedule),
+        message: `Created schedule **${schedule.name ?? name}** (\`${schedule.id}\`).`
       };
     }
 
     if (ctx.input.action === 'update') {
-      let body: Record<string, any> = {};
-      if (ctx.input.name !== undefined) body.name = ctx.input.name;
-      if (ctx.input.cronExpression !== undefined)
-        body.cronExpression = ctx.input.cronExpression;
-      if (ctx.input.timezone !== undefined) body.timezone = ctx.input.timezone;
-      if (ctx.input.isEnabled !== undefined) body.isEnabled = ctx.input.isEnabled;
-      if (ctx.input.isExclusive !== undefined) body.isExclusive = ctx.input.isExclusive;
-      if (ctx.input.description !== undefined) body.description = ctx.input.description;
-      if (ctx.input.actions !== undefined) {
-        body.actions = ctx.input.actions.map(a => {
-          let action: Record<string, any> = { type: a.type };
-          if (a.actorId !== undefined) action.actorId = a.actorId;
-          if (a.actorTaskId !== undefined) action.actorTaskId = a.actorTaskId;
-          if (a.input !== undefined) action.input = a.input;
-          if (a.build !== undefined) action.build = a.build;
-          if (a.timeout !== undefined) action.timeoutSecs = a.timeout;
-          if (a.memory !== undefined) action.memoryMbytes = a.memory;
-          return action;
-        });
-      }
-
-      let schedule = await client.updateSchedule(ctx.input.scheduleId!, body);
+      let scheduleId = requireString(ctx.input.scheduleId, 'scheduleId', 'update');
+      let body = pickDefined({
+        name: ctx.input.name,
+        cronExpression: ctx.input.cronExpression,
+        timezone: ctx.input.timezone,
+        isEnabled: ctx.input.isEnabled,
+        isExclusive: ctx.input.isExclusive,
+        description: ctx.input.description,
+        actions: toScheduleActions(ctx.input.actions)
+      });
+      ensureAtLeastOne(body, 'update the schedule');
+      let schedule = await client.updateSchedule(scheduleId, body);
       return {
-        output: {
-          scheduleId: schedule.id,
-          name: schedule.name,
-          cronExpression: schedule.cronExpression,
-          timezone: schedule.timezone,
-          isEnabled: schedule.isEnabled,
-          isExclusive: schedule.isExclusive,
-          modifiedAt: schedule.modifiedAt,
-          actions: schedule.actions
-        },
-        message: `Updated schedule **${schedule.name}** (\`${schedule.id}\`).`
+        output: mapSchedule(schedule),
+        message: `Updated schedule **${schedule.name ?? scheduleId}** (\`${schedule.id ?? scheduleId}\`).`
       };
     }
 
-    // delete
-    await client.deleteSchedule(ctx.input.scheduleId!);
+    let scheduleId = requireString(ctx.input.scheduleId, 'scheduleId', 'delete');
+    await client.deleteSchedule(scheduleId);
     return {
-      output: { scheduleId: ctx.input.scheduleId, deleted: true },
-      message: `Deleted schedule \`${ctx.input.scheduleId}\`.`
+      output: { scheduleId, deleted: true },
+      message: `Deleted schedule \`${scheduleId}\`.`
     };
   })
   .build();

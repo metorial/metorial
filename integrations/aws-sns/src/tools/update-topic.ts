@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SnsClient } from '../lib/client';
+import { snsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateTopic = SlateTool.create(spec, {
@@ -33,6 +34,10 @@ export let updateTopic = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Enable content-based deduplication (FIFO topics only)'),
+      fifoThroughputScope: z
+        .enum(['Topic', 'MessageGroup'])
+        .optional()
+        .describe('FIFO throughput and deduplication scope'),
       archivePolicy: z
         .string()
         .optional()
@@ -87,6 +92,9 @@ export let updateTopic = SlateTool.create(spec, {
         value: String(ctx.input.contentBasedDeduplication)
       });
     }
+    if (ctx.input.fifoThroughputScope !== undefined) {
+      attrUpdates.push({ name: 'FifoThroughputScope', value: ctx.input.fifoThroughputScope });
+    }
     if (ctx.input.archivePolicy !== undefined) {
       attrUpdates.push({ name: 'ArchivePolicy', value: ctx.input.archivePolicy });
     }
@@ -107,6 +115,10 @@ export let updateTopic = SlateTool.create(spec, {
     if (ctx.input.removeTagKeys && ctx.input.removeTagKeys.length > 0) {
       await client.untagResource(ctx.input.topicArn, ctx.input.removeTagKeys);
       updatedAttributes.push('Tags (removed)');
+    }
+
+    if (updatedAttributes.length === 0) {
+      throw snsServiceError('Provide at least one topic attribute or tag change.');
     }
 
     return {

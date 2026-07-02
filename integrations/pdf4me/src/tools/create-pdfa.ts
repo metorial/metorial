@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let createPdfA = SlateTool.create(spec, {
   name: 'Create PDF/A',
@@ -23,12 +24,7 @@ export let createPdfA = SlateTool.create(spec, {
       allowDowngrade: z.boolean().optional().describe('Allow downgrading the compliance level')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded PDF/A compliant document'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -41,7 +37,8 @@ export let createPdfA = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully created **${ctx.input.compliance}** compliant PDF: **${result.fileName}**`
     };
   })

@@ -49,6 +49,54 @@ export let listProjects = SlateTool.create(spec, {
   })
   .build();
 
+export let getProject = SlateTool.create(spec, {
+  name: 'Get Project',
+  key: 'get_project',
+  description: `Retrieve a Browserbase project by ID. Defaults to the configured project and returns timeout and concurrency settings.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      projectId: z
+        .string()
+        .optional()
+        .describe('Project ID to retrieve. Defaults to the configured project.')
+    })
+  )
+  .output(
+    z.object({
+      projectId: z.string().describe('Project identifier'),
+      name: z.string().describe('Project name'),
+      ownerId: z.string().describe('Owner identifier'),
+      defaultTimeout: z.number().describe('Default session timeout in seconds'),
+      concurrency: z.number().describe('Maximum concurrent sessions'),
+      createdAt: z.string().describe('Creation timestamp'),
+      updatedAt: z.string().describe('Last update timestamp')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+
+    let projectId = ctx.input.projectId || ctx.config.projectId;
+    let project = await client.getProject(projectId);
+
+    return {
+      output: {
+        projectId: project.projectId,
+        name: project.name,
+        ownerId: project.ownerId,
+        defaultTimeout: project.defaultTimeout,
+        concurrency: project.concurrency,
+        createdAt: project.createdAt,
+        updatedAt: project.updatedAt
+      },
+      message: `Retrieved project **${project.name}** (${project.projectId}).`
+    };
+  })
+  .build();
+
 export let getProjectUsage = SlateTool.create(spec, {
   name: 'Get Project Usage',
   key: 'get_project_usage',

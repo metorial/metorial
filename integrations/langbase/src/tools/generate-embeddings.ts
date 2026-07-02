@@ -24,6 +24,7 @@ export let generateEmbeddings = SlateTool.create(spec, {
       embeddingModel: z
         .enum([
           'openai:text-embedding-3-large',
+          'cohere:embed-v4.0',
           'cohere:embed-multilingual-v3.0',
           'cohere:embed-multilingual-light-v3.0',
           'google:text-embedding-004'

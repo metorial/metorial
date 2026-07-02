@@ -30,7 +30,7 @@ export let trainingCompleted = SlateTrigger.create(spec, {
       trainingId: z.string().describe('Training ID'),
       model: z.string().optional().describe('Base model identifier'),
       version: z.string().optional().describe('Base model version ID'),
-      status: z.string().describe('Terminal status: succeeded, failed, or canceled'),
+      status: z.string().describe('Terminal status: succeeded, failed, canceled, or aborted'),
       input: z.any().optional().describe('Training input parameters'),
       output: z
         .any()
@@ -57,7 +57,7 @@ export let trainingCompleted = SlateTrigger.create(spec, {
       let lastSeenAt = ctx.state?.lastSeenAt as string | undefined;
       let trainings = (result.results || []) as any[];
 
-      let terminalStatuses = ['succeeded', 'failed', 'canceled'];
+      let terminalStatuses = ['succeeded', 'failed', 'canceled', 'aborted'];
       let newTrainings = trainings.filter((t: any) => {
         if (!terminalStatuses.includes(t.status)) return false;
         if (!t.completed_at) return false;

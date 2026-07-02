@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrazeClient } from '../lib/client';
+import { requireBrazeNumber, requireBrazeString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getKpiAnalytics = SlateTool.create(spec, {
@@ -138,18 +139,103 @@ export let getCustomEventAnalytics = SlateTool.create(spec, {
         message: `Found **${(result.events ?? []).length}** custom event(s).`
       };
     } else {
-      let result = await client.getCustomEventAnalytics(
-        ctx.input.eventName!,
-        ctx.input.length!,
-        ctx.input.endingAt
-      );
+      let eventName = requireBrazeString(ctx.input.eventName, 'eventName', 'analytics');
+      let length = requireBrazeNumber(ctx.input.length, 'length', 'analytics');
+      let result = await client.getCustomEventAnalytics(eventName, length, ctx.input.endingAt);
       return {
         output: {
           dataSeries: result.data ?? [],
           message: result.message
         },
-        message: `Retrieved **${(result.data ?? []).length}** data points for event **${ctx.input.eventName}**.`
+        message: `Retrieved **${(result.data ?? []).length}** data points for event **${eventName}**.`
       };
+    }
+  })
+  .build();
+
+export let getPurchaseAnalytics = SlateTool.create(spec, {
+  name: 'Get Purchase Analytics',
+  key: 'get_purchase_analytics',
+  description: `List product IDs or retrieve Braze purchase quantity and revenue analytics for a product or all products over a date range.`,
+  tags: {
+    destructive: false,
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      action: z
+        .enum(['list_products', 'quantity_series', 'revenue_series'])
+        .describe('Purchase analytics operation to perform'),
+      length: z
+        .number()
+        .optional()
+        .describe('Number of days of data to return (required for series actions, max 100)'),
+      endingAt: z
+        .string()
+        .optional()
+        .describe('End date for the data series in ISO 8601 format'),
+      productId: z.string().optional().describe('Optional product ID to filter series data'),
+      page: z.number().optional().describe('Page number for list_products')
+    })
+  )
+  .output(
+    z.object({
+      productIds: z.array(z.string()).optional().describe('Product IDs'),
+      dataSeries: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Purchase analytics data points'),
+      message: z.string().describe('Response status')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new BrazeClient({
+      token: ctx.auth.token,
+      instanceUrl: ctx.config.instanceUrl
+    });
+
+    switch (ctx.input.action) {
+      case 'list_products': {
+        let result = await client.listProducts(ctx.input.page);
+        return {
+          output: {
+            productIds: result.products ?? result.product_ids ?? [],
+            message: result.message
+          },
+          message: `Found **${(result.products ?? result.product_ids ?? []).length}** product ID(s).`
+        };
+      }
+      case 'quantity_series': {
+        let length = requireBrazeNumber(ctx.input.length, 'length', 'quantity_series');
+        let result = await client.getPurchaseQuantitySeries(
+          length,
+          ctx.input.endingAt,
+          ctx.input.productId
+        );
+        return {
+          output: {
+            dataSeries: result.data ?? [],
+            message: result.message
+          },
+          message: `Retrieved **${(result.data ?? []).length}** purchase quantity data point(s).`
+        };
+      }
+      case 'revenue_series': {
+        let length = requireBrazeNumber(ctx.input.length, 'length', 'revenue_series');
+        let result = await client.getPurchaseRevenueSeries(
+          length,
+          ctx.input.endingAt,
+          ctx.input.productId
+        );
+        return {
+          output: {
+            dataSeries: result.data ?? [],
+            message: result.message
+          },
+          message: `Retrieved **${(result.data ?? []).length}** purchase revenue data point(s).`
+        };
+      }
     }
   })
   .build();

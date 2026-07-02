@@ -4,6 +4,7 @@ export * from './create-model';
 export * from './delete-model';
 export * from './generate-embeddings';
 export * from './generate-text';
+export * from './get-version';
 export * from './list-models';
 export * from './pull-model';
 export * from './push-model';

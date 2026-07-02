@@ -83,15 +83,15 @@ Use a query string with New Relic entity search syntax. Supports filtering by ty
       let mapped = {
         entityGuid: entity.guid,
         name: entity.name,
-        entityType: entity.entityType,
-        domain: entity.domain,
-        type: entity.type,
-        reporting: entity.reporting,
-        alertSeverity: entity.alertSeverity,
-        permalink: entity.permalink,
-        tags: entity.tags,
+        entityType: entity.entityType ?? undefined,
+        domain: entity.domain ?? undefined,
+        type: entity.type ?? undefined,
+        reporting: entity.reporting ?? undefined,
+        alertSeverity: entity.alertSeverity ?? undefined,
+        permalink: entity.permalink ?? undefined,
+        tags: entity.tags ?? undefined,
         accountId: entity.account?.id?.toString(),
-        accountName: entity.account?.name
+        accountName: entity.account?.name ?? undefined
       };
 
       return {
@@ -109,15 +109,15 @@ Use a query string with New Relic entity search syntax. Supports filtering by ty
     let entities = (result?.results?.entities || []).map((e: any) => ({
       entityGuid: e.guid,
       name: e.name,
-      entityType: e.entityType,
-      domain: e.domain,
-      type: e.type,
-      reporting: e.reporting,
-      alertSeverity: e.alertSeverity,
-      permalink: e.permalink,
-      tags: e.tags,
+      entityType: e.entityType ?? undefined,
+      domain: e.domain ?? undefined,
+      type: e.type ?? undefined,
+      reporting: e.reporting ?? undefined,
+      alertSeverity: e.alertSeverity ?? undefined,
+      permalink: e.permalink ?? undefined,
+      tags: e.tags ?? undefined,
       accountId: e.account?.id?.toString(),
-      accountName: e.account?.name
+      accountName: e.account?.name ?? undefined
     }));
 
     return {

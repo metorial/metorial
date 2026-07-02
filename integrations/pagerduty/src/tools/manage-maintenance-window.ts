@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PagerDutyClient } from '../lib/client';
+import { pagerDutyServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageMaintenanceWindow = SlateTool.create(spec, {
@@ -80,11 +81,11 @@ export let manageMaintenanceWindow = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.startTime) throw new Error('startTime is required');
-      if (!ctx.input.endTime) throw new Error('endTime is required');
+      if (!ctx.input.startTime) throw pagerDutyServiceError('startTime is required');
+      if (!ctx.input.endTime) throw pagerDutyServiceError('endTime is required');
       if (!ctx.input.serviceIds || ctx.input.serviceIds.length === 0)
-        throw new Error('serviceIds is required');
-      if (!ctx.input.fromEmail) throw new Error('fromEmail is required');
+        throw pagerDutyServiceError('serviceIds is required');
+      if (!ctx.input.fromEmail) throw pagerDutyServiceError('fromEmail is required');
 
       let mw = await client.createMaintenanceWindow(
         {
@@ -105,7 +106,8 @@ export let manageMaintenanceWindow = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'end') {
-      if (!ctx.input.maintenanceWindowId) throw new Error('maintenanceWindowId is required');
+      if (!ctx.input.maintenanceWindowId)
+        throw pagerDutyServiceError('maintenanceWindowId is required');
       await client.deleteMaintenanceWindow(ctx.input.maintenanceWindowId);
 
       return {

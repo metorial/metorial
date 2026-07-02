@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BraintreeGraphQLClient } from '../lib/client';
+import { braintreeServiceError } from '../lib/errors';
 import { AUTHORIZE_PAYMENT_METHOD, CHARGE_PAYMENT_METHOD } from '../lib/graphql-queries';
 import { spec } from '../spec';
 
@@ -40,8 +41,12 @@ Requires a payment method ID (from the Braintree vault or a single-use nonce) an
         .string()
         .optional()
         .describe(
-          'ISO 4217 currency code (e.g. "USD"). Defaults to merchant default currency.'
+          'Deprecated. Braintree determines currency from merchantAccountId; provide merchantAccountId instead.'
         ),
+      apiRequestKey: z
+        .string()
+        .optional()
+        .describe('Optional idempotency key to prevent duplicate transaction creation.'),
       type: z
         .enum(['sale', 'authorize'])
         .default('sale')
@@ -71,6 +76,12 @@ Requires a payment method ID (from the Braintree vault or a single-use nonce) an
   )
   .output(transactionOutputSchema)
   .handleInvocation(async ctx => {
+    if (ctx.input.currencyCode) {
+      throw braintreeServiceError(
+        'Braintree does not accept currencyCode directly when creating transactions. Set merchantAccountId for the account configured with the desired currency.'
+      );
+    }
+
     let client = new BraintreeGraphQLClient({
       token: ctx.auth.token,
       environment: ctx.config.environment
@@ -85,18 +96,33 @@ Requires a payment method ID (from the Braintree vault or a single-use nonce) an
     if (ctx.input.merchantAccountId)
       transactionInput.merchantAccountId = ctx.input.merchantAccountId;
     if (ctx.input.customerId) transactionInput.customerId = ctx.input.customerId;
+    if (ctx.input.lineItems) transactionInput.lineItems = ctx.input.lineItems;
+
+    let input: Record<string, any> = {
+      paymentMethodId: ctx.input.paymentMethodId,
+      transaction: transactionInput
+    };
+    if (ctx.input.apiRequestKey) input.apiRequestKey = ctx.input.apiRequestKey;
 
     let transaction: any;
 
     if (ctx.input.type === 'authorize') {
-      let result = await client.query(AUTHORIZE_PAYMENT_METHOD, {
-        input: { paymentMethodId: ctx.input.paymentMethodId, transaction: transactionInput }
-      });
+      let result = await client.query(
+        AUTHORIZE_PAYMENT_METHOD,
+        {
+          input
+        },
+        'authorize payment method'
+      );
       transaction = result.authorizePaymentMethod.transaction;
     } else {
-      let result = await client.query(CHARGE_PAYMENT_METHOD, {
-        input: { paymentMethodId: ctx.input.paymentMethodId, transaction: transactionInput }
-      });
+      let result = await client.query(
+        CHARGE_PAYMENT_METHOD,
+        {
+          input
+        },
+        'charge payment method'
+      );
       transaction = result.chargePaymentMethod.transaction;
     }
 
@@ -105,7 +131,7 @@ Requires a payment method ID (from the Braintree vault or a single-use nonce) an
       legacyId: transaction.legacyId,
       status: transaction.status,
       amount: transaction.amount?.value || ctx.input.amount,
-      currencyCode: transaction.amount?.currencyCode || ctx.input.currencyCode || 'USD',
+      currencyCode: transaction.amount?.currencyCode || 'USD',
       merchantAccountId: transaction.merchantAccountId,
       orderId: transaction.orderId,
       customerEmail: transaction.customer?.email,

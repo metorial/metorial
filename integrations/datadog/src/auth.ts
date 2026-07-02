@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { datadogApiError, datadogServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -144,6 +145,7 @@ export let auth = SlateAuth.create()
           'us5.datadoghq.com',
           'datadoghq.eu',
           'ap1.datadoghq.com',
+          'ap2.datadoghq.com',
           'ddog-gov.com'
         ])
         .default('datadoghq.com')
@@ -170,19 +172,24 @@ export let auth = SlateAuth.create()
       let site = ctx.input.site || 'datadoghq.com';
       let http = createAxios({ baseURL: `https://api.${site}` });
 
-      let response = await http.post(
-        '/oauth2/v1/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        }
-      );
+      let response: any;
+      try {
+        response = await http.post(
+          '/oauth2/v1/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            redirect_uri: ctx.redirectUri
+          }).toString(),
+          {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          }
+        );
+      } catch (error) {
+        throw datadogApiError(error, 'OAuth token exchange');
+      }
 
       let data = response.data;
       let expiresAt = data.expires_in
@@ -204,18 +211,29 @@ export let auth = SlateAuth.create()
       let site = ctx.input.site || 'datadoghq.com';
       let http = createAxios({ baseURL: `https://api.${site}` });
 
-      let response = await http.post(
-        '/oauth2/v1/token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken || '',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }).toString(),
-        {
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        }
-      );
+      if (!ctx.output.refreshToken) {
+        throw datadogServiceError(
+          'Datadog OAuth token refresh requires a saved refresh token. Re-authorize the Datadog connection.'
+        );
+      }
+
+      let response: any;
+      try {
+        response = await http.post(
+          '/oauth2/v1/token',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          }).toString(),
+          {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+          }
+        );
+      } catch (error) {
+        throw datadogApiError(error, 'OAuth token refresh');
+      }
 
       let data = response.data;
       let expiresAt = data.expires_in
@@ -240,7 +258,19 @@ export let auth = SlateAuth.create()
 
     inputSchema: z.object({
       apiKey: z.string().describe('Datadog API key (DD-API-KEY)'),
-      appKey: z.string().describe('Datadog Application key (DD-APPLICATION-KEY)')
+      appKey: z.string().describe('Datadog Application key (DD-APPLICATION-KEY)'),
+      site: z
+        .enum([
+          'datadoghq.com',
+          'us3.datadoghq.com',
+          'us5.datadoghq.com',
+          'datadoghq.eu',
+          'ap1.datadoghq.com',
+          'ap2.datadoghq.com',
+          'ddog-gov.com'
+        ])
+        .default('datadoghq.com')
+        .describe('Datadog site/region for validating the keys')
     }),
 
     getOutput: async ctx => {
@@ -261,16 +291,22 @@ export let auth = SlateAuth.create()
         appKey?: string;
         authMethod: 'oauth' | 'apikey';
       };
-      input: { apiKey: string; appKey: string };
+      input: { apiKey: string; appKey: string; site?: string };
     }) => {
-      let http = createAxios({ baseURL: 'https://api.datadoghq.com' });
+      let site = ctx.input.site || 'datadoghq.com';
+      let http = createAxios({ baseURL: `https://api.${site}` });
 
-      let response = await http.get('/api/v1/validate', {
-        headers: {
-          'DD-API-KEY': ctx.output.apiKey || '',
-          'DD-APPLICATION-KEY': ctx.output.appKey || ''
-        }
-      });
+      let response: any;
+      try {
+        response = await http.get('/api/v1/validate', {
+          headers: {
+            'DD-API-KEY': ctx.output.apiKey || '',
+            'DD-APPLICATION-KEY': ctx.output.appKey || ''
+          }
+        });
+      } catch (error) {
+        throw datadogApiError(error, 'key validation');
+      }
 
       return {
         profile: {

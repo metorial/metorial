@@ -1,5 +1,7 @@
+export * from './assign-files';
 export * from './classify-image';
 export * from './create-model';
+export * from './delete-files';
 export * from './detect-objects';
 export * from './extract-document-data';
 export * from './extract-full-text';
@@ -9,4 +11,5 @@ export * from './list-processed-files';
 export * from './retry-file-processing';
 export * from './review-file';
 export * from './train-model';
+export * from './update-file-fields';
 export * from './upload-training-data';

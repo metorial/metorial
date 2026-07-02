@@ -72,7 +72,12 @@ export let noteChangesTrigger = SlateTrigger.create(spec, {
             token: ctx.auth.token,
             noteStoreUrl: ctx.auth.noteStoreUrl
           });
-          let note = await client.getNote(ctx.input.noteGuid, false, false, false, false);
+          let note = await client.getNoteWithResultSpec(ctx.input.noteGuid, {
+            includeContent: false,
+            includeResourcesData: false,
+            includeResourcesRecognition: false,
+            includeResourcesAlternateData: false
+          });
           noteTitle = note.title;
           createdAt = note.created ? new Date(note.created).toISOString() : undefined;
           updatedAt = note.updated ? new Date(note.updated).toISOString() : undefined;

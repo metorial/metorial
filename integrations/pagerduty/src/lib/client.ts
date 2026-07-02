@@ -1,9 +1,12 @@
 import { createAxios } from 'slates';
+import { pagerDutyApiError } from './errors';
 import type {
   PagerDutyAnalyticsIncidentData,
+  PagerDutyBusinessService,
   PagerDutyEscalationPolicy,
   PagerDutyIncident,
   PagerDutyIncidentNote,
+  PagerDutyIntegration,
   PagerDutyMaintenanceWindow,
   PagerDutyOnCall,
   PagerDutyPriority,
@@ -39,22 +42,38 @@ export class PagerDutyClient {
   // ─── Generic helpers ────────────────────────────────────────
 
   private async get<T>(path: string, params?: Record<string, any>): Promise<T> {
-    let response = await this.axios.get(path, { params });
-    return response.data as T;
+    try {
+      let response = await this.axios.get(path, { params });
+      return response.data as T;
+    } catch (error) {
+      throw pagerDutyApiError(error, `GET ${path}`);
+    }
   }
 
   private async post<T>(path: string, body?: Record<string, any>): Promise<T> {
-    let response = await this.axios.post(path, body || {});
-    return response.data as T;
+    try {
+      let response = await this.axios.post(path, body || {});
+      return response.data as T;
+    } catch (error) {
+      throw pagerDutyApiError(error, `POST ${path}`);
+    }
   }
 
   private async put<T>(path: string, body?: Record<string, any>): Promise<T> {
-    let response = await this.axios.put(path, body || {});
-    return response.data as T;
+    try {
+      let response = await this.axios.put(path, body || {});
+      return response.data as T;
+    } catch (error) {
+      throw pagerDutyApiError(error, `PUT ${path}`);
+    }
   }
 
   private async delete(path: string): Promise<void> {
-    await this.axios.delete(path);
+    try {
+      await this.axios.delete(path);
+    } catch (error) {
+      throw pagerDutyApiError(error, `DELETE ${path}`);
+    }
   }
 
   // ─── Incidents ──────────────────────────────────────────────
@@ -111,7 +130,7 @@ export class PagerDutyClient {
       conferenceNumber?: string;
       conferenceUrl?: string;
     },
-    _fromEmail: string
+    fromEmail: string
   ): Promise<PagerDutyIncident> {
     let incident: Record<string, any> = {
       type: 'incident',
@@ -144,8 +163,18 @@ export class PagerDutyClient {
         incident.conference_bridge.conference_url = params.conferenceUrl;
     }
 
-    let data = await this.post<{ incident: PagerDutyIncident }>('/incidents', { incident });
-    return data.incident;
+    try {
+      let response = await this.axios.post(
+        '/incidents',
+        { incident },
+        {
+          headers: { From: fromEmail }
+        }
+      );
+      return (response.data as { incident: PagerDutyIncident }).incident;
+    } catch (error) {
+      throw pagerDutyApiError(error, 'POST /incidents');
+    }
   }
 
   async updateIncident(
@@ -196,14 +225,18 @@ export class PagerDutyClient {
       incident.body = { type: 'incident_body', details: params.resolution };
     }
 
-    let response = await this.axios.put(
-      `/incidents/${incidentId}`,
-      { incident },
-      {
-        headers: { From: fromEmail }
-      }
-    );
-    return (response.data as { incident: PagerDutyIncident }).incident;
+    try {
+      let response = await this.axios.put(
+        `/incidents/${incidentId}`,
+        { incident },
+        {
+          headers: { From: fromEmail }
+        }
+      );
+      return (response.data as { incident: PagerDutyIncident }).incident;
+    } catch (error) {
+      throw pagerDutyApiError(error, `PUT /incidents/${incidentId}`);
+    }
   }
 
   async manageIncidents(
@@ -243,14 +276,18 @@ export class PagerDutyClient {
       return item;
     });
 
-    let response = await this.axios.put(
-      '/incidents',
-      { incidents: body },
-      {
-        headers: { From: fromEmail }
-      }
-    );
-    return (response.data as { incidents: PagerDutyIncident[] }).incidents;
+    try {
+      let response = await this.axios.put(
+        '/incidents',
+        { incidents: body },
+        {
+          headers: { From: fromEmail }
+        }
+      );
+      return (response.data as { incidents: PagerDutyIncident[] }).incidents;
+    } catch (error) {
+      throw pagerDutyApiError(error, 'PUT /incidents');
+    }
   }
 
   async mergeIncidents(
@@ -258,19 +295,23 @@ export class PagerDutyClient {
     sourceIncidentIds: string[],
     fromEmail: string
   ): Promise<PagerDutyIncident> {
-    let response = await this.axios.put(
-      `/incidents/${targetIncidentId}/merge`,
-      {
-        source_incidents: sourceIncidentIds.map(id => ({
-          id,
-          type: 'incident_reference'
-        }))
-      },
-      {
-        headers: { From: fromEmail }
-      }
-    );
-    return (response.data as { incident: PagerDutyIncident }).incident;
+    try {
+      let response = await this.axios.put(
+        `/incidents/${targetIncidentId}/merge`,
+        {
+          source_incidents: sourceIncidentIds.map(id => ({
+            id,
+            type: 'incident_reference'
+          }))
+        },
+        {
+          headers: { From: fromEmail }
+        }
+      );
+      return (response.data as { incident: PagerDutyIncident }).incident;
+    } catch (error) {
+      throw pagerDutyApiError(error, `PUT /incidents/${targetIncidentId}/merge`);
+    }
   }
 
   async addIncidentNote(
@@ -278,16 +319,20 @@ export class PagerDutyClient {
     content: string,
     fromEmail: string
   ): Promise<PagerDutyIncidentNote> {
-    let response = await this.axios.post(
-      `/incidents/${incidentId}/notes`,
-      {
-        note: { content }
-      },
-      {
-        headers: { From: fromEmail }
-      }
-    );
-    return (response.data as { note: PagerDutyIncidentNote }).note;
+    try {
+      let response = await this.axios.post(
+        `/incidents/${incidentId}/notes`,
+        {
+          note: { content }
+        },
+        {
+          headers: { From: fromEmail }
+        }
+      );
+      return (response.data as { note: PagerDutyIncidentNote }).note;
+    } catch (error) {
+      throw pagerDutyApiError(error, `POST /incidents/${incidentId}/notes`);
+    }
   }
 
   async listIncidentNotes(incidentId: string): Promise<PagerDutyIncidentNote[]> {
@@ -302,16 +347,20 @@ export class PagerDutyClient {
     durationSeconds: number,
     fromEmail: string
   ): Promise<PagerDutyIncident> {
-    let response = await this.axios.post(
-      `/incidents/${incidentId}/snooze`,
-      {
-        duration: durationSeconds
-      },
-      {
-        headers: { From: fromEmail }
-      }
-    );
-    return (response.data as { incident: PagerDutyIncident }).incident;
+    try {
+      let response = await this.axios.post(
+        `/incidents/${incidentId}/snooze`,
+        {
+          duration: durationSeconds
+        },
+        {
+          headers: { From: fromEmail }
+        }
+      );
+      return (response.data as { incident: PagerDutyIncident }).incident;
+    } catch (error) {
+      throw pagerDutyApiError(error, `POST /incidents/${incidentId}/snooze`);
+    }
   }
 
   // ─── Services ───────────────────────────────────────────────
@@ -416,6 +465,148 @@ export class PagerDutyClient {
 
   async deleteService(serviceId: string): Promise<void> {
     await this.delete(`/services/${serviceId}`);
+  }
+
+  async listServiceIntegrations(serviceId: string): Promise<PagerDutyIntegration[]> {
+    let service = await this.getService(serviceId, ['integrations']);
+    return service.integrations ?? [];
+  }
+
+  async getServiceIntegration(
+    serviceId: string,
+    integrationId: string
+  ): Promise<PagerDutyIntegration> {
+    let data = await this.get<{ integration: PagerDutyIntegration }>(
+      `/services/${serviceId}/integrations/${integrationId}`
+    );
+    return data.integration;
+  }
+
+  async createServiceIntegration(params: {
+    serviceId: string;
+    name: string;
+    integrationType?: string;
+    vendorId?: string;
+  }): Promise<PagerDutyIntegration> {
+    let integration: Record<string, any> = {
+      type: params.integrationType ?? 'events_api_v2_inbound_integration',
+      name: params.name
+    };
+
+    if (params.vendorId) {
+      integration.vendor = { id: params.vendorId, type: 'vendor_reference' };
+    }
+
+    let data = await this.post<{ integration: PagerDutyIntegration }>(
+      `/services/${params.serviceId}/integrations`,
+      { integration }
+    );
+    return data.integration;
+  }
+
+  async updateServiceIntegration(params: {
+    serviceId: string;
+    integrationId: string;
+    name?: string;
+  }): Promise<PagerDutyIntegration> {
+    let current = await this.getServiceIntegration(params.serviceId, params.integrationId);
+    let integration: Record<string, any> = {
+      type: current.type
+    };
+
+    if (params.name !== undefined) integration.name = params.name;
+
+    let data = await this.put<{ integration: PagerDutyIntegration }>(
+      `/services/${params.serviceId}/integrations/${params.integrationId}`,
+      { integration }
+    );
+    return data.integration;
+  }
+
+  // ─── Business Services ──────────────────────────────────────
+
+  async listBusinessServices(params?: {
+    query?: string;
+    teamIds?: string[];
+    limit?: number;
+    offset?: number;
+  }): Promise<{
+    business_services: PagerDutyBusinessService[];
+    more: boolean;
+    total: number;
+  }> {
+    let query: Record<string, any> = {};
+    if (params?.query) query.query = params.query;
+    if (params?.teamIds) query['team_ids[]'] = params.teamIds;
+    if (params?.limit) query.limit = params.limit;
+    if (params?.offset) query.offset = params.offset;
+
+    let data = await this.get<{
+      business_services: PagerDutyBusinessService[];
+      more: boolean;
+      total: number;
+    }>('/business_services', query);
+    return data;
+  }
+
+  async getBusinessService(businessServiceId: string): Promise<PagerDutyBusinessService> {
+    let data = await this.get<{ business_service: PagerDutyBusinessService }>(
+      `/business_services/${businessServiceId}`
+    );
+    return data.business_service;
+  }
+
+  async createBusinessService(params: {
+    name: string;
+    description?: string;
+    pointOfContact?: string;
+    teamId?: string;
+  }): Promise<PagerDutyBusinessService> {
+    let businessService: Record<string, any> = {
+      type: 'business_service',
+      name: params.name
+    };
+
+    if (params.description !== undefined) businessService.description = params.description;
+    if (params.pointOfContact !== undefined)
+      businessService.point_of_contact = params.pointOfContact;
+    if (params.teamId) businessService.team = { id: params.teamId, type: 'team_reference' };
+
+    let data = await this.post<{ business_service: PagerDutyBusinessService }>(
+      '/business_services',
+      { business_service: businessService }
+    );
+    return data.business_service;
+  }
+
+  async updateBusinessService(
+    businessServiceId: string,
+    params: {
+      name?: string;
+      description?: string;
+      pointOfContact?: string;
+      teamId?: string;
+    }
+  ): Promise<PagerDutyBusinessService> {
+    let businessService: Record<string, any> = {
+      type: 'business_service'
+    };
+
+    if (params.name !== undefined) businessService.name = params.name;
+    if (params.description !== undefined) businessService.description = params.description;
+    if (params.pointOfContact !== undefined)
+      businessService.point_of_contact = params.pointOfContact;
+    if (params.teamId) businessService.team = { id: params.teamId, type: 'team_reference' };
+
+    let data = await this.put<{ business_service: PagerDutyBusinessService }>(
+      `/business_services/${businessServiceId}`,
+      { business_service: businessService }
+    );
+    return data.business_service;
+  }
+
+  async deleteBusinessService(businessServiceId: string): Promise<void> {
+    await this.delete(`/business_services/${businessServiceId}`);
   }
 
   // ─── Users ──────────────────────────────────────────────────
@@ -641,15 +832,19 @@ export class PagerDutyClient {
     };
     if (params.description) maintenanceWindow.description = params.description;
 
-    let response = await this.axios.post(
-      '/maintenance_windows',
-      { maintenance_window: maintenanceWindow },
-      {
-        headers: { From: fromEmail }
-      }
-    );
-    return (response.data as { maintenance_window: PagerDutyMaintenanceWindow })
-      .maintenance_window;
+    try {
+      let response = await this.axios.post(
+        '/maintenance_windows',
+        { maintenance_window: maintenanceWindow },
+        {
+          headers: { From: fromEmail }
+        }
+      );
+      return (response.data as { maintenance_window: PagerDutyMaintenanceWindow })
+        .maintenance_window;
+    } catch (error) {
+      throw pagerDutyApiError(error, 'POST /maintenance_windows');
+    }
   }
 
   async deleteMaintenanceWindow(windowId: string): Promise<void> {
@@ -783,8 +978,12 @@ export class PagerDutyClient {
       if (params.customDetails) body.payload.custom_details = params.customDetails;
     }
 
-    let response = await eventsAxios.post('/v2/enqueue', body);
-    return response.data as { status: string; message: string; dedup_key: string };
+    try {
+      let response = await eventsAxios.post('/v2/enqueue', body);
+      return response.data as { status: string; message: string; dedup_key: string };
+    } catch (error) {
+      throw pagerDutyApiError(error, 'POST /v2/enqueue');
+    }
   }
 
   async sendChangeEvent(params: {
@@ -812,7 +1011,11 @@ export class PagerDutyClient {
     if (params.customDetails) body.payload.custom_details = params.customDetails;
     if (params.links) body.links = params.links;
 
-    let response = await eventsAxios.post('/v2/change/enqueue', body);
-    return response.data as { status: string; message: string };
+    try {
+      let response = await eventsAxios.post('/v2/change/enqueue', body);
+      return response.data as { status: string; message: string };
+    } catch (error) {
+      throw pagerDutyApiError(error, 'POST /v2/change/enqueue');
+    }
   }
 }

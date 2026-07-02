@@ -1,5 +1,3 @@
-Let me get more details on the webhook functionality and the document generation/security features.Now I have enough information to write the specification.
-
 # Slates Specification for Pdf4me
 
 ## Overview
@@ -10,17 +8,20 @@ Pdf4me is a cloud-based document processing API that provides capabilities for P
 
 Pdf4me uses **API Key authentication**. Every request must include proper authentication credentials to ensure secure communication and validate your identity as an authorized user.
 
-The API key is passed via the `Authorization` header on each request:
+The current REST API examples use the `Authorization` header on each request.
+PDF4me's current endpoint-specific docs generally show a Basic header whose
+value is the Base64-encoded API key:
 
 ```
-Authorization: [Your API Key]
+Authorization: Basic [Base64 API Key]
 ```
 
 API keys are obtained by registering at dev.pdf4me.com and accessing the dashboard. There are two types of API keys based on your API subscription or API purchase: one from the developer portal (dev.pdf4me.com) for monthly subscriptions, and one from pdf4me.com for prepaid call packages.
 
 All communications are strictly conducted over HTTPS. Unsecured HTTP connections are not permitted.
 
-The base endpoint for API V2 is: `https://api.pdf4me.com/v2/`
+The base URL is `https://api.pdf4me.com`, with operations exposed under
+`/api/v2/<OperationName>`.
 
 Additionally, Pdf4me has two connector types for no-code platforms: PDF4me Connect (requires API Key) and PDF4me (direct authentication using account credentials via OAuth).
 

@@ -6,10 +6,11 @@ import { spec } from '../spec';
 export let sendInBulk = SlateTool.create(spec, {
   name: 'Send in Bulk',
   key: 'send_in_bulk',
-  description: `Send the same agreement to a large number of recipients simultaneously (MegaSign). Each recipient receives a personalized signing experience. Useful for mass onboarding, policy acknowledgments, or form collection.`,
+  description: `Send the same agreement to many recipients using Adobe Acrobat Sign Send in Bulk (MegaSign). Current v6 bulk sends require a CSV transient document that contains the child agreement recipient information.`,
   instructions: [
-    'Upload the document first using the Upload Document tool, or use a library template ID.',
-    'Each recipient set gets their own copy of the agreement.'
+    'Upload the agreement document first using Upload Document, or use a library template ID.',
+    'Upload the Adobe Acrobat Sign Send in Bulk recipient CSV using Upload Document with mimeType "text/csv", then pass its transientDocumentId as childAgreementsTransientDocumentId.',
+    'Each CSV row creates a child agreement for the corresponding recipient data.'
   ],
   tags: {
     destructive: false,
@@ -33,7 +34,11 @@ export let sendInBulk = SlateTool.create(spec, {
           })
         )
         .describe('Documents to include'),
-      recipientEmails: z.array(z.string()).describe('List of recipient email addresses'),
+      childAgreementsTransientDocumentId: z
+        .string()
+        .describe(
+          'Transient document ID of the Send in Bulk CSV containing child agreement recipient information'
+        ),
       signatureType: z
         .enum(['ESIGN', 'WRITTEN'])
         .optional()
@@ -51,8 +56,7 @@ export let sendInBulk = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      megaSignId: z.string().describe('ID of the bulk send operation'),
-      totalRecipients: z.number().describe('Number of recipients')
+      bulkSendId: z.string().describe('ID of the Send in Bulk operation')
     })
   )
   .handleInvocation(async ctx => {
@@ -62,14 +66,10 @@ export let sendInBulk = SlateTool.create(spec, {
       shard: ctx.auth.shard
     });
 
-    let recipientSetInfos = ctx.input.recipientEmails.map(email => ({
-      recipientSetMemberInfos: [{ email }]
-    }));
-
     let result = await client.createMegaSign({
       name: ctx.input.name,
       fileInfos: ctx.input.fileInfos,
-      recipientSetInfos,
+      childAgreementsTransientDocumentId: ctx.input.childAgreementsTransientDocumentId,
       signatureType: ctx.input.signatureType,
       message: ctx.input.message,
       ccs: ctx.input.ccs
@@ -77,9 +77,8 @@ export let sendInBulk = SlateTool.create(spec, {
 
     return {
       output: {
-        megaSignId: result.id,
-        totalRecipients: ctx.input.recipientEmails.length
+        bulkSendId: result.id
       },
-      message: `Sent **${ctx.input.name}** in bulk to **${ctx.input.recipientEmails.length}** recipients. MegaSign ID: \`${result.id}\`.`
+      message: `Created Send in Bulk **${ctx.input.name}** with ID \`${result.id}\`.`
     };
   });

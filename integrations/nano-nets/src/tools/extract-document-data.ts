@@ -29,7 +29,12 @@ let pageResultSchema = z.object({
     .optional()
     .describe('Request file ID for retrieving results later'),
   predictions: z.array(predictionSchema).describe('Extracted predictions for this page'),
-  fileUrl: z.string().optional().describe('URL of the processed file')
+  fileUrl: z.string().optional().describe('URL of the processed file'),
+  requestMetadata: z.string().optional().describe('Metadata echoed from the request'),
+  processingType: z
+    .string()
+    .optional()
+    .describe('Nanonets processing mode reported for the page')
 });
 
 export let extractDocumentData = SlateTool.create(spec, {
@@ -61,6 +66,22 @@ export let extractDocumentData = SlateTool.create(spec, {
         .default(false)
         .describe(
           'Use async processing for large documents. Results must be retrieved separately.'
+        ),
+      language: z
+        .string()
+        .optional()
+        .describe(
+          'Optional OCR language code. Omit unless a specific language is required; Nanonets generally recommends no language parameter for best results.'
+        ),
+      requestMetadata: z
+        .string()
+        .optional()
+        .describe('Optional metadata string stored with the uploaded document'),
+      pagesToProcess: z
+        .string()
+        .optional()
+        .describe(
+          'Optional comma-separated page numbers to process, such as "1,2". Applies to PDF documents.'
         )
     })
   )
@@ -68,23 +89,30 @@ export let extractDocumentData = SlateTool.create(spec, {
     z.object({
       message: z.string().describe('Processing status message'),
       pages: z.array(pageResultSchema).describe('Extraction results per page'),
-      isAsync: z.boolean().describe('Whether the request was processed asynchronously')
+      isAsync: z.boolean().describe('Whether the request was processed asynchronously'),
+      signedUrls: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Signed file URLs returned by Nanonets, when available')
     })
   )
   .handleInvocation(async ctx => {
     let client = new NanonetsClient(ctx.auth.token);
 
-    let result = await client.predictByUrl(
-      ctx.input.modelId,
-      ctx.input.urls,
-      ctx.input.asyncMode
-    );
+    let result = await client.predictByUrl(ctx.input.modelId, ctx.input.urls, {
+      asyncMode: ctx.input.asyncMode,
+      language: ctx.input.language,
+      requestMetadata: ctx.input.requestMetadata,
+      pagesToProcess: ctx.input.pagesToProcess
+    });
 
     let pages = (result.result || []).map((page: any) => ({
       pageIndex: page.page ?? 0,
       fileId: page.id,
       requestFileId: page.request_file_id,
       fileUrl: page.file_url,
+      requestMetadata: page.request_metadata,
+      processingType: page.processing_type,
       predictions: (page.prediction || []).map((pred: any) => ({
         predictionId: pred.id,
         label: pred.label,
@@ -115,7 +143,8 @@ export let extractDocumentData = SlateTool.create(spec, {
         output: {
           message: result.message || 'Processing',
           pages,
-          isAsync: true
+          isAsync: true,
+          signedUrls: result.signed_urls
         },
         message: `Submitted ${ctx.input.urls.length} document(s) for async processing. Request file IDs: ${fileIds.join(', ')}. Use "Get Prediction Results" to retrieve results when ready.`
       };
@@ -125,7 +154,8 @@ export let extractDocumentData = SlateTool.create(spec, {
       output: {
         message: result.message || 'Success',
         pages,
-        isAsync: false
+        isAsync: false,
+        signedUrls: result.signed_urls
       },
       message: `Extracted **${totalPredictions}** predictions across **${pages.length}** page(s) from ${ctx.input.urls.length} document(s).`
     };

@@ -1,9 +1,42 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { atlasApiError, atlasServiceError } from './lib/errors';
 
 let atlasOAuthAxios = createAxios({
   baseURL: 'https://cloud.mongodb.com'
 });
+
+let requestServiceAccountToken = async (clientId: string, clientSecret: string) => {
+  try {
+    let params = new URLSearchParams({
+      grant_type: 'client_credentials'
+    });
+
+    let credentials = btoa(`${clientId}:${clientSecret}`);
+
+    let response = await atlasOAuthAxios.post('/api/oauth/token', params.toString(), {
+      headers: {
+        Authorization: `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Accept: 'application/json'
+      }
+    });
+
+    let tokenData = response.data;
+    if (!tokenData?.access_token || typeof tokenData.expires_in !== 'number') {
+      throw atlasServiceError(
+        'MongoDB Atlas OAuth token response did not include access_token and expires_in.'
+      );
+    }
+
+    return {
+      accessToken: tokenData.access_token as string,
+      expiresAt: new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
+    };
+  } catch (error) {
+    throw atlasApiError(error, 'OAuth token exchange');
+  }
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -34,22 +67,10 @@ export let auth = SlateAuth.create()
       // We exchange client credentials directly for an access token.
       // The "authorization URL" step is not applicable for client_credentials,
       // but the framework requires it. We use a special redirect to signal direct token exchange.
-      let params = new URLSearchParams({
-        grant_type: 'client_credentials'
-      });
-
-      let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
-
-      let response = await atlasOAuthAxios.post('/api/oauth/token', params.toString(), {
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json'
-        }
-      });
-
-      let tokenData = response.data;
-      let expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+      let { accessToken, expiresAt } = await requestServiceAccountToken(
+        ctx.clientId,
+        ctx.clientSecret
+      );
 
       // For client_credentials, we redirect to the callback with the token encoded
       let callbackUrl = new URL(ctx.redirectUri);
@@ -59,7 +80,7 @@ export let auth = SlateAuth.create()
       return {
         url: callbackUrl.toString(),
         callbackState: {
-          accessToken: tokenData.access_token,
+          accessToken,
           expiresAt
         }
       };
@@ -68,6 +89,11 @@ export let auth = SlateAuth.create()
     handleCallback: async ctx => {
       let accessToken = ctx.callbackState?.accessToken as string;
       let expiresAt = ctx.callbackState?.expiresAt as string;
+      if (!accessToken || !expiresAt) {
+        throw atlasServiceError(
+          'MongoDB Atlas OAuth callback state did not include an access token.'
+        );
+      }
 
       return {
         output: {
@@ -79,25 +105,14 @@ export let auth = SlateAuth.create()
     },
 
     handleTokenRefresh: async (ctx: any) => {
-      let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
-      let params = new URLSearchParams({
-        grant_type: 'client_credentials'
-      });
-
-      let response = await atlasOAuthAxios.post('/api/oauth/token', params.toString(), {
-        headers: {
-          Authorization: `Basic ${credentials}`,
-          'Content-Type': 'application/x-www-form-urlencoded',
-          Accept: 'application/json'
-        }
-      });
-
-      let tokenData = response.data;
-      let expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+      let { accessToken, expiresAt } = await requestServiceAccountToken(
+        ctx.clientId,
+        ctx.clientSecret
+      );
 
       return {
         output: {
-          token: tokenData.access_token,
+          token: accessToken,
           authMethod: 'oauth' as const,
           expiresAt
         }

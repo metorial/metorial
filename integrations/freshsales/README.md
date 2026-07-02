@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/freshsales.png" height="20"> Freshsales
 
-Manage leads, contacts, accounts, and deals in Freshsales CRM. Create, view, update, delete, and list leads with lead scoring and conversion to contacts. Manage contacts and associate them with accounts. Track and manage deals through pipelines. Create and manage tasks, appointments, notes, and sales activities. Search across entities using keywords, filter records with saved views, and retrieve activity timelines. Log sales activities such as calls and emails. Manage files and documents on records. Retrieve field metadata and configure custom modules.
+Manage leads, contacts, accounts, and deals in Freshsales CRM. Create, view, update, delete, and list leads with lead scoring and conversion to contacts. Manage contacts and accounts. Track and manage deals through pipelines. Create, view, update, delete, and list tasks, appointments, notes, and sales activities. Search across entities using keywords or exact contact filters, work with saved views, and retrieve field metadata.
 
 ## Tools
 
@@ -32,13 +32,29 @@ Delete a lead from Freshsales by its ID. This action is permanent and cannot be 
 
 Delete a note from Freshsales by its ID.
 
+### Delete Sales Activity
+
+Delete a sales activity from Freshsales by its ID.
+
 ### Delete Task
 
 Delete a task from Freshsales by its ID.
 
+### Complete Task
+
+Mark a Freshsales task as done by setting its status to completed.
+
+### Filter Contacts
+
+Find Freshsales contacts that exactly match one or more filter rules. Use this for precise contact lookups such as matching an email address.
+
 ### Get Account
 
 Retrieve a single account (company) by ID from Freshsales. Optionally include related contacts, deals, tasks, and more.
+
+### Get Appointment
+
+Retrieve a single appointment by ID from Freshsales.
 
 ### Get Contact
 
@@ -55,6 +71,14 @@ Retrieve field metadata for an entity type in Freshsales. Returns all standard a
 ### Get Lead
 
 Retrieve a single lead by ID from Freshsales. Optionally include related data like owner, tasks, appointments, and notes.
+
+### Get Sales Activity
+
+Retrieve a single sales activity by ID from Freshsales.
+
+### Get Task
+
+Retrieve a single task by ID from Freshsales.
 
 ### List Accounts
 
@@ -79,6 +103,10 @@ List available filter views for an entity type in Freshsales. View IDs returned 
 ### List Leads
 
 List leads from a saved view in Freshsales. Use the **listFilters** tool first to get available view IDs. Supports pagination and sorting.
+
+### List Sales Activities
+
+List sales activities from Freshsales with optional pagination.
 
 ### List Selectors
 

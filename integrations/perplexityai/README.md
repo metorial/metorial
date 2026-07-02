@@ -1,6 +1,6 @@
-# Perplexity Ai
+# Perplexity AI
 
-Perform AI-powered web searches and generate grounded answers with citations. Access multiple LLM providers (OpenAI, Anthropic, Google, xAI, Sonar) through a unified chat completions interface. Retrieve raw ranked web search results for RAG pipelines. Generate text embeddings for semantic search and retrieval. Supports streaming responses, structured JSON output, search recency and domain filtering, multi-step reasoning, deep research reports, model fallback, and configurable presets for common workflows. Manage API keys and groups programmatically.
+Perform AI-powered web searches and generate grounded answers with citations. Access multiple model providers through Perplexity's Agent API, retrieve raw ranked web search results for RAG pipelines, submit long-running async Sonar requests, list current Agent model IDs, and generate standard or contextualized text embeddings for semantic retrieval. Supports structured JSON schema output, search recency and domain filtering, multi-step reasoning, deep research reports, model fallback, and configurable presets for common workflows.
 
 ## License
 

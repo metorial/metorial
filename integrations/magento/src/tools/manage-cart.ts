@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MagentoClient } from '../lib/client';
+import { magentoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCart = SlateTool.create(spec, {
   name: 'Manage Cart',
   key: 'manage_cart',
-  description: `Create and manage shopping carts. Create carts for customers or guests, add/update/remove items, apply or remove coupon codes, and view cart contents. Supports the full pre-checkout shopping experience.`,
+  description: `Create and manage shopping carts. Create carts for customers or guests, add/update/remove items, estimate shipping methods, apply or remove coupon codes, and view cart contents. Supports the full pre-checkout shopping experience.`,
   instructions: [
     'To **create** a cart, set action to "create" and optionally provide a customerId.',
     'To **get** cart details, set action to "get" with the cartId.',
     'To **add an item**, set action to "add_item" with cartId, itemSku, and itemQty.',
     'To **update an item** quantity, set action to "update_item" with cartId, cartItemId, and itemQty.',
     'To **remove an item**, set action to "remove_item" with cartId and cartItemId.',
+    'To **estimate shipping**, set action to "estimate_shipping" with cartId and shippingAddress.',
     'To **apply a coupon**, set action to "apply_coupon" with cartId and couponCode.',
     'To **remove a coupon**, set action to "remove_coupon" with cartId.'
   ],
@@ -30,6 +32,7 @@ export let manageCart = SlateTool.create(spec, {
           'add_item',
           'update_item',
           'remove_item',
+          'estimate_shipping',
           'apply_coupon',
           'remove_coupon'
         ])
@@ -49,7 +52,11 @@ export let manageCart = SlateTool.create(spec, {
         .number()
         .optional()
         .describe('Cart item ID (for update_item, remove_item)'),
-      couponCode: z.string().optional().describe('Coupon code (for apply_coupon)')
+      couponCode: z.string().optional().describe('Coupon code (for apply_coupon)'),
+      shippingAddress: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Shipping address object (for estimate_shipping)')
     })
   )
   .output(
@@ -86,7 +93,20 @@ export let manageCart = SlateTool.create(spec, {
         })
         .optional()
         .describe('Added or updated item details'),
-      success: z.boolean().optional().describe('Whether the operation succeeded')
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
+      shippingMethods: z
+        .array(
+          z.object({
+            carrierCode: z.string().optional().describe('Shipping carrier code'),
+            methodCode: z.string().optional().describe('Shipping method code'),
+            carrierTitle: z.string().optional().describe('Shipping carrier title'),
+            methodTitle: z.string().optional().describe('Shipping method title'),
+            amount: z.number().optional().describe('Shipping amount'),
+            available: z.boolean().optional().describe('Whether the method is available')
+          })
+        )
+        .optional()
+        .describe('Estimated shipping methods')
     })
   )
   .handleInvocation(async ctx => {
@@ -119,7 +139,7 @@ export let manageCart = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.cartId) throw new Error('cartId is required for get action');
+      if (!ctx.input.cartId) throw magentoServiceError('cartId is required for get action');
       let cart = await client.getCart(ctx.input.cartId);
       return {
         output: {
@@ -142,9 +162,10 @@ export let manageCart = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'add_item') {
-      if (!ctx.input.cartId) throw new Error('cartId is required');
-      if (!ctx.input.itemSku) throw new Error('itemSku is required for add_item');
-      if (ctx.input.itemQty === undefined) throw new Error('itemQty is required for add_item');
+      if (!ctx.input.cartId) throw magentoServiceError('cartId is required');
+      if (!ctx.input.itemSku) throw magentoServiceError('itemSku is required for add_item');
+      if (ctx.input.itemQty === undefined)
+        throw magentoServiceError('itemQty is required for add_item');
       let item = await client.addCartItem(ctx.input.cartId, {
         sku: ctx.input.itemSku,
         qty: ctx.input.itemQty
@@ -163,10 +184,11 @@ export let manageCart = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update_item') {
-      if (!ctx.input.cartId) throw new Error('cartId is required');
-      if (!ctx.input.cartItemId) throw new Error('cartItemId is required for update_item');
+      if (!ctx.input.cartId) throw magentoServiceError('cartId is required');
+      if (!ctx.input.cartItemId)
+        throw magentoServiceError('cartItemId is required for update_item');
       if (ctx.input.itemQty === undefined)
-        throw new Error('itemQty is required for update_item');
+        throw magentoServiceError('itemQty is required for update_item');
       let item = await client.updateCartItem(ctx.input.cartId, ctx.input.cartItemId, {
         qty: ctx.input.itemQty
       });
@@ -184,8 +206,9 @@ export let manageCart = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'remove_item') {
-      if (!ctx.input.cartId) throw new Error('cartId is required');
-      if (!ctx.input.cartItemId) throw new Error('cartItemId is required for remove_item');
+      if (!ctx.input.cartId) throw magentoServiceError('cartId is required');
+      if (!ctx.input.cartItemId)
+        throw magentoServiceError('cartItemId is required for remove_item');
       await client.removeCartItem(ctx.input.cartId, ctx.input.cartItemId);
       return {
         output: { success: true },
@@ -193,9 +216,30 @@ export let manageCart = SlateTool.create(spec, {
       };
     }
 
+    if (ctx.input.action === 'estimate_shipping') {
+      if (!ctx.input.cartId) throw magentoServiceError('cartId is required');
+      if (!ctx.input.shippingAddress)
+        throw magentoServiceError('shippingAddress is required for estimate_shipping');
+      let methods = await client.estimateShipping(ctx.input.cartId, ctx.input.shippingAddress);
+      return {
+        output: {
+          shippingMethods: methods.map(method => ({
+            carrierCode: method.carrier_code,
+            methodCode: method.method_code,
+            carrierTitle: method.carrier_title,
+            methodTitle: method.method_title,
+            amount: method.amount,
+            available: method.available
+          }))
+        },
+        message: `Found **${methods.length}** shipping method(s) for cart \`${ctx.input.cartId}\`.`
+      };
+    }
+
     if (ctx.input.action === 'apply_coupon') {
-      if (!ctx.input.cartId) throw new Error('cartId is required');
-      if (!ctx.input.couponCode) throw new Error('couponCode is required for apply_coupon');
+      if (!ctx.input.cartId) throw magentoServiceError('cartId is required');
+      if (!ctx.input.couponCode)
+        throw magentoServiceError('couponCode is required for apply_coupon');
       await client.applyCoupon(ctx.input.cartId, ctx.input.couponCode);
       return {
         output: { success: true },
@@ -204,7 +248,7 @@ export let manageCart = SlateTool.create(spec, {
     }
 
     // remove_coupon
-    if (!ctx.input.cartId) throw new Error('cartId is required');
+    if (!ctx.input.cartId) throw magentoServiceError('cartId is required');
     await client.removeCoupon(ctx.input.cartId);
     return {
       output: { success: true },

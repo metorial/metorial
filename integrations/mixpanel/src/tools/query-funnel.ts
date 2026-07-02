@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import { createClientFromContext, requireServiceAccount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let queryFunnel = SlateTool.create(spec, {
@@ -47,6 +47,8 @@ Use **List Funnels** first to discover available funnel IDs.`,
     })
   )
   .handleInvocation(async ctx => {
+    requireServiceAccount(ctx);
+
     let client = createClientFromContext(ctx);
 
     let result = await client.queryFunnel({

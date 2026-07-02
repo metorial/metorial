@@ -1,4 +1,6 @@
-import { createAxios } from 'slates';
+import { Buffer } from 'node:buffer';
+import { createAxios, getResponseHeaderValue } from 'slates';
+import { ocrspaceApiError, ocrspaceUpstreamError } from './errors';
 
 export interface OcrParseOptions {
   url?: string;
@@ -52,6 +54,12 @@ export interface OcrResponse {
   processingTimeInMilliseconds: number;
 }
 
+export interface DownloadedFile {
+  contentBase64: string;
+  mimeType: string;
+  byteLength: number;
+}
+
 interface RawTextOverlayWord {
   WordText: string;
   Left: number;
@@ -74,21 +82,45 @@ interface RawTextOverlay {
 
 interface RawParsedResult {
   TextOverlay: RawTextOverlay | null;
-  FileParseExitCode: number;
-  ParsedText: string;
-  ErrorMessage: string | null;
+  FileParseExitCode: number | string;
+  ParsedText: string | null;
+  ErrorMessage: string[] | string | null;
   ErrorDetails: string | null;
 }
 
 interface RawOcrResponse {
   ParsedResults: RawParsedResult[];
-  OCRExitCode: number;
+  OCRExitCode: number | string;
   IsErroredOnProcessing: boolean;
   ErrorMessage: string[] | string | null;
   ErrorDetails: string | null;
   SearchablePDFURL: string | null;
-  ProcessingTimeInMilliseconds: number;
+  ProcessingTimeInMilliseconds: number | string;
 }
+
+let toNumber = (value: number | string | null | undefined, fallback = 0) => {
+  let number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+let normalizeErrorMessage = (value: string[] | string | null | undefined) => {
+  if (Array.isArray(value)) {
+    let joined = value.filter(Boolean).join('; ');
+    return joined || null;
+  }
+
+  return value || null;
+};
+
+let toBuffer = (value: unknown) => {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof ArrayBuffer) return Buffer.from(value);
+  if (ArrayBuffer.isView(value)) {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (typeof value === 'string') return Buffer.from(value);
+  return Buffer.alloc(0);
+};
 
 let normalizeOverlayWord = (word: RawTextOverlayWord): TextOverlayWord => ({
   wordText: word.WordText,
@@ -115,29 +147,27 @@ let normalizeOverlay = (overlay: RawTextOverlay | null): TextOverlay | null => {
 
 let normalizeParsedResult = (result: RawParsedResult): ParsedResult => ({
   textOverlay: normalizeOverlay(result.TextOverlay),
-  fileParseExitCode: result.FileParseExitCode,
-  parsedText: result.ParsedText,
-  errorMessage: result.ErrorMessage,
+  fileParseExitCode: toNumber(result.FileParseExitCode),
+  parsedText: result.ParsedText || '',
+  errorMessage: normalizeErrorMessage(result.ErrorMessage),
   errorDetails: result.ErrorDetails
 });
 
 let normalizeResponse = (raw: RawOcrResponse): OcrResponse => {
-  let errorMessage = raw.ErrorMessage;
-  let errorMessageStr = Array.isArray(errorMessage) ? errorMessage.join('; ') : errorMessage;
-
   return {
     parsedResults: (raw.ParsedResults || []).map(normalizeParsedResult),
-    ocrExitCode: raw.OCRExitCode,
+    ocrExitCode: toNumber(raw.OCRExitCode),
     isErroredOnProcessing: raw.IsErroredOnProcessing,
-    errorMessage: errorMessageStr,
+    errorMessage: normalizeErrorMessage(raw.ErrorMessage),
     errorDetails: raw.ErrorDetails,
     searchablePdfUrl: raw.SearchablePDFURL || null,
-    processingTimeInMilliseconds: raw.ProcessingTimeInMilliseconds
+    processingTimeInMilliseconds: toNumber(raw.ProcessingTimeInMilliseconds)
   };
 };
 
 export class Client {
-  private axios;
+  private axios: ReturnType<typeof createAxios>;
+  private downloadAxios: ReturnType<typeof createAxios>;
 
   constructor(opts: { token: string }) {
     this.axios = createAxios({
@@ -146,6 +176,7 @@ export class Client {
         apikey: opts.token
       }
     });
+    this.downloadAxios = createAxios({});
   }
 
   async parseImage(options: OcrParseOptions): Promise<OcrResponse> {
@@ -188,18 +219,41 @@ export class Client {
       );
     }
 
-    let response = await this.axios.post('/parse/image', formData);
-    let raw = response.data as RawOcrResponse;
+    let raw: RawOcrResponse;
+    try {
+      let response = await this.axios.post('/parse/image', formData);
+      raw = response.data as RawOcrResponse;
+    } catch (error) {
+      throw ocrspaceApiError(error, 'parse image');
+    }
 
-    if (raw.IsErroredOnProcessing || raw.OCRExitCode === 3 || raw.OCRExitCode === 4) {
-      let errorMsg = raw.ErrorMessage
-        ? Array.isArray(raw.ErrorMessage)
-          ? raw.ErrorMessage.join('; ')
-          : raw.ErrorMessage
-        : 'OCR processing failed';
-      throw new Error(errorMsg);
+    let ocrExitCode = toNumber(raw.OCRExitCode);
+    if (raw.IsErroredOnProcessing || ocrExitCode === 3 || ocrExitCode === 4) {
+      let errorMsg = normalizeErrorMessage(raw.ErrorMessage) || 'OCR processing failed';
+      throw ocrspaceUpstreamError(errorMsg, {
+        reason: 'ocrspace_processing_error'
+      });
     }
 
     return normalizeResponse(raw);
+  }
+
+  async downloadFile(url: string, fallbackMimeType = 'application/octet-stream') {
+    try {
+      let response = await this.downloadAxios.get(url, {
+        responseType: 'arraybuffer'
+      });
+      let content = toBuffer(response.data);
+      let mimeType =
+        getResponseHeaderValue(response.headers, 'content-type') || fallbackMimeType;
+
+      return {
+        contentBase64: content.toString('base64'),
+        mimeType,
+        byteLength: content.byteLength
+      };
+    } catch (error) {
+      throw ocrspaceApiError(error, 'download file');
+    }
   }
 }

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let searchPdfText = SlateTool.create(spec, {
@@ -58,7 +59,7 @@ Returns the text, coordinates, and page index for each match found.`,
     });
 
     if (result.error) {
-      throw new Error(`Text search failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Text search failed', result);
     }
 
     let matches = (result.body || []).map((m: any) => ({

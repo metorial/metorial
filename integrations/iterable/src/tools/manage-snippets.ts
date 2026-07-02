@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { IterableClient } from '../lib/client';
+import { requireField } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageSnippets = SlateTool.create(spec, {
@@ -14,11 +15,13 @@ export let manageSnippets = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'update', 'delete']).describe('Operation to perform'),
+      action: z
+        .enum(['list', 'get', 'create', 'update', 'delete'])
+        .describe('Operation to perform'),
       name: z
         .string()
         .optional()
-        .describe('Snippet name (required for create, update, delete)'),
+        .describe('Snippet name or ID (required for get, create, update, delete)'),
       content: z
         .string()
         .optional()
@@ -38,6 +41,7 @@ export let manageSnippets = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of snippets'),
+      snippet: z.record(z.string(), z.any()).optional().describe('Snippet details'),
       message: z.string().describe('Result message')
     })
   )
@@ -64,39 +68,56 @@ export let manageSnippets = SlateTool.create(spec, {
       };
     }
 
+    if (ctx.input.action === 'get') {
+      let name = requireField(ctx.input.name, 'name');
+      let snippet = await client.getSnippet(name);
+      return {
+        output: {
+          snippet,
+          message: `Retrieved snippet "${name}".`
+        },
+        message: `Retrieved snippet **${name}**.`
+      };
+    }
+
     if (ctx.input.action === 'create') {
+      let name = requireField(ctx.input.name, 'name');
+      let content = requireField(ctx.input.content, 'content');
       await client.createSnippet({
-        name: ctx.input.name!,
-        content: ctx.input.content!
+        name,
+        content
       });
       return {
         output: {
-          message: `Snippet "${ctx.input.name}" created.`
+          message: `Snippet "${name}" created.`
         },
-        message: `Created snippet **${ctx.input.name}**.`
+        message: `Created snippet **${name}**.`
       };
     }
 
     if (ctx.input.action === 'update') {
+      let name = requireField(ctx.input.name, 'name');
+      let content = requireField(ctx.input.content, 'content');
       await client.updateSnippet({
-        name: ctx.input.name!,
-        content: ctx.input.content!
+        name,
+        content
       });
       return {
         output: {
-          message: `Snippet "${ctx.input.name}" updated.`
+          message: `Snippet "${name}" updated.`
         },
-        message: `Updated snippet **${ctx.input.name}**.`
+        message: `Updated snippet **${name}**.`
       };
     }
 
     // delete
-    await client.deleteSnippet(ctx.input.name!);
+    let name = requireField(ctx.input.name, 'name');
+    await client.deleteSnippet(name);
     return {
       output: {
-        message: `Snippet "${ctx.input.name}" deleted.`
+        message: `Snippet "${name}" deleted.`
       },
-      message: `Deleted snippet **${ctx.input.name}**.`
+      message: `Deleted snippet **${name}**.`
     };
   })
   .build();

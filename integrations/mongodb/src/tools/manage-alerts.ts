@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let alertSchema = z.object({
@@ -68,7 +69,7 @@ export let manageAlertsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required');
+    if (!projectId) throw mongodbServiceError('projectId is required');
 
     let client = new AtlasClient(ctx.auth);
 
@@ -100,7 +101,7 @@ export let manageAlertsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.alertId) throw new Error('alertId is required');
+      if (!ctx.input.alertId) throw mongodbServiceError('alertId is required');
       let a = await client.getAlert(projectId, ctx.input.alertId);
       return {
         output: {
@@ -125,8 +126,9 @@ export let manageAlertsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'acknowledge') {
-      if (!ctx.input.alertId) throw new Error('alertId is required');
-      if (!ctx.input.acknowledgedUntil) throw new Error('acknowledgedUntil is required');
+      if (!ctx.input.alertId) throw mongodbServiceError('alertId is required');
+      if (!ctx.input.acknowledgedUntil)
+        throw mongodbServiceError('acknowledgedUntil is required');
       let a = await client.acknowledgeAlert(projectId, ctx.input.alertId, {
         acknowledgedUntil: ctx.input.acknowledgedUntil,
         acknowledgementComment: ctx.input.acknowledgementComment
@@ -153,6 +155,6 @@ export let manageAlertsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -46,6 +46,44 @@ export let listCloudAccounts = SlateTool.create(spec, {
   })
   .build();
 
+export let getCloudAccount = SlateTool.create(spec, {
+  name: 'Get Cloud Account',
+  key: 'get_cloud_account',
+  description: `Retrieve details for a single Redis Cloud hosting cloud account by ID.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      cloudAccountId: z.number().describe('Cloud account ID to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      cloudAccount: cloudAccountSchema.describe('Cloud account details'),
+      raw: z.any().describe('Full API response')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new RedisCloudClient(ctx.auth);
+    let data = await client.getCloudAccount(ctx.input.cloudAccountId);
+
+    let cloudAccount = {
+      cloudAccountId: data.id,
+      name: data.name,
+      provider: data.provider,
+      status: data.status,
+      accessKeyId: data.accessKeyId
+    };
+
+    return {
+      output: { cloudAccount, raw: data },
+      message: `Cloud account **${ctx.input.cloudAccountId}** retrieved.`
+    };
+  })
+  .build();
+
 export let createCloudAccount = SlateTool.create(spec, {
   name: 'Create Cloud Account',
   key: 'create_cloud_account',

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { segmentServiceError } from '../lib/errors';
 import { TrackingClient } from '../lib/tracking';
 import { spec } from '../spec';
 
@@ -41,10 +42,10 @@ export let identifyUser = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.writeKey) {
-      throw new Error('A write key is required to use the Tracking API.');
+      throw segmentServiceError('A write key is required to use the Tracking API.');
     }
     if (!ctx.input.userId && !ctx.input.anonymousId) {
-      throw new Error('Either userId or anonymousId is required');
+      throw segmentServiceError('Either userId or anonymousId is required');
     }
 
     let client = new TrackingClient(ctx.auth.writeKey, ctx.config.region);

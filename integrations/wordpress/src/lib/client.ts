@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { wordpressApiError, wordpressServiceError } from './errors';
 
 export interface WordPressClientConfig {
   siteUrl: string;
@@ -9,6 +10,7 @@ export interface WordPressClientConfig {
 
 export class WordPressClient {
   private http: ReturnType<typeof createAxios>;
+  private headers: Record<string, string>;
   private siteUrl: string;
   private apiType: 'wpcom' | 'selfhosted';
   private siteId: string;
@@ -18,26 +20,140 @@ export class WordPressClient {
     this.apiType = config.apiType;
     this.siteId = this.siteUrl.replace(/^https?:\/\//, '');
 
-    if (config.apiType === 'wpcom') {
-      this.http = createAxios({
-        baseURL: 'https://public-api.wordpress.com/rest/v1.1',
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-    } else {
-      this.http = createAxios({
-        baseURL: `${this.siteUrl}/wp-json/wp/v2`,
-        headers: {
-          Authorization:
-            config.authMethod === 'application_password'
-              ? `Basic ${config.token}`
-              : `Bearer ${config.token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+    let authorization =
+      config.apiType === 'wpcom' || config.authMethod !== 'application_password'
+        ? `Bearer ${config.token}`
+        : `Basic ${config.token}`;
+
+    this.headers = {
+      Authorization: authorization,
+      'Content-Type': 'application/json'
+    };
+
+    this.http = this.createHttp(
+      config.apiType === 'wpcom'
+        ? 'https://public-api.wordpress.com/rest/v1.1'
+        : `${this.siteUrl}/wp-json/wp/v2`
+    );
+  }
+
+  private createHttp(baseURL: string, headers: Record<string, string> = this.headers) {
+    let http = createAxios({
+      baseURL,
+      headers
+    });
+
+    http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(wordpressApiError(error))
+    );
+
+    return http;
+  }
+
+  private normalizeSelfHostedOrder(order?: string) {
+    return (order || 'desc').toLowerCase();
+  }
+
+  private sanitizeHeaderValue(value: string) {
+    return value.replace(/[\r\n"]/g, '_');
+  }
+
+  private async fetchRemoteFile(fileUrl: string) {
+    let url: URL;
+    try {
+      url = new URL(fileUrl);
+    } catch {
+      throw wordpressServiceError('fileUrl must be a valid HTTP or HTTPS URL.');
     }
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      throw wordpressServiceError('fileUrl must use HTTP or HTTPS.');
+    }
+
+    let response: Response;
+    try {
+      response = await fetch(url);
+    } catch (error) {
+      let serviceError = wordpressServiceError(
+        `Unable to fetch media file URL: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      if (error instanceof Error) {
+        serviceError.setParent(error);
+      }
+      throw serviceError;
+    }
+
+    if (!response.ok) {
+      throw wordpressServiceError(
+        `Unable to fetch media file URL: HTTP ${response.status} ${response.statusText}`.trim()
+      );
+    }
+
+    return {
+      body: Buffer.from(await response.arrayBuffer()),
+      mimeType: response.headers.get('content-type') ?? undefined
+    };
+  }
+
+  private async findWpcomCategory(identifier: string) {
+    let categories = await this.listCategories({
+      search: /^\d+$/.test(identifier) ? undefined : identifier,
+      perPage: 1000,
+      page: 1
+    });
+
+    return categories.find((category: any) => {
+      return (
+        String(category.ID ?? category.id ?? '') === identifier ||
+        String(category.slug ?? '') === identifier ||
+        String(category.name ?? '') === identifier
+      );
+    });
+  }
+
+  private async requireWpcomCategory(identifier: string) {
+    let category = await this.findWpcomCategory(identifier);
+    if (!category) {
+      throw wordpressServiceError(`WordPress.com category ${identifier} was not found.`);
+    }
+    if (!category.slug) {
+      throw wordpressServiceError(
+        `WordPress.com category ${identifier} did not include a slug for mutation.`
+      );
+    }
+
+    return category;
+  }
+
+  private async findWpcomTag(identifier: string) {
+    let tags = await this.listTags({
+      search: /^\d+$/.test(identifier) ? undefined : identifier,
+      perPage: 1000,
+      page: 1
+    });
+
+    return tags.find((tag: any) => {
+      return (
+        String(tag.ID ?? tag.id ?? '') === identifier ||
+        String(tag.slug ?? '') === identifier ||
+        String(tag.name ?? '') === identifier
+      );
+    });
+  }
+
+  private async requireWpcomTag(identifier: string) {
+    let tag = await this.findWpcomTag(identifier);
+    if (!tag) {
+      throw wordpressServiceError(`WordPress.com tag ${identifier} was not found.`);
+    }
+    if (!tag.slug) {
+      throw wordpressServiceError(
+        `WordPress.com tag ${identifier} did not include a slug for mutation.`
+      );
+    }
+
+    return tag;
   }
 
   // ──────────────────────────────── Posts ────────────────────────────────
@@ -85,7 +201,7 @@ export class WordPressClient {
           per_page: params.perPage || 20,
           page: params.page || 1,
           orderby: params.orderBy || 'date',
-          order: params.order || 'desc',
+          order: this.normalizeSelfHostedOrder(params.order),
           after: params.after,
           before: params.before
         }
@@ -270,7 +386,7 @@ export class WordPressClient {
           per_page: params.perPage || 20,
           page: params.page || 1,
           orderby: params.orderBy || 'date',
-          order: params.order || 'desc'
+          order: this.normalizeSelfHostedOrder(params.order)
         }
       });
       return response.data;
@@ -533,6 +649,65 @@ export class WordPressClient {
     }
   }
 
+  async uploadMedia(data: {
+    fileUrl: string;
+    fileName: string;
+    title?: string;
+    caption?: string;
+    altText?: string;
+    description?: string;
+    mimeType?: string;
+    postId?: string;
+  }): Promise<any> {
+    if (this.apiType === 'wpcom') {
+      let body = new URLSearchParams({
+        media_urls: data.fileUrl
+      });
+
+      if (data.title) body.set('attrs[0][title]', data.title);
+      if (data.caption) body.set('attrs[0][caption]', data.caption);
+      if (data.altText) body.set('attrs[0][alt]', data.altText);
+      if (data.description) body.set('attrs[0][description]', data.description);
+      if (data.postId) body.set('attrs[0][parent_id]', data.postId);
+
+      let response = await this.http.post(`/sites/${this.siteId}/media/new`, body.toString(), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      });
+
+      let media = response.data?.media?.[0];
+      if (!media) {
+        let errors = response.data?.errors ?? response.data?.media_errors;
+        throw wordpressServiceError(
+          `WordPress.com media upload did not return a media item${
+            errors ? `: ${JSON.stringify(errors)}` : '.'
+          }`
+        );
+      }
+
+      return media;
+    } else {
+      let file = await this.fetchRemoteFile(data.fileUrl);
+      let response = await this.http.post('/media', file.body, {
+        params: {
+          title: data.title,
+          caption: data.caption,
+          alt_text: data.altText,
+          description: data.description,
+          post: data.postId ? Number(data.postId) : undefined
+        },
+        headers: {
+          'Content-Type': data.mimeType ?? file.mimeType ?? 'application/octet-stream',
+          'Content-Disposition': `attachment; filename="${this.sanitizeHeaderValue(
+            data.fileName
+          )}"`
+        }
+      });
+      return response.data;
+    }
+  }
+
   async updateMedia(
     mediaId: string,
     data: {
@@ -623,6 +798,15 @@ export class WordPressClient {
     }
   }
 
+  async getCategory(categoryId: string): Promise<any> {
+    if (this.apiType === 'wpcom') {
+      return this.requireWpcomCategory(categoryId);
+    } else {
+      let response = await this.http.get(`/categories/${categoryId}`);
+      return response.data;
+    }
+  }
+
   async updateCategory(
     categoryId: string,
     data: {
@@ -633,8 +817,9 @@ export class WordPressClient {
     }
   ): Promise<any> {
     if (this.apiType === 'wpcom') {
+      let category = await this.requireWpcomCategory(categoryId);
       let response = await this.http.post(
-        `/sites/${this.siteId}/categories/slug:${categoryId}`,
+        `/sites/${this.siteId}/categories/slug:${encodeURIComponent(category.slug)}`,
         {
           name: data.name,
           description: data.description,
@@ -655,8 +840,9 @@ export class WordPressClient {
 
   async deleteCategory(categoryId: string): Promise<any> {
     if (this.apiType === 'wpcom') {
+      let category = await this.requireWpcomCategory(categoryId);
       let response = await this.http.post(
-        `/sites/${this.siteId}/categories/slug:${categoryId}/delete`
+        `/sites/${this.siteId}/categories/slug:${encodeURIComponent(category.slug)}/delete`
       );
       return response.data;
     } else {
@@ -710,9 +896,49 @@ export class WordPressClient {
     }
   }
 
+  async getTag(tagId: string): Promise<any> {
+    if (this.apiType === 'wpcom') {
+      return this.requireWpcomTag(tagId);
+    } else {
+      let response = await this.http.get(`/tags/${tagId}`);
+      return response.data;
+    }
+  }
+
+  async updateTag(
+    tagId: string,
+    data: {
+      name?: string;
+      description?: string;
+      slug?: string;
+    }
+  ): Promise<any> {
+    if (this.apiType === 'wpcom') {
+      let tag = await this.requireWpcomTag(tagId);
+      let response = await this.http.post(
+        `/sites/${this.siteId}/tags/slug:${encodeURIComponent(tag.slug)}`,
+        {
+          name: data.name,
+          description: data.description
+        }
+      );
+      return response.data;
+    } else {
+      let response = await this.http.post(`/tags/${tagId}`, {
+        name: data.name,
+        description: data.description,
+        slug: data.slug
+      });
+      return response.data;
+    }
+  }
+
   async deleteTag(tagId: string): Promise<any> {
     if (this.apiType === 'wpcom') {
-      let response = await this.http.post(`/sites/${this.siteId}/tags/slug:${tagId}/delete`);
+      let tag = await this.requireWpcomTag(tagId);
+      let response = await this.http.post(
+        `/sites/${this.siteId}/tags/slug:${encodeURIComponent(tag.slug)}/delete`
+      );
       return response.data;
     } else {
       let response = await this.http.delete(`/tags/${tagId}`, {
@@ -758,7 +984,7 @@ export class WordPressClient {
       });
       let users: any[] = response.data.users || [];
       let user = users.find((u: any) => String(u.ID) === userId);
-      if (!user) throw new Error(`User ${userId} not found`);
+      if (!user) throw wordpressServiceError(`User ${userId} not found`);
       return user;
     } else {
       let response = await this.http.get(`/users/${userId}`);
@@ -768,13 +994,7 @@ export class WordPressClient {
 
   async getCurrentUser(): Promise<any> {
     if (this.apiType === 'wpcom') {
-      let wpcomHttp = createAxios({
-        baseURL: 'https://public-api.wordpress.com/rest/v1.1',
-        headers: {
-          Authorization: `Bearer ${this.http.defaults.headers.common?.Authorization?.toString().replace('Bearer ', '')}`
-        }
-      });
-      let response = await wpcomHttp.get('/me');
+      let response = await this.http.get('/me');
       return response.data;
     } else {
       let response = await this.http.get('/users/me');
@@ -789,10 +1009,7 @@ export class WordPressClient {
       let response = await this.http.get(`/sites/${this.siteId}`);
       return response.data;
     } else {
-      let settingsHttp = createAxios({
-        baseURL: `${this.siteUrl}/wp-json`,
-        headers: this.http.defaults.headers.common as Record<string, string>
-      });
+      let settingsHttp = this.createHttp(`${this.siteUrl}/wp-json`);
       let response = await settingsHttp.get('/');
       return response.data;
     }
@@ -825,7 +1042,7 @@ export class WordPressClient {
       let response = await this.http.get(`/sites/${this.siteId}/stats`);
       return response.data;
     } else {
-      throw new Error(
+      throw wordpressServiceError(
         'Site statistics are only available for WordPress.com or Jetpack-connected sites.'
       );
     }
@@ -844,7 +1061,7 @@ export class WordPressClient {
       });
       return response.data;
     } else {
-      throw new Error(
+      throw wordpressServiceError(
         'Site statistics are only available for WordPress.com or Jetpack-connected sites.'
       );
     }
@@ -863,7 +1080,7 @@ export class WordPressClient {
       });
       return response.data;
     } else {
-      throw new Error(
+      throw wordpressServiceError(
         'Site statistics are only available for WordPress.com or Jetpack-connected sites.'
       );
     }

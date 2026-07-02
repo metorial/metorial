@@ -1,6 +1,6 @@
 import { SlateDefaultPollingIntervalSeconds, SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { KlaviyoClient } from '../lib/client';
+import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let newEvents = SlateTrigger.create(spec, {
@@ -37,10 +37,7 @@ export let newEvents = SlateTrigger.create(spec, {
     },
 
     pollEvents: async ctx => {
-      let client = new KlaviyoClient({
-        token: ctx.auth.token,
-        revision: ctx.config.revision
-      });
+      let client = createClient(ctx);
 
       let state = ctx.state as { lastTimestamp?: string; lastSeenIds?: string[] } | undefined;
       let lastTimestamp = state?.lastTimestamp;

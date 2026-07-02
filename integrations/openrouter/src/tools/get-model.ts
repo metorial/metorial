@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { normalizeModel } from './list-models';
 
 export let getModel = SlateTool.create(spec, {
   name: 'Get Model',
@@ -21,6 +22,7 @@ export let getModel = SlateTool.create(spec, {
   .output(
     z.object({
       modelId: z.string().describe('Unique model identifier'),
+      canonicalSlug: z.string().optional().describe('Canonical model slug'),
       name: z.string().optional().describe('Human-readable model name'),
       description: z.string().optional().describe('Model description'),
       contextLength: z.number().optional().describe('Maximum context length in tokens'),
@@ -44,6 +46,14 @@ export let getModel = SlateTool.create(spec, {
       architecture: z
         .object({
           modality: z.string().optional().describe('Input/output modality'),
+          inputModalities: z
+            .array(z.string())
+            .optional()
+            .describe('Supported input modalities'),
+          outputModalities: z
+            .array(z.string())
+            .optional()
+            .describe('Supported output modalities'),
           tokenizer: z.string().optional().describe('Tokenizer'),
           instructType: z.string().optional().describe('Instruction type')
         })
@@ -64,45 +74,11 @@ export let getModel = SlateTool.create(spec, {
     });
 
     let m = await client.getModel(ctx.input.modelId);
-
-    let pricing = m.pricing as Record<string, unknown> | undefined;
-    let topProvider = m.top_provider as Record<string, unknown> | undefined;
-    let architecture = m.architecture as Record<string, unknown> | undefined;
+    let normalized = normalizeModel(m);
 
     let output = {
-      modelId: (m.id as string) || ctx.input.modelId,
-      name: (m.name as string) || undefined,
-      description: (m.description as string) || undefined,
-      contextLength: (m.context_length as number) || undefined,
-      ...(pricing
-        ? {
-            pricing: {
-              prompt: (pricing.prompt as string) || undefined,
-              completion: (pricing.completion as string) || undefined,
-              image: (pricing.image as string) || undefined,
-              request: (pricing.request as string) || undefined
-            }
-          }
-        : {}),
-      ...(topProvider
-        ? {
-            topProvider: {
-              contextLength: (topProvider.context_length as number) || undefined,
-              maxCompletionTokens: (topProvider.max_completion_tokens as number) || undefined,
-              isModerated: (topProvider.is_moderated as boolean) || undefined
-            }
-          }
-        : {}),
-      ...(architecture
-        ? {
-            architecture: {
-              modality: (architecture.modality as string) || undefined,
-              tokenizer: (architecture.tokenizer as string) || undefined,
-              instructType: (architecture.instruct_type as string) || undefined
-            }
-          }
-        : {}),
-      supportedParameters: (m.supported_parameters as string[]) || undefined,
+      ...normalized,
+      modelId: normalized.modelId || ctx.input.modelId,
       createdAt: m.created ? String(m.created) : undefined
     };
 

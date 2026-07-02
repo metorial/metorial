@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TranscribeClient } from '../lib/client';
 import { spec } from '../spec';
+import { requireString, tagSchema, validateVocabularySource } from './common';
 
 export let manageVocabulary = SlateTool.create(spec, {
   name: 'Manage Vocabulary',
@@ -37,15 +38,7 @@ export let manageVocabulary = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('S3 URI of a text file containing vocabulary terms'),
-      tags: z
-        .array(
-          z.object({
-            key: z.string().describe('Tag key'),
-            value: z.string().describe('Tag value')
-          })
-        )
-        .optional()
-        .describe('Tags for the vocabulary (create only)'),
+      tags: z.array(tagSchema).optional().describe('Tags for the vocabulary (create only)'),
       stateEquals: z
         .enum(['PENDING', 'READY', 'FAILED'])
         .optional()
@@ -97,9 +90,19 @@ export let manageVocabulary = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      let vocabularyName = requireString(
+        ctx.input.vocabularyName,
+        'vocabularyName is required for create.'
+      );
+      let languageCode = requireString(
+        ctx.input.languageCode,
+        'languageCode is required for create.'
+      );
+      validateVocabularySource(ctx.input.phrases, ctx.input.vocabularyFileUri);
+
       let result = await client.createVocabulary({
-        vocabularyName: ctx.input.vocabularyName!,
-        languageCode: ctx.input.languageCode!,
+        vocabularyName,
+        languageCode,
         phrases: ctx.input.phrases,
         vocabularyFileUri: ctx.input.vocabularyFileUri,
         tags: ctx.input.tags
@@ -117,9 +120,19 @@ export let manageVocabulary = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
+      let vocabularyName = requireString(
+        ctx.input.vocabularyName,
+        'vocabularyName is required for update.'
+      );
+      let languageCode = requireString(
+        ctx.input.languageCode,
+        'languageCode is required for update.'
+      );
+      validateVocabularySource(ctx.input.phrases, ctx.input.vocabularyFileUri);
+
       let result = await client.updateVocabulary({
-        vocabularyName: ctx.input.vocabularyName!,
-        languageCode: ctx.input.languageCode!,
+        vocabularyName,
+        languageCode,
         phrases: ctx.input.phrases,
         vocabularyFileUri: ctx.input.vocabularyFileUri
       });
@@ -135,7 +148,11 @@ export let manageVocabulary = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      let result = await client.getVocabulary(ctx.input.vocabularyName!);
+      let vocabularyName = requireString(
+        ctx.input.vocabularyName,
+        'vocabularyName is required for get.'
+      );
+      let result = await client.getVocabulary(vocabularyName);
       return {
         output: {
           vocabularyName: result.VocabularyName,
@@ -150,13 +167,17 @@ export let manageVocabulary = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteVocabulary(ctx.input.vocabularyName!);
+      let vocabularyName = requireString(
+        ctx.input.vocabularyName,
+        'vocabularyName is required for delete.'
+      );
+      await client.deleteVocabulary(vocabularyName);
       return {
         output: {
-          vocabularyName: ctx.input.vocabularyName,
+          vocabularyName,
           deleted: true
         },
-        message: `Deleted vocabulary **${ctx.input.vocabularyName}**.`
+        message: `Deleted vocabulary **${vocabularyName}**.`
       };
     }
 

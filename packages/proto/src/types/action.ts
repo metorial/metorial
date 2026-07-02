@@ -23,6 +23,7 @@ export let slatesActionBase = z.object({
     .optional(),
   metadata: z.record(z.string(), z.any()).optional(),
   scopes: slatesActionScopes.optional(),
+  authMethods: z.array(z.string()).optional(),
 
   inputSchema: z.record(z.string(), z.any()),
   outputSchema: z.record(z.string(), z.any()),

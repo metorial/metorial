@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let taskSchema = z.object({
@@ -33,10 +34,11 @@ let taskSchema = z.object({
 export let manageJob = SlateTool.create(spec, {
   name: 'Manage Job',
   key: 'manage_job',
-  description: `Create or delete a multi-task workflow job. Supports notebook, Python, and SQL task types with dependencies, scheduling, and notification settings.`,
+  description: `Create, update, or delete a multi-task workflow job. Supports notebook, Python, and SQL task types with dependencies, scheduling, and notification settings.`,
   instructions: [
     'To create a job, provide a name and at least one task.',
     'Tasks can depend on each other using the dependsOn field referencing other task keys.',
+    'To update a job, provide jobId and at least one setting such as name, tasks, schedule, timeoutSeconds, or tags.',
     'To delete a job, provide only the jobId and set action to "delete".'
   ],
   tags: {
@@ -45,8 +47,8 @@ export let manageJob = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      action: z.enum(['create', 'delete']).describe('Action to perform'),
-      jobId: z.string().optional().describe('Job ID (required for delete)'),
+      action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
+      jobId: z.string().optional().describe('Job ID (required for update and delete)'),
       name: z.string().optional().describe('Job name (required for create)'),
       tasks: z.array(taskSchema).optional().describe('List of tasks for the job'),
       schedule: z
@@ -77,7 +79,7 @@ export let manageJob = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.jobId) throw new Error('jobId is required for delete');
+      if (!ctx.input.jobId) throw databricksServiceError('jobId is required for delete');
       await client.deleteJob(ctx.input.jobId);
       return {
         output: { jobId: ctx.input.jobId },
@@ -85,8 +87,36 @@ export let manageJob = SlateTool.create(spec, {
       };
     }
 
+    if (ctx.input.action === 'update') {
+      if (!ctx.input.jobId) throw databricksServiceError('jobId is required for update');
+      if (
+        !ctx.input.name &&
+        !ctx.input.tasks &&
+        !ctx.input.schedule &&
+        ctx.input.maxConcurrentRuns === undefined &&
+        ctx.input.timeoutSeconds === undefined &&
+        !ctx.input.tags
+      ) {
+        throw databricksServiceError('At least one job setting is required for update');
+      }
+
+      await client.updateJob(ctx.input.jobId, {
+        name: ctx.input.name,
+        tasks: ctx.input.tasks,
+        schedule: ctx.input.schedule,
+        maxConcurrentRuns: ctx.input.maxConcurrentRuns,
+        timeoutSeconds: ctx.input.timeoutSeconds,
+        tags: ctx.input.tags as Record<string, string> | undefined
+      });
+
+      return {
+        output: { jobId: ctx.input.jobId },
+        message: `Updated job **${ctx.input.jobId}**.`
+      };
+    }
+
     if (!ctx.input.name || !ctx.input.tasks || ctx.input.tasks.length === 0) {
-      throw new Error('name and at least one task are required for create');
+      throw databricksServiceError('name and at least one task are required for create');
     }
 
     let result = await client.createJob({

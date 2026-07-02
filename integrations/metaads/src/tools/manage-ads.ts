@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetaAdsClient } from '../lib/client';
+import { metaAdsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let adSchema = z.object({
@@ -191,6 +192,10 @@ export let updateAd = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.name && !ctx.input.status && !ctx.input.creativeId) {
+      throw metaAdsServiceError('Provide at least one ad field to update.');
+    }
+
     let client = new MetaAdsClient({
       token: ctx.auth.token,
       adAccountId: ctx.config.adAccountId,

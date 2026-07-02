@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'mailerlite',
   name: 'MailerLite',
   description:
-    'Email marketing platform for subscriber management, campaign creation, automations, and e-commerce integration.',
+    'Email marketing platform for subscriber management, campaign creation, automations, signup forms, and webhooks.',
   metadata: {},
   config,
   auth

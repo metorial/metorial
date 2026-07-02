@@ -1,6 +1,7 @@
 import { SlateDefaultPollingIntervalSeconds, SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { requireString } from '../lib/validation';
 import { spec } from '../spec';
 
 export let projectEventsTrigger = SlateTrigger.create(spec, {
@@ -42,9 +43,11 @@ export let projectEventsTrigger = SlateTrigger.create(spec, {
 
     pollEvents: async ctx => {
       let client = createClient(ctx.auth);
-      let projectId = ctx.config.projectId;
-      if (!projectId)
-        throw new Error('projectId is required in config for project event polling.');
+      let projectId = requireString(
+        ctx.config.projectId,
+        'projectId',
+        'in config for project event polling'
+      );
 
       let state = ctx.state || {};
       let lastPolledAt = state.lastPolledAt as string | undefined;

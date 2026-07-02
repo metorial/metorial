@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TranscribeClient } from '../lib/client';
 import { spec } from '../spec';
+import { kmsEncryptionContextSchema, mediaFormatSchema, tagSchema } from './common';
 
 export let startMedicalTranscriptionJob = SlateTool.create(spec, {
   name: 'Start Medical Transcription Job',
@@ -28,9 +29,9 @@ export let startMedicalTranscriptionJob = SlateTool.create(spec, {
         .describe('Unique name for the medical transcription job (1-200 chars, no spaces)'),
       mediaFileUri: z.string().describe('S3 URI of the medical audio file'),
       languageCode: z
-        .string()
+        .enum(['en-US'])
         .default('en-US')
-        .describe('Language code (currently only en-US supported)'),
+        .describe('Language code. AWS Transcribe Medical currently supports en-US.'),
       specialty: z.enum(['PRIMARYCARE']).default('PRIMARYCARE').describe('Medical specialty'),
       type: z
         .enum(['CONVERSATION', 'DICTATION'])
@@ -41,10 +42,8 @@ export let startMedicalTranscriptionJob = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('KMS key ID for encrypting the output'),
-      mediaFormat: z
-        .enum(['mp3', 'mp4', 'wav', 'flac', 'ogg', 'amr', 'webm'])
-        .optional()
-        .describe('Format of the media file'),
+      kmsEncryptionContext: kmsEncryptionContextSchema,
+      mediaFormat: mediaFormatSchema.optional().describe('Format of the media file'),
       mediaSampleRateHertz: z.number().optional().describe('Sample rate of the audio in Hz'),
       settings: z
         .object({
@@ -73,15 +72,7 @@ export let startMedicalTranscriptionJob = SlateTool.create(spec, {
         .enum(['PHI'])
         .optional()
         .describe('Identify protected health information (PHI)'),
-      tags: z
-        .array(
-          z.object({
-            key: z.string().describe('Tag key'),
-            value: z.string().describe('Tag value')
-          })
-        )
-        .optional()
-        .describe('Tags to associate with the job')
+      tags: z.array(tagSchema).optional().describe('Tags to associate with the job')
     })
   )
   .output(

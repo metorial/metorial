@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let snapshotSchema = z.object({
@@ -107,7 +108,7 @@ export let manageBackupsTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required');
+    if (!projectId) throw mongodbServiceError('projectId is required');
 
     let client = new AtlasClient(ctx.auth);
 
@@ -131,7 +132,7 @@ export let manageBackupsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_snapshot') {
-      if (!ctx.input.snapshotId) throw new Error('snapshotId is required');
+      if (!ctx.input.snapshotId) throw mongodbServiceError('snapshotId is required');
       let s = await client.getBackupSnapshot(
         projectId,
         ctx.input.clusterName,
@@ -195,7 +196,7 @@ export let manageBackupsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create_restore_job') {
-      if (!ctx.input.deliveryType) throw new Error('deliveryType is required');
+      if (!ctx.input.deliveryType) throw mongodbServiceError('deliveryType is required');
       let payload: any = { deliveryType: ctx.input.deliveryType };
       if (ctx.input.snapshotId) payload.snapshotId = ctx.input.snapshotId;
       if (ctx.input.targetClusterName) payload.targetClusterName = ctx.input.targetClusterName;
@@ -229,7 +230,7 @@ export let manageBackupsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update_schedule') {
-      if (!ctx.input.scheduleData) throw new Error('scheduleData is required');
+      if (!ctx.input.scheduleData) throw mongodbServiceError('scheduleData is required');
       let schedule = await client.updateBackupSchedule(
         projectId,
         ctx.input.clusterName,
@@ -241,6 +242,6 @@ export let manageBackupsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

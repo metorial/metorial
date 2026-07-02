@@ -12,8 +12,10 @@ import {
   listServices,
   listTeams,
   listUsers,
+  manageBusinessService,
   manageMaintenanceWindow,
   manageService,
+  manageServiceIntegration,
   sendEvent,
   updateIncident
 } from './tools';
@@ -28,6 +30,8 @@ export let provider = Slate.create({
     updateIncident,
     listServices,
     manageService,
+    manageServiceIntegration,
+    manageBusinessService,
     listUsers,
     listOnCalls,
     listEscalationPolicies,

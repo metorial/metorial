@@ -1,5 +1,7 @@
+export * from './control-search-job';
 export * from './get-search-results';
 export * from './get-server-info';
+export * from './list-apps';
 export * from './list-fired-alerts';
 export * from './list-users';
 export * from './manage-indexes';

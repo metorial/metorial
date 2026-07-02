@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetaAdsClient } from '../lib/client';
+import { metaAdsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let adSetSchema = z.object({
@@ -213,6 +214,14 @@ export let createAdSet = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.dailyBudget && ctx.input.lifetimeBudget) {
+      throw metaAdsServiceError('Provide either dailyBudget or lifetimeBudget, not both.');
+    }
+
+    if (ctx.input.lifetimeBudget && !ctx.input.endTime) {
+      throw metaAdsServiceError('endTime is required when lifetimeBudget is provided.');
+    }
+
     let client = new MetaAdsClient({
       token: ctx.auth.token,
       adAccountId: ctx.config.adAccountId,
@@ -280,6 +289,27 @@ export let updateAdSet = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.name &&
+      !ctx.input.status &&
+      !ctx.input.targeting &&
+      !ctx.input.dailyBudget &&
+      !ctx.input.lifetimeBudget &&
+      !ctx.input.bidAmount &&
+      !ctx.input.endTime &&
+      !ctx.input.optimizationGoal
+    ) {
+      throw metaAdsServiceError('Provide at least one ad set field to update.');
+    }
+
+    if (ctx.input.dailyBudget && ctx.input.lifetimeBudget) {
+      throw metaAdsServiceError('Provide either dailyBudget or lifetimeBudget, not both.');
+    }
+
+    if (ctx.input.lifetimeBudget && !ctx.input.endTime) {
+      throw metaAdsServiceError('endTime is required when lifetimeBudget is provided.');
+    }
+
     let client = new MetaAdsClient({
       token: ctx.auth.token,
       adAccountId: ctx.config.adAccountId,

@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
+let tailSchema = z.object({
+  tailId: z.string().describe('Tail session UUID'),
+  websocketUrl: z.string().optional().describe('WebSocket URL for streaming logs'),
+  expiresAt: z.string().optional().describe('ISO 8601 expiration timestamp')
+});
+
 export let createTail = SlateTool.create(spec, {
   name: 'Start Tail Session',
   key: 'create_tail',
@@ -53,6 +59,7 @@ export let listTails = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      tails: z.array(tailSchema).describe('Active tail sessions for the Worker'),
       tailId: z.string().optional().describe('Active tail session UUID'),
       websocketUrl: z.string().optional().describe('WebSocket URL for streaming logs'),
       expiresAt: z.string().optional().describe('ISO 8601 expiration timestamp')
@@ -62,16 +69,22 @@ export let listTails = SlateTool.create(spec, {
     let client = createClient(ctx);
     let result = await client.listTails(ctx.input.scriptName);
 
-    let tail = Array.isArray(result) ? result[0] : result;
+    let tails = (Array.isArray(result) ? result : result ? [result] : []).map((tail: any) => ({
+      tailId: tail.id,
+      websocketUrl: tail.url,
+      expiresAt: tail.expires_at
+    }));
+    let tail = tails[0];
 
     return {
       output: {
-        tailId: tail?.id,
-        websocketUrl: tail?.url,
-        expiresAt: tail?.expires_at
+        tails,
+        tailId: tail?.tailId,
+        websocketUrl: tail?.websocketUrl,
+        expiresAt: tail?.expiresAt
       },
-      message: tail?.id
-        ? `Active tail session **${tail.id}** for Worker **${ctx.input.scriptName}**.`
+      message: tail?.tailId
+        ? `Active tail session **${tail.tailId}** for Worker **${ctx.input.scriptName}**.`
         : `No active tail sessions for Worker **${ctx.input.scriptName}**.`
     };
   })

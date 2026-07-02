@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { bigcommerceApiError } from './errors';
 
 export interface ClientConfig {
   token: string;
@@ -37,6 +38,11 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+
+    this.api.interceptors.response.use(
+      response => response,
+      error => Promise.reject(bigcommerceApiError(error))
+    );
   }
 
   // ─── Products ───────────────────────────────────────────────────────
@@ -288,8 +294,11 @@ export class Client {
 
   // ─── Carts ──────────────────────────────────────────────────────────
 
-  async createCart(data: Record<string, any>): Promise<SingleResponse<any>> {
-    let response = await this.api.post('/v3/carts', data);
+  async createCart(
+    data: Record<string, any>,
+    params?: Record<string, any>
+  ): Promise<SingleResponse<any>> {
+    let response = await this.api.post('/v3/carts', data, { params });
     return response.data;
   }
 
@@ -300,18 +309,22 @@ export class Client {
 
   async addCartLineItems(
     cartId: string,
-    data: Record<string, any>
+    data: Record<string, any>,
+    params?: Record<string, any>
   ): Promise<SingleResponse<any>> {
-    let response = await this.api.post(`/v3/carts/${cartId}/items`, data);
+    let response = await this.api.post(`/v3/carts/${cartId}/items`, data, { params });
     return response.data;
   }
 
   async updateCartLineItem(
     cartId: string,
     itemId: string,
-    data: Record<string, any>
+    data: Record<string, any>,
+    params?: Record<string, any>
   ): Promise<SingleResponse<any>> {
-    let response = await this.api.put(`/v3/carts/${cartId}/items/${itemId}`, data);
+    let response = await this.api.put(`/v3/carts/${cartId}/items/${itemId}`, data, {
+      params
+    });
     return response.data;
   }
 
@@ -321,6 +334,14 @@ export class Client {
 
   async deleteCart(cartId: string): Promise<void> {
     await this.api.delete(`/v3/carts/${cartId}`);
+  }
+
+  async createCartRedirectUrl(
+    cartId: string,
+    data?: Record<string, any>
+  ): Promise<SingleResponse<any>> {
+    let response = await this.api.post(`/v3/carts/${cartId}/redirect_urls`, data ?? {});
+    return response.data;
   }
 
   // ─── Checkouts ──────────────────────────────────────────────────────
@@ -523,8 +544,11 @@ export class Client {
     return response.data;
   }
 
-  async adjustInventory(data: Record<string, any>[]): Promise<any> {
-    let response = await this.api.put('/v3/inventory/adjustments/absolute', { items: data });
+  async adjustInventory(data: {
+    items: Record<string, any>[];
+    reason?: string;
+  }): Promise<any> {
+    let response = await this.api.put('/v3/inventory/adjustments/absolute', data);
     return response.data;
   }
 

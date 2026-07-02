@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient, extractPaginationCursor } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -115,7 +116,7 @@ Campaigns target lists and/or segments with marketing messages. Use this to mana
     }
 
     if (action === 'get') {
-      if (!campaignId) throw new Error('campaignId is required');
+      if (!campaignId) throw klaviyoServiceError('campaignId is required');
       let result = await client.getCampaign(campaignId);
       let c = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -141,7 +142,7 @@ Campaigns target lists and/or segments with marketing messages. Use this to mana
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create');
+      if (!name) throw klaviyoServiceError('name is required for create');
       let attributes: Record<string, any> = { name };
       if (channel) attributes.channel = channel;
       if (audiences) {
@@ -163,7 +164,7 @@ Campaigns target lists and/or segments with marketing messages. Use this to mana
     }
 
     if (action === 'update') {
-      if (!campaignId) throw new Error('campaignId is required');
+      if (!campaignId) throw klaviyoServiceError('campaignId is required');
       let attributes: Record<string, any> = {};
       if (name) attributes.name = name;
       if (audiences) {
@@ -182,7 +183,7 @@ Campaigns target lists and/or segments with marketing messages. Use this to mana
     }
 
     if (action === 'delete') {
-      if (!campaignId) throw new Error('campaignId is required');
+      if (!campaignId) throw klaviyoServiceError('campaignId is required');
       await client.deleteCampaign(campaignId);
       return {
         output: { campaignId, success: true },
@@ -191,7 +192,7 @@ Campaigns target lists and/or segments with marketing messages. Use this to mana
     }
 
     if (action === 'send') {
-      if (!campaignId) throw new Error('campaignId is required');
+      if (!campaignId) throw klaviyoServiceError('campaignId is required');
       await client.sendCampaign(campaignId);
       return {
         output: { campaignId, success: true },
@@ -199,6 +200,6 @@ Campaigns target lists and/or segments with marketing messages. Use this to mana
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw klaviyoServiceError(`Unknown action: ${action}`);
   })
   .build();

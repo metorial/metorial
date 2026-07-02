@@ -1,6 +1,6 @@
 # <img src="logo.png" height="20"> Service Now
 
-Manage IT service management records including incidents, problems, changes, and requests. Create, read, update, and delete records across any ServiceNow table. Query and manage Configuration Items (CIs) and their relationships in the CMDB. Browse and submit service catalog requests. Create and search knowledge base articles. Upload and manage file attachments on records. Import and transform bulk data from external systems using import sets. Manage users, groups, and role assignments. Trigger and interact with automated workflows and orchestration processes. Receive outbound webhook notifications for record changes via business rules.
+Manage IT service management records including incidents, problems, changes, and requests. Create, read, update, and delete records across any ServiceNow table. Query, create, read, and update Configuration Items (CIs) with the CMDB Instance API. Browse and submit service catalog requests. Create and search knowledge base articles. Upload, download, list, and delete file attachments on records. Import and transform bulk data from external systems using import sets. Manage users, groups, and role assignments. Trigger and interact with automated workflows and orchestration processes. Receive outbound webhook notifications for record changes via business rules.
 
 ## License
 

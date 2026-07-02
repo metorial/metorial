@@ -21,7 +21,7 @@ let saleSchema = z.object({
 export let listSales = SlateTool.create(spec, {
   name: 'List Sales',
   key: 'list_sales',
-  description: `Retrieve sales from your Gumroad account with optional filtering by date range, email, product, or order ID. Returns up to 10 sales per page with cursor-based pagination.`,
+  description: `Retrieve sales from your Gumroad account with optional filtering by date range, buyer email, buyer name, license key, product, or order ID. Returns up to 10 sales per page with cursor-based pagination.`,
   instructions: [
     'Use after/before dates in YYYY-MM-DD format.',
     'Use pageKey from a previous response to get the next page of results.'
@@ -38,6 +38,8 @@ export let listSales = SlateTool.create(spec, {
         .optional()
         .describe('Only return sales before this date (YYYY-MM-DD)'),
       email: z.string().optional().describe('Filter by buyer email address'),
+      name: z.string().optional().describe('Filter by buyer name'),
+      licenseKey: z.string().optional().describe('Filter by license key'),
       productId: z.string().optional().describe('Filter by product ID'),
       orderId: z.string().optional().describe('Filter by order ID'),
       pageKey: z.string().optional().describe('Pagination cursor from previous response')
@@ -46,7 +48,8 @@ export let listSales = SlateTool.create(spec, {
   .output(
     z.object({
       sales: z.array(saleSchema).describe('List of sales'),
-      nextPageKey: z.string().optional().describe('Cursor for next page of results')
+      nextPageKey: z.string().optional().describe('Cursor for next page of results'),
+      nextPageUrl: z.string().optional().describe('URL for next page of results')
     })
   )
   .handleInvocation(async ctx => {
@@ -55,6 +58,8 @@ export let listSales = SlateTool.create(spec, {
       after: ctx.input.after,
       before: ctx.input.before,
       email: ctx.input.email,
+      name: ctx.input.name,
+      licenseKey: ctx.input.licenseKey,
       productId: ctx.input.productId,
       orderId: ctx.input.orderId,
       pageKey: ctx.input.pageKey
@@ -76,7 +81,11 @@ export let listSales = SlateTool.create(spec, {
     }));
 
     return {
-      output: { sales: mapped, nextPageKey: result.nextPageKey },
+      output: {
+        sales: mapped,
+        nextPageKey: result.nextPageKey,
+        nextPageUrl: result.nextPageUrl
+      },
       message: `Found **${mapped.length}** sale(s).${result.nextPageKey ? ' More results available with pagination.' : ''}`
     };
   })

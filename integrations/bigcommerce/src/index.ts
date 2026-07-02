@@ -8,6 +8,7 @@ import {
   getStoreInformation,
   listChannels,
   listCustomers,
+  listOrderStatuses,
   listOrders,
   listProducts,
   manageBrand,
@@ -15,6 +16,7 @@ import {
   manageCategory,
   manageCoupon,
   manageCustomer,
+  manageInventory,
   manageOrderShipment,
   managePage,
   managePriceList,
@@ -46,6 +48,7 @@ export let provider = Slate.create({
     listCustomers,
     manageCustomer,
     manageCart,
+    manageInventory,
     manageCategory,
     manageBrand,
     manageCoupon,
@@ -53,7 +56,8 @@ export let provider = Slate.create({
     getStoreInformation,
     manageSubscriber,
     listChannels,
-    managePriceList
+    managePriceList,
+    listOrderStatuses
   ],
   triggers: [
     orderEvents,

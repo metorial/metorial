@@ -1,12 +1,48 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { confluenceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
+
+type SearchContentInput = {
+  cql?: string;
+  query?: string;
+};
+
+let quoteCqlTextSearch = (query: string) =>
+  `text ~ "${query.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
+export let resolveSearchContentQuery = (input: SearchContentInput) => {
+  let cql = input.cql?.trim();
+  let query = input.query?.trim();
+
+  if (cql && query) {
+    throw confluenceServiceError('Provide either cql or query, not both.');
+  }
+
+  if (cql) {
+    return {
+      cql,
+      label: `CQL query: \`${cql}\``
+    };
+  }
+
+  if (query) {
+    return {
+      cql: quoteCqlTextSearch(query),
+      label: `query: \`${query}\``
+    };
+  }
+
+  throw confluenceServiceError(
+    'Either cql or query is required to search Confluence content.'
+  );
+};
 
 export let searchContent = SlateTool.create(spec, {
   name: 'Search Content',
   key: 'search_content',
-  description: `Search Confluence content using CQL (Confluence Query Language). CQL supports filtering by type, space, label, creator, date, title, text content, and more.
+  description: `Search Confluence content. Use query for plain-text searches, or cql for advanced Confluence Query Language filters. CQL supports filtering by type, space, label, creator, date, title, text content, and more.
 
 **Example CQL queries:**
 - \`type=page AND space=DEV\` — all pages in the DEV space
@@ -17,9 +53,26 @@ export let searchContent = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      cql: z.string().describe('Confluence Query Language query string'),
-      limit: z.number().optional().default(25).describe('Maximum number of results (max 200)'),
-      start: z.number().optional().describe('Offset for pagination'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Plain-text search terms. The tool converts this to a Confluence CQL text search. Provide either query or cql, not both.'
+        ),
+      cql: z
+        .string()
+        .optional()
+        .describe(
+          'Advanced Confluence Query Language query string. Provide either cql or query, not both.'
+        ),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('Maximum number of results (max 200)'),
+      start: z.number().int().min(0).optional().describe('Offset for pagination'),
       includeArchivedSpaces: z
         .boolean()
         .optional()
@@ -44,10 +97,11 @@ export let searchContent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let searchQuery = resolveSearchContentQuery(ctx.input);
     let client = createClient(ctx.auth, ctx.config);
     let response = await client.search({
-      cql: ctx.input.cql,
-      limit: ctx.input.limit,
+      cql: searchQuery.cql,
+      limit: ctx.input.limit ?? 25,
       start: ctx.input.start,
       includeArchivedSpaces: ctx.input.includeArchivedSpaces
     });
@@ -70,7 +124,7 @@ export let searchContent = SlateTool.create(spec, {
         totalSize: response.size,
         hasMore
       },
-      message: `Found **${results.length}** results for CQL query: \`${ctx.input.cql}\``
+      message: `Found **${results.length}** results for ${searchQuery.label}`
     };
   })
   .build();

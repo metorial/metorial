@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { AmplitudeClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getChartResultsTool = SlateTool.create(spec, {
   name: 'Get Chart Results',
   key: 'get_chart_results',
-  description: `Fetch results from a saved chart in Amplitude by its chart ID. Returns the same data that the chart displays in the Amplitude dashboard. The chart ID can be found in the URL when viewing a chart.`,
+  description: `Fetch CSV results from a saved chart in Amplitude by its chart ID. The chart ID can be found in the URL when viewing a chart. The CSV content is returned as a Slate attachment.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -21,7 +21,9 @@ export let getChartResultsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      chartData: z.any().describe('Full chart data including series, labels, and metadata.')
+      contentType: z.string().describe('MIME type of the exported chart attachment.'),
+      byteLength: z.number().describe('Size of the exported chart CSV in bytes.'),
+      attachmentCount: z.number().describe('Number of attachments returned.')
     })
   )
   .handleInvocation(async ctx => {
@@ -35,8 +37,13 @@ export let getChartResultsTool = SlateTool.create(spec, {
     let result = await client.getChartResults(ctx.input.chartId);
 
     return {
-      output: { chartData: result.data ?? result },
-      message: `Retrieved results for chart **${ctx.input.chartId}**.`
+      output: {
+        contentType: result.contentType,
+        byteLength: result.byteLength,
+        attachmentCount: 1
+      },
+      attachments: [createTextAttachment(result.content, result.contentType)],
+      message: `Retrieved CSV results for chart **${ctx.input.chartId}** as an attachment.`
     };
   })
   .build();

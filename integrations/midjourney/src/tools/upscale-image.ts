@@ -1,17 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { midjourneyServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let upscaleImage = SlateTool.create(spec, {
   name: 'Upscale Image',
   key: 'upscale_image',
-  description: `Upscale a Midjourney image to higher resolution at 2x or 4x scale. Can upscale from a previous task by referencing its task ID, or upscale any image by providing its URL directly.`,
+  description: `Upscale a Midjourney image. Supports APIFRAME's 1x grid selection, subtle/creative upscales from a selected image, and 2x/4x high-resolution upscales from a task or image URL.`,
   instructions: [
-    'Provide either a parentTaskId (to upscale from a previous generation) or an imageUrl (to upscale any image), but not both.',
-    'When upscaling from a 4-image grid task, specify the index (1-4) to select which image to upscale.'
+    'Use scale "1x" with parentTaskId and index to select one image from a 4-image Midjourney grid.',
+    'Use scale "subtle" or "creative" with the parentTaskId returned by a prior 1x upscale.',
+    'Use scale "2x" or "4x" with exactly one of parentTaskId or imageUrl. Add index only when the parent task is a 4-image grid.'
   ],
-  constraints: ['When using imageUrl directly, the image must not be larger than 2048x2048.'],
+  constraints: [
+    'When using imageUrl directly for 2x/4x upscales, the image must not be larger than 2048x2048.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
@@ -27,7 +31,11 @@ export let upscaleImage = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Direct URL of an image to upscale (alternative to parentTaskId)'),
-      scale: z.enum(['2x', '4x']).describe('Upscale factor: "2x" or "4x"'),
+      scale: z
+        .enum(['1x', '2x', '4x', 'subtle', 'creative'])
+        .describe(
+          'Upscale mode: "1x" selects from an image grid, "subtle"/"creative" upscale a 1x image, and "2x"/"4x" run high-resolution upscale.'
+        ),
       index: z
         .enum(['1', '2', '3', '4'])
         .optional()
@@ -52,8 +60,35 @@ export let upscaleImage = SlateTool.create(spec, {
       baseUrl: ctx.config.baseUrl
     });
 
-    if (!ctx.input.parentTaskId && !ctx.input.imageUrl) {
-      throw new Error('Either parentTaskId or imageUrl must be provided');
+    if (ctx.input.scale === '1x') {
+      if (!ctx.input.parentTaskId || !ctx.input.index) {
+        throw midjourneyServiceError(
+          'scale "1x" requires parentTaskId and index from a 4-image grid task.'
+        );
+      }
+      if (ctx.input.imageUrl) {
+        throw midjourneyServiceError('scale "1x" does not support imageUrl.');
+      }
+    } else if (ctx.input.scale === 'subtle' || ctx.input.scale === 'creative') {
+      if (!ctx.input.parentTaskId) {
+        throw midjourneyServiceError(
+          `scale "${ctx.input.scale}" requires parentTaskId from a prior 1x upscale task.`
+        );
+      }
+      if (ctx.input.imageUrl || ctx.input.index) {
+        throw midjourneyServiceError(
+          `scale "${ctx.input.scale}" does not support imageUrl or index.`
+        );
+      }
+    } else {
+      if (Boolean(ctx.input.parentTaskId) === Boolean(ctx.input.imageUrl)) {
+        throw midjourneyServiceError(
+          'scale "2x" and "4x" require exactly one of parentTaskId or imageUrl.'
+        );
+      }
+      if (ctx.input.imageUrl && ctx.input.index) {
+        throw midjourneyServiceError('index is only supported with parentTaskId.');
+      }
     }
 
     ctx.progress('Submitting upscale request...');

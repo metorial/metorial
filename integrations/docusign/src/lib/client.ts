@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { createAxios, getResponseHeaderValue } from 'slates';
+import { docusignApiError } from './errors';
 
 export interface ClientConfig {
   token: string;
@@ -80,6 +81,7 @@ export interface ListEnvelopesParams {
   folderId?: string;
   userId?: string;
   envelopeIds?: string;
+  transactionIds?: string;
 }
 
 export interface ConnectConfiguration {
@@ -100,6 +102,52 @@ export interface ConnectConfiguration {
   includeHMAC?: string;
 }
 
+export interface DocumentDownload {
+  contentBase64: string;
+  mimeType: string;
+  byteLength: number;
+  fileName?: string;
+}
+
+export interface SenderViewRequest {
+  returnUrl: string;
+  viewAccess: 'envelope';
+  settings?: Record<string, any>;
+}
+
+let toBuffer = (data: unknown) => {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+  if (typeof data === 'string') {
+    return Buffer.from(data, 'binary');
+  }
+  return Buffer.from(data as any);
+};
+
+let getFileNameFromDisposition = (contentDisposition?: string) => {
+  if (!contentDisposition) {
+    return undefined;
+  }
+
+  let utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ''));
+  }
+
+  let match = contentDisposition.match(/filename="?([^";]+)"?/i);
+  return match?.[1]?.trim();
+};
+
+let fallbackDocumentMimeType = (documentId: string) =>
+  documentId === 'archive' ? 'application/zip' : 'application/pdf';
+
 export class Client {
   private token: string;
   private baseUri: string;
@@ -112,13 +160,20 @@ export class Client {
   }
 
   private getAxios() {
-    return createAxios({
+    let ax = createAxios({
       baseURL: `${this.baseUri}/restapi/v2.1/accounts/${this.accountId}`,
       headers: {
         Authorization: `Bearer ${this.token}`,
         'Content-Type': 'application/json'
       }
     });
+
+    ax.interceptors.response.use(
+      response => response,
+      error => Promise.reject(docusignApiError(error, 'request'))
+    );
+
+    return ax;
   }
 
   // ---- Envelopes ----
@@ -153,6 +208,7 @@ export class Client {
     if (queryParams.folderId) params.folder_ids = queryParams.folderId;
     if (queryParams.userId) params.user_id = queryParams.userId;
     if (queryParams.envelopeIds) params.envelope_ids = queryParams.envelopeIds;
+    if (queryParams.transactionIds) params.transaction_ids = queryParams.transactionIds;
     let response = await ax.get('/envelopes', { params });
     return response.data;
   }
@@ -194,20 +250,26 @@ export class Client {
     return response.data;
   }
 
-  async getDocument(envelopeId: string, documentId: string): Promise<string> {
+  async getDocument(envelopeId: string, documentId: string): Promise<DocumentDownload> {
     let ax = this.getAxios();
     let response = await ax.get(`/envelopes/${envelopeId}/documents/${documentId}`, {
       responseType: 'arraybuffer'
     });
-    let binary = '';
-    let bytes = new Uint8Array(response.data as ArrayBuffer);
-    for (let i = 0; i < bytes.byteLength; i++) {
-      binary += String.fromCharCode(bytes[i]!);
-    }
-    return btoa(binary);
+    let content = toBuffer(response.data);
+    let headers = response.headers as Record<string, any>;
+    let contentDisposition = getResponseHeaderValue(headers, 'content-disposition');
+    let mimeType =
+      getResponseHeaderValue(headers, 'content-type') ?? fallbackDocumentMimeType(documentId);
+
+    return {
+      contentBase64: content.toString('base64'),
+      mimeType,
+      byteLength: content.byteLength,
+      fileName: getFileNameFromDisposition(contentDisposition)
+    };
   }
 
-  async getCombinedDocument(envelopeId: string): Promise<string> {
+  async getCombinedDocument(envelopeId: string): Promise<DocumentDownload> {
     return this.getDocument(envelopeId, 'combined');
   }
 
@@ -262,10 +324,33 @@ export class Client {
     return response.data;
   }
 
-  async createSenderView(envelopeId: string, returnUrl: string): Promise<any> {
+  async createSenderView(envelopeId: string, viewRequest: SenderViewRequest): Promise<any> {
     let ax = this.getAxios();
-    let response = await ax.post(`/envelopes/${envelopeId}/views/sender`, { returnUrl });
+    let response = await ax.post(`/envelopes/${envelopeId}/views/sender`, viewRequest);
     return response.data;
+  }
+
+  // ---- Folders ----
+
+  async moveEnvelopesToFolder(params: {
+    destinationFolderId: string;
+    sourceFolderId: string;
+    envelopeIds: string[];
+  }): Promise<any> {
+    let ax = this.getAxios();
+    let response = await ax.put(`/folders/${params.destinationFolderId}`, {
+      fromFolderId: params.sourceFolderId,
+      envelopeIds: params.envelopeIds
+    });
+    return response.data;
+  }
+
+  async deleteEnvelope(envelopeId: string, sourceFolderId: string): Promise<any> {
+    return this.moveEnvelopesToFolder({
+      destinationFolderId: 'recyclebin',
+      sourceFolderId,
+      envelopeIds: [envelopeId]
+    });
   }
 
   // ---- Connect (Webhooks) ----

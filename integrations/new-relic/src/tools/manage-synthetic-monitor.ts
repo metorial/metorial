@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NerdGraphClient } from '../lib/client';
 import { spec } from '../spec';
@@ -19,10 +19,11 @@ let monitorOutputSchema = z.object({
 export let manageSyntheticMonitor = SlateTool.create(spec, {
   name: 'Manage Synthetic Monitor',
   key: 'manage_synthetic_monitor',
-  description: `Create or delete synthetic monitors. Synthetics simulate user interactions or API calls to proactively detect availability and performance issues.
+  description: `Create, update, or delete synthetic monitors. Synthetics simulate user interactions or API calls to proactively detect availability and performance issues.
 Supports ping monitors, simple browser monitors, scripted browser tests, and scripted API tests.`,
   instructions: [
     'To create: provide `action: "create"`, `name`, `monitorType`, `period`, `status`, and `locations`.',
+    'To update: provide `action: "update"`, `monitorGuid`, `monitorType`, and the fields to change.',
     'To delete: provide `action: "delete"` and the `monitorGuid`.',
     'Monitor types: `SIMPLE` (ping), `SIMPLE_BROWSER`, `SCRIPT_BROWSER`, `SCRIPT_API`.',
     'Periods: `EVERY_MINUTE`, `EVERY_5_MINUTES`, `EVERY_10_MINUTES`, `EVERY_15_MINUTES`, `EVERY_30_MINUTES`, `EVERY_HOUR`, `EVERY_6_HOURS`, `EVERY_12_HOURS`, `EVERY_DAY`.'
@@ -33,7 +34,7 @@ Supports ping monitors, simple browser monitors, scripted browser tests, and scr
 })
   .input(
     z.object({
-      action: z.enum(['create', 'delete']).describe('Action to perform'),
+      action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       monitorGuid: z.string().optional().describe('Monitor entity GUID (required for delete)'),
       name: z.string().optional().describe('Monitor name (required for create)'),
       monitorType: z
@@ -70,7 +71,32 @@ Supports ping monitors, simple browser monitors, scripted browser tests, and scr
       script: z
         .string()
         .optional()
-        .describe('Script content for SCRIPT_BROWSER or SCRIPT_API monitors')
+        .describe('Script content for SCRIPT_BROWSER or SCRIPT_API monitors'),
+      runtimeTypeVersion: z
+        .string()
+        .optional()
+        .describe('Runtime version for browser/API monitor types, e.g. LATEST or 22.20.0'),
+      browsers: z
+        .array(z.enum(['CHROME', 'FIREFOX']))
+        .optional()
+        .describe('Browser engines for SIMPLE_BROWSER or SCRIPT_BROWSER monitors'),
+      devices: z
+        .array(
+          z.enum([
+            'DESKTOP',
+            'MOBILE_LANDSCAPE',
+            'MOBILE_PORTRAIT',
+            'TABLET_LANDSCAPE',
+            'TABLET_PORTRAIT'
+          ])
+        )
+        .optional()
+        .describe('Device profiles for SIMPLE_BROWSER or SCRIPT_BROWSER monitors'),
+      apdexTarget: z.number().optional().describe('Monitor Apdex target in seconds'),
+      advancedOptions: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Advanced synthetics options supported by the selected monitor type')
     })
   )
   .output(monitorOutputSchema)
@@ -84,7 +110,8 @@ Supports ping monitors, simple browser monitors, scripted browser tests, and scr
     let { action } = ctx.input;
 
     if (action === 'delete') {
-      if (!ctx.input.monitorGuid) throw new Error('monitorGuid is required for delete action');
+      if (!ctx.input.monitorGuid)
+        throw createApiServiceError('monitorGuid is required for delete action');
       ctx.progress('Deleting synthetic monitor...');
       await client.deleteSyntheticMonitor(ctx.input.monitorGuid);
       return {
@@ -93,12 +120,61 @@ Supports ping monitors, simple browser monitors, scripted browser tests, and scr
       };
     }
 
-    // create
-    if (!ctx.input.name) throw new Error('name is required for create action');
-    if (!ctx.input.monitorType) throw new Error('monitorType is required for create action');
-    if (!ctx.input.period) throw new Error('period is required for create action');
+    if (action === 'update') {
+      if (!ctx.input.monitorGuid)
+        throw createApiServiceError('monitorGuid is required for update action');
+      if (!ctx.input.monitorType)
+        throw createApiServiceError('monitorType is required for update action');
+
+      ctx.progress('Updating synthetic monitor...');
+      let result = await client.updateSyntheticMonitor(ctx.input.monitorGuid, {
+        type: ctx.input.monitorType,
+        name: ctx.input.name,
+        uri: ctx.input.uri,
+        period: ctx.input.period,
+        status: ctx.input.status,
+        locations: ctx.input.locations ? { public: ctx.input.locations } : undefined,
+        script: ctx.input.script,
+        runtimeTypeVersion: ctx.input.runtimeTypeVersion,
+        browsers: ctx.input.browsers,
+        devices: ctx.input.devices,
+        apdexTarget: ctx.input.apdexTarget,
+        advancedOptions: ctx.input.advancedOptions
+      });
+
+      return {
+        output: {
+          monitorGuid: result?.guid || ctx.input.monitorGuid,
+          name: result?.name,
+          status: result?.status,
+          period: result?.period,
+          uri: result?.uri,
+          locations: result?.locations?.public
+        },
+        message: `Synthetic monitor **${result?.name || ctx.input.monitorGuid}** updated successfully.`
+      };
+    }
+
+    if (!ctx.input.name) throw createApiServiceError('name is required for create action');
+    if (!ctx.input.monitorType)
+      throw createApiServiceError('monitorType is required for create action');
+    if (!ctx.input.period) throw createApiServiceError('period is required for create action');
     if (!ctx.input.locations?.length)
-      throw new Error('At least one location is required for create action');
+      throw createApiServiceError('At least one location is required for create action');
+    if (
+      (ctx.input.monitorType === 'SIMPLE' || ctx.input.monitorType === 'SIMPLE_BROWSER') &&
+      !ctx.input.uri
+    ) {
+      throw createApiServiceError('uri is required for SIMPLE and SIMPLE_BROWSER monitors');
+    }
+    if (
+      (ctx.input.monitorType === 'SCRIPT_BROWSER' || ctx.input.monitorType === 'SCRIPT_API') &&
+      !ctx.input.script
+    ) {
+      throw createApiServiceError(
+        'script is required for SCRIPT_BROWSER and SCRIPT_API monitors'
+      );
+    }
 
     ctx.progress('Creating synthetic monitor...');
     let result = await client.createSyntheticMonitor({
@@ -108,7 +184,12 @@ Supports ping monitors, simple browser monitors, scripted browser tests, and scr
       period: ctx.input.period,
       status: ctx.input.status || 'ENABLED',
       locations: { public: ctx.input.locations },
-      script: ctx.input.script
+      script: ctx.input.script,
+      runtimeTypeVersion: ctx.input.runtimeTypeVersion,
+      browsers: ctx.input.browsers,
+      devices: ctx.input.devices,
+      apdexTarget: ctx.input.apdexTarget,
+      advancedOptions: ctx.input.advancedOptions
     });
 
     return {

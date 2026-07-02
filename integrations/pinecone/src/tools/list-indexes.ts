@@ -18,11 +18,18 @@ export let listIndexesTool = SlateTool.create(spec, {
         .array(
           z.object({
             indexName: z.string().describe('Name of the index'),
-            dimension: z.number().describe('Dimensionality of vectors in the index'),
+            dimension: z
+              .number()
+              .optional()
+              .describe('Dimensionality of vectors in dense indexes'),
             metric: z
               .string()
               .describe('Distance metric used (cosine, euclidean, dotproduct)'),
             host: z.string().describe('Host URL for data plane operations'),
+            privateHost: z
+              .string()
+              .optional()
+              .describe('Private host URL when private endpoints are enabled'),
             vectorType: z.string().optional().describe('Type of vectors (dense or sparse)'),
             deletionProtection: z
               .string()
@@ -49,12 +56,13 @@ export let listIndexesTool = SlateTool.create(spec, {
       dimension: idx.dimension,
       metric: idx.metric,
       host: idx.host,
+      privateHost: idx.private_host,
       vectorType: idx.vector_type,
       deletionProtection: idx.deletion_protection,
       isReady: idx.status.ready,
       state: idx.status.state,
       spec: idx.spec,
-      tags: idx.tags
+      tags: idx.tags ?? undefined
     }));
 
     return {

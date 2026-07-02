@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { applyPdfmonkeyApiErrorInterceptor } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,7 +18,7 @@ export let auth = SlateAuth.create()
       apiKey: z
         .string()
         .describe(
-          'Your PDFMonkey API Secret Key, available on the My Account page in the PDFMonkey dashboard.'
+          'Your PDFMonkey API Secret Key, available on the API Key page in the PDFMonkey dashboard.'
         )
     }),
 
@@ -36,6 +37,7 @@ export let auth = SlateAuth.create()
           Authorization: `Bearer ${ctx.output.token}`
         }
       });
+      applyPdfmonkeyApiErrorInterceptor(axiosInstance);
 
       let response = await axiosInstance.get('/current_user');
       let user = response.data.current_user;

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createKubeClient } from '../lib/client';
+import { kubernetesServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageNamespace = SlateTool.create(spec, {
@@ -62,7 +63,7 @@ export let manageNamespace = SlateTool.create(spec, {
     }
 
     if (!namespaceName) {
-      throw new Error('namespaceName is required for create/update actions');
+      throw kubernetesServiceError('namespaceName is required for create/update actions');
     }
 
     if (action === 'create') {
@@ -99,6 +100,10 @@ export let manageNamespace = SlateTool.create(spec, {
     if (ctx.input.annotations) {
       patch.metadata = patch.metadata || {};
       patch.metadata.annotations = ctx.input.annotations;
+    }
+
+    if (Object.keys(patch).length === 0) {
+      throw kubernetesServiceError('Provide labels or annotations when updating a namespace.');
     }
 
     let result = await client.patchResource(

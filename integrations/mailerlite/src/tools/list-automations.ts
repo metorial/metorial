@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mailerLiteServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listAutomations = SlateTool.create(spec, {
@@ -32,6 +33,22 @@ export let listAutomations = SlateTool.create(spec, {
         .enum(['completed', 'active', 'canceled', 'failed'])
         .optional()
         .describe('Filter activity by status'),
+      activityDateFrom: z
+        .string()
+        .optional()
+        .describe('Activity date_from filter in Y-m-d format for completed/canceled/failed'),
+      activityDateTo: z
+        .string()
+        .optional()
+        .describe('Activity date_to filter in Y-m-d format for completed/canceled/failed'),
+      activityScheduledFrom: z
+        .string()
+        .optional()
+        .describe('Scheduled_from filter in Y-m-d format for active automation activity'),
+      activityScheduledTo: z
+        .string()
+        .optional()
+        .describe('Scheduled_to filter in Y-m-d format for active automation activity'),
       limit: z.number().optional().describe('Number of results per page'),
       page: z.number().optional().describe('Page number')
     })
@@ -77,10 +94,20 @@ export let listAutomations = SlateTool.create(spec, {
 
       let activities: any[] | undefined;
       if (ctx.input.includeActivity) {
+        if (!ctx.input.activityStatus) {
+          throw mailerLiteServiceError(
+            'activityStatus is required when includeActivity is true.'
+          );
+        }
+
         let activityResult = await client.getAutomationSubscriberActivity(
           ctx.input.automationId,
           {
             status: ctx.input.activityStatus,
+            date_from: ctx.input.activityDateFrom,
+            date_to: ctx.input.activityDateTo,
+            scheduled_from: ctx.input.activityScheduledFrom,
+            scheduled_to: ctx.input.activityScheduledTo,
             limit: ctx.input.limit,
             page: ctx.input.page
           }

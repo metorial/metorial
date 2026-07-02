@@ -1,8 +1,10 @@
 import { createAxios } from 'slates';
+import { pdfCoUpstreamError, toPdfCoServiceError } from './errors';
 import type {
   PdfCoBarcodeReadResponse,
   PdfCoClassifierResponse,
   PdfCoDocumentParserResponse,
+  PdfCoDownloadedFile,
   PdfCoFileResponse,
   PdfCoFindTextResponse,
   PdfCoInfoResponse,
@@ -23,6 +25,53 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  private async post<T>(endpoint: string, params: unknown): Promise<T> {
+    try {
+      let response = await this.http.post(endpoint, params);
+      return response.data;
+    } catch (error) {
+      throw toPdfCoServiceError(error, `PDF.co request failed for ${endpoint}`);
+    }
+  }
+
+  private async get<T>(endpoint: string, config?: any): Promise<T> {
+    try {
+      let response = await this.http.get(endpoint, config);
+      return response.data;
+    } catch (error) {
+      throw toPdfCoServiceError(error, `PDF.co request failed for ${endpoint}`);
+    }
+  }
+
+  async downloadFileUrl(
+    url: string,
+    fallbackMimeType = 'application/octet-stream'
+  ): Promise<PdfCoDownloadedFile> {
+    try {
+      let response = await fetch(url);
+      if (!response.ok) {
+        throw pdfCoUpstreamError(
+          `PDF.co output download failed with HTTP ${response.status}.`,
+          {
+            status: response.status
+          }
+        );
+      }
+
+      let content = Buffer.from(await response.arrayBuffer());
+      let mimeType =
+        response.headers.get('content-type')?.split(';')[0]?.trim() || fallbackMimeType;
+
+      return {
+        contentBase64: content.toString('base64'),
+        mimeType,
+        byteLength: content.byteLength
+      };
+    } catch (error) {
+      throw toPdfCoServiceError(error, 'PDF.co output download failed');
+    }
   }
 
   // ── PDF Conversion (From PDF) ──────────────────────────────────
@@ -68,8 +117,7 @@ export class Client {
     };
 
     let endpoint = `/pdf/convert/to/${formatMap[format]}`;
-    let response = await this.http.post(endpoint, params);
-    return response.data;
+    return this.post(endpoint, params);
   }
 
   // ── PDF Generation (To PDF) ────────────────────────────────────
@@ -85,8 +133,7 @@ export class Client {
     footer?: string;
     mediaType?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/convert/from/html', params);
-    return response.data;
+    return this.post('/pdf/convert/from/html', params);
   }
 
   async convertUrlToPdf(params: {
@@ -101,28 +148,24 @@ export class Client {
     mediaType?: string;
     renderTimeout?: number;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/convert/from/url', params);
-    return response.data;
+    return this.post('/pdf/convert/from/url', params);
   }
 
   async convertDocumentToPdf(params: {
     url: string;
     name?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/convert/from/doc', params);
-    return response.data;
+    return this.post('/pdf/convert/from/doc', params);
   }
 
   async convertImageToPdf(params: { url: string; name?: string }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/convert/from/image', params);
-    return response.data;
+    return this.post('/pdf/convert/from/image', params);
   }
 
   // ── PDF Merge & Split ──────────────────────────────────────────
 
   async mergePdfs(params: { url: string; name?: string }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/merge', params);
-    return response.data;
+    return this.post('/pdf/merge', params);
   }
 
   async splitPdfByPages(params: {
@@ -131,8 +174,7 @@ export class Client {
     name?: string;
     password?: string;
   }): Promise<PdfCoSplitResponse> {
-    let response = await this.http.post('/pdf/split', params);
-    return response.data;
+    return this.post('/pdf/split', params);
   }
 
   async splitPdfByTextOrBarcode(params: {
@@ -144,8 +186,7 @@ export class Client {
     name?: string;
     password?: string;
   }): Promise<PdfCoSplitResponse> {
-    let response = await this.http.post('/pdf/split2', params);
-    return response.data;
+    return this.post('/pdf/split2', params);
   }
 
   // ── PDF Editing ────────────────────────────────────────────────
@@ -180,8 +221,7 @@ export class Client {
     name?: string;
     password?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/edit/add', params);
-    return response.data;
+    return this.post('/pdf/edit/add', params);
   }
 
   async searchAndReplaceText(params: {
@@ -194,8 +234,7 @@ export class Client {
     password?: string;
     name?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/edit/replace-text', params);
-    return response.data;
+    return this.post('/pdf/edit/replace-text', params);
   }
 
   async searchAndDeleteText(params: {
@@ -207,8 +246,7 @@ export class Client {
     password?: string;
     name?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/edit/delete-text', params);
-    return response.data;
+    return this.post('/pdf/edit/delete-text', params);
   }
 
   async deletePages(params: {
@@ -217,8 +255,7 @@ export class Client {
     name?: string;
     password?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/edit/delete-pages', params);
-    return response.data;
+    return this.post('/pdf/edit/delete-pages', params);
   }
 
   // ── PDF Security ───────────────────────────────────────────────
@@ -234,8 +271,7 @@ export class Client {
     allowFillForms?: boolean;
     name?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/security/add', params);
-    return response.data;
+    return this.post('/pdf/security/add', params);
   }
 
   async removePassword(params: {
@@ -243,8 +279,7 @@ export class Client {
     password: string;
     name?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/security/remove', params);
-    return response.data;
+    return this.post('/pdf/security/remove', params);
   }
 
   // ── PDF Search & Info ──────────────────────────────────────────
@@ -257,13 +292,11 @@ export class Client {
     regexSearch?: boolean;
     wordMatchingMode?: string;
   }): Promise<PdfCoFindTextResponse> {
-    let response = await this.http.post('/pdf/find', params);
-    return response.data;
+    return this.post('/pdf/find', params);
   }
 
   async getPdfInfo(params: { url: string; password?: string }): Promise<PdfCoInfoResponse> {
-    let response = await this.http.post('/pdf/info', params);
-    return response.data;
+    return this.post('/pdf/info', params);
   }
 
   // ── Barcode Operations ─────────────────────────────────────────
@@ -275,8 +308,7 @@ export class Client {
     inline?: boolean;
     decorationImage?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/barcode/generate', params);
-    return response.data;
+    return this.post('/barcode/generate', params);
   }
 
   async readBarcode(params: {
@@ -286,18 +318,16 @@ export class Client {
     pages?: string;
     password?: string;
   }): Promise<PdfCoBarcodeReadResponse> {
-    let response = await this.http.post('/barcode/read/from/url', params);
-    return response.data;
+    return this.post('/barcode/read/from/url', params);
   }
 
   // ── Data Extraction ────────────────────────────────────────────
 
   async parseInvoice(params: { url: string; inline?: boolean }): Promise<PdfCoInlineResponse> {
-    let response = await this.http.post('/pdf/ai-invoice-parser', {
+    return this.post('/pdf/ai-invoice-parser', {
       ...params,
       inline: true
     });
-    return response.data;
   }
 
   async parseDocument(params: {
@@ -306,11 +336,10 @@ export class Client {
     inline?: boolean;
     password?: string;
   }): Promise<PdfCoDocumentParserResponse> {
-    let response = await this.http.post('/pdf/documentparser', {
+    return this.post('/pdf/documentparser', {
       ...params,
       inline: true
     });
-    return response.data;
   }
 
   async classifyDocument(params: {
@@ -320,11 +349,10 @@ export class Client {
     caseSensitive?: boolean;
     password?: string;
   }): Promise<PdfCoClassifierResponse> {
-    let response = await this.http.post('/pdf/classifier', {
+    return this.post('/pdf/classifier', {
       ...params,
       inline: true
     });
-    return response.data;
   }
 
   // ── File Management ────────────────────────────────────────────
@@ -333,25 +361,22 @@ export class Client {
     url: string;
     name?: string;
   }): Promise<PdfCoUploadResponse> {
-    let response = await this.http.post('/file/upload/url', params);
-    return response.data;
+    return this.post('/file/upload/url', params);
   }
 
   async getPresignedUploadUrl(params: {
     name: string;
     contentType?: string;
   }): Promise<PdfCoUploadResponse> {
-    let response = await this.http.get('/file/upload/get-presigned-url', {
+    return this.get('/file/upload/get-presigned-url', {
       params
     });
-    return response.data;
   }
 
   // ── Job Management ─────────────────────────────────────────────
 
   async checkJob(jobId: string): Promise<PdfCoJobCheckResponse> {
-    let response = await this.http.post('/job/check', { jobid: jobId });
-    return response.data;
+    return this.post('/job/check', { jobid: jobId });
   }
 
   // ── Make Searchable / Unsearchable ─────────────────────────────
@@ -363,8 +388,7 @@ export class Client {
     password?: string;
     name?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/makesearchable', params);
-    return response.data;
+    return this.post('/pdf/makesearchable', params);
   }
 
   async makePdfUnsearchable(params: {
@@ -373,7 +397,18 @@ export class Client {
     password?: string;
     name?: string;
   }): Promise<PdfCoFileResponse> {
-    let response = await this.http.post('/pdf/makeunsearchable', params);
-    return response.data;
+    return this.post('/pdf/makeunsearchable', params);
+  }
+
+  async compressPdf(params: {
+    url: string;
+    pages?: string;
+    password?: string;
+    name?: string;
+    config?: Record<string, unknown>;
+    expiration?: number;
+    profiles?: Record<string, unknown>;
+  }): Promise<PdfCoFileResponse> {
+    return this.post('https://api.pdf.co/v2/pdf/compress', params);
   }
 }

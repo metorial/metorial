@@ -91,7 +91,12 @@ export let getSurveyResponses = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({
+      token: ctx.auth.token,
+      clientId: ctx.auth.clientId,
+      clientSecret: ctx.auth.clientSecret,
+      expiresAt: ctx.auth.expiresAt
+    });
 
     let result = await client.listSurveyResponses(ctx.input.siteId, ctx.input.surveyId, {
       limit: ctx.input.limit,

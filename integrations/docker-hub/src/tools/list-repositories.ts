@@ -23,7 +23,17 @@ export let listRepositories = SlateTool.create(spec, {
       pageSize: z
         .number()
         .optional()
-        .describe('Number of results per page (default 25, max 100).')
+        .describe('Number of results per page (default 10, max 100).'),
+      name: z
+        .string()
+        .optional()
+        .describe('Filter repositories by a partial repository name match.'),
+      ordering: z
+        .enum(['name', '-name', 'last_updated', '-last_updated', 'pull_count', '-pull_count'])
+        .optional()
+        .describe(
+          'Order repositories by name, last_updated, or pull_count. Prefix with "-" for descending order.'
+        )
     })
   )
   .output(
@@ -37,7 +47,24 @@ export let listRepositories = SlateTool.create(spec, {
           isPrivate: z.boolean().describe('Whether the repository is private.'),
           starCount: z.number().describe('Number of stars.'),
           pullCount: z.number().describe('Number of pulls.'),
-          lastUpdated: z.string().describe('ISO timestamp of the last update.')
+          lastUpdated: z.string().describe('ISO timestamp of the last update.'),
+          statusDescription: z.string().optional().describe('Repository status label.'),
+          categories: z
+            .array(
+              z.object({
+                name: z.string().describe('Category display name.'),
+                slug: z.string().describe('Category slug.')
+              })
+            )
+            .describe('Docker Hub repository categories.'),
+          permissions: z
+            .object({
+              read: z.boolean().describe('Whether the caller can read the repository.'),
+              write: z.boolean().describe('Whether the caller can write to the repository.'),
+              admin: z.boolean().describe('Whether the caller can administer the repository.')
+            })
+            .optional()
+            .describe('Caller permissions when returned by Docker Hub.')
         })
       )
     })
@@ -48,10 +75,12 @@ export let listRepositories = SlateTool.create(spec, {
       ns = ctx.auth.username;
     }
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listRepositories(ns, {
       page: ctx.input.page,
-      pageSize: ctx.input.pageSize
+      pageSize: ctx.input.pageSize,
+      name: ctx.input.name,
+      ordering: ctx.input.ordering
     });
 
     return {
@@ -64,7 +93,10 @@ export let listRepositories = SlateTool.create(spec, {
           isPrivate: r.is_private,
           starCount: r.star_count,
           pullCount: r.pull_count,
-          lastUpdated: r.last_updated
+          lastUpdated: r.last_updated,
+          statusDescription: r.status_description,
+          categories: r.categories || [],
+          permissions: r.permissions
         }))
       },
       message: `Found **${result.count}** repositories in namespace **${ns}**.`

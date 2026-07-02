@@ -2,7 +2,7 @@
 
 ## Overview
 
-Zoho CRM is a cloud-based customer relationship management platform that manages sales, marketing, and support processes. It is an online Sales CRM software that manages your sales, marketing and support in one CRM platform. The API allows programmatic access to CRM data including leads, contacts, deals, accounts, tasks, and other standard and custom modules.
+Zoho CRM is a cloud-based customer relationship management platform that manages sales, marketing, and support processes. It is an online Sales CRM software that manages your sales, marketing and support in one CRM platform. This integration targets the current Zoho CRM V8 APIs for programmatic access to CRM data including leads, contacts, deals, accounts, tasks, and other standard and custom modules.
 
 ## Authentication
 
@@ -40,7 +40,7 @@ Your data center (DC) base URL for Zoho Accounts varies by region (US, EU, IN, A
 
 Scopes contain three parameters — service name, scope name, and operation type. The format is `scope=service_name.scope_name.operation_type`.
 
-- Key scope categories include: `ZohoCRM.modules.*` (for module data like leads, contacts, deals), `ZohoCRM.settings.*` (for CRM settings like fields, layouts, roles), and `ZohoCRM.notifications.*` (for notification subscriptions).
+- Key scope categories include: `ZohoCRM.modules.*` (for module data like leads, contacts, deals), `ZohoCRM.modules.notes.*`, `ZohoCRM.modules.attachments.*`, `ZohoCRM.settings.*` (for CRM settings like fields, layouts, custom views, tags, and related lists), `ZohoSearch.securesearch.READ` (for Search Records), and `ZohoCRM.notifications.*` (for notification subscriptions).
 - You can set specific permissions like READ, CREATE, UPDATE, DELETE, or ALL for each module.
 - Example: `ZohoCRM.modules.leads.READ` for read-only access to leads, or `ZohoCRM.modules.ALL` for full access to all modules.
 
@@ -60,35 +60,19 @@ Retrieve users' data, add users, update user details, and delete users from your
 
 ### Module and Field Metadata
 
-Access metadata about modules, fields, layouts, custom views, and related lists. This allows dynamic discovery of the CRM's data structure including custom modules and fields.
-
-### Automation Configuration
-
-Cadences automate and streamline customer follow-up processes, enabling targeted sequential communications like emails, calls, or tasks. You can get cadence details, enroll, and unenroll records via the API. Scoring rules for ranking records can also be managed through the API.
+Access metadata about modules, fields, layouts, custom views, and related lists. This allows dynamic discovery of the CRM's data structure including custom modules, field API names, custom view IDs, and related list API names.
 
 ### File Management
 
-Upload and download files stored on Zoho's File System (ZFS). Attachments, photos, and documents associated with records can be managed.
-
-### Bulk Operations
-
-Retrieve or upload large amounts of data using a single Bulk API call. This is asynchronous and is useful for tasks like migration, data backup, and initial data sync between Zoho CRM and external services.
+List, upload, download, and delete attachments associated with CRM records. Downloaded file bytes must be returned through Slate attachments rather than inline output fields.
 
 ### Tags and Notes
 
-Organize records with tags and associate notes with records across modules.
-
-### Blueprints and Workflows
-
-Access and interact with blueprint transitions to move records through defined business processes. Workflow rules and their associated actions can be retrieved.
+Organize records with tags and associate notes with records across modules. Notes can be listed, created, updated, and deleted.
 
 ### Email and Communication
 
-Send emails from CRM, manage email templates, and track email interactions linked to CRM records.
-
-### Record Sharing and Territories
-
-Manage record sharing rules, territory assignments, and access control for records across users and roles.
+Send emails from CRM and track email interactions linked to CRM records.
 
 ## Events
 

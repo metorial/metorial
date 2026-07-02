@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { brevoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createOrUpdateContact = SlateTool.create(spec, {
@@ -38,7 +39,17 @@ When updating, identify the contact by email, contact ID, or external ID.`,
       updateEnabled: z
         .boolean()
         .optional()
-        .describe('If true, update existing contact if already present')
+        .describe('If true, update existing contact if already present'),
+      forceMerge: z
+        .boolean()
+        .optional()
+        .describe(
+          'If true, merge with an existing contact sharing email, SMS, external ID, WhatsApp, or landline identifiers'
+        ),
+      getId: z
+        .boolean()
+        .optional()
+        .describe('If true, return the surviving contact ID after a force merge')
     })
   )
   .output(
@@ -47,6 +58,10 @@ When updating, identify the contact by email, contact ID, or external ID.`,
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.email && !ctx.input.extId && !ctx.input.attributes?.SMS) {
+      throw brevoServiceError('Provide at least one of email, extId, or attributes.SMS.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       authType: ctx.auth.authType
@@ -59,7 +74,9 @@ When updating, identify the contact by email, contact ID, or external ID.`,
       listIds: ctx.input.listIds,
       emailBlacklisted: ctx.input.emailBlacklisted,
       smsBlacklisted: ctx.input.smsBlacklisted,
-      updateEnabled: ctx.input.updateEnabled
+      updateEnabled: ctx.input.updateEnabled,
+      forceMerge: ctx.input.forceMerge,
+      getId: ctx.input.getId
     });
 
     let action = ctx.input.updateEnabled ? 'created/updated' : 'created';
@@ -312,6 +329,10 @@ export let listContacts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.segmentId !== undefined && ctx.input.listIds?.length) {
+      throw brevoServiceError('segmentId and listIds are mutually exclusive.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       authType: ctx.auth.authType

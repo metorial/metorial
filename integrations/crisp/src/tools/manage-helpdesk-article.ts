@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { crispServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageHelpdeskArticle = SlateTool.create(spec, {
@@ -33,9 +34,17 @@ export let manageHelpdeskArticle = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+    let client = new Client({
+      token: ctx.auth.token,
+      websiteId: ctx.config.websiteId,
+      tier: ctx.auth.tier
+    });
 
-    if (ctx.input.delete && ctx.input.articleId) {
+    if (ctx.input.delete) {
+      if (!ctx.input.articleId) {
+        throw crispServiceError('articleId is required when delete is true.');
+      }
+
       await client.deleteHelpdeskArticle(ctx.input.localeId, ctx.input.articleId);
       return {
         output: { articleId: ctx.input.articleId, action: 'deleted' as const },
@@ -52,6 +61,10 @@ export let manageHelpdeskArticle = SlateTool.create(spec, {
       if (ctx.input.order !== undefined) article.order = ctx.input.order;
       if (ctx.input.category !== undefined) article.category = ctx.input.category;
 
+      if (Object.keys(article).length === 0) {
+        throw crispServiceError('Provide at least one article field to update.');
+      }
+
       await client.updateHelpdeskArticle(ctx.input.localeId, ctx.input.articleId, article);
       return {
         output: { articleId: ctx.input.articleId, action: 'updated' as const },
@@ -59,8 +72,12 @@ export let manageHelpdeskArticle = SlateTool.create(spec, {
       };
     }
 
+    if (!ctx.input.title) {
+      throw crispServiceError('title is required to create a helpdesk article.');
+    }
+
     let result = await client.createHelpdeskArticle(ctx.input.localeId, {
-      title: ctx.input.title || 'Untitled',
+      title: ctx.input.title,
       description: ctx.input.description,
       content: ctx.input.content,
       featured: ctx.input.featured,

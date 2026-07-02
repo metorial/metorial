@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PandaDocClient } from '../lib/client';
+import { pandadocServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let linkCrmObject = SlateTool.create(spec, {
@@ -56,7 +57,9 @@ export let linkCrmObject = SlateTool.create(spec, {
 
     if (ctx.input.action === 'link') {
       if (!ctx.input.provider || !ctx.input.entityType || !ctx.input.entityId) {
-        throw new Error('provider, entityType, and entityId are required for link action');
+        throw pandadocServiceError(
+          'provider, entityType, and entityId are required for link action.'
+        );
       }
 
       let result = await client.createLinkedObject(ctx.input.documentId, {
@@ -97,7 +100,7 @@ export let linkCrmObject = SlateTool.create(spec, {
 
     if (ctx.input.action === 'unlink') {
       if (!ctx.input.linkedObjectId) {
-        throw new Error('linkedObjectId is required for unlink action');
+        throw pandadocServiceError('linkedObjectId is required for unlink action.');
       }
 
       await client.deleteLinkedObject(ctx.input.documentId, ctx.input.linkedObjectId);
@@ -108,6 +111,6 @@ export let linkCrmObject = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw pandadocServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

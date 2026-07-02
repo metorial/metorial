@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { datadogServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -126,7 +127,9 @@ Supports metric alerts, log alerts, anomaly detection, forecast, outlier, APM, a
       });
     } else {
       if (!data.name || !data.type || !data.query) {
-        throw new Error('name, type, and query are required when creating a new monitor.');
+        throw datadogServiceError(
+          'name, type, and query are required when creating a new monitor.'
+        );
       }
       monitor = await client.createMonitor({
         name: data.name,

@@ -1,6 +1,6 @@
 # Ollama
 
-Run and manage large language models locally or via Ollama cloud. Generate text completions, conduct chat conversations, and create vector embeddings. Support tool calling (function calling) and structured JSON outputs. Manage models by pulling, pushing, creating, copying, deleting, and listing them. Generate images using experimental image generation models. Provides OpenAI-compatible API endpoints for drop-in integration with existing applications.
+Run and manage large language models locally or via Ollama Cloud. Generate text completions, conduct chat conversations, and create vector embeddings. Support tool calling (function calling), structured JSON outputs, log probability metadata, and thinking output where supported by the selected model. Manage models by pulling, pushing, creating, copying, deleting, listing local models, checking running models, showing model details, and reading the Ollama server version.
 
 ## License
 

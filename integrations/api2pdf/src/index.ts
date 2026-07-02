@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   captureScreenshot,
   checkBalance,
+  checkStatus,
   convertDocument,
   convertToMarkdown,
   createZip,
@@ -35,7 +36,8 @@ export let provider = Slate.create({
     createZip,
     convertToMarkdown,
     deleteFile,
-    checkBalance
+    checkBalance,
+    checkStatus
   ],
   triggers: [inboundWebhook]
 });

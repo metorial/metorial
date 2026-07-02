@@ -34,7 +34,7 @@
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
     "@slates/tool-recipes": "1.0.0-rc.4",
-    "slates": "1.0.0-rc.14",
+    "slates": "1.0.0-rc.15",
     "zod": "^4.2"
   },
   "devDependencies": {

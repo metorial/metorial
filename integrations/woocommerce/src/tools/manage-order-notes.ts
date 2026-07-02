@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { woocommerceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -60,7 +61,7 @@ export let manageOrderNotes = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.note) throw new Error('note is required for create action');
+      if (!ctx.input.note) throw woocommerceServiceError('note is required for create action');
 
       let result = await client.createOrderNote(orderId, {
         note: ctx.input.note,
@@ -82,7 +83,8 @@ export let manageOrderNotes = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.noteId) throw new Error('noteId is required for delete action');
+      if (!ctx.input.noteId)
+        throw woocommerceServiceError('noteId is required for delete action');
 
       await client.deleteOrderNote(orderId, ctx.input.noteId);
 
@@ -92,6 +94,6 @@ export let manageOrderNotes = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw woocommerceServiceError(`Unknown action: ${action}`);
   })
   .build();

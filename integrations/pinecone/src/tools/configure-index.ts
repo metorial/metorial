@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PineconeControlPlaneClient } from '../lib/client';
+import { pineconeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let configureIndexTool = SlateTool.create(spec, {
   name: 'Configure Index',
   key: 'configure_index',
-  description: `Update the configuration of an existing Pinecone index. Modify deletion protection, tags, and pod-based index settings like replicas. Can also be used to describe or delete an index.`,
+  description: `Describe, update, or delete an existing Pinecone index. Update deletion protection, tags, legacy pod replicas, or integrated embedding field/read/write parameters.`,
   instructions: [
     'To get index details, set action to "describe".',
     'To update settings, set action to "configure" with the desired changes.',
@@ -31,7 +32,19 @@ export let configureIndexTool = SlateTool.create(spec, {
         .number()
         .int()
         .optional()
-        .describe('New number of replicas for pod-based indexes')
+        .describe('New number of replicas for legacy pod-based indexes'),
+      embedFieldMap: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Updated field map for an integrated embedding index'),
+      embedReadParameters: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Updated read parameters for an integrated embedding index'),
+      embedWriteParameters: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Updated write parameters for an integrated embedding index')
     })
   )
   .output(
@@ -40,9 +53,11 @@ export let configureIndexTool = SlateTool.create(spec, {
       dimension: z.number().optional().describe('Dimensionality of the index'),
       metric: z.string().optional().describe('Distance metric'),
       host: z.string().optional().describe('Host URL for data plane operations'),
+      privateHost: z.string().optional().describe('Private host URL when available'),
       isReady: z.boolean().optional().describe('Whether the index is ready'),
       state: z.string().optional().describe('Current state of the index'),
       deletionProtection: z.string().optional().describe('Deletion protection status'),
+      embed: z.any().optional().describe('Integrated embedding configuration when present'),
       deleted: z.boolean().optional().describe('Whether the index was deleted')
     })
   )
@@ -71,6 +86,23 @@ export let configureIndexTool = SlateTool.create(spec, {
       if (ctx.input.podReplicas !== undefined) {
         configParams.spec = { pod: { replicas: ctx.input.podReplicas } };
       }
+      if (
+        ctx.input.embedFieldMap ||
+        ctx.input.embedReadParameters ||
+        ctx.input.embedWriteParameters
+      ) {
+        configParams.embed = {
+          field_map: ctx.input.embedFieldMap,
+          read_parameters: ctx.input.embedReadParameters,
+          write_parameters: ctx.input.embedWriteParameters
+        };
+      }
+
+      if (Object.keys(configParams).length === 0) {
+        throw pineconeServiceError(
+          'Provide at least one configuration field when action is "configure".'
+        );
+      }
 
       let result = await client.configureIndex(ctx.input.indexName, configParams);
       return {
@@ -79,9 +111,11 @@ export let configureIndexTool = SlateTool.create(spec, {
           dimension: result.dimension,
           metric: result.metric,
           host: result.host,
+          privateHost: result.private_host,
           isReady: result.status.ready,
           state: result.status.state,
-          deletionProtection: result.deletion_protection
+          deletionProtection: result.deletion_protection,
+          embed: result.embed
         },
         message: `Updated configuration for index \`${result.name}\`.`
       };
@@ -95,9 +129,11 @@ export let configureIndexTool = SlateTool.create(spec, {
         dimension: result.dimension,
         metric: result.metric,
         host: result.host,
+        privateHost: result.private_host,
         isReady: result.status.ready,
         state: result.status.state,
-        deletionProtection: result.deletion_protection
+        deletionProtection: result.deletion_protection,
+        embed: result.embed
       },
       message: `Index \`${result.name}\`: dimension=${result.dimension}, metric=${result.metric}, state=${result.status.state}, ready=${result.status.ready}.`
     };

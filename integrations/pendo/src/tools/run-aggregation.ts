@@ -1,7 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PendoClient } from '../lib/client';
+import { pendoServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import { createPendoClient } from './helpers';
 
 export let runAggregation = SlateTool.create(spec, {
   name: 'Run Aggregation',
@@ -42,10 +43,12 @@ Pipeline steps include **source** (required first step), **filter**, **group**, 
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PendoClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let firstStep = ctx.input.pipeline[0];
+    if (typeof firstStep !== 'object' || firstStep === null || !('source' in firstStep)) {
+      throw pendoServiceError('Pendo aggregation pipelines must start with a source step.');
+    }
+
+    let client = createPendoClient(ctx);
 
     let response = await client.runAggregation(ctx.input.pipeline, ctx.input.requestId);
 

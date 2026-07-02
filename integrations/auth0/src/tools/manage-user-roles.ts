@@ -1,7 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Auth0Client } from '../lib/client';
+import { requireNonEmptyArray } from '../lib/errors';
 import { spec } from '../spec';
+import { dispatchAuth0Action } from './shared';
 
 export let manageUserRolesTool = SlateTool.create(spec, {
   name: 'Manage User Roles',
@@ -42,41 +44,37 @@ export let manageUserRolesTool = SlateTool.create(spec, {
       domain: ctx.auth.domain
     });
 
-    if (ctx.input.action === 'list') {
-      let roles = await client.getUserRoles(ctx.input.userId);
-      let mapped = (Array.isArray(roles) ? roles : (roles.roles ?? [])).map((r: any) => ({
-        roleId: r.id,
-        name: r.name,
-        description: r.description
-      }));
-      return {
-        output: { roles: mapped, success: true },
-        message: `User has **${mapped.length}** role(s) assigned.`
-      };
-    }
+    return dispatchAuth0Action(ctx.input.action, {
+      list: async () => {
+        let roles = await client.getUserRoles(ctx.input.userId);
+        let mapped = (Array.isArray(roles) ? roles : (roles.roles ?? [])).map((r: any) => ({
+          roleId: r.id,
+          name: r.name,
+          description: r.description
+        }));
+        return {
+          output: { roles: mapped, success: true },
+          message: `User has **${mapped.length}** role(s) assigned.`
+        };
+      },
 
-    if (ctx.input.action === 'assign') {
-      if (!ctx.input.roleIds?.length) {
-        throw new Error('roleIds are required for assign action');
+      assign: async () => {
+        let roleIds = requireNonEmptyArray(ctx.input.roleIds, 'roleIds', 'assign');
+        await client.assignUserRoles(ctx.input.userId, roleIds);
+        return {
+          output: { success: true },
+          message: `Assigned **${roleIds.length}** role(s) to user.`
+        };
+      },
+
+      remove: async () => {
+        let roleIds = requireNonEmptyArray(ctx.input.roleIds, 'roleIds', 'remove');
+        await client.removeUserRoles(ctx.input.userId, roleIds);
+        return {
+          output: { success: true },
+          message: `Removed **${roleIds.length}** role(s) from user.`
+        };
       }
-      await client.assignUserRoles(ctx.input.userId, ctx.input.roleIds);
-      return {
-        output: { success: true },
-        message: `Assigned **${ctx.input.roleIds.length}** role(s) to user.`
-      };
-    }
-
-    if (ctx.input.action === 'remove') {
-      if (!ctx.input.roleIds?.length) {
-        throw new Error('roleIds are required for remove action');
-      }
-      await client.removeUserRoles(ctx.input.userId, ctx.input.roleIds);
-      return {
-        output: { success: true },
-        message: `Removed **${ctx.input.roleIds.length}** role(s) from user.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    });
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { IterableClient } from '../lib/client';
+import { requireArrayField, requireField, requireRecordField } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageCatalogs = SlateTool.create(spec, {
@@ -25,6 +26,7 @@ export let manageCatalogs = SlateTool.create(spec, {
           'createCatalog',
           'deleteCatalog',
           'listItems',
+          'getItem',
           'uploadItems',
           'deleteItems'
         ])
@@ -39,6 +41,7 @@ export let manageCatalogs = SlateTool.create(spec, {
         .describe(
           'Items to upload. Object where keys are item IDs and values are item field objects (for uploadItems)'
         ),
+      itemId: z.string().optional().describe('Item ID to retrieve (for getItem)'),
       itemIds: z.array(z.string()).optional().describe('Item IDs to delete (for deleteItems)'),
       replaceUploadedFieldsOnly: z
         .boolean()
@@ -60,6 +63,7 @@ export let manageCatalogs = SlateTool.create(spec, {
         .optional()
         .describe('List of catalogs'),
       items: z.array(z.record(z.string(), z.any())).optional().describe('Catalog items'),
+      item: z.record(z.string(), z.any()).optional().describe('Catalog item details'),
       message: z.string().describe('Result message')
     })
   )
@@ -87,27 +91,30 @@ export let manageCatalogs = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'createCatalog') {
-      await client.createCatalog(ctx.input.catalogName!);
+      let catalogName = requireField(ctx.input.catalogName, 'catalogName');
+      await client.createCatalog(catalogName);
       return {
         output: {
-          message: `Catalog "${ctx.input.catalogName}" created.`
+          message: `Catalog "${catalogName}" created.`
         },
-        message: `Created catalog **${ctx.input.catalogName}**.`
+        message: `Created catalog **${catalogName}**.`
       };
     }
 
     if (ctx.input.action === 'deleteCatalog') {
-      await client.deleteCatalog(ctx.input.catalogName!);
+      let catalogName = requireField(ctx.input.catalogName, 'catalogName');
+      await client.deleteCatalog(catalogName);
       return {
         output: {
-          message: `Catalog "${ctx.input.catalogName}" deleted.`
+          message: `Catalog "${catalogName}" deleted.`
         },
-        message: `Deleted catalog **${ctx.input.catalogName}**.`
+        message: `Deleted catalog **${catalogName}**.`
       };
     }
 
     if (ctx.input.action === 'listItems') {
-      let result = await client.getCatalogItems(ctx.input.catalogName!, {
+      let catalogName = requireField(ctx.input.catalogName, 'catalogName');
+      let result = await client.getCatalogItems(catalogName, {
         page: ctx.input.page,
         pageSize: ctx.input.pageSize
       });
@@ -116,34 +123,51 @@ export let manageCatalogs = SlateTool.create(spec, {
       return {
         output: {
           items,
-          message: `Found ${items.length} item(s) in catalog "${ctx.input.catalogName}".`
+          message: `Found ${items.length} item(s) in catalog "${catalogName}".`
         },
-        message: `Retrieved **${items.length}** item(s) from catalog **${ctx.input.catalogName}**.`
+        message: `Retrieved **${items.length}** item(s) from catalog **${catalogName}**.`
+      };
+    }
+
+    if (ctx.input.action === 'getItem') {
+      let catalogName = requireField(ctx.input.catalogName, 'catalogName');
+      let itemId = requireField(ctx.input.itemId, 'itemId');
+      let item = await client.getCatalogItem(catalogName, itemId);
+      return {
+        output: {
+          item,
+          message: `Retrieved item "${itemId}" from catalog "${catalogName}".`
+        },
+        message: `Retrieved item **${itemId}** from catalog **${catalogName}**.`
       };
     }
 
     if (ctx.input.action === 'uploadItems') {
+      let catalogName = requireField(ctx.input.catalogName, 'catalogName');
+      let items = requireRecordField(ctx.input.items, 'items');
       await client.bulkUploadCatalogItems(
-        ctx.input.catalogName!,
-        ctx.input.items!,
+        catalogName,
+        items,
         ctx.input.replaceUploadedFieldsOnly
       );
-      let count = Object.keys(ctx.input.items!).length;
+      let count = Object.keys(items).length;
       return {
         output: {
-          message: `Upload of ${count} item(s) to catalog "${ctx.input.catalogName}" accepted.`
+          message: `Upload of ${count} item(s) to catalog "${catalogName}" accepted.`
         },
-        message: `Uploaded **${count}** item(s) to catalog **${ctx.input.catalogName}**. The upload is processed asynchronously.`
+        message: `Uploaded **${count}** item(s) to catalog **${catalogName}**. The upload is processed asynchronously.`
       };
     }
 
     // deleteItems
-    await client.deleteCatalogItems(ctx.input.catalogName!, ctx.input.itemIds!);
+    let catalogName = requireField(ctx.input.catalogName, 'catalogName');
+    let itemIds = requireArrayField(ctx.input.itemIds, 'itemIds');
+    await client.deleteCatalogItems(catalogName, itemIds);
     return {
       output: {
-        message: `Deleted ${ctx.input.itemIds!.length} item(s) from catalog "${ctx.input.catalogName}".`
+        message: `Deleted ${itemIds.length} item(s) from catalog "${catalogName}".`
       },
-      message: `Deleted **${ctx.input.itemIds!.length}** item(s) from catalog **${ctx.input.catalogName}**.`
+      message: `Deleted **${itemIds.length}** item(s) from catalog **${catalogName}**.`
     };
   })
   .build();

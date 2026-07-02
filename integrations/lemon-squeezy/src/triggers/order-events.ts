@@ -1,6 +1,7 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { lemonSqueezyServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let ALL_ORDER_EVENTS = ['order_created', 'order_refunded'];
@@ -73,7 +74,9 @@ export let orderEventsTrigger = SlateTrigger.create(spec, {
       if (!storeId) {
         let storesResponse = await client.listStores({ perPage: 1 });
         storeId = storesResponse.data?.[0]?.id;
-        if (!storeId) throw new Error('No store found. Please configure a store ID.');
+        if (!storeId) {
+          throw lemonSqueezyServiceError('No store found. Please configure a store ID.');
+        }
       }
 
       let secret = generateSecret();

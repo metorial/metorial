@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { IterableClient } from '../lib/client';
+import { iterableServiceError } from '../lib/errors';
+import { requireUserIdentity } from '../lib/validation';
 import { spec } from '../spec';
 
 export let updateSubscriptions = SlateTool.create(spec, {
@@ -39,6 +41,17 @@ export let updateSubscriptions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireUserIdentity(ctx.input);
+    if (
+      ctx.input.emailListIds === undefined &&
+      ctx.input.unsubscribedChannelIds === undefined &&
+      ctx.input.unsubscribedMessageTypeIds === undefined
+    ) {
+      throw iterableServiceError(
+        'Provide at least one of emailListIds, unsubscribedChannelIds, or unsubscribedMessageTypeIds.'
+      );
+    }
+
     let client = new IterableClient({
       token: ctx.auth.token,
       dataCenter: ctx.config.dataCenter

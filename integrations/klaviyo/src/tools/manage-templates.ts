@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient, extractPaginationCursor } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -93,7 +94,7 @@ Templates are used in campaigns and flows for composing email content. Supports 
     }
 
     if (action === 'get') {
-      if (!templateId) throw new Error('templateId is required');
+      if (!templateId) throw klaviyoServiceError('templateId is required');
       let result = await client.getTemplate(templateId);
       let t = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -116,7 +117,7 @@ Templates are used in campaigns and flows for composing email content. Supports 
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create');
+      if (!name) throw klaviyoServiceError('name is required for create');
       let result = await client.createTemplate({
         name,
         html: html ?? '<html><body></body></html>',
@@ -130,7 +131,7 @@ Templates are used in campaigns and flows for composing email content. Supports 
     }
 
     if (action === 'update') {
-      if (!templateId) throw new Error('templateId is required');
+      if (!templateId) throw klaviyoServiceError('templateId is required');
       let attributes: Record<string, any> = {};
       if (name) attributes.name = name;
       if (html) attributes.html = html;
@@ -142,7 +143,7 @@ Templates are used in campaigns and flows for composing email content. Supports 
     }
 
     if (action === 'delete') {
-      if (!templateId) throw new Error('templateId is required');
+      if (!templateId) throw klaviyoServiceError('templateId is required');
       await client.deleteTemplate(templateId);
       return {
         output: { templateId, success: true },
@@ -151,8 +152,8 @@ Templates are used in campaigns and flows for composing email content. Supports 
     }
 
     if (action === 'clone') {
-      if (!templateId) throw new Error('templateId is required');
-      if (!name) throw new Error('name is required for clone');
+      if (!templateId) throw klaviyoServiceError('templateId is required');
+      if (!name) throw klaviyoServiceError('name is required for clone');
       let result = await client.cloneTemplate(templateId, name);
       let t = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -162,7 +163,7 @@ Templates are used in campaigns and flows for composing email content. Supports 
     }
 
     if (action === 'render') {
-      if (!templateId) throw new Error('templateId is required');
+      if (!templateId) throw klaviyoServiceError('templateId is required');
       let result = await client.renderTemplate(templateId, renderContext);
       let rendered = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -176,6 +177,6 @@ Templates are used in campaigns and flows for composing email content. Supports 
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw klaviyoServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,5 +1,6 @@
 export * from './capture-screenshot';
 export * from './check-balance';
+export * from './check-status';
 export * from './convert-document';
 export * from './convert-to-markdown';
 export * from './create-zip';

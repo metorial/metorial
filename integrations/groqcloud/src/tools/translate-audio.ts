@@ -20,8 +20,8 @@ export let translateAudio = SlateTool.create(spec, {
       audioUrl: z.string().describe('URL of the audio file to translate'),
       model: z
         .enum(['whisper-large-v3', 'whisper-large-v3-turbo'])
-        .default('whisper-large-v3-turbo')
-        .describe('Whisper model to use'),
+        .default('whisper-large-v3')
+        .describe('Whisper model to use. whisper-large-v3 is the translation-capable default'),
       prompt: z
         .string()
         .optional()

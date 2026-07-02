@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { invalidAction, requireString, resolveProjectId } from '../lib/validation';
 import { spec } from '../spec';
 
 let roleSchema = z.object({
@@ -76,8 +77,7 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
     let { action, username } = ctx.input;
     let authDb = ctx.input.authDatabaseName || 'admin';
@@ -91,7 +91,7 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
       };
     }
 
-    if (!username) throw new Error('username is required for this action.');
+    username = requireString(username, 'username', 'for this action');
 
     if (action === 'get') {
       let user = await client.getDatabaseUser(projectId, authDb, username);
@@ -144,6 +144,6 @@ export let manageDatabaseUserTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

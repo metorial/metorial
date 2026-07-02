@@ -1,42 +1,125 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type CampaignSettings, Client } from '../lib/client';
+import { taggunServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let campaignSettingsSchema = z
   .object({
-    dateFrom: z.string().optional().describe('Campaign start date (ISO 8601)'),
-    dateTo: z.string().optional().describe('Campaign end date (ISO 8601)'),
+    date: z
+      .object({
+        start: z
+          .string()
+          .optional()
+          .describe('Campaign start date in UTC ISO format, e.g. 2026-06-01T00:00:00.000Z'),
+        end: z
+          .string()
+          .optional()
+          .describe('Campaign end date in UTC ISO format, e.g. 2026-06-30T23:59:59.999Z')
+      })
+      .optional()
+      .describe('Optional receipt date window. If supplied, provide both start and end.'),
     merchantNames: z
-      .array(z.string())
+      .object({
+        skip: z.boolean().optional().describe('Skip merchant name validation'),
+        returnFromTheList: z
+          .boolean()
+          .optional()
+          .describe('Return the matched merchant name from the supplied list'),
+        allowList: z.array(z.string()).optional().describe('Accepted merchant names'),
+        blockList: z.array(z.string()).optional().describe('Rejected merchant names'),
+        list: z
+          .array(z.string())
+          .optional()
+          .describe('Legacy accepted merchant names. Prefer allowList for new campaigns.')
+      })
       .optional()
-      .describe('List of participating merchant names'),
+      .describe('Merchant name validation rules'),
+    productCodes: z
+      .object({
+        skip: z.boolean().optional().describe('Skip product code validation'),
+        description: z
+          .string()
+          .optional()
+          .describe('Natural-language instruction for finding relevant product codes'),
+        list: z.array(z.string()).optional().describe('Accepted product codes')
+      })
+      .optional()
+      .describe('Product code validation rules'),
     productLineItems: z
-      .array(
-        z.object({
-          name: z.string().optional().describe('Product name or keyword to match'),
-          quantity: z.number().optional().describe('Required quantity'),
-          totalPrice: z.number().optional().describe('Expected total price')
-        })
-      )
+      .object({
+        skip: z.boolean().optional().describe('Skip product line item validation'),
+        names: z.array(z.string()).optional().describe('Product names to match'),
+        totalPrice: z
+          .object({
+            min: z.number().optional().describe('Minimum accepted line item total price'),
+            max: z.number().optional().describe('Maximum accepted line item total price')
+          })
+          .optional()
+          .describe('Accepted line item total price range'),
+        quantity: z
+          .object({
+            min: z.number().optional().describe('Minimum accepted line item quantity'),
+            max: z.number().optional().describe('Maximum accepted line item quantity')
+          })
+          .optional()
+          .describe('Accepted line item quantity range'),
+        shouldMatchAbbreviations: z
+          .boolean()
+          .optional()
+          .describe('Also consider product name abbreviations when matching line items')
+      })
       .optional()
-      .describe('Eligible product definitions for the campaign'),
+      .describe('Product line item validation rules'),
+    balanceOwing: z
+      .object({
+        skip: z.boolean().optional().describe('Skip balance owing validation'),
+        min: z.number().optional().describe('Minimum accepted balance owing, if enabled'),
+        max: z.number().optional().describe('Maximum accepted balance owing')
+      })
+      .optional()
+      .describe('Balance owing validation rules'),
     fraudDetection: z
-      .boolean()
+      .object({
+        skip: z.boolean().optional().describe('Skip fraud validation checks'),
+        allowSimilarityCheck: z
+          .boolean()
+          .optional()
+          .describe('Enable duplicate and similarity checks'),
+        allowTamperDetection: z.boolean().optional().describe('Enable tamper detection'),
+        allowDigitalDetection: z
+          .boolean()
+          .optional()
+          .describe('Enable digital receipt detection'),
+        allowHandwritingDetection: z
+          .boolean()
+          .optional()
+          .describe('Enable handwritten receipt detection')
+      })
       .optional()
-      .describe('Enable fraud detection for this campaign'),
-    productCodes: z.array(z.string()).optional().describe('List of eligible product codes'),
-    balanceOwingMin: z.number().optional().describe('Minimum balance/total amount required'),
-    balanceOwingMax: z.number().optional().describe('Maximum balance/total amount allowed'),
+      .describe('Fraud detection validation controls'),
     smartValidate: z
-      .string()
+      .object({
+        prompts: z
+          .array(
+            z.object({
+              question: z.string().describe('True/false question Taggun should answer'),
+              example: z
+                .record(z.string(), z.boolean())
+                .optional()
+                .describe('Expected boolean output key, e.g. { "is_credit_card": true }'),
+              skip: z
+                .boolean()
+                .optional()
+                .describe('Skip adding this prompt as a validation check')
+            })
+          )
+          .max(3)
+          .optional()
+          .describe('One to three Smart Validate prompts')
+      })
       .optional()
-      .describe('Natural language SmartValidate prompt for custom validation logic'),
-    skip: z.boolean().optional().describe('Skip certain validation checks'),
-    returnFromTheList: z
-      .boolean()
-      .optional()
-      .describe('Return normalized merchant names from the known list')
+      .describe('Smart Validate prompt rules')
   })
   .optional();
 
@@ -52,7 +135,7 @@ Use **list** to see all campaigns, **get** to retrieve a specific campaign, **cr
     'Campaign management requires the validation feature to be enabled on your account.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -79,6 +162,12 @@ Use **list** to see all campaigns, **get** to retrieve a specific campaign, **cr
         .describe('List of campaign IDs (list action)'),
       campaignId: z.string().nullable().optional().describe('Campaign ID'),
       settings: z.any().nullable().optional().describe('Campaign settings object'),
+      result: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Result message for create/update/delete'),
+      statusCode: z.number().nullable().optional().describe('Taggun response status code'),
       deleted: z
         .boolean()
         .nullable()
@@ -92,13 +181,21 @@ Use **list** to see all campaigns, **get** to retrieve a specific campaign, **cr
     let { action, campaignId, settings } = ctx.input;
 
     if (action !== 'list' && !campaignId) {
-      throw new Error('campaignId is required for get, create, update, and delete actions.');
+      throw taggunServiceError(
+        'campaignId is required for get, create, update, and delete actions.'
+      );
+    }
+
+    if ((action === 'create' || action === 'update') && !settings) {
+      throw taggunServiceError('settings are required for create and update actions.');
     }
 
     let output: any = {
       campaignIds: null,
       campaignId: campaignId ?? null,
       settings: null,
+      result: null,
+      statusCode: null,
       deleted: null,
       error: null
     };
@@ -122,9 +219,10 @@ Use **list** to see all campaigns, **get** to retrieve a specific campaign, **cr
     }
 
     if (action === 'create') {
-      let apiSettings = mapSettingsToApi(settings);
+      let apiSettings = normalizeSettings(settings);
       let result = await client.createCampaign(campaignId!, apiSettings);
-      output.settings = result;
+      output.result = result?.result ?? null;
+      output.statusCode = result?.statusCode ?? null;
       return {
         output,
         message: `Created campaign **${campaignId}**.`
@@ -132,9 +230,10 @@ Use **list** to see all campaigns, **get** to retrieve a specific campaign, **cr
     }
 
     if (action === 'update') {
-      let apiSettings = mapSettingsToApi(settings);
+      let apiSettings = normalizeSettings(settings);
       let result = await client.updateCampaign(campaignId!, apiSettings);
-      output.settings = result;
+      output.result = result?.result ?? null;
+      output.statusCode = result?.statusCode ?? null;
       return {
         output,
         message: `Updated campaign **${campaignId}**.`
@@ -142,44 +241,54 @@ Use **list** to see all campaigns, **get** to retrieve a specific campaign, **cr
     }
 
     if (action === 'delete') {
-      await client.deleteCampaign(campaignId!);
+      let result = await client.deleteCampaign(campaignId!);
       output.deleted = true;
+      output.result = result?.result ?? null;
+      output.statusCode = result?.statusCode ?? null;
       return {
         output,
         message: `Deleted campaign **${campaignId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw taggunServiceError(`Unknown action: ${action}`);
   })
   .build();
 
-let mapSettingsToApi = (settings: any) => {
+let normalizeSettings = (settings: CampaignSettings | undefined): CampaignSettings => {
   if (!settings) return {};
 
-  let apiSettings: Record<string, unknown> = {};
-
-  if (settings.dateFrom || settings.dateTo) {
-    apiSettings.date = {
-      from: settings.dateFrom,
-      to: settings.dateTo
-    };
+  if (settings.date && (!settings.date.start || !settings.date.end)) {
+    throw taggunServiceError(
+      'settings.date.start and settings.date.end are both required when date is provided.'
+    );
   }
-  if (settings.merchantNames) apiSettings.merchantNames = settings.merchantNames;
-  if (settings.productLineItems) apiSettings.productLineItems = settings.productLineItems;
-  if (settings.fraudDetection !== undefined)
-    apiSettings.fraudDetection = settings.fraudDetection;
-  if (settings.productCodes) apiSettings.productCodes = settings.productCodes;
-  if (settings.balanceOwingMin !== undefined || settings.balanceOwingMax !== undefined) {
-    apiSettings.balanceOwing = {
-      min: settings.balanceOwingMin,
-      max: settings.balanceOwingMax
-    };
-  }
-  if (settings.smartValidate) apiSettings.smartValidate = settings.smartValidate;
-  if (settings.skip !== undefined) apiSettings.skip = settings.skip;
-  if (settings.returnFromTheList !== undefined)
-    apiSettings.returnFromTheList = settings.returnFromTheList;
 
-  return apiSettings;
+  if (settings.productLineItems?.totalPrice) {
+    let { min, max } = settings.productLineItems.totalPrice;
+    if (min === undefined || max === undefined) {
+      throw taggunServiceError(
+        'settings.productLineItems.totalPrice.min and max are both required when totalPrice is provided.'
+      );
+    }
+  }
+
+  if (settings.productLineItems?.quantity) {
+    let { min, max } = settings.productLineItems.quantity;
+    if (min === undefined || max === undefined) {
+      throw taggunServiceError(
+        'settings.productLineItems.quantity.min and max are both required when quantity is provided.'
+      );
+    }
+  }
+
+  for (let prompt of settings.smartValidate?.prompts ?? []) {
+    if (!prompt.example || Object.keys(prompt.example).length === 0) {
+      throw taggunServiceError(
+        'Each settings.smartValidate.prompts item must include a non-empty example object.'
+      );
+    }
+  }
+
+  return settings;
 };

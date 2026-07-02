@@ -1,0 +1,16 @@
+{
+  "name": "@microsoft/fabric",
+  "description": "Use Microsoft Fabric REST, OneLake data-plane APIs, and Fabric documentation resources to inspect workspaces and items, move files through OneLake, create Fabric items, and manage Data Factory pipelines and dataflows.",
+  "categories": ["apis-and-http-requests", "data-and-analytics"],
+  "skills": [
+    "read Microsoft Fabric API documentation",
+    "list Fabric workspaces and items",
+    "upload and download OneLake files",
+    "manage OneLake directories",
+    "inspect OneLake Iceberg tables",
+    "create Fabric items",
+    "create and run Data Factory pipelines",
+    "create Dataflows and execute queries"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/microsoft-fabric.svg"
+}

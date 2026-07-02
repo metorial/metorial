@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdf4meServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  attachmentMetadataSchema,
+  streamDocumentAttachment,
+  streamDocumentOutput
+} from './shared';
 
 export let extractContent = SlateTool.create(spec, {
   name: 'Extract Content from PDF',
@@ -38,14 +44,10 @@ Use this to pull structured data out of PDFs for further processing.`,
         .optional()
         .describe('Extracted text content (one entry per page)'),
       images: z
-        .array(
-          z.object({
-            fileName: z.string().describe('Image file name'),
-            fileContent: z.string().describe('Base64-encoded image content')
-          })
-        )
+        .array(attachmentMetadataSchema)
         .optional()
-        .describe('Extracted images'),
+        .describe('Extracted image attachment metadata'),
+      attachmentCount: z.number().optional().describe('Number of returned image attachments'),
       tables: z
         .array(
           z.object({
@@ -78,7 +80,9 @@ Use this to pull structured data out of PDFs for further processing.`,
 
     if (ctx.input.extractType === 'regex') {
       if (!ctx.input.regexExpression || !ctx.input.pages) {
-        throw new Error('regexExpression and pages are required for regex extraction');
+        throw pdf4meServiceError(
+          'regexExpression and pages are required for regex extraction'
+        );
       }
       let result = await client.extractTextByExpression({
         docContent: ctx.input.fileContent,
@@ -104,16 +108,17 @@ Use this to pull structured data out of PDFs for further processing.`,
       extractImage
     });
 
-    let images = (result.images ?? []).map(img => ({
-      fileName: img.fileName,
-      fileContent: img.streamFile
-    }));
+    let imageDocuments = result.images ?? [];
+    let images = imageDocuments.map(streamDocumentOutput);
+    let attachments = imageDocuments.map(streamDocumentAttachment);
 
     return {
       output: {
         texts: extractText ? (result.texts ?? []) : undefined,
-        images: extractImage ? images : undefined
+        images: extractImage ? images : undefined,
+        attachmentCount: extractImage ? attachments.length : undefined
       },
+      attachments: extractImage ? attachments : undefined,
       message: `Extracted${extractText ? ` text (${(result.texts ?? []).length} pages)` : ''}${extractText && extractImage ? ' and' : ''}${extractImage ? ` ${images.length} image(s)` : ''} from the PDF`
     };
   })

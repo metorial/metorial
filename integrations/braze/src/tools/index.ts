@@ -5,6 +5,7 @@ export * from './list-canvases';
 export * from './list-segments';
 export * from './manage-catalogs';
 export * from './manage-email';
+export * from './manage-sms';
 export * from './manage-subscription';
 export * from './manage-templates';
 export * from './manage-users';

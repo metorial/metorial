@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let searchIndexSchema = z.object({
@@ -63,13 +64,14 @@ export let manageSearchIndexesTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required');
+    if (!projectId) throw mongodbServiceError('projectId is required');
 
     let client = new AtlasClient(ctx.auth);
 
     if (ctx.input.action === 'list') {
-      if (!ctx.input.database) throw new Error('database is required for list');
-      if (!ctx.input.collectionName) throw new Error('collectionName is required for list');
+      if (!ctx.input.database) throw mongodbServiceError('database is required for list');
+      if (!ctx.input.collectionName)
+        throw mongodbServiceError('collectionName is required for list');
       let result = await client.listSearchIndexes(
         projectId,
         ctx.input.clusterName,
@@ -95,7 +97,7 @@ export let manageSearchIndexesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.indexId) throw new Error('indexId is required');
+      if (!ctx.input.indexId) throw mongodbServiceError('indexId is required');
       let idx = await client.getSearchIndex(
         projectId,
         ctx.input.clusterName,
@@ -119,9 +121,9 @@ export let manageSearchIndexesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.database) throw new Error('database is required');
-      if (!ctx.input.collectionName) throw new Error('collectionName is required');
-      if (!ctx.input.name) throw new Error('name is required');
+      if (!ctx.input.database) throw mongodbServiceError('database is required');
+      if (!ctx.input.collectionName) throw mongodbServiceError('collectionName is required');
+      if (!ctx.input.name) throw mongodbServiceError('name is required');
       let payload: any = {
         database: ctx.input.database,
         collectionName: ctx.input.collectionName,
@@ -148,7 +150,7 @@ export let manageSearchIndexesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.indexId) throw new Error('indexId is required');
+      if (!ctx.input.indexId) throw mongodbServiceError('indexId is required');
       let payload: any = {};
       if (ctx.input.definition) payload.definition = ctx.input.definition;
 
@@ -175,7 +177,7 @@ export let manageSearchIndexesTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.indexId) throw new Error('indexId is required');
+      if (!ctx.input.indexId) throw mongodbServiceError('indexId is required');
       await client.deleteSearchIndex(projectId, ctx.input.clusterName, ctx.input.indexId);
       return {
         output: { deleted: true },
@@ -183,6 +185,6 @@ export let manageSearchIndexesTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -1,16 +1,20 @@
 import { createAxios } from 'slates';
+import { withHelpScoutErrorHandling } from './errors';
 
 export class HelpScoutClient {
   private http: ReturnType<typeof createAxios>;
 
   constructor(token: string) {
-    this.http = createAxios({
-      baseURL: 'https://api.helpscout.net/v2',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    this.http = withHelpScoutErrorHandling(
+      createAxios({
+        baseURL: 'https://api.helpscout.net/v2',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      'Inbox API request'
+    );
   }
 
   // ─── Conversations ──────────────────────────────────────────
@@ -78,7 +82,7 @@ export class HelpScoutClient {
     }>;
     tags?: string[];
     status?: string;
-    assignTo?: number;
+    assignTo?: number | null;
     autoReply?: boolean;
   }) {
     let body: Record<string, any> = {
@@ -91,7 +95,7 @@ export class HelpScoutClient {
       autoReply: data.autoReply
     };
     if (data.tags) body.tags = data.tags;
-    if (data.assignTo) body.assignTo = data.assignTo;
+    if (data.assignTo !== undefined) body.assignTo = data.assignTo;
 
     let response = await this.http.post('/conversations', body);
     let location = response.headers?.['resource-id'] ?? response.headers?.location;
@@ -103,10 +107,11 @@ export class HelpScoutClient {
     operations: Array<{
       op: string;
       path: string;
-      value: any;
+      value?: any;
     }>
   ) {
-    await this.http.patch(`/conversations/${conversationId}`, operations, {
+    let body = operations.length === 1 ? operations[0] : operations;
+    await this.http.patch(`/conversations/${conversationId}`, body, {
       headers: { 'Content-Type': 'application/json' }
     });
   }
@@ -116,19 +121,17 @@ export class HelpScoutClient {
   }
 
   async updateConversationStatus(conversationId: number, status: string) {
-    await this.http.put(`/conversations/${conversationId}/status`, {
-      status,
-      op: 'replace',
-      path: '/status'
-    });
+    await this.updateConversation(conversationId, [
+      { op: 'replace', path: '/status', value: status }
+    ]);
   }
 
-  async assignConversation(conversationId: number, assignTo: number) {
-    await this.http.put(`/conversations/${conversationId}/assignee`, {
-      assignTo,
-      op: 'replace',
-      path: '/assignTo'
-    });
+  async assignConversation(conversationId: number, assignTo: number | null) {
+    await this.updateConversation(conversationId, [
+      assignTo === null
+        ? { op: 'remove', path: '/assignTo' }
+        : { op: 'replace', path: '/assignTo', value: assignTo }
+    ]);
   }
 
   async updateConversationTags(conversationId: number, tags: string[]) {
@@ -189,6 +192,19 @@ export class HelpScoutClient {
     }
   ) {
     await this.http.post(`/conversations/${conversationId}/phones`, {
+      text: data.text,
+      customer: data.customer
+    });
+  }
+
+  async createChatThread(
+    conversationId: number,
+    data: {
+      text: string;
+      customer: { email?: string; id?: number };
+    }
+  ) {
+    await this.http.post(`/conversations/${conversationId}/chats`, {
       text: data.text,
       customer: data.customer
     });

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { squareServiceError } from '../lib/errors';
 import { createClient, generateIdempotencyKey } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -105,6 +106,20 @@ export let adjustInventory = SlateTool.create(spec, {
           }
         : undefined
     }));
+
+    for (let [index, change] of ctx.input.changes.entries()) {
+      if (change.type === 'PHYSICAL_COUNT' && !change.physicalCount) {
+        throw squareServiceError(
+          `changes[${index}].physicalCount is required for PHYSICAL_COUNT.`
+        );
+      }
+      if (change.type === 'ADJUSTMENT' && !change.adjustment) {
+        throw squareServiceError(`changes[${index}].adjustment is required for ADJUSTMENT.`);
+      }
+      if (change.type === 'TRANSFER' && !change.transfer) {
+        throw squareServiceError(`changes[${index}].transfer is required for TRANSFER.`);
+      }
+    }
 
     let result = await client.batchChangeInventory({
       idempotencyKey: ctx.input.idempotencyKey || generateIdempotencyKey(),

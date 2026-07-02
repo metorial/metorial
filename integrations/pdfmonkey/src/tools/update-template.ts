@@ -61,9 +61,23 @@ export let updateTemplate = SlateTool.create(spec, {
         .optional()
         .describe('Updated draft page layout settings'),
       editionMode: z
-        .enum(['code', 'visual'])
+        .enum(['code', 'builder'])
         .optional()
         .describe('Edition mode for the template editor'),
+      outputType: z
+        .enum(['pdf', 'image'])
+        .optional()
+        .describe('Template output type. Defaults to pdf. Use image for image templates.'),
+      pdfEngineId: z
+        .string()
+        .optional()
+        .describe(
+          'PDF engine ID used for generated documents. Omit to keep the current engine.'
+        ),
+      pdfEngineDraftId: z
+        .string()
+        .optional()
+        .describe('PDF engine ID used for draft previews. Omit to keep the current engine.'),
       folderId: z
         .string()
         .nullable()
@@ -77,6 +91,9 @@ export let updateTemplate = SlateTool.create(spec, {
       templateId: z.string().describe('ID of the updated template'),
       identifier: z.string().describe('Human-readable name'),
       workspaceId: z.string().describe('Workspace ID'),
+      outputType: z.string().nullable().describe('Template output type'),
+      pdfEngineId: z.string().nullable().describe('PDF engine ID used for generation'),
+      pdfEngineDraftId: z.string().nullable().describe('PDF engine ID used for previews'),
       updatedAt: z.string().describe('Last update timestamp')
     })
   )
@@ -115,6 +132,9 @@ export let updateTemplate = SlateTool.create(spec, {
       settings: settingsObj,
       settingsDraft: settingsDraftObj,
       editionMode: ctx.input.editionMode,
+      outputType: ctx.input.outputType,
+      pdfEngineId: ctx.input.pdfEngineId,
+      pdfEngineDraftId: ctx.input.pdfEngineDraftId,
       templateFolderId: ctx.input.folderId,
       documentTtl: ctx.input.documentTtl
     });
@@ -123,6 +143,9 @@ export let updateTemplate = SlateTool.create(spec, {
       templateId: String(tmpl.id),
       identifier: String(tmpl.identifier),
       workspaceId: String(tmpl.app_id),
+      outputType: tmpl.output_type ? String(tmpl.output_type) : null,
+      pdfEngineId: tmpl.pdf_engine_id ? String(tmpl.pdf_engine_id) : null,
+      pdfEngineDraftId: tmpl.pdf_engine_draft_id ? String(tmpl.pdf_engine_draft_id) : null,
       updatedAt: String(tmpl.updated_at)
     };
 

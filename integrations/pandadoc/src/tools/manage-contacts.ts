@@ -12,7 +12,9 @@ let contactFieldsSchema = z.object({
   phone: z.string().optional().describe('Phone number'),
   country: z.string().optional().describe('Country'),
   state: z.string().optional().describe('State'),
-  streetAddress: z.string().optional().describe('Street address')
+  streetAddress: z.string().optional().describe('Street address'),
+  city: z.string().optional().describe('City'),
+  postalCode: z.string().optional().describe('Postal code')
 });
 
 let contactOutputSchema = z.object({
@@ -25,7 +27,9 @@ let contactOutputSchema = z.object({
   phone: z.string().optional().describe('Phone number'),
   country: z.string().optional().describe('Country'),
   state: z.string().optional().describe('State'),
-  streetAddress: z.string().optional().describe('Street address')
+  streetAddress: z.string().optional().describe('Street address'),
+  city: z.string().optional().describe('City'),
+  postalCode: z.string().optional().describe('Postal code')
 });
 
 export let createContact = SlateTool.create(spec, {
@@ -53,7 +57,9 @@ export let createContact = SlateTool.create(spec, {
       phone: ctx.input.phone,
       country: ctx.input.country,
       state: ctx.input.state,
-      street_address: ctx.input.streetAddress
+      street_address: ctx.input.streetAddress,
+      city: ctx.input.city,
+      postal_code: ctx.input.postalCode
     });
 
     return {
@@ -67,7 +73,9 @@ export let createContact = SlateTool.create(spec, {
         phone: result.phone,
         country: result.country,
         state: result.state,
-        streetAddress: result.street_address
+        streetAddress: result.street_address,
+        city: result.city,
+        postalCode: result.postal_code
       },
       message: `Created contact **${ctx.input.email}** (ID: \`${result.id}\`).`
     };
@@ -110,7 +118,9 @@ export let listContacts = SlateTool.create(spec, {
       phone: c.phone,
       country: c.country,
       state: c.state,
-      streetAddress: c.street_address
+      streetAddress: c.street_address,
+      city: c.city,
+      postalCode: c.postal_code
     }));
 
     return {
@@ -139,7 +149,9 @@ export let updateContact = SlateTool.create(spec, {
       phone: z.string().optional().describe('New phone number'),
       country: z.string().optional().describe('New country'),
       state: z.string().optional().describe('New state'),
-      streetAddress: z.string().optional().describe('New street address')
+      streetAddress: z.string().optional().describe('New street address'),
+      city: z.string().optional().describe('New city'),
+      postalCode: z.string().optional().describe('New postal code')
     })
   )
   .output(contactOutputSchema)
@@ -159,6 +171,8 @@ export let updateContact = SlateTool.create(spec, {
     if (ctx.input.country) updateParams.country = ctx.input.country;
     if (ctx.input.state) updateParams.state = ctx.input.state;
     if (ctx.input.streetAddress) updateParams.street_address = ctx.input.streetAddress;
+    if (ctx.input.city) updateParams.city = ctx.input.city;
+    if (ctx.input.postalCode) updateParams.postal_code = ctx.input.postalCode;
 
     let result = await client.updateContact(ctx.input.contactId, updateParams);
 
@@ -173,7 +187,9 @@ export let updateContact = SlateTool.create(spec, {
         phone: result.phone,
         country: result.country,
         state: result.state,
-        streetAddress: result.street_address
+        streetAddress: result.street_address,
+        city: result.city,
+        postalCode: result.postal_code
       },
       message: `Updated contact \`${ctx.input.contactId}\`.`
     };

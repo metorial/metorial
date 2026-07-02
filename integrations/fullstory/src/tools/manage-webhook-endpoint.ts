@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fullStoryServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let eventTypeSchema = z.object({
@@ -14,6 +15,20 @@ let eventTypeSchema = z.object({
     .optional()
     .describe('Subcategory, required for "recording.event.custom" events')
 });
+
+let validateEventTypes = (eventTypes: Array<{ eventName: string; subcategory?: string }>) => {
+  if (eventTypes.length === 0) {
+    throw fullStoryServiceError('Provide at least one FullStory webhook event type.');
+  }
+
+  for (let eventType of eventTypes) {
+    if (eventType.eventName === 'recording.event.custom' && !eventType.subcategory) {
+      throw fullStoryServiceError(
+        'FullStory webhook event type recording.event.custom requires subcategory.'
+      );
+    }
+  }
+};
 
 export let manageWebhookEndpoint = SlateTool.create(spec, {
   name: 'Manage Webhook Endpoint',
@@ -65,6 +80,10 @@ export let manageWebhookEndpoint = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.deleteEndpoint && !ctx.input.endpointId) {
+      throw fullStoryServiceError('endpointId is required when deleting a webhook endpoint.');
+    }
+
     if (ctx.input.deleteEndpoint && ctx.input.endpointId) {
       await client.deleteWebhookEndpoint(ctx.input.endpointId);
       return {
@@ -77,6 +96,10 @@ export let manageWebhookEndpoint = SlateTool.create(spec, {
     }
 
     if (ctx.input.endpointId) {
+      if (ctx.input.eventTypes) {
+        validateEventTypes(ctx.input.eventTypes);
+      }
+
       let endpoint = await client.updateWebhookEndpoint(ctx.input.endpointId, {
         url: ctx.input.url,
         eventTypes: ctx.input.eventTypes,
@@ -98,8 +121,11 @@ export let manageWebhookEndpoint = SlateTool.create(spec, {
     }
 
     if (!ctx.input.url || !ctx.input.eventTypes) {
-      throw new Error('url and eventTypes are required when creating a new webhook endpoint');
+      throw fullStoryServiceError(
+        'url and eventTypes are required when creating a new webhook endpoint.'
+      );
     }
+    validateEventTypes(ctx.input.eventTypes);
 
     let endpoint = await client.createWebhookEndpoint({
       url: ctx.input.url,

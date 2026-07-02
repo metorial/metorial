@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient, extractPaginationCursor } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -88,8 +89,8 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (action === 'create_tag') {
-      if (!name) throw new Error('name is required');
-      if (!tagGroupId) throw new Error('tagGroupId is required for creating a tag');
+      if (!name) throw klaviyoServiceError('name is required');
+      if (!tagGroupId) throw klaviyoServiceError('tagGroupId is required for creating a tag');
       let result = await client.createTag(name, tagGroupId);
       let t = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -99,8 +100,8 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (action === 'update_tag') {
-      if (!tagId) throw new Error('tagId is required');
-      if (!name) throw new Error('name is required');
+      if (!tagId) throw klaviyoServiceError('tagId is required');
+      if (!name) throw klaviyoServiceError('name is required');
       let result = await client.updateTag(tagId, name);
       let t = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -110,7 +111,7 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (action === 'delete_tag') {
-      if (!tagId) throw new Error('tagId is required');
+      if (!tagId) throw klaviyoServiceError('tagId is required');
       await client.deleteTag(tagId);
       return {
         output: { tagId, success: true },
@@ -133,7 +134,7 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (action === 'create_tag_group') {
-      if (!name) throw new Error('name is required');
+      if (!name) throw klaviyoServiceError('name is required');
       let result = await client.createTagGroup(name, exclusive);
       let g = Array.isArray(result.data) ? result.data[0] : result.data;
       return {
@@ -142,6 +143,6 @@ export let manageTags = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw klaviyoServiceError(`Unknown action: ${action}`);
   })
   .build();

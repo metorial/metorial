@@ -35,7 +35,7 @@ PostHog supports OAuth 2.0 with authorization code flow for third-party integrat
 - Must authenticate with both client_id and client_secret when exchanging authorization code for tokens. OAuth supports all the same scopes as Personal API Keys.
 - Each scope has a read and/or write action (e.g., `experiment:read`, `experiment:write`).
 - Standard OpenID Connect scopes are also supported: `openid`, `profile`.
-- Token endpoint: `https://app.posthog.com/oauth/token` (or your instance URL).
+- Token endpoint: `https://oauth.posthog.com/oauth/token` for PostHog Cloud OAuth, or your self-hosted instance URL.
 - PostHog rotates refresh tokens: when a refresh token is exchanged, the previous access and refresh tokens are invalidated and new tokens are returned.
 - Access tokens are prefixed with `pha_`, refresh tokens with `phr_`.
 - You can use the `required_access_level=project` or `required_access_level=organization` query parameter in the authorization URL to force the user to scope access.
@@ -115,10 +115,6 @@ Manage actions (combinations of events), event definitions, and property definit
 ### Project & Organization Management
 
 List, create, update, and manage projects within an organization. Retrieve current user and organization info.
-
-### Data Pipelines (CDP)
-
-Configure data pipeline destinations and sources. Send event data to external services or ingest data from external systems into PostHog via incoming webhooks.
 
 ### Annotations
 

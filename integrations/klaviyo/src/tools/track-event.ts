@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -44,6 +45,12 @@ Common use cases: tracking purchases, form submissions, quiz completions, passwo
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
+
+    if (!ctx.input.profileId && !ctx.input.email && !ctx.input.phoneNumber) {
+      throw klaviyoServiceError(
+        'Provide profileId, email, or phoneNumber so Klaviyo can associate the event with a profile.'
+      );
+    }
 
     let profileData: Record<string, any> = { type: 'profile' };
     if (ctx.input.profileId) {

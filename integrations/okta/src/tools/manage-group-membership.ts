@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OktaClient } from '../lib/client';
+import { oktaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageGroupMembershipTool = SlateTool.create(spec, {
@@ -47,13 +48,14 @@ export let manageGroupMembershipTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OktaClient({
       domain: ctx.config.domain,
-      token: ctx.auth.token
+      token: ctx.auth.token,
+      authMethod: ctx.auth.authMethod
     });
 
     let { action, groupId, userId } = ctx.input;
 
     if (action === 'add') {
-      if (!userId) throw new Error('User ID is required for add action');
+      if (!userId) throw oktaServiceError('User ID is required for add action');
       await client.addUserToGroup(groupId, userId);
       return {
         output: { groupId, action, success: true },
@@ -62,7 +64,7 @@ export let manageGroupMembershipTool = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!userId) throw new Error('User ID is required for remove action');
+      if (!userId) throw oktaServiceError('User ID is required for remove action');
       await client.removeUserFromGroup(groupId, userId);
       return {
         output: { groupId, action, success: true },
@@ -103,6 +105,6 @@ export let manageGroupMembershipTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw oktaServiceError(`Unknown action: ${action}`);
   })
   .build();

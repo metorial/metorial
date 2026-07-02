@@ -23,12 +23,25 @@ export let getPrediction = SlateTool.create(spec, {
       version: z.string().optional().describe('Model version ID used'),
       status: z
         .string()
-        .describe('Current status: starting, processing, succeeded, failed, canceled'),
+        .describe(
+          'Current status: starting, processing, succeeded, failed, canceled, or aborted'
+        ),
       input: z.any().optional().describe('Input provided to the model'),
       output: z.any().optional().describe('Model output'),
       error: z.string().optional().nullable().describe('Error message if prediction failed'),
       logs: z.string().optional().describe('Log output from the prediction'),
       metrics: z.record(z.string(), z.any()).optional().describe('Prediction metrics'),
+      dataRemoved: z
+        .boolean()
+        .optional()
+        .describe('Whether the prediction output has been deleted'),
+      source: z.enum(['api', 'web']).optional().describe('How the prediction was created'),
+      deadline: z
+        .string()
+        .optional()
+        .nullable()
+        .describe('When the prediction will be automatically canceled'),
+      deployment: z.string().optional().describe('Deployment that created the prediction'),
       createdAt: z.string().describe('When the prediction was created'),
       startedAt: z
         .string()
@@ -54,6 +67,10 @@ export let getPrediction = SlateTool.create(spec, {
         error: result.error,
         logs: result.logs,
         metrics: result.metrics,
+        dataRemoved: result.data_removed,
+        source: result.source,
+        deadline: result.deadline,
+        deployment: result.deployment,
         createdAt: result.created_at,
         startedAt: result.started_at,
         completedAt: result.completed_at,

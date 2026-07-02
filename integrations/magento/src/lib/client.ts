@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { magentoApiError } from './errors';
 import type {
   MagentoCart,
   MagentoCartItem,
@@ -8,6 +9,7 @@ import type {
   MagentoCustomer,
   MagentoInventorySourceItem,
   MagentoInvoice,
+  MagentoMediaGalleryEntry,
   MagentoOrder,
   MagentoProduct,
   MagentoSearchResult,
@@ -30,6 +32,11 @@ export class MagentoClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      (error: unknown) => Promise.reject(magentoApiError(error))
+    );
   }
 
   // ─── Search Criteria Helpers ──────────────────────────────────
@@ -103,6 +110,40 @@ export class MagentoClient {
 
   async deleteProduct(sku: string): Promise<boolean> {
     let response = await this.axios.delete(`/products/${encodeURIComponent(sku)}`);
+    return response.data as boolean;
+  }
+
+  async listProductMedia(sku: string): Promise<MagentoMediaGalleryEntry[]> {
+    let response = await this.axios.get(`/products/${encodeURIComponent(sku)}/media`);
+    return response.data as MagentoMediaGalleryEntry[];
+  }
+
+  async createProductMedia(
+    sku: string,
+    entry: MagentoMediaGalleryEntry
+  ): Promise<string | number> {
+    let response = await this.axios.post(`/products/${encodeURIComponent(sku)}/media`, {
+      entry
+    });
+    return response.data as string | number;
+  }
+
+  async updateProductMedia(
+    sku: string,
+    entryId: number,
+    entry: MagentoMediaGalleryEntry
+  ): Promise<boolean> {
+    let response = await this.axios.put(
+      `/products/${encodeURIComponent(sku)}/media/${entryId}`,
+      { entry: { ...entry, id: entryId } }
+    );
+    return response.data as boolean;
+  }
+
+  async deleteProductMedia(sku: string, entryId: number): Promise<boolean> {
+    let response = await this.axios.delete(
+      `/products/${encodeURIComponent(sku)}/media/${entryId}`
+    );
     return response.data as boolean;
   }
 

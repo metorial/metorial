@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Auth0Client } from '../lib/client';
+import { auth0ServiceError, requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageActionsTool = SlateTool.create(spec, {
@@ -109,8 +110,8 @@ export let manageActionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.actionId) throw new Error('actionId is required for get action');
-      let a = await client.getAction(ctx.input.actionId);
+      let actionId = requireField(ctx.input.actionId, 'actionId', 'get');
+      let a = await client.getAction(actionId);
       return {
         output: { actionDetails: mapAction(a) },
         message: `Retrieved action **${a.name}** (${a.status}).`
@@ -118,15 +119,13 @@ export let manageActionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      if (!ctx.input.triggerId) throw new Error('triggerId is required for create action');
-      if (!ctx.input.code) throw new Error('code is required for create action');
+      let name = requireField(ctx.input.name, 'name', 'create');
+      let triggerId = requireField(ctx.input.triggerId, 'triggerId', 'create');
+      let code = requireField(ctx.input.code, 'code', 'create');
       let a = await client.createAction({
-        name: ctx.input.name,
-        supportedTriggers: [
-          { id: ctx.input.triggerId, version: ctx.input.triggerVersion || 'v3' }
-        ],
-        code: ctx.input.code,
+        name,
+        supportedTriggers: [{ id: triggerId, version: ctx.input.triggerVersion || 'v3' }],
+        code,
         dependencies: ctx.input.dependencies,
         secrets: ctx.input.secrets
       });
@@ -137,8 +136,8 @@ export let manageActionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.actionId) throw new Error('actionId is required for update action');
-      let a = await client.updateAction(ctx.input.actionId, {
+      let actionId = requireField(ctx.input.actionId, 'actionId', 'update');
+      let a = await client.updateAction(actionId, {
         name: ctx.input.name,
         code: ctx.input.code,
         dependencies: ctx.input.dependencies,
@@ -151,8 +150,8 @@ export let manageActionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'deploy') {
-      if (!ctx.input.actionId) throw new Error('actionId is required for deploy action');
-      let _a = await client.deployAction(ctx.input.actionId);
+      let actionId = requireField(ctx.input.actionId, 'actionId', 'deploy');
+      let _a = await client.deployAction(actionId);
       return {
         output: { deployed: true },
         message: `Deployed action successfully.`
@@ -160,14 +159,14 @@ export let manageActionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.actionId) throw new Error('actionId is required for delete action');
-      await client.deleteAction(ctx.input.actionId);
+      let actionId = requireField(ctx.input.actionId, 'actionId', 'delete');
+      await client.deleteAction(actionId);
       return {
         output: { deleted: true },
-        message: `Deleted action **${ctx.input.actionId}**.`
+        message: `Deleted action **${actionId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw auth0ServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

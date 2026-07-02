@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MagentoClient } from '../lib/client';
+import { magentoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let sourceItemSchema = z.object({
@@ -79,7 +80,7 @@ export let manageInventory = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'get_stock') {
-      if (!ctx.input.sku) throw new Error('sku is required for get_stock action');
+      if (!ctx.input.sku) throw magentoServiceError('sku is required for get_stock action');
       let stock = await client.getStockItem(ctx.input.sku);
       return {
         output: {
@@ -96,7 +97,7 @@ export let manageInventory = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get_sources') {
-      if (!ctx.input.sku) throw new Error('sku is required for get_sources action');
+      if (!ctx.input.sku) throw magentoServiceError('sku is required for get_sources action');
       let result = await client.getSourceItems(ctx.input.sku);
       return {
         output: {
@@ -113,7 +114,7 @@ export let manageInventory = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update_sources') {
       if (!ctx.input.sourceItems || ctx.input.sourceItems.length === 0) {
-        throw new Error('sourceItems are required for update_sources action');
+        throw magentoServiceError('sourceItems are required for update_sources action');
       }
       await client.saveSourceItems(
         ctx.input.sourceItems.map(s => ({
@@ -130,9 +131,9 @@ export let manageInventory = SlateTool.create(spec, {
     }
 
     // check_salable
-    if (!ctx.input.sku) throw new Error('sku is required for check_salable action');
+    if (!ctx.input.sku) throw magentoServiceError('sku is required for check_salable action');
     if (ctx.input.stockId === undefined)
-      throw new Error('stockId is required for check_salable action');
+      throw magentoServiceError('stockId is required for check_salable action');
     let isSalable = await client.isProductSalable(ctx.input.sku, ctx.input.stockId);
     return {
       output: { isSalable },

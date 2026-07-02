@@ -1,6 +1,7 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { requireString } from '../lib/validation';
 import { spec } from '../spec';
 
 export let alertWebhookTrigger = SlateTrigger.create(spec, {
@@ -47,9 +48,11 @@ export let alertWebhookTrigger = SlateTrigger.create(spec, {
   .webhook({
     autoRegisterWebhook: async ctx => {
       let client = createClient(ctx.auth);
-      let projectId = ctx.config.projectId;
-      if (!projectId)
-        throw new Error('projectId is required in config for webhook registration.');
+      let projectId = requireString(
+        ctx.config.projectId,
+        'projectId',
+        'in config for webhook registration'
+      );
 
       // Configure the webhook integration for the project
       await client.configureIntegration(projectId, 'WEBHOOK', {

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TrelloClient } from '../lib/client';
+import { requireAtLeastOneTrelloField, requireTrelloString } from '../lib/errors';
 import { spec } from '../spec';
 
 let labelSchema = z.object({
@@ -55,7 +56,8 @@ export let manageLabels = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'get') {
-      let rawLabels = await client.getBoardLabels(ctx.input.boardId!);
+      let boardId = requireTrelloString(ctx.input.boardId, 'boardId', action);
+      let rawLabels = await client.getBoardLabels(boardId);
       let labels = rawLabels.map((l: any) => ({
         labelId: l.id,
         name: l.name || undefined,
@@ -69,10 +71,13 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
+      let boardId = requireTrelloString(ctx.input.boardId, 'boardId', action);
+      let name = requireTrelloString(ctx.input.name, 'name', action);
+      let color = requireTrelloString(ctx.input.color, 'color', action);
       let label = await client.createLabel({
-        name: ctx.input.name!,
-        color: ctx.input.color!,
-        idBoard: ctx.input.boardId!
+        name,
+        color,
+        idBoard: boardId
       });
       return {
         output: {
@@ -88,11 +93,21 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
+      let labelId = requireTrelloString(ctx.input.labelId, 'labelId', action);
+      requireAtLeastOneTrelloField(
+        {
+          name: ctx.input.name,
+          color: ctx.input.color
+        },
+        'label field to update',
+        action
+      );
+
       let updateData: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
       if (ctx.input.color !== undefined) updateData.color = ctx.input.color;
 
-      let label = await client.updateLabel(ctx.input.labelId!, updateData);
+      let label = await client.updateLabel(labelId, updateData);
       return {
         output: {
           label: {
@@ -107,26 +122,31 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteLabel(ctx.input.labelId!);
+      let labelId = requireTrelloString(ctx.input.labelId, 'labelId', action);
+      await client.deleteLabel(labelId);
       return {
         output: {},
-        message: `Deleted label \`${ctx.input.labelId}\`.`
+        message: `Deleted label \`${labelId}\`.`
       };
     }
 
     if (action === 'assign') {
-      await client.addCardLabel(ctx.input.cardId!, ctx.input.labelId!);
+      let cardId = requireTrelloString(ctx.input.cardId, 'cardId', action);
+      let labelId = requireTrelloString(ctx.input.labelId, 'labelId', action);
+      await client.addCardLabel(cardId, labelId);
       return {
         output: {},
-        message: `Assigned label \`${ctx.input.labelId}\` to card \`${ctx.input.cardId}\`.`
+        message: `Assigned label \`${labelId}\` to card \`${cardId}\`.`
       };
     }
 
     // unassign
-    await client.removeCardLabel(ctx.input.cardId!, ctx.input.labelId!);
+    let cardId = requireTrelloString(ctx.input.cardId, 'cardId', action);
+    let labelId = requireTrelloString(ctx.input.labelId, 'labelId', action);
+    await client.removeCardLabel(cardId, labelId);
     return {
       output: {},
-      message: `Removed label \`${ctx.input.labelId}\` from card \`${ctx.input.cardId}\`.`
+      message: `Removed label \`${labelId}\` from card \`${cardId}\`.`
     };
   })
   .build();

@@ -4,9 +4,18 @@ import {
   blendImages,
   createVariations,
   describeImage,
+  extendVideo,
+  fetchManyTasks,
   fetchTask,
   generateImage,
-  upscaleImage
+  generateVideo,
+  getAccountInfo,
+  getSeed,
+  inpaintImage,
+  panImage,
+  rerollImage,
+  upscaleImage,
+  zoomOutImage
 } from './tools';
 
 import { inboundWebhook } from './triggers/inbound-webhook';
@@ -19,7 +28,16 @@ export let provider = Slate.create({
     upscaleImage,
     blendImages,
     describeImage,
-    fetchTask
+    fetchTask,
+    rerollImage,
+    panImage,
+    zoomOutImage,
+    inpaintImage,
+    getSeed,
+    fetchManyTasks,
+    getAccountInfo,
+    generateVideo,
+    extendVideo
   ],
   triggers: [inboundWebhook]
 });

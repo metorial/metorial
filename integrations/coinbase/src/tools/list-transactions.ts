@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { coinbaseOAuthAuthMethods } from '../lib/auth-methods';
 import { CoinbaseClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -24,6 +25,7 @@ export let listTransactions = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(coinbaseOAuthAuthMethods)
   .input(
     z.object({
       accountId: z.string().describe('Account ID to list transactions for'),

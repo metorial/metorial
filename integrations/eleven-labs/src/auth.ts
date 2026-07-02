@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { elevenLabsApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -33,14 +34,20 @@ export let auth = SlateAuth.create()
         }
       });
 
-      let response = await client.get('/v1/user');
-      let user = response.data as {
+      let user: {
         user_id?: string;
         first_name?: string;
         subscription?: {
           tier?: string;
         };
       };
+
+      try {
+        let response = await client.get('/v1/user');
+        user = response.data as typeof user;
+      } catch (error) {
+        throw elevenLabsApiError(error, 'get auth profile');
+      }
 
       return {
         profile: {

@@ -1,6 +1,6 @@
 {
   "name": "@metorial/taggun",
-  "description": "Extract structured data from receipt and invoice images using OCR and machine learning. Submit documents as file uploads (JPG, PNG, PDF, GIF, HEIF), base64-encoded content, or URLs. Extract totals, tax amounts, dates, merchant details, and line items with confidence scores. Detect fraudulent, duplicate, tampered, or AI-generated receipts. Validate purchases against campaign rules for promotions, rebates, and warranty programs. Normalize merchant names, verify merchant locations, and categorize purchases by merchant and product type. Extract multi-tier tax details, verify VAT numbers, and read QR codes from receipts. Validate serial numbers and barcodes for warranty workflows.",
+  "description": "Extract structured data from receipt and invoice images using OCR and machine learning. Submit documents as base64-encoded content or public HTTPS URLs. Extract totals, tax amounts, dates, merchant details, line items, raw OCR text, and account-enabled fraud or categorization fields. Create and manage purchase validation campaigns, validate receipts against those campaigns, submit corrected feedback for model training, and manage product category files for purchase categorization.",
   "categories": [
     "apis-and-http-requests",
     "document-processing",
@@ -9,14 +9,13 @@
   "skills": [
     "extract receipt data",
     "extract invoice data",
-    "detect duplicate receipts",
-    "detect receipt tampering",
+    "extract receipt line items",
     "validate purchase campaigns",
-    "normalize merchant names",
+    "manage validation campaigns",
     "categorize purchases",
-    "extract tax details",
-    "verify VAT numbers",
-    "extract QR codes"
+    "manage product categories",
+    "submit receipt feedback",
+    "extract tax details"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/taggun.svg"
 }

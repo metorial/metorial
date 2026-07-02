@@ -1,6 +1,10 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import {
+  createClientFromContext,
+  requireNonEmptyStringArray,
+  requireProjectToken
+} from '../lib/helpers';
 import { spec } from '../spec';
 
 export let trackEvents = SlateTool.create(spec, {
@@ -43,6 +47,12 @@ export let trackEvents = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireProjectToken(ctx);
+    requireNonEmptyStringArray(
+      ctx.input.events.map(event => event.eventName),
+      'events'
+    );
+
     let client = createClientFromContext(ctx);
 
     let events = ctx.input.events.map(e => ({

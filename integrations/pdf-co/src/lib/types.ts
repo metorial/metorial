@@ -108,3 +108,9 @@ export interface PdfCoUploadResponse {
   status: number;
   remainingCredits: number;
 }
+
+export interface PdfCoDownloadedFile {
+  contentBase64: string;
+  mimeType: string;
+  byteLength: number;
+}

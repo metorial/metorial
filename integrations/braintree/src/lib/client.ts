@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { braintreeApiError, braintreeGraphQLError } from './errors';
 
 let GRAPHQL_URLS: Record<string, string> = {
   sandbox: 'https://payments.sandbox.braintree-api.com/graphql',
@@ -31,18 +32,26 @@ export class BraintreeGraphQLClient {
     });
   }
 
-  async query<T = any>(query: string, variables?: Record<string, any>): Promise<T> {
+  async query<T = any>(
+    query: string,
+    variables?: Record<string, any>,
+    operation = 'GraphQL request'
+  ): Promise<T> {
     let body: Record<string, any> = { query };
     if (variables) {
       body.variables = variables;
     }
-    let response = await this.http.post('', body);
-    let data = response.data;
-    if (data.errors && data.errors.length > 0) {
-      let messages = data.errors.map((e: any) => e.message).join('; ');
-      throw new Error(`Braintree GraphQL error: ${messages}`);
+
+    try {
+      let response = await this.http.post('', body);
+      let data = response.data;
+      if (Array.isArray(data.errors) && data.errors.length > 0) {
+        throw braintreeGraphQLError(data.errors, operation, data.extensions?.requestId);
+      }
+      return data.data;
+    } catch (error) {
+      throw braintreeApiError(error, operation);
     }
-    return data.data;
   }
 }
 
@@ -69,30 +78,46 @@ export class BraintreeRestClient {
   }
 
   async get(path: string): Promise<string> {
-    let response = await this.http.get(`${this.merchantPath}${path}`, {
-      responseType: 'text'
-    });
-    return response.data;
+    try {
+      let response = await this.http.get(`${this.merchantPath}${path}`, {
+        responseType: 'text'
+      });
+      return response.data;
+    } catch (error) {
+      throw braintreeApiError(error, `GET ${path}`);
+    }
   }
 
   async post(path: string, body: string): Promise<string> {
-    let response = await this.http.post(`${this.merchantPath}${path}`, body, {
-      responseType: 'text'
-    });
-    return response.data;
+    try {
+      let response = await this.http.post(`${this.merchantPath}${path}`, body, {
+        responseType: 'text'
+      });
+      return response.data;
+    } catch (error) {
+      throw braintreeApiError(error, `POST ${path}`);
+    }
   }
 
   async put(path: string, body: string): Promise<string> {
-    let response = await this.http.put(`${this.merchantPath}${path}`, body, {
-      responseType: 'text'
-    });
-    return response.data;
+    try {
+      let response = await this.http.put(`${this.merchantPath}${path}`, body, {
+        responseType: 'text'
+      });
+      return response.data;
+    } catch (error) {
+      throw braintreeApiError(error, `PUT ${path}`);
+    }
   }
 
   async delete(path: string): Promise<string> {
-    let response = await this.http.delete(`${this.merchantPath}${path}`, {
-      responseType: 'text'
-    });
-    return response.data;
+    try {
+      let response = await this.http.delete(`${this.merchantPath}${path}`, {
+        responseType: 'text'
+      });
+      return response.data;
+    } catch (error) {
+      throw braintreeApiError(error, `DELETE ${path}`);
+    }
   }
 }

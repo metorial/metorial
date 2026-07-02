@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { railwayServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getVariablesTool = SlateTool.create(spec, {
@@ -31,7 +32,7 @@ export let getVariablesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let variables = await client.getVariables(
       ctx.input.projectId,
       ctx.input.environmentId,
@@ -82,7 +83,12 @@ export let setVariablesTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let count = Object.keys(ctx.input.variables).length;
+    if (count === 0) {
+      throw railwayServiceError('Provide at least one Railway variable to set.');
+    }
+
     await client.upsertVariables({
       projectId: ctx.input.projectId,
       environmentId: ctx.input.environmentId,
@@ -90,8 +96,6 @@ export let setVariablesTool = SlateTool.create(spec, {
       variables: ctx.input.variables,
       replace: ctx.input.replaceAll || undefined
     });
-
-    let count = Object.keys(ctx.input.variables).length;
 
     return {
       output: { set: true, count },
@@ -122,7 +126,7 @@ export let deleteVariableTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     await client.deleteVariable({
       projectId: ctx.input.projectId,
       environmentId: ctx.input.environmentId,

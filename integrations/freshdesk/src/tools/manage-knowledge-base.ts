@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FreshdeskClient } from '../lib/client';
+import { freshdeskServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listKnowledgeBase = SlateTool.create(spec, {
@@ -69,6 +70,12 @@ export let listKnowledgeBase = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.categoryId && ctx.input.folderId) {
+      throw freshdeskServiceError(
+        'Provide either categoryId to list folders or folderId to list articles, not both.'
+      );
+    }
+
     let client = new FreshdeskClient({
       subdomain: ctx.config.subdomain,
       token: ctx.auth.token

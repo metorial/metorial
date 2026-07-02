@@ -17,11 +17,15 @@ import {
   getSuppressions,
   getTemplate,
   getTemplates,
+  manageEventWebhooks,
   manageListContacts,
+  manageScheduledSends,
+  manageTemplateVersion,
   removeSuppression,
   searchContacts,
   sendEmail,
   updateList,
+  updateTemplate,
   validateDomain,
   validateEmail
 } from './tools';
@@ -44,6 +48,8 @@ export let provider = Slate.create({
     getTemplates,
     getTemplate,
     createTemplate,
+    updateTemplate,
+    manageTemplateVersion,
     deleteTemplate,
     getSuppressions,
     addSuppression,
@@ -52,7 +58,9 @@ export let provider = Slate.create({
     validateEmail,
     getAuthenticatedDomains,
     authenticateDomain,
-    validateDomain
+    validateDomain,
+    manageEventWebhooks,
+    manageScheduledSends
   ],
   triggers: [emailEvents, inboundEmail]
 });

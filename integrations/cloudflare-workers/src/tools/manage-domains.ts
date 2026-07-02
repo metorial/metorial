@@ -46,6 +46,38 @@ export let listDomains = SlateTool.create(spec, {
   })
   .build();
 
+export let getDomain = SlateTool.create(spec, {
+  name: 'Get Worker Domain',
+  key: 'get_domain',
+  description: `Retrieve a specific custom domain attachment for a Worker.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      domainId: z.string().describe('Domain record UUID to retrieve')
+    })
+  )
+  .output(domainSchema)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx);
+    let result = await client.getDomain(ctx.input.domainId);
+
+    return {
+      output: {
+        domainId: result.id,
+        hostname: result.hostname,
+        service: result.service,
+        zoneId: result.zone_id,
+        zoneName: result.zone_name,
+        environment: result.environment
+      },
+      message: `Retrieved Worker domain **${ctx.input.domainId}**.`
+    };
+  })
+  .build();
+
 export let attachDomain = SlateTool.create(spec, {
   name: 'Attach Worker Domain',
   key: 'attach_domain',

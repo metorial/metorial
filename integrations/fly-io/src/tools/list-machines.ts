@@ -18,7 +18,17 @@ export let listMachines = SlateTool.create(spec, {
       region: z
         .string()
         .optional()
-        .describe('Filter machines by region code (e.g. "ord", "lhr", "sin")')
+        .describe('Filter machines by region code (e.g. "ord", "lhr", "sin")'),
+      state: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated machine states to include (created, started, stopped, suspended)'
+        ),
+      summary: z
+        .boolean()
+        .optional()
+        .describe('Only return summary fields from the Fly.io API')
     })
   )
   .output(
@@ -46,7 +56,9 @@ export let listMachines = SlateTool.create(spec, {
     let client = createClient(ctx);
     let machines = await client.listMachines(ctx.input.appName, {
       includeDeleted: ctx.input.includeDeleted,
-      region: ctx.input.region
+      region: ctx.input.region,
+      state: ctx.input.state,
+      summary: ctx.input.summary
     });
 
     let machinesSummary = machines.map(m => ({

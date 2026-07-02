@@ -14,7 +14,7 @@ Slack uses **OAuth 2.0** as its primary authentication mechanism. OAuth allows a
 
 1. Redirect the user to the authorization URL: `https://slack.com/oauth/v2/authorize` with query parameters including `client_id`, `scope` (bot scopes), optionally `user_scope` (user-level scopes), `redirect_uri`, and `state`.
 2. Parse the HTTP request that lands at your Redirect URL for a `code` field — that's a temporary authorization code, which expires after ten minutes.
-3. Exchange the code for an access token by calling `oauth.v2.access` with your `code`, `client_id`, and `client_secret`.
+3. Exchange the code for an access token by calling `oauth.v2.access` for bot or combined OAuth scopes, or `oauth.v2.user.access` for user-only OAuth scopes, with your `code`, `client_id`, and `client_secret`.
 
 **Credentials Required:**
 

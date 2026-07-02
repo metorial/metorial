@@ -1,8 +1,11 @@
-import { createAxios } from 'slates';
+import { createCodaHttp } from './http';
 
-let http = createAxios({
-  baseURL: 'https://coda.io/apis/v1'
-});
+let http = createCodaHttp();
+
+type CanvasContent = {
+  format: 'html';
+  content: string;
+};
 
 export class Client {
   private headers: Record<string, string>;
@@ -18,6 +21,7 @@ export class Client {
 
   async listDocs(params?: {
     isOwner?: boolean;
+    isPublished?: boolean;
     query?: string;
     sourceDoc?: string;
     isStarred?: boolean;
@@ -95,7 +99,7 @@ export class Client {
     return response.data;
   }
 
-  async createFolder(body: { name: string; parentFolderId?: string }) {
+  async createFolder(body: { name: string; workspaceId: string; description?: string }) {
     let response = await http.post('/folders', body, {
       headers: this.headers
     });
@@ -106,6 +110,7 @@ export class Client {
     folderId: string,
     body: {
       name?: string;
+      description?: string;
     }
   ) {
     let response = await http.patch(`/folders/${folderId}`, body, {
@@ -152,7 +157,10 @@ export class Client {
       iconName?: string;
       imageUrl?: string;
       parentPageId?: string;
-      pageContent?: { type: string; body: string };
+      pageContent?: {
+        type: 'canvas';
+        canvasContent: CanvasContent;
+      };
     }
   ) {
     let response = await http.post(`/docs/${docId}/pages`, body, {
@@ -170,8 +178,9 @@ export class Client {
       iconName?: string;
       imageUrl?: string;
       contentUpdate?: {
-        insertionIndex?: number;
-        canvasContent?: { type: string; body: string };
+        insertionMode?: 'append' | 'replace' | 'before' | 'after';
+        elementId?: string;
+        canvasContent?: CanvasContent;
       };
     }
   ) {
@@ -199,7 +208,8 @@ export class Client {
     docId: string,
     pageIdOrName: string,
     params?: {
-      outputFormat?: 'html' | 'markdown';
+      limit?: number;
+      pageToken?: string;
     }
   ) {
     let response = await http.get(
@@ -207,6 +217,23 @@ export class Client {
       {
         headers: this.headers,
         params
+      }
+    );
+    return response.data;
+  }
+
+  async deletePageContent(
+    docId: string,
+    pageIdOrName: string,
+    body?: {
+      elementIds?: string[];
+    }
+  ) {
+    let response = await http.delete(
+      `/docs/${docId}/pages/${encodeURIComponent(pageIdOrName)}/content`,
+      {
+        headers: this.headers,
+        data: body
       }
     );
     return response.data;
@@ -236,6 +263,15 @@ export class Client {
         headers: this.headers
       }
     );
+    return response.data;
+  }
+
+  async downloadText(url: string) {
+    let response = await http.get<string>(url, {
+      headers: this.headers,
+      responseType: 'text',
+      transformResponse: value => value
+    });
     return response.data;
   }
 
@@ -349,13 +385,17 @@ export class Client {
     body: {
       rows: Array<{ cells: Array<{ column: string; value: any }> }>;
       keyColumns?: string[];
+    },
+    params?: {
+      disableParsing?: boolean;
     }
   ) {
     let response = await http.post(
       `/docs/${docId}/tables/${encodeURIComponent(tableIdOrName)}/rows`,
       body,
       {
-        headers: this.headers
+        headers: this.headers,
+        params
       }
     );
     return response.data;
@@ -367,13 +407,17 @@ export class Client {
     rowIdOrName: string,
     body: {
       row: { cells: Array<{ column: string; value: any }> };
+    },
+    params?: {
+      disableParsing?: boolean;
     }
   ) {
     let response = await http.put(
       `/docs/${docId}/tables/${encodeURIComponent(tableIdOrName)}/rows/${encodeURIComponent(rowIdOrName)}`,
       body,
       {
-        headers: this.headers
+        headers: this.headers,
+        params
       }
     );
     return response.data;
@@ -502,7 +546,7 @@ export class Client {
     body: {
       access: 'readonly' | 'write' | 'comment';
       principal: { type: 'email' | 'domain' | 'anyone'; email?: string; domain?: string };
-      suppressNotification?: boolean;
+      suppressEmail?: boolean;
     }
   ) {
     let response = await http.post(`/docs/${docId}/acl/permissions`, body, {
@@ -583,35 +627,6 @@ export class Client {
 
   async triggerAutomation(docId: string, ruleId: string, body: Record<string, any>) {
     let response = await http.post(`/docs/${docId}/hooks/automation/${ruleId}`, body, {
-      headers: this.headers
-    });
-    return response.data;
-  }
-
-  // ── Webhooks ──
-
-  async listWebhooks(docId: string) {
-    let response = await http.get(`/docs/${docId}/webhooks`, {
-      headers: this.headers
-    });
-    return response.data;
-  }
-
-  async createWebhook(
-    docId: string,
-    body: {
-      url: string;
-      eventTypes: string[];
-    }
-  ) {
-    let response = await http.post(`/docs/${docId}/webhooks`, body, {
-      headers: this.headers
-    });
-    return response.data;
-  }
-
-  async deleteWebhook(docId: string, webhookId: string) {
-    let response = await http.delete(`/docs/${docId}/webhooks/${webhookId}`, {
       headers: this.headers
     });
     return response.data;

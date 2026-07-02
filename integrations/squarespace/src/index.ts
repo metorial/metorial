@@ -3,17 +3,23 @@ import { spec } from './spec';
 import {
   createOrder,
   fulfillOrder,
+  getContact,
+  getContactTransactionSummaries,
   getOrder,
   getProduct,
   getProfile,
   getSiteInfo,
+  listContacts,
   listOrders,
   listProducts,
   listProfiles,
   listStorePages,
   listTransactions,
+  manageContact,
+  manageContactAddress,
   manageInventory,
-  manageProduct
+  manageProduct,
+  manageProductVariant
 } from './tools';
 import { extensionEvents, orderEvents } from './triggers';
 
@@ -27,7 +33,13 @@ export let provider = Slate.create({
     listProducts,
     getProduct,
     manageProduct,
+    manageProductVariant,
     manageInventory,
+    listContacts,
+    getContact,
+    manageContact,
+    manageContactAddress,
+    getContactTransactionSummaries,
     listProfiles,
     getProfile,
     listTransactions,

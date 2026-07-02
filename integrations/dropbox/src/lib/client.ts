@@ -1,4 +1,42 @@
-import { createAxios } from 'slates';
+import { createAxios, getResponseHeaderValue } from 'slates';
+import { dropboxApiError } from './errors';
+
+type UploadMode = 'add' | 'overwrite' | 'update';
+type UploadContent = string | Uint8Array | Buffer;
+type TaggedValue<T extends string = string> = { '.tag': T };
+type WriteModeValue = UploadMode | (TaggedValue<'update'> & { update: string });
+
+type SharedLinkSettings = {
+  requestedVisibility?: string;
+  audience?: string;
+  access?: string;
+  allowDownload?: boolean;
+  password?: string;
+  expires?: string;
+};
+
+let tag = <T extends string>(value: T): TaggedValue<T> => ({ '.tag': value });
+
+let normalizeRootPath = (path: string) => (path === '/' ? '' : path);
+
+let toWriteMode = (mode: UploadMode, rev?: string): WriteModeValue => {
+  if (mode !== 'update') return mode;
+
+  return {
+    '.tag': 'update',
+    update: rev ?? ''
+  };
+};
+
+let toBase64 = (data: unknown) => {
+  if (Buffer.isBuffer(data)) return data.toString('base64');
+  if (data instanceof ArrayBuffer) return Buffer.from(data).toString('base64');
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('base64');
+  }
+  if (typeof data === 'string') return Buffer.from(data, 'binary').toString('base64');
+  return Buffer.from(String(data)).toString('base64');
+};
 
 export class DropboxClient {
   private api: ReturnType<typeof createAxios>;
@@ -21,44 +59,77 @@ export class DropboxClient {
     });
   }
 
-  // ── Files & Folders ──────────────────────────────────────────
+  private async apiPost(path: string, data: unknown, operation: string) {
+    try {
+      let response = await this.api.post(path, data);
+      return response.data;
+    } catch (error) {
+      throw dropboxApiError(error, operation);
+    }
+  }
+
+  private async contentPost(
+    path: string,
+    data: unknown,
+    config: Record<string, unknown>,
+    operation: string
+  ) {
+    try {
+      return await this.content.post(path, data, config);
+    } catch (error) {
+      throw dropboxApiError(error, operation);
+    }
+  }
+
+  // Files & folders
 
   async listFolder(path: string, recursive: boolean = false, limit?: number) {
-    let response = await this.api.post('/files/list_folder', {
-      path: path === '/' ? '' : path,
-      recursive,
-      include_mounted_folders: true,
-      include_non_downloadable_files: true,
-      ...(limit ? { limit } : {})
-    });
-    return response.data;
+    return await this.apiPost(
+      '/files/list_folder',
+      {
+        path: normalizeRootPath(path),
+        recursive,
+        include_mounted_folders: true,
+        include_non_downloadable_files: true,
+        ...(limit ? { limit } : {})
+      },
+      'list folder'
+    );
   }
 
   async listFolderContinue(cursor: string) {
-    let response = await this.api.post('/files/list_folder/continue', { cursor });
-    return response.data;
+    return await this.apiPost(
+      '/files/list_folder/continue',
+      { cursor },
+      'continue folder listing'
+    );
   }
 
   async getMetadata(path: string) {
-    let response = await this.api.post('/files/get_metadata', {
-      path,
-      include_media_info: true,
-      include_has_explicit_shared_members: true
-    });
-    return response.data;
+    return await this.apiPost(
+      '/files/get_metadata',
+      {
+        path,
+        include_media_info: true,
+        include_has_explicit_shared_members: true
+      },
+      'get metadata'
+    );
   }
 
   async createFolder(path: string, autorename: boolean = false) {
-    let response = await this.api.post('/files/create_folder_v2', {
-      path,
-      autorename
-    });
-    return response.data;
+    return await this.apiPost(
+      '/files/create_folder_v2',
+      {
+        path,
+        autorename
+      },
+      'create folder'
+    );
   }
 
   async deleteFile(path: string) {
-    let response = await this.api.post('/files/delete_v2', { path });
-    return response.data;
+    return await this.apiPost('/files/delete_v2', { path }, 'delete file or folder');
   }
 
   async moveFile(
@@ -67,13 +138,16 @@ export class DropboxClient {
     autorename: boolean = false,
     allowOwnershipTransfer: boolean = false
   ) {
-    let response = await this.api.post('/files/move_v2', {
-      from_path: fromPath,
-      to_path: toPath,
-      autorename,
-      allow_ownership_transfer: allowOwnershipTransfer
-    });
-    return response.data;
+    return await this.apiPost(
+      '/files/move_v2',
+      {
+        from_path: fromPath,
+        to_path: toPath,
+        autorename,
+        allow_ownership_transfer: allowOwnershipTransfer
+      },
+      'move file or folder'
+    );
   }
 
   async copyFile(
@@ -82,53 +156,213 @@ export class DropboxClient {
     autorename: boolean = false,
     allowOwnershipTransfer: boolean = false
   ) {
-    let response = await this.api.post('/files/copy_v2', {
-      from_path: fromPath,
-      to_path: toPath,
-      autorename,
-      allow_ownership_transfer: allowOwnershipTransfer
-    });
-    return response.data;
+    return await this.apiPost(
+      '/files/copy_v2',
+      {
+        from_path: fromPath,
+        to_path: toPath,
+        autorename,
+        allow_ownership_transfer: allowOwnershipTransfer
+      },
+      'copy file or folder'
+    );
   }
 
   async uploadFile(
     path: string,
-    content: string,
-    mode: string = 'add',
+    content: UploadContent,
+    mode: UploadMode = 'add',
     autorename: boolean = false,
-    mute: boolean = false
+    mute: boolean = false,
+    options?: {
+      rev?: string;
+      contentHash?: string;
+      clientModified?: string;
+    }
   ) {
-    let response = await this.content.post('/files/upload', content, {
-      headers: {
-        'Content-Type': 'application/octet-stream',
-        'Dropbox-API-Arg': JSON.stringify({
-          path,
-          mode,
-          autorename,
-          mute,
-          strict_conflict: false
-        })
-      }
-    });
+    let response = await this.contentPost(
+      '/files/upload',
+      content,
+      {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({
+            path,
+            mode: toWriteMode(mode, options?.rev),
+            autorename,
+            mute,
+            strict_conflict: false,
+            ...(options?.clientModified ? { client_modified: options.clientModified } : {}),
+            ...(options?.contentHash ? { content_hash: options.contentHash } : {})
+          })
+        }
+      },
+      'upload file'
+    );
     return response.data;
   }
 
   async downloadFile(path: string) {
-    let response = await this.content.post('/files/download', null, {
-      headers: {
-        'Dropbox-API-Arg': JSON.stringify({ path })
+    let response = await this.contentPost(
+      '/files/download',
+      null,
+      {
+        headers: {
+          'Dropbox-API-Arg': JSON.stringify({ path })
+        },
+        responseType: 'arraybuffer'
       },
-      responseType: 'text'
-    });
-    let metadata = response.headers['dropbox-api-result'];
+      'download file'
+    );
+    let headers = response.headers as Record<string, unknown>;
+    let metadata = getResponseHeaderValue(headers, 'dropbox-api-result');
     let parsedMetadata = metadata ? JSON.parse(metadata) : {};
     return {
       metadata: parsedMetadata,
-      content: response.data
+      contentBase64: toBase64(response.data),
+      contentType: getResponseHeaderValue(headers, 'content-type')
     };
   }
 
-  // ── Search ───────────────────────────────────────────────────
+  async getTemporaryLink(path: string) {
+    return await this.apiPost('/files/get_temporary_link', { path }, 'get temporary link');
+  }
+
+  async getThumbnail(
+    path: string,
+    options?: {
+      format?: string;
+      size?: string;
+      mode?: string;
+      quality?: string;
+      excludeMediaInfo?: boolean;
+    }
+  ) {
+    let response = await this.contentPost(
+      '/files/get_thumbnail_v2',
+      null,
+      {
+        headers: {
+          'Dropbox-API-Arg': JSON.stringify({
+            resource: {
+              '.tag': 'path',
+              path
+            },
+            format: tag(options?.format ?? 'jpeg'),
+            size: tag(options?.size ?? 'w64h64'),
+            mode: tag(options?.mode ?? 'strict'),
+            quality: tag(options?.quality ?? 'quality_80'),
+            ...(options?.excludeMediaInfo !== undefined
+              ? { exclude_media_info: options.excludeMediaInfo }
+              : {})
+          })
+        },
+        responseType: 'arraybuffer'
+      },
+      'get thumbnail'
+    );
+    let headers = response.headers as Record<string, unknown>;
+    let metadata = getResponseHeaderValue(headers, 'dropbox-api-result');
+    let parsedMetadata = metadata ? JSON.parse(metadata) : {};
+    return {
+      metadata: parsedMetadata.file_metadata ?? parsedMetadata.link_metadata ?? {},
+      contentBase64: toBase64(response.data),
+      contentType: getResponseHeaderValue(headers, 'content-type')
+    };
+  }
+
+  async startUploadSession(
+    content: UploadContent,
+    close: boolean = false,
+    contentHash?: string
+  ) {
+    let response = await this.contentPost(
+      '/files/upload_session/start',
+      content,
+      {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({
+            close,
+            ...(contentHash ? { content_hash: contentHash } : {})
+          })
+        }
+      },
+      'start upload session'
+    );
+    return response.data;
+  }
+
+  async appendUploadSession(
+    sessionId: string,
+    offset: number,
+    content: UploadContent,
+    close: boolean = false,
+    contentHash?: string
+  ) {
+    let response = await this.contentPost(
+      '/files/upload_session/append_v2',
+      content,
+      {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({
+            cursor: {
+              session_id: sessionId,
+              offset
+            },
+            close,
+            ...(contentHash ? { content_hash: contentHash } : {})
+          })
+        }
+      },
+      'append upload session'
+    );
+    return response.data;
+  }
+
+  async finishUploadSession(
+    sessionId: string,
+    offset: number,
+    path: string,
+    content: UploadContent,
+    options?: {
+      mode?: UploadMode;
+      rev?: string;
+      autorename?: boolean;
+      mute?: boolean;
+      contentHash?: string;
+      clientModified?: string;
+    }
+  ) {
+    let response = await this.contentPost(
+      '/files/upload_session/finish',
+      content,
+      {
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          'Dropbox-API-Arg': JSON.stringify({
+            cursor: {
+              session_id: sessionId,
+              offset
+            },
+            commit: {
+              path,
+              mode: toWriteMode(options?.mode ?? 'add', options?.rev),
+              autorename: options?.autorename ?? false,
+              mute: options?.mute ?? false,
+              ...(options?.clientModified ? { client_modified: options.clientModified } : {})
+            },
+            ...(options?.contentHash ? { content_hash: options.contentHash } : {})
+          })
+        }
+      },
+      'finish upload session'
+    );
+    return response.data;
+  }
+
+  // Search
 
   async searchFiles(
     query: string,
@@ -137,77 +371,68 @@ export class DropboxClient {
     fileCategories?: string[]
   ) {
     let options: Record<string, any> = {};
-    if (path) {
-      options.path = path;
-    }
-    if (maxResults) {
-      options.max_results = maxResults;
-    }
-    if (fileCategories && fileCategories.length > 0) {
-      options.file_categories = fileCategories;
-    }
+    if (path) options.path = path;
+    if (maxResults) options.max_results = maxResults;
+    if (fileCategories && fileCategories.length > 0) options.file_categories = fileCategories;
 
-    let response = await this.api.post('/files/search_v2', {
-      query,
-      options: Object.keys(options).length > 0 ? options : undefined
-    });
-    return response.data;
+    return await this.apiPost(
+      '/files/search_v2',
+      {
+        query,
+        options: Object.keys(options).length > 0 ? options : undefined
+      },
+      'search files'
+    );
   }
 
-  // ── File Revisions ───────────────────────────────────────────
+  async searchFilesContinue(cursor: string) {
+    return await this.apiPost('/files/search/continue_v2', { cursor }, 'continue file search');
+  }
 
-  async listRevisions(path: string, limit?: number) {
-    let response = await this.api.post('/files/list_revisions', {
-      path,
-      mode: { '.tag': 'path' },
-      ...(limit ? { limit } : {})
-    });
-    return response.data;
+  // File revisions
+
+  async listRevisions(path: string, limit?: number, mode: 'path' | 'id' = 'path') {
+    return await this.apiPost(
+      '/files/list_revisions',
+      {
+        path,
+        mode: tag(mode),
+        ...(limit ? { limit } : {})
+      },
+      'list file revisions'
+    );
   }
 
   async restoreRevision(path: string, rev: string) {
-    let response = await this.api.post('/files/restore', { path, rev });
-    return response.data;
+    return await this.apiPost('/files/restore', { path, rev }, 'restore file revision');
   }
 
-  // ── Sharing ──────────────────────────────────────────────────
+  // Sharing
 
-  async createSharedLink(
-    path: string,
-    settings?: {
-      requestedVisibility?: string;
-      audience?: string;
-      access?: string;
-      allowDownload?: boolean;
-      password?: string;
-      expires?: string;
-    }
-  ) {
+  async createSharedLink(path: string, settings?: SharedLinkSettings) {
     let requestSettings: Record<string, any> = {};
     if (settings?.requestedVisibility) {
-      requestSettings.requested_visibility = { '.tag': settings.requestedVisibility };
+      requestSettings.requested_visibility = tag(settings.requestedVisibility);
     }
-    if (settings?.audience) {
-      requestSettings.audience = { '.tag': settings.audience };
-    }
-    if (settings?.access) {
-      requestSettings.access = { '.tag': settings.access };
-    }
+    if (settings?.audience) requestSettings.audience = tag(settings.audience);
+    if (settings?.access) requestSettings.access = tag(settings.access);
     if (settings?.allowDownload !== undefined) {
       requestSettings.allow_download = settings.allowDownload;
     }
     if (settings?.password) {
+      requestSettings.require_password = true;
       requestSettings.link_password = settings.password;
     }
-    if (settings?.expires) {
-      requestSettings.expires = settings.expires;
-    }
+    if (settings?.expires) requestSettings.expires = settings.expires;
 
-    let response = await this.api.post('/sharing/create_shared_link_with_settings', {
-      path,
-      settings: Object.keys(requestSettings).length > 0 ? requestSettings : undefined
-    });
-    return response.data;
+    return await this.apiPost(
+      '/sharing/create_shared_link_with_settings',
+      {
+        path,
+        settings: Object.keys(requestSettings).length > 0 ? requestSettings : undefined
+      },
+      'create shared link'
+    );
   }
 
   async listSharedLinks(path?: string, cursor?: string, directOnly?: boolean) {
@@ -216,12 +441,11 @@ export class DropboxClient {
     if (cursor) body.cursor = cursor;
     if (directOnly !== undefined) body.direct_only = directOnly;
 
-    let response = await this.api.post('/sharing/list_shared_links', body);
-    return response.data;
+    return await this.apiPost('/sharing/list_shared_links', body, 'list shared links');
   }
 
   async revokeSharedLink(url: string) {
-    await this.api.post('/sharing/revoke_shared_link', { url });
+    await this.apiPost('/sharing/revoke_shared_link', { url }, 'revoke shared link');
   }
 
   async shareFolder(
@@ -232,12 +456,11 @@ export class DropboxClient {
     forceAsync: boolean = false
   ) {
     let body: Record<string, any> = { path, force_async: forceAsync };
-    if (memberPolicy) body.member_policy = { '.tag': memberPolicy };
-    if (aclUpdatePolicy) body.acl_update_policy = { '.tag': aclUpdatePolicy };
-    if (sharedLinkPolicy) body.shared_link_policy = { '.tag': sharedLinkPolicy };
+    if (memberPolicy) body.member_policy = tag(memberPolicy);
+    if (aclUpdatePolicy) body.acl_update_policy = tag(aclUpdatePolicy);
+    if (sharedLinkPolicy) body.shared_link_policy = tag(sharedLinkPolicy);
 
-    let response = await this.api.post('/sharing/share_folder', body);
-    return response.data;
+    return await this.apiPost('/sharing/share_folder', body, 'share folder');
   }
 
   async addFolderMember(
@@ -246,16 +469,19 @@ export class DropboxClient {
     quiet: boolean = false,
     customMessage?: string
   ) {
-    let response = await this.api.post('/sharing/add_folder_member', {
-      shared_folder_id: sharedFolderId,
-      members: members.map(m => ({
-        member: { '.tag': 'email', email: m.email },
-        access_level: { '.tag': m.accessLevel || 'viewer' }
-      })),
-      quiet,
-      custom_message: customMessage
-    });
-    return response.data;
+    return await this.apiPost(
+      '/sharing/add_folder_member',
+      {
+        shared_folder_id: sharedFolderId,
+        members: members.map(m => ({
+          member: { '.tag': 'email', email: m.email },
+          access_level: tag(m.accessLevel || 'viewer')
+        })),
+        quiet,
+        custom_message: customMessage
+      },
+      'add shared folder member'
+    );
   }
 
   async removeFolderMember(
@@ -263,103 +489,129 @@ export class DropboxClient {
     memberEmail: string,
     leaveACopy: boolean = false
   ) {
-    let response = await this.api.post('/sharing/remove_folder_member', {
-      shared_folder_id: sharedFolderId,
-      member: { '.tag': 'email', email: memberEmail },
-      leave_a_copy: leaveACopy
-    });
-    return response.data;
+    return await this.apiPost(
+      '/sharing/remove_folder_member',
+      {
+        shared_folder_id: sharedFolderId,
+        member: { '.tag': 'email', email: memberEmail },
+        leave_a_copy: leaveACopy
+      },
+      'remove shared folder member'
+    );
   }
 
   async listFolderMembers(sharedFolderId: string, limit?: number) {
     let body: Record<string, any> = { shared_folder_id: sharedFolderId };
     if (limit) body.limit = limit;
 
-    let response = await this.api.post('/sharing/list_folder_members', body);
-    return response.data;
+    return await this.apiPost(
+      '/sharing/list_folder_members',
+      body,
+      'list shared folder members'
+    );
   }
 
-  // ── File Requests ────────────────────────────────────────────
+  // File requests
 
   async createFileRequest(
     title: string,
     destination: string,
     deadline?: string,
-    open: boolean = true
+    open: boolean = true,
+    description?: string
   ) {
     let body: Record<string, any> = {
       title,
       destination,
       open
     };
-    if (deadline) {
-      body.deadline = { deadline };
-    }
+    if (deadline) body.deadline = { deadline };
+    if (description) body.description = description;
 
-    let response = await this.api.post('/file_requests/create', body);
-    return response.data;
+    return await this.apiPost('/file_requests/create', body, 'create file request');
   }
 
-  async listFileRequests() {
-    let response = await this.api.post('/file_requests/list_v2', {
-      limit: 1000
-    });
-    return response.data;
+  async listFileRequests(limit?: number) {
+    return await this.apiPost(
+      '/file_requests/list_v2',
+      {
+        limit: limit ?? 1000
+      },
+      'list file requests'
+    );
+  }
+
+  async listFileRequestsContinue(cursor: string) {
+    return await this.apiPost(
+      '/file_requests/list/continue',
+      { cursor },
+      'continue file request listing'
+    );
   }
 
   async getFileRequest(fileRequestId: string) {
-    let response = await this.api.post('/file_requests/get', { id: fileRequestId });
-    return response.data;
+    return await this.apiPost('/file_requests/get', { id: fileRequestId }, 'get file request');
   }
 
   async updateFileRequest(
     fileRequestId: string,
-    updates: { title?: string; destination?: string; deadline?: string | null; open?: boolean }
+    updates: {
+      title?: string;
+      destination?: string;
+      deadline?: string | null;
+      open?: boolean;
+      description?: string;
+    }
   ) {
     let body: Record<string, any> = { id: fileRequestId };
     if (updates.title !== undefined) body.title = updates.title;
     if (updates.destination !== undefined) body.destination = updates.destination;
     if (updates.open !== undefined) body.open = updates.open;
+    if (updates.description !== undefined) body.description = updates.description;
     if (updates.deadline !== undefined) {
       body.deadline =
-        updates.deadline === null ? { '.tag': 'no_deadline' } : { deadline: updates.deadline };
+        updates.deadline === null
+          ? { '.tag': 'update', update: null }
+          : { '.tag': 'update', update: { deadline: updates.deadline } };
     }
 
-    let response = await this.api.post('/file_requests/update', body);
-    return response.data;
+    return await this.apiPost('/file_requests/update', body, 'update file request');
   }
 
   async deleteFileRequests(fileRequestIds: string[]) {
-    let response = await this.api.post('/file_requests/delete', { ids: fileRequestIds });
-    return response.data;
+    return await this.apiPost(
+      '/file_requests/delete',
+      { ids: fileRequestIds },
+      'delete file requests'
+    );
   }
 
-  // ── Account ──────────────────────────────────────────────────
+  // Account
 
   async getCurrentAccount() {
-    let response = await this.api.post('/users/get_current_account', null);
-    return response.data;
+    return await this.apiPost('/users/get_current_account', null, 'get current account');
   }
 
   async getSpaceUsage() {
-    let response = await this.api.post('/users/get_space_usage', null);
-    return response.data;
+    return await this.apiPost('/users/get_space_usage', null, 'get space usage');
   }
 
   async getAccount(accountId: string) {
-    let response = await this.api.post('/users/get_account', { account_id: accountId });
-    return response.data;
+    return await this.apiPost('/users/get_account', { account_id: accountId }, 'get account');
   }
 
-  // ── Polling / List folder longpoll ───────────────────────────
+  // Polling / list folder cursors
 
   async listFolderGetLatestCursor(path: string, recursive: boolean = false) {
-    let response = await this.api.post('/files/list_folder/get_latest_cursor', {
-      path: path === '/' ? '' : path,
-      recursive,
-      include_mounted_folders: true,
-      include_non_downloadable_files: true
-    });
-    return response.data;
+    return await this.apiPost(
+      '/files/list_folder/get_latest_cursor',
+      {
+        path: normalizeRootPath(path),
+        recursive,
+        include_mounted_folders: true,
+        include_non_downloadable_files: true
+      },
+      'get latest folder cursor'
+    );
   }
 }

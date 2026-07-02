@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { datadogServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -64,7 +65,7 @@ export let manageIncident = SlateTool.create(spec, {
       result = await client.updateIncident(incidentId, data);
     } else {
       if (!data.title) {
-        throw new Error('title is required when creating a new incident.');
+        throw datadogServiceError('title is required when creating a new incident.');
       }
       result = await client.createIncident({
         title: data.title,

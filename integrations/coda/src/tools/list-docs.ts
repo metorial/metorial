@@ -15,7 +15,13 @@ export let listDocsTool = SlateTool.create(spec, {
     z.object({
       query: z.string().optional().describe('Search query to filter docs by name'),
       isOwner: z.boolean().optional().describe('Show only docs owned by the API token owner'),
+      isPublished: z.boolean().optional().describe('Show only published docs'),
       isStarred: z.boolean().optional().describe('Show only starred docs'),
+      inGallery: z.boolean().optional().describe('Show only docs visible in the gallery'),
+      sourceDocId: z
+        .string()
+        .optional()
+        .describe('Show only docs copied from this source doc ID'),
       workspaceId: z.string().optional().describe('Filter docs to a specific workspace'),
       folderId: z.string().optional().describe('Filter docs to a specific folder'),
       limit: z.number().optional().describe('Maximum number of docs to return (default 25)'),
@@ -48,7 +54,10 @@ export let listDocsTool = SlateTool.create(spec, {
     let result = await client.listDocs({
       query: ctx.input.query,
       isOwner: ctx.input.isOwner,
+      isPublished: ctx.input.isPublished,
       isStarred: ctx.input.isStarred,
+      inGallery: ctx.input.inGallery,
+      sourceDoc: ctx.input.sourceDocId,
       workspaceId: ctx.input.workspaceId,
       folderId: ctx.input.folderId,
       limit: ctx.input.limit,
@@ -58,7 +67,7 @@ export let listDocsTool = SlateTool.create(spec, {
     let docs = (result.items || []).map((doc: any) => ({
       docId: doc.id,
       name: doc.name,
-      ownerName: doc.owner,
+      ownerName: doc.ownerName ?? doc.owner,
       createdAt: doc.createdAt,
       updatedAt: doc.updatedAt,
       workspaceId: doc.workspace?.id,

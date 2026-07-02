@@ -1,12 +1,12 @@
 # <img src="https://provider-logos.metorial-cdn.com/opsgenie.png" height="20"> Opsgenie
 
-Create, manage, and resolve alerts and incidents with priority levels, responders, and rich metadata. Configure on-call schedules with rotations and overrides, and query who is currently on-call. Define escalation policies to notify responders in order when alerts go unacknowledged. Manage teams, users, services, and integrations. Set up per-user notification rules with contact method preferences. Receive webhook notifications for alert activity such as creation, acknowledgment, and closure.
+Create, manage, and resolve alerts and incidents with priority levels, responders, and rich metadata. Track asynchronous alert and incident request status. Configure on-call schedules with rotations and temporary overrides, and query who is currently on-call. Define escalation policies to notify responders in order when alerts go unacknowledged. Manage teams, users, and services. Receive webhook notifications for alert activity such as creation, acknowledgment, and closure.
 
 ## Tools
 
 ### Alert Action
 
-Perform an action on an existing alert: close, acknowledge, unacknowledge, snooze, assign ownership, escalate, add a note, or add/remove tags. All actions are processed asynchronously.
+Perform an action on an existing alert: close, acknowledge, unacknowledge, snooze, assign ownership, escalate, add a note, add/remove tags, or delete. All mutating actions are processed asynchronously.
 
 ### Create Alert
 
@@ -20,9 +20,17 @@ Create a new incident in OpsGenie. Incidents are higher-severity events that may
 
 Retrieve detailed information about a specific alert. Supports lookup by alert ID, tiny ID, or alias.
 
+### Get Alert Request Status
+
+Check the processing status of an asynchronous alert request, such as create, delete, acknowledge, close, snooze, assign, or tag updates.
+
 ### Get Incident
 
 Retrieve detailed information about a specific incident. Only available on Standard and Enterprise plans.
+
+### Get Incident Request Status
+
+Check the processing status of an asynchronous incident request, such as create, delete, resolve, close, or add note.
 
 ### Get On-Call
 
@@ -75,6 +83,10 @@ Create, update, or delete an escalation policy. Escalation policies define the o
 ### Manage Schedule
 
 Create, update, or delete an on-call schedule. When creating, provide a name and optionally rotations and timezone. When updating, provide the schedule identifier and fields to change. When deleting, provide the identifier with the delete action.
+
+### Manage Schedule Override
+
+Create, get, update, delete, or list temporary on-call overrides for an Opsgenie schedule.
 
 ### Manage Service
 

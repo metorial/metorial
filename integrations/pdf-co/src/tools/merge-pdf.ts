@@ -1,7 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  createPdfCoAttachment,
+  downloadPdfCoOutput,
+  fileAttachmentOutputFields,
+  toFileOutput
+} from './shared';
 
 export let mergePdf = SlateTool.create(spec, {
   name: 'Merge Documents',
@@ -22,7 +29,7 @@ Provide multiple file URLs separated by commas. All documents will be combined i
   )
   .output(
     z.object({
-      outputUrl: z.string().describe('URL to download the merged PDF'),
+      ...fileAttachmentOutputFields,
       pageCount: z.number().describe('Total pages in the merged PDF'),
       creditsUsed: z.number().describe('API credits consumed'),
       remainingCredits: z.number().describe('Credits remaining on the account')
@@ -37,17 +44,14 @@ Provide multiple file URLs separated by commas. All documents will be combined i
     });
 
     if (result.error) {
-      throw new Error(`Merge failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Merge failed', result);
     }
+    let file = await downloadPdfCoOutput(client, result, 'application/pdf');
 
     return {
-      output: {
-        outputUrl: result.url,
-        pageCount: result.pageCount,
-        creditsUsed: result.credits,
-        remainingCredits: result.remainingCredits
-      },
-      message: `Merged documents into a single PDF — ${result.pageCount} page(s). [Download merged PDF](${result.url})`
+      output: toFileOutput(result, file),
+      attachments: [createPdfCoAttachment(file)],
+      message: `Merged documents into a single PDF — ${result.pageCount} page(s), returned as an attachment.`
     };
   })
   .build();

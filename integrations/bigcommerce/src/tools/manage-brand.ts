@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bigcommerceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageBrand = SlateTool.create(spec, {
@@ -52,7 +53,7 @@ export let manageBrand = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.brandId) throw new Error('brandId is required for delete');
+      if (!ctx.input.brandId) throw bigcommerceServiceError('brandId is required for delete');
       await client.deleteBrand(ctx.input.brandId);
       return {
         output: { deleted: true },
@@ -74,7 +75,7 @@ export let manageBrand = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.brandId) throw new Error('brandId is required for update');
+    if (!ctx.input.brandId) throw bigcommerceServiceError('brandId is required for update');
     let result = await client.updateBrand(ctx.input.brandId, data);
     return {
       output: { brand: result.data },

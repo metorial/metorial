@@ -1,365 +1,427 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios, pickDefined, requestAxiosData } from 'slates';
+import { workableApiError } from './errors';
 
 export class WorkableClient {
-  private axios: ReturnType<typeof createAxios>;
+  private axios: ReturnType<typeof createAuthenticatedAxios>;
+  private subdomain: string;
 
   constructor(config: { token: string; subdomain: string }) {
-    this.axios = createAxios({
+    this.subdomain = config.subdomain;
+    this.axios = createAuthenticatedAxios({
       baseURL: `https://${config.subdomain}.workable.com/spi/v3`,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+      authHeader: {
+        value: `Bearer ${config.token}`
       }
     });
   }
 
-  // ─── Account ──────────────────────────────────────────────
+  private async request<T>(operation: string, request: () => Promise<{ data: T }>) {
+    return await requestAxiosData<T>(operation, request as any, workableApiError);
+  }
+
+  // Account and lookup endpoints
 
   async getAccount(): Promise<any> {
-    let response = await this.axios.get('/account');
-    return response.data;
+    return await this.request('get account', () =>
+      this.axios.get(`/accounts/${this.subdomain}`)
+    );
   }
 
-  async getMembers(params?: { limit?: number; cursor?: string }): Promise<any> {
-    let response = await this.axios.get('/members', { params });
-    return response.data;
+  async listMembers(params?: {
+    limit?: number;
+    since_id?: string;
+    max_id?: string;
+    role?: string;
+    shortcode?: string;
+    email?: string;
+    name?: string;
+    status?: string;
+  }): Promise<any> {
+    return await this.request('list members', () =>
+      this.axios.get('/members', { params: pickDefined(params ?? {}) })
+    );
   }
 
-  // ─── Jobs ─────────────────────────────────────────────────
+  async listStages(): Promise<any> {
+    return await this.request('list stages', () => this.axios.get('/stages'));
+  }
+
+  async listDepartments(): Promise<any> {
+    return await this.request('list departments', () => this.axios.get('/departments'));
+  }
+
+  async listLegalEntities(): Promise<any> {
+    return await this.request('list legal entities', () => this.axios.get('/legal_entities'));
+  }
+
+  async listWorkSchedules(): Promise<any> {
+    return await this.request('list work schedules', () => this.axios.get('/work_schedules'));
+  }
+
+  async listEmployeeFields(): Promise<any> {
+    return await this.request('list employee fields', () =>
+      this.axios.get('/employee_fields')
+    );
+  }
+
+  async listAccountCustomAttributes(): Promise<any> {
+    return await this.request('list account custom attributes', () =>
+      this.axios.get('/custom_attributes')
+    );
+  }
+
+  async listDisqualificationReasons(): Promise<any> {
+    return await this.request('list disqualification reasons', () =>
+      this.axios.get('/disqualification_reasons')
+    );
+  }
+
+  // Jobs
 
   async listJobs(params?: {
     state?: string;
     limit?: number;
     since_id?: string;
+    max_id?: string;
     created_after?: string;
     updated_after?: string;
+    include_fields?: string;
   }): Promise<any> {
-    let response = await this.axios.get('/jobs', { params });
-    return response.data;
+    return await this.request('list jobs', () =>
+      this.axios.get('/jobs', { params: pickDefined(params ?? {}) })
+    );
   }
 
   async getJob(shortcode: string): Promise<any> {
-    let response = await this.axios.get(`/jobs/${shortcode}`);
-    return response.data;
+    return await this.request('get job', () => this.axios.get(`/jobs/${shortcode}`));
   }
 
   async getJobApplicationForm(shortcode: string): Promise<any> {
-    let response = await this.axios.get(`/jobs/${shortcode}/application_form`);
-    return response.data;
+    return await this.request('get job application form', () =>
+      this.axios.get(`/jobs/${shortcode}/application_form`)
+    );
+  }
+
+  async getJobQuestions(shortcode: string): Promise<any> {
+    return await this.request('list job questions', () =>
+      this.axios.get(`/jobs/${shortcode}/questions`)
+    );
+  }
+
+  async getJobCustomAttributes(shortcode: string): Promise<any> {
+    return await this.request('list job custom attributes', () =>
+      this.axios.get(`/jobs/${shortcode}/custom_attributes`)
+    );
   }
 
   async getJobMembers(shortcode: string): Promise<any> {
-    let response = await this.axios.get(`/jobs/${shortcode}/members`);
-    return response.data;
+    return await this.request('get job members', () =>
+      this.axios.get(`/jobs/${shortcode}/members`)
+    );
   }
 
   async getJobStages(shortcode: string): Promise<any> {
-    let response = await this.axios.get(`/jobs/${shortcode}/stages`);
-    return response.data;
+    return await this.request('get job stages', () =>
+      this.axios.get(`/jobs/${shortcode}/stages`)
+    );
   }
 
-  async getJobActivities(
-    shortcode: string,
-    params?: { limit?: number; since_id?: string }
-  ): Promise<any> {
-    let response = await this.axios.get(`/jobs/${shortcode}/activities`, { params });
-    return response.data;
-  }
-
-  // ─── Candidates ───────────────────────────────────────────
+  // Candidates
 
   async listCandidates(params?: {
-    job_shortcode?: string;
+    email?: string;
+    shortcode?: string;
     stage?: string;
-    state?: string;
     limit?: number;
     since_id?: string;
+    max_id?: string;
     created_after?: string;
     updated_after?: string;
   }): Promise<any> {
-    let allParams: any = { ...params };
-    if (params?.job_shortcode) {
-      let shortcode = params.job_shortcode;
-      allParams.job_shortcode = undefined;
-      let response = await this.axios.get(`/jobs/${shortcode}/candidates`, {
-        params: allParams
-      });
-      return response.data;
-    }
-    let response = await this.axios.get('/candidates', { params: allParams });
-    return response.data;
+    return await this.request('list candidates', () =>
+      this.axios.get('/candidates', { params: pickDefined(params ?? {}) })
+    );
   }
 
-  async getCandidate(jobShortcode: string, candidateId: string): Promise<any> {
-    let response = await this.axios.get(`/jobs/${jobShortcode}/candidates/${candidateId}`);
-    return response.data;
+  async getCandidate(candidateId: string): Promise<any> {
+    return await this.request('get candidate', () =>
+      this.axios.get(`/candidates/${candidateId}`)
+    );
   }
 
-  async createCandidate(jobShortcode: string, candidateData: any): Promise<any> {
-    let response = await this.axios.post(`/jobs/${jobShortcode}/candidates`, candidateData);
-    return response.data;
-  }
-
-  async moveCandidate(
+  async createCandidate(
     jobShortcode: string,
-    candidateId: string,
-    stageSlug: string
+    body: Record<string, unknown>,
+    params?: { stage?: string }
   ): Promise<any> {
-    let response = await this.axios.post(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/move`,
-      {
-        stage: stageSlug
-      }
+    return await this.request('create candidate', () =>
+      this.axios.post(`/jobs/${jobShortcode}/candidates`, body, {
+        params: pickDefined(params ?? {})
+      })
     );
-    return response.data;
   }
 
-  async copyCandidate(
-    jobShortcode: string,
+  async updateCandidate(candidateId: string, body: Record<string, unknown>): Promise<any> {
+    return await this.request('update candidate', () =>
+      this.axios.patch(`/candidates/${candidateId}`, body)
+    );
+  }
+
+  async moveCandidate(candidateId: string, body: Record<string, unknown>): Promise<any> {
+    return await this.request('move candidate', () =>
+      this.axios.post(`/candidates/${candidateId}/move`, body)
+    );
+  }
+
+  async copyCandidate(candidateId: string, body: Record<string, unknown>): Promise<any> {
+    return await this.request('copy candidate', () =>
+      this.axios.post(`/candidates/${candidateId}/copy`, body)
+    );
+  }
+
+  async relocateCandidate(candidateId: string, body: Record<string, unknown>): Promise<any> {
+    return await this.request('relocate candidate', () =>
+      this.axios.post(`/candidates/${candidateId}/relocate`, body)
+    );
+  }
+
+  async disqualifyCandidate(candidateId: string, body: Record<string, unknown>): Promise<any> {
+    return await this.request('disqualify candidate', () =>
+      this.axios.post(`/candidates/${candidateId}/disqualify`, body)
+    );
+  }
+
+  async revertDisqualification(
     candidateId: string,
-    targetJobShortcode: string,
-    stageSlug?: string
+    body: Record<string, unknown>
   ): Promise<any> {
-    let body: any = { target_job: targetJobShortcode };
-    if (stageSlug) body.target_stage = stageSlug;
-    let response = await this.axios.post(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/copy`,
-      body
+    return await this.request('revert candidate disqualification', () =>
+      this.axios.post(`/candidates/${candidateId}/revert`, body)
     );
-    return response.data;
   }
 
-  async relocateCandidate(
-    jobShortcode: string,
-    candidateId: string,
-    targetJobShortcode: string,
-    stageSlug?: string
-  ): Promise<any> {
-    let body: any = { target_job: targetJobShortcode };
-    if (stageSlug) body.target_stage = stageSlug;
-    let response = await this.axios.post(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/relocate`,
-      body
+  async addCandidateComment(candidateId: string, body: Record<string, unknown>) {
+    return await this.request('comment on candidate', () =>
+      this.axios.post(`/candidates/${candidateId}/comments`, body)
     );
-    return response.data;
   }
 
-  async disqualifyCandidate(
-    jobShortcode: string,
-    candidateId: string,
-    reason?: string
-  ): Promise<any> {
-    let body: any = {};
-    if (reason) body.disqualification_reason = reason;
-    let response = await this.axios.post(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/disqualify`,
-      body
+  async setCandidateTags(candidateId: string, tags: string[]): Promise<any> {
+    return await this.request('set candidate tags', () =>
+      this.axios.put(`/candidates/${candidateId}/tags`, { tags })
     );
-    return response.data;
   }
 
-  async revertDisqualification(jobShortcode: string, candidateId: string): Promise<any> {
-    let response = await this.axios.post(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/revert`
+  async addCandidateRating(candidateId: string, body: Record<string, unknown>) {
+    return await this.request('rate candidate', () =>
+      this.axios.post(`/candidates/${candidateId}/ratings`, body)
     );
-    return response.data;
-  }
-
-  async addCandidateComment(
-    jobShortcode: string,
-    candidateId: string,
-    body: string,
-    policyName?: string
-  ): Promise<any> {
-    let payload: any = { body };
-    if (policyName) payload.policy = policyName;
-    let response = await this.axios.post(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/comments`,
-      payload
-    );
-    return response.data;
-  }
-
-  async addCandidateTag(jobShortcode: string, candidateId: string, tag: string): Promise<any> {
-    let response = await this.axios.post(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/tags`,
-      { tag }
-    );
-    return response.data;
   }
 
   async getCandidateActivities(
-    jobShortcode: string,
     candidateId: string,
-    params?: { limit?: number; since_id?: string }
+    params?: {
+      limit?: number;
+      since_id?: string;
+      max_id?: string;
+      actions?: string;
+      updated_after?: string;
+    }
   ): Promise<any> {
-    let response = await this.axios.get(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/activities`,
-      { params }
+    return await this.request('list candidate activities', () =>
+      this.axios.get(`/candidates/${candidateId}/activities`, {
+        params: pickDefined(params ?? {})
+      })
     );
-    return response.data;
   }
 
-  async getCandidateOffer(jobShortcode: string, candidateId: string): Promise<any> {
-    let response = await this.axios.get(
-      `/jobs/${jobShortcode}/candidates/${candidateId}/offer`
+  async getCandidateOffer(candidateId: string): Promise<any> {
+    return await this.request('get candidate offer', () =>
+      this.axios.get(`/candidates/${candidateId}/offer`)
     );
-    return response.data;
   }
 
-  // ─── Departments ──────────────────────────────────────────
-
-  async listDepartments(): Promise<any> {
-    let response = await this.axios.get('/departments');
-    return response.data;
+  async listCandidateFiles(candidateId: string): Promise<any> {
+    return await this.request('list candidate files', () =>
+      this.axios.get(`/candidates/${candidateId}/files`)
+    );
   }
 
-  async createDepartment(name: string, parentId?: string): Promise<any> {
-    let body: any = { name };
-    if (parentId) body.parent_id = parentId;
-    let response = await this.axios.post('/departments', body);
-    return response.data;
-  }
-
-  // ─── Employees ────────────────────────────────────────────
+  // Employees
 
   async listEmployees(params?: {
     limit?: number;
-    cursor?: string;
-    email?: string;
-    work_email?: string;
+    offset?: number;
+    query?: string;
+    order_by?: string;
+    member_id?: string;
   }): Promise<any> {
-    let response = await this.axios.get('/employees', { params });
-    return response.data;
+    return await this.request('list employees', () =>
+      this.axios.get('/employees', { params: pickDefined(params ?? {}) })
+    );
   }
 
-  async getEmployee(employeeId: string): Promise<any> {
-    let response = await this.axios.get(`/employees/${employeeId}`);
-    return response.data;
+  async getEmployee(employeeId: string, params?: { member_id?: string }): Promise<any> {
+    return await this.request('get employee', () =>
+      this.axios.get(`/employees/${employeeId}`, { params: pickDefined(params ?? {}) })
+    );
   }
 
-  async createEmployee(employeeData: any): Promise<any> {
-    let response = await this.axios.post('/employees', employeeData);
-    return response.data;
+  async createEmployee(body: Record<string, unknown>): Promise<any> {
+    return await this.request('create employee', () => this.axios.post('/employees', body));
   }
 
-  async updateEmployee(employeeId: string, employeeData: any): Promise<any> {
-    let response = await this.axios.patch(`/employees/${employeeId}`, employeeData);
-    return response.data;
+  async updateEmployee(employeeId: string, body: Record<string, unknown>): Promise<any> {
+    return await this.request('update employee', () =>
+      this.axios.patch(`/employees/${employeeId}`, body)
+    );
   }
 
-  async getEmployeeDocuments(employeeId: string): Promise<any> {
-    let response = await this.axios.get(`/employees/${employeeId}/documents`);
-    return response.data;
+  async getEmployeeDocuments(
+    employeeId: string,
+    params?: {
+      member_id?: string;
+      type?: string;
+      limit?: number;
+      offset?: number;
+    }
+  ): Promise<any> {
+    return await this.request('list employee documents', () =>
+      this.axios.get(`/employees/${employeeId}/documents`, {
+        params: pickDefined(params ?? {})
+      })
+    );
   }
 
-  // ─── Time Off ─────────────────────────────────────────────
+  // Time off
 
   async listTimeOffCategories(): Promise<any> {
-    let response = await this.axios.get('/time_off/categories');
-    return response.data;
+    return await this.request('list time off categories', () =>
+      this.axios.get('/timeoff/categories')
+    );
   }
 
-  async listTimeOffRequests(params?: {
+  async listTimeOffRequests(params: {
+    from_date: string;
+    to_date?: string;
+    category_ids?: string[];
+    states?: string[];
     employee_id?: string;
-    status?: string;
+    employee_ids?: string[];
     limit?: number;
-    cursor?: string;
+    offset?: number;
   }): Promise<any> {
-    let response = await this.axios.get('/time_off/requests', { params });
-    return response.data;
+    return await this.request('list time off requests', () =>
+      this.axios.get('/timeoff/requests', { params: pickDefined(params) })
+    );
   }
 
-  async createTimeOffRequest(requestData: any): Promise<any> {
-    let response = await this.axios.post('/time_off/requests', requestData);
-    return response.data;
+  async createTimeOffRequest(body: Record<string, unknown>): Promise<any> {
+    return await this.request('create time off request', () =>
+      this.axios.post('/timeoff/requests', body)
+    );
   }
 
-  async getTimeOffBalances(employeeId: string): Promise<any> {
-    let response = await this.axios.get(`/time_off/balances/${employeeId}`);
-    return response.data;
+  async getTimeOffBalances(params?: { employee_id?: string }): Promise<any> {
+    return await this.request('get time off balances', () =>
+      this.axios.get('/timeoff/balances', { params: pickDefined(params ?? {}) })
+    );
   }
 
-  // ─── Requisitions ─────────────────────────────────────────
+  async updateTimeOffApproval(
+    approvalKey: string,
+    body: Record<string, unknown>
+  ): Promise<any> {
+    return await this.request('update time off approval', () =>
+      this.axios.patch(`/timeoff/approvals/${approvalKey}`, body)
+    );
+  }
+
+  // Requisitions
 
   async listRequisitions(params?: {
     limit?: number;
-    cursor?: string;
+    since_id?: string;
+    max_id?: string;
     state?: string;
+    job_id?: string;
+    plan_date_from?: string;
+    plan_date_to?: string;
+    created_after?: string;
+    updated_after?: string;
   }): Promise<any> {
-    let response = await this.axios.get('/requisitions', { params });
-    return response.data;
+    return await this.request('list requisitions', () =>
+      this.axios.get('/requisitions', { params: pickDefined(params ?? {}) })
+    );
   }
 
-  async getRequisition(requisitionId: string): Promise<any> {
-    let response = await this.axios.get(`/requisitions/${requisitionId}`);
-    return response.data;
+  async getRequisition(requisitionCode: string): Promise<any> {
+    return await this.request('get requisition', () =>
+      this.axios.get(`/requisitions/${requisitionCode}`)
+    );
   }
 
-  async createRequisition(requisitionData: any): Promise<any> {
-    let response = await this.axios.post('/requisitions', requisitionData);
-    return response.data;
+  async createRequisition(body: Record<string, unknown>): Promise<any> {
+    return await this.request('create requisition', () =>
+      this.axios.post('/requisitions', body)
+    );
   }
 
-  async updateRequisition(requisitionId: string, requisitionData: any): Promise<any> {
-    let response = await this.axios.patch(`/requisitions/${requisitionId}`, requisitionData);
-    return response.data;
+  async updateRequisition(requisitionId: string, body: Record<string, unknown>) {
+    return await this.request('update requisition', () =>
+      this.axios.patch(`/requisitions/${requisitionId}`, body)
+    );
   }
 
-  async approveRequisition(requisitionId: string): Promise<any> {
-    let response = await this.axios.post(`/requisitions/${requisitionId}/approve`);
-    return response.data;
+  async approveRequisition(requisitionCode: string, body: Record<string, unknown>) {
+    return await this.request('approve requisition', () =>
+      this.axios.patch(`/requisitions/${requisitionCode}/approve`, body)
+    );
   }
 
-  async rejectRequisition(requisitionId: string, reason?: string): Promise<any> {
-    let body: any = {};
-    if (reason) body.reason = reason;
-    let response = await this.axios.post(`/requisitions/${requisitionId}/reject`, body);
-    return response.data;
+  async rejectRequisition(requisitionCode: string, body: Record<string, unknown>) {
+    return await this.request('reject requisition', () =>
+      this.axios.patch(`/requisitions/${requisitionCode}/reject`, body)
+    );
   }
 
-  // ─── Events / Interviews ──────────────────────────────────
+  // Events and webhook subscriptions
 
   async listEvents(params?: {
     type?: string;
     candidate_id?: string;
-    job_shortcode?: string;
+    shortcode?: string;
     member_id?: string;
     start_date?: string;
     end_date?: string;
     context?: string;
     limit?: number;
     since_id?: string;
+    max_id?: string;
+    include_cancelled?: boolean;
   }): Promise<any> {
-    let response = await this.axios.get('/events', { params });
-    return response.data;
+    return await this.request('list events', () =>
+      this.axios.get('/events', { params: pickDefined(params ?? {}) })
+    );
   }
-
-  // ─── Webhooks / Subscriptions ─────────────────────────────
 
   async createSubscription(subscriptionData: {
     target: string;
     event: string;
     args?: { job_shortcode?: string; stage_slug?: string };
   }): Promise<any> {
-    let response = await this.axios.post('/subscriptions', subscriptionData);
-    return response.data;
+    return await this.request('create subscription', () =>
+      this.axios.post('/subscriptions', subscriptionData)
+    );
   }
 
   async deleteSubscription(subscriptionId: string): Promise<any> {
-    let response = await this.axios.delete(`/subscriptions/${subscriptionId}`);
-    return response.data;
+    return await this.request('delete subscription', () =>
+      this.axios.delete(`/subscriptions/${subscriptionId}`)
+    );
   }
 
   async listSubscriptions(): Promise<any> {
-    let response = await this.axios.get('/subscriptions');
-    return response.data;
-  }
-
-  // ─── Work Schedules ───────────────────────────────────────
-
-  async listWorkSchedules(): Promise<any> {
-    let response = await this.axios.get('/work_schedules');
-    return response.data;
+    return await this.request('list subscriptions', () => this.axios.get('/subscriptions'));
   }
 }

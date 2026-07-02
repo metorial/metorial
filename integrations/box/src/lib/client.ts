@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { boxApiError } from './errors';
 
 let api = createAxios({
   baseURL: 'https://api.box.com/2.0'
@@ -7,6 +8,40 @@ let api = createAxios({
 let uploadApi = createAxios({
   baseURL: 'https://upload.box.com/api/2.0'
 });
+
+let applyBoxApiErrorInterceptor = (
+  http: ReturnType<typeof createAxios>,
+  operation: string
+) => {
+  http.interceptors.response.use(
+    response => response,
+    error => Promise.reject(boxApiError(error, operation))
+  );
+};
+
+let getHeaderValue = (headers: Record<string, any>, name: string) => {
+  let value = headers[name] ?? headers[name.toLowerCase()];
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return typeof value === 'string' ? value : undefined;
+};
+
+let toBuffer = (data: unknown) => {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+  return Buffer.from(data as any);
+};
+
+applyBoxApiErrorInterceptor(api, 'request');
+applyBoxApiErrorInterceptor(uploadApi, 'upload request');
 
 export class Client {
   private headers: Record<string, string>;
@@ -78,6 +113,36 @@ export class Client {
       validateStatus: (status: number) => status >= 200 && status < 400
     });
     return response.headers?.location || response.request?.responseURL || '';
+  }
+
+  async downloadFile(
+    fileId: string,
+    version?: string
+  ): Promise<{
+    file: any;
+    contentBase64: string;
+    mimeType: string;
+    byteLength: number;
+  }> {
+    let [file, response] = await Promise.all([
+      this.getFileInfo(fileId, ['id', 'name', 'size', 'extension']),
+      api.get(`/files/${fileId}/content`, {
+        headers: this.headers,
+        params: version ? { version } : undefined,
+        responseType: 'arraybuffer'
+      })
+    ]);
+    let content = toBuffer(response.data);
+    let mimeType =
+      getHeaderValue(response.headers as Record<string, any>, 'content-type') ||
+      'application/octet-stream';
+
+    return {
+      file,
+      contentBase64: content.toString('base64'),
+      mimeType,
+      byteLength: content.byteLength
+    };
   }
 
   async lockFile(fileId: string, expiresAt?: string): Promise<any> {

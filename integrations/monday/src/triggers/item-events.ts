@@ -1,6 +1,7 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { MondayClient } from '../lib/client';
+import { mondayServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let itemEventsTrigger = SlateTrigger.create(spec, {
@@ -58,7 +59,7 @@ export let itemEventsTrigger = SlateTrigger.create(spec, {
       let boardId = url.searchParams.get('boardId');
 
       if (!boardId) {
-        throw new Error(
+        throw mondayServiceError(
           'Board ID is required. Configure the boardId query parameter on the webhook URL.'
         );
       }

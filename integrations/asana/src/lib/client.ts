@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { asanaApiError } from './errors';
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
@@ -11,6 +12,11 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(asanaApiError(error))
+    );
   }
 
   // ── Workspaces ──
@@ -55,13 +61,14 @@ export class Client {
     workspaceId: string,
     params?: { limit?: number; offset?: string; archived?: boolean; team?: string }
   ) {
-    let response = await this.axios.get('/projects', {
+    let path = params?.team
+      ? `/teams/${params.team}/projects`
+      : `/workspaces/${workspaceId}/projects`;
+    let response = await this.axios.get(path, {
       params: {
-        workspace: workspaceId,
         limit: params?.limit ?? 100,
         offset: params?.offset,
         archived: params?.archived,
-        team: params?.team,
         opt_fields:
           'name,gid,archived,color,created_at,current_status,due_on,start_on,modified_at,owner,team,workspace,notes,public,default_view'
       }
@@ -80,9 +87,9 @@ export class Client {
   }
 
   async createProject(workspaceId: string, data: Record<string, any>) {
-    let response = await this.axios.post('/projects', {
-      data: { ...data, workspace: workspaceId }
-    });
+    let { team, ...projectData } = data;
+    let path = team ? `/teams/${team}/projects` : `/workspaces/${workspaceId}/projects`;
+    let response = await this.axios.post(path, { data: projectData });
     return response.data.data;
   }
 
@@ -209,6 +216,12 @@ export class Client {
   async removeDependenciesFromTask(taskId: string, dependencyIds: string[]) {
     await this.axios.post(`/tasks/${taskId}/removeDependencies`, {
       data: { dependencies: dependencyIds }
+    });
+  }
+
+  async removeDependentsFromTask(taskId: string, dependentIds: string[]) {
+    await this.axios.post(`/tasks/${taskId}/removeDependents`, {
+      data: { dependents: dependentIds }
     });
   }
 
@@ -483,6 +496,18 @@ export class Client {
     return response.data.data;
   }
 
+  async createEnumOption(customFieldId: string, data: Record<string, any>) {
+    let response = await this.axios.post(`/custom_fields/${customFieldId}/enum_options`, {
+      data
+    });
+    return response.data.data;
+  }
+
+  async updateEnumOption(enumOptionId: string, data: Record<string, any>) {
+    let response = await this.axios.put(`/enum_options/${enumOptionId}`, { data });
+    return response.data.data;
+  }
+
   // ── Teams ──
 
   async listTeamsInWorkspace(
@@ -522,16 +547,19 @@ export class Client {
 
   async typeahead(workspaceId: string, resourceType: string, query: string, count?: number) {
     let response = await this.axios.get(`/workspaces/${workspaceId}/typeahead`, {
-      params: { resource_type: resourceType, query, count: count ?? 10 }
+      params: { resource_type: resourceType, query, count: count ?? 20 }
     });
     return response.data;
   }
 
   // ── Attachments ──
 
-  async listAttachments(parentId: string, parentType: string = 'task') {
-    let response = await this.axios.get(`/${parentType}s/${parentId}/attachments`, {
+  async listAttachments(parentId: string, params?: { limit?: number; offset?: string }) {
+    let response = await this.axios.get('/attachments', {
       params: {
+        parent: parentId,
+        limit: params?.limit ?? 100,
+        offset: params?.offset,
         opt_fields:
           'name,gid,resource_type,created_at,download_url,host,parent,view_url,resource_subtype,size'
       }
@@ -540,14 +568,50 @@ export class Client {
   }
 
   async getAttachment(attachmentId: string) {
-    let response = await this.axios.get(`/attachments/${attachmentId}`);
+    let response = await this.axios.get(`/attachments/${attachmentId}`, {
+      params: {
+        opt_fields:
+          'name,gid,resource_type,created_at,download_url,host,parent,view_url,resource_subtype,size'
+      }
+    });
     return response.data.data;
   }
 
-  async createAttachmentFromUrl(parentId: string, url: string, name: string) {
-    let response = await this.axios.post(`/tasks/${parentId}/attachments`, {
-      data: { resource_subtype: 'external', url, name, parent: parentId }
+  async createExternalAttachment(params: {
+    parentId: string;
+    url: string;
+    name: string;
+    connectToApp?: boolean;
+  }) {
+    let form = new FormData();
+    form.append('parent', params.parentId);
+    form.append('resource_subtype', 'external');
+    form.append('url', params.url);
+    form.append('name', params.name);
+    if (params.connectToApp !== undefined) {
+      form.append('connect_to_app', String(params.connectToApp));
+    }
+
+    let response = await this.axios.post('/attachments', form);
+    return response.data.data;
+  }
+
+  async uploadAttachment(params: {
+    parentId: string;
+    fileName: string;
+    contentBase64: string;
+    mimeType?: string;
+  }) {
+    let fileBytes = Buffer.from(params.contentBase64, 'base64');
+    let form = new FormData();
+    let blob = new Blob([fileBytes], {
+      type: params.mimeType ?? 'application/octet-stream'
     });
+
+    form.append('parent', params.parentId);
+    form.append('file', blob, params.fileName);
+
+    let response = await this.axios.post('/attachments', form);
     return response.data.data;
   }
 
@@ -571,7 +635,11 @@ export class Client {
     let payload: any = response.data;
     return {
       webhook: payload?.data,
-      hookSecret: payload?.['X-Hook-Secret'] ?? null
+      hookSecret:
+        response.headers?.['x-hook-secret'] ??
+        response.headers?.['X-Hook-Secret'] ??
+        payload?.['X-Hook-Secret'] ??
+        null
     };
   }
 
@@ -595,19 +663,31 @@ export class Client {
 
   // ── Project Templates ──
 
-  async listProjectTemplates(
-    workspaceId: string,
-    params?: { limit?: number; offset?: string }
-  ) {
-    let response = await this.axios.get(`/project_templates`, {
+  async listProjectTemplates(params: {
+    workspaceId?: string;
+    teamId?: string;
+    limit?: number;
+    offset?: string;
+  }) {
+    let response = await this.axios.get('/project_templates', {
       params: {
-        workspace: workspaceId,
-        limit: params?.limit ?? 100,
-        offset: params?.offset,
-        opt_fields: 'name,gid,description,color,public,requested_dates,team'
+        workspace: params.workspaceId,
+        team: params.teamId,
+        limit: params.limit ?? 100,
+        offset: params.offset,
+        opt_fields: 'name,gid,description,color,public,requested_dates,team,workspace'
       }
     });
     return response.data;
+  }
+
+  async getProjectTemplate(templateId: string) {
+    let response = await this.axios.get(`/project_templates/${templateId}`, {
+      params: {
+        opt_fields: 'name,gid,description,color,public,requested_dates,team,workspace'
+      }
+    });
+    return response.data.data;
   }
 
   async instantiateProjectTemplate(templateId: string, data: Record<string, any>) {
@@ -630,6 +710,16 @@ export class Client {
       }
     });
     return response.data;
+  }
+
+  async getTimeTrackingEntry(timeTrackingEntryId: string) {
+    let response = await this.axios.get(`/time_tracking_entries/${timeTrackingEntryId}`, {
+      params: {
+        opt_fields:
+          'gid,created_by,created_by.name,duration_minutes,entered_on,created_at,task'
+      }
+    });
+    return response.data.data;
   }
 
   // ── User Task Lists ──

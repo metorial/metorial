@@ -1,15 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageSale = SlateTool.create(spec, {
   name: 'Manage Sale',
   key: 'manage_sale',
-  description: `Mark a sale as shipped or refund a sale. Supports partial refunds by specifying an amount in cents.`,
+  description: `Mark a sale as shipped, refund a sale, or resend the purchase receipt. Supports partial refunds by specifying an amount in cents.`,
   instructions: [
     'Use "mark_as_shipped" to mark a physical product sale as shipped, optionally providing a tracking URL.',
-    'Use "refund" to process a full or partial refund. Omit amountCents for a full refund.'
+    'Use "refund" to process a full or partial refund. Omit amountCents for a full refund.',
+    'Use "resend_receipt" to email the purchase receipt to the customer again.'
   ],
   tags: {
     destructive: true
@@ -17,7 +19,9 @@ export let manageSale = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      action: z.enum(['mark_as_shipped', 'refund']).describe('Action to perform on the sale'),
+      action: z
+        .enum(['mark_as_shipped', 'refund', 'resend_receipt'])
+        .describe('Action to perform on the sale'),
       saleId: z.string().describe('The sale ID to manage'),
       trackingUrl: z
         .string()
@@ -34,7 +38,8 @@ export let manageSale = SlateTool.create(spec, {
       saleId: z.string().describe('The managed sale ID'),
       productName: z.string().optional().describe('Product name'),
       refunded: z.boolean().optional().describe('Whether the sale is refunded'),
-      shipped: z.boolean().optional().describe('Whether the sale is marked as shipped')
+      shipped: z.boolean().optional().describe('Whether the sale is marked as shipped'),
+      receiptResent: z.boolean().optional().describe('Whether the receipt was resent')
     })
   )
   .handleInvocation(async ctx => {
@@ -67,6 +72,17 @@ export let manageSale = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    if (action === 'resend_receipt') {
+      await client.resendReceipt(saleId);
+      return {
+        output: {
+          saleId,
+          receiptResent: true
+        },
+        message: `Resent receipt for sale **${saleId}**.`
+      };
+    }
+
+    throw gumroadServiceError(`Unknown action: ${action}`);
   })
   .build();

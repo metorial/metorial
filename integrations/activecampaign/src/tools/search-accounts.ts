@@ -15,6 +15,10 @@ export let searchAccounts = SlateTool.create(spec, {
   .input(
     z.object({
       search: z.string().optional().describe('Search term to filter accounts by name'),
+      includeCounts: z
+        .boolean()
+        .optional()
+        .describe('Whether ActiveCampaign should compute contact and deal counts'),
       limit: z.number().optional().describe('Maximum number of accounts to return'),
       offset: z.number().optional().describe('Pagination offset')
     })
@@ -41,6 +45,7 @@ export let searchAccounts = SlateTool.create(spec, {
 
     let params: Record<string, any> = {};
     if (ctx.input.search) params.search = ctx.input.search;
+    if (ctx.input.includeCounts !== undefined) params.count_deals = ctx.input.includeCounts;
     if (ctx.input.limit) params.limit = ctx.input.limit;
     if (ctx.input.offset) params.offset = ctx.input.offset;
 

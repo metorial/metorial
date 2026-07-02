@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { planetscaleApiError } from './errors';
 
 let api = createAxios({
   baseURL: 'https://api.planetscale.com/v1'
@@ -16,6 +17,11 @@ export interface PaginatedResponse<T> {
   prevPage: number | null;
   prevPageUrl: string | null;
   data: T[];
+}
+
+export interface PlanetScaleStorage {
+  minimumStorageBytes?: number;
+  maximumStorageBytes?: number;
 }
 
 export class Client {
@@ -69,19 +75,43 @@ export class Client {
     };
   }
 
+  private async request<T>(operation: string, run: () => Promise<{ data: T }>): Promise<T> {
+    try {
+      let response = await run();
+      return response.data;
+    } catch (error) {
+      throw planetscaleApiError(error, operation);
+    }
+  }
+
+  private storageBody(storage?: PlanetScaleStorage): Record<string, number> | undefined {
+    let body: Record<string, number> = {};
+    if (storage?.minimumStorageBytes !== undefined) {
+      body.minimum_storage_bytes = storage.minimumStorageBytes;
+    }
+    if (storage?.maximumStorageBytes !== undefined) {
+      body.maximum_storage_bytes = storage.maximumStorageBytes;
+    }
+
+    return Object.keys(body).length > 0 ? body : undefined;
+  }
+
   // ---- Organizations ----
 
   async listOrganizations(pagination?: PaginationParams): Promise<PaginatedResponse<any>> {
-    let response = await api.get('/organizations', {
-      headers: this.headers,
-      params: this.paginationParams(pagination)
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list organizations', () =>
+      api.get('/organizations', {
+        headers: this.headers,
+        params: this.paginationParams(pagination)
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async getOrganization(): Promise<any> {
-    let response = await api.get(this.orgPath(), { headers: this.headers });
-    return response.data;
+    return await this.request('get organization', () =>
+      api.get(this.orgPath(), { headers: this.headers })
+    );
   }
 
   // ---- Databases ----
@@ -92,61 +122,90 @@ export class Client {
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, any> = { ...this.paginationParams(pagination) };
     if (query) params.q = query;
-    let response = await api.get(this.orgPath('/databases'), {
-      headers: this.headers,
-      params
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list databases', () =>
+      api.get(this.orgPath('/databases'), {
+        headers: this.headers,
+        params
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async getDatabase(database: string): Promise<any> {
-    let response = await api.get(this.dbPath(database), { headers: this.headers });
-    return response.data;
+    return await this.request('get database', () =>
+      api.get(this.dbPath(database), { headers: this.headers })
+    );
   }
 
   async createDatabase(data: {
     name: string;
-    clusterSize?: string;
+    clusterSize: string;
     region?: string;
     replicas?: number;
     kind?: string;
     majorVersion?: string;
+    storage?: PlanetScaleStorage;
   }): Promise<any> {
-    let body: Record<string, any> = { name: data.name };
-    if (data.clusterSize) body.cluster_size = data.clusterSize;
+    let body: Record<string, any> = { name: data.name, cluster_size: data.clusterSize };
     if (data.region) body.region = data.region;
     if (data.replicas !== undefined) body.replicas = data.replicas;
     if (data.kind) body.kind = data.kind;
     if (data.majorVersion) body.major_version = data.majorVersion;
+    let storage = this.storageBody(data.storage);
+    if (storage) body.storage = storage;
 
-    let response = await api.post(this.orgPath('/databases'), body, { headers: this.headers });
-    return response.data;
+    return await this.request('create database', () =>
+      api.post(this.orgPath('/databases'), body, { headers: this.headers })
+    );
   }
 
   async updateDatabase(
     database: string,
     data: {
+      newName?: string;
+      automaticMigrations?: boolean;
+      migrationFramework?: string;
+      migrationTableName?: string;
       requireApprovalForDeploy?: boolean;
-      foreignKeysEnabled?: boolean;
+      restrictBranchRegion?: boolean;
+      allowForeignKeyConstraints?: boolean;
       allowDataBranching?: boolean;
-      insightsEnabled?: boolean;
+      insightsRawQueries?: boolean;
+      productionBranchWebConsole?: boolean;
+      defaultBranch?: string;
     }
   ): Promise<any> {
     let body: Record<string, any> = {};
+    if (data.newName !== undefined) body.new_name = data.newName;
+    if (data.automaticMigrations !== undefined)
+      body.automatic_migrations = data.automaticMigrations;
+    if (data.migrationFramework !== undefined)
+      body.migration_framework = data.migrationFramework;
+    if (data.migrationTableName !== undefined)
+      body.migration_table_name = data.migrationTableName;
     if (data.requireApprovalForDeploy !== undefined)
       body.require_approval_for_deploy = data.requireApprovalForDeploy;
-    if (data.foreignKeysEnabled !== undefined)
-      body.foreign_keys_enabled = data.foreignKeysEnabled;
+    if (data.restrictBranchRegion !== undefined)
+      body.restrict_branch_region = data.restrictBranchRegion;
+    if (data.allowForeignKeyConstraints !== undefined)
+      body.allow_foreign_key_constraints = data.allowForeignKeyConstraints;
     if (data.allowDataBranching !== undefined)
       body.allow_data_branching = data.allowDataBranching;
-    if (data.insightsEnabled !== undefined) body.insights_enabled = data.insightsEnabled;
+    if (data.insightsRawQueries !== undefined)
+      body.insights_raw_queries = data.insightsRawQueries;
+    if (data.productionBranchWebConsole !== undefined)
+      body.production_branch_web_console = data.productionBranchWebConsole;
+    if (data.defaultBranch !== undefined) body.default_branch = data.defaultBranch;
 
-    let response = await api.patch(this.dbPath(database), body, { headers: this.headers });
-    return response.data;
+    return await this.request('update database', () =>
+      api.patch(this.dbPath(database), body, { headers: this.headers })
+    );
   }
 
   async deleteDatabase(database: string): Promise<void> {
-    await api.delete(this.dbPath(database), { headers: this.headers });
+    await this.request('delete database', () =>
+      api.delete(this.dbPath(database), { headers: this.headers })
+    );
   }
 
   // ---- Branches ----
@@ -155,16 +214,19 @@ export class Client {
     database: string,
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
-    let response = await api.get(this.dbPath(database, '/branches'), {
-      headers: this.headers,
-      params: this.paginationParams(pagination)
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list branches', () =>
+      api.get(this.dbPath(database, '/branches'), {
+        headers: this.headers,
+        params: this.paginationParams(pagination)
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async getBranch(database: string, branch: string): Promise<any> {
-    let response = await api.get(this.branchPath(database, branch), { headers: this.headers });
-    return response.data;
+    return await this.request('get branch', () =>
+      api.get(this.branchPath(database, branch), { headers: this.headers })
+    );
   }
 
   async createBranch(
@@ -178,6 +240,9 @@ export class Client {
       seedData?: string;
       clusterSize?: string;
       majorVersion?: string;
+      createDatabaseIfMissing?: boolean;
+      kind?: string;
+      storage?: PlanetScaleStorage;
     }
   ): Promise<any> {
     let body: Record<string, any> = { name: data.name };
@@ -188,67 +253,73 @@ export class Client {
     if (data.seedData) body.seed_data = data.seedData;
     if (data.clusterSize) body.cluster_size = data.clusterSize;
     if (data.majorVersion) body.major_version = data.majorVersion;
+    if (data.createDatabaseIfMissing !== undefined)
+      body.create_database_if_missing = data.createDatabaseIfMissing;
+    if (data.kind) body.kind = data.kind;
+    let storage = this.storageBody(data.storage);
+    if (storage) body.storage = storage;
 
-    let response = await api.post(this.dbPath(database, '/branches'), body, {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('create branch', () =>
+      api.post(this.dbPath(database, '/branches'), body, {
+        headers: this.headers
+      })
+    );
   }
 
   async deleteBranch(database: string, branch: string): Promise<void> {
-    await api.delete(this.branchPath(database, branch), { headers: this.headers });
+    await this.request('delete branch', () =>
+      api.delete(this.branchPath(database, branch), { headers: this.headers })
+    );
   }
 
   async promoteBranch(database: string, branch: string): Promise<any> {
-    let response = await api.post(
-      this.branchPath(database, branch, '/promote'),
-      {},
-      { headers: this.headers }
+    return await this.request('promote branch', () =>
+      api.post(this.branchPath(database, branch, '/promote'), {}, { headers: this.headers })
     );
-    return response.data;
   }
 
   async demoteBranch(database: string, branch: string): Promise<any> {
-    let response = await api.post(
-      this.branchPath(database, branch, '/demote'),
-      {},
-      { headers: this.headers }
+    return await this.request('demote branch', () =>
+      api.post(this.branchPath(database, branch, '/demote'), {}, { headers: this.headers })
     );
-    return response.data;
   }
 
   async enableSafeMigrations(database: string, branch: string): Promise<any> {
-    let response = await api.post(
-      this.branchPath(database, branch, '/enable-safe-migrations'),
-      {},
-      { headers: this.headers }
+    return await this.request('enable safe migrations', () =>
+      api.post(
+        this.branchPath(database, branch, '/enable-safe-migrations'),
+        {},
+        { headers: this.headers }
+      )
     );
-    return response.data;
   }
 
   async disableSafeMigrations(database: string, branch: string): Promise<any> {
-    let response = await api.post(
-      this.branchPath(database, branch, '/disable-safe-migrations'),
-      {},
-      { headers: this.headers }
+    return await this.request('disable safe migrations', () =>
+      api.post(
+        this.branchPath(database, branch, '/disable-safe-migrations'),
+        {},
+        { headers: this.headers }
+      )
     );
-    return response.data;
   }
 
   async getBranchSchema(database: string, branch: string): Promise<any> {
-    let response = await api.get(this.branchPath(database, branch, '/schema'), {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('get branch schema', () =>
+      api.get(this.branchPath(database, branch, '/schema'), {
+        headers: this.headers
+      })
+    );
   }
 
   async lintBranchSchema(database: string, branch: string): Promise<any> {
-    let response = await api.post(
-      this.branchPath(database, branch, '/schema/lint'),
-      {},
-      { headers: this.headers }
+    return await this.request('lint branch schema', () =>
+      api.post(
+        this.branchPath(database, branch, '/schema/lint'),
+        {},
+        { headers: this.headers }
+      )
     );
-    return response.data;
   }
 
   // ---- Deploy Requests ----
@@ -260,18 +331,21 @@ export class Client {
   ): Promise<PaginatedResponse<any>> {
     let params: Record<string, any> = { ...this.paginationParams(pagination) };
     if (state) params.state = state;
-    let response = await api.get(this.dbPath(database, '/deploy-requests'), {
-      headers: this.headers,
-      params
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list deploy requests', () =>
+      api.get(this.dbPath(database, '/deploy-requests'), {
+        headers: this.headers,
+        params
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async getDeployRequest(database: string, number: number): Promise<any> {
-    let response = await api.get(this.dbPath(database, `/deploy-requests/${number}`), {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('get deploy request', () =>
+      api.get(this.dbPath(database, `/deploy-requests/${number}`), {
+        headers: this.headers
+      })
+    );
   }
 
   async createDeployRequest(
@@ -292,55 +366,74 @@ export class Client {
     if (data.autoCutover !== undefined) body.auto_cutover = data.autoCutover;
     if (data.autoDeleteBranch !== undefined) body.auto_delete_branch = data.autoDeleteBranch;
 
-    let response = await api.post(this.dbPath(database, '/deploy-requests'), body, {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('create deploy request', () =>
+      api.post(this.dbPath(database, '/deploy-requests'), body, {
+        headers: this.headers
+      })
+    );
   }
 
-  async deployDeployRequest(database: string, number: number): Promise<any> {
-    let response = await api.post(
-      this.dbPath(database, `/deploy-requests/${number}/deploy`),
-      {},
-      { headers: this.headers }
+  async deployDeployRequest(
+    database: string,
+    number: number,
+    data?: { instantDdl?: boolean }
+  ): Promise<any> {
+    let body: Record<string, any> = {};
+    if (data?.instantDdl !== undefined) body.instant_ddl = data.instantDdl;
+
+    return await this.request('queue deploy request', () =>
+      api.post(this.dbPath(database, `/deploy-requests/${number}/deploy`), body, {
+        headers: this.headers
+      })
     );
-    return response.data;
   }
 
   async cancelDeployRequest(database: string, number: number): Promise<any> {
-    let response = await api.post(
-      this.dbPath(database, `/deploy-requests/${number}/cancel`),
-      {},
-      { headers: this.headers }
+    return await this.request('cancel deploy request', () =>
+      api.post(
+        this.dbPath(database, `/deploy-requests/${number}/cancel`),
+        {},
+        {
+          headers: this.headers
+        }
+      )
     );
-    return response.data;
   }
 
   async closeDeployRequest(database: string, number: number): Promise<any> {
-    let response = await api.post(
-      this.dbPath(database, `/deploy-requests/${number}/close`),
-      {},
-      { headers: this.headers }
+    return await this.request('close deploy request', () =>
+      api.patch(
+        this.dbPath(database, `/deploy-requests/${number}`),
+        { state: 'closed' },
+        {
+          headers: this.headers
+        }
+      )
     );
-    return response.data;
   }
 
   async skipRevertPeriod(database: string, number: number): Promise<any> {
-    let response = await api.post(
-      this.dbPath(database, `/deploy-requests/${number}/skip-revert-period`),
-      {},
-      { headers: this.headers }
+    return await this.request('skip deploy request revert period', () =>
+      api.post(
+        this.dbPath(database, `/deploy-requests/${number}/skip-revert-period`),
+        {},
+        {
+          headers: this.headers
+        }
+      )
     );
-    return response.data;
   }
 
   async completeRevert(database: string, number: number): Promise<any> {
-    let response = await api.post(
-      this.dbPath(database, `/deploy-requests/${number}/complete-revert`),
-      {},
-      { headers: this.headers }
+    return await this.request('complete deploy request revert', () =>
+      api.post(
+        this.dbPath(database, `/deploy-requests/${number}/complete-revert`),
+        {},
+        {
+          headers: this.headers
+        }
+      )
     );
-    return response.data;
   }
 
   async reviewDeployRequest(
@@ -351,23 +444,24 @@ export class Client {
       body?: string;
     }
   ): Promise<any> {
-    let response = await api.post(
-      this.dbPath(database, `/deploy-requests/${number}/reviews`),
-      {
-        state: data.state,
-        body: data.body
-      },
-      { headers: this.headers }
+    return await this.request('review deploy request', () =>
+      api.post(
+        this.dbPath(database, `/deploy-requests/${number}/reviews`),
+        {
+          state: data.state,
+          body: data.body
+        },
+        { headers: this.headers }
+      )
     );
-    return response.data;
   }
 
   async getDeployment(database: string, number: number): Promise<any> {
-    let response = await api.get(
-      this.dbPath(database, `/deploy-requests/${number}/deployment`),
-      { headers: this.headers }
+    return await this.request('get deployment', () =>
+      api.get(this.dbPath(database, `/deploy-requests/${number}/deployment`), {
+        headers: this.headers
+      })
     );
-    return response.data;
   }
 
   async listDeployOperations(
@@ -375,14 +469,21 @@ export class Client {
     number: number,
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
-    let response = await api.get(
-      this.dbPath(database, `/deploy-requests/${number}/operations`),
-      {
+    let data = await this.request<any>('list deploy operations', () =>
+      api.get(this.dbPath(database, `/deploy-requests/${number}/operations`), {
         headers: this.headers,
         params: this.paginationParams(pagination)
-      }
+      })
     );
-    return this.mapPaginatedResponse(response.data);
+    return this.mapPaginatedResponse(data);
+  }
+
+  async checkDeployRequestStorage(database: string, number: number): Promise<any> {
+    return await this.request('check deploy request storage', () =>
+      api.get(this.dbPath(database, `/deploy-requests/${number}/storage-check`), {
+        headers: this.headers
+      })
+    );
   }
 
   // ---- Passwords ----
@@ -392,19 +493,21 @@ export class Client {
     branch: string,
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
-    let response = await api.get(this.branchPath(database, branch, '/passwords'), {
-      headers: this.headers,
-      params: this.paginationParams(pagination)
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list passwords', () =>
+      api.get(this.branchPath(database, branch, '/passwords'), {
+        headers: this.headers,
+        params: this.paginationParams(pagination)
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async getPassword(database: string, branch: string, passwordId: string): Promise<any> {
-    let response = await api.get(
-      this.branchPath(database, branch, `/passwords/${passwordId}`),
-      { headers: this.headers }
+    return await this.request('get password', () =>
+      api.get(this.branchPath(database, branch, `/passwords/${passwordId}`), {
+        headers: this.headers
+      })
     );
-    return response.data;
   }
 
   async createPassword(
@@ -412,22 +515,24 @@ export class Client {
     branch: string,
     data: {
       name?: string;
-      role: string;
       replica?: boolean;
       ttl?: number;
       cidrs?: string[];
+      directVtgate?: boolean;
     }
   ): Promise<any> {
-    let body: Record<string, any> = { role: data.role };
+    let body: Record<string, any> = {};
     if (data.name) body.name = data.name;
     if (data.replica !== undefined) body.replica = data.replica;
     if (data.ttl) body.ttl = data.ttl;
     if (data.cidrs) body.cidrs = data.cidrs;
+    if (data.directVtgate !== undefined) body.direct_vtgate = data.directVtgate;
 
-    let response = await api.post(this.branchPath(database, branch, '/passwords'), body, {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('create password', () =>
+      api.post(this.branchPath(database, branch, '/passwords'), body, {
+        headers: this.headers
+      })
+    );
   }
 
   async updatePassword(
@@ -443,27 +548,31 @@ export class Client {
     if (data.name !== undefined) body.name = data.name;
     if (data.cidrs !== undefined) body.cidrs = data.cidrs;
 
-    let response = await api.patch(
-      this.branchPath(database, branch, `/passwords/${passwordId}`),
-      body,
-      { headers: this.headers }
+    return await this.request('update password', () =>
+      api.patch(this.branchPath(database, branch, `/passwords/${passwordId}`), body, {
+        headers: this.headers
+      })
     );
-    return response.data;
   }
 
   async deletePassword(database: string, branch: string, passwordId: string): Promise<void> {
-    await api.delete(this.branchPath(database, branch, `/passwords/${passwordId}`), {
-      headers: this.headers
-    });
+    await this.request('delete password', () =>
+      api.delete(this.branchPath(database, branch, `/passwords/${passwordId}`), {
+        headers: this.headers
+      })
+    );
   }
 
   async renewPassword(database: string, branch: string, passwordId: string): Promise<any> {
-    let response = await api.post(
-      this.branchPath(database, branch, `/passwords/${passwordId}/renew`),
-      {},
-      { headers: this.headers }
+    return await this.request('renew password', () =>
+      api.post(
+        this.branchPath(database, branch, `/passwords/${passwordId}/renew`),
+        {},
+        {
+          headers: this.headers
+        }
+      )
     );
-    return response.data;
   }
 
   // ---- Backups ----
@@ -471,20 +580,41 @@ export class Client {
   async listBackups(
     database: string,
     branch: string,
-    pagination?: PaginationParams
+    pagination?: PaginationParams,
+    filters?: {
+      all?: boolean;
+      state?: string;
+      policy?: string;
+      from?: string;
+      to?: string;
+      runningAt?: string;
+      production?: boolean;
+    }
   ): Promise<PaginatedResponse<any>> {
-    let response = await api.get(this.branchPath(database, branch, '/backups'), {
-      headers: this.headers,
-      params: this.paginationParams(pagination)
-    });
-    return this.mapPaginatedResponse(response.data);
+    let params: Record<string, any> = { ...this.paginationParams(pagination) };
+    if (filters?.all !== undefined) params.all = filters.all;
+    if (filters?.state) params.state = filters.state;
+    if (filters?.policy) params.policy = filters.policy;
+    if (filters?.from) params.from = filters.from;
+    if (filters?.to) params.to = filters.to;
+    if (filters?.runningAt) params.running_at = filters.runningAt;
+    if (filters?.production !== undefined) params.production = filters.production;
+
+    let data = await this.request<any>('list backups', () =>
+      api.get(this.branchPath(database, branch, '/backups'), {
+        headers: this.headers,
+        params
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async getBackup(database: string, branch: string, backupId: string): Promise<any> {
-    let response = await api.get(this.branchPath(database, branch, `/backups/${backupId}`), {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('get backup', () =>
+      api.get(this.branchPath(database, branch, `/backups/${backupId}`), {
+        headers: this.headers
+      })
+    );
   }
 
   async createBackup(
@@ -503,16 +633,36 @@ export class Client {
     if (data?.retentionValue) body.retention_value = data.retentionValue;
     if (data?.emergency !== undefined) body.emergency = data.emergency;
 
-    let response = await api.post(this.branchPath(database, branch, '/backups'), body, {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('create backup', () =>
+      api.post(this.branchPath(database, branch, '/backups'), body, {
+        headers: this.headers
+      })
+    );
+  }
+
+  async updateBackup(
+    database: string,
+    branch: string,
+    backupId: string,
+    data: {
+      protected: boolean;
+    }
+  ): Promise<any> {
+    return await this.request('update backup', () =>
+      api.patch(
+        this.branchPath(database, branch, `/backups/${backupId}`),
+        { protected: data.protected },
+        { headers: this.headers }
+      )
+    );
   }
 
   async deleteBackup(database: string, branch: string, backupId: string): Promise<void> {
-    await api.delete(this.branchPath(database, branch, `/backups/${backupId}`), {
-      headers: this.headers
-    });
+    await this.request('delete backup', () =>
+      api.delete(this.branchPath(database, branch, `/backups/${backupId}`), {
+        headers: this.headers
+      })
+    );
   }
 
   // ---- Webhooks ----
@@ -521,18 +671,21 @@ export class Client {
     database: string,
     pagination?: PaginationParams
   ): Promise<PaginatedResponse<any>> {
-    let response = await api.get(this.dbPath(database, '/webhooks'), {
-      headers: this.headers,
-      params: this.paginationParams(pagination)
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list webhooks', () =>
+      api.get(this.dbPath(database, '/webhooks'), {
+        headers: this.headers,
+        params: this.paginationParams(pagination)
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async getWebhook(database: string, webhookId: string): Promise<any> {
-    let response = await api.get(this.dbPath(database, `/webhooks/${webhookId}`), {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('get webhook', () =>
+      api.get(this.dbPath(database, `/webhooks/${webhookId}`), {
+        headers: this.headers
+      })
+    );
   }
 
   async createWebhook(
@@ -543,10 +696,11 @@ export class Client {
       events?: string[];
     }
   ): Promise<any> {
-    let response = await api.post(this.dbPath(database, '/webhooks'), data, {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('create webhook', () =>
+      api.post(this.dbPath(database, '/webhooks'), data, {
+        headers: this.headers
+      })
+    );
   }
 
   async updateWebhook(
@@ -558,63 +712,99 @@ export class Client {
       events?: string[];
     }
   ): Promise<any> {
-    let response = await api.patch(this.dbPath(database, `/webhooks/${webhookId}`), data, {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('update webhook', () =>
+      api.patch(this.dbPath(database, `/webhooks/${webhookId}`), data, {
+        headers: this.headers
+      })
+    );
   }
 
   async deleteWebhook(database: string, webhookId: string): Promise<void> {
-    await api.delete(this.dbPath(database, `/webhooks/${webhookId}`), {
-      headers: this.headers
-    });
+    await this.request('delete webhook', () =>
+      api.delete(this.dbPath(database, `/webhooks/${webhookId}`), {
+        headers: this.headers
+      })
+    );
   }
 
   async testWebhook(database: string, webhookId: string): Promise<any> {
-    let response = await api.post(
-      this.dbPath(database, `/webhooks/${webhookId}/test`),
-      {},
-      { headers: this.headers }
+    return await this.request('test webhook', () =>
+      api.post(
+        this.dbPath(database, `/webhooks/${webhookId}/test`),
+        {},
+        {
+          headers: this.headers
+        }
+      )
     );
-    return response.data;
   }
 
   // ---- Organization Members ----
 
   async listMembers(pagination?: PaginationParams): Promise<PaginatedResponse<any>> {
-    let response = await api.get(this.orgPath('/members'), {
-      headers: this.headers,
-      params: this.paginationParams(pagination)
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list organization members', () =>
+      api.get(this.orgPath('/members'), {
+        headers: this.headers,
+        params: this.paginationParams(pagination)
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async getMember(memberId: string): Promise<any> {
-    let response = await api.get(this.orgPath(`/members/${memberId}`), {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('get organization member', () =>
+      api.get(this.orgPath(`/members/${memberId}`), {
+        headers: this.headers
+      })
+    );
   }
 
   async removeMember(memberId: string): Promise<void> {
-    await api.delete(this.orgPath(`/members/${memberId}`), { headers: this.headers });
+    await this.request('remove organization member', () =>
+      api.delete(this.orgPath(`/members/${memberId}`), { headers: this.headers })
+    );
   }
 
   // ---- Regions ----
 
-  async listRegions(): Promise<any> {
-    let response = await api.get(this.orgPath('/regions'), { headers: this.headers });
-    return response.data;
+  async listRegions(pagination?: PaginationParams): Promise<PaginatedResponse<any>> {
+    let data = await this.request<any>('list organization regions', () =>
+      api.get(this.orgPath('/regions'), {
+        headers: this.headers,
+        params: this.paginationParams(pagination)
+      })
+    );
+    return this.mapPaginatedResponse(data);
+  }
+
+  async listClusterSizes(filters?: {
+    engine?: string;
+    rates?: boolean;
+    region?: string;
+  }): Promise<any[]> {
+    let params: Record<string, any> = {};
+    if (filters?.engine) params.engine = filters.engine;
+    if (filters?.rates !== undefined) params.rates = filters.rates;
+    if (filters?.region) params.region = filters.region;
+
+    return await this.request('list cluster sizes', () =>
+      api.get(this.orgPath('/cluster-size-skus'), {
+        headers: this.headers,
+        params
+      })
+    );
   }
 
   // ---- Service Tokens ----
 
   async listServiceTokens(pagination?: PaginationParams): Promise<PaginatedResponse<any>> {
-    let response = await api.get(this.orgPath('/service-tokens'), {
-      headers: this.headers,
-      params: this.paginationParams(pagination)
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list service tokens', () =>
+      api.get(this.orgPath('/service-tokens'), {
+        headers: this.headers,
+        params: this.paginationParams(pagination)
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 
   async createServiceToken(data?: { name?: string; ttl?: number }): Promise<any> {
@@ -622,21 +812,25 @@ export class Client {
     if (data?.name) body.name = data.name;
     if (data?.ttl) body.ttl = data.ttl;
 
-    let response = await api.post(this.orgPath('/service-tokens'), body, {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('create service token', () =>
+      api.post(this.orgPath('/service-tokens'), body, {
+        headers: this.headers
+      })
+    );
   }
 
   async getServiceToken(tokenId: string): Promise<any> {
-    let response = await api.get(this.orgPath(`/service-tokens/${tokenId}`), {
-      headers: this.headers
-    });
-    return response.data;
+    return await this.request('get service token', () =>
+      api.get(this.orgPath(`/service-tokens/${tokenId}`), {
+        headers: this.headers
+      })
+    );
   }
 
   async deleteServiceToken(tokenId: string): Promise<void> {
-    await api.delete(this.orgPath(`/service-tokens/${tokenId}`), { headers: this.headers });
+    await this.request('delete service token', () =>
+      api.delete(this.orgPath(`/service-tokens/${tokenId}`), { headers: this.headers })
+    );
   }
 
   // ---- Audit Logs ----
@@ -656,10 +850,12 @@ export class Client {
     if (filters?.since) params.since = filters.since;
     if (filters?.until) params.until = filters.until;
 
-    let response = await api.get(this.orgPath('/audit-log'), {
-      headers: this.headers,
-      params
-    });
-    return this.mapPaginatedResponse(response.data);
+    let data = await this.request<any>('list audit logs', () =>
+      api.get(this.orgPath('/audit-log'), {
+        headers: this.headers,
+        params
+      })
+    );
+    return this.mapPaginatedResponse(data);
   }
 }

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/crisp.png" height="20"> Crisp
 
-Manage customer conversations, contacts, and support operations across multiple channels. Send and receive messages (text, files, audio, carousels) in conversations, assign conversations to operators, and track conversation states. Create, update, search, and manage contact profiles with custom data, events, and subscription status. Build and manage helpdesk knowledge base articles with multi-language support. Create and manage marketing campaigns including one-shot and automated campaigns. Configure website workspace settings, chatbox appearance, and operator roles. Track visitors in real-time, monitor website availability status, and access analytics for messaging, contacts, ratings, and campaigns. Receive real-time events via webhooks or WebSocket for session changes, messages, campaigns, and more.
+Manage customer conversations, contacts, and support operations across multiple channels. Send and receive messages, mark message status, assign conversations to operators, move conversations between inboxes, and track conversation states. Create, update, search, and manage contact profiles with custom data and subscription status. Browse and manage helpdesk knowledge base articles with multi-language support. Configure website workspace settings, inspect operator availability, monitor website availability status, and receive real-time events via polling or inbound webhooks.
 
 ## Tools
 
@@ -36,9 +36,21 @@ Check the current online/offline availability status of the Crisp website (works
 
 List and search conversations in your Crisp workspace. Supports filtering by status (unread, resolved, assigned), date range, inbox, and text/segment search. Returns paginated conversation summaries with metadata.
 
+### List Conversation Activity
+
+List pages viewed, custom events, or file messages for a conversation. Use this to inspect visitor context beyond the message transcript.
+
+### List Helpdesk Locales
+
+List helpdesk knowledge base locales configured for the workspace. Use locale IDs from this tool before listing or managing articles.
+
 ### List Helpdesk Articles
 
 List helpdesk knowledge base articles for a specific locale. Returns paginated article summaries. Use this to browse your knowledge base or find articles to update.
+
+### List Inboxes
+
+List website inboxes. Use inbox IDs to filter conversations or move a conversation with Update Conversation.
 
 ### List Operators
 
@@ -51,6 +63,10 @@ List and search contact profiles in the Crisp CRM. Supports searching by name, e
 ### Manage Helpdesk Article
 
 Create, update, or delete a helpdesk knowledge base article. Articles are organized by locale for multi-language support. You can set the title, content, category, featured status, and order.
+
+### Manage Message Status
+
+Mark conversation messages as read, unread, or delivered using message fingerprints from Get Messages or Send Message when needed.
 
 ### Manage Website Settings
 
@@ -70,7 +86,7 @@ Send a message in a Crisp conversation. Supports text messages, notes (internal)
 
 ### Update Conversation
 
-Update a conversation's metadata, state, routing assignment, or block status. Combine multiple updates in a single call — set the nickname, assign an operator, change state to resolved, and add segments all at once.
+Update a conversation's metadata, state, routing assignment, inbox, or block status. Combine multiple updates in a single call — set the nickname, assign an operator, change state to resolved, move inboxes, and add segments all at once.
 
 ### Update Person
 

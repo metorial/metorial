@@ -1,19 +1,21 @@
 {
   "name": "@microsoft/dynamics-365",
-  "description": "Create, read, update, and delete CRM and ERP records across Dynamics 365 entities including accounts, contacts, leads, opportunities, and cases. Query data with advanced filtering, sorting, pagination, and FetchXML aggregation. Manage relationships between entities by associating and disassociating records. Discover and inspect metadata, schema definitions, and entity attributes. Invoke built-in and custom functions and actions (e.g., WhoAmI, InitializeFrom). Detect duplicate records using configurable rules. Search across multiple entities with full-text relevance search. Upload and download files and images attached to entity columns. Receive real-time webhook notifications on record create, update, delete, assign, and status change events.",
-  "categories": ["crm-and-sales-tools", "financial-data-and-stock-market"],
+  "description": "Unified Microsoft Dynamics 365 connector for Dataverse, Sales, Customer Service, Field Service, Contact Center, Customer Insights, Finance, Supply Chain, Project Operations, Commerce, Human Resources, and Business Central. Tools use explicit subservice-prefixed IDs and resource-specific Microsoft auth inputs.",
+  "categories": ["crm-and-sales-tools", "erp-tools"],
   "skills": [
-    "manage CRM records",
-    "query and filter data",
-    "manage entity relationships",
-    "detect duplicate records",
-    "search across entities",
-    "upload and download files",
-    "discover schema metadata",
-    "invoke custom actions",
-    "receive webhook notifications",
-    "manage leads and opportunities"
+    "manage Dataverse records and metadata",
+    "work with Dynamics 365 Sales records and workflows",
+    "manage Customer Service cases, queues, notes, and attachments",
+    "inspect Field Service work orders, bookings, resources, and lifecycle state",
+    "read Contact Center conversations, transcripts, and representative availability",
+    "query Customer Insights tables, profiles, segments, and segment members",
+    "read Finance legal entities, ledgers, journals, customers, vendors, and invoices",
+    "read Supply Chain products, inventory, warehouses, orders, shipments, and receipts",
+    "manage Project Operations records, schedule APIs, and finance handoff checks",
+    "use Commerce Retail Server channels, catalogs, products, customers, carts, orders, and metadata",
+    "read Human Resources workers, jobs, leave, compensation, and benefit records",
+    "read Business Central companies, customers, vendors, invoices, items, accounts, journals, and attachments"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/Dynamics%20365%20Icon.svg",
-  "version": "0.1.2"
+  "version": "0.3.0"
 }

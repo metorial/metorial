@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TranscribeClient } from '../lib/client';
 import { spec } from '../spec';
+import { requireString, tagSchema, validateVocabularySource } from './common';
 
 export let manageVocabularyFilter = SlateTool.create(spec, {
   name: 'Manage Vocabulary Filter',
@@ -37,15 +38,7 @@ export let manageVocabularyFilter = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('S3 URI of a text file containing filter words'),
-      tags: z
-        .array(
-          z.object({
-            key: z.string().describe('Tag key'),
-            value: z.string().describe('Tag value')
-          })
-        )
-        .optional()
-        .describe('Tags for the filter (create only)'),
+      tags: z.array(tagSchema).optional().describe('Tags for the filter (create only)'),
       nameContains: z.string().optional().describe('Filter by name (list only)'),
       maxResults: z.number().optional().describe('Max results to return (list only, 1-100)'),
       nextToken: z.string().optional().describe('Pagination token (list only)')
@@ -87,9 +80,23 @@ export let manageVocabularyFilter = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      let vocabularyFilterName = requireString(
+        ctx.input.vocabularyFilterName,
+        'vocabularyFilterName is required for create.'
+      );
+      let languageCode = requireString(
+        ctx.input.languageCode,
+        'languageCode is required for create.'
+      );
+      validateVocabularySource(
+        ctx.input.words,
+        ctx.input.vocabularyFilterFileUri,
+        'vocabularyFilterFileUri'
+      );
+
       let result = await client.createVocabularyFilter({
-        vocabularyFilterName: ctx.input.vocabularyFilterName!,
-        languageCode: ctx.input.languageCode!,
+        vocabularyFilterName,
+        languageCode,
         words: ctx.input.words,
         vocabularyFilterFileUri: ctx.input.vocabularyFilterFileUri,
         tags: ctx.input.tags
@@ -105,8 +112,18 @@ export let manageVocabularyFilter = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
+      let vocabularyFilterName = requireString(
+        ctx.input.vocabularyFilterName,
+        'vocabularyFilterName is required for update.'
+      );
+      validateVocabularySource(
+        ctx.input.words,
+        ctx.input.vocabularyFilterFileUri,
+        'vocabularyFilterFileUri'
+      );
+
       let result = await client.updateVocabularyFilter({
-        vocabularyFilterName: ctx.input.vocabularyFilterName!,
+        vocabularyFilterName,
         words: ctx.input.words,
         vocabularyFilterFileUri: ctx.input.vocabularyFilterFileUri
       });
@@ -121,7 +138,11 @@ export let manageVocabularyFilter = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      let result = await client.getVocabularyFilter(ctx.input.vocabularyFilterName!);
+      let vocabularyFilterName = requireString(
+        ctx.input.vocabularyFilterName,
+        'vocabularyFilterName is required for get.'
+      );
+      let result = await client.getVocabularyFilter(vocabularyFilterName);
       return {
         output: {
           vocabularyFilterName: result.VocabularyFilterName,
@@ -134,13 +155,17 @@ export let manageVocabularyFilter = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteVocabularyFilter(ctx.input.vocabularyFilterName!);
+      let vocabularyFilterName = requireString(
+        ctx.input.vocabularyFilterName,
+        'vocabularyFilterName is required for delete.'
+      );
+      await client.deleteVocabularyFilter(vocabularyFilterName);
       return {
         output: {
-          vocabularyFilterName: ctx.input.vocabularyFilterName,
+          vocabularyFilterName,
           deleted: true
         },
-        message: `Deleted vocabulary filter **${ctx.input.vocabularyFilterName}**.`
+        message: `Deleted vocabulary filter **${vocabularyFilterName}**.`
       };
     }
 

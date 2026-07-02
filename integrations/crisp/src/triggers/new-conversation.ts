@@ -34,7 +34,11 @@ export let newConversation = SlateTrigger.create(spec, {
     },
 
     pollEvents: async ctx => {
-      let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+      let client = new Client({
+        token: ctx.auth.token,
+        websiteId: ctx.config.websiteId,
+        tier: ctx.auth.tier
+      });
 
       let conversations = await client.listConversations({
         pageNumber: 1,

@@ -5,8 +5,13 @@ import { spec } from '../spec';
 
 let locationSchema = z.object({
   name: z.string().optional().describe('Location name.'),
-  latitude: z.number().optional().describe('Latitude coordinate.'),
-  longitude: z.number().optional().describe('Longitude coordinate.'),
+  coordinates: z
+    .object({
+      latitude: z.number().describe('Latitude coordinate.'),
+      longitude: z.number().describe('Longitude coordinate.')
+    })
+    .optional()
+    .describe('Location coordinates.'),
   distance: z.number().optional().describe('Search radius distance.'),
   unit: z.string().optional().describe('Distance unit (e.g., "km", "mi").')
 });
@@ -62,6 +67,10 @@ Returns a ranked shortlist with matching scores for each category.`,
         .boolean()
         .optional()
         .describe('Whether job title match is required.'),
+      jobTitlesCurrentOnly: z
+        .boolean()
+        .optional()
+        .describe('Match only current job titles when searching resumes.'),
       skills: z.array(skillSchema).optional().describe('Skills to search for.'),
       skillsWeight: z.number().optional().describe('Weight for skills matching (0 to 1).'),
       locations: z.array(locationSchema).optional().describe('Locations to search for.'),
@@ -140,6 +149,8 @@ Returns a ranked shortlist with matching scores for each category.`,
       searchParams.jobTitlesWeight = ctx.input.jobTitlesWeight;
     if (ctx.input.jobTitlesRequired !== undefined)
       searchParams.jobTitlesRequired = ctx.input.jobTitlesRequired;
+    if (ctx.input.jobTitlesCurrentOnly !== undefined)
+      searchParams.jobTitlesCurrentOnly = ctx.input.jobTitlesCurrentOnly;
     if (ctx.input.skills) searchParams.skills = ctx.input.skills;
     if (ctx.input.skillsWeight !== undefined)
       searchParams.skillsWeight = ctx.input.skillsWeight;

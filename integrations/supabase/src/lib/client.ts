@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { supabaseApiError } from './errors';
 
 export class ManagementClient {
   private http: ReturnType<typeof createAxios>;
@@ -10,6 +11,11 @@ export class ManagementClient {
         Authorization: `Bearer ${token}`
       }
     });
+
+    this.http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(supabaseApiError(error, 'Management API request'))
+    );
   }
 
   // ─── Organizations ──────────────────────────────────────────
@@ -80,8 +86,12 @@ export class ManagementClient {
 
   // ─── Project API Keys ──────────────────────────────────────
 
-  async getProjectApiKeys(projectRef: string) {
-    let response = await this.http.get(`/projects/${projectRef}/api-keys`);
+  async getProjectApiKeys(projectRef: string, options: { reveal?: boolean } = {}) {
+    let response = await this.http.get(`/projects/${projectRef}/api-keys`, {
+      params: {
+        reveal: options.reveal ?? true
+      }
+    });
     return response.data;
   }
 
@@ -113,13 +123,29 @@ export class ManagementClient {
       slug: string;
       body: string;
       verifyJwt?: boolean;
+      entrypointPath?: string;
     }
   ) {
-    let response = await this.http.post(`/projects/${projectRef}/functions`, {
-      name: data.name,
-      slug: data.slug,
-      body: data.body,
-      verify_jwt: data.verifyJwt
+    let entrypointPath = data.entrypointPath ?? 'index.ts';
+    let form = new FormData();
+    form.append(
+      'file',
+      new Blob([data.body], { type: 'application/typescript' }),
+      entrypointPath
+    );
+    form.append(
+      'metadata',
+      JSON.stringify({
+        entrypoint_path: entrypointPath,
+        name: data.name,
+        verify_jwt: data.verifyJwt
+      })
+    );
+
+    let response = await this.http.post(`/projects/${projectRef}/functions/deploy`, form, {
+      params: {
+        slug: data.slug
+      }
     });
     return response.data;
   }
@@ -143,6 +169,16 @@ export class ManagementClient {
 
   async deleteEdgeFunction(projectRef: string, functionSlug: string) {
     let response = await this.http.delete(`/projects/${projectRef}/functions/${functionSlug}`);
+    return response.data;
+  }
+
+  async getEdgeFunctionBody(projectRef: string, functionSlug: string) {
+    let response = await this.http.get(
+      `/projects/${projectRef}/functions/${functionSlug}/body`,
+      {
+        responseType: 'text'
+      }
+    );
     return response.data;
   }
 
@@ -260,7 +296,7 @@ export class ManagementClient {
   async getProjectLogs(
     projectRef: string,
     params: {
-      collection: string;
+      sql?: string;
       startTimestamp?: string;
       endTimestamp?: string;
     }
@@ -271,10 +307,44 @@ export class ManagementClient {
         params: {
           iso_timestamp_start: params.startTimestamp,
           iso_timestamp_end: params.endTimestamp,
-          source: params.collection
+          sql: params.sql
         }
       }
     );
+    return response.data;
+  }
+
+  async getProjectHealth(
+    projectRef: string,
+    params: {
+      services: string[];
+      timeoutMs?: number;
+    }
+  ) {
+    let response = await this.http.get(`/projects/${projectRef}/health`, {
+      params: {
+        services: params.services,
+        timeout_ms: params.timeoutMs
+      }
+    });
+    return response.data;
+  }
+
+  async getDatabaseOpenApi(projectRef: string, schema?: string) {
+    let response = await this.http.get(`/projects/${projectRef}/database/openapi`, {
+      params: {
+        schema
+      }
+    });
+    return response.data;
+  }
+
+  async generateTypescriptTypes(projectRef: string, includedSchemas?: string) {
+    let response = await this.http.get(`/projects/${projectRef}/types/typescript`, {
+      params: {
+        included_schemas: includedSchemas
+      }
+    });
     return response.data;
   }
 

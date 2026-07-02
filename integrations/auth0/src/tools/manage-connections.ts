@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Auth0Client } from '../lib/client';
+import { auth0ServiceError, requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageConnectionsTool = SlateTool.create(spec, {
@@ -95,8 +96,8 @@ export let manageConnectionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.connectionId) throw new Error('connectionId is required for get action');
-      let conn = await client.getConnection(ctx.input.connectionId);
+      let connectionId = requireField(ctx.input.connectionId, 'connectionId', 'get');
+      let conn = await client.getConnection(connectionId);
       return {
         output: { connection: mapConn(conn) },
         message: `Retrieved connection **${conn.name}** (${conn.strategy}).`
@@ -104,11 +105,11 @@ export let manageConnectionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      if (!ctx.input.strategy) throw new Error('strategy is required for create action');
+      let name = requireField(ctx.input.name, 'name', 'create');
+      let strategy = requireField(ctx.input.strategy, 'strategy', 'create');
       let conn = await client.createConnection({
-        name: ctx.input.name,
-        strategy: ctx.input.strategy,
+        name,
+        strategy,
         options: ctx.input.options,
         enabledClients: ctx.input.enabledClients,
         metadata: ctx.input.metadata
@@ -120,9 +121,8 @@ export let manageConnectionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.connectionId)
-        throw new Error('connectionId is required for update action');
-      let conn = await client.updateConnection(ctx.input.connectionId, {
+      let connectionId = requireField(ctx.input.connectionId, 'connectionId', 'update');
+      let conn = await client.updateConnection(connectionId, {
         options: ctx.input.options,
         enabledClients: ctx.input.enabledClients,
         metadata: ctx.input.metadata
@@ -134,15 +134,14 @@ export let manageConnectionsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.connectionId)
-        throw new Error('connectionId is required for delete action');
-      await client.deleteConnection(ctx.input.connectionId);
+      let connectionId = requireField(ctx.input.connectionId, 'connectionId', 'delete');
+      await client.deleteConnection(connectionId);
       return {
         output: { deleted: true },
-        message: `Deleted connection **${ctx.input.connectionId}**.`
+        message: `Deleted connection **${connectionId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw auth0ServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

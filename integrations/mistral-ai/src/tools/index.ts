@@ -1,4 +1,5 @@
 export * from './agent-completion';
+export * from './audio';
 export * from './batch-jobs';
 export * from './chat-completion';
 export * from './code-completion';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageForms = SlateTool.create(spec, {
@@ -47,7 +48,7 @@ export let manageForms = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx.auth);
     let input = ctx.input;
 
     if (input.action === 'list') {
@@ -76,7 +77,7 @@ export let manageForms = SlateTool.create(spec, {
     }
 
     if (input.action === 'add_subscriber') {
-      if (!input.formId) throw new Error('formId is required for add_subscriber');
+      if (!input.formId) throw kitServiceError('formId is required for add_subscriber');
       if (input.subscriberId) {
         await client.addSubscriberToFormById(input.formId, input.subscriberId);
         return {
@@ -90,8 +91,8 @@ export let manageForms = SlateTool.create(spec, {
           message: `Added **${input.subscriberEmail}** to form #${input.formId}`
         };
       }
-      throw new Error('subscriberId or subscriberEmail is required for add_subscriber');
+      throw kitServiceError('subscriberId or subscriberEmail is required for add_subscriber');
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw kitServiceError(`Unknown action: ${input.action}`);
   });

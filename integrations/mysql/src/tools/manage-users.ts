@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { mysqlServiceError } from '../lib/errors';
 import { createClient, escapeLiteral } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -101,14 +102,14 @@ Can also list existing users and their grants.`,
     }
 
     if (!ctx.input.userName) {
-      throw new Error('userName is required for this action');
+      throw mysqlServiceError('userName is required for this action');
     }
 
     let userSpec = `${escapeLiteral(ctx.input.userName)}@${escapeLiteral(ctx.input.host || '%')}`;
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.password) {
-        throw new Error('password is required when creating a user');
+        throw mysqlServiceError('password is required when creating a user');
       }
       statements.push(
         `CREATE USER ${userSpec} IDENTIFIED BY ${escapeLiteral(ctx.input.password)}`
@@ -118,7 +119,7 @@ Can also list existing users and their grants.`,
       statements.push(`DROP USER ${ifExists}${userSpec}`);
     } else if (ctx.input.action === 'grant') {
       if (!ctx.input.privileges || ctx.input.privileges.length === 0) {
-        throw new Error('privileges are required for grant action');
+        throw mysqlServiceError('privileges are required for grant action');
       }
       let target = ctx.input.grantTarget || '*.*';
       let privs = ctx.input.privileges.join(', ');
@@ -129,7 +130,7 @@ Can also list existing users and their grants.`,
       statements.push(sql);
     } else if (ctx.input.action === 'revoke') {
       if (!ctx.input.privileges || ctx.input.privileges.length === 0) {
-        throw new Error('privileges are required for revoke action');
+        throw mysqlServiceError('privileges are required for revoke action');
       }
       let target = ctx.input.grantTarget || '*.*';
       let privs = ctx.input.privileges.join(', ');

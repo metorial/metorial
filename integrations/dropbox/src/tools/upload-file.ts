@@ -1,12 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DropboxClient } from '../lib/client';
+import { decodeDropboxContent } from '../lib/content';
+import { dropboxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let uploadFile = SlateTool.create(spec, {
   name: 'Upload File',
   key: 'upload_file',
-  description: `Upload a text file to Dropbox at the specified path. Supports creating new files, overwriting existing files, or appending with autorename. Best for small text-based files (up to 150 MB).`,
+  description: `Upload a file to Dropbox at the specified path. Supports text or base64 content, creating new files, overwriting existing files, or updating a specific revision.`,
   instructions: [
     'Use mode "add" to create a new file (fails if it exists), "overwrite" to replace existing content, or "update" to update a specific revision.'
   ],
@@ -24,15 +26,33 @@ export let uploadFile = SlateTool.create(spec, {
         .string()
         .describe('Destination path including filename (e.g., "/Documents/notes.txt")'),
       content: z.string().describe('Text content to upload'),
-      mode: z
-        .enum(['add', 'overwrite'])
+      contentEncoding: z
+        .enum(['text', 'base64'])
         .optional()
-        .describe('Upload mode: "add" creates new file, "overwrite" replaces existing'),
+        .describe('How to decode content. Use "base64" for binary files. Defaults to "text".'),
+      mode: z
+        .enum(['add', 'overwrite', 'update'])
+        .optional()
+        .describe(
+          'Upload mode: "add" creates new file, "overwrite" replaces existing, "update" overwrites only if rev matches'
+        ),
+      rev: z
+        .string()
+        .optional()
+        .describe('Existing file revision required when mode is "update"'),
       autorename: z
         .boolean()
         .optional()
         .describe('If true, rename the file if a conflict exists'),
-      mute: z.boolean().optional().describe('If true, suppress notifications for this upload')
+      mute: z.boolean().optional().describe('If true, suppress notifications for this upload'),
+      contentHash: z
+        .string()
+        .optional()
+        .describe('Optional Dropbox content hash to verify the uploaded bytes'),
+      clientModified: z
+        .string()
+        .optional()
+        .describe('Optional ISO timestamp to store as the client modified time')
     })
   )
   .output(
@@ -46,13 +66,23 @@ export let uploadFile = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.mode === 'update' && !ctx.input.rev) {
+      throw dropboxServiceError('rev is required when upload mode is "update".');
+    }
+
     let client = new DropboxClient(ctx.auth.token);
+    let content = decodeDropboxContent(ctx.input.content, ctx.input.contentEncoding ?? 'text');
     let result = await client.uploadFile(
       ctx.input.path,
-      ctx.input.content,
+      content,
       ctx.input.mode ?? 'add',
       ctx.input.autorename ?? false,
-      ctx.input.mute ?? false
+      ctx.input.mute ?? false,
+      {
+        rev: ctx.input.rev,
+        contentHash: ctx.input.contentHash,
+        clientModified: ctx.input.clientModified
+      }
     );
 
     return {

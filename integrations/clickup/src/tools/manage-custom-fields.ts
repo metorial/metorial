@@ -85,3 +85,33 @@ export let setCustomFieldValue = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let removeCustomFieldValue = SlateTool.create(spec, {
+  name: 'Remove Custom Field Value',
+  key: 'remove_custom_field_value',
+  description: `Remove a ClickUp custom field value from a task without deleting the field definition.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      taskId: z.string().describe('The task ID to clear the field on'),
+      fieldId: z.string().describe('The custom field ID to clear')
+    })
+  )
+  .output(
+    z.object({
+      removed: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new ClickUpClient(ctx.auth.token);
+    await client.removeCustomFieldValue(ctx.input.taskId, ctx.input.fieldId);
+
+    return {
+      output: { removed: true },
+      message: `Removed custom field ${ctx.input.fieldId} from task ${ctx.input.taskId}.`
+    };
+  })
+  .build();

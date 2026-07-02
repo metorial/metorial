@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SnsClient } from '../lib/client';
+import { snsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateSubscription = SlateTool.create(spec, {
@@ -34,7 +35,11 @@ export let updateSubscription = SlateTool.create(spec, {
       redrivePolicy: z
         .string()
         .optional()
-        .describe('JSON dead-letter queue policy for undeliverable messages')
+        .describe('JSON dead-letter queue policy for undeliverable messages'),
+      replayPolicy: z
+        .string()
+        .optional()
+        .describe('JSON FIFO replay policy for replaying archived messages')
     })
   )
   .output(
@@ -73,6 +78,13 @@ export let updateSubscription = SlateTool.create(spec, {
     }
     if (ctx.input.redrivePolicy !== undefined) {
       updates.push({ name: 'RedrivePolicy', value: ctx.input.redrivePolicy });
+    }
+    if (ctx.input.replayPolicy !== undefined) {
+      updates.push({ name: 'ReplayPolicy', value: ctx.input.replayPolicy });
+    }
+
+    if (updates.length === 0) {
+      throw snsServiceError('Provide at least one subscription attribute to update.');
     }
 
     for (let attr of updates) {

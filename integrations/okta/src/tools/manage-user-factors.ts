@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OktaClient } from '../lib/client';
+import { oktaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let factorSchema = z.object({
@@ -64,7 +65,8 @@ export let manageUserFactorsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OktaClient({
       domain: ctx.config.domain,
-      token: ctx.auth.token
+      token: ctx.auth.token,
+      authMethod: ctx.auth.authMethod
     });
 
     let { action, userId } = ctx.input;
@@ -87,8 +89,12 @@ export let manageUserFactorsTool = SlateTool.create(spec, {
     }
 
     if (action === 'enroll') {
-      if (!ctx.input.factorType) throw new Error('Factor type is required for enrollment');
-      if (!ctx.input.provider) throw new Error('Provider is required for enrollment');
+      if (!ctx.input.factorType) {
+        throw oktaServiceError('Factor type is required for enrollment');
+      }
+      if (!ctx.input.provider) {
+        throw oktaServiceError('Provider is required for enrollment');
+      }
 
       let factor = await client.enrollFactor(userId, {
         factorType: ctx.input.factorType,
@@ -123,6 +129,6 @@ export let manageUserFactorsTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw oktaServiceError(`Unknown action: ${action}`);
   })
   .build();

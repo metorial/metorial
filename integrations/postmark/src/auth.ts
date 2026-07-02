@@ -1,9 +1,15 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { postmarkApiError } from './lib/errors';
 
 let postmarkAxios = createAxios({
   baseURL: 'https://api.postmarkapp.com'
 });
+
+postmarkAxios.interceptors?.response?.use(
+  response => response,
+  error => Promise.reject(postmarkApiError(error, 'profile lookup'))
+);
 
 export let auth = SlateAuth.create()
   .output(
@@ -18,7 +24,7 @@ export let auth = SlateAuth.create()
     key: 'server_token',
 
     inputSchema: z.object({
-      serverToken: z.string(),
+      serverToken: z.string().min(1),
       accountToken: z.string().optional()
     }),
 

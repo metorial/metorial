@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { docusignApiError, docusignServiceError } from './lib/errors';
 
 let getAuthBaseUrl = (environment: string) =>
   environment === 'production'
@@ -64,12 +65,12 @@ function createDocusignOauth(name: string, key: string, environment: 'demo' | 'p
     key,
     docs: [
       {
-        type: 'docs.auth.oauth',
+        type: 'docs.auth.oauth' as const,
         name: 'OAuth documentation',
         url: 'https://developers.docusign.com/platform/auth/authcode/'
       },
       {
-        type: 'docs.auth.oauth_scopes',
+        type: 'docs.auth.oauth_scopes' as const,
         name: 'OAuth scopes',
         url: 'https://developers.docusign.com/platform/auth/reference/scopes/'
       }
@@ -91,103 +92,115 @@ function createDocusignOauth(name: string, key: string, environment: 'demo' | 'p
       let axiosInstance = createAxios({ baseURL: authBaseUrl });
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
-      let tokenResponse = await axiosInstance.post(
-        '/oauth/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
+      try {
+        let tokenResponse = await axiosInstance.post(
+          '/oauth/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri
+          }).toString(),
+          {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
+        );
+
+        let tokenData = tokenResponse.data;
+        let accessToken = tokenData.access_token;
+        let refreshToken = tokenData.refresh_token;
+        let expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+
+        let userInfoResponse = await axiosInstance.get('/oauth/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        let userInfo = userInfoResponse.data;
+        let defaultAccount =
+          userInfo.accounts?.find((a: any) => a.is_default) || userInfo.accounts?.[0];
+
+        if (!defaultAccount) {
+          throw docusignServiceError('No DocuSign account found for this user.');
         }
-      );
 
-      let tokenData = tokenResponse.data;
-      let accessToken = tokenData.access_token;
-      let refreshToken = tokenData.refresh_token;
-      let expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
-
-      let userInfoResponse = await axiosInstance.get('/oauth/userinfo', {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      });
-
-      let userInfo = userInfoResponse.data;
-      let defaultAccount =
-        userInfo.accounts?.find((a: any) => a.is_default) || userInfo.accounts?.[0];
-
-      if (!defaultAccount) {
-        throw new Error('No DocuSign account found for this user');
+        return {
+          output: {
+            token: accessToken,
+            refreshToken,
+            expiresAt,
+            baseUri: defaultAccount.base_uri,
+            accountId: defaultAccount.account_id,
+            environment
+          }
+        };
+      } catch (error) {
+        throw docusignApiError(error, 'OAuth callback');
       }
-
-      return {
-        output: {
-          token: accessToken,
-          refreshToken,
-          expiresAt,
-          baseUri: defaultAccount.base_uri,
-          accountId: defaultAccount.account_id,
-          environment
-        }
-      };
     },
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw docusignServiceError('No DocuSign refresh token is available.');
       }
       let axiosInstance = createAxios({ baseURL: authBaseUrl });
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
-      let tokenResponse = await axiosInstance.post(
-        '/oauth/token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
+      try {
+        let tokenResponse = await axiosInstance.post(
+          '/oauth/token',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken
+          }).toString(),
+          {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
 
-      let tokenData = tokenResponse.data;
-      let expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
+        let tokenData = tokenResponse.data;
+        let expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
 
-      return {
-        output: {
-          token: tokenData.access_token,
-          refreshToken: tokenData.refresh_token || ctx.output.refreshToken,
-          expiresAt,
-          baseUri: ctx.output.baseUri,
-          accountId: ctx.output.accountId,
-          environment
-        }
-      };
+        return {
+          output: {
+            token: tokenData.access_token,
+            refreshToken: tokenData.refresh_token || ctx.output.refreshToken,
+            expiresAt,
+            baseUri: ctx.output.baseUri,
+            accountId: ctx.output.accountId,
+            environment
+          }
+        };
+      } catch (error) {
+        throw docusignApiError(error, 'OAuth refresh');
+      }
     },
 
     getProfile: async (ctx: any) => {
       let axiosInstance = createAxios({ baseURL: authBaseUrl });
-      let userInfoResponse = await axiosInstance.get('/oauth/userinfo', {
-        headers: { Authorization: `Bearer ${ctx.output.token}` }
-      });
-      let userInfo = userInfoResponse.data;
-      return {
-        profile: {
-          id: userInfo.sub,
-          email: userInfo.email,
-          name: userInfo.name,
-          accountId: ctx.output.accountId,
-          accountName: userInfo.accounts?.find(
-            (a: any) => a.account_id === ctx.output.accountId
-          )?.account_name
-        }
-      };
+      try {
+        let userInfoResponse = await axiosInstance.get('/oauth/userinfo', {
+          headers: { Authorization: `Bearer ${ctx.output.token}` }
+        });
+        let userInfo = userInfoResponse.data;
+        return {
+          profile: {
+            id: userInfo.sub,
+            email: userInfo.email,
+            name: userInfo.name,
+            accountId: ctx.output.accountId,
+            accountName: userInfo.accounts?.find(
+              (a: any) => a.account_id === ctx.output.accountId
+            )?.account_name
+          }
+        };
+      } catch (error) {
+        throw docusignApiError(error, 'profile request');
+      }
     }
   };
 }

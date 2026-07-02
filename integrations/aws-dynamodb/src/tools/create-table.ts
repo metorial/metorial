@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { dynamoDbServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -86,6 +87,11 @@ Supports configuring billing mode (on-demand or provisioned), table class, Dynam
         .enum(['STANDARD', 'STANDARD_INFREQUENT_ACCESS'])
         .optional()
         .describe('Table class'),
+      deletionProtectionEnabled: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe('Enable deletion protection on the table'),
       enableStreams: z.boolean().optional().describe('Enable DynamoDB Streams'),
       streamViewType: z
         .enum(['KEYS_ONLY', 'NEW_IMAGE', 'OLD_IMAGE', 'NEW_AND_OLD_IMAGES'])
@@ -107,11 +113,25 @@ Supports configuring billing mode (on-demand or provisioned), table class, Dynam
       tableName: z.string().describe('Name of the created table'),
       tableArn: z.string().describe('ARN of the created table'),
       tableStatus: z.string().describe('Current status of the table'),
-      tableId: z.string().optional().describe('Unique identifier of the table')
+      tableId: z.string().optional().describe('Unique identifier of the table'),
+      deletionProtectionEnabled: z
+        .boolean()
+        .optional()
+        .describe('Whether deletion protection is enabled')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
+    if (ctx.input.billingMode === 'PROVISIONED' && !ctx.input.provisionedThroughput) {
+      throw dynamoDbServiceError(
+        'provisionedThroughput is required when billingMode is PROVISIONED.'
+      );
+    }
+    if (ctx.input.billingMode === 'PAY_PER_REQUEST' && ctx.input.provisionedThroughput) {
+      throw dynamoDbServiceError(
+        'provisionedThroughput cannot be set when billingMode is PAY_PER_REQUEST.'
+      );
+    }
 
     let result = await client.createTable({
       tableName: ctx.input.tableName,
@@ -159,6 +179,7 @@ Supports configuring billing mode (on-demand or provisioned), table class, Dynam
         }
       })),
       tableClass: ctx.input.tableClass,
+      deletionProtectionEnabled: ctx.input.deletionProtectionEnabled,
       streamSpecification: ctx.input.enableStreams
         ? {
             StreamEnabled: true,
@@ -178,7 +199,8 @@ Supports configuring billing mode (on-demand or provisioned), table class, Dynam
         tableName: tableDesc.TableName,
         tableArn: tableDesc.TableArn,
         tableStatus: tableDesc.TableStatus,
-        tableId: tableDesc.TableId
+        tableId: tableDesc.TableId,
+        deletionProtectionEnabled: tableDesc.DeletionProtectionEnabled
       },
       message: `Created table **${tableDesc.TableName}** (status: ${tableDesc.TableStatus})`
     };

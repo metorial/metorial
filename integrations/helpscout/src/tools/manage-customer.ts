@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HelpScoutClient } from '../lib/client';
+import { helpscoutServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listCustomers = SlateTool.create(spec, {
@@ -194,6 +195,13 @@ export let createCustomer = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new HelpScoutClient(ctx.auth.token);
+
+    if (!ctx.input.firstName && !ctx.input.emails?.length) {
+      throw helpscoutServiceError(
+        'Provide at least a first name or email address to create a customer.'
+      );
+    }
+
     let result = await client.createCustomer({
       firstName: ctx.input.firstName,
       lastName: ctx.input.lastName,
@@ -299,12 +307,49 @@ export let updateCustomer = SlateTool.create(spec, {
       updated.push(`removed ${ctx.input.removePhoneIds.length} phone(s)`);
     }
 
+    if (updated.length === 0) {
+      throw helpscoutServiceError(
+        'Provide at least one customer field or contact method to update.'
+      );
+    }
+
     return {
       output: {
         customerId: ctx.input.customerId,
         updated
       },
       message: `Updated customer **#${ctx.input.customerId}**: ${updated.join(', ')}.`
+    };
+  })
+  .build();
+
+export let deleteCustomer = SlateTool.create(spec, {
+  name: 'Delete Customer',
+  key: 'delete_customer',
+  description: `Permanently delete a customer and their associated survey responses and conversations. This supports Help Scout's GDPR erasure workflow and cannot be undone.`,
+  tags: { destructive: true }
+})
+  .input(
+    z.object({
+      customerId: z.number().describe('Customer ID to permanently delete')
+    })
+  )
+  .output(
+    z.object({
+      customerId: z.number().describe('Deleted customer ID'),
+      deleted: z.boolean().describe('Whether the deletion was successful')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new HelpScoutClient(ctx.auth.token);
+    await client.deleteCustomer(ctx.input.customerId);
+
+    return {
+      output: {
+        customerId: ctx.input.customerId,
+        deleted: true
+      },
+      message: `Deleted customer **#${ctx.input.customerId}**.`
     };
   })
   .build();

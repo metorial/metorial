@@ -35,7 +35,11 @@ export let createRepository = SlateTool.create(spec, {
       isPrivate: z
         .boolean()
         .optional()
-        .describe('Whether the repository should be private. Defaults to false (public).')
+        .describe('Whether the repository should be private. Defaults to false (public).'),
+      registry: z
+        .string()
+        .optional()
+        .describe('Docker registry host for the repository. Defaults to docker.io.')
     })
   )
   .output(
@@ -48,12 +52,13 @@ export let createRepository = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let ns = ctx.input.namespace || ctx.config.namespace || ctx.auth.username;
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let repo = await client.createRepository(ns, {
       name: ctx.input.repositoryName,
       description: ctx.input.description,
       full_description: ctx.input.fullDescription,
-      is_private: ctx.input.isPrivate
+      is_private: ctx.input.isPrivate,
+      registry: ctx.input.registry
     });
 
     return {

@@ -1,18 +1,17 @@
 {
   "name": "@metorial/new-relic",
-  "description": "Query telemetry data using NRQL across metrics, events, logs, and traces. Create and manage alert conditions, policies, and notification workflows. Build and update dashboards with custom widgets and charts. Search, tag, and manage monitored entities such as applications, hosts, and services. Configure synthetic monitors to proactively detect issues. Ingest custom metrics, events, logs, and distributed tracing spans via dedicated APIs. Track deployments and change events. Manage workloads, user groups, roles, and API keys. Set up alert notifications to destinations like Slack, PagerDuty, Jira, email, and webhooks.",
+  "description": "Query telemetry data using NRQL across metrics, events, logs, and traces. Create and manage alert policies and NRQL alert conditions, and list alert issues. Build and update dashboards with custom widgets and charts. Search, tag, and manage monitored entities such as applications, hosts, and services. Configure synthetic monitors to proactively detect issues. Ingest custom metrics, events, logs, and distributed tracing spans via dedicated APIs. Track deployments and change markers.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "query telemetry data",
+    "manage alert policies",
     "manage alert conditions",
+    "list alert issues",
     "create and update dashboards",
     "search and tag entities",
     "ingest custom metrics and logs",
     "configure synthetic monitors",
-    "track deployments and changes",
-    "manage notification workflows",
-    "manage user groups and roles",
-    "configure workloads"
+    "track deployments and changes"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/new-relic.png"
 }

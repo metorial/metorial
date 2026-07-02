@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { kubernetesServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -110,6 +111,9 @@ let parseKubeconfig = (
       break;
     }
   }
+  if (!currentContext) {
+    throw kubernetesServiceError('Kubeconfig must include current-context.');
+  }
 
   // Find the context entry to get cluster and user names
   let contextCluster = '';
@@ -140,6 +144,11 @@ let parseKubeconfig = (
     if (inTargetContext && contextCluster && contextUser) break;
     if (inContexts && line.match(/^\s*- name:/) && inTargetContext) break;
   }
+  if (!contextCluster || !contextUser) {
+    throw kubernetesServiceError(
+      `Kubeconfig current-context "${currentContext}" must reference a cluster and user.`
+    );
+  }
 
   // Find user credentials
   let inUsers = false;
@@ -160,11 +169,14 @@ let parseKubeconfig = (
     if (inTargetUser) {
       if (line.includes('client-certificate-data:')) {
         let b64 = line.split('client-certificate-data:')[1] || '';
-        result.clientCertificate = atob(b64.trim());
+        result.clientCertificate = decodeKubeconfigBase64(
+          b64.trim(),
+          'client-certificate-data'
+        );
       }
       if (line.includes('client-key-data:')) {
         let b64 = line.split('client-key-data:')[1] || '';
-        result.clientKey = atob(b64.trim());
+        result.clientKey = decodeKubeconfigBase64(b64.trim(), 'client-key-data');
       }
       if (line.includes('token:') && !line.includes('token-file')) {
         let part = line.split('token:')[1] || '';
@@ -193,7 +205,7 @@ let parseKubeconfig = (
     }
     if (inTargetCluster && line.includes('certificate-authority-data:')) {
       let b64 = line.split('certificate-authority-data:')[1] || '';
-      result.caCertificate = atob(b64.trim());
+      result.caCertificate = decodeKubeconfigBase64(b64.trim(), 'certificate-authority-data');
     }
     if (
       inClusters &&
@@ -204,5 +216,23 @@ let parseKubeconfig = (
       break;
   }
 
+  if (!result.token && (!result.clientCertificate || !result.clientKey)) {
+    throw kubernetesServiceError(
+      `Kubeconfig user "${contextUser}" must include a bearer token or client certificate and key data.`
+    );
+  }
+
   return result;
+};
+
+let decodeKubeconfigBase64 = (value: string, fieldName: string) => {
+  try {
+    return atob(value);
+  } catch (error) {
+    let serviceError = kubernetesServiceError(`Kubeconfig ${fieldName} is not valid base64.`);
+    if (error instanceof Error) {
+      serviceError.setParent(error);
+    }
+    throw serviceError;
+  }
 };

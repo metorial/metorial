@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { servicenowServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -48,7 +49,7 @@ export let manageKnowledgeArticle = SlateTool.create(spec, {
 
     if (ctx.input.action === 'search') {
       if (!ctx.input.searchQuery) {
-        throw new Error('searchQuery is required for search action');
+        throw servicenowServiceError('searchQuery is required for search action');
       }
       let articles = await client.searchKnowledge({
         query: ctx.input.searchQuery,
@@ -82,7 +83,7 @@ export let manageKnowledgeArticle = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.articleId) {
-        throw new Error('articleId is required for update action');
+        throw servicenowServiceError('articleId is required for update action');
       }
       let record = await client.updateKnowledgeArticle(ctx.input.articleId, fields);
       return {
@@ -94,6 +95,6 @@ export let manageKnowledgeArticle = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw servicenowServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

@@ -56,6 +56,14 @@ Returns the URL of the newly created queue. If a queue with the same name and id
             .string()
             .optional()
             .describe('Set to "true" to enable content-based deduplication (FIFO only)'),
+          deduplicationScope: z
+            .string()
+            .optional()
+            .describe('FIFO high-throughput deduplication scope: "messageGroup" or "queue"'),
+          fifoThroughputLimit: z
+            .string()
+            .optional()
+            .describe('FIFO throughput quota mode: "perQueue" or "perMessageGroupId"'),
           kmsMasterKeyId: z
             .string()
             .optional()
@@ -113,6 +121,8 @@ Returns the URL of the newly created queue. If a queue with the same name and id
         ReceiveMessageWaitTimeSeconds: ctx.input.attributes.receiveMessageWaitTimeSeconds,
         FifoQueue: ctx.input.attributes.fifoQueue,
         ContentBasedDeduplication: ctx.input.attributes.contentBasedDeduplication,
+        DeduplicationScope: ctx.input.attributes.deduplicationScope,
+        FifoThroughputLimit: ctx.input.attributes.fifoThroughputLimit,
         KmsMasterKeyId: ctx.input.attributes.kmsMasterKeyId,
         KmsDataKeyReusePeriodSeconds: ctx.input.attributes.kmsDataKeyReusePeriodSeconds,
         SqsManagedSseEnabled: ctx.input.attributes.sqsManagedSseEnabled,

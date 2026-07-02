@@ -101,6 +101,89 @@ export let createTeam = SlateTool.create(spec, {
   })
   .build();
 
+export let getTeam = SlateTool.create(spec, {
+  name: 'Get Team',
+  key: 'get_team',
+  description: `Retrieve a Grafana team by ID, including its name, email, and timestamps.`,
+  tags: {
+    destructive: false,
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      teamId: z.number().describe('ID of the team to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      teamId: z.number().describe('Team ID'),
+      name: z.string().describe('Team name'),
+      email: z.string().optional().describe('Team email'),
+      created: z.string().optional().describe('Creation timestamp'),
+      updated: z.string().optional().describe('Last update timestamp')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new GrafanaClient({
+      instanceUrl: ctx.config.instanceUrl,
+      token: ctx.auth.token,
+      organizationId: ctx.config.organizationId
+    });
+
+    let team = await client.getTeam(ctx.input.teamId);
+
+    return {
+      output: {
+        teamId: team.id,
+        name: team.name,
+        email: team.email,
+        created: team.created,
+        updated: team.updated
+      },
+      message: `Retrieved team **${team.name || ctx.input.teamId}**.`
+    };
+  })
+  .build();
+
+export let updateTeam = SlateTool.create(spec, {
+  name: 'Update Team',
+  key: 'update_team',
+  description: `Update a Grafana team's name and optional email address by ID.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      teamId: z.number().describe('ID of the team to update'),
+      name: z.string().describe('Updated team name'),
+      email: z.string().optional().describe('Updated team email')
+    })
+  )
+  .output(
+    z.object({
+      message: z.string().describe('Confirmation message')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new GrafanaClient({
+      instanceUrl: ctx.config.instanceUrl,
+      token: ctx.auth.token,
+      organizationId: ctx.config.organizationId
+    });
+
+    let result = await client.updateTeam(ctx.input.teamId, ctx.input.name, ctx.input.email);
+
+    return {
+      output: {
+        message: result.message || `Team ${ctx.input.teamId} updated.`
+      },
+      message: `Team **${ctx.input.teamId}** updated.`
+    };
+  })
+  .build();
+
 export let getTeamMembers = SlateTool.create(spec, {
   name: 'Get Team Members',
   key: 'get_team_members',

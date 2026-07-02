@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { freshsalesApiError } from './errors';
 
 export type ApiVersion = 'freshworks' | 'classic';
 
@@ -17,6 +18,27 @@ let buildBaseUrl = (domain: string, apiVersion: ApiVersion): string => {
   return `https://${domain}.myfreshworks.com/crm/sales/api`;
 };
 
+let collectRecordArrays = (value: unknown, results: Record<string, any>[] = []) => {
+  if (Array.isArray(value)) {
+    for (let item of value) {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        results.push(item as Record<string, any>);
+      }
+    }
+    return results;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return results;
+  }
+
+  for (let nested of Object.values(value)) {
+    collectRecordArrays(nested, results);
+  }
+
+  return results;
+};
+
 export class Client {
   private axios: ReturnType<typeof createAxios>;
 
@@ -28,6 +50,11 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+
+    this.axios.interceptors.response.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(freshsalesApiError(error))
+    );
   }
 
   // ---- Leads ----
@@ -272,6 +299,11 @@ export class Client {
     return response.data.task;
   }
 
+  async completeTask(taskId: number): Promise<Record<string, any>> {
+    let response = await this.axios.put(`/tasks/${taskId}`, { task: { status: 1 } });
+    return response.data.task;
+  }
+
   async deleteTask(taskId: number): Promise<void> {
     await this.axios.delete(`/tasks/${taskId}`);
   }
@@ -345,6 +377,20 @@ export class Client {
     return response.data.sales_activity;
   }
 
+  async listSalesActivities(options?: {
+    page?: number;
+    perPage?: number;
+  }): Promise<{ salesActivities: Record<string, any>[]; meta: Record<string, any> }> {
+    let params: Record<string, any> = {};
+    if (options?.page) params.page = options.page;
+    if (options?.perPage) params.per_page = options.perPage;
+    let response = await this.axios.get('/sales_activities', { params });
+    return {
+      salesActivities: response.data.sales_activities || [],
+      meta: response.data.meta || {}
+    };
+  }
+
   async updateSalesActivity(
     activityId: number,
     salesActivity: Record<string, any>
@@ -375,14 +421,14 @@ export class Client {
   ): Promise<Record<string, any>[]> {
     let params: Record<string, any> = { q: query, f: field, entities };
     let response = await this.axios.get('/lookup', { params });
-    return response.data || [];
+    return collectRecordArrays(response.data);
   }
 
   async filteredSearch(
     entityType: string,
     filterRules: Record<string, any>[],
     options?: { page?: number; perPage?: number }
-  ): Promise<Record<string, any>[]> {
+  ): Promise<Record<string, any>> {
     let params: Record<string, any> = {};
     if (options?.page) params.page = options.page;
     if (options?.perPage) params.per_page = options.perPage;
@@ -391,7 +437,7 @@ export class Client {
       { filter_rule: filterRules },
       { params }
     );
-    return response.data || [];
+    return response.data || {};
   }
 
   // ---- Selectors ----

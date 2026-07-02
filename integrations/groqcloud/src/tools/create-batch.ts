@@ -1,20 +1,22 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { groqCloudServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createBatch = SlateTool.create(spec, {
   name: 'Create Batch',
   key: 'create_batch',
-  description: `Create a batch processing job on GroqCloud. Upload a JSONL file of API requests to be processed asynchronously at 50% lower cost. Supports chat completions, audio transcriptions, and translations. Each line in the JSONL content should contain a request object with custom_id, method, url, and body fields.`,
+  description: `Create a batch processing job on GroqCloud. Use an uploaded batch JSONL file or provide JSONL content to upload and create the batch in one step. Each line should contain a request object with custom_id, method, url, and body fields for the chat completions endpoint.`,
   instructions: [
-    'Provide JSONL content where each line is a JSON object with: custom_id, method ("POST"), url (e.g., "/v1/chat/completions"), and body (the request payload).',
+    'Provide exactly one of inputFileId or jsonlContent.',
+    'JSONL lines must be objects with custom_id, method ("POST"), url "/v1/chat/completions", and body.',
     'The batch will be processed within the specified completion window (24h to 7d).',
-    'Use the Get Batch tool to poll for completion status.'
+    'Use Get Batch to poll for status and Download File to retrieve outputFileId or errorFileId contents.'
   ],
   constraints: [
     'Maximum file size: 100 MB',
-    'Supported endpoints: /v1/chat/completions, /v1/audio/transcriptions, /v1/audio/translations',
+    'Supported endpoint: /v1/chat/completions',
     'Completion window: 24h to 7d'
   ],
   tags: {
@@ -23,13 +25,25 @@ export let createBatch = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      inputFileId: z
+        .string()
+        .optional()
+        .describe(
+          'Existing uploaded batch file ID. Provide either inputFileId or jsonlContent'
+        ),
       jsonlContent: z
         .string()
+        .optional()
         .describe(
-          'JSONL content where each line is a batch request object with custom_id, method, url, and body fields'
+          'JSONL content to upload before creating the batch. Provide either jsonlContent or inputFileId'
         ),
+      filename: z
+        .string()
+        .optional()
+        .default('batch_input.jsonl')
+        .describe('Filename to use when uploading jsonlContent'),
       endpoint: z
-        .enum(['/v1/chat/completions', '/v1/audio/transcriptions', '/v1/audio/translations'])
+        .enum(['/v1/chat/completions'])
         .default('/v1/chat/completions')
         .describe('API endpoint for the batch requests'),
       completionWindow: z
@@ -54,13 +68,28 @@ export let createBatch = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
+    let hasInputFileId =
+      ctx.input.inputFileId !== undefined && ctx.input.inputFileId.trim().length > 0;
+    let hasJsonlContent =
+      ctx.input.jsonlContent !== undefined && ctx.input.jsonlContent.trim().length > 0;
 
-    ctx.info('Uploading batch file...');
-    let file = await client.uploadFile(ctx.input.jsonlContent, 'batch_input.jsonl');
-    ctx.info(`File uploaded: ${file.id}`);
+    if (hasInputFileId === hasJsonlContent) {
+      throw groqCloudServiceError(
+        'Provide exactly one of inputFileId or jsonlContent when creating a batch.'
+      );
+    }
+
+    let inputFileId = ctx.input.inputFileId;
+
+    if (hasJsonlContent) {
+      ctx.info('Uploading batch file...');
+      let file = await client.uploadFile(ctx.input.jsonlContent!, ctx.input.filename);
+      ctx.info(`File uploaded: ${file.id}`);
+      inputFileId = file.id;
+    }
 
     let batch = await client.createBatch({
-      inputFileId: file.id,
+      inputFileId: inputFileId!,
       endpoint: ctx.input.endpoint,
       completionWindow: ctx.input.completionWindow,
       metadata: ctx.input.metadata

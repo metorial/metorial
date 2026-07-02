@@ -3,6 +3,15 @@ import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
+let displayFieldValue = (value: any) => {
+  if (value && typeof value === 'object') {
+    if ('value' in value) return value.value;
+    if ('display_value' in value) return value.display_value;
+  }
+
+  return value;
+};
+
 export let manageChangeRequest = SlateTool.create(spec, {
   name: 'Manage Change Request',
   key: 'manage_change_request',
@@ -110,13 +119,17 @@ export let manageChangeRequest = SlateTool.create(spec, {
       action = 'Created';
     }
 
+    let changeRequestId = displayFieldValue(record.sys_id);
+    let changeRequestNumber = displayFieldValue(record.number);
+    let shortDescription = displayFieldValue(record.short_description);
+
     return {
       output: {
         record,
-        changeRequestId: record.sys_id,
-        changeRequestNumber: record.number?.display_value || record.number
+        changeRequestId,
+        changeRequestNumber
       },
-      message: `${action} change request **${record.number?.display_value || record.number || record.sys_id}**: ${record.short_description?.display_value || record.short_description || 'No description'}`
+      message: `${action} change request **${changeRequestNumber || changeRequestId}**: ${shortDescription || 'No description'}`
     };
   })
   .build();

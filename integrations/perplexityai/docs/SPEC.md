@@ -1,5 +1,3 @@
-Now let me get more details on the Agent API and specific features:Now I have enough information to compile the specification.
-
 # Slates Specification for Perplexity AI
 
 ## Overview
@@ -24,7 +22,7 @@ Authorization: Bearer pplx-your-api-key-here
 
 The base URL for all API calls is `https://api.perplexity.ai`.
 
-API keys can also be programmatically generated, listed, and revoked via management endpoints using an existing key. There are no OAuth flows or scopes; a single API key grants access to all available API features within its usage tier.
+Perplexity also documents programmatic key generation and revocation endpoints, but this integration does not expose those destructive credential-management workflows as tools. There are no OAuth flows or scopes; a single API key grants access to available API features within its usage tier.
 
 ## Features
 
@@ -32,10 +30,11 @@ API keys can also be programmatically generated, listed, and revoked via managem
 
 A unified interface that provides access to models from multiple providers (OpenAI, Anthropic, Google, xAI, and Perplexity's own Sonar models) through a single API key. It supports built-in tools like web search and URL fetching, configurable reasoning controls and token budgets, and pre-configured **presets** (e.g., "pro-search", "deep-research") optimized for specific use cases. It also supports **model fallback**, allowing specification of multiple models for automatic failover. The API is compatible with the OpenAI Chat Completions format.
 
-- **Tools**: Web search, URL fetching, and custom function calling can be attached to requests.
+- **Tools**: Web search, URL fetching, finance search, people search, and sandbox can be attached to requests.
 - **Presets**: Pre-configured combinations of models, system instructions, tools, and token limits for common workflows.
 - **Structured outputs**: Supports JSON schema-based output formatting.
 - **Streaming**: Responses can be streamed for lower latency.
+- **Model discovery**: Agent model IDs can be listed with `GET /v1/models`.
 
 ### Sonar API (AI Search Chat Completions)
 
@@ -46,21 +45,23 @@ Perplexity's native search-augmented chat completion models that combine LLM gen
 - **Sonar Reasoning Pro**: Chain-of-thought reasoning model for complex multi-step analysis.
 - **Sonar Deep Research**: Expert-level research model that conducts exhaustive searches and generates comprehensive reports.
 
-Key parameters include `search_recency_filter` (limit results by time), `search_domain_filter` (restrict to specific domains), `return_images`, `return_related_questions`, `temperature`, `top_p`, `presence_penalty`, and `frequency_penalty`. Some features (images, domain filters, structured output) are gated by usage tier.
+Key parameters include `search_recency_filter` (limit results by time), `search_domain_filter` (restrict to specific domains), `search_context_size`, `return_images`, `return_related_questions`, `temperature`, `top_p`, `presence_penalty`, and `frequency_penalty`. Some features (images, domain filters, structured output) are gated by usage tier.
+
+The async Sonar API supports submitting long-running chat completion requests with `POST /v1/async/sonar`, fetching a request by ID with `GET /v1/async/sonar/{request_id}`, and listing async requests with `GET /v1/async/sonar`.
 
 ### Search API (Raw Web Search Results)
 
 Provides raw, ranked web search results from Perplexity's index (covering hundreds of billions of webpages) without LLM-synthesized answers. Results include pre-ranked, fine-grained snippets rather than full documents, making them ready for use in RAG pipelines or custom synthesis workflows.
 
-- Supports domain filtering, multi-query search in a single request, and content extraction.
-- Configurable parameters include `max_results` and `max_tokens_per_page` to control result volume and snippet length.
+- Supports domain filtering, multi-query search in a single request, People Search routing, and content extraction.
+- Configurable parameters include `max_results`, `search_context_size`, `max_tokens`, and `max_tokens_per_page` to control result volume and snippet length.
 
 ### Embeddings API
 
 Generates vector representations of text for use in semantic search, retrieval-augmented generation, and recommendation systems.
 
-- **Standard Embeddings**: General-purpose text embeddings.
-- **Contextualized Embeddings**: Embeddings that incorporate additional context for improved relevance in specific retrieval scenarios.
+- **Standard Embeddings**: General-purpose text embeddings for independent texts and search queries.
+- **Contextualized Embeddings**: Document-chunk embeddings that accept nested arrays, where each inner array contains chunks from one document.
 
 ### API Key Management
 

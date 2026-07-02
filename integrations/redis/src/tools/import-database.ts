@@ -1,7 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { RedisCloudClient } from '../lib/client';
+import { redisServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import { subscriptionTypeSchema } from './common';
 
 export let importDatabase = SlateTool.create(spec, {
   name: 'Import Database',
@@ -9,7 +11,7 @@ export let importDatabase = SlateTool.create(spec, {
   description: `Import data into an existing Redis Cloud database from external sources. Supports AWS S3, Google Cloud Storage, Azure Blob Storage, FTP, HTTP, and Redis server sources.
 **Warning:** Importing data overwrites any existing data in the target database.`,
   instructions: [
-    'sourceType must match the URI scheme: aws-s3, google-blob-storage, azure-blob-storage, ftp, HTTP, or redis.',
+    'sourceType must match the URI scheme: aws-s3, google-blob-storage, azure-blob-storage, ftp, http, or redis.',
     'Import URIs follow provider-specific formats (e.g., s3://bucket/path/file.rdb for AWS S3).'
   ]
 })
@@ -17,9 +19,9 @@ export let importDatabase = SlateTool.create(spec, {
     z.object({
       subscriptionId: z.number().describe('Subscription ID containing the database'),
       databaseId: z.number().describe('Database ID to import data into'),
-      type: z.enum(['pro', 'essentials']).default('pro').describe('Subscription type'),
+      type: subscriptionTypeSchema,
       sourceType: z
-        .enum(['aws-s3', 'google-blob-storage', 'azure-blob-storage', 'ftp', 'HTTP', 'redis'])
+        .enum(['aws-s3', 'google-blob-storage', 'azure-blob-storage', 'ftp', 'http', 'redis'])
         .describe('Source type for the import'),
       importFromUri: z
         .array(z.string())
@@ -34,6 +36,14 @@ export let importDatabase = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new RedisCloudClient(ctx.auth);
+    for (let uri of ctx.input.importFromUri) {
+      if (!importUriMatchesSourceType(ctx.input.sourceType, uri)) {
+        throw redisServiceError(
+          `Import URI "${uri}" does not match sourceType "${ctx.input.sourceType}".`
+        );
+      }
+    }
+
     let body: Record<string, any> = {
       sourceType: ctx.input.sourceType,
       importFromUri: ctx.input.importFromUri
@@ -62,3 +72,24 @@ export let importDatabase = SlateTool.create(spec, {
     };
   })
   .build();
+
+let importUriMatchesSourceType = (sourceType: string, uri: string) => {
+  let normalizedUri = uri.toLowerCase();
+
+  switch (sourceType) {
+    case 'aws-s3':
+      return normalizedUri.startsWith('s3://');
+    case 'google-blob-storage':
+      return normalizedUri.startsWith('gs://');
+    case 'azure-blob-storage':
+      return normalizedUri.startsWith('abs://');
+    case 'ftp':
+      return normalizedUri.startsWith('ftp://') || normalizedUri.startsWith('ftps://');
+    case 'http':
+      return normalizedUri.startsWith('http://') || normalizedUri.startsWith('https://');
+    case 'redis':
+      return normalizedUri.startsWith('redis://') || normalizedUri.startsWith('rediss://');
+    default:
+      return false;
+  }
+};

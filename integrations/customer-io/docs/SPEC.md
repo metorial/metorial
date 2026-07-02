@@ -18,7 +18,7 @@ Track API keys are used to send behavioral tracking activity (events and attribu
 
 ### App API — Bearer Token Authentication
 
-App API keys are used to trigger messages and broadcasts, or programmatically retrieve data from your workspace for analysis, troubleshooting, or reporting. API requests to `https://api.customer.io/v1/api/` use App API Keys.
+App API keys are used to trigger messages and broadcasts, or programmatically retrieve data from your workspace for analysis, troubleshooting, or reporting. API requests to `https://api.customer.io/v1/` use App API Keys.
 
 - Authentication: Bearer token in the `Authorization` header (`Authorization: Bearer <APP_API_KEY>`).
 - App API Keys are shown only once when created and stored as hashed values in Customer.io. Make sure to store these keys in a safe and non-public location.
@@ -59,7 +59,7 @@ You can trigger broadcasts: set up a broadcast in the UI and then trigger it wit
 
 ### Campaigns and Workflows
 
-Retrieve information about campaigns, their actions, messages, and metrics. You can get campaigns, broadcasts, and messages, and look up information about your workflows and individual messages.
+Retrieve information about campaigns and broadcasts, their actions, messages, triggers, and metrics. You can get campaigns, API-triggered broadcasts, broadcast trigger status and errors, transactional message definitions, and individual delivery records.
 
 ### Collections
 
@@ -67,7 +67,7 @@ Collections provide a way to store data in your workspace that you can use in ca
 
 ### Bulk Import and Export
 
-You can import and export bulk data: import and export people in bulk. Exports can include attribute and event data for selected profiles or segments.
+You can import and export bulk data: import and export people in bulk. Exports can include attribute and event data for selected profiles or segments. Export downloads are file-producing operations and should return file bytes as Slate attachments with structured output limited to metadata.
 
 ### Device Management
 

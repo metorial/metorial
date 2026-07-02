@@ -1,4 +1,6 @@
+import { Buffer } from 'node:buffer';
 import { createAxios } from 'slates';
+import { docsumoApiError, docsumoServiceError } from './errors';
 
 export interface DocsumoDocument {
   docId: string;
@@ -16,6 +18,7 @@ export interface DocsumoDocument {
   userId?: string;
   folderId?: string;
   folderName?: string;
+  caseId?: string;
   approvedWithError?: boolean;
   convertedToDigital?: boolean;
   reviewToken?: boolean;
@@ -40,14 +43,24 @@ export interface DocumentType {
   docTypeId: string;
   title: string;
   docType: string;
-  canUpload: boolean;
-  isDefault: boolean;
-  docCounts: {
+  canUpload?: boolean;
+  isDefault?: boolean;
+  category?: string;
+  docCounts?: {
     all: number;
     processed: number;
     reviewing: number;
   };
   uploadEmail?: string;
+}
+
+export interface AccountInfo {
+  userId: string;
+  email: string;
+  fullName: string;
+  monthlyDocCurrent: number;
+  monthlyDocLimit: number;
+  documentTypes: DocumentType[];
 }
 
 export interface ListDocumentsParams {
@@ -83,11 +96,94 @@ export interface UploadBase64Params {
   password?: string;
 }
 
+export interface UpdateReviewStatusParams {
+  docId: string;
+  action: 'start' | 'end' | 'skip';
+  forced?: boolean;
+  strict?: boolean;
+}
+
+export interface ListAgentsParams {
+  agentType?: 'all' | 'doctype' | 'casetype';
+}
+
+export interface ListCasesParams {
+  casetypeId: string;
+  limit?: number;
+  offset?: number;
+  sortBy?:
+    | 'created_date.asc'
+    | 'created_date.desc'
+    | 'modified_date.asc'
+    | 'modified_date.desc';
+  stageIds?: string[];
+  assignedTo?: string[];
+  workflowStates?: string[];
+  createdDateFrom?: string;
+  createdDateTo?: string;
+  modifiedDateFrom?: string;
+  modifiedDateTo?: string;
+}
+
+export interface CreateCaseFile {
+  filename: string;
+  contentBase64: string;
+  contentType?: string;
+}
+
+export interface CreateCaseParams {
+  casetypeId: string;
+  caseId?: string;
+  userCaseId?: string;
+  caseName?: string;
+  stageId?: string;
+  assignedTo?: string;
+  doctype?: string;
+  triggerWorkflow?: boolean;
+  userCaseMetadata?: Record<string, unknown>;
+  caseFields?: Record<string, unknown>;
+  files?: CreateCaseFile[];
+}
+
+export interface UpdateCaseParams {
+  casetypeId: string;
+  caseId: string;
+  stageId?: string;
+  caseFields?: Record<string, unknown>;
+  assignedTo?: string;
+  approval?: {
+    id: string;
+    isApproved: boolean;
+    reason?: string;
+  };
+  triggerWorkflow?: boolean;
+  caseName?: string;
+}
+
+let isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null;
+
+let documentCount = (value: unknown) => {
+  if (!isRecord(value)) {
+    return {
+      all: 0,
+      processed: 0,
+      reviewing: 0
+    };
+  }
+
+  return {
+    all: Number(value.all) || 0,
+    processed: Number(value.processed) || 0,
+    reviewing: Number(value.reviewing) || 0
+  };
+};
+
 let mapDocument = (doc: any): DocsumoDocument => ({
-  docId: doc.doc_id,
-  title: doc.title,
-  status: doc.status,
-  type: doc.type,
+  docId: String(doc.doc_id ?? doc.docId ?? ''),
+  title: String(doc.title ?? ''),
+  status: String(doc.status ?? ''),
+  type: String(doc.type ?? doc.doc_type ?? ''),
   typeTitle: doc.type_title,
   createdAt: doc.created_at,
   createdAtIso: doc.created_at_iso,
@@ -99,6 +195,7 @@ let mapDocument = (doc: any): DocsumoDocument => ({
   userId: doc.user_id,
   folderId: doc.folder_id,
   folderName: doc.folder_name,
+  caseId: doc.case_id,
   approvedWithError: doc.approved_with_error,
   convertedToDigital: doc.converted_to_digital,
   reviewToken: doc.review_token,
@@ -119,11 +216,59 @@ let mapDocument = (doc: any): DocsumoDocument => ({
     : undefined,
   timeDict: doc.time_dict
     ? {
-        processingTime: doc.time_dict.processing_time,
-        totalTime: doc.time_dict.total_time
+        processingTime: Number(doc.time_dict.processing_time) || 0,
+        totalTime: Number(doc.time_dict.total_time) || 0
       }
     : undefined
 });
+
+let mapDocumentType = (docType: any): DocumentType => ({
+  docTypeId: String(
+    docType.id ?? docType.doc_type_id ?? docType.value ?? docType.doc_type ?? ''
+  ),
+  title: String(docType.title ?? ''),
+  docType: String(docType.doc_type ?? docType.value ?? ''),
+  canUpload: docType.can_upload,
+  isDefault: docType.default,
+  category: docType.category,
+  docCounts: docType.doc_counts ? documentCount(docType.doc_counts) : undefined,
+  uploadEmail: docType.upload_email
+});
+
+let asArray = (value: unknown): any[] => {
+  if (Array.isArray(value)) return value;
+  if (value === undefined || value === null) return [];
+  return [value];
+};
+
+let dataUrlPattern = /^data:[^;,]+;base64,/i;
+
+let normalizeBase64 = (value: string) => value.replace(dataUrlPattern, '').trim();
+
+let toBlob = (file: CreateCaseFile) => {
+  let normalized = normalizeBase64(file.contentBase64);
+  let bytes = Buffer.from(normalized, 'base64');
+  let roundTrip = bytes.toString('base64').replace(/=+$/, '');
+
+  if (!bytes.length || roundTrip !== normalized.replace(/=+$/, '')) {
+    throw docsumoServiceError('Case file contentBase64 must be valid non-empty base64 data.');
+  }
+
+  return new Blob([bytes], { type: file.contentType || 'application/octet-stream' });
+};
+
+let appendFormField = (formData: FormData, name: string, value: unknown) => {
+  if (value === undefined || value === null) return;
+  if (typeof value === 'boolean') {
+    formData.append(name, value ? 'true' : 'false');
+    return;
+  }
+  if (typeof value === 'object') {
+    formData.append(name, JSON.stringify(value));
+    return;
+  }
+  formData.append(name, String(value));
+};
 
 export class Client {
   private axios;
@@ -132,9 +277,80 @@ export class Client {
     this.axios = createAxios({
       baseURL: 'https://app.docsumo.com',
       headers: {
-        'X-API-KEY': options.token
+        'X-API-KEY': options.token,
+        apikey: options.token
       }
     });
+  }
+
+  private async request<T>(operation: string, run: () => Promise<any>): Promise<T> {
+    try {
+      let response = await run();
+      this.assertSuccessfulResponse(response, operation);
+      return response.data;
+    } catch (error) {
+      throw docsumoApiError(error, operation);
+    }
+  }
+
+  private async requestData<T>(operation: string, run: () => Promise<any>): Promise<T> {
+    let body = await this.request<any>(operation, run);
+    return (body?.data ?? body) as T;
+  }
+
+  private assertSuccessfulResponse(response: any, operation: string) {
+    let body = response?.data;
+    let statusCode = Number(body?.status_code ?? response?.status);
+    let status = typeof body?.status === 'string' ? body.status.toLowerCase() : '';
+
+    if (status === 'fail' || statusCode >= 400 || statusCode === 202) {
+      let reason = [body?.error, body?.message, body?.error_code]
+        .filter((value: unknown) => typeof value === 'string' && value.trim())
+        .join(' - ');
+
+      throw docsumoServiceError(
+        `Docsumo API ${operation} failed: ${statusCode ? `HTTP ${statusCode}: ` : ''}${reason || 'Unknown error'}`
+      );
+    }
+  }
+
+  async getAccountInfo(): Promise<AccountInfo> {
+    let data = await this.requestData<any>('get account info', () =>
+      this.axios.get('/api/v1/eevee/apikey/limit/')
+    );
+
+    return {
+      userId: String(data.user_id ?? ''),
+      email: String(data.email ?? ''),
+      fullName: String(data.full_name ?? ''),
+      monthlyDocCurrent: Number(data.monthly_doc_current) || 0,
+      monthlyDocLimit: Number(data.monthly_doc_limit) || 0,
+      documentTypes: asArray(data.document_types).map(mapDocumentType)
+    };
+  }
+
+  async listEnabledDocumentTypes(): Promise<DocumentType[]> {
+    let data = await this.requestData<any>('list enabled document types', () =>
+      this.axios.get('/api/v1/mew/documents/types/')
+    );
+
+    return asArray(data.document ?? data.documents ?? data.document_types).map(
+      mapDocumentType
+    );
+  }
+
+  async getDocumentsSummary(): Promise<{
+    documentTypes: DocumentType[];
+    disabledDocumentTypes: string[];
+  }> {
+    let data = await this.requestData<any>('get documents summary', () =>
+      this.axios.get('/api/v1/mew/apikey/documents/summary/')
+    );
+
+    return {
+      documentTypes: asArray(data.document ?? data.documents).map(mapDocumentType),
+      disabledDocumentTypes: asArray(data.disabled_doc_types).map(String)
+    };
   }
 
   async listDocuments(params: ListDocumentsParams = {}): Promise<{
@@ -160,29 +376,33 @@ export class Client {
         : `lte:${params.createdDateLte}`;
     }
 
-    let response = await this.axios.get('/api/v1/eevee/apikey/documents/all/', {
-      params: queryParams
-    });
-
-    let data = response.data?.data || {};
-    let documents = (data.documents || []).map(mapDocument);
+    let data = await this.requestData<any>('list documents', () =>
+      this.axios.get('/api/v1/eevee/apikey/documents/all/', {
+        params: queryParams
+      })
+    );
+    let documents = asArray(data.documents).map(mapDocument);
 
     return {
       documents,
-      total: data.total || 0,
-      limit: data.limit || 0,
-      offset: data.offset || 0
+      total: Number(data.total) || 0,
+      limit: Number(data.limit) || 0,
+      offset: Number(data.offset) || 0
     };
   }
 
   async getDocumentDetail(docId: string): Promise<DocsumoDocument> {
-    let response = await this.axios.get(`/api/v1/eevee/apikey/documents/detail/${docId}/`);
-    let doc = response.data?.data?.document || response.data?.data || {};
+    let data = await this.requestData<any>('get document detail', () =>
+      this.axios.get(`/api/v1/eevee/apikey/documents/detail/${docId}/`)
+    );
+    let doc = data.document || data;
     return mapDocument(doc);
   }
 
   async deleteDocument(docId: string): Promise<void> {
-    await this.axios.delete(`/api/v1/eevee/apikey/delete/${docId}/`);
+    await this.request('delete document', () =>
+      this.axios.delete(`/api/v1/eevee/apikey/delete/${docId}/`)
+    );
   }
 
   async uploadFromUrl(params: UploadUrlParams): Promise<DocsumoDocument[]> {
@@ -190,16 +410,16 @@ export class Client {
     formData.append('file', params.fileUrl);
     formData.append('file_type', 'url');
     formData.append('type', params.documentType);
-    if (params.userDocId) formData.append('user_doc_id', params.userDocId);
-    if (params.docMetaData) formData.append('doc_meta_data', params.docMetaData);
-    if (params.reviewToken !== undefined)
-      formData.append('review_token', String(params.reviewToken));
-    if (params.filename) formData.append('filename', params.filename);
-    if (params.password) formData.append('password', params.password);
+    appendFormField(formData, 'user_doc_id', params.userDocId);
+    appendFormField(formData, 'doc_meta_data', params.docMetaData);
+    appendFormField(formData, 'review_token', params.reviewToken);
+    appendFormField(formData, 'filename', params.filename);
+    appendFormField(formData, 'password', params.password);
 
-    let response = await this.axios.post('/api/v1/eevee/apikey/upload/custom/', formData);
-    let documents = (response.data?.data?.document || []).map(mapDocument);
-    return documents;
+    let data = await this.requestData<any>('upload document from URL', () =>
+      this.axios.post('/api/v1/eevee/apikey/upload/custom/', formData)
+    );
+    return asArray(data.document).map(mapDocument);
   }
 
   async uploadFromBase64(params: UploadBase64Params): Promise<DocsumoDocument[]> {
@@ -208,23 +428,24 @@ export class Client {
     formData.append('file_type', 'base64');
     formData.append('type', params.documentType);
     formData.append('filename', params.filename);
-    if (params.userDocId) formData.append('user_doc_id', params.userDocId);
-    if (params.docMetaData) formData.append('doc_meta_data', params.docMetaData);
-    if (params.reviewToken !== undefined)
-      formData.append('review_token', String(params.reviewToken));
-    if (params.password) formData.append('password', params.password);
+    appendFormField(formData, 'user_doc_id', params.userDocId);
+    appendFormField(formData, 'doc_meta_data', params.docMetaData);
+    appendFormField(formData, 'review_token', params.reviewToken);
+    appendFormField(formData, 'password', params.password);
 
-    let response = await this.axios.post('/api/v1/eevee/apikey/upload/custom/', formData);
-    let documents = (response.data?.data?.document || []).map(mapDocument);
-    return documents;
+    let data = await this.requestData<any>('upload document from base64', () =>
+      this.axios.post('/api/v1/eevee/apikey/upload/custom/', formData)
+    );
+    return asArray(data.document).map(mapDocument);
   }
 
   async getExtractedData(docId: string): Promise<{
     sections: Record<string, any>;
     metaData: Record<string, any>;
   }> {
-    let response = await this.axios.get(`/api/v1/eevee/apikey/data/simplified/${docId}/`);
-    let data = response.data?.data || {};
+    let data = await this.requestData<any>('get extracted data', () =>
+      this.axios.get(`/api/v1/eevee/apikey/data/simplified/${docId}/`)
+    );
     let metaData = data.meta_data || {};
     let sections: Record<string, any> = {};
 
@@ -237,86 +458,186 @@ export class Client {
     return { sections, metaData };
   }
 
-  async updateReviewStatus(
-    docId: string,
-    action: 'review' | 'skip' | 'finish'
-  ): Promise<void> {
-    let actionPath: string;
-    switch (action) {
-      case 'review':
-        actionPath = 'start_review';
-        break;
-      case 'skip':
-        actionPath = 'review_skipped';
-        break;
-      case 'finish':
-        actionPath = 'finish_review';
-        break;
-    }
+  async updateReviewStatus(params: UpdateReviewStatusParams): Promise<{
+    status: string;
+    statusCode: number;
+    message?: string;
+  }> {
+    let queryParams: Record<string, boolean> = {};
+    if (params.forced !== undefined) queryParams.forced = params.forced;
+    if (params.strict !== undefined) queryParams.strict = params.strict;
 
-    await this.axios.post(`/api/v1/pik/review/${docId}/${actionPath}/`);
-  }
+    let body = await this.request<any>('update review status', () =>
+      this.axios.post(`/api/v1/pik/review/${params.docId}/${params.action}/`, null, {
+        params: queryParams
+      })
+    );
 
-  async getDocumentTypes(): Promise<DocumentType[]> {
-    let response = await this.axios.get('/api/v1/eevee/apikey/limit/');
-    let data = response.data?.data || {};
-    let docTypes = data.document_types || data.documents || [];
-
-    return docTypes.map((dt: any) => ({
-      docTypeId: dt.id || dt.doc_type_id || '',
-      title: dt.title || '',
-      docType: dt.doc_type || '',
-      canUpload: dt.can_upload ?? true,
-      isDefault: dt.default ?? false,
-      docCounts: {
-        all: dt.doc_counts?.all || 0,
-        processed: dt.doc_counts?.processed || 0,
-        reviewing: dt.doc_counts?.reviewing || 0
-      },
-      uploadEmail: dt.upload_email
-    }));
-  }
-
-  async getDocumentsSummary(): Promise<DocumentType[]> {
-    let response = await this.axios.get('/api/v1/eevee/apikey/documents/summary/');
-    let data = response.data?.data || {};
-    let docTypes = data.document || data.documents || [];
-
-    return docTypes.map((dt: any) => ({
-      docTypeId: dt.id || dt.doc_type_id || '',
-      title: dt.title || '',
-      docType: dt.doc_type || '',
-      canUpload: dt.can_upload ?? true,
-      isDefault: dt.default ?? false,
-      docCounts: {
-        all: dt.doc_counts?.all || 0,
-        processed: dt.doc_counts?.processed || 0,
-        reviewing: dt.doc_counts?.reviewing || 0
-      },
-      uploadEmail: dt.upload_email
-    }));
+    return {
+      status: String(body.status ?? ''),
+      statusCode: Number(body.status_code) || 0,
+      message: body.message
+    };
   }
 
   async getReviewUrl(docId: string): Promise<string> {
-    let response = await this.axios.get(`/api/v1/eevee/apikey/review-url/${docId}/`);
-    return response.data?.data?.review_url || response.data?.data?.url || '';
+    let data = await this.requestData<any>('get review URL', () =>
+      this.axios.get(`/api/v1/eevee/apikey/review-url/${docId}/`)
+    );
+    return data.review_url || data.url || '';
   }
 
-  async getUserDetails(): Promise<{
-    userId: string;
-    email: string;
-    fullName: string;
-    monthlyDocCurrent: number;
-    monthlyDocLimit: number;
+  async getBankStatementAnalytics(
+    docId: string,
+    mode: 'basic' | 'all' = 'basic'
+  ): Promise<Record<string, any>> {
+    let body = await this.request<any>('get bank statement analytics', () =>
+      this.axios.get(`/api/v1/mew/usbs-analytics/${docId}/`, {
+        params: {
+          output: 'json',
+          mode
+        },
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+    );
+
+    return body.data ?? body;
+  }
+
+  async listAgents(params: ListAgentsParams = {}): Promise<{
+    agents: Record<string, any>[];
+    disabledAgents: Record<string, any>[];
   }> {
-    let response = await this.axios.get('/api/v1/eevee/apikey/limit/');
-    let data = response.data?.data || {};
+    let data = await this.requestData<any>('list agents', () =>
+      this.axios.get('/api/v1/external/agents', {
+        params: {
+          type: params.agentType || 'all'
+        }
+      })
+    );
+
     return {
-      userId: data.user_id || '',
-      email: data.email || '',
-      fullName: data.full_name || '',
-      monthlyDocCurrent: data.monthly_doc_current || 0,
-      monthlyDocLimit: data.monthly_doc_limit || 0
+      agents: asArray(data.agents),
+      disabledAgents: asArray(data.disabled_agents)
+    };
+  }
+
+  async getCaseTypeDetails(casetypeId: string): Promise<Record<string, any>> {
+    return await this.requestData<Record<string, any>>('get case type details', () =>
+      this.axios.get(`/api/v1/external/agents/${casetypeId}`)
+    );
+  }
+
+  async listCases(params: ListCasesParams): Promise<{
+    cases: Record<string, any>[];
+    pagination: Record<string, any>;
+  }> {
+    let data = await this.requestData<any>('list cases', () =>
+      this.axios.get(`/api/v1/external/agents/${params.casetypeId}/cases`, {
+        params: {
+          limit: params.limit,
+          offset: params.offset,
+          sort_by: params.sortBy,
+          stage_id: params.stageIds,
+          assigned_to: params.assignedTo,
+          workflow_state: params.workflowStates,
+          created_date_from: params.createdDateFrom,
+          created_date_to: params.createdDateTo,
+          modified_date_from: params.modifiedDateFrom,
+          modified_date_to: params.modifiedDateTo
+        }
+      })
+    );
+
+    return {
+      cases: asArray(data.cases),
+      pagination: isRecord(data.pagination) ? data.pagination : {}
+    };
+  }
+
+  async getCaseOverview(params: {
+    casetypeId: string;
+    caseId: string;
+    include?: Array<'doctypes' | 'fields' | 'approvals' | 'exports' | 'documents'>;
+  }): Promise<Record<string, any>> {
+    return await this.requestData<Record<string, any>>('get case overview', () =>
+      this.axios.get(`/api/v1/external/agents/${params.casetypeId}/case/${params.caseId}`, {
+        params: {
+          include: params.include?.join(',')
+        }
+      })
+    );
+  }
+
+  async createCase(params: CreateCaseParams): Promise<Record<string, any>> {
+    let formData = new FormData();
+    formData.append('casetype_id', params.casetypeId);
+    appendFormField(formData, 'case_id', params.caseId);
+    appendFormField(formData, 'user_case_id', params.userCaseId);
+    appendFormField(formData, 'case_name', params.caseName);
+    appendFormField(formData, 'stage_id', params.stageId);
+    appendFormField(formData, 'assigned_to', params.assignedTo);
+    appendFormField(formData, 'doctype', params.doctype);
+    appendFormField(formData, 'trigger_workflow', params.triggerWorkflow);
+    appendFormField(formData, 'user_case_metadata', params.userCaseMetadata);
+    appendFormField(formData, 'case_fields', params.caseFields);
+
+    for (let file of params.files ?? []) {
+      formData.append('files', toBlob(file), file.filename);
+    }
+
+    return await this.requestData<Record<string, any>>('create case', () =>
+      this.axios.post('/api/v1/upload-service/agents/casetype/case', formData)
+    );
+  }
+
+  async updateCase(params: UpdateCaseParams): Promise<Record<string, any>> {
+    let body: Record<string, unknown> = {};
+    if (params.stageId !== undefined) body.stage_id = params.stageId;
+    if (params.caseFields !== undefined) body.case_fields = params.caseFields;
+    if (params.assignedTo !== undefined) body.assigned_to = params.assignedTo;
+    if (params.approval !== undefined) {
+      body.approval = {
+        id: params.approval.id,
+        is_approved: params.approval.isApproved,
+        reason: params.approval.reason
+      };
+    }
+    if (params.triggerWorkflow !== undefined) body.trigger_workflow = params.triggerWorkflow;
+    if (params.caseName !== undefined) body.case_name = params.caseName;
+
+    if (Object.keys(body).length === 0) {
+      throw docsumoServiceError(
+        'Provide at least one case update field: stageId, caseFields, assignedTo, approval, triggerWorkflow, or caseName.'
+      );
+    }
+
+    return await this.requestData<Record<string, any>>('update case', () =>
+      this.axios.patch(
+        `/api/v1/external/agents/${params.casetypeId}/case/${params.caseId}`,
+        body
+      )
+    );
+  }
+
+  async runCaseWorkflow(
+    casetypeId: string,
+    caseId: string
+  ): Promise<{
+    status: string;
+    statusCode: number;
+    message?: string;
+  }> {
+    let body = await this.request<any>('run case workflow', () =>
+      this.axios.get(`/api/v1/external/agents/${casetypeId}/case/${caseId}/run`)
+    );
+
+    return {
+      status: String(body.status ?? ''),
+      statusCode: Number(body.status_code) || 0,
+      message: body.message
     };
   }
 }

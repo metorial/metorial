@@ -8,41 +8,133 @@ Manage machine learning model, dataset, and Spaces repositories on Hugging Face 
 
 Get information about the authenticated user, including username, email, organizations, and account details.
 
-### Chat Completion
+### Search Models
 
-Run a chat completion using a model on the Hugging Face Inference API. Follows the OpenAI-compatible chat completions format. Supports conversation history with system, user, and assistant messages.
+Search for machine learning models on Hugging Face Hub by keyword, author, library, pipeline task, and tags.
 
-### Get Collection
+### Search Datasets
 
-Retrieve a Hugging Face collection by its slug. Returns the collection's title, description, and all items (models, datasets, spaces) it contains.
+Search for datasets on Hugging Face Hub by keyword, author, tags, and sort order.
 
-### List Discussions
+### Search Spaces
 
-List discussions and pull requests on a Hugging Face repository. Returns summaries including title, status, and whether each item is a PR.
-
-### List Repository Files
-
-List files and directories in a Hugging Face repository at a given path and revision. Returns file metadata including type, size, and OID.
+Search for Spaces on Hugging Face Hub by keyword, author, tags, and sort order.
 
 ### Create Repository
 
 Create a new model, dataset, or Space repository on Hugging Face Hub. Supports setting visibility, SDK type (for Spaces), and license.
 
+### Delete Repository
+
+Permanently delete a model, dataset, or Space repository.
+
+### Duplicate Repository
+
+Duplicate a Space repository to a new Space.
+
+### Get Repository Info
+
+Get metadata for a model, dataset, or Space repository.
+
+### Update Repository Visibility
+
+Change a repository's public/private visibility.
+
+### List Repository Files
+
+List files and directories in a Hugging Face repository at a path and revision.
+
+### Get File Content
+
+Download repository file text as a Slate attachment with metadata.
+
+### Upload File
+
+Upload or update a text file in a repository through the commit API.
+
+### Delete File
+
+Delete a repository file through the commit API.
+
+### List Discussions
+
+List discussions and pull requests on a Hugging Face repository.
+
+### Get Discussion
+
+Get details, comments, and events for a discussion or pull request.
+
+### Create Discussion
+
+Create a discussion or pull request on a repository.
+
+### Comment on Discussion
+
+Post a markdown comment on a discussion or pull request.
+
+### Update Discussion Status
+
+Open, close, or merge a discussion or pull request.
+
+### List Collections
+
+List Hugging Face collections by owner, query, item, sort, and cursor.
+
+### Get Collection
+
+Retrieve a collection by slug and list its items.
+
+### Create Collection
+
+Create a collection for models, datasets, and Spaces.
+
+### Update Collection
+
+Update collection metadata, visibility, and theme.
+
+### Delete Collection
+
+Delete a collection without deleting its contained items.
+
+### Add Collection Item
+
+Add a model, dataset, or Space to a collection.
+
+### Remove Collection Item
+
+Remove an item from a collection.
+
 ### Get Space Runtime
 
 Get runtime information for a Space, including hardware, stage, SDK, and storage details.
 
-### Search Datasets
+### Control Space
 
-Search for datasets on Hugging Face Hub. Filter by keyword, author, and tags. Results include dataset metadata such as downloads and likes.
+Pause, restart, or change hardware for a Space.
 
-### Search Models
+### Manage Space Secrets
 
-Search for machine learning models on Hugging Face Hub. Filter by keyword, author, library framework, pipeline task, and tags. Results include model metadata such as downloads, likes, and pipeline task.
+List, add, or delete encrypted Space secrets.
 
-### Search Spaces
+### Manage Space Variables
 
-Search for Spaces (ML application demos) on Hugging Face Hub. Filter by keyword, author, and tags. Results include Space metadata such as SDK type and likes.
+List, add, or delete public Space variables.
+
+### Chat Completion
+
+Run an OpenAI-compatible chat completion through Hugging Face Inference Providers.
+
+### Text Generation
+
+Generate text with a Hugging Face text-generation model.
+
+### Feature Extraction
+
+Generate embeddings for semantic search, RAG, clustering, and similarity workflows.
+
+### Run Inference
+
+Run generic inference on a Hugging Face model with task-specific inputs and parameters.
 
 ## License
 

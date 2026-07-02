@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TrackClient } from '../lib/client';
+import { customerIoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageDevice = SlateTool.create(spec, {
@@ -46,9 +47,13 @@ export let manageDevice = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'add') {
+      if (!ctx.input.platform) {
+        throw customerIoServiceError('platform is required when adding a device.');
+      }
+
       await trackClient.addDevice(ctx.input.personIdentifier, {
         id: ctx.input.deviceToken,
-        platform: ctx.input.platform ?? 'ios',
+        platform: ctx.input.platform,
         last_used: ctx.input.lastUsed,
         attributes: ctx.input.deviceAttributes
       });

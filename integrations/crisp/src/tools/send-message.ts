@@ -1,7 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { crispServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export let sendMessage = SlateTool.create(spec, {
   name: 'Send Message',
@@ -48,11 +52,30 @@ export let sendMessage = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      fingerprint: z.string().optional().describe('Unique fingerprint of the sent message')
+      fingerprint: z.number().optional().describe('Unique fingerprint of the sent message')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+    let client = new Client({
+      token: ctx.auth.token,
+      websiteId: ctx.config.websiteId,
+      tier: ctx.auth.tier
+    });
+
+    if (['text', 'note'].includes(ctx.input.type) && typeof ctx.input.content !== 'string') {
+      throw crispServiceError(`${ctx.input.type} messages require string content.`);
+    }
+
+    if (
+      ['file', 'animation', 'audio'].includes(ctx.input.type) &&
+      (!isRecord(ctx.input.content) ||
+        typeof ctx.input.content.url !== 'string' ||
+        typeof ctx.input.content.type !== 'string')
+    ) {
+      throw crispServiceError(
+        `${ctx.input.type} messages require content with url and MIME type fields.`
+      );
+    }
 
     let message: any = {
       type: ctx.input.type,

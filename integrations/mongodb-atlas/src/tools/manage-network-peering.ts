@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { invalidAction, requireString, resolveProjectId } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageNetworkPeeringTool = SlateTool.create(spec, {
@@ -54,8 +55,7 @@ export let manageNetworkPeeringTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
     let { action } = ctx.input;
 
@@ -71,36 +71,42 @@ export let manageNetworkPeeringTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.peerId) throw new Error('peerId is required.');
-      let peering = await client.getNetworkPeering(projectId, ctx.input.peerId);
+      let peerId = requireString(ctx.input.peerId, 'peerId');
+      let peering = await client.getNetworkPeering(projectId, peerId);
       return {
         output: { peering },
-        message: `Retrieved network peering **${ctx.input.peerId}** (status: ${peering.statusName}).`
+        message: `Retrieved network peering **${peerId}** (status: ${peering.statusName}).`
       };
     }
 
     if (action === 'create') {
-      if (!ctx.input.containerId)
-        throw new Error('containerId is required for creating a peering connection.');
-      if (!ctx.input.providerName)
-        throw new Error('providerName is required for creating a peering connection.');
+      let containerId = requireString(
+        ctx.input.containerId,
+        'containerId',
+        'for creating a peering connection'
+      );
+      let providerName = requireString(
+        ctx.input.providerName,
+        'providerName',
+        'for creating a peering connection'
+      );
 
       let data: any = {
-        containerId: ctx.input.containerId,
-        providerName: ctx.input.providerName
+        containerId,
+        providerName
       };
 
-      if (ctx.input.providerName === 'AWS') {
+      if (providerName === 'AWS') {
         data.accepterRegionName = ctx.input.accepterRegionName;
         data.awsAccountId = ctx.input.awsAccountId;
         data.routeTableCidrBlock = ctx.input.routeTableCidrBlock;
         data.vpcId = ctx.input.vpcId;
-      } else if (ctx.input.providerName === 'AZURE') {
+      } else if (providerName === 'AZURE') {
         data.azureDirectoryId = ctx.input.azureDirectoryId;
         data.azureSubscriptionId = ctx.input.azureSubscriptionId;
         data.resourceGroupName = ctx.input.resourceGroupName;
         data.vNetName = ctx.input.vNetName;
-      } else if (ctx.input.providerName === 'GCP') {
+      } else if (providerName === 'GCP') {
         data.gcpProjectId = ctx.input.gcpProjectId;
         data.networkName = ctx.input.networkName;
       }
@@ -113,14 +119,14 @@ export let manageNetworkPeeringTool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.peerId) throw new Error('peerId is required.');
-      await client.deleteNetworkPeering(projectId, ctx.input.peerId);
+      let peerId = requireString(ctx.input.peerId, 'peerId');
+      await client.deleteNetworkPeering(projectId, peerId);
       return {
         output: {},
-        message: `Deleted network peering **${ctx.input.peerId}**.`
+        message: `Deleted network peering **${peerId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

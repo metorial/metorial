@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let tagSubscriber = SlateTool.create(spec, {
@@ -31,7 +32,7 @@ export let tagSubscriber = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (!ctx.input.subscriberId && !ctx.input.emailAddress) {
-      throw new Error('Provide either subscriberId or emailAddress');
+      throw kitServiceError('Provide either subscriberId or emailAddress');
     }
 
     if (ctx.input.action === 'add') {
@@ -58,6 +59,6 @@ export let tagSubscriber = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw kitServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

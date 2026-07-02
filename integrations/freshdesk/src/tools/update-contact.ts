@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FreshdeskClient } from '../lib/client';
+import { freshdeskServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateContact = SlateTool.create(spec, {
@@ -60,6 +61,10 @@ export let updateContact = SlateTool.create(spec, {
     if (ctx.input.tags !== undefined) updateData.tags = ctx.input.tags;
     if (ctx.input.customFields !== undefined)
       updateData.custom_fields = ctx.input.customFields;
+
+    if (Object.keys(updateData).length === 0) {
+      throw freshdeskServiceError('Provide at least one field to update on the contact.');
+    }
 
     let contact = await client.updateContact(ctx.input.contactId, updateData);
 

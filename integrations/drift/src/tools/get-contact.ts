@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DriftClient } from '../lib/client';
+import { driftServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -44,7 +45,7 @@ export let getContact = SlateTool.create(spec, {
     } else if (ctx.input.email) {
       contacts = await client.getContactsByEmail(ctx.input.email);
     } else {
-      throw new Error('Either contactId or email must be provided');
+      throw driftServiceError('Either contactId or email must be provided.');
     }
 
     return {

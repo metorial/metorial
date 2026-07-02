@@ -1,11 +1,18 @@
 export { getUserInfoTool } from './get-user-info';
-export { chatCompletionTool, runInferenceTool, textGenerationTool } from './inference';
+export {
+  chatCompletionTool,
+  featureExtractionTool,
+  runInferenceTool,
+  textGenerationTool
+} from './inference';
 export {
   addCollectionItemTool,
   createCollectionTool,
   deleteCollectionTool,
   getCollectionTool,
-  removeCollectionItemTool
+  listCollectionsTool,
+  removeCollectionItemTool,
+  updateCollectionTool
 } from './manage-collections';
 export {
   commentOnDiscussionTool,
@@ -23,6 +30,7 @@ export {
 export {
   createRepositoryTool,
   deleteRepositoryTool,
+  duplicateRepositoryTool,
   getRepositoryInfoTool,
   updateRepositoryVisibilityTool
 } from './manage-repository';

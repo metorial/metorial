@@ -2,14 +2,22 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrowserlessClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  fileAttachment,
+  fileOutput,
+  fileOutputSchema,
+  gotoOptionsSchema,
+  requireExactlyOneSource,
+  waitForSelectorSchema
+} from './shared';
 
 export let generatePdf = SlateTool.create(spec, {
   name: 'Generate PDF',
   key: 'generate_pdf',
-  description: `Generate a PDF from a web page or raw HTML. Navigate to a URL or render provided HTML in a headless browser and export it as a PDF. Supports page formatting options including paper size, margins, headers/footers, background printing, and landscape orientation. Returns the PDF as a base64-encoded string.`,
+  description: `Generate a PDF from a web page or raw HTML. Navigate to a URL or render provided HTML in a headless browser and export it as a PDF. Supports page formatting options including paper size, margins, headers/footers, background printing, and landscape orientation. Returns the PDF bytes as a Slate attachment with metadata in the tool output.`,
   instructions: [
     'Provide either a URL or raw HTML, but not both.',
-    'The returned PDF is base64-encoded.'
+    'The returned PDF content is in response attachments, not inline output fields.'
   ],
   tags: {
     readOnly: true
@@ -52,31 +60,13 @@ export let generatePdf = SlateTool.create(spec, {
         .enum(['screen', 'print'])
         .optional()
         .describe('Emulate media type for CSS media queries'),
-      gotoOptions: z
-        .object({
-          waitUntil: z
-            .enum(['load', 'domcontentloaded', 'networkidle0', 'networkidle2'])
-            .optional(),
-          timeout: z.number().optional()
-        })
-        .optional()
-        .describe('Navigation options'),
-      waitForSelector: z
-        .object({
-          selector: z.string(),
-          timeout: z.number().optional()
-        })
-        .optional()
-        .describe('Wait for a CSS selector before generating the PDF'),
+      gotoOptions: gotoOptionsSchema,
+      waitForSelector: waitForSelectorSchema,
       waitForTimeout: z.number().optional().describe('Wait a fixed number of milliseconds'),
       bestAttempt: z.boolean().optional().describe('Proceed even when async events fail')
     })
   )
-  .output(
-    z.object({
-      pdfBase64: z.string().describe('Base64-encoded PDF content')
-    })
-  )
+  .output(fileOutputSchema)
   .handleInvocation(async ctx => {
     let client = new BrowserlessClient({
       token: ctx.auth.token,
@@ -84,7 +74,9 @@ export let generatePdf = SlateTool.create(spec, {
     });
 
     let input = ctx.input;
-    let pdfBase64 = await client.generatePdf({
+    requireExactlyOneSource(input);
+
+    let file = await client.generatePdf({
       url: input.url,
       html: input.html,
       emulateMediaType: input.emulateMediaType,
@@ -113,8 +105,9 @@ export let generatePdf = SlateTool.create(spec, {
     let source = input.url ?? 'provided HTML';
 
     return {
-      output: { pdfBase64 },
-      message: `Generated PDF from ${source}. The PDF is base64-encoded (${pdfBase64.length} characters).`
+      output: fileOutput(file),
+      attachments: [fileAttachment(file)],
+      message: `Generated PDF from ${source} (${file.byteLength} bytes).`
     };
   })
   .build();

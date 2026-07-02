@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let runJob = SlateTool.create(spec, {
@@ -37,7 +38,7 @@ export let runJob = SlateTool.create(spec, {
     });
 
     if (ctx.input.action === 'cancel') {
-      if (!ctx.input.runId) throw new Error('runId is required for cancel');
+      if (!ctx.input.runId) throw databricksServiceError('runId is required for cancel');
       await client.cancelJobRun(ctx.input.runId);
       return {
         output: { runId: ctx.input.runId },
@@ -45,7 +46,7 @@ export let runJob = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.jobId) throw new Error('jobId is required for run_now');
+    if (!ctx.input.jobId) throw databricksServiceError('jobId is required for run_now');
 
     let result = await client.runJobNow(ctx.input.jobId, {
       notebookParams: ctx.input.notebookParams as Record<string, string> | undefined,

@@ -35,7 +35,7 @@ AWS SES uses standard AWS authentication mechanisms. All API requests must be si
 
 ### Email Sending
 
-Send emails in two modes: **Formatted** (provide From, To, subject, and body — SES handles formatting) or **Raw** (manually compose the full MIME message for complete control over headers and content). Supports sending to multiple recipients with To, Cc, and Bcc fields. Emails can also be sent via SMTP.
+Send emails in three SESv2 modes: **Simple** (provide From, To, subject, body, optional headers, and optional attachments), **Raw** (manually compose the full MIME message for complete control over headers and content), or **Template** (use a reusable or ARN-addressed template with replacement data, optional headers, and optional attachments). Supports sending to multiple recipients with To, Cc, and Bcc fields, plus tenant and multi-region endpoint routing. Emails can also be sent via SMTP.
 
 ### Email Templates
 
@@ -51,7 +51,7 @@ Verify and manage sending identities (email addresses and domains). Configure DK
 
 ### Configuration Sets
 
-Configuration sets are groups of rules that you can apply to the emails that you send. You apply a configuration set to an email by specifying its name when you call the API. All rules in that configuration set are applied to the email. Configuration sets control delivery options, reputation monitoring, tracking options, and suppression behavior.
+Configuration sets are groups of rules that you can apply to the emails that you send. You apply a configuration set to an email by specifying its name when you call the API. All rules in that configuration set are applied to the email. Configuration sets control delivery options such as TLS policy and maximum delivery time, reputation monitoring, tracking options, event destinations, and suppression behavior.
 
 ### Suppression List Management
 
@@ -64,6 +64,10 @@ Grouping dedicated IPs together in a pool makes them easier to manage. A common 
 ### Virtual Deliverability Manager (VDM)
 
 The SES Virtual Deliverability Manager provides insights into your sending and delivery data. VDM provides near-realtime advice on how to fix issues negatively affecting your delivery success rate and reputation. Includes dashboard metrics and guardian features for proactive deliverability management.
+
+### Email Address Validation Insights
+
+SES can analyze a specific email address for validation signals, including syntax, DNS, disposable-address, role-address, random-input, mailbox-existence, and overall validity verdicts. This is useful before adding contacts or sending campaigns to a recipient address.
 
 ### Sending Statistics and Account Management
 

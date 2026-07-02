@@ -1,0 +1,20 @@
+{
+  "name": "@metorial/poweroffice",
+  "description": "Connect to PowerOffice Go accounting data for Norway-focused ERP workflows. Read integration privileges, accounting settings, dimensions, customers, suppliers, products, sales orders, invoices, customer and supplier ledgers, account transactions, trial balance, and voucher documentation, with guarded write tools for master data, sales order drafts, invoice sending, and journal-entry approval workflows.",
+  "categories": ["financial-data-and-stock-market", "task-and-project-management"],
+  "skills": [
+    "inspect integration privileges",
+    "resolve accounting settings and dimensions",
+    "sync customers and suppliers",
+    "manage products",
+    "create and edit sales order drafts",
+    "send sales order invoices",
+    "list outgoing and incoming invoices",
+    "reconcile customer and supplier ledgers",
+    "analyze ledger transactions",
+    "get trial balance",
+    "download voucher documentation",
+    "prepare supplier invoice voucher drafts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/poweroffice.png"
+}

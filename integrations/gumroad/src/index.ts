@@ -1,10 +1,15 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  getEarnings,
+  getPayout,
   getProduct,
   getSale,
   getSubscriber,
+  getUpcomingPayouts,
   getUser,
+  listCategories,
+  listPayouts,
   listProducts,
   listSales,
   listSubscribers,
@@ -20,6 +25,7 @@ import { saleEvents, subscriptionEvents } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
+    listCategories,
     listProducts,
     getProduct,
     manageProduct,
@@ -32,6 +38,10 @@ export let provider = Slate.create({
     listSubscribers,
     getSubscriber,
     manageLicense,
+    listPayouts,
+    getPayout,
+    getUpcomingPayouts,
+    getEarnings,
     getUser
   ],
   triggers: [saleEvents, subscriptionEvents]

@@ -1,0 +1,16 @@
+{
+  "name": "@ifs/applications",
+  "description": "Discover IFS Cloud / IFS Applications projection APIs, export tenant OpenAPI documents, and query bounded OData records from enabled projections.",
+  "categories": [
+    "apis-and-http-requests",
+    "financial-data-and-stock-market",
+    "crm-and-sales-tools"
+  ],
+  "skills": [
+    "discover IFS Cloud integration projections",
+    "export IFS projection OpenAPI schemas",
+    "query IFS Cloud OData projection records",
+    "inspect tenant-specific ERP API capabilities"
+  ],
+  "logoUrl": "https://ifs-p-001.sitecorecontenthub.cloud/api/public/content/ifs_logo_negative_rgb-1.svg-ac1100?v=1194de8e"
+}

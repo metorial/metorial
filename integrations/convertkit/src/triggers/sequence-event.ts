@@ -1,6 +1,6 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let sequenceEvent = SlateTrigger.create(spec, {
@@ -34,7 +34,7 @@ export let sequenceEvent = SlateTrigger.create(spec, {
   )
   .webhook({
     autoRegisterWebhook: async ctx => {
-      let client = new Client({ token: ctx.auth.token });
+      let client = createClient(ctx.auth);
       let sequencesResult = await client.listSequences({ perPage: 500 });
       let webhookIds: number[] = [];
 
@@ -58,7 +58,7 @@ export let sequenceEvent = SlateTrigger.create(spec, {
     },
 
     autoUnregisterWebhook: async ctx => {
-      let client = new Client({ token: ctx.auth.token });
+      let client = createClient(ctx.auth);
       let details = ctx.input.registrationDetails as { webhookIds: number[] };
 
       for (let webhookId of details.webhookIds) {

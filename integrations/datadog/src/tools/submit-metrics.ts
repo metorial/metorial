@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import type { MetricSeriesInput } from '../lib/types';
 import { spec } from '../spec';
 
 export let submitMetrics = SlateTool.create(spec, {
@@ -34,7 +35,17 @@ export let submitMetrics = SlateTool.create(spec, {
             tags: z
               .array(z.string())
               .optional()
-              .describe('Tags to associate, e.g. ["env:production", "service:web"]')
+              .describe('Tags to associate, e.g. ["env:production", "service:web"]'),
+            resources: z
+              .array(
+                z.object({
+                  name: z.string().describe('Resource name, such as a host name'),
+                  type: z.string().describe('Resource type, such as "host"')
+                })
+              )
+              .optional()
+              .describe('Datadog v2 metric resources to associate with the metric'),
+            unit: z.string().optional().describe('Metric unit, such as "request" or "second"')
           })
         )
         .describe('One or more metric series to submit')
@@ -42,24 +53,18 @@ export let submitMetrics = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      status: z.string().describe('Submission status from Datadog')
+      status: z.string().describe('Submission status from Datadog'),
+      errors: z.array(z.string()).optional().describe('Datadog intake errors, if any')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth, ctx.config);
-    let result = await client.submitMetrics(
-      ctx.input.series as Array<{
-        metric: string;
-        type?: number;
-        points: [number, number][];
-        host?: string;
-        tags?: string[];
-      }>
-    );
+    let result = await client.submitMetrics(ctx.input.series as MetricSeriesInput[]);
 
     return {
       output: {
-        status: result.status || 'ok'
+        status: 'accepted',
+        errors: result.errors
       },
       message: `Submitted **${ctx.input.series.length}** metric series to Datadog`
     };

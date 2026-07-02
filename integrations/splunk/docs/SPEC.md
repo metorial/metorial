@@ -37,11 +37,11 @@ Splunk users must have role and/or capability-based authorization to use REST en
 
 ### Search and Analytics
 
-API functions allow you to either run searches, or manage objects and configuration. You can programmatically execute searches using Splunk's Search Processing Language (SPL), create search jobs (normal, real-time, or export), monitor job status, and retrieve results in JSON, XML, or CSV formats. This includes ad-hoc searches, scheduled searches, and real-time searches.
+API functions allow you to either run searches, or manage objects and configuration. You can programmatically execute searches using Splunk's Search Processing Language (SPL), create search jobs, monitor job status, control job lifecycle, and retrieve results in JSON through the semantic v2 search results endpoint. This includes ad-hoc searches, scheduled searches, and retained async search jobs.
 
 ### Saved Searches and Alerts
 
-Manage search resources including alerts triggered by searches, Python search command information, saved searches, search results, and scheduled view objects. You can create, read, update, delete, and schedule saved searches. Alerts can be configured with trigger conditions and actions (including webhook callbacks).
+Manage search resources including alerts triggered by searches, Python search command information, saved searches, search results, and scheduled view objects. You can create, read, update, delete, and schedule saved searches. Alerts can be configured with trigger type, comparator, threshold, custom alert conditions, and actions including webhook callbacks.
 
 ### Data Ingestion (HTTP Event Collector)
 
@@ -71,7 +71,7 @@ You can manage users, roles, and capabilities through the API. This includes cre
 
 ### App Management
 
-The API allows listing, installing, updating, and removing Splunk apps on the instance.
+The API allows listing, installing, updating, and removing Splunk apps on the instance. The integration exposes read-only app listing as a practical discovery tool for app namespace values used by searches, saved searches, and KV Store operations.
 
 ### Server and Deployment Configuration
 

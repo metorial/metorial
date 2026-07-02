@@ -29,6 +29,26 @@ export let createProject = SlateTool.create(spec, {
         .describe(
           'PostgreSQL version (e.g., 14, 15, 16, 17). Defaults to the latest supported version.'
         ),
+      branchName: z
+        .string()
+        .optional()
+        .describe('Name for the default branch. Defaults to main.'),
+      databaseName: z
+        .string()
+        .optional()
+        .describe('Name for the default database. Defaults to neondb.'),
+      roleName: z
+        .string()
+        .optional()
+        .describe('Name for the default role. Defaults to the database owner role.'),
+      storePasswords: z
+        .boolean()
+        .optional()
+        .describe('Whether Neon should store role passwords for retrieval features.'),
+      historyRetentionSeconds: z
+        .number()
+        .optional()
+        .describe('Seconds to retain branch history for point-in-time restore.'),
       orgId: z
         .string()
         .optional()
@@ -61,6 +81,11 @@ export let createProject = SlateTool.create(spec, {
       name: ctx.input.name,
       regionId: ctx.input.regionId,
       pgVersion: ctx.input.pgVersion,
+      branchName: ctx.input.branchName,
+      databaseName: ctx.input.databaseName,
+      roleName: ctx.input.roleName,
+      storePasswords: ctx.input.storePasswords,
+      historyRetentionSeconds: ctx.input.historyRetentionSeconds,
       orgId: ctx.input.orgId
     });
 

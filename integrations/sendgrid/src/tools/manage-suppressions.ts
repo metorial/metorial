@@ -1,9 +1,17 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 // ── Suppression Groups ──
+
+let suppressionGroupSchema = z.object({
+  groupId: z.number().describe('Suppression group ID'),
+  name: z.string().describe('Group name'),
+  description: z.string().describe('Group description shown to recipients'),
+  isDefault: z.boolean().describe('Whether this is the default suppression group'),
+  unsubscribes: z.number().optional().describe('Number of unsubscribed emails in this group')
+});
 
 export let listSuppressionGroups = SlateTool.create(spec, {
   name: 'List Suppression Groups',
@@ -14,20 +22,7 @@ export let listSuppressionGroups = SlateTool.create(spec, {
   .input(z.object({}))
   .output(
     z.object({
-      groups: z
-        .array(
-          z.object({
-            groupId: z.number().describe('Suppression group ID'),
-            name: z.string().describe('Group name'),
-            description: z.string().describe('Group description shown to recipients'),
-            isDefault: z.boolean().describe('Whether this is the default suppression group'),
-            unsubscribes: z
-              .number()
-              .optional()
-              .describe('Number of unsubscribed emails in this group')
-          })
-        )
-        .describe('Suppression groups')
+      groups: z.array(suppressionGroupSchema).describe('Suppression groups')
     })
   )
   .handleInvocation(async ctx => {
@@ -45,6 +40,34 @@ export let listSuppressionGroups = SlateTool.create(spec, {
         }))
       },
       message: `Found **${(groups || []).length}** suppression group(s).`
+    };
+  });
+
+export let getSuppressionGroup = SlateTool.create(spec, {
+  name: 'Get Suppression Group',
+  key: 'get_suppression_group',
+  description: `Retrieve a single suppression (unsubscribe) group by ID, including its default status and unsubscribe count.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      groupId: z.number().describe('Suppression group ID')
+    })
+  )
+  .output(suppressionGroupSchema)
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let g = await client.getSuppressionGroup(ctx.input.groupId);
+
+    return {
+      output: {
+        groupId: g.id,
+        name: g.name,
+        description: g.description,
+        isDefault: g.is_default,
+        unsubscribes: g.unsubscribes
+      },
+      message: `Retrieved suppression group **${g.name}** (ID: ${g.id}).`
     };
   });
 
@@ -87,6 +110,80 @@ export let createSuppressionGroup = SlateTool.create(spec, {
         isDefault: g.is_default
       },
       message: `Created suppression group **${g.name}** (ID: ${g.id}).`
+    };
+  });
+
+export let updateSuppressionGroup = SlateTool.create(spec, {
+  name: 'Update Suppression Group',
+  key: 'update_suppression_group',
+  description: `Update a suppression (unsubscribe) group's name, description, or default status.`,
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      groupId: z.number().describe('Suppression group ID'),
+      name: z.string().optional().describe('New group name'),
+      description: z
+        .string()
+        .optional()
+        .describe('New description shown to recipients in unsubscribe preferences'),
+      isDefault: z.boolean().optional().describe('Set as the default suppression group')
+    })
+  )
+  .output(suppressionGroupSchema)
+  .handleInvocation(async ctx => {
+    if (
+      ctx.input.name === undefined &&
+      ctx.input.description === undefined &&
+      ctx.input.isDefault === undefined
+    ) {
+      throw createApiServiceError(
+        'Provide at least one of name, description, or isDefault when updating a suppression group.'
+      );
+    }
+
+    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    let g = await client.updateSuppressionGroup(ctx.input.groupId, {
+      name: ctx.input.name,
+      description: ctx.input.description,
+      isDefault: ctx.input.isDefault
+    });
+
+    return {
+      output: {
+        groupId: g.id,
+        name: g.name,
+        description: g.description,
+        isDefault: g.is_default,
+        unsubscribes: g.unsubscribes
+      },
+      message: `Updated suppression group **${g.name}** (ID: ${g.id}).`
+    };
+  });
+
+export let deleteSuppressionGroup = SlateTool.create(spec, {
+  name: 'Delete Suppression Group',
+  key: 'delete_suppression_group',
+  description: `Delete a suppression (unsubscribe) group by ID.`,
+  tags: { destructive: true }
+})
+  .input(
+    z.object({
+      groupId: z.number().describe('Suppression group ID')
+    })
+  )
+  .output(
+    z.object({
+      deleted: z.boolean().describe('Whether deletion was successful')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
+    await client.deleteSuppressionGroup(ctx.input.groupId);
+
+    return {
+      output: { deleted: true },
+      message: `Deleted suppression group ${ctx.input.groupId}.`
     };
   });
 
@@ -161,7 +258,7 @@ export let removeSuppressedEmail = SlateTool.create(spec, {
     switch (ctx.input.suppressionType) {
       case 'group':
         if (!ctx.input.groupId)
-          throw new Error('groupId is required when suppressionType is "group"');
+          throw createApiServiceError('groupId is required when suppressionType is "group".');
         await client.deleteSuppressedEmail(ctx.input.groupId, ctx.input.email);
         break;
       case 'global':
@@ -254,7 +351,7 @@ export let listSuppressions = SlateTool.create(spec, {
         break;
       case 'group':
         if (!ctx.input.groupId)
-          throw new Error('groupId is required when suppressionType is "group"');
+          throw createApiServiceError('groupId is required when suppressionType is "group".');
         items = await client.listSuppressedEmails(ctx.input.groupId);
         break;
       default:

@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireProjectToken } from '../lib/helpers';
 import { spec } from '../spec';
 
 let featureFlagOutput = z.object({
@@ -27,6 +27,14 @@ Returns flag configuration including key, active status, rollout percentage, and
   .input(
     z.object({
       search: z.string().optional().describe('Search by flag key or name'),
+      active: z
+        .enum(['STALE', 'false', 'true'])
+        .optional()
+        .describe('Filter by active state: true, false, or STALE'),
+      type: z
+        .enum(['boolean', 'experiment', 'multivariant', 'remote_config'])
+        .optional()
+        .describe('Filter by flag type'),
       limit: z.number().optional().describe('Maximum number of results'),
       offset: z.number().optional().describe('Pagination offset')
     })
@@ -41,6 +49,8 @@ Returns flag configuration including key, active status, rollout percentage, and
     let client = createClient(ctx.config, ctx.auth);
     let data = await client.listFeatureFlags({
       search: ctx.input.search,
+      active: ctx.input.active,
+      type: ctx.input.type,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -227,6 +237,10 @@ Optionally pass person properties and group properties inline for server-side ev
   .input(
     z.object({
       distinctId: z.string().describe('The distinct ID of the user to evaluate flags for'),
+      groups: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Group values for group-based flags, keyed by group type'),
       personProperties: z
         .record(z.string(), z.any())
         .optional()
@@ -234,7 +248,15 @@ Optionally pass person properties and group properties inline for server-side ev
       groupProperties: z
         .record(z.string(), z.record(z.string(), z.any()))
         .optional()
-        .describe('Group properties keyed by group type')
+        .describe('Group properties keyed by group type'),
+      evaluationContexts: z
+        .array(z.string())
+        .optional()
+        .describe('Evaluation context tags used to filter which flags are evaluated'),
+      includeConfig: z
+        .boolean()
+        .optional()
+        .describe('Also request PostHog client configuration data via config=true')
     })
   )
   .output(
@@ -242,6 +264,10 @@ Optionally pass person properties and group properties inline for server-side ev
       featureFlags: z
         .record(z.string(), z.any())
         .describe('Map of flag keys to their values (boolean or string variant)'),
+      flagDetails: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Raw /flags?v=2 flag detail objects keyed by flag key'),
       featureFlagPayloads: z
         .record(z.string(), z.any())
         .optional()
@@ -249,27 +275,50 @@ Optionally pass person properties and group properties inline for server-side ev
       errorsWhileComputingFlags: z
         .boolean()
         .optional()
-        .describe('Whether there were errors during computation')
+        .describe('Whether there were errors during computation'),
+      requestId: z.string().optional().describe('PostHog request ID'),
+      quotaLimited: z.array(z.string()).optional().describe('Quota-limited products if any')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
-    let apiKey = ctx.auth.projectToken || ctx.auth.token;
+    let apiKey = requireProjectToken(ctx.auth);
 
     let result = await client.evaluateFeatureFlags({
       apiKey,
       distinctId: ctx.input.distinctId,
+      groups: ctx.input.groups,
       personProperties: ctx.input.personProperties,
-      groupProperties: ctx.input.groupProperties
+      groupProperties: ctx.input.groupProperties,
+      evaluationContexts: ctx.input.evaluationContexts,
+      includeConfig: ctx.input.includeConfig
     });
 
-    let flagCount = Object.keys(result.featureFlags || {}).length;
+    let flagDetails = result.flags;
+    let featureFlags = result.featureFlags || {};
+    if (flagDetails && Object.keys(featureFlags).length === 0) {
+      featureFlags = Object.fromEntries(
+        Object.entries(flagDetails).map(([key, value]) => {
+          if (value && typeof value === 'object') {
+            let detail = value as Record<string, any>;
+            return [key, detail.variant ?? detail.enabled ?? detail];
+          }
+
+          return [key, value];
+        })
+      );
+    }
+
+    let flagCount = Object.keys(featureFlags).length;
 
     return {
       output: {
-        featureFlags: result.featureFlags || {},
+        featureFlags,
+        flagDetails,
         featureFlagPayloads: result.featureFlagPayloads,
-        errorsWhileComputingFlags: result.errorsWhileComputingFlags
+        errorsWhileComputingFlags: result.errorsWhileComputingFlags,
+        requestId: result.requestId,
+        quotaLimited: result.quotaLimited
       },
       message: `Evaluated **${flagCount}** feature flag(s) for distinct ID **${ctx.input.distinctId}**.`
     };

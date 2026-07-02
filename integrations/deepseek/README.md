@@ -1,6 +1,6 @@
-# Deep Seek
+# DeepSeek
 
-Generate chat completions, chain-of-thought reasoning responses, and code completions using DeepSeek large language models. Supports streaming and non-streaming chat, structured JSON output, function calling with up to 128 parallel tool invocations, fill-in-the-middle (FIM) code completion, and chat prefix completion. List available models and check account balance. Compatible with OpenAI API format.
+Generate chat completions, thinking-mode reasoning responses, and code completions using DeepSeek V4 models. Supports non-streaming chat, structured JSON output, function calling with up to 128 tool definitions, beta strict tool-call mode, beta fill-in-the-middle (FIM) completion, and beta chat prefix completion. List available models and check account balance. Compatible with the OpenAI-format DeepSeek API.
 
 ## License
 

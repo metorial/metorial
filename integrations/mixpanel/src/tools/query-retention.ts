@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import { createClientFromContext, requireServiceAccount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let queryRetention = SlateTool.create(spec, {
@@ -58,6 +58,8 @@ Returns retention counts per cohort date bucket.`,
     })
   )
   .handleInvocation(async ctx => {
+    requireServiceAccount(ctx);
+
     let client = createClientFromContext(ctx);
 
     let result = await client.queryRetention({

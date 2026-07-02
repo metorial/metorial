@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageBackup = SlateTool.create(spec, {
@@ -11,6 +12,7 @@ export let manageBackup = SlateTool.create(spec, {
     'Use action "list" to list all backups for a branch.',
     'Use action "create" to create a new backup. Optionally specify retention policy.',
     'Use action "get" to retrieve backup details.',
+    'Use action "update" to protect or unprotect a backup.',
     'Use action "delete" to permanently remove a backup.',
     'To restore a backup, use the Create Branch tool with the backupId parameter.'
   ]
@@ -19,8 +21,10 @@ export let manageBackup = SlateTool.create(spec, {
     z.object({
       databaseName: z.string().describe('Name of the database'),
       branchName: z.string().describe('Name of the branch'),
-      action: z.enum(['list', 'create', 'get', 'delete']).describe('Action to perform'),
-      backupId: z.string().optional().describe('Backup ID (required for get, delete)'),
+      action: z
+        .enum(['list', 'create', 'get', 'update', 'delete'])
+        .describe('Action to perform'),
+      backupId: z.string().optional().describe('Backup ID (required for get, update, delete)'),
       name: z.string().optional().describe('Name for the backup (used with create)'),
       retentionUnit: z
         .enum(['hour', 'day', 'week', 'month', 'year'])
@@ -34,6 +38,26 @@ export let manageBackup = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Trigger immediate backup, PostgreSQL only (used with create)'),
+      protected: z
+        .boolean()
+        .optional()
+        .describe('Whether the backup is protected from deletion'),
+      all: z
+        .boolean()
+        .optional()
+        .describe('Include all backups, including deleted ones (used with list)'),
+      state: z
+        .enum(['pending', 'running', 'success', 'failed', 'canceled', 'ignored'])
+        .optional()
+        .describe('Filter backups by state (used with list)'),
+      policy: z.string().optional().describe('Filter backups by backup policy ID'),
+      from: z.string().optional().describe('Filter backups started after this ISO timestamp'),
+      to: z.string().optional().describe('Filter backups started before this ISO timestamp'),
+      runningAt: z
+        .string()
+        .optional()
+        .describe('Filter backups running during a time or time range'),
+      production: z.boolean().optional().describe('Filter backups by production branch'),
       page: z.number().optional().describe('Page number for list pagination'),
       perPage: z.number().optional().describe('Results per page for list pagination')
     })
@@ -81,10 +105,23 @@ export let manageBackup = SlateTool.create(spec, {
     let { databaseName, branchName, action } = ctx.input;
 
     if (action === 'list') {
-      let result = await client.listBackups(databaseName, branchName, {
-        page: ctx.input.page,
-        perPage: ctx.input.perPage
-      });
+      let result = await client.listBackups(
+        databaseName,
+        branchName,
+        {
+          page: ctx.input.page,
+          perPage: ctx.input.perPage
+        },
+        {
+          all: ctx.input.all,
+          state: ctx.input.state,
+          policy: ctx.input.policy,
+          from: ctx.input.from,
+          to: ctx.input.to,
+          runningAt: ctx.input.runningAt,
+          production: ctx.input.production
+        }
+      );
 
       let backups = result.data.map((b: any) => ({
         backupId: b.id,
@@ -103,10 +140,39 @@ export let manageBackup = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteBackup(databaseName, branchName, ctx.input.backupId!);
+      let backupId = requireField(ctx.input.backupId, 'backupId', 'delete action');
+      await client.deleteBackup(databaseName, branchName, backupId);
       return {
         output: { deleted: true },
-        message: `Deleted backup **${ctx.input.backupId}** from branch **${branchName}**.`
+        message: `Deleted backup **${backupId}** from branch **${branchName}**.`
+      };
+    }
+
+    if (action === 'update') {
+      let backup = await client.updateBackup(
+        databaseName,
+        branchName,
+        requireField(ctx.input.backupId, 'backupId', 'update action'),
+        {
+          protected: requireField(ctx.input.protected, 'protected', 'update action')
+        }
+      );
+
+      return {
+        output: {
+          backup: {
+            backupId: backup.id,
+            name: backup.name,
+            state: backup.state,
+            size: backup.size,
+            protected: backup.protected,
+            createdAt: backup.created_at,
+            startedAt: backup.started_at,
+            completedAt: backup.completed_at,
+            expiresAt: backup.expires_at
+          }
+        },
+        message: `Updated backup **${backup.name || backup.id}** (protected: ${backup.protected ? 'yes' : 'no'}).`
       };
     }
 
@@ -137,7 +203,11 @@ export let manageBackup = SlateTool.create(spec, {
     }
 
     // get
-    let backup = await client.getBackup(databaseName, branchName, ctx.input.backupId!);
+    let backup = await client.getBackup(
+      databaseName,
+      branchName,
+      requireField(ctx.input.backupId, 'backupId', 'get action')
+    );
     return {
       output: {
         backup: {

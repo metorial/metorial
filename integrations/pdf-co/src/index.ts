@@ -2,6 +2,7 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   classifyDocument,
+  compressPdf,
   convertPdf,
   editPdf,
   generateBarcode,
@@ -35,7 +36,8 @@ export let provider = Slate.create({
     classifyDocument,
     getPdfInfo,
     searchPdfText,
-    pdfOcr
+    pdfOcr,
+    compressPdf
   ],
   triggers: [inboundWebhook]
 });

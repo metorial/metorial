@@ -2,7 +2,7 @@
 
 ## Overview
 
-Amazon Transcribe is a fully managed automatic speech recognition (ASR) service that converts speech to text. It supports both batch transcription of media files stored in Amazon S3 and real-time streaming transcription of audio. It offers three main types of batch transcription: Standard, Medical, and Call Analytics.
+Amazon Transcribe is a fully managed automatic speech recognition (ASR) service that converts speech to text. This integration focuses on the practical batch API surface for media files stored in Amazon S3: Standard, Medical, and Call Analytics transcription jobs, plus the vocabularies, filters, categories, and language model metadata those workflows need.
 
 ## Authentication
 
@@ -27,7 +27,7 @@ Transcribe pre-recorded audio or video files stored in Amazon S3. Supported form
 
 ### Streaming Transcription
 
-Process live audio for real-time transcription by sending audio over a secure connection and receiving text in response. Streaming supports Standard, Medical, Call Analytics, and HealthScribe transcription types. Streaming connections can remain open for up to four hours.
+Amazon Transcribe also supports real-time streaming APIs. This integration does not expose streaming tools because they require bidirectional streaming transport rather than the batch JSON API used by the current tool surface.
 
 ### Automatic Language Identification
 
@@ -75,11 +75,11 @@ Amazon Transcribe Medical enables medical speech-to-text capabilities for transc
 
 ### AWS HealthScribe
 
-HealthScribe transcriptions are designed to automatically create clinical notes from patient-clinician conversations using generative AI.
+HealthScribe APIs are outside the current high-value batch transcription scope for this integration.
 
 ## Events
 
-AWS Transcribe supports event-driven notifications through Amazon EventBridge.
+AWS Transcribe supports event-driven notifications through Amazon EventBridge. This integration exposes a polling trigger for terminal transcription job states rather than provisioning EventBridge rules.
 
 ### Transcription Job State Changes
 

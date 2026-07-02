@@ -1,6 +1,7 @@
 export * from './analyze-text';
 export * from './get-usage';
 export * from './list-models';
+export * from './manage-auth';
 export * from './manage-keys';
 export * from './manage-members';
 export * from './manage-projects';

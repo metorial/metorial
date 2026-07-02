@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { auth0ApiError } from './errors';
 
 export class Auth0Client {
   private http: ReturnType<typeof createAxios>;
@@ -11,6 +12,23 @@ export class Auth0Client {
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  private async request(operation: string, run: () => Promise<{ data: any }>): Promise<any> {
+    try {
+      let response = await run();
+      return response.data;
+    } catch (error) {
+      throw auth0ApiError(error, operation);
+    }
+  }
+
+  private async send(operation: string, run: () => Promise<unknown>) {
+    try {
+      await run();
+    } catch (error) {
+      throw auth0ApiError(error, operation);
+    }
   }
 
   // ─── Users ───
@@ -26,25 +44,27 @@ export class Auth0Client {
     includeFields?: boolean;
     searchEngine?: string;
   }) {
-    let response = await this.http.get('/users', {
-      params: {
-        q: params?.q,
-        page: params?.page,
-        per_page: params?.perPage,
-        include_totals: params?.includeTotals,
-        sort: params?.sort,
-        connection: params?.connection,
-        fields: params?.fields,
-        include_fields: params?.includeFields,
-        search_engine: params?.searchEngine ?? 'v3'
-      }
-    });
-    return response.data;
+    return await this.request('list users', () =>
+      this.http.get('/users', {
+        params: {
+          q: params?.q,
+          page: params?.page,
+          per_page: params?.perPage,
+          include_totals: params?.includeTotals,
+          sort: params?.sort,
+          connection: params?.connection,
+          fields: params?.fields,
+          include_fields: params?.includeFields,
+          search_engine: params?.searchEngine ?? 'v3'
+        }
+      })
+    );
   }
 
   async getUser(userId: string) {
-    let response = await this.http.get(`/users/${encodeURIComponent(userId)}`);
-    return response.data;
+    return await this.request('get user', () =>
+      this.http.get(`/users/${encodeURIComponent(userId)}`)
+    );
   }
 
   async createUser(data: {
@@ -60,20 +80,21 @@ export class Auth0Client {
     verifyEmail?: boolean;
     phoneVerified?: boolean;
   }) {
-    let response = await this.http.post('/users', {
-      connection: data.connection,
-      email: data.email,
-      password: data.password,
-      username: data.username,
-      phone_number: data.phoneNumber,
-      user_metadata: data.userMetadata,
-      app_metadata: data.appMetadata,
-      blocked: data.blocked,
-      email_verified: data.emailVerified,
-      verify_email: data.verifyEmail,
-      phone_verified: data.phoneVerified
-    });
-    return response.data;
+    return await this.request('create user', () =>
+      this.http.post('/users', {
+        connection: data.connection,
+        email: data.email,
+        password: data.password,
+        username: data.username,
+        phone_number: data.phoneNumber,
+        user_metadata: data.userMetadata,
+        app_metadata: data.appMetadata,
+        blocked: data.blocked,
+        email_verified: data.emailVerified,
+        verify_email: data.verifyEmail,
+        phone_verified: data.phoneVerified
+      })
+    );
   }
 
   async updateUser(
@@ -97,81 +118,94 @@ export class Auth0Client {
       familyName?: string;
     }
   ) {
-    let response = await this.http.patch(`/users/${encodeURIComponent(userId)}`, {
-      email: data.email,
-      password: data.password,
-      username: data.username,
-      phone_number: data.phoneNumber,
-      user_metadata: data.userMetadata,
-      app_metadata: data.appMetadata,
-      blocked: data.blocked,
-      email_verified: data.emailVerified,
-      phone_verified: data.phoneVerified,
-      connection: data.connection,
-      client_id: data.clientId,
-      name: data.name,
-      nickname: data.nickname,
-      picture: data.picture,
-      given_name: data.givenName,
-      family_name: data.familyName
-    });
-    return response.data;
+    return await this.request('update user', () =>
+      this.http.patch(`/users/${encodeURIComponent(userId)}`, {
+        email: data.email,
+        password: data.password,
+        username: data.username,
+        phone_number: data.phoneNumber,
+        user_metadata: data.userMetadata,
+        app_metadata: data.appMetadata,
+        blocked: data.blocked,
+        email_verified: data.emailVerified,
+        phone_verified: data.phoneVerified,
+        connection: data.connection,
+        client_id: data.clientId,
+        name: data.name,
+        nickname: data.nickname,
+        picture: data.picture,
+        given_name: data.givenName,
+        family_name: data.familyName
+      })
+    );
   }
 
   async deleteUser(userId: string) {
-    await this.http.delete(`/users/${encodeURIComponent(userId)}`);
+    await this.send('delete user', () =>
+      this.http.delete(`/users/${encodeURIComponent(userId)}`)
+    );
   }
 
   async getUserRoles(userId: string, params?: { page?: number; perPage?: number }) {
-    let response = await this.http.get(`/users/${encodeURIComponent(userId)}/roles`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+    return await this.request('get user roles', () =>
+      this.http.get(`/users/${encodeURIComponent(userId)}/roles`, {
+        params: { page: params?.page, per_page: params?.perPage }
+      })
+    );
   }
 
   async assignUserRoles(userId: string, roleIds: string[]) {
-    await this.http.post(`/users/${encodeURIComponent(userId)}/roles`, {
-      roles: roleIds
-    });
+    await this.send('assign user roles', () =>
+      this.http.post(`/users/${encodeURIComponent(userId)}/roles`, {
+        roles: roleIds
+      })
+    );
   }
 
   async removeUserRoles(userId: string, roleIds: string[]) {
-    await this.http.delete(`/users/${encodeURIComponent(userId)}/roles`, {
-      data: { roles: roleIds }
-    });
+    await this.send('remove user roles', () =>
+      this.http.delete(`/users/${encodeURIComponent(userId)}/roles`, {
+        data: { roles: roleIds }
+      })
+    );
   }
 
   async getUserPermissions(userId: string, params?: { page?: number; perPage?: number }) {
-    let response = await this.http.get(`/users/${encodeURIComponent(userId)}/permissions`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+    return await this.request('get user permissions', () =>
+      this.http.get(`/users/${encodeURIComponent(userId)}/permissions`, {
+        params: { page: params?.page, per_page: params?.perPage }
+      })
+    );
   }
 
   async assignUserPermissions(
     userId: string,
     permissions: Array<{ resourceServerIdentifier: string; permissionName: string }>
   ) {
-    await this.http.post(`/users/${encodeURIComponent(userId)}/permissions`, {
-      permissions: permissions.map(p => ({
-        resource_server_identifier: p.resourceServerIdentifier,
-        permission_name: p.permissionName
-      }))
-    });
+    await this.send('assign user permissions', () =>
+      this.http.post(`/users/${encodeURIComponent(userId)}/permissions`, {
+        permissions: permissions.map(p => ({
+          resource_server_identifier: p.resourceServerIdentifier,
+          permission_name: p.permissionName
+        }))
+      })
+    );
   }
 
   async removeUserPermissions(
     userId: string,
     permissions: Array<{ resourceServerIdentifier: string; permissionName: string }>
   ) {
-    await this.http.delete(`/users/${encodeURIComponent(userId)}/permissions`, {
-      data: {
-        permissions: permissions.map(p => ({
-          resource_server_identifier: p.resourceServerIdentifier,
-          permission_name: p.permissionName
-        }))
-      }
-    });
+    await this.send('remove user permissions', () =>
+      this.http.delete(`/users/${encodeURIComponent(userId)}/permissions`, {
+        data: {
+          permissions: permissions.map(p => ({
+            resource_server_identifier: p.resourceServerIdentifier,
+            permission_name: p.permissionName
+          }))
+        }
+      })
+    );
   }
 
   // ─── Roles ───
@@ -182,67 +216,76 @@ export class Auth0Client {
     includeTotals?: boolean;
     nameFilter?: string;
   }) {
-    let response = await this.http.get('/roles', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
-        include_totals: params?.includeTotals,
-        name_filter: params?.nameFilter
-      }
-    });
-    return response.data;
+    return await this.request('list roles', () =>
+      this.http.get('/roles', {
+        params: {
+          page: params?.page,
+          per_page: params?.perPage,
+          include_totals: params?.includeTotals,
+          name_filter: params?.nameFilter
+        }
+      })
+    );
   }
 
   async getRole(roleId: string) {
-    let response = await this.http.get(`/roles/${encodeURIComponent(roleId)}`);
-    return response.data;
+    return await this.request('get role', () =>
+      this.http.get(`/roles/${encodeURIComponent(roleId)}`)
+    );
   }
 
   async createRole(data: { name: string; description?: string }) {
-    let response = await this.http.post('/roles', data);
-    return response.data;
+    return await this.request('create role', () => this.http.post('/roles', data));
   }
 
   async updateRole(roleId: string, data: { name?: string; description?: string }) {
-    let response = await this.http.patch(`/roles/${encodeURIComponent(roleId)}`, data);
-    return response.data;
+    return await this.request('update role', () =>
+      this.http.patch(`/roles/${encodeURIComponent(roleId)}`, data)
+    );
   }
 
   async deleteRole(roleId: string) {
-    await this.http.delete(`/roles/${encodeURIComponent(roleId)}`);
+    await this.send('delete role', () =>
+      this.http.delete(`/roles/${encodeURIComponent(roleId)}`)
+    );
   }
 
   async getRolePermissions(roleId: string, params?: { page?: number; perPage?: number }) {
-    let response = await this.http.get(`/roles/${encodeURIComponent(roleId)}/permissions`, {
-      params: { page: params?.page, per_page: params?.perPage }
-    });
-    return response.data;
+    return await this.request('get role permissions', () =>
+      this.http.get(`/roles/${encodeURIComponent(roleId)}/permissions`, {
+        params: { page: params?.page, per_page: params?.perPage }
+      })
+    );
   }
 
   async addRolePermissions(
     roleId: string,
     permissions: Array<{ resourceServerIdentifier: string; permissionName: string }>
   ) {
-    await this.http.post(`/roles/${encodeURIComponent(roleId)}/permissions`, {
-      permissions: permissions.map(p => ({
-        resource_server_identifier: p.resourceServerIdentifier,
-        permission_name: p.permissionName
-      }))
-    });
+    await this.send('add role permissions', () =>
+      this.http.post(`/roles/${encodeURIComponent(roleId)}/permissions`, {
+        permissions: permissions.map(p => ({
+          resource_server_identifier: p.resourceServerIdentifier,
+          permission_name: p.permissionName
+        }))
+      })
+    );
   }
 
   async removeRolePermissions(
     roleId: string,
     permissions: Array<{ resourceServerIdentifier: string; permissionName: string }>
   ) {
-    await this.http.delete(`/roles/${encodeURIComponent(roleId)}/permissions`, {
-      data: {
-        permissions: permissions.map(p => ({
-          resource_server_identifier: p.resourceServerIdentifier,
-          permission_name: p.permissionName
-        }))
-      }
-    });
+    await this.send('remove role permissions', () =>
+      this.http.delete(`/roles/${encodeURIComponent(roleId)}/permissions`, {
+        data: {
+          permissions: permissions.map(p => ({
+            resource_server_identifier: p.resourceServerIdentifier,
+            permission_name: p.permissionName
+          }))
+        }
+      })
+    );
   }
 
   // ─── Connections ───
@@ -255,22 +298,24 @@ export class Auth0Client {
     name?: string;
     fields?: string;
   }) {
-    let response = await this.http.get('/connections', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
-        include_totals: params?.includeTotals,
-        strategy: params?.strategy,
-        name: params?.name,
-        fields: params?.fields
-      }
-    });
-    return response.data;
+    return await this.request('list connections', () =>
+      this.http.get('/connections', {
+        params: {
+          page: params?.page,
+          per_page: params?.perPage,
+          include_totals: params?.includeTotals,
+          strategy: params?.strategy,
+          name: params?.name,
+          fields: params?.fields
+        }
+      })
+    );
   }
 
   async getConnection(connectionId: string) {
-    let response = await this.http.get(`/connections/${encodeURIComponent(connectionId)}`);
-    return response.data;
+    return await this.request('get connection', () =>
+      this.http.get(`/connections/${encodeURIComponent(connectionId)}`)
+    );
   }
 
   async createConnection(data: {
@@ -280,14 +325,15 @@ export class Auth0Client {
     enabledClients?: string[];
     metadata?: Record<string, string>;
   }) {
-    let response = await this.http.post('/connections', {
-      name: data.name,
-      strategy: data.strategy,
-      options: data.options,
-      enabled_clients: data.enabledClients,
-      metadata: data.metadata
-    });
-    return response.data;
+    return await this.request('create connection', () =>
+      this.http.post('/connections', {
+        name: data.name,
+        strategy: data.strategy,
+        options: data.options,
+        enabled_clients: data.enabledClients,
+        metadata: data.metadata
+      })
+    );
   }
 
   async updateConnection(
@@ -298,16 +344,19 @@ export class Auth0Client {
       metadata?: Record<string, string>;
     }
   ) {
-    let response = await this.http.patch(`/connections/${encodeURIComponent(connectionId)}`, {
-      options: data.options,
-      enabled_clients: data.enabledClients,
-      metadata: data.metadata
-    });
-    return response.data;
+    return await this.request('update connection', () =>
+      this.http.patch(`/connections/${encodeURIComponent(connectionId)}`, {
+        options: data.options,
+        enabled_clients: data.enabledClients,
+        metadata: data.metadata
+      })
+    );
   }
 
   async deleteConnection(connectionId: string) {
-    await this.http.delete(`/connections/${encodeURIComponent(connectionId)}`);
+    await this.send('delete connection', () =>
+      this.http.delete(`/connections/${encodeURIComponent(connectionId)}`)
+    );
   }
 
   // ─── Applications (Clients) ───
@@ -319,21 +368,23 @@ export class Auth0Client {
     fields?: string;
     appType?: string;
   }) {
-    let response = await this.http.get('/clients', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
-        include_totals: params?.includeTotals,
-        fields: params?.fields,
-        app_type: params?.appType
-      }
-    });
-    return response.data;
+    return await this.request('list applications', () =>
+      this.http.get('/clients', {
+        params: {
+          page: params?.page,
+          per_page: params?.perPage,
+          include_totals: params?.includeTotals,
+          fields: params?.fields,
+          app_type: params?.appType
+        }
+      })
+    );
   }
 
   async getClient(clientId: string) {
-    let response = await this.http.get(`/clients/${encodeURIComponent(clientId)}`);
-    return response.data;
+    return await this.request('get application', () =>
+      this.http.get(`/clients/${encodeURIComponent(clientId)}`)
+    );
   }
 
   async createClient(data: {
@@ -346,17 +397,18 @@ export class Auth0Client {
     allowedLogoutUrls?: string[];
     logoUri?: string;
   }) {
-    let response = await this.http.post('/clients', {
-      name: data.name,
-      app_type: data.appType,
-      description: data.description,
-      callbacks: data.callbacks,
-      allowed_origins: data.allowedOrigins,
-      web_origins: data.webOrigins,
-      allowed_logout_urls: data.allowedLogoutUrls,
-      logo_uri: data.logoUri
-    });
-    return response.data;
+    return await this.request('create application', () =>
+      this.http.post('/clients', {
+        name: data.name,
+        app_type: data.appType,
+        description: data.description,
+        callbacks: data.callbacks,
+        allowed_origins: data.allowedOrigins,
+        web_origins: data.webOrigins,
+        allowed_logout_urls: data.allowedLogoutUrls,
+        logo_uri: data.logoUri
+      })
+    );
   }
 
   async updateClient(
@@ -372,21 +424,24 @@ export class Auth0Client {
       logoUri?: string;
     }
   ) {
-    let response = await this.http.patch(`/clients/${encodeURIComponent(clientId)}`, {
-      name: data.name,
-      app_type: data.appType,
-      description: data.description,
-      callbacks: data.callbacks,
-      allowed_origins: data.allowedOrigins,
-      web_origins: data.webOrigins,
-      allowed_logout_urls: data.allowedLogoutUrls,
-      logo_uri: data.logoUri
-    });
-    return response.data;
+    return await this.request('update application', () =>
+      this.http.patch(`/clients/${encodeURIComponent(clientId)}`, {
+        name: data.name,
+        app_type: data.appType,
+        description: data.description,
+        callbacks: data.callbacks,
+        allowed_origins: data.allowedOrigins,
+        web_origins: data.webOrigins,
+        allowed_logout_urls: data.allowedLogoutUrls,
+        logo_uri: data.logoUri
+      })
+    );
   }
 
   async deleteClient(clientId: string) {
-    await this.http.delete(`/clients/${encodeURIComponent(clientId)}`);
+    await this.send('delete application', () =>
+      this.http.delete(`/clients/${encodeURIComponent(clientId)}`)
+    );
   }
 
   // ─── Organizations ───
@@ -396,24 +451,27 @@ export class Auth0Client {
     perPage?: number;
     includeTotals?: boolean;
   }) {
-    let response = await this.http.get('/organizations', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
-        include_totals: params?.includeTotals
-      }
-    });
-    return response.data;
+    return await this.request('list organizations', () =>
+      this.http.get('/organizations', {
+        params: {
+          page: params?.page,
+          per_page: params?.perPage,
+          include_totals: params?.includeTotals
+        }
+      })
+    );
   }
 
   async getOrganization(organizationId: string) {
-    let response = await this.http.get(`/organizations/${encodeURIComponent(organizationId)}`);
-    return response.data;
+    return await this.request('get organization', () =>
+      this.http.get(`/organizations/${encodeURIComponent(organizationId)}`)
+    );
   }
 
   async getOrganizationByName(name: string) {
-    let response = await this.http.get(`/organizations/name/${encodeURIComponent(name)}`);
-    return response.data;
+    return await this.request('get organization by name', () =>
+      this.http.get(`/organizations/name/${encodeURIComponent(name)}`)
+    );
   }
 
   async createOrganization(data: {
@@ -422,18 +480,19 @@ export class Auth0Client {
     branding?: { logoUrl?: string; colors?: Record<string, string> };
     metadata?: Record<string, string>;
   }) {
-    let response = await this.http.post('/organizations', {
-      name: data.name,
-      display_name: data.displayName,
-      branding: data.branding
-        ? {
-            logo_url: data.branding.logoUrl,
-            colors: data.branding.colors
-          }
-        : undefined,
-      metadata: data.metadata
-    });
-    return response.data;
+    return await this.request('create organization', () =>
+      this.http.post('/organizations', {
+        name: data.name,
+        display_name: data.displayName,
+        branding: data.branding
+          ? {
+              logo_url: data.branding.logoUrl,
+              colors: data.branding.colors
+            }
+          : undefined,
+        metadata: data.metadata
+      })
+    );
   }
 
   async updateOrganization(
@@ -445,9 +504,8 @@ export class Auth0Client {
       metadata?: Record<string, string>;
     }
   ) {
-    let response = await this.http.patch(
-      `/organizations/${encodeURIComponent(organizationId)}`,
-      {
+    return await this.request('update organization', () =>
+      this.http.patch(`/organizations/${encodeURIComponent(organizationId)}`, {
         name: data.name,
         display_name: data.displayName,
         branding: data.branding
@@ -457,38 +515,86 @@ export class Auth0Client {
             }
           : undefined,
         metadata: data.metadata
-      }
+      })
     );
-    return response.data;
   }
 
   async deleteOrganization(organizationId: string) {
-    await this.http.delete(`/organizations/${encodeURIComponent(organizationId)}`);
+    await this.send('delete organization', () =>
+      this.http.delete(`/organizations/${encodeURIComponent(organizationId)}`)
+    );
   }
 
   async listOrganizationMembers(
     organizationId: string,
     params?: { page?: number; perPage?: number }
   ) {
-    let response = await this.http.get(
-      `/organizations/${encodeURIComponent(organizationId)}/members`,
-      {
+    return await this.request('list organization members', () =>
+      this.http.get(`/organizations/${encodeURIComponent(organizationId)}/members`, {
         params: { page: params?.page, per_page: params?.perPage }
-      }
+      })
     );
-    return response.data;
   }
 
   async addOrganizationMembers(organizationId: string, memberIds: string[]) {
-    await this.http.post(`/organizations/${encodeURIComponent(organizationId)}/members`, {
-      members: memberIds
-    });
+    await this.send('add organization members', () =>
+      this.http.post(`/organizations/${encodeURIComponent(organizationId)}/members`, {
+        members: memberIds
+      })
+    );
   }
 
   async removeOrganizationMembers(organizationId: string, memberIds: string[]) {
-    await this.http.delete(`/organizations/${encodeURIComponent(organizationId)}/members`, {
-      data: { members: memberIds }
-    });
+    await this.send('remove organization members', () =>
+      this.http.delete(`/organizations/${encodeURIComponent(organizationId)}/members`, {
+        data: { members: memberIds }
+      })
+    );
+  }
+
+  async getOrganizationMemberRoles(
+    organizationId: string,
+    userId: string,
+    params?: { page?: number; perPage?: number }
+  ) {
+    return await this.request('get organization member roles', () =>
+      this.http.get(
+        `/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(userId)}/roles`,
+        {
+          params: { page: params?.page, per_page: params?.perPage }
+        }
+      )
+    );
+  }
+
+  async assignOrganizationMemberRoles(
+    organizationId: string,
+    userId: string,
+    roleIds: string[]
+  ) {
+    await this.send('assign organization member roles', () =>
+      this.http.post(
+        `/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(userId)}/roles`,
+        {
+          roles: roleIds
+        }
+      )
+    );
+  }
+
+  async removeOrganizationMemberRoles(
+    organizationId: string,
+    userId: string,
+    roleIds: string[]
+  ) {
+    await this.send('remove organization member roles', () =>
+      this.http.delete(
+        `/organizations/${encodeURIComponent(organizationId)}/members/${encodeURIComponent(userId)}/roles`,
+        {
+          data: { roles: roleIds }
+        }
+      )
+    );
   }
 
   // ─── Logs ───
@@ -504,25 +610,27 @@ export class Auth0Client {
     from?: string;
     take?: number;
   }) {
-    let response = await this.http.get('/logs', {
-      params: {
-        q: params?.q,
-        page: params?.page,
-        per_page: params?.perPage,
-        sort: params?.sort,
-        fields: params?.fields,
-        include_fields: params?.includeFields,
-        include_totals: params?.includeTotals,
-        from: params?.from,
-        take: params?.take
-      }
-    });
-    return response.data;
+    return await this.request('get logs', () =>
+      this.http.get('/logs', {
+        params: {
+          q: params?.q,
+          page: params?.page,
+          per_page: params?.perPage,
+          sort: params?.sort,
+          fields: params?.fields,
+          include_fields: params?.includeFields,
+          include_totals: params?.includeTotals,
+          from: params?.from,
+          take: params?.take
+        }
+      })
+    );
   }
 
   async getLogEvent(logEventId: string) {
-    let response = await this.http.get(`/logs/${encodeURIComponent(logEventId)}`);
-    return response.data;
+    return await this.request('get log event', () =>
+      this.http.get(`/logs/${encodeURIComponent(logEventId)}`)
+    );
   }
 
   // ─── Resource Servers (APIs) ───
@@ -532,21 +640,21 @@ export class Auth0Client {
     perPage?: number;
     includeTotals?: boolean;
   }) {
-    let response = await this.http.get('/resource-servers', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
-        include_totals: params?.includeTotals
-      }
-    });
-    return response.data;
+    return await this.request('list resource servers', () =>
+      this.http.get('/resource-servers', {
+        params: {
+          page: params?.page,
+          per_page: params?.perPage,
+          include_totals: params?.includeTotals
+        }
+      })
+    );
   }
 
   async getResourceServer(resourceServerId: string) {
-    let response = await this.http.get(
-      `/resource-servers/${encodeURIComponent(resourceServerId)}`
+    return await this.request('get resource server', () =>
+      this.http.get(`/resource-servers/${encodeURIComponent(resourceServerId)}`)
     );
-    return response.data;
   }
 
   async createResourceServer(data: {
@@ -558,17 +666,18 @@ export class Auth0Client {
     tokenDialect?: string;
     skipConsentForVerifiableFirstPartyClients?: boolean;
   }) {
-    let response = await this.http.post('/resource-servers', {
-      name: data.name,
-      identifier: data.identifier,
-      scopes: data.scopes,
-      signing_alg: data.signingAlg,
-      token_lifetime: data.tokenLifetime,
-      token_dialect: data.tokenDialect,
-      skip_consent_for_verifiable_first_party_clients:
-        data.skipConsentForVerifiableFirstPartyClients
-    });
-    return response.data;
+    return await this.request('create resource server', () =>
+      this.http.post('/resource-servers', {
+        name: data.name,
+        identifier: data.identifier,
+        scopes: data.scopes,
+        signing_alg: data.signingAlg,
+        token_lifetime: data.tokenLifetime,
+        token_dialect: data.tokenDialect,
+        skip_consent_for_verifiable_first_party_clients:
+          data.skipConsentForVerifiableFirstPartyClients
+      })
+    );
   }
 
   async updateResourceServer(
@@ -582,9 +691,8 @@ export class Auth0Client {
       skipConsentForVerifiableFirstPartyClients?: boolean;
     }
   ) {
-    let response = await this.http.patch(
-      `/resource-servers/${encodeURIComponent(resourceServerId)}`,
-      {
+    return await this.request('update resource server', () =>
+      this.http.patch(`/resource-servers/${encodeURIComponent(resourceServerId)}`, {
         name: data.name,
         scopes: data.scopes,
         signing_alg: data.signingAlg,
@@ -592,13 +700,14 @@ export class Auth0Client {
         token_dialect: data.tokenDialect,
         skip_consent_for_verifiable_first_party_clients:
           data.skipConsentForVerifiableFirstPartyClients
-      }
+      })
     );
-    return response.data;
   }
 
   async deleteResourceServer(resourceServerId: string) {
-    await this.http.delete(`/resource-servers/${encodeURIComponent(resourceServerId)}`);
+    await this.send('delete resource server', () =>
+      this.http.delete(`/resource-servers/${encodeURIComponent(resourceServerId)}`)
+    );
   }
 
   // ─── Client Grants ───
@@ -609,47 +718,52 @@ export class Auth0Client {
     audience?: string;
     clientId?: string;
   }) {
-    let response = await this.http.get('/client-grants', {
-      params: {
-        page: params?.page,
-        per_page: params?.perPage,
-        audience: params?.audience,
-        client_id: params?.clientId
-      }
-    });
-    return response.data;
+    return await this.request('list client grants', () =>
+      this.http.get('/client-grants', {
+        params: {
+          page: params?.page,
+          per_page: params?.perPage,
+          audience: params?.audience,
+          client_id: params?.clientId
+        }
+      })
+    );
   }
 
   async createClientGrant(data: { clientId: string; audience: string; scope: string[] }) {
-    let response = await this.http.post('/client-grants', {
-      client_id: data.clientId,
-      audience: data.audience,
-      scope: data.scope
-    });
-    return response.data;
+    return await this.request('create client grant', () =>
+      this.http.post('/client-grants', {
+        client_id: data.clientId,
+        audience: data.audience,
+        scope: data.scope
+      })
+    );
   }
 
   async updateClientGrant(grantId: string, data: { scope: string[] }) {
-    let response = await this.http.patch(`/client-grants/${encodeURIComponent(grantId)}`, {
-      scope: data.scope
-    });
-    return response.data;
+    return await this.request('update client grant', () =>
+      this.http.patch(`/client-grants/${encodeURIComponent(grantId)}`, {
+        scope: data.scope
+      })
+    );
   }
 
   async deleteClientGrant(grantId: string) {
-    await this.http.delete(`/client-grants/${encodeURIComponent(grantId)}`);
+    await this.send('delete client grant', () =>
+      this.http.delete(`/client-grants/${encodeURIComponent(grantId)}`)
+    );
   }
 
   // ─── Log Streams ───
 
   async listLogStreams() {
-    let response = await this.http.get('/log-streams');
-    return response.data;
+    return await this.request('list log streams', () => this.http.get('/log-streams'));
   }
 
   async getLogStream(logStreamId: string) {
-    let response = await this.http.get(`/log-streams/${encodeURIComponent(logStreamId)}`);
-    return response.data;
+    return await this.request('get log stream', () =>
+      this.http.get(`/log-streams/${encodeURIComponent(logStreamId)}`)
+    );
   }
 
   async createLogStream(data: {
@@ -658,35 +772,57 @@ export class Auth0Client {
     sink: Record<string, unknown>;
     filters?: Array<{ type: string; name: string }>;
   }) {
-    let response = await this.http.post('/log-streams', {
-      name: data.name,
-      type: data.type,
-      sink: data.sink,
-      filters: data.filters
-    });
-    return response.data;
+    return await this.request('create log stream', () =>
+      this.http.post('/log-streams', {
+        name: data.name,
+        type: data.type,
+        sink: data.sink,
+        filters: data.filters
+      })
+    );
+  }
+
+  async updateLogStream(
+    logStreamId: string,
+    data: {
+      name?: string;
+      status?: string;
+      filters?: Array<{ type: string; name: string }>;
+    }
+  ) {
+    return await this.request('update log stream', () =>
+      this.http.patch(`/log-streams/${encodeURIComponent(logStreamId)}`, {
+        name: data.name,
+        status: data.status,
+        filters: data.filters
+      })
+    );
   }
 
   async deleteLogStream(logStreamId: string) {
-    await this.http.delete(`/log-streams/${encodeURIComponent(logStreamId)}`);
+    await this.send('delete log stream', () =>
+      this.http.delete(`/log-streams/${encodeURIComponent(logStreamId)}`)
+    );
   }
 
   // ─── Actions ───
 
   async listActions(params?: { triggerId?: string; deployed?: boolean; installed?: boolean }) {
-    let response = await this.http.get('/actions/actions', {
-      params: {
-        triggerId: params?.triggerId,
-        deployed: params?.deployed,
-        installed: params?.installed
-      }
-    });
-    return response.data;
+    return await this.request('list actions', () =>
+      this.http.get('/actions/actions', {
+        params: {
+          triggerId: params?.triggerId,
+          deployed: params?.deployed,
+          installed: params?.installed
+        }
+      })
+    );
   }
 
   async getAction(actionId: string) {
-    let response = await this.http.get(`/actions/actions/${encodeURIComponent(actionId)}`);
-    return response.data;
+    return await this.request('get action', () =>
+      this.http.get(`/actions/actions/${encodeURIComponent(actionId)}`)
+    );
   }
 
   async createAction(data: {
@@ -696,14 +832,15 @@ export class Auth0Client {
     dependencies?: Array<{ name: string; version: string }>;
     secrets?: Array<{ name: string; value: string }>;
   }) {
-    let response = await this.http.post('/actions/actions', {
-      name: data.name,
-      supported_triggers: data.supportedTriggers,
-      code: data.code,
-      dependencies: data.dependencies,
-      secrets: data.secrets
-    });
-    return response.data;
+    return await this.request('create action', () =>
+      this.http.post('/actions/actions', {
+        name: data.name,
+        supported_triggers: data.supportedTriggers,
+        code: data.code,
+        dependencies: data.dependencies,
+        secrets: data.secrets
+      })
+    );
   }
 
   async updateAction(
@@ -715,23 +852,25 @@ export class Auth0Client {
       secrets?: Array<{ name: string; value: string }>;
     }
   ) {
-    let response = await this.http.patch(`/actions/actions/${encodeURIComponent(actionId)}`, {
-      name: data.name,
-      code: data.code,
-      dependencies: data.dependencies,
-      secrets: data.secrets
-    });
-    return response.data;
+    return await this.request('update action', () =>
+      this.http.patch(`/actions/actions/${encodeURIComponent(actionId)}`, {
+        name: data.name,
+        code: data.code,
+        dependencies: data.dependencies,
+        secrets: data.secrets
+      })
+    );
   }
 
   async deleteAction(actionId: string) {
-    await this.http.delete(`/actions/actions/${encodeURIComponent(actionId)}`);
+    await this.send('delete action', () =>
+      this.http.delete(`/actions/actions/${encodeURIComponent(actionId)}`)
+    );
   }
 
   async deployAction(actionId: string) {
-    let response = await this.http.post(
-      `/actions/actions/${encodeURIComponent(actionId)}/deploy`
+    return await this.request('deploy action', () =>
+      this.http.post(`/actions/actions/${encodeURIComponent(actionId)}/deploy`)
     );
-    return response.data;
   }
 }

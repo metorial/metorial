@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { servicenowServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -55,7 +56,7 @@ export let manageGroupMembership = SlateTool.create(spec, {
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.userId) {
-        throw new Error('userId is required for add action');
+        throw servicenowServiceError('userId is required for add action');
       }
       let record = await client.addGroupMember(ctx.input.groupId, ctx.input.userId);
       return {
@@ -76,13 +77,15 @@ export let manageGroupMembership = SlateTool.create(spec, {
           (m: any) => m.user?.value === ctx.input.userId || m.user === ctx.input.userId
         );
         if (!match) {
-          throw new Error('User not found in the group');
+          throw servicenowServiceError('User not found in the group');
         }
         membershipToRemove = match.sys_id;
       }
 
       if (!membershipToRemove) {
-        throw new Error('Either membershipId or userId is required for remove action');
+        throw servicenowServiceError(
+          'Either membershipId or userId is required for remove action'
+        );
       }
 
       await client.removeGroupMember(membershipToRemove);
@@ -94,6 +97,6 @@ export let manageGroupMembership = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw servicenowServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

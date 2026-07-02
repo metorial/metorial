@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let eventSchema = z.object({
@@ -70,11 +71,12 @@ export let listEventsTool = SlateTool.create(spec, {
     let result: any;
     if (ctx.input.scope === 'project') {
       let projectId = ctx.input.projectId || ctx.config.projectId;
-      if (!projectId) throw new Error('projectId is required for project scope');
+      if (!projectId) throw mongodbServiceError('projectId is required for project scope');
       result = await client.listProjectEvents(projectId, params);
     } else {
       let orgId = ctx.input.organizationId || ctx.config.organizationId;
-      if (!orgId) throw new Error('organizationId is required for organization scope');
+      if (!orgId)
+        throw mongodbServiceError('organizationId is required for organization scope');
       result = await client.listOrganizationEvents(orgId, params);
     }
 

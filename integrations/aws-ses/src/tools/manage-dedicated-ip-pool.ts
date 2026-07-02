@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SesClient } from '../lib/client';
+import { requireAwsSesString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageDedicatedIpPool = SlateTool.create(spec, {
@@ -46,18 +47,20 @@ export let manageDedicatedIpPool = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      let poolName = requireAwsSesString(ctx.input.poolName, 'poolName', action);
       await client.createDedicatedIpPool({
-        poolName: ctx.input.poolName!,
+        poolName,
         scalingMode: ctx.input.scalingMode
       });
       return {
-        output: { poolName: ctx.input.poolName, scalingMode: ctx.input.scalingMode },
-        message: `Dedicated IP pool **${ctx.input.poolName}** created${ctx.input.scalingMode ? ` (mode: ${ctx.input.scalingMode})` : ''}.`
+        output: { poolName, scalingMode: ctx.input.scalingMode },
+        message: `Dedicated IP pool **${poolName}** created${ctx.input.scalingMode ? ` (mode: ${ctx.input.scalingMode})` : ''}.`
       };
     }
 
     if (action === 'get') {
-      let result = await client.getDedicatedIpPool(ctx.input.poolName!);
+      let poolName = requireAwsSesString(ctx.input.poolName, 'poolName', action);
+      let result = await client.getDedicatedIpPool(poolName);
       return {
         output: result,
         message: `Pool **${result.poolName}**: scaling mode = ${result.scalingMode}.`
@@ -65,10 +68,11 @@ export let manageDedicatedIpPool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteDedicatedIpPool(ctx.input.poolName!);
+      let poolName = requireAwsSesString(ctx.input.poolName, 'poolName', action);
+      await client.deleteDedicatedIpPool(poolName);
       return {
-        output: { poolName: ctx.input.poolName },
-        message: `Dedicated IP pool **${ctx.input.poolName}** deleted.`
+        output: { poolName },
+        message: `Dedicated IP pool **${poolName}** deleted.`
       };
     }
 

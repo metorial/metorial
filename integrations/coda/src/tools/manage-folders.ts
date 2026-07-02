@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { codaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listFoldersTool = SlateTool.create(spec, {
@@ -26,6 +27,7 @@ export let listFoldersTool = SlateTool.create(spec, {
           folderId: z.string().describe('ID of the folder'),
           name: z.string().describe('Name of the folder'),
           workspaceId: z.string().optional().describe('ID of the containing workspace'),
+          description: z.string().optional().describe('Folder description'),
           browserLink: z.string().optional().describe('URL to open the folder')
         })
       ),
@@ -46,6 +48,7 @@ export let listFoldersTool = SlateTool.create(spec, {
       folderId: folder.id,
       name: folder.name,
       workspaceId: folder.workspace?.id,
+      description: folder.description,
       browserLink: folder.browserLink
     }));
 
@@ -59,10 +62,53 @@ export let listFoldersTool = SlateTool.create(spec, {
   })
   .build();
 
+export let getFolderTool = SlateTool.create(spec, {
+  name: 'Get Folder',
+  key: 'get_folder',
+  description: `Retrieve details for a Coda folder, including workspace, description, editability, and browser link.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      folderId: z.string().describe('ID of the folder to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      folderId: z.string().describe('ID of the folder'),
+      name: z.string().describe('Name of the folder'),
+      workspaceId: z.string().optional().describe('ID of the containing workspace'),
+      workspaceName: z.string().optional().describe('Name of the containing workspace'),
+      description: z.string().optional().describe('Folder description'),
+      canEdit: z.boolean().optional().describe('Whether folder settings can be edited'),
+      browserLink: z.string().optional().describe('URL to open the folder')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let folder = await client.getFolder(ctx.input.folderId);
+
+    return {
+      output: {
+        folderId: folder.id,
+        name: folder.name,
+        workspaceId: folder.workspace?.id,
+        workspaceName: folder.workspace?.name,
+        description: folder.description,
+        canEdit: folder.canEdit,
+        browserLink: folder.browserLink
+      },
+      message: `Retrieved folder **${folder.name}** (${folder.id}).`
+    };
+  })
+  .build();
+
 export let createFolderTool = SlateTool.create(spec, {
   name: 'Create Folder',
   key: 'create_folder',
-  description: `Create a new folder in a workspace, optionally nested under a parent folder.`,
+  description: `Create a new folder in a Coda workspace.`,
   tags: {
     destructive: false
   }
@@ -70,13 +116,18 @@ export let createFolderTool = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Name for the new folder'),
-      parentFolderId: z.string().optional().describe('ID of the parent folder for nesting')
+      workspaceId: z
+        .string()
+        .describe('ID of the workspace where the folder should be created'),
+      description: z.string().optional().describe('Description for the folder')
     })
   )
   .output(
     z.object({
       folderId: z.string().describe('ID of the created folder'),
       name: z.string().describe('Name of the created folder'),
+      workspaceId: z.string().optional().describe('ID of the containing workspace'),
+      description: z.string().optional().describe('Folder description'),
       browserLink: z.string().optional().describe('URL to open the folder')
     })
   )
@@ -85,13 +136,16 @@ export let createFolderTool = SlateTool.create(spec, {
 
     let folder = await client.createFolder({
       name: ctx.input.name,
-      parentFolderId: ctx.input.parentFolderId
+      workspaceId: ctx.input.workspaceId,
+      description: ctx.input.description
     });
 
     return {
       output: {
         folderId: folder.id,
         name: folder.name,
+        workspaceId: folder.workspace?.id,
+        description: folder.description,
         browserLink: folder.browserLink
       },
       message: `Created folder **${folder.name}**.`
@@ -102,7 +156,7 @@ export let createFolderTool = SlateTool.create(spec, {
 export let updateFolderTool = SlateTool.create(spec, {
   name: 'Update Folder',
   key: 'update_folder',
-  description: `Rename an existing folder.`,
+  description: `Update an existing folder name or description.`,
   tags: {
     destructive: false
   }
@@ -110,28 +164,36 @@ export let updateFolderTool = SlateTool.create(spec, {
   .input(
     z.object({
       folderId: z.string().describe('ID of the folder to update'),
-      name: z.string().describe('New name for the folder')
+      name: z.string().optional().describe('New name for the folder'),
+      description: z.string().optional().describe('New description for the folder')
     })
   )
   .output(
     z.object({
       folderId: z.string().describe('ID of the updated folder'),
-      name: z.string().describe('Updated name of the folder')
+      name: z.string().optional().describe('Updated name of the folder'),
+      description: z.string().optional().describe('Updated description of the folder')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
+    if (ctx.input.name === undefined && ctx.input.description === undefined) {
+      throw codaServiceError('Provide name or description to update the folder.');
+    }
+
     await client.updateFolder(ctx.input.folderId, {
-      name: ctx.input.name
+      name: ctx.input.name,
+      description: ctx.input.description
     });
 
     return {
       output: {
         folderId: ctx.input.folderId,
-        name: ctx.input.name
+        name: ctx.input.name,
+        description: ctx.input.description
       },
-      message: `Updated folder **${ctx.input.folderId}** to **${ctx.input.name}**.`
+      message: `Updated folder **${ctx.input.folderId}**.`
     };
   })
   .build();

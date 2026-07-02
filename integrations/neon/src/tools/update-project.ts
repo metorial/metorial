@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NeonClient } from '../lib/client';
+import { neonValidationError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateProject = SlateTool.create(spec, {
@@ -14,7 +15,11 @@ export let updateProject = SlateTool.create(spec, {
   .input(
     z.object({
       projectId: z.string().describe('ID of the project to update'),
-      name: z.string().optional().describe('New name for the project')
+      name: z.string().optional().describe('New name for the project'),
+      historyRetentionSeconds: z
+        .number()
+        .optional()
+        .describe('Seconds to retain branch history for point-in-time restore')
     })
   )
   .output(
@@ -25,10 +30,15 @@ export let updateProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.name === undefined && ctx.input.historyRetentionSeconds === undefined) {
+      throw neonValidationError('Provide at least one project field to update.');
+    }
+
     let client = new NeonClient({ token: ctx.auth.token });
 
     let result = await client.updateProject(ctx.input.projectId, {
-      name: ctx.input.name
+      name: ctx.input.name,
+      historyRetentionSeconds: ctx.input.historyRetentionSeconds
     });
 
     let p = result.project;

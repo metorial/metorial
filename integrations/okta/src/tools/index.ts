@@ -5,6 +5,7 @@ export * from './list-groups';
 export * from './list-policies';
 export * from './list-users';
 export * from './manage-app-assignment';
+export * from './manage-event-hook';
 export * from './manage-group';
 export * from './manage-group-membership';
 export * from './manage-user-factors';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NeonClient } from '../lib/client';
+import { neonValidationError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createBranch = SlateTool.create(spec, {
@@ -53,6 +54,12 @@ export let createBranch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.parentTimestamp && ctx.input.parentLsn) {
+      throw neonValidationError(
+        'Provide either parentTimestamp or parentLsn when creating a branch, not both.'
+      );
+    }
+
     let client = new NeonClient({ token: ctx.auth.token });
 
     let endpoints = ctx.input.createEndpoint ? [{ type: 'read_write' }] : undefined;

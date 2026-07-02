@@ -1,7 +1,42 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PandaDocClient } from '../lib/client';
+import { pandadocServiceError } from '../lib/errors';
 import { spec } from '../spec';
+
+let documentStatusSchema = z.enum([
+  'draft',
+  'sent',
+  'completed',
+  'uploaded',
+  'error',
+  'viewed',
+  'waiting_approval',
+  'approved',
+  'rejected',
+  'waiting_pay',
+  'paid',
+  'voided',
+  'declined',
+  'external_review'
+]);
+
+let statusMap: Record<z.infer<typeof documentStatusSchema>, number> = {
+  draft: 0,
+  sent: 1,
+  completed: 2,
+  uploaded: 3,
+  error: 4,
+  viewed: 5,
+  waiting_approval: 6,
+  approved: 7,
+  rejected: 8,
+  waiting_pay: 9,
+  paid: 10,
+  voided: 11,
+  declined: 12,
+  external_review: 13
+};
 
 export let listDocuments = SlateTool.create(spec, {
   name: 'List Documents',
@@ -14,29 +49,23 @@ export let listDocuments = SlateTool.create(spec, {
   .input(
     z.object({
       query: z.string().optional().describe('Search by document name or reference number'),
-      status: z
-        .enum([
-          'draft',
-          'sent',
-          'completed',
-          'uploaded',
-          'error',
-          'viewed',
-          'waiting_approval',
-          'approved',
-          'rejected',
-          'waiting_pay',
-          'paid',
-          'voided',
-          'declined',
-          'external_review'
-        ])
+      documentId: z.string().optional().describe('Filter by exact document UUID'),
+      status: documentStatusSchema.optional().describe('Filter by document status'),
+      excludedStatus: documentStatusSchema
         .optional()
-        .describe('Filter by document status'),
+        .describe('Exclude documents with this status'),
       templateId: z.string().optional().describe('Filter by template UUID'),
+      formId: z
+        .string()
+        .optional()
+        .describe('Filter by form UUID. Cannot be combined with templateId.'),
       folderUuid: z.string().optional().describe('Filter by folder UUID'),
       tag: z.string().optional().describe('Filter by tag'),
       contactId: z.string().optional().describe('Filter by contact ID'),
+      membershipId: z
+        .string()
+        .optional()
+        .describe("Filter documents by the owner's PandaDoc membership ID"),
       createdFrom: z
         .string()
         .optional()
@@ -62,9 +91,30 @@ export let listDocuments = SlateTool.create(spec, {
         .optional()
         .describe('Filter documents completed before this ISO 8601 date'),
       orderBy: z
-        .enum(['date_created', 'date_status_changed', 'date_modified', 'name'])
+        .enum([
+          'name',
+          'date_created',
+          'date_status_changed',
+          'date_of_last_action',
+          'date_modified',
+          'date_sent',
+          'date_completed',
+          'date_expiration',
+          'date_declined',
+          'status',
+          '-name',
+          '-date_created',
+          '-date_status_changed',
+          '-date_of_last_action',
+          '-date_modified',
+          '-date_sent',
+          '-date_completed',
+          '-date_expiration',
+          '-date_declined',
+          '-status'
+        ])
         .optional()
-        .describe('Sort order'),
+        .describe('Sort order. Prefix with "-" for descending order.'),
       page: z.number().optional().describe('Page number (starts at 1)'),
       count: z.number().optional().describe('Items per page (max 100, default 50)'),
       deleted: z.boolean().optional().describe('If true, show only deleted documents'),
@@ -98,30 +148,21 @@ export let listDocuments = SlateTool.create(spec, {
       authType: ctx.auth.authType
     });
 
-    let statusMap: Record<string, number> = {
-      draft: 0,
-      sent: 1,
-      completed: 2,
-      uploaded: 3,
-      error: 4,
-      viewed: 5,
-      waiting_approval: 6,
-      approved: 7,
-      rejected: 8,
-      waiting_pay: 9,
-      paid: 10,
-      voided: 11,
-      declined: 12,
-      external_review: 13
-    };
+    if (ctx.input.templateId && ctx.input.formId) {
+      throw pandadocServiceError('templateId cannot be combined with formId.');
+    }
 
     let params: any = {};
     if (ctx.input.query) params.q = ctx.input.query;
     if (ctx.input.status) params.status = statusMap[ctx.input.status];
+    if (ctx.input.excludedStatus) params.status__ne = statusMap[ctx.input.excludedStatus];
+    if (ctx.input.documentId) params.id = ctx.input.documentId;
     if (ctx.input.templateId) params.template_id = ctx.input.templateId;
+    if (ctx.input.formId) params.form_id = ctx.input.formId;
     if (ctx.input.folderUuid) params.folder_uuid = ctx.input.folderUuid;
     if (ctx.input.tag) params.tag = ctx.input.tag;
     if (ctx.input.contactId) params.contact_id = ctx.input.contactId;
+    if (ctx.input.membershipId) params.membership_id = ctx.input.membershipId;
     if (ctx.input.createdFrom) params.created_from = ctx.input.createdFrom;
     if (ctx.input.createdTo) params.created_to = ctx.input.createdTo;
     if (ctx.input.modifiedFrom) params.modified_from = ctx.input.modifiedFrom;

@@ -34,6 +34,7 @@ Mixpanel supports different API base URLs depending on data residency:
 
 - **Standard:** `api.mixpanel.com`
 - **EU Residency:** `eu.mixpanel.com`
+- **India Residency:** `in.mixpanel.com`
 
 ### Project Secret (Deprecating)
 
@@ -73,7 +74,7 @@ Query pre-built analytics reports programmatically, including:
 
 ### Raw Data Export
 
-Export raw event data for a specified date range. Returns individual event records with all properties. Useful for feeding data into external systems or performing custom analysis outside Mixpanel.
+Export raw event data for a specified date range. The Slates tool returns the JSONL export as an attachment with metadata in the structured output. Useful for feeding data into external systems or performing custom analysis outside Mixpanel.
 
 ### Data Pipelines
 

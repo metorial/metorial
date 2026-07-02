@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createWixClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -8,7 +8,8 @@ export let managePricingPlans = SlateTool.create(spec, {
   key: 'manage_pricing_plans',
   description: `Query and retrieve pricing plans on a Wix site.
 Use **action** to specify the operation: \`list\` or \`get\`.
-Pricing plans represent subscription-based offerings with recurring or one-time pricing.`,
+Pricing plans represent subscription-based offerings with recurring or one-time pricing.
+Uses the current Wix Pricing Plans V3 API.`,
   tags: { destructive: false, readOnly: true }
 })
   .input(
@@ -56,7 +57,8 @@ Pricing plans represent subscription-based offerings with recurring or one-time 
         };
       }
       case 'get': {
-        if (!ctx.input.planId) throw new Error('planId is required for get action');
+        if (!ctx.input.planId)
+          throw createApiServiceError('planId is required for get action');
         let result = await client.getPricingPlan(ctx.input.planId);
         return {
           output: { plan: result.plan },

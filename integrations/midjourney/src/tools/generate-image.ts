@@ -68,13 +68,12 @@ export let generateImage = SlateTool.create(spec, {
     });
 
     let prompt = ctx.input.prompt;
-    if (ctx.input.aspectRatio && !prompt.includes('--ar')) {
-      prompt = `${prompt} --ar ${ctx.input.aspectRatio}`;
-    }
+    let aspectRatio =
+      ctx.input.aspectRatio && !prompt.includes('--ar') ? ctx.input.aspectRatio : undefined;
 
     ctx.progress('Submitting imagine request...');
 
-    let submitResult = await client.imagine({ prompt });
+    let submitResult = await client.imagine({ prompt, aspectRatio });
 
     if (!ctx.input.waitForResult) {
       return {

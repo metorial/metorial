@@ -1,4 +1,9 @@
-import type { AxiosInstance, CreateAxiosDefaults, InternalAxiosRequestConfig } from 'axios';
+import type {
+  AxiosInstance,
+  AxiosResponse,
+  CreateAxiosDefaults,
+  InternalAxiosRequestConfig
+} from 'axios';
 import baseAxios, { getAdapter, isAxiosError } from 'axios';
 import { getCurrentContext } from '../context/hook';
 import type { SlateAxiosErrorOptions } from '../error';
@@ -11,6 +16,17 @@ import {
 
 export interface SlateAxiosDefaults extends CreateAxiosDefaults {
   errorMapping?: SlateAxiosErrorOptions;
+}
+
+export type SlateAxiosErrorAdapter = (error: unknown, operation: string) => unknown;
+
+export interface SlateAuthenticatedAxiosDefaults extends SlateAxiosDefaults {
+  authHeader?: {
+    name?: string;
+    value: string;
+  };
+  contentType?: string | false;
+  errorAdapter?: (error: unknown) => unknown;
 }
 
 let applySlateInterceptors = (
@@ -71,6 +87,48 @@ export let createAxios = (config?: SlateAxiosDefaults) => {
 
   applySlateInterceptors(instance, errorMapping);
   return instance;
+};
+
+export let createAuthenticatedAxios = (config: SlateAuthenticatedAxiosDefaults) => {
+  let { authHeader, contentType = 'application/json', errorAdapter, ...axiosConfig } = config;
+  let instance = createAxios({
+    ...axiosConfig,
+    headers: {
+      ...(contentType === false ? {} : { 'Content-Type': contentType }),
+      ...(authHeader ? { [authHeader.name ?? 'Authorization']: authHeader.value } : {}),
+      ...axiosConfig.headers
+    }
+  });
+
+  if (errorAdapter) {
+    instance.interceptors.response.use(
+      response => response,
+      error => Promise.reject(errorAdapter(error))
+    );
+  }
+
+  return instance;
+};
+
+export let requestAxios = async <T = unknown>(
+  operation: string,
+  request: () => Promise<AxiosResponse<T>>,
+  errorAdapter: SlateAxiosErrorAdapter
+) => {
+  try {
+    return await request();
+  } catch (error) {
+    throw errorAdapter(error, operation);
+  }
+};
+
+export let requestAxiosData = async <T = unknown>(
+  operation: string,
+  request: () => Promise<AxiosResponse<T>>,
+  errorAdapter: SlateAxiosErrorAdapter
+) => {
+  let response = await requestAxios(operation, request, errorAdapter);
+  return response.data as T;
 };
 
 export let axios = createAxios();

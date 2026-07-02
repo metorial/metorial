@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NotionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -72,7 +72,7 @@ Optionally include initial content as block children, and set an icon or cover i
     } else if (ctx.input.parentPageId) {
       parent = { type: 'page_id', page_id: ctx.input.parentPageId };
     } else {
-      throw new Error('Either parentPageId or parentDatabaseId must be provided');
+      throw createApiServiceError('Either parentPageId or parentDatabaseId must be provided');
     }
 
     let page = await client.createPage({

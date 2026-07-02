@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ManagementClient } from '../lib/client';
+import { requireProjectRef } from '../lib/errors';
 import { ProjectClient } from '../lib/project-client';
 import { spec } from '../spec';
 
@@ -54,12 +55,7 @@ export let manageTableRows = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectRef = ctx.input.projectRef ?? ctx.config.projectRef;
-    if (!projectRef) {
-      throw new Error(
-        'projectRef is required — provide it as input or set it in the configuration'
-      );
-    }
+    let projectRef = requireProjectRef(ctx.input.projectRef ?? ctx.config.projectRef);
 
     let mgmt = new ManagementClient(ctx.auth.token);
     let keys = await mgmt.getProjectApiKeys(projectRef);
@@ -69,7 +65,7 @@ export let manageTableRows = SlateTool.create(spec, {
     let apiKey = serviceKey?.api_key;
 
     if (!apiKey) {
-      throw new Error(
+      throw createApiServiceError(
         'Could not retrieve service_role API key for the project. service_role key is required for data modifications.'
       );
     }
@@ -80,17 +76,17 @@ export let manageTableRows = SlateTool.create(spec, {
 
     if (action === 'insert') {
       if (!ctx.input.rows || ctx.input.rows.length === 0) {
-        throw new Error('rows are required for insert action');
+        throw createApiServiceError('rows are required for insert action');
       }
       result = await projectClient.insertRows(table, ctx.input.rows, {
         schema: ctx.input.schema
       });
     } else if (action === 'update') {
       if (!ctx.input.updates) {
-        throw new Error('updates are required for update action');
+        throw createApiServiceError('updates are required for update action');
       }
       if (!ctx.input.filters || Object.keys(ctx.input.filters).length === 0) {
-        throw new Error(
+        throw createApiServiceError(
           'filters are required for update action to prevent accidental full-table updates'
         );
       }
@@ -99,7 +95,7 @@ export let manageTableRows = SlateTool.create(spec, {
       });
     } else if (action === 'upsert') {
       if (!ctx.input.rows || ctx.input.rows.length === 0) {
-        throw new Error('rows are required for upsert action');
+        throw createApiServiceError('rows are required for upsert action');
       }
       result = await projectClient.upsertRows(table, ctx.input.rows, {
         onConflict: ctx.input.onConflict,
@@ -108,7 +104,7 @@ export let manageTableRows = SlateTool.create(spec, {
     } else {
       // delete
       if (!ctx.input.filters || Object.keys(ctx.input.filters).length === 0) {
-        throw new Error(
+        throw createApiServiceError(
           'filters are required for delete action to prevent accidental full-table deletes'
         );
       }

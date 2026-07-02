@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { huggingFaceApiError } from './lib/errors';
 
 let hfAxios = createAxios({
   baseURL: 'https://huggingface.co'
@@ -48,6 +49,26 @@ export let auth = SlateAuth.create()
         scope: 'manage-repos'
       },
       {
+        title: 'Read Collections',
+        description: 'Read access to collections',
+        scope: 'read-collections'
+      },
+      {
+        title: 'Write Collections',
+        description: 'Create, update, and delete collections',
+        scope: 'write-collections'
+      },
+      {
+        title: 'Write Discussions',
+        description: 'Create and update discussions and pull requests',
+        scope: 'write-discussions'
+      },
+      {
+        title: 'Webhooks',
+        description: 'Manage repository webhooks',
+        scope: 'webhooks'
+      },
+      {
         title: 'Inference API',
         description: 'Make inference requests on behalf of the user',
         scope: 'inference-api'
@@ -69,27 +90,31 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let response = await hfAxios.post(
-        '/oauth/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+      try {
+        let response = await hfAxios.post(
+          '/oauth/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          }).toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
 
-      return {
-        output: {
-          token: response.data.access_token
-        }
-      };
+        return {
+          output: {
+            token: response.data.access_token
+          }
+        };
+      } catch (error) {
+        throw huggingFaceApiError(error, 'exchange OAuth code');
+      }
     },
 
     handleTokenRefresh: async (ctx: any) => {
@@ -101,11 +126,16 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: any; scopes: string[] }) => {
-      let response = await hfAxios.get('/api/whoami-v2', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+      try {
+        response = await hfAxios.get('/api/whoami-v2', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+      } catch (error) {
+        throw huggingFaceApiError(error, 'load OAuth profile');
+      }
 
       let data = response.data;
 
@@ -138,11 +168,16 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await hfAxios.get('/api/whoami-v2', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+      try {
+        response = await hfAxios.get('/api/whoami-v2', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+      } catch (error) {
+        throw huggingFaceApiError(error, 'load token profile');
+      }
 
       let data = response.data;
 

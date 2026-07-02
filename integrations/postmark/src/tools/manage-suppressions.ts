@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requirePostmarkArray } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageSuppressions = SlateTool.create(spec, {
@@ -96,14 +97,13 @@ export let manageSuppressions = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.emailAddresses || ctx.input.emailAddresses.length === 0) {
-        throw new Error('emailAddresses are required for creating suppressions');
-      }
-
-      let result = await client.createSuppressions(
-        ctx.input.streamId,
-        ctx.input.emailAddresses
+      let emailAddresses = requirePostmarkArray(
+        ctx.input.emailAddresses,
+        'emailAddresses',
+        'create'
       );
+
+      let result = await client.createSuppressions(ctx.input.streamId, emailAddresses);
 
       return {
         output: {
@@ -113,15 +113,17 @@ export let manageSuppressions = SlateTool.create(spec, {
             statusMessage: s.Message
           }))
         },
-        message: `Created suppressions for **${ctx.input.emailAddresses.length}** address(es) in stream "${ctx.input.streamId}".`
+        message: `Created suppressions for **${emailAddresses.length}** address(es) in stream "${ctx.input.streamId}".`
       };
     }
 
-    if (!ctx.input.emailAddresses || ctx.input.emailAddresses.length === 0) {
-      throw new Error('emailAddresses are required for deleting suppressions');
-    }
+    let emailAddresses = requirePostmarkArray(
+      ctx.input.emailAddresses,
+      'emailAddresses',
+      'delete'
+    );
 
-    let result = await client.deleteSuppressions(ctx.input.streamId, ctx.input.emailAddresses);
+    let result = await client.deleteSuppressions(ctx.input.streamId, emailAddresses);
 
     return {
       output: {
@@ -131,6 +133,6 @@ export let manageSuppressions = SlateTool.create(spec, {
           statusMessage: s.Message
         }))
       },
-      message: `Deleted suppressions for **${ctx.input.emailAddresses.length}** address(es) in stream "${ctx.input.streamId}".`
+      message: `Deleted suppressions for **${emailAddresses.length}** address(es) in stream "${ctx.input.streamId}".`
     };
   });

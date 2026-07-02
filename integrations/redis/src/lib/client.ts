@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { redisApiError } from './errors';
 
 export class RedisCloudClient {
   private http;
@@ -14,121 +15,145 @@ export class RedisCloudClient {
     });
   }
 
+  private async request(operation: string, run: () => Promise<{ data: any }>) {
+    try {
+      let response = await run();
+      return response.data;
+    } catch (error) {
+      throw redisApiError(error, operation);
+    }
+  }
+
   // ===== Subscriptions (Pro) =====
 
   async listSubscriptions() {
-    let response = await this.http.get('/subscriptions');
-    return response.data;
+    return await this.request('list subscriptions', () => this.http.get('/subscriptions'));
   }
 
   async getSubscription(subscriptionId: number) {
-    let response = await this.http.get(`/subscriptions/${subscriptionId}`);
-    return response.data;
+    return await this.request('get subscription', () =>
+      this.http.get(`/subscriptions/${subscriptionId}`)
+    );
   }
 
   async createSubscription(body: Record<string, any>) {
-    let response = await this.http.post('/subscriptions', body);
-    return response.data;
+    return await this.request('create subscription', () =>
+      this.http.post('/subscriptions', body)
+    );
   }
 
   async updateSubscription(subscriptionId: number, body: Record<string, any>) {
-    let response = await this.http.put(`/subscriptions/${subscriptionId}`, body);
-    return response.data;
+    return await this.request('update subscription', () =>
+      this.http.put(`/subscriptions/${subscriptionId}`, body)
+    );
   }
 
   async deleteSubscription(subscriptionId: number) {
-    let response = await this.http.delete(`/subscriptions/${subscriptionId}`);
-    return response.data;
+    return await this.request('delete subscription', () =>
+      this.http.delete(`/subscriptions/${subscriptionId}`)
+    );
   }
 
   // ===== Subscriptions (Essentials) =====
 
   async listEssentialsSubscriptions() {
-    let response = await this.http.get('/fixed/subscriptions');
-    return response.data;
+    return await this.request('list Essentials subscriptions', () =>
+      this.http.get('/fixed/subscriptions')
+    );
   }
 
   async getEssentialsSubscription(subscriptionId: number) {
-    let response = await this.http.get(`/fixed/subscriptions/${subscriptionId}`);
-    return response.data;
+    return await this.request('get Essentials subscription', () =>
+      this.http.get(`/fixed/subscriptions/${subscriptionId}`)
+    );
   }
 
   async createEssentialsSubscription(body: Record<string, any>) {
-    let response = await this.http.post('/fixed/subscriptions', body);
-    return response.data;
+    return await this.request('create Essentials subscription', () =>
+      this.http.post('/fixed/subscriptions', body)
+    );
   }
 
   async updateEssentialsSubscription(subscriptionId: number, body: Record<string, any>) {
-    let response = await this.http.put(`/fixed/subscriptions/${subscriptionId}`, body);
-    return response.data;
+    return await this.request('update Essentials subscription', () =>
+      this.http.put(`/fixed/subscriptions/${subscriptionId}`, body)
+    );
   }
 
   async deleteEssentialsSubscription(subscriptionId: number) {
-    let response = await this.http.delete(`/fixed/subscriptions/${subscriptionId}`);
-    return response.data;
+    return await this.request('delete Essentials subscription', () =>
+      this.http.delete(`/fixed/subscriptions/${subscriptionId}`)
+    );
   }
 
   // ===== Essentials Plans =====
 
   async listEssentialsPlans() {
-    let response = await this.http.get('/fixed/plans');
-    return response.data;
+    return await this.request('list Essentials plans', () => this.http.get('/fixed/plans'));
+  }
+
+  async getEssentialsPlan(planId: number) {
+    return await this.request('get Essentials plan', () =>
+      this.http.get(`/fixed/plans/${planId}`)
+    );
+  }
+
+  async listCompatibleEssentialsPlans(subscriptionId: number) {
+    return await this.request('list compatible Essentials plans', () =>
+      this.http.get(`/fixed/plans/subscriptions/${subscriptionId}`)
+    );
   }
 
   // ===== Databases (Pro) =====
 
   async listDatabases(subscriptionId: number) {
-    let response = await this.http.get(`/subscriptions/${subscriptionId}/databases`);
-    return response.data;
+    return await this.request('list databases', () =>
+      this.http.get(`/subscriptions/${subscriptionId}/databases`)
+    );
   }
 
   async getDatabase(subscriptionId: number, databaseId: number) {
-    let response = await this.http.get(
-      `/subscriptions/${subscriptionId}/databases/${databaseId}`
+    return await this.request('get database', () =>
+      this.http.get(`/subscriptions/${subscriptionId}/databases/${databaseId}`)
     );
-    return response.data;
   }
 
   async createDatabase(subscriptionId: number, body: Record<string, any>) {
-    let response = await this.http.post(`/subscriptions/${subscriptionId}/databases`, body);
-    return response.data;
+    return await this.request('create database', () =>
+      this.http.post(`/subscriptions/${subscriptionId}/databases`, body)
+    );
   }
 
   async updateDatabase(subscriptionId: number, databaseId: number, body: Record<string, any>) {
-    let response = await this.http.put(
-      `/subscriptions/${subscriptionId}/databases/${databaseId}`,
-      body
+    return await this.request('update database', () =>
+      this.http.put(`/subscriptions/${subscriptionId}/databases/${databaseId}`, body)
     );
-    return response.data;
   }
 
   async deleteDatabase(subscriptionId: number, databaseId: number) {
-    let response = await this.http.delete(
-      `/subscriptions/${subscriptionId}/databases/${databaseId}`
+    return await this.request('delete database', () =>
+      this.http.delete(`/subscriptions/${subscriptionId}/databases/${databaseId}`)
     );
-    return response.data;
   }
 
   // ===== Databases (Essentials) =====
 
   async listEssentialsDatabases(subscriptionId: number) {
-    let response = await this.http.get(`/fixed/subscriptions/${subscriptionId}/databases`);
-    return response.data;
+    return await this.request('list Essentials databases', () =>
+      this.http.get(`/fixed/subscriptions/${subscriptionId}/databases`)
+    );
   }
 
   async getEssentialsDatabase(subscriptionId: number, databaseId: number) {
-    let response = await this.http.get(
-      `/fixed/subscriptions/${subscriptionId}/databases/${databaseId}`
+    return await this.request('get Essentials database', () =>
+      this.http.get(`/fixed/subscriptions/${subscriptionId}/databases/${databaseId}`)
     );
-    return response.data;
   }
 
   async createEssentialsDatabase(subscriptionId: number, body: Record<string, any>) {
-    let response = await this.http.post(
-      `/fixed/subscriptions/${subscriptionId}/databases`,
-      body
+    return await this.request('create Essentials database', () =>
+      this.http.post(`/fixed/subscriptions/${subscriptionId}/databases`, body)
     );
-    return response.data;
   }
 
   async updateEssentialsDatabase(
@@ -136,18 +161,15 @@ export class RedisCloudClient {
     databaseId: number,
     body: Record<string, any>
   ) {
-    let response = await this.http.put(
-      `/fixed/subscriptions/${subscriptionId}/databases/${databaseId}`,
-      body
+    return await this.request('update Essentials database', () =>
+      this.http.put(`/fixed/subscriptions/${subscriptionId}/databases/${databaseId}`, body)
     );
-    return response.data;
   }
 
   async deleteEssentialsDatabase(subscriptionId: number, databaseId: number) {
-    let response = await this.http.delete(
-      `/fixed/subscriptions/${subscriptionId}/databases/${databaseId}`
+    return await this.request('delete Essentials database', () =>
+      this.http.delete(`/fixed/subscriptions/${subscriptionId}/databases/${databaseId}`)
     );
-    return response.data;
   }
 
   // ===== Database Backup & Import =====
@@ -157,19 +179,18 @@ export class RedisCloudClient {
     databaseId: number,
     body?: Record<string, any>
   ) {
-    let response = await this.http.post(
-      `/subscriptions/${subscriptionId}/databases/${databaseId}/backup`,
-      body || {}
+    return await this.request('back up database', () =>
+      this.http.post(
+        `/subscriptions/${subscriptionId}/databases/${databaseId}/backup`,
+        body || {}
+      )
     );
-    return response.data;
   }
 
   async importDatabase(subscriptionId: number, databaseId: number, body: Record<string, any>) {
-    let response = await this.http.post(
-      `/subscriptions/${subscriptionId}/databases/${databaseId}/import`,
-      body
+    return await this.request('import database', () =>
+      this.http.post(`/subscriptions/${subscriptionId}/databases/${databaseId}/import`, body)
     );
-    return response.data;
   }
 
   async backupEssentialsDatabase(
@@ -177,11 +198,12 @@ export class RedisCloudClient {
     databaseId: number,
     body?: Record<string, any>
   ) {
-    let response = await this.http.post(
-      `/fixed/subscriptions/${subscriptionId}/databases/${databaseId}/backup`,
-      body || {}
+    return await this.request('back up Essentials database', () =>
+      this.http.post(
+        `/fixed/subscriptions/${subscriptionId}/databases/${databaseId}/backup`,
+        body || {}
+      )
     );
-    return response.data;
   }
 
   async importEssentialsDatabase(
@@ -189,178 +211,256 @@ export class RedisCloudClient {
     databaseId: number,
     body: Record<string, any>
   ) {
-    let response = await this.http.post(
-      `/fixed/subscriptions/${subscriptionId}/databases/${databaseId}/import`,
-      body
+    return await this.request('import Essentials database', () =>
+      this.http.post(
+        `/fixed/subscriptions/${subscriptionId}/databases/${databaseId}/import`,
+        body
+      )
     );
-    return response.data;
+  }
+
+  async getDatabaseBackupStatus(
+    subscriptionId: number,
+    databaseId: number,
+    params?: { regionName?: string }
+  ) {
+    return await this.request('get database backup status', () =>
+      this.http.get(`/subscriptions/${subscriptionId}/databases/${databaseId}/backup`, {
+        params
+      })
+    );
+  }
+
+  async getEssentialsDatabaseBackupStatus(subscriptionId: number, databaseId: number) {
+    return await this.request('get Essentials database backup status', () =>
+      this.http.get(`/fixed/subscriptions/${subscriptionId}/databases/${databaseId}/backup`)
+    );
+  }
+
+  async getDatabaseImportStatus(subscriptionId: number, databaseId: number) {
+    return await this.request('get database import status', () =>
+      this.http.get(`/subscriptions/${subscriptionId}/databases/${databaseId}/import`)
+    );
+  }
+
+  async getEssentialsDatabaseImportStatus(subscriptionId: number, databaseId: number) {
+    return await this.request('get Essentials database import status', () =>
+      this.http.get(`/fixed/subscriptions/${subscriptionId}/databases/${databaseId}/import`)
+    );
+  }
+
+  async getDatabaseTraffic(subscriptionId: number, databaseId: number) {
+    return await this.request('get database traffic', () =>
+      this.http.get(`/subscriptions/${subscriptionId}/databases/${databaseId}/traffic`)
+    );
+  }
+
+  async getEssentialsDatabaseTraffic(subscriptionId: number, databaseId: number) {
+    return await this.request('get Essentials database traffic', () =>
+      this.http.get(`/fixed/subscriptions/${subscriptionId}/databases/${databaseId}/traffic`)
+    );
+  }
+
+  async getDatabaseSlowLog(
+    subscriptionId: number,
+    databaseId: number,
+    params?: { regionName?: string }
+  ) {
+    return await this.request('get database slow log', () =>
+      this.http.get(`/subscriptions/${subscriptionId}/databases/${databaseId}/slow-log`, {
+        params
+      })
+    );
+  }
+
+  async getEssentialsDatabaseSlowLog(subscriptionId: number, databaseId: number) {
+    return await this.request('get Essentials database slow log', () =>
+      this.http.get(`/fixed/subscriptions/${subscriptionId}/databases/${databaseId}/slow-log`)
+    );
   }
 
   // ===== ACL Redis Rules =====
 
   async listAclRules() {
-    let response = await this.http.get('/acl/redisRules');
-    return response.data;
+    return await this.request('list ACL rules', () => this.http.get('/acl/redisRules'));
   }
 
   async getAclRule(ruleId: number) {
-    let response = await this.http.get(`/acl/redisRules/${ruleId}`);
-    return response.data;
+    return await this.request('get ACL rule', () =>
+      this.http.get(`/acl/redisRules/${ruleId}`)
+    );
   }
 
   async createAclRule(body: Record<string, any>) {
-    let response = await this.http.post('/acl/redisRules', body);
-    return response.data;
+    return await this.request('create ACL rule', () =>
+      this.http.post('/acl/redisRules', body)
+    );
   }
 
   async updateAclRule(ruleId: number, body: Record<string, any>) {
-    let response = await this.http.put(`/acl/redisRules/${ruleId}`, body);
-    return response.data;
+    return await this.request('update ACL rule', () =>
+      this.http.put(`/acl/redisRules/${ruleId}`, body)
+    );
   }
 
   async deleteAclRule(ruleId: number) {
-    let response = await this.http.delete(`/acl/redisRules/${ruleId}`);
-    return response.data;
+    return await this.request('delete ACL rule', () =>
+      this.http.delete(`/acl/redisRules/${ruleId}`)
+    );
   }
 
   // ===== ACL Roles =====
 
   async listAclRoles() {
-    let response = await this.http.get('/acl/roles');
-    return response.data;
+    return await this.request('list ACL roles', () => this.http.get('/acl/roles'));
   }
 
   async getAclRole(roleId: number) {
-    let response = await this.http.get(`/acl/roles/${roleId}`);
-    return response.data;
+    return await this.request('get ACL role', () => this.http.get(`/acl/roles/${roleId}`));
   }
 
   async createAclRole(body: Record<string, any>) {
-    let response = await this.http.post('/acl/roles', body);
-    return response.data;
+    return await this.request('create ACL role', () => this.http.post('/acl/roles', body));
   }
 
   async updateAclRole(roleId: number, body: Record<string, any>) {
-    let response = await this.http.put(`/acl/roles/${roleId}`, body);
-    return response.data;
+    return await this.request('update ACL role', () =>
+      this.http.put(`/acl/roles/${roleId}`, body)
+    );
   }
 
   async deleteAclRole(roleId: number) {
-    let response = await this.http.delete(`/acl/roles/${roleId}`);
-    return response.data;
+    return await this.request('delete ACL role', () =>
+      this.http.delete(`/acl/roles/${roleId}`)
+    );
   }
 
   // ===== ACL Users =====
 
   async listAclUsers() {
-    let response = await this.http.get('/acl/users');
-    return response.data;
+    return await this.request('list ACL users', () => this.http.get('/acl/users'));
   }
 
   async getAclUser(userId: number) {
-    let response = await this.http.get(`/acl/users/${userId}`);
-    return response.data;
+    return await this.request('get ACL user', () => this.http.get(`/acl/users/${userId}`));
   }
 
   async createAclUser(body: Record<string, any>) {
-    let response = await this.http.post('/acl/users', body);
-    return response.data;
+    return await this.request('create ACL user', () => this.http.post('/acl/users', body));
   }
 
   async updateAclUser(userId: number, body: Record<string, any>) {
-    let response = await this.http.put(`/acl/users/${userId}`, body);
-    return response.data;
+    return await this.request('update ACL user', () =>
+      this.http.put(`/acl/users/${userId}`, body)
+    );
   }
 
   async deleteAclUser(userId: number) {
-    let response = await this.http.delete(`/acl/users/${userId}`);
-    return response.data;
+    return await this.request('delete ACL user', () =>
+      this.http.delete(`/acl/users/${userId}`)
+    );
   }
 
   // ===== Account Users =====
 
   async listUsers() {
-    let response = await this.http.get('/users');
-    return response.data;
+    return await this.request('list users', () => this.http.get('/users'));
   }
 
   async getUser(userId: number) {
-    let response = await this.http.get(`/users/${userId}`);
-    return response.data;
+    return await this.request('get user', () => this.http.get(`/users/${userId}`));
   }
 
   async updateUser(userId: number, body: Record<string, any>) {
-    let response = await this.http.put(`/users/${userId}`, body);
-    return response.data;
+    return await this.request('update user', () => this.http.put(`/users/${userId}`, body));
   }
 
   async deleteUser(userId: number) {
-    let response = await this.http.delete(`/users/${userId}`);
-    return response.data;
+    return await this.request('delete user', () => this.http.delete(`/users/${userId}`));
   }
 
   // ===== Cloud Accounts =====
 
   async listCloudAccounts() {
-    let response = await this.http.get('/cloud-accounts');
-    return response.data;
+    return await this.request('list cloud accounts', () => this.http.get('/cloud-accounts'));
   }
 
   async getCloudAccount(cloudAccountId: number) {
-    let response = await this.http.get(`/cloud-accounts/${cloudAccountId}`);
-    return response.data;
+    return await this.request('get cloud account', () =>
+      this.http.get(`/cloud-accounts/${cloudAccountId}`)
+    );
   }
 
   async createCloudAccount(body: Record<string, any>) {
-    let response = await this.http.post('/cloud-accounts', body);
-    return response.data;
+    return await this.request('create cloud account', () =>
+      this.http.post('/cloud-accounts', body)
+    );
   }
 
   async updateCloudAccount(cloudAccountId: number, body: Record<string, any>) {
-    let response = await this.http.put(`/cloud-accounts/${cloudAccountId}`, body);
-    return response.data;
+    return await this.request('update cloud account', () =>
+      this.http.put(`/cloud-accounts/${cloudAccountId}`, body)
+    );
   }
 
   async deleteCloudAccount(cloudAccountId: number) {
-    let response = await this.http.delete(`/cloud-accounts/${cloudAccountId}`);
-    return response.data;
+    return await this.request('delete cloud account', () =>
+      this.http.delete(`/cloud-accounts/${cloudAccountId}`)
+    );
   }
 
   // ===== Payment Methods =====
 
   async listPaymentMethods() {
-    let response = await this.http.get('/payment-methods');
-    return response.data;
-  }
-
-  async getPaymentMethod(paymentMethodId: number) {
-    let response = await this.http.get(`/payment-methods/${paymentMethodId}`);
-    return response.data;
+    return await this.request('list payment methods', () => this.http.get('/payment-methods'));
   }
 
   // ===== Tasks =====
 
   async listTasks() {
-    let response = await this.http.get('/tasks');
-    return response.data;
+    return await this.request('list tasks', () => this.http.get('/tasks'));
   }
 
   async getTask(taskId: string) {
-    let response = await this.http.get(`/tasks/${taskId}`);
-    return response.data;
+    return await this.request('get task', () => this.http.get(`/tasks/${taskId}`));
   }
 
   // ===== System Logs =====
 
   async getLogs(params?: { offset?: number; limit?: number }) {
-    let response = await this.http.get('/logs', { params });
-    return response.data;
+    return await this.request('get system logs', () => this.http.get('/logs', { params }));
+  }
+
+  // ===== Database Configuration Metadata =====
+
+  async listProRedisVersions(subscriptionId?: number) {
+    let params = subscriptionId === undefined ? undefined : { subscriptionId };
+    return await this.request('list Pro Redis versions', () =>
+      this.http.get('/subscriptions/redis-versions', { params })
+    );
+  }
+
+  async listEssentialsRedisVersions(subscriptionId: number) {
+    return await this.request('list Essentials Redis versions', () =>
+      this.http.get('/fixed/redis-versions', { params: { subscriptionId } })
+    );
+  }
+
+  async listDatabaseModules() {
+    return await this.request('list database modules', () =>
+      this.http.get('/database-modules')
+    );
+  }
+
+  async listDataPersistenceOptions() {
+    return await this.request('list data persistence options', () =>
+      this.http.get('/data-persistence')
+    );
   }
 
   // ===== Account =====
 
   async getAccount() {
-    let response = await this.http.get('/');
-    return response.data;
+    return await this.request('get account', () => this.http.get('/'));
   }
 }

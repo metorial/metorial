@@ -3,6 +3,16 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let defaultAnalyticsExportColumns = [
+  'Message ID',
+  'Conversation ID',
+  'Message date',
+  'Direction',
+  'Status',
+  'Inbox',
+  'Subject'
+];
+
 export let createAnalyticsExport = SlateTool.create(spec, {
   name: 'Create Analytics Export',
   key: 'create_analytics_export',
@@ -21,7 +31,18 @@ export let createAnalyticsExport = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Timezone for the export (e.g., America/New_York)'),
-      type: z.string().describe('Export type (e.g., messages, conversations, tags)'),
+      type: z
+        .enum(['messages'])
+        .optional()
+        .describe(
+          'Export type. Front currently allows messages exports. Defaults to messages.'
+        ),
+      columns: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Analytics export columns to include. Defaults to common message export columns.'
+        ),
       filters: z
         .record(z.string(), z.any())
         .optional()
@@ -43,7 +64,8 @@ export let createAnalyticsExport = SlateTool.create(spec, {
       start: ctx.input.start,
       end: ctx.input.end,
       timezone: ctx.input.timezone,
-      type: ctx.input.type,
+      type: ctx.input.type ?? 'messages',
+      columns: ctx.input.columns ?? defaultAnalyticsExportColumns,
       filters: ctx.input.filters
     });
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createKubeClient } from '../lib/client';
+import { kubernetesServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageConfigStorage = SlateTool.create(spec, {
@@ -11,7 +12,7 @@ For secrets, values should be provided as plain text — they will be base64-enc
   instructions: [
     'When updating, only provided keys are changed; existing keys not in the update are preserved.',
     'For secrets, provide plaintext values — they are automatically base64-encoded.',
-    'To delete a specific key, set its value to an empty string in the entries.'
+    'To delete specific keys during an update, list them in deleteKeys.'
   ],
   tags: {
     destructive: false
@@ -29,6 +30,10 @@ For secrets, values should be provided as plain text — they will be base64-enc
         .record(z.string(), z.string())
         .optional()
         .describe('Key-value data to set. For secrets, provide plain text values.'),
+      deleteKeys: z
+        .array(z.string())
+        .optional()
+        .describe('Data keys to remove during update. Ignored for create actions.'),
       secretType: z
         .string()
         .optional()
@@ -87,15 +92,24 @@ For secrets, values should be provided as plain text — they will be base64-enc
     } else {
       // update via merge patch
       let patch: any = {};
+      let deleteKeys = ctx.input.deleteKeys || [];
 
       if (resourceKind === 'configmaps') {
-        if (ctx.input.entries) {
-          patch.data = ctx.input.entries;
+        if (ctx.input.entries || deleteKeys.length > 0) {
+          patch.data = { ...(ctx.input.entries || {}) };
+          for (let key of deleteKeys) {
+            patch.data[key] = null;
+          }
         }
-      } else if (ctx.input.entries) {
-        let encodedData: Record<string, string> = {};
-        for (let [key, value] of Object.entries(ctx.input.entries)) {
-          encodedData[key] = btoa(value as string);
+      } else if (ctx.input.entries || deleteKeys.length > 0) {
+        let encodedData: Record<string, string | null> = {};
+        if (ctx.input.entries) {
+          for (let [key, value] of Object.entries(ctx.input.entries)) {
+            encodedData[key] = btoa(value as string);
+          }
+        }
+        for (let key of deleteKeys) {
+          encodedData[key] = null;
         }
         patch.data = encodedData;
       }
@@ -106,6 +120,12 @@ For secrets, values should be provided as plain text — they will be base64-enc
       if (ctx.input.annotations) {
         patch.metadata = patch.metadata || {};
         patch.metadata.annotations = ctx.input.annotations;
+      }
+
+      if (Object.keys(patch).length === 0) {
+        throw kubernetesServiceError(
+          'Provide entries, deleteKeys, labels, or annotations when updating a ConfigMap or Secret.'
+        );
       }
 
       result = await client.patchResource(

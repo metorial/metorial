@@ -16,7 +16,7 @@ Useful for complex, cross-field queries and precise data extraction.`,
     'Use field API names in queries.'
   ],
   constraints: [
-    'Maximum 200 records per query.',
+    'Maximum 2,000 records per query.',
     'Only SELECT queries are supported (no INSERT/UPDATE/DELETE).'
   ],
   tags: {

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { woocommerceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -103,7 +104,8 @@ export let manageCoupons = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.couponId) throw new Error('couponId is required for get action');
+      if (!ctx.input.couponId)
+        throw woocommerceServiceError('couponId is required for get action');
       let coupon = await client.getCoupon(ctx.input.couponId);
 
       return {
@@ -113,7 +115,7 @@ export let manageCoupons = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.code) throw new Error('code is required for create action');
+      if (!ctx.input.code) throw woocommerceServiceError('code is required for create action');
 
       let data = buildCouponData(ctx.input);
       data.code = ctx.input.code;
@@ -127,7 +129,8 @@ export let manageCoupons = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.couponId) throw new Error('couponId is required for update action');
+      if (!ctx.input.couponId)
+        throw woocommerceServiceError('couponId is required for update action');
 
       let data = buildCouponData(ctx.input);
       if (ctx.input.code) data.code = ctx.input.code;
@@ -141,7 +144,8 @@ export let manageCoupons = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.couponId) throw new Error('couponId is required for delete action');
+      if (!ctx.input.couponId)
+        throw woocommerceServiceError('couponId is required for delete action');
 
       await client.deleteCoupon(ctx.input.couponId, ctx.input.force);
 
@@ -151,7 +155,7 @@ export let manageCoupons = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw woocommerceServiceError(`Unknown action: ${action}`);
   })
   .build();
 

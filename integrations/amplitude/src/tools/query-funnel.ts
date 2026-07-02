@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AmplitudeClient } from '../lib/client';
+import { amplitudeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let queryFunnelTool = SlateTool.create(spec, {
@@ -58,6 +59,23 @@ export let queryFunnelTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let parsedEvents: unknown;
+    try {
+      parsedEvents = JSON.parse(ctx.input.events);
+    } catch (error) {
+      let serviceError = amplitudeServiceError(
+        'events must be a JSON-encoded array of event objects.'
+      );
+      if (error instanceof Error) {
+        serviceError.setParent(error);
+      }
+      throw serviceError;
+    }
+
+    if (!Array.isArray(parsedEvents)) {
+      throw amplitudeServiceError('events must be a JSON-encoded array of event objects.');
+    }
+
     let client = new AmplitudeClient({
       apiKey: ctx.auth.apiKey,
       secretKey: ctx.auth.secretKey,
@@ -83,7 +101,7 @@ export let queryFunnelTool = SlateTool.create(spec, {
         events: data.events,
         funnelData: data
       },
-      message: `Funnel analysis completed for **${ctx.input.start}** to **${ctx.input.end}** with ${JSON.parse(ctx.input.events).length} steps.`
+      message: `Funnel analysis completed for **${ctx.input.start}** to **${ctx.input.end}** with ${parsedEvents.length} steps.`
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bigcommerceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let managePriceList = SlateTool.create(spec, {
@@ -56,7 +57,8 @@ export let managePriceList = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.priceListId) throw new Error('priceListId is required for get');
+      if (!ctx.input.priceListId)
+        throw bigcommerceServiceError('priceListId is required for get');
       let result = await client.getPriceList(ctx.input.priceListId);
       return {
         output: { priceList: result.data },
@@ -65,7 +67,8 @@ export let managePriceList = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.priceListId) throw new Error('priceListId is required for delete');
+      if (!ctx.input.priceListId)
+        throw bigcommerceServiceError('priceListId is required for delete');
       await client.deletePriceList(ctx.input.priceListId);
       return {
         output: { deleted: true },
@@ -85,7 +88,8 @@ export let managePriceList = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.priceListId) throw new Error('priceListId is required for update');
+    if (!ctx.input.priceListId)
+      throw bigcommerceServiceError('priceListId is required for update');
     let result = await client.updatePriceList(ctx.input.priceListId, data);
     return {
       output: { priceList: result.data },

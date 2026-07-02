@@ -37,7 +37,7 @@ export let listWebhooks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let ns = ctx.input.namespace || ctx.config.namespace || ctx.auth.username;
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listWebhooks(ns, ctx.input.repositoryName);
 
     return {
@@ -86,7 +86,7 @@ export let createWebhook = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let ns = ctx.input.namespace || ctx.config.namespace || ctx.auth.username;
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let webhook = await client.createWebhook(ns, ctx.input.repositoryName, {
       name: ctx.input.webhookName,
       webhookUrl: ctx.input.webhookUrl
@@ -129,7 +129,7 @@ export let deleteWebhook = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let ns = ctx.input.namespace || ctx.config.namespace || ctx.auth.username;
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     await client.deleteWebhook(ns, ctx.input.repositoryName, ctx.input.webhookId);
 
     return {

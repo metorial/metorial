@@ -37,7 +37,10 @@ Manage online stores including product catalogs, inventory, carts, checkouts, or
 
 ### Stores (Product Catalog)
 
-Create and manage physical and digital products, collections, and product variants. Includes product media, options, and inventory management.
+Create and manage physical and digital products, collections/categories, and product variants.
+Includes product media, options, and inventory management. Wix Stores sites can use
+Catalog V1 or Catalog V3, so product catalog flows should check the Catalog Versioning
+API before choosing catalog endpoints.
 
 ### Bookings
 
@@ -69,7 +72,8 @@ Access and manage form submissions collected through Wix Forms.
 
 ### Pricing Plans
 
-Create and manage subscription-based pricing plans and member plan assignments.
+Create and manage subscription-based pricing plans and member plan assignments. The
+legacy Plans API is deprecated; use Pricing Plans V3 for plan retrieval and query flows.
 
 ### Restaurants
 

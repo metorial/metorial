@@ -4,7 +4,7 @@ import { config } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'mistral-ai',
-  name: 'Mistral Ai',
+  name: 'Mistral AI',
   description: undefined,
   metadata: {},
   config,

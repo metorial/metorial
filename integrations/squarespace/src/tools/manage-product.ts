@@ -1,17 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { squarespaceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageProduct = SlateTool.create(spec, {
   name: 'Manage Product',
   key: 'manage_product',
-  description: `Create, update, or delete a product on a Squarespace store. Supports physical, service, and gift card products. Use the "action" field to specify the operation. When creating, a store page ID and at least one variant are required.`,
+  description: `Create, update, or delete a product on a Squarespace store. Supports physical, service, gift card, and digital products. Use the "action" field to specify the operation. Physical, service, and gift card products require at least one variant when creating.`,
   instructions: [
-    'To create a product, set action to "create" and provide storePageId, productType, and at least one variant',
-    'To update, set action to "update" and provide productId with the fields to change',
+    'To create a product, set action to "create" and provide storePageId and productType. For non-digital products, provide at least one variant',
+    'To update, set action to "update" and provide productId with at least one field to change',
     'To delete, set action to "delete" and provide productId',
-    'Download products cannot be created or deleted via this tool'
+    'Product updates are sent using Squarespace v2 change-wrapper fields'
   ],
   constraints: ['Maximum 100 variants per product', 'SKU maximum 60 characters'],
   tags: {
@@ -24,7 +25,7 @@ export let manageProduct = SlateTool.create(spec, {
       productId: z.string().optional().describe('Product ID (required for update and delete)'),
       storePageId: z.string().optional().describe('Store page ID (required for create)'),
       productType: z
-        .enum(['PHYSICAL', 'SERVICE', 'GIFT_CARD'])
+        .enum(['PHYSICAL', 'SERVICE', 'GIFT_CARD', 'DIGITAL'])
         .optional()
         .describe('Product type (required for create)'),
       name: z.string().optional().describe('Product name'),
@@ -32,6 +33,14 @@ export let manageProduct = SlateTool.create(spec, {
       urlSlug: z.string().optional().describe('URL-friendly slug for the product'),
       tags: z.array(z.string()).optional().describe('Product tags for categorization'),
       isVisible: z.boolean().optional().describe('Whether the product is visible on the site'),
+      basePriceCurrency: z
+        .string()
+        .optional()
+        .describe('ISO 4217 currency code for digital product-level pricing'),
+      basePriceValue: z
+        .string()
+        .optional()
+        .describe('Digital product-level base price amount as a string'),
       variants: z
         .array(
           z.object({
@@ -60,9 +69,24 @@ export let manageProduct = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.storePageId || !ctx.input.productType || !ctx.input.variants?.length) {
-        throw new Error(
-          'storePageId, productType, and at least one variant are required to create a product'
+      if (!ctx.input.storePageId || !ctx.input.productType) {
+        throw squarespaceServiceError(
+          'storePageId and productType are required to create a product'
+        );
+      }
+
+      if (ctx.input.productType !== 'DIGITAL' && !ctx.input.variants?.length) {
+        throw squarespaceServiceError(
+          'At least one variant is required to create a physical, service, or gift card product'
+        );
+      }
+
+      if (
+        ctx.input.productType === 'DIGITAL' &&
+        (!ctx.input.basePriceCurrency || !ctx.input.basePriceValue)
+      ) {
+        throw squarespaceServiceError(
+          'basePriceCurrency and basePriceValue are required to create a digital product'
         );
       }
 
@@ -74,7 +98,7 @@ export let manageProduct = SlateTool.create(spec, {
         urlSlug: ctx.input.urlSlug,
         tags: ctx.input.tags,
         isVisible: ctx.input.isVisible,
-        variants: ctx.input.variants.map(v => ({
+        variants: ctx.input.variants?.map(v => ({
           sku: v.sku,
           pricing: {
             basePrice: {
@@ -83,7 +107,16 @@ export let manageProduct = SlateTool.create(spec, {
             }
           },
           attributes: v.attributes
-        }))
+        })),
+        pricing:
+          ctx.input.basePriceCurrency && ctx.input.basePriceValue
+            ? {
+                basePrice: {
+                  currency: ctx.input.basePriceCurrency,
+                  value: ctx.input.basePriceValue
+                }
+              }
+            : undefined
       });
 
       return {
@@ -98,7 +131,20 @@ export let manageProduct = SlateTool.create(spec, {
 
     if (action === 'update') {
       if (!ctx.input.productId) {
-        throw new Error('productId is required to update a product');
+        throw squarespaceServiceError('productId is required to update a product');
+      }
+
+      let hasUpdates =
+        ctx.input.name !== undefined ||
+        ctx.input.description !== undefined ||
+        ctx.input.urlSlug !== undefined ||
+        ctx.input.tags !== undefined ||
+        ctx.input.isVisible !== undefined;
+
+      if (!hasUpdates) {
+        throw squarespaceServiceError(
+          'At least one product field is required to update a product'
+        );
       }
 
       let product = await client.updateProduct(ctx.input.productId, {
@@ -121,7 +167,7 @@ export let manageProduct = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!ctx.input.productId) {
-        throw new Error('productId is required to delete a product');
+        throw squarespaceServiceError('productId is required to delete a product');
       }
 
       await client.deleteProduct(ctx.input.productId);
@@ -135,6 +181,6 @@ export let manageProduct = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw squarespaceServiceError(`Unknown action: ${action}`);
   })
   .build();

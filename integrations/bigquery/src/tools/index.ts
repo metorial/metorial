@@ -3,6 +3,7 @@ export * from './export-data';
 export * from './load-data';
 export * from './manage-datasets';
 export * from './manage-jobs';
+export * from './manage-models';
 export * from './manage-routines';
 export * from './manage-tables';
 export * from './table-data';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireZohoCrmArray } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -23,7 +24,15 @@ Set **action** to "list" to view available tags for a module, "add" to tag recor
       tagNames: z
         .array(z.string())
         .optional()
-        .describe('Tag names to add or remove (required for "add" and "remove")')
+        .describe('Tag names to add or remove (required for "add" and "remove")'),
+      myTags: z
+        .boolean()
+        .optional()
+        .describe('For "list", return only tags created by the current user.'),
+      overWrite: z
+        .boolean()
+        .optional()
+        .describe('For "add", replace existing record tags instead of appending.')
     })
   )
   .output(
@@ -45,7 +54,7 @@ Set **action** to "list" to view available tags for a module, "add" to tag recor
     });
 
     if (ctx.input.action === 'list') {
-      let result = await client.getTags(ctx.input.module);
+      let result = await client.getTags(ctx.input.module, ctx.input.myTags);
       let tagsList = result?.tags || [];
       return {
         output: { tags: tagsList },
@@ -54,26 +63,27 @@ Set **action** to "list" to view available tags for a module, "add" to tag recor
     }
 
     if (ctx.input.action === 'add') {
+      let recordIds = requireZohoCrmArray(ctx.input.recordIds, 'recordIds', 'add');
+      let tagNames = requireZohoCrmArray(ctx.input.tagNames, 'tagNames', 'add');
       let result = await client.addTagsToRecords(
         ctx.input.module,
-        ctx.input.recordIds || [],
-        ctx.input.tagNames || []
+        recordIds,
+        tagNames,
+        ctx.input.overWrite
       );
       return {
         output: { results: result?.data || [] },
-        message: `Added tags [${(ctx.input.tagNames || []).join(', ')}] to **${(ctx.input.recordIds || []).length}** record(s).`
+        message: `Added tags [${tagNames.join(', ')}] to **${recordIds.length}** record(s).`
       };
     }
 
     if (ctx.input.action === 'remove') {
-      let result = await client.removeTagsFromRecords(
-        ctx.input.module,
-        ctx.input.recordIds || [],
-        ctx.input.tagNames || []
-      );
+      let recordIds = requireZohoCrmArray(ctx.input.recordIds, 'recordIds', 'remove');
+      let tagNames = requireZohoCrmArray(ctx.input.tagNames, 'tagNames', 'remove');
+      let result = await client.removeTagsFromRecords(ctx.input.module, recordIds, tagNames);
       return {
         output: { results: result?.data || [] },
-        message: `Removed tags [${(ctx.input.tagNames || []).join(', ')}] from **${(ctx.input.recordIds || []).length}** record(s).`
+        message: `Removed tags [${tagNames.join(', ')}] from **${recordIds.length}** record(s).`
       };
     }
 

@@ -36,6 +36,8 @@ OAuth is the standard for apps that need to connect to multiple HubSpot accounts
 - `crm.lists.read` / `.write` — Contact lists
 - `content` — CMS, blog, email, landing pages
 - `automation` — Workflows
+- `automation.sequences.read` — Read sales and service sequences
+- `automation.sequences.enrollments.write` — Enroll contacts in sales and service sequences
 - `forms` — Forms
 - `files` — File Manager
 - `tickets` — Tickets

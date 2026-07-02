@@ -170,6 +170,7 @@ export let createDataSource = SlateTool.create(spec, {
       url: ctx.input.url,
       access: ctx.input.access,
       isDefault: ctx.input.isDefault,
+      database: ctx.input.database,
       jsonData: ctx.input.jsonData,
       secureJsonData: ctx.input.secureJsonData
     });
@@ -203,6 +204,7 @@ export let updateDataSource = SlateTool.create(spec, {
       url: z.string().optional().describe('New URL for the data source'),
       access: z.enum(['proxy', 'direct']).optional().describe('Updated access mode'),
       isDefault: z.boolean().optional().describe('Whether to set as default data source'),
+      database: z.string().optional().describe('Updated database name if applicable'),
       jsonData: z
         .record(z.string(), z.any())
         .optional()
@@ -237,6 +239,7 @@ export let updateDataSource = SlateTool.create(spec, {
     if (ctx.input.url !== undefined) updated.url = ctx.input.url;
     if (ctx.input.access !== undefined) updated.access = ctx.input.access;
     if (ctx.input.isDefault !== undefined) updated.isDefault = ctx.input.isDefault;
+    if (ctx.input.database !== undefined) updated.database = ctx.input.database;
     if (ctx.input.jsonData !== undefined)
       updated.jsonData = { ...current.jsonData, ...ctx.input.jsonData };
     if (ctx.input.secureJsonData !== undefined)

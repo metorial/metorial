@@ -1,3 +1,4 @@
+export * from './discover-assets';
 export * from './get-insights';
 export * from './manage-ad-sets';
 export * from './manage-ads';

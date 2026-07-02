@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { functionToolSchema, mapFunctionTools, mapMemoryNames } from './shared';
 
 let messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant']).describe('Role of the message sender'),
@@ -42,9 +43,29 @@ export let updatePipe = SlateTool.create(spec, {
         .optional()
         .describe('System prompts and few-shot examples'),
       variables: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Key-value pairs for variable substitution in pipe prompts'),
+      tools: z
+        .array(functionToolSchema)
+        .optional()
+        .describe('Function tools the model may call from this pipe'),
+      toolChoice: z
+        .enum(['auto', 'required'])
+        .optional()
+        .describe('Controls whether the model may or must call tools'),
+      parallelToolCalls: z
+        .boolean()
+        .optional()
+        .describe('Whether the model may call multiple tools in parallel'),
+      memoryNames: z
         .array(z.string())
         .optional()
-        .describe('Variable names used in the pipe prompts')
+        .describe('Names of Langbase memories attached to this pipe'),
+      responseFormat: z
+        .enum(['text', 'json_object'])
+        .optional()
+        .describe('Response format for the pipe output')
     })
   )
   .output(
@@ -78,6 +99,14 @@ export let updatePipe = SlateTool.create(spec, {
     if (ctx.input.stop !== undefined) body.stop = ctx.input.stop;
     if (ctx.input.messages !== undefined) body.messages = ctx.input.messages;
     if (ctx.input.variables !== undefined) body.variables = ctx.input.variables;
+    if (ctx.input.tools !== undefined) body.tools = mapFunctionTools(ctx.input.tools);
+    if (ctx.input.toolChoice !== undefined) body.tool_choice = ctx.input.toolChoice;
+    if (ctx.input.parallelToolCalls !== undefined)
+      body.parallel_tool_calls = ctx.input.parallelToolCalls;
+    if (ctx.input.memoryNames !== undefined)
+      body.memory = mapMemoryNames(ctx.input.memoryNames);
+    if (ctx.input.responseFormat !== undefined)
+      body.response_format = { type: ctx.input.responseFormat };
 
     let result = await client.updatePipe(ctx.input.pipeName, body);
 

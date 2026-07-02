@@ -6,9 +6,9 @@ import { spec } from '../spec';
 export let listKnowledgeBaseArticles = SlateTool.create(spec, {
   name: 'List Knowledge Base Articles',
   key: 'list_knowledge_base_articles',
-  description: `List knowledge base articles from a specific folder. To discover folders, first list categories, then list folders within a category.`,
+  description: `List knowledge base articles. Optionally filter by folder. To discover folders, list categories and folders first.`,
   instructions: [
-    'Use listKnowledgeBaseCategories first to find category IDs, then get folders within a category to find folder IDs.'
+    'Use folderId to filter articles by folder, or omit it to list articles across accessible folders.'
   ],
   tags: {
     destructive: false,
@@ -17,7 +17,7 @@ export let listKnowledgeBaseArticles = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      folderId: z.number().describe('ID of the solution folder to list articles from'),
+      folderId: z.number().optional().describe('ID of the solution folder to filter by'),
       page: z.number().optional().describe('Page number'),
       perPage: z.number().optional().describe('Results per page')
     })
@@ -223,6 +223,84 @@ export let updateKnowledgeBaseArticle = SlateTool.create(spec, {
   })
   .build();
 
+export let deleteKnowledgeBaseArticle = SlateTool.create(spec, {
+  name: 'Delete Knowledge Base Article',
+  key: 'delete_knowledge_base_article',
+  description: `Delete a Freshservice knowledge base article. Deleted articles can be restored.`,
+  tags: {
+    destructive: true,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      articleId: z.number().describe('ID of the article to delete')
+    })
+  )
+  .output(
+    z.object({
+      articleId: z.number().describe('ID of the deleted article'),
+      deleted: z.boolean().describe('Whether deletion was accepted')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      subdomain: ctx.config.subdomain,
+      authType: ctx.auth.authType
+    });
+
+    await client.deleteSolutionArticle(ctx.input.articleId);
+
+    return {
+      output: {
+        articleId: ctx.input.articleId,
+        deleted: true
+      },
+      message: `Deleted article **#${ctx.input.articleId}**`
+    };
+  })
+  .build();
+
+export let restoreKnowledgeBaseArticle = SlateTool.create(spec, {
+  name: 'Restore Knowledge Base Article',
+  key: 'restore_knowledge_base_article',
+  description: `Restore a deleted Freshservice knowledge base article.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      articleId: z.number().describe('ID of the deleted article to restore')
+    })
+  )
+  .output(
+    z.object({
+      articleId: z.number().describe('ID of the restored article'),
+      restored: z.boolean().describe('Whether restore was accepted')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      subdomain: ctx.config.subdomain,
+      authType: ctx.auth.authType
+    });
+
+    await client.restoreSolutionArticle(ctx.input.articleId);
+
+    return {
+      output: {
+        articleId: ctx.input.articleId,
+        restored: true
+      },
+      message: `Restored article **#${ctx.input.articleId}**`
+    };
+  })
+  .build();
+
 export let listKnowledgeBaseCategories = SlateTool.create(spec, {
   name: 'List Knowledge Base Categories',
   key: 'list_knowledge_base_categories',
@@ -281,7 +359,7 @@ export let listKnowledgeBaseCategories = SlateTool.create(spec, {
 export let listKnowledgeBaseFolders = SlateTool.create(spec, {
   name: 'List Knowledge Base Folders',
   key: 'list_knowledge_base_folders',
-  description: `List all folders within a knowledge base category. Each folder contains articles.`,
+  description: `List knowledge base folders. Optionally filter by category. Each folder contains articles.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -289,7 +367,7 @@ export let listKnowledgeBaseFolders = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      categoryId: z.number().describe('ID of the category to list folders from'),
+      categoryId: z.number().optional().describe('ID of the category to filter by'),
       page: z.number().optional().describe('Page number'),
       perPage: z.number().optional().describe('Results per page')
     })
@@ -333,7 +411,7 @@ export let listKnowledgeBaseFolders = SlateTool.create(spec, {
 
     return {
       output: { folders },
-      message: `Found **${folders.length}** folders in category #${ctx.input.categoryId}`
+      message: `Found **${folders.length}** knowledge base folders`
     };
   })
   .build();

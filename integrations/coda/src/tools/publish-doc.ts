@@ -23,7 +23,8 @@ export let publishDocTool = SlateTool.create(spec, {
       categoryNames: z
         .array(z.string())
         .optional()
-        .describe('Categories to assign to the published doc')
+        .describe('Categories to assign to the published doc'),
+      earnCredit: z.boolean().optional().describe('Whether to show author credit')
     })
   )
   .output(
@@ -38,7 +39,8 @@ export let publishDocTool = SlateTool.create(spec, {
       slug: ctx.input.slug,
       discoverable: ctx.input.discoverable,
       mode: ctx.input.mode,
-      categoryNames: ctx.input.categoryNames
+      categoryNames: ctx.input.categoryNames,
+      earnCredit: ctx.input.earnCredit
     });
 
     return {

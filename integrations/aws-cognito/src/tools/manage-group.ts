@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { cognitoServiceError } from '../lib/errors';
 import { createCognitoClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -99,6 +100,6 @@ export let manageGroup = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw cognitoServiceError(`Unknown action: ${action}`);
   })
   .build();

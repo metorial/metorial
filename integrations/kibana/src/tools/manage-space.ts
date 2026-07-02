@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { kibanaServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -100,7 +101,7 @@ Rules and connectors are isolated to the space in which they were created.`,
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
+      if (!name) throw kibanaServiceError('name is required for create action');
       let space = await client.createSpace({
         id: spaceId,
         name,
@@ -155,6 +156,6 @@ Rules and connectors are isolated to the space in which they were created.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw kibanaServiceError(`Unknown action: ${action}`);
   })
   .build();

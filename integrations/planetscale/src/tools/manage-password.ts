@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireAtLeastOne, requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 export let managePassword = SlateTool.create(spec, {
   name: 'Manage Password',
   key: 'manage_password',
-  description: `Create, list, update, renew, or delete connection credentials (passwords) for a database branch. Passwords are scoped to a specific branch and can be configured with specific roles. The plaintext password is only returned on creation.`,
+  description: `Create, list, update, renew, or delete connection credentials (passwords) for a database branch. Passwords are scoped to a specific branch and can be configured with TTLs, CIDR restrictions, and direct vtgate access. The plaintext password is only returned on creation.`,
   instructions: [
     'Use action "list" to list all passwords for a branch.',
     'Use action "create" to create a new password (the plaintext value is only available in the response on creation).',
@@ -31,10 +32,6 @@ export let managePassword = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Display name for the password (used with create/update)'),
-      role: z
-        .enum(['reader', 'writer', 'admin', 'readwriter'])
-        .optional()
-        .describe('Access role (required for create)'),
       replica: z
         .boolean()
         .optional()
@@ -47,6 +44,10 @@ export let managePassword = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Allowed IP/CIDR ranges (used with create/update)'),
+      directVtgate: z
+        .boolean()
+        .optional()
+        .describe('Create a direct vtgate password (used with create)'),
       page: z.number().optional().describe('Page number for list pagination'),
       perPage: z.number().optional().describe('Results per page for list pagination')
     })
@@ -58,13 +59,14 @@ export let managePassword = SlateTool.create(spec, {
           z.object({
             passwordId: z.string(),
             name: z.string().optional(),
-            role: z.string().optional(),
             username: z.string().optional(),
             plainText: z
               .string()
               .optional()
               .describe('Plaintext password (only available on creation)'),
             accessHostUrl: z.string().optional(),
+            accessHostRegionalUrl: z.string().optional(),
+            directVtgate: z.boolean().optional(),
             expired: z.boolean().optional(),
             expiresAt: z.string().optional(),
             createdAt: z.string().optional()
@@ -75,10 +77,11 @@ export let managePassword = SlateTool.create(spec, {
         .object({
           passwordId: z.string(),
           name: z.string().optional(),
-          role: z.string().optional(),
           username: z.string().optional(),
           plainText: z.string().optional(),
           accessHostUrl: z.string().optional(),
+          accessHostRegionalUrl: z.string().optional(),
+          directVtgate: z.boolean().optional(),
           expired: z.boolean().optional(),
           expiresAt: z.string().optional(),
           cidrs: z.array(z.string()).optional(),
@@ -110,9 +113,10 @@ export let managePassword = SlateTool.create(spec, {
       let passwords = result.data.map((p: any) => ({
         passwordId: p.id,
         name: p.name,
-        role: p.role,
         username: p.username,
         accessHostUrl: p.access_host_url,
+        accessHostRegionalUrl: p.access_host_regional_url,
+        directVtgate: p.direct_vtgate,
         expired: p.expired,
         expiresAt: p.expires_at,
         createdAt: p.created_at
@@ -125,10 +129,11 @@ export let managePassword = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deletePassword(databaseName, branchName, ctx.input.passwordId!);
+      let passwordId = requireField(ctx.input.passwordId, 'passwordId', 'delete action');
+      await client.deletePassword(databaseName, branchName, passwordId);
       return {
         output: { deleted: true },
-        message: `Deleted password **${ctx.input.passwordId}** from branch **${branchName}**.`
+        message: `Deleted password **${passwordId}** from branch **${branchName}**.`
       };
     }
 
@@ -137,23 +142,40 @@ export let managePassword = SlateTool.create(spec, {
       case 'create':
         pw = await client.createPassword(databaseName, branchName, {
           name: ctx.input.name,
-          role: ctx.input.role!,
           replica: ctx.input.replica,
           ttl: ctx.input.ttl,
-          cidrs: ctx.input.cidrs
+          cidrs: ctx.input.cidrs,
+          directVtgate: ctx.input.directVtgate
         });
         break;
       case 'get':
-        pw = await client.getPassword(databaseName, branchName, ctx.input.passwordId!);
+        pw = await client.getPassword(
+          databaseName,
+          branchName,
+          requireField(ctx.input.passwordId, 'passwordId', 'get action')
+        );
         break;
       case 'update':
-        pw = await client.updatePassword(databaseName, branchName, ctx.input.passwordId!, {
-          name: ctx.input.name,
-          cidrs: ctx.input.cidrs
-        });
+        requireAtLeastOne(
+          { name: ctx.input.name, cidrs: ctx.input.cidrs },
+          'Provide name or cidrs when updating a PlanetScale password.'
+        );
+        pw = await client.updatePassword(
+          databaseName,
+          branchName,
+          requireField(ctx.input.passwordId, 'passwordId', 'update action'),
+          {
+            name: ctx.input.name,
+            cidrs: ctx.input.cidrs
+          }
+        );
         break;
       case 'renew':
-        pw = await client.renewPassword(databaseName, branchName, ctx.input.passwordId!);
+        pw = await client.renewPassword(
+          databaseName,
+          branchName,
+          requireField(ctx.input.passwordId, 'passwordId', 'renew action')
+        );
         break;
     }
 
@@ -162,10 +184,11 @@ export let managePassword = SlateTool.create(spec, {
         password: {
           passwordId: pw.id,
           name: pw.name,
-          role: pw.role,
           username: pw.username,
           plainText: pw.plain_text,
           accessHostUrl: pw.access_host_url,
+          accessHostRegionalUrl: pw.access_host_regional_url,
+          directVtgate: pw.direct_vtgate,
           expired: pw.expired,
           expiresAt: pw.expires_at,
           cidrs: pw.cidrs,
@@ -176,7 +199,7 @@ export let managePassword = SlateTool.create(spec, {
       },
       message:
         action === 'create'
-          ? `Created password **${pw.name || pw.id}** with role **${pw.role}** for branch **${branchName}**.`
+          ? `Created password **${pw.name || pw.id}** for branch **${branchName}**.`
           : `${action === 'get' ? 'Retrieved' : action === 'update' ? 'Updated' : 'Renewed'} password **${pw.name || pw.id}** for branch **${branchName}**.`
     };
   });

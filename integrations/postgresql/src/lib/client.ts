@@ -1,6 +1,6 @@
-import * as crypto from 'crypto';
-import * as net from 'net';
-import * as tls from 'tls';
+import * as crypto from 'node:crypto';
+import * as net from 'node:net';
+import * as tls from 'node:tls';
 import {
   postgresFieldsError,
   postgresServiceError,
@@ -580,6 +580,8 @@ export class PostgresClient {
   ): Promise<{ msg: ParsedMessage; remaining: Uint8Array }> {
     return new Promise((resolve, reject) => {
       let buffer = currentBuffer;
+      let onData: (data: Uint8Array) => void = () => {};
+      let onError: (err: Error) => void = () => {};
 
       let timer = setTimeout(() => {
         cleanup();
@@ -596,7 +598,7 @@ export class PostgresClient {
         socket.removeListener('error', onError);
       };
 
-      let onError = (err: Error) => {
+      onError = (err: Error) => {
         cleanup();
         reject(
           postgresUpstreamError(`PostgreSQL socket error: ${err.message}`, {
@@ -607,10 +609,24 @@ export class PostgresClient {
       };
 
       let processBuffer = (): boolean => {
-        let { messages, remaining } = parseMessages(buffer);
-        buffer = remaining;
+        let offset = 0;
+        let view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 
-        for (let msg of messages) {
+        while (offset + 5 <= buffer.length) {
+          let type = buffer[offset]!;
+          let length = view.getInt32(offset + 1, false);
+          let messageEnd = offset + 1 + length;
+
+          if (messageEnd > buffer.length) {
+            break;
+          }
+
+          let msg: ParsedMessage = {
+            type,
+            length,
+            body: buffer.slice(offset + 5, messageEnd)
+          };
+
           if (msg.type === MessageTypes.ERROR_RESPONSE) {
             let fields = parseErrorFields(msg.body);
             cleanup();
@@ -619,17 +635,21 @@ export class PostgresClient {
           }
           if (msg.type === expectedType) {
             cleanup();
-            resolve({ msg, remaining: buffer });
+            resolve({ msg, remaining: buffer.slice(messageEnd) });
             return true;
           }
+
+          offset = messageEnd;
         }
+
+        buffer = buffer.slice(offset);
         return false;
       };
 
       // Check existing buffer first
       if (processBuffer()) return;
 
-      let onData = (data: Uint8Array) => {
+      onData = (data: Uint8Array) => {
         let newBuf = new Uint8Array(buffer.length + data.length);
         newBuf.set(buffer);
         newBuf.set(data, buffer.length);

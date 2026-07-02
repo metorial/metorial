@@ -1,13 +1,50 @@
 import { createAxios } from 'slates';
+import { adobeSignApiError, adobeSignServiceError } from './errors';
+
+type AgreementFileInfo = {
+  transientDocumentId?: string;
+  libraryDocumentId?: string;
+  urlFileInfo?: { url: string; name?: string; mimeType?: string };
+};
+
+let validateBase64 = (value: string, fieldName: string) => {
+  if (!value.trim()) {
+    throw adobeSignServiceError(`${fieldName} must contain base64-encoded file content.`);
+  }
+
+  try {
+    return atob(value);
+  } catch (error) {
+    let serviceError = adobeSignServiceError(`${fieldName} must be valid base64 data.`);
+    if (error instanceof Error) serviceError.setParent(error);
+    throw serviceError;
+  }
+};
+
+let validateFileInfos = (fileInfos: AgreementFileInfo[], label: string) => {
+  if (fileInfos.length === 0) {
+    throw adobeSignServiceError(`${label} requires at least one fileInfo.`);
+  }
+
+  for (let [index, fileInfo] of fileInfos.entries()) {
+    let sourceCount = [
+      fileInfo.transientDocumentId,
+      fileInfo.libraryDocumentId,
+      fileInfo.urlFileInfo?.url
+    ].filter(Boolean).length;
+
+    if (sourceCount !== 1) {
+      throw adobeSignServiceError(
+        `${label} fileInfos[${index}] must provide exactly one of transientDocumentId, libraryDocumentId, or urlFileInfo.url.`
+      );
+    }
+  }
+};
 
 export class Client {
   private ax;
 
-  constructor(config: {
-    token: string;
-    apiBaseUrl?: string;
-    shard?: string;
-  }) {
+  constructor(config: { token: string; apiBaseUrl?: string; shard?: string }) {
     let baseURL = config.apiBaseUrl || `https://api.${config.shard || 'na1'}.adobesign.com/`;
     // Ensure trailing slash is removed for consistent URL joining
     if (baseURL.endsWith('/')) {
@@ -19,6 +56,10 @@ export class Client {
         Authorization: `Bearer ${config.token}`
       }
     });
+    this.ax.interceptors.response.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(adobeSignApiError(error))
+    );
   }
 
   // ── Transient Documents ────────────────────────────────────────────
@@ -28,12 +69,16 @@ export class Client {
     fileContent: string; // base64 encoded
     mimeType?: string;
   }): Promise<{ transientDocumentId: string }> {
+    if (!params.fileName.trim()) {
+      throw adobeSignServiceError('fileName is required.');
+    }
+
     // Build multipart form data manually
     let boundary = `----SlatesFormBoundary${Date.now().toString(36)}`;
     let mimeType = params.mimeType || 'application/pdf';
 
     // Decode base64 to binary
-    let binaryString = atob(params.fileContent);
+    let binaryString = validateBase64(params.fileContent, 'fileContent');
     let bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
@@ -73,11 +118,7 @@ export class Client {
       role: string;
       order?: number;
     }>;
-    fileInfos: Array<{
-      transientDocumentId?: string;
-      libraryDocumentId?: string;
-      urlFileInfo?: { url: string; name?: string; mimeType?: string };
-    }>;
+    fileInfos: AgreementFileInfo[];
     signatureType?: string;
     state?: string;
     ccs?: Array<{ email: string }>;
@@ -86,6 +127,8 @@ export class Client {
     reminderFrequency?: string;
     expirationTime?: string;
   }): Promise<any> {
+    validateFileInfos(params.fileInfos, 'Agreement creation');
+
     let body: any = {
       name: params.name,
       participantSetsInfo: params.participantSetsInfo,
@@ -166,8 +209,20 @@ export class Client {
     return response.data;
   }
 
-  async getAgreementFormData(agreementId: string): Promise<any> {
-    let response = await this.ax.get(`/api/rest/v6/agreements/${agreementId}/formData`);
+  async getAgreementCombinedDocument(agreementId: string): Promise<any> {
+    let response = await this.ax.get(
+      `/api/rest/v6/agreements/${agreementId}/combinedDocument`,
+      {
+        responseType: 'arraybuffer'
+      }
+    );
+    return response.data;
+  }
+
+  async getAgreementFormData(agreementId: string): Promise<string> {
+    let response = await this.ax.get(`/api/rest/v6/agreements/${agreementId}/formData`, {
+      responseType: 'text'
+    });
     return response.data;
   }
 
@@ -185,17 +240,30 @@ export class Client {
     frequency?: string;
     firstReminderDelay?: number;
   }): Promise<any> {
+    if (!params.recipientParticipantIds || params.recipientParticipantIds.length === 0) {
+      throw adobeSignServiceError(
+        'recipientParticipantIds is required to create an Adobe Acrobat Sign reminder.'
+      );
+    }
+
     let body: any = {
-      agreementId: params.agreementId
+      status: 'ACTIVE',
+      recipientParticipantIds: params.recipientParticipantIds
     };
-    if (params.recipientParticipantIds)
-      body.recipientParticipantIds = params.recipientParticipantIds;
-    if (params.comment) body.comment = params.comment;
+    if (params.comment) body.note = params.comment;
     if (params.frequency) body.frequency = params.frequency;
     if (params.firstReminderDelay !== undefined)
       body.firstReminderDelay = params.firstReminderDelay;
 
-    let response = await this.ax.post('/api/rest/v6/reminders', body);
+    let response = await this.ax.post(
+      `/api/rest/v6/agreements/${params.agreementId}/reminders`,
+      body
+    );
+    return response.data;
+  }
+
+  async listAgreementReminders(agreementId: string): Promise<any> {
+    let response = await this.ax.get(`/api/rest/v6/agreements/${agreementId}/reminders`);
     return response.data;
   }
 
@@ -203,29 +271,34 @@ export class Client {
 
   async createWebForm(params: {
     name: string;
-    fileInfos: Array<{
-      transientDocumentId?: string;
-      libraryDocumentId?: string;
-    }>;
-    participantSetsInfo?: Array<{
-      memberInfos: Array<{ email: string }>;
+    fileInfos: AgreementFileInfo[];
+    widgetParticipantSetInfo: {
+      memberInfos: Array<{ email?: string; securityOption?: any }>;
       role: string;
-    }>;
+    };
     state?: string;
     additionalParticipantSetsInfo?: Array<{
       memberInfos: Array<{ email: string }>;
       role: string;
     }>;
+    ccs?: Array<{ email: string }>;
   }): Promise<any> {
+    validateFileInfos(params.fileInfos, 'Web form creation');
+    if (params.fileInfos.some(fileInfo => fileInfo.libraryDocumentId)) {
+      throw adobeSignServiceError(
+        'Web form creation does not support libraryDocumentId in current Adobe Acrobat Sign v6.'
+      );
+    }
+
     let body: any = {
       name: params.name,
       fileInfos: params.fileInfos,
+      widgetParticipantSetInfo: params.widgetParticipantSetInfo,
       state: params.state || 'ACTIVE'
     };
-    if (params.participantSetsInfo)
-      body.widgetParticipantSetInfo = { participantSetInfos: params.participantSetsInfo };
     if (params.additionalParticipantSetsInfo)
       body.additionalParticipantSetsInfo = params.additionalParticipantSetsInfo;
+    if (params.ccs) body.ccs = params.ccs;
 
     let response = await this.ax.post('/api/rest/v6/widgets', body);
     return response.data;
@@ -247,10 +320,9 @@ export class Client {
 
   async updateWebFormState(widgetId: string, state: string, message?: string): Promise<void> {
     let body: any = {
-      state,
-      widgetStatus: state
+      state
     };
-    if (message) body.message = message;
+    if (message) body.widgetInActiveInfo = { message };
     await this.ax.put(`/api/rest/v6/widgets/${widgetId}/state`, body);
   }
 
@@ -265,13 +337,15 @@ export class Client {
     sharingMode?: string;
     state?: string;
   }): Promise<any> {
+    validateFileInfos(params.fileInfos, 'Library template creation');
+
     let body: any = {
       name: params.name,
       fileInfos: params.fileInfos,
       templateTypes: params.templateTypes,
+      sharingMode: params.sharingMode || 'USER',
       state: params.state || 'ACTIVE'
     };
-    if (params.sharingMode) body.sharingMode = params.sharingMode;
 
     let response = await this.ax.post('/api/rest/v6/libraryDocuments', body);
     return response.data;
@@ -291,6 +365,10 @@ export class Client {
     return response.data;
   }
 
+  async updateLibraryDocumentState(libraryDocumentId: string, state: string): Promise<void> {
+    await this.ax.put(`/api/rest/v6/libraryDocuments/${libraryDocumentId}/state`, { state });
+  }
+
   // ── MegaSign (Send in Bulk) ────────────────────────────────────────
 
   async createMegaSign(params: {
@@ -299,26 +377,33 @@ export class Client {
       transientDocumentId?: string;
       libraryDocumentId?: string;
     }>;
-    recipientSetInfos: Array<{
-      recipientSetMemberInfos: Array<{ email: string }>;
-    }>;
+    childAgreementsTransientDocumentId: string;
     signatureType?: string;
     state?: string;
     message?: string;
     ccs?: Array<{ email: string }>;
   }): Promise<any> {
+    validateFileInfos(params.fileInfos, 'Send in Bulk creation');
+    if (!params.childAgreementsTransientDocumentId.trim()) {
+      throw adobeSignServiceError(
+        'childAgreementsTransientDocumentId is required for Send in Bulk creation.'
+      );
+    }
+
     let body: any = {
       name: params.name,
       fileInfos: params.fileInfos,
-      megaSignInput: {
-        recipientSetInfos: params.recipientSetInfos,
-        signatureType: params.signatureType || 'ESIGN',
-        name: params.name
+      childAgreementsInfo: {
+        fileInfo: {
+          transientDocumentId: params.childAgreementsTransientDocumentId,
+          fileType: 'CSV'
+        }
       },
+      signatureType: params.signatureType || 'ESIGN',
       state: params.state || 'IN_PROCESS'
     };
-    if (params.message) body.megaSignInput.message = params.message;
-    if (params.ccs) body.megaSignInput.ccs = params.ccs;
+    if (params.message) body.message = params.message;
+    if (params.ccs) body.ccs = params.ccs;
 
     let response = await this.ax.post('/api/rest/v6/megaSigns', body);
     return response.data;
@@ -336,6 +421,18 @@ export class Client {
 
     let response = await this.ax.get('/api/rest/v6/megaSigns', { params: queryParams });
     return response.data;
+  }
+
+  async updateMegaSignState(
+    megaSignId: string,
+    state: string,
+    params?: { cancellationInfo?: { comment?: string; notifyOthers?: boolean } }
+  ): Promise<void> {
+    let body: any = { state };
+    if (params?.cancellationInfo) {
+      body.megaSignCancellationInfo = params.cancellationInfo;
+    }
+    await this.ax.put(`/api/rest/v6/megaSigns/${megaSignId}/state`, body);
   }
 
   // ── Users ──────────────────────────────────────────────────────────

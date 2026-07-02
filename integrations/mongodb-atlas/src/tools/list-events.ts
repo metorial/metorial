@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { atlasServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -66,7 +67,7 @@ export let listEventsTool = SlateTool.create(spec, {
     } else if (orgId) {
       result = await client.listOrganizationEvents(orgId, params);
     } else {
-      throw new Error('Either projectId or organizationId is required.');
+      throw atlasServiceError('Either projectId or organizationId is required.');
     }
 
     let events = (result.results || []).map((e: any) => ({

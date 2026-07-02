@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { affindaApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -33,15 +34,19 @@ export let auth = SlateAuth.create()
         }
       });
 
-      let response = await httpClient.get('/organizations');
-      let orgs = response.data as Array<{ identifier: string; name: string }>;
-      let firstOrg = orgs[0];
+      try {
+        let response = await httpClient.get('/organizations');
+        let orgs = response.data as Array<{ identifier: string; name: string }>;
+        let firstOrg = orgs[0];
 
-      return {
-        profile: {
-          id: firstOrg?.identifier,
-          name: firstOrg?.name
-        }
-      };
+        return {
+          profile: {
+            id: firstOrg?.identifier,
+            name: firstOrg?.name
+          }
+        };
+      } catch (error) {
+        throw affindaApiError(error, 'load auth profile');
+      }
     }
   });

@@ -1,18 +1,19 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios } from 'slates';
+import { segmentApiError } from './errors';
 
 export class SegmentClient {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(token: string, region: string = 'us') {
     let baseURL =
       region === 'eu' ? 'https://eu1.api.segmentapis.com' : 'https://api.segmentapis.com';
 
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: {
+        value: `Bearer ${token}`
+      },
+      errorAdapter: error => segmentApiError(error, 'request')
     });
   }
 
@@ -64,6 +65,16 @@ export class SegmentClient {
 
   async deleteSource(sourceId: string) {
     await this.http.delete(`/v1/sources/${sourceId}`);
+  }
+
+  async createSourceWriteKey(sourceId: string) {
+    let response = await this.http.post(`/v1/sources/${sourceId}/writekey`);
+    return response.data?.data;
+  }
+
+  async removeSourceWriteKey(sourceId: string, writeKey: string) {
+    let response = await this.http.delete(`/v1/sources/${sourceId}/writekey/${writeKey}`);
+    return response.data?.data;
   }
 
   async listConnectedDestinationsFromSource(
@@ -180,6 +191,13 @@ export class SegmentClient {
       params: pagination
     });
     return response.data?.data;
+  }
+
+  async getDestinationSubscription(destinationId: string, subscriptionId: string) {
+    let response = await this.http.get(
+      `/v1/destinations/${destinationId}/subscriptions/${subscriptionId}`
+    );
+    return response.data?.data?.subscription;
   }
 
   async createDestinationSubscription(
@@ -718,25 +736,88 @@ export class SegmentClient {
 
   // ─── Usage ─────────────────────────────────────────────────────
 
-  async getApiCallUsage(
-    params: { period: string; count?: number; cursor?: string } = { period: 'current' }
-  ) {
+  async getDailyWorkspaceApiCallsUsage(params: {
+    period: string;
+    count?: number;
+    cursor?: string;
+  }) {
     let query: Record<string, any> = { period: params.period };
     if (params.count) query['pagination.count'] = params.count;
     if (params.cursor) query['pagination.cursor'] = params.cursor;
 
-    let response = await this.http.get('/v1/usage/api-calls', { params: query });
+    let response = await this.http.get('/v1/usage/api-calls/daily', { params: query });
     return response.data?.data;
   }
 
-  async getMtuUsage(
-    params: { period: string; count?: number; cursor?: string } = { period: 'current' }
-  ) {
+  async getDailyPerSourceApiCallsUsage(params: {
+    period: string;
+    count?: number;
+    cursor?: string;
+  }) {
     let query: Record<string, any> = { period: params.period };
     if (params.count) query['pagination.count'] = params.count;
     if (params.cursor) query['pagination.cursor'] = params.cursor;
 
-    let response = await this.http.get('/v1/usage/mtu', { params: query });
+    let response = await this.http.get('/v1/usage/api-calls/sources/daily', {
+      params: query
+    });
+    return response.data?.data;
+  }
+
+  async getDailyWorkspaceMtuUsage(params: {
+    period: string;
+    count?: number;
+    cursor?: string;
+  }) {
+    let query: Record<string, any> = { period: params.period };
+    if (params.count) query['pagination.count'] = params.count;
+    if (params.cursor) query['pagination.cursor'] = params.cursor;
+
+    let response = await this.http.get('/v1/usage/mtu/daily', { params: query });
+    return response.data?.data;
+  }
+
+  async getDailyPerSourceMtuUsage(params: {
+    period: string;
+    count?: number;
+    cursor?: string;
+  }) {
+    let query: Record<string, any> = { period: params.period };
+    if (params.count) query['pagination.count'] = params.count;
+    if (params.cursor) query['pagination.cursor'] = params.cursor;
+
+    let response = await this.http.get('/v1/usage/mtu/sources/daily', {
+      params: query
+    });
+    return response.data?.data;
+  }
+
+  async getEventsVolume(params: {
+    granularity: string;
+    startTime: string;
+    endTime: string;
+    groupBy?: string[];
+    sourceId?: string[];
+    eventName?: string[];
+    eventType?: string[];
+    appVersion?: string[];
+    count?: number;
+    cursor?: string;
+  }) {
+    let query: Record<string, any> = {
+      granularity: params.granularity,
+      startTime: params.startTime,
+      endTime: params.endTime
+    };
+    if (params.groupBy?.length) query.groupBy = params.groupBy;
+    if (params.sourceId?.length) query.sourceId = params.sourceId;
+    if (params.eventName?.length) query.eventName = params.eventName;
+    if (params.eventType?.length) query.eventType = params.eventType;
+    if (params.appVersion?.length) query.appVersion = params.appVersion;
+    if (params.count) query['pagination.count'] = params.count;
+    if (params.cursor) query['pagination.cursor'] = params.cursor;
+
+    let response = await this.http.get('/v1/events/volume', { params: query });
     return response.data?.data;
   }
 

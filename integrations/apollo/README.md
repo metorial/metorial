@@ -24,6 +24,10 @@ Enrich one organization by domain, or up to 10 organizations by domain.
 
 List current job postings for an Apollo organization ID.
 
+### Search News Articles
+
+Search Apollo news articles related to specific companies by Apollo organization ID, with category, publication date, and pagination filters.
+
 ### Enrich Person
 
 Enrich a person's profile data using Apollo's enrichment engine. Provide identifiers like email, name + company, or LinkedIn URL to get detailed profile information including employment history, contact details, and organization data. Supports both single and bulk enrichment (up to 10 records per request).

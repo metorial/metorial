@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageWarehouse = SlateTool.create(spec, {
@@ -52,7 +53,7 @@ export let manageWarehouse = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.metadataId) {
-        throw new Error('metadataId is required to create a warehouse');
+        throw segmentServiceError('metadataId is required to create a warehouse');
       }
       let wh = await client.createWarehouse({
         metadataId: ctx.input.metadataId,
@@ -72,7 +73,7 @@ export let manageWarehouse = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.warehouseId) {
-        throw new Error('warehouseId is required to update');
+        throw segmentServiceError('warehouseId is required to update');
       }
       let wh = await client.updateWarehouse(ctx.input.warehouseId, {
         name: ctx.input.name,
@@ -91,7 +92,7 @@ export let manageWarehouse = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.warehouseId) {
-        throw new Error('warehouseId is required to delete');
+        throw segmentServiceError('warehouseId is required to delete');
       }
       await client.deleteWarehouse(ctx.input.warehouseId);
       return {
@@ -102,7 +103,7 @@ export let manageWarehouse = SlateTool.create(spec, {
 
     if (ctx.input.action === 'add_source') {
       if (!ctx.input.warehouseId || !ctx.input.sourceId) {
-        throw new Error('warehouseId and sourceId are required');
+        throw segmentServiceError('warehouseId and sourceId are required');
       }
       await client.addSourceToWarehouse(ctx.input.warehouseId, ctx.input.sourceId);
       return {
@@ -113,7 +114,7 @@ export let manageWarehouse = SlateTool.create(spec, {
 
     if (ctx.input.action === 'remove_source') {
       if (!ctx.input.warehouseId || !ctx.input.sourceId) {
-        throw new Error('warehouseId and sourceId are required');
+        throw segmentServiceError('warehouseId and sourceId are required');
       }
       await client.removeSourceFromWarehouse(ctx.input.warehouseId, ctx.input.sourceId);
       return {
@@ -122,6 +123,6 @@ export let manageWarehouse = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw segmentServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

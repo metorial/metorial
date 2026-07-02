@@ -1,5 +1,3 @@
-Now let me get the specific OAuth scopes and webhook event types from Front's documentation.Now let me get the full list of event types:The events page didn't render the table with event types. Let me search for the specific event types.Now I have comprehensive information to write the specification. Let me compile it.
-
 # Slates Specification for Front
 
 ## Overview
@@ -31,26 +29,22 @@ Front's OAuth implementation uses the **authorization code grant type**:
 
 ### Token Scopes
 
-Scopes are configured when creating API tokens or setting up OAuth and cover three dimensions:
+Front's current Core API reference lists resource-specific required scopes per endpoint. This integration requests scopes for the resources it exposes:
 
-**Features:**
-
-- **Access resources** — manage Core API resources (conversations, contacts, inboxes, etc.)
-- **Auto-provisioning** — manage provisioning resources via SCIM (not generally available)
-- **Application triggers** — process events from external services (not available for OAuth tokens)
-
-**Namespaces:**
-
-- **Global resources** — company-level resources (company rules, teams, accounts)
-- **Shared resources** — workspace-scoped resources (shared inboxes, workspace tags); can be set to all shared workspaces or specific ones
-- **Private resources** — individual teammate resources (personal inboxes, signatures); requires the teammate to enable API access
-
-**Permissions** (per namespace):
-
-- **Read** — retrieve resource information
-- **Write** — create and update resources
-- **Delete** — remove resources
-- **Send** — create and send messages (distinct from importing historical messages, which only requires Write)
+- `conversations:read` and `conversations:write`
+- `messages:read` and `messages:send`
+- `contacts:read`, `contacts:write`, and `contacts:delete`
+- `accounts:read`, `accounts:write`, and `accounts:delete`
+- `inboxes:read` and `channels:read`
+- `tags:read`, `tags:write`, and `tags:delete`
+- `comments:write`
+- `teammates:read` and `teammates:write`
+- `teams:read` and `teams:write`
+- `links:read` and `links:write`
+- `message_templates:read`, `message_templates:write`, and `message_templates:delete`
+- `analytics:read`
+- `knowledge_bases:read`
+- `events:*:read`
 
 ## Features
 

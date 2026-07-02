@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { planetscaleApiError, planetscaleServiceError } from './lib/errors';
 
 let authAxios = createAxios({
   baseURL: 'https://auth.planetscale.com'
@@ -159,24 +160,35 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let response = await authAxios.post(
-        '/oauth/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Accept: 'application/json'
+      let response: any;
+      try {
+        response = await authAxios.post(
+          '/oauth/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          }).toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              Accept: 'application/json'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw planetscaleApiError(error, 'OAuth callback');
+      }
 
       let data = response.data;
+      if (!data.access_token) {
+        throw planetscaleServiceError(
+          'PlanetScale OAuth callback did not return an access token.'
+        );
+      }
+
       let expiresAt = data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : undefined;
@@ -193,26 +205,37 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        throw planetscaleServiceError('No PlanetScale OAuth refresh token is available.');
       }
 
-      let response = await authAxios.post(
-        '/oauth/token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            Accept: 'application/json'
+      let response: any;
+      try {
+        response = await authAxios.post(
+          '/oauth/token',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          }).toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              Accept: 'application/json'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw planetscaleApiError(error, 'OAuth token refresh');
+      }
 
       let data = response.data;
+      if (!data.access_token) {
+        throw planetscaleServiceError(
+          'PlanetScale OAuth refresh did not return an access token.'
+        );
+      }
+
       let expiresAt = data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : undefined;
@@ -228,14 +251,25 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: any; scopes: string[] }) => {
-      let response = await apiAxios.get('/user', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`,
-          Accept: 'application/json'
-        }
-      });
+      let response: any;
+      try {
+        response = await apiAxios.get('/user', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`,
+            Accept: 'application/json'
+          }
+        });
+      } catch (error) {
+        throw planetscaleApiError(error, 'get OAuth profile');
+      }
 
       let user = response.data;
+      if (!user.id) {
+        throw planetscaleServiceError(
+          'PlanetScale profile response did not include a user id.'
+        );
+      }
+
       return {
         profile: {
           id: user.id,

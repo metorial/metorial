@@ -1,5 +1,12 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { wixApiError } from './lib/errors';
+
+let validateContextIds = (siteId?: string, accountId?: string) => {
+  if (siteId && accountId) {
+    throw createApiServiceError('Use either siteId or accountId for Wix API calls, not both.');
+  }
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -19,6 +26,7 @@ export let auth = SlateAuth.create()
       accountId: z.string().optional().describe('Wix Account ID for account-level API calls')
     }),
     getOutput: async ctx => {
+      validateContextIds(ctx.input.siteId, ctx.input.accountId);
       return {
         output: {
           token: ctx.input.apiKey,
@@ -42,13 +50,24 @@ export let auth = SlateAuth.create()
       accountId: z.string().optional().describe('Wix Account ID for account-level API calls')
     }),
     getOutput: async ctx => {
+      validateContextIds(ctx.input.siteId, ctx.input.accountId);
       let axios = createAxios({ baseURL: 'https://www.wixapis.com' });
-      let response = await axios.post('/oauth2/token', {
-        grant_type: 'client_credentials',
-        client_id: ctx.input.appId,
-        client_secret: ctx.input.appSecret,
-        instance_id: ctx.input.instanceId
-      });
+      let response: { data: { access_token?: string } };
+      try {
+        response = await axios.post('/oauth2/token', {
+          grant_type: 'client_credentials',
+          client_id: ctx.input.appId,
+          client_secret: ctx.input.appSecret,
+          instance_id: ctx.input.instanceId
+        });
+      } catch (error) {
+        throw wixApiError(error, 'create OAuth app access token');
+      }
+
+      if (!response.data.access_token) {
+        throw createApiServiceError('Wix OAuth response did not include an access token.');
+      }
+
       return {
         output: {
           token: response.data.access_token,

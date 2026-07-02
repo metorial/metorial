@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let addSubscriberToForm = SlateTool.create(spec, {
@@ -32,7 +33,7 @@ export let addSubscriberToForm = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (!ctx.input.subscriberId && !ctx.input.emailAddress) {
-      throw new Error('Provide either subscriberId or emailAddress');
+      throw kitServiceError('Provide either subscriberId or emailAddress');
     }
 
     let data: any;

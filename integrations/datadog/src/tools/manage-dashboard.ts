@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { datadogServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -68,7 +69,7 @@ export let manageDashboard = SlateTool.create(spec, {
       dashboard = await client.updateDashboard(dashboardId, data);
     } else {
       if (!data.title || !data.layoutType || !data.widgets) {
-        throw new Error(
+        throw datadogServiceError(
           'title, layoutType, and widgets are required when creating a new dashboard.'
         );
       }

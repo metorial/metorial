@@ -1,16 +1,17 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { docusignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let listEnvelopes = SlateTool.create(spec, {
   name: 'List Envelopes',
   key: 'list_envelopes',
   description: `Searches and lists DocuSign envelopes with flexible filtering by date range, status, text, and more. Returns up to 1000 envelopes per call with pagination support.
-Use **fromDate** to specify the start of the search window (required unless envelopeIds are provided).`,
+Use **fromDate** to specify the start of the search window (required unless envelopeIds or transactionIds are provided).`,
   constraints: [
     'Maximum of 1000 envelopes returned per call. Use pagination (startPosition) for more.',
-    'fromDate is required unless specific envelopeIds are provided.'
+    'fromDate is required unless specific envelopeIds or transactionIds are provided.'
   ],
   tags: {
     destructive: false,
@@ -43,12 +44,24 @@ Use **fromDate** to specify the start of the search window (required unless enve
         .string()
         .optional()
         .describe('Comma-separated list of specific envelope IDs to retrieve'),
+      transactionIds: z
+        .string()
+        .optional()
+        .describe('Comma-separated list of transaction IDs to retrieve'),
       count: z
         .number()
+        .int()
+        .min(1)
+        .max(1000)
         .optional()
         .default(25)
         .describe('Number of results to return (max 1000)'),
-      startPosition: z.number().optional().describe('Starting position for pagination'),
+      startPosition: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Starting position for pagination'),
       orderBy: z
         .enum(['created', 'last_modified', 'status'])
         .optional()
@@ -84,6 +97,12 @@ Use **fromDate** to specify the start of the search window (required unless enve
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.fromDate && !ctx.input.envelopeIds && !ctx.input.transactionIds) {
+      throw docusignServiceError(
+        'fromDate, envelopeIds, or transactionIds is required to list DocuSign envelopes.'
+      );
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       baseUri: ctx.auth.baseUri,
@@ -97,6 +116,7 @@ Use **fromDate** to specify the start of the search window (required unless enve
       fromToStatus: ctx.input.fromToStatus,
       searchText: ctx.input.searchText,
       envelopeIds: ctx.input.envelopeIds,
+      transactionIds: ctx.input.transactionIds,
       count: ctx.input.count?.toString(),
       startPosition: ctx.input.startPosition?.toString(),
       orderBy: ctx.input.orderBy,

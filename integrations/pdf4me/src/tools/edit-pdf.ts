@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { fileAttachment, fileAttachmentOutputSchema, fileOutput } from './shared';
 
 export let findAndReplaceText = SlateTool.create(spec, {
   name: 'Find and Replace Text',
@@ -23,12 +24,7 @@ export let findAndReplaceText = SlateTool.create(spec, {
         .describe('Pages to apply find/replace on (e.g. "1,2,3" or "all")')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded PDF with replaced text'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -41,7 +37,8 @@ export let findAndReplaceText = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Replaced "${ctx.input.searchText}" with "${ctx.input.replaceText}" in **${result.fileName}**`
     };
   })
@@ -61,12 +58,7 @@ export let flattenPdf = SlateTool.create(spec, {
       fileName: z.string().describe('PDF file name with extension')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded flattened PDF'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -76,7 +68,8 @@ export let flattenPdf = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Flattened PDF form fields in **${result.fileName}**`
     };
   })
@@ -96,12 +89,7 @@ export let repairPdf = SlateTool.create(spec, {
       fileName: z.string().describe('PDF file name with extension')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded repaired PDF'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -111,7 +99,8 @@ export let repairPdf = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Successfully repaired PDF: **${result.fileName}**`
     };
   })
@@ -135,12 +124,7 @@ export let linearizePdf = SlateTool.create(spec, {
         .describe('Compression type to apply during linearization')
     })
   )
-  .output(
-    z.object({
-      fileContent: z.string().describe('Base64-encoded linearized PDF'),
-      fileName: z.string().describe('Output file name')
-    })
-  )
+  .output(fileAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -151,7 +135,8 @@ export let linearizePdf = SlateTool.create(spec, {
     });
 
     return {
-      output: result,
+      output: fileOutput(result, 'application/pdf'),
+      attachments: [fileAttachment(result, 'application/pdf')],
       message: `Linearized PDF for web viewing: **${result.fileName}**`
     };
   })

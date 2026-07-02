@@ -46,7 +46,7 @@ export let loyaltyEvents = SlateTrigger.create(spec, {
       let subscription = await client.createWebhookSubscription({
         idempotencyKey: crypto.randomUUID(),
         subscription: {
-          name: 'Slates Loyalty Events',
+          name: 'Square Loyalty Events',
           eventTypes: LOYALTY_EVENT_TYPES,
           notificationUrl: ctx.input.webhookBaseUrl
         }

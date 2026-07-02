@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/zoho-crm.svg" height="20"> Zoho Crm
 
-Manage CRM data including leads, contacts, accounts, deals, tasks, events, campaigns, products, quotes, invoices, and custom modules. Create, read, update, and delete records across all modules. Search and query records using COQL or criteria-based search. Send emails from CRM and manage email templates. Upload and download file attachments. Manage users, roles, territories, and record sharing rules. Organize records with tags and notes. Interact with blueprints to move records through business processes. Enroll and unenroll records in automated cadences. Perform bulk data import and export operations. Subscribe to record change notifications for create, update, and delete events.
+Manage Zoho CRM records across standard and custom modules. Create, read, update, delete, search, and query records with the current Zoho CRM V8 APIs; discover module fields, layouts, custom views, and related lists; manage notes, tags, and record attachments; send CRM emails; inspect users and organization metadata; and subscribe to record change notifications.
 
 ## Tools
 
@@ -18,7 +18,7 @@ Execute a COQL (CRM Object Query Language) query to retrieve data using SQL-like
 
 ### Get Module Metadata
 
-Retrieve metadata about CRM modules including available fields, layouts, and module configuration. Without a module name, lists all available modules. With a module name, returns fields and layouts for that module. Useful for discovering field API names, data types, picklist values, and module structure.
+Retrieve metadata about CRM modules including available fields, layouts, custom views, related lists, and module configuration. Without a module name, lists all available modules. With a module name, returns selected metadata for that module. Useful for discovering field API names, data types, picklist values, custom view IDs, related list API names, and module structure.
 
 ### Get Organization
 
@@ -42,7 +42,11 @@ Retrieve CRM users from your Zoho organization. Filter by user type (AllUsers, A
 
 ### Manage Notes
 
-List, create, or delete notes associated with a CRM record. Set **action** to "list" to get notes, "create" to add a new note, or "delete" to remove a note.
+List, create, update, or delete notes associated with a CRM record. Set **action** to "list" to get notes, "create" to add a new note, "update" to edit a note, or "delete" to remove a note.
+
+### Manage Attachments
+
+List, upload, download, or delete attachments associated with a CRM record. File downloads are returned as Slate attachments, with structured output limited to metadata such as attachment ID, MIME type, size, and attachment count.
 
 ### Manage Tags
 

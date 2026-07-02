@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
-let modelSchema = z.object({
+export let modelSchema = z.object({
   modelId: z.string().describe('Unique model identifier (e.g., "openai/gpt-4o")'),
+  canonicalSlug: z.string().optional().describe('Canonical model slug'),
   name: z.string().optional().describe('Human-readable model name'),
   description: z.string().optional().describe('Model description'),
   contextLength: z.number().optional().describe('Maximum context length in tokens'),
@@ -37,12 +38,63 @@ let modelSchema = z.object({
         .string()
         .optional()
         .describe('Model modality (e.g., "text->text", "text+image->text")'),
+      inputModalities: z.array(z.string()).optional().describe('Supported input modalities'),
+      outputModalities: z.array(z.string()).optional().describe('Supported output modalities'),
       tokenizer: z.string().optional().describe('Tokenizer used'),
       instructType: z.string().optional().describe('Instruction type')
     })
     .optional()
-    .describe('Model architecture details')
+    .describe('Model architecture details'),
+  supportedParameters: z
+    .array(z.string())
+    .optional()
+    .describe('Supported OpenRouter request parameters')
 });
+
+export let normalizeModel = (m: Record<string, unknown>) => {
+  let pricing = m.pricing as Record<string, unknown> | undefined;
+  let topProvider = m.top_provider as Record<string, unknown> | undefined;
+  let architecture = m.architecture as Record<string, unknown> | undefined;
+
+  return {
+    modelId: (m.id as string) || '',
+    canonicalSlug: (m.canonical_slug as string) || undefined,
+    name: (m.name as string) || undefined,
+    description: (m.description as string) || undefined,
+    contextLength: (m.context_length as number) || undefined,
+    ...(pricing
+      ? {
+          pricing: {
+            prompt: (pricing.prompt as string) || undefined,
+            completion: (pricing.completion as string) || undefined,
+            image: (pricing.image as string) || undefined,
+            request: (pricing.request as string) || undefined
+          }
+        }
+      : {}),
+    ...(topProvider
+      ? {
+          topProvider: {
+            contextLength: (topProvider.context_length as number) || undefined,
+            maxCompletionTokens: (topProvider.max_completion_tokens as number) || undefined,
+            isModerated: (topProvider.is_moderated as boolean) || undefined
+          }
+        }
+      : {}),
+    ...(architecture
+      ? {
+          architecture: {
+            modality: (architecture.modality as string) || undefined,
+            inputModalities: (architecture.input_modalities as string[]) || undefined,
+            outputModalities: (architecture.output_modalities as string[]) || undefined,
+            tokenizer: (architecture.tokenizer as string) || undefined,
+            instructType: (architecture.instruct_type as string) || undefined
+          }
+        }
+      : {}),
+    supportedParameters: (m.supported_parameters as string[]) || undefined
+  };
+};
 
 export let listModels = SlateTool.create(spec, {
   name: 'List Models',
@@ -61,7 +113,36 @@ export let listModels = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Filter models by supported parameter (e.g., "tools", "response_format", "temperature")'
+          'Filter models by supported parameter, comma-separated for multiple values (e.g., "tools,response_format")'
+        ),
+      category: z
+        .string()
+        .optional()
+        .describe('Filter models by OpenRouter use-case category'),
+      outputModalities: z
+        .string()
+        .optional()
+        .describe(
+          'Filter by output modalities, comma-separated (text, image, audio, embeddings) or "all"'
+        ),
+      sort: z
+        .enum([
+          'pricing-low-to-high',
+          'pricing-high-to-low',
+          'context-high-to-low',
+          'throughput-high-to-low',
+          'latency-low-to-high',
+          'most-popular',
+          'top-weekly',
+          'newest'
+        ])
+        .optional()
+        .describe('Server-side sort order for model discovery'),
+      userFiltered: z
+        .boolean()
+        .optional()
+        .describe(
+          'List models filtered by the authenticated user preferences, privacy settings, and guardrails'
         ),
       search: z
         .string()
@@ -87,50 +168,14 @@ export let listModels = SlateTool.create(spec, {
     });
 
     let rawModels = await client.listModels({
-      supportedParameters: ctx.input.supportedParameters
+      supportedParameters: ctx.input.supportedParameters,
+      category: ctx.input.category,
+      outputModalities: ctx.input.outputModalities,
+      sort: ctx.input.sort,
+      userFiltered: ctx.input.userFiltered
     });
 
-    let models = rawModels.map((m: Record<string, unknown>) => {
-      let pricing = m.pricing as Record<string, unknown> | undefined;
-      let topProvider = m.top_provider as Record<string, unknown> | undefined;
-      let architecture = m.architecture as Record<string, unknown> | undefined;
-
-      return {
-        modelId: (m.id as string) || '',
-        name: (m.name as string) || undefined,
-        description: (m.description as string) || undefined,
-        contextLength: (m.context_length as number) || undefined,
-        ...(pricing
-          ? {
-              pricing: {
-                prompt: (pricing.prompt as string) || undefined,
-                completion: (pricing.completion as string) || undefined,
-                image: (pricing.image as string) || undefined,
-                request: (pricing.request as string) || undefined
-              }
-            }
-          : {}),
-        ...(topProvider
-          ? {
-              topProvider: {
-                contextLength: (topProvider.context_length as number) || undefined,
-                maxCompletionTokens:
-                  (topProvider.max_completion_tokens as number) || undefined,
-                isModerated: (topProvider.is_moderated as boolean) || undefined
-              }
-            }
-          : {}),
-        ...(architecture
-          ? {
-              architecture: {
-                modality: (architecture.modality as string) || undefined,
-                tokenizer: (architecture.tokenizer as string) || undefined,
-                instructType: (architecture.instruct_type as string) || undefined
-              }
-            }
-          : {})
-      };
-    });
+    let models = rawModels.map(normalizeModel);
 
     // Client-side search filter
     if (ctx.input.search) {

@@ -1,7 +1,6 @@
 import { SlateDefaultPollingIntervalSeconds, SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { DynamicsClient } from '../lib/client';
-import { resolveDynamicsInstanceUrl } from '../lib/resolve-instance-url';
+import { createDynamicsClient, inferDataverseRecordId } from '../lib/client';
 import { spec } from '../spec';
 
 export let recordChanged = SlateTrigger.create(spec, {
@@ -37,16 +36,13 @@ export let recordChanged = SlateTrigger.create(spec, {
     },
 
     pollEvents: async ctx => {
-      let client = new DynamicsClient({
-        token: ctx.auth.token,
-        instanceUrl: resolveDynamicsInstanceUrl(ctx)
-      });
+      let client = createDynamicsClient(ctx);
 
-      let entitySetName = ctx.input.state?.entitySetName || 'accounts';
-      let lastPolled =
-        ctx.input.state?.lastPolled || new Date(Date.now() - 60000).toISOString();
+      let entitySetName = ctx.state?.entitySetName || 'accounts';
+      let lastPolled = ctx.state?.lastPolled || new Date(Date.now() - 60000).toISOString();
 
-      let result = await client.getModifiedRecords(entitySetName, lastPolled, {
+      let result = await client.listRecords(entitySetName, {
+        filter: `modifiedon gt ${lastPolled}`,
         top: 50,
         orderBy: 'modifiedon asc'
       });
@@ -55,15 +51,11 @@ export let recordChanged = SlateTrigger.create(spec, {
         let createdOn = record.createdon || '';
         let modifiedOn = record.modifiedon || '';
         let isNew = createdOn === modifiedOn;
+        let recordId = inferDataverseRecordId(record) ?? '';
 
         return {
           eventType: isNew ? ('created' as const) : ('updated' as const),
-          recordId:
-            record[
-              Object.keys(record).find(
-                k => k.endsWith('id') && !k.startsWith('_') && !k.startsWith('@')
-              ) || ''
-            ] || '',
+          recordId,
           entitySetName,
           modifiedOn,
           createdOn,
@@ -71,10 +63,8 @@ export let recordChanged = SlateTrigger.create(spec, {
         };
       });
 
-      let newLastPolled =
-        result.records.length > 0
-          ? result.records[result.records.length - 1].modifiedon || lastPolled
-          : lastPolled;
+      let lastRecord = result.records.at(-1) as { modifiedon?: string } | undefined;
+      let newLastPolled = lastRecord?.modifiedon || lastPolled;
 
       return {
         inputs,

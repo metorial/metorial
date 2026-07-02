@@ -16,6 +16,10 @@ Create a new task in a project or workspace. Supports setting name, notes, assig
 
 Permanently delete a project. This action cannot be undone.
 
+### Delete Section
+
+Delete an empty project section. Asana does not allow deleting the last remaining section.
+
 ### Delete Task
 
 Permanently delete a task. This action cannot be undone.
@@ -48,6 +52,10 @@ List tasks filtered by project, section, or assignee. At least one filter must b
 
 List all teams in an organization workspace.
 
+### List Time Tracking Entries
+
+List Asana time tracking entries for a task, or retrieve one entry by GID.
+
 ### List Users
 
 List users in a workspace. Returns user GIDs and names for referencing in other tools.
@@ -72,9 +80,29 @@ List all sections in a project. Sections are used to organize tasks within a pro
 
 List all tags in a workspace.
 
+### Manage Attachments
+
+List, inspect, attach, upload, or delete Asana attachments on tasks, projects, and project briefs. File bytes are accepted only as input for uploads; downloaded file contents are not returned inline.
+
+### Manage Custom Fields
+
+List, inspect, create, update, and maintain Asana custom field metadata for a workspace.
+
+### Manage Project Templates
+
+List, inspect, and instantiate Asana project templates.
+
 ### Search Tasks
 
 Search for tasks in a workspace using various filters like text, assignee, projects, tags, completion status, and date ranges. Supports full-text search across task names and descriptions.
+
+### Typeahead Search
+
+Search Asana workspace objects with the low-latency typeahead endpoint. Use this to discover project, project template, portfolio, tag, task, user, or custom field GIDs for other tools.
+
+### Update Section
+
+Rename an existing project section.
 
 ### Update Project
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { IngestClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,8 @@ export let ingestData = SlateTool.create(spec, {
 Requires a License Key to be configured in authentication.`,
   instructions: [
     'Choose a `dataType` and provide the corresponding data array.',
-    'Metrics require `name`, `type` (gauge, count, summary), and `value`.',
+    'Metrics require `name`, `type` (gauge, count, summary), and `value`; count and summary metrics also require `intervalMs`.',
+    'Summary metric `value` must be an object with numeric `count`, `sum`, `min`, and `max` fields.',
     'Events require an `eventType` field and arbitrary key-value attributes.',
     'Logs require a `message` field.',
     'Traces require `traceId`, `spanId`, `serviceName`, `name`, and `durationMs`.'
@@ -33,8 +34,18 @@ Requires a License Key to be configured in authentication.`,
           z.object({
             name: z.string().describe('Metric name'),
             type: z.enum(['gauge', 'count', 'summary']).describe('Metric type'),
-            value: z.number().describe('Metric value'),
+            value: z
+              .any()
+              .describe(
+                'Metric value. Use a number for gauge/count, or { count, sum, min, max } for summary.'
+              ),
             timestamp: z.number().optional().describe('Unix timestamp in seconds'),
+            intervalMs: z
+              .number()
+              .optional()
+              .describe(
+                'Metric interval length in milliseconds. Required for count and summary metrics.'
+              ),
             attributes: z
               .record(z.string(), z.any())
               .optional()
@@ -47,7 +58,7 @@ Requires a License Key to be configured in authentication.`,
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe(
-          'Event objects, each must include an "eventType" field (required when dataType is "events")'
+          'Event objects. Each must include a string "eventType"; other values must be strings or numbers.'
         ),
       logs: z
         .array(
@@ -91,7 +102,7 @@ Requires a License Key to be configured in authentication.`,
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.licenseKey) {
-      throw new Error(
+      throw createApiServiceError(
         'License Key is required for data ingestion. Please configure it in authentication settings.'
       );
     }
@@ -106,7 +117,7 @@ Requires a License Key to be configured in authentication.`,
 
     if (dataType === 'metrics') {
       if (!ctx.input.metrics?.length)
-        throw new Error('metrics array is required when dataType is "metrics"');
+        throw createApiServiceError('metrics array is required when dataType is "metrics"');
       ctx.progress(`Ingesting ${ctx.input.metrics.length} metric(s)...`);
       let result = await ingestClient.ingestMetrics(ctx.input.metrics);
       return {
@@ -121,7 +132,7 @@ Requires a License Key to be configured in authentication.`,
 
     if (dataType === 'events') {
       if (!ctx.input.events?.length)
-        throw new Error('events array is required when dataType is "events"');
+        throw createApiServiceError('events array is required when dataType is "events"');
       ctx.progress(`Ingesting ${ctx.input.events.length} event(s)...`);
       let result = await ingestClient.ingestEvents(ctx.input.events);
       return {
@@ -136,7 +147,7 @@ Requires a License Key to be configured in authentication.`,
 
     if (dataType === 'logs') {
       if (!ctx.input.logs?.length)
-        throw new Error('logs array is required when dataType is "logs"');
+        throw createApiServiceError('logs array is required when dataType is "logs"');
       ctx.progress(`Ingesting ${ctx.input.logs.length} log(s)...`);
       let result = await ingestClient.ingestLogs(ctx.input.logs);
       return {
@@ -151,7 +162,7 @@ Requires a License Key to be configured in authentication.`,
 
     // traces
     if (!ctx.input.traces?.length)
-      throw new Error('traces array is required when dataType is "traces"');
+      throw createApiServiceError('traces array is required when dataType is "traces"');
     ctx.progress(`Ingesting ${ctx.input.traces.length} span(s)...`);
     let result = await ingestClient.ingestTraces(ctx.input.traces);
     return {

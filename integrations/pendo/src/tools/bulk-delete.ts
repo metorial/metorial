@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PendoClient } from '../lib/client';
 import { spec } from '../spec';
+import { createPendoClient } from './helpers';
 
 export let bulkDelete = SlateTool.create(spec, {
   name: 'Bulk Delete Visitors or Accounts',
@@ -30,27 +30,32 @@ export let bulkDelete = SlateTool.create(spec, {
   .output(
     z.object({
       entityType: z.string().describe('The type of entities deleted'),
+      requestId: z
+        .string()
+        .optional()
+        .describe('Pendo deletion request ID when returned by the API'),
       deletedCount: z.number().describe('Number of IDs submitted for deletion'),
-      success: z.boolean().describe('Whether the deletion request was accepted')
+      success: z.boolean().describe('Whether the deletion request was accepted'),
+      raw: z.any().optional().describe('Raw Pendo bulk deletion response')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PendoClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createPendoClient(ctx);
+    let result: any;
 
     if (ctx.input.entityType === 'visitor') {
-      await client.bulkDeleteVisitors(ctx.input.entityIds);
+      result = await client.bulkDeleteVisitors(ctx.input.entityIds);
     } else {
-      await client.bulkDeleteAccounts(ctx.input.entityIds);
+      result = await client.bulkDeleteAccounts(ctx.input.entityIds);
     }
 
     return {
       output: {
         entityType: ctx.input.entityType,
+        requestId: result?.id || result?.requestId,
         deletedCount: ctx.input.entityIds.length,
-        success: true
+        success: true,
+        raw: result
       },
       message: `Submitted **${ctx.input.entityIds.length}** ${ctx.input.entityType}(s) for deletion from Pendo.`
     };

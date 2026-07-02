@@ -1,72 +1,52 @@
-# <img src="https://provider-logos.metorial-cdn.com/monday.png" height="20"> Mondaycom
+# <img src="https://provider-logos.metorial-cdn.com/monday.png" height="20"> Monday.com
 
-Create, read, update, and delete boards, items, sub-items, groups, and columns to manage projects and workflows. Post updates and replies on items for team communication. Manage workspaces, folders, documents (Workdocs), users, teams, tags, and file assets. Upload files, send notifications, query activity logs and dashboards, and configure webhooks for real-time event notifications on boards. Supports a wide variety of column types including status, date, people, timeline, dropdown, and more.
+Manage monday.com boards, items, groups, columns, updates, workspaces, folders, webhooks, users, teams, tags, notifications, and activity logs through the monday.com GraphQL API.
+
+This integration pins monday.com API requests to the current stable `2026-04` version.
 
 ## Tools
 
-### Create Board
+### Boards
 
-Create a new board in Monday.com. Specify the board name, visibility type, and optionally assign it to a workspace or folder.
+- `list_boards`: Retrieve board metadata, columns, groups, and owners.
+- `create_board`: Create a board, including `2026-04` empty-board and prompt options.
+- `update_board`: Update board name or description, archive a board, or delete a board.
+- `duplicate_board`: Duplicate a board with structure, items, or items and updates.
+- `move_board`: Move a board to a workspace/folder or update its hierarchy position.
 
-### Create Item
+### Items and Sub-items
 
-Create a new item (row) on a Monday.com board. Optionally place it in a specific group and set initial column values. Column values should be a JSON object mapping column IDs to their values, formatted per Monday.com's column value specification.
+- `list_items`: Retrieve specific items or board items with cursor pagination, group filtering, `items_page` filters, sorting, and hierarchy scope.
+- `create_item`: Create an item with optional group and initial column values.
+- `update_item`: Update column values, move an item to a group, archive an item, or delete an item.
+- `duplicate_item`: Duplicate an item or sub-item.
+- `move_item`: Move an item to a group, a board position, or another board.
+- `set_item_description`: Replace an item's `2026-04` markdown description content.
+- `create_subitem`: Create a sub-item under a parent item.
 
-### Create Sub-item
+### Groups and Columns
 
-Create a sub-item under a parent item. Sub-items are nested items that appear within the parent item. Optionally set initial column values.
+- `list_groups`, `create_group`, `update_group`: Read and manage board groups.
+- `list_columns`, `create_column`, `update_column_metadata`, `delete_column`: Read and manage board column definitions.
 
-### Get Activity Logs
+### Updates
 
-Retrieve activity log entries for one or more boards. Activity logs capture a history of changes and actions performed on the board, including item creation, column updates, status changes, etc.
+- `list_updates`: Read item or account updates.
+- `create_update`: Post an update or reply.
+- `edit_update`: Edit update body content.
+- `react_to_update`: Like or unlike an update.
+- `pin_update`: Pin or unpin an update.
+- `clear_item_updates`: Clear all updates from an item.
+- `delete_update`: Delete an update.
 
-### List Boards
+### Account Resources
 
-Retrieve boards from the Monday.com account. Supports filtering by board IDs, workspace, board kind, and state. Returns board metadata including columns, groups, and owners.
-
-### List Items
-
-Retrieve items from a board or by item IDs. When fetching by board, supports pagination via cursor and filtering by group. Returns item data including column values and sub-item references.
-
-### List Tags
-
-Retrieve all tags in the Monday.com account. Tags are used to label and categorize items across boards.
-
-### List Teams
-
-Retrieve teams from the Monday.com account. Optionally filter by team IDs. Returns team members and owners.
-
-### List Users
-
-Retrieve users from the Monday.com account. Filter by user IDs, email addresses, or name. Returns user profile details and team memberships.
-
-### List Columns
-
-Retrieve all columns (fields) defined on a board. Returns column metadata including type, title, and settings.
-
-### List Groups
-
-Retrieve all groups from a board. Groups are sections that organize items within a board.
-
-### List Updates
-
-Retrieve updates (comments/discussions) from an item or by update IDs. Updates include threaded replies.
-
-### List Workspaces
-
-Retrieve workspaces from the Monday.com account. Workspaces are organizational containers that hold boards, dashboards, and folders.
-
-### Send Notification
-
-Send a notification to a specific user on behalf of the authenticated user. The notification is linked to a target item on a board.
-
-### Update Board
-
-Update a board's properties such as name, description, or communication settings. Can also archive or delete a board.
-
-### Update Item
-
-Update an item's column values, move it to a different group, archive it, or delete it. For column value updates, provide a JSON object mapping column IDs to their new values.
+- `list_workspaces`, `create_workspace`, `update_workspace`: Read and manage workspaces.
+- `list_folders`, `create_folder`, `update_folder`, `delete_folder`: Read and manage workspace folders.
+- `list_webhooks`, `create_webhook`, `delete_webhook`: Read and manage board webhooks.
+- `list_users`, `list_teams`, `list_tags`: Read account users, teams, and tags.
+- `send_notification`: Send a notification linked to an item or board target.
+- `get_activity_logs`: Read board activity logs.
 
 ## License
 

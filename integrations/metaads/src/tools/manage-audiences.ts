@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetaAdsClient } from '../lib/client';
+import { metaAdsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let audienceSchema = z.object({
@@ -27,6 +28,16 @@ let audienceSchema = z.object({
   timeCreated: z.string().optional().describe('Creation timestamp'),
   timeUpdated: z.string().optional().describe('Last update timestamp')
 });
+
+let validateAudienceRows = (schema: string[], userData: string[][]) => {
+  for (let [index, row] of userData.entries()) {
+    if (row.length !== schema.length) {
+      throw metaAdsServiceError(
+        `userData row ${index + 1} has ${row.length} values but schema has ${schema.length} fields.`
+      );
+    }
+  }
+};
 
 export let listCustomAudiences = SlateTool.create(spec, {
   name: 'List Custom Audiences',
@@ -124,6 +135,67 @@ export let getCustomAudience = SlateTool.create(spec, {
   })
   .build();
 
+export let removeUsersFromAudience = SlateTool.create(spec, {
+  name: 'Remove Users from Audience',
+  key: 'remove_users_from_audience',
+  description: `Remove users from an existing custom audience using the same SHA-256 hashed identifier schema used for uploads.`,
+  instructions: [
+    'Use the same schema and hashed values that were uploaded to the custom audience.',
+    'All PII values must be SHA-256 hashed before including them.'
+  ],
+  tags: {
+    destructive: true
+  }
+})
+  .input(
+    z.object({
+      audienceId: z.string().describe('Custom audience ID to remove users from'),
+      schema: z
+        .array(z.string())
+        .describe(
+          'Array of field names in the data (e.g., ["EMAIL", "PHONE", "FN", "LN", "COUNTRY"])'
+        ),
+      userData: z
+        .array(z.array(z.string()))
+        .describe(
+          'Array of user records, each an array of SHA-256 hashed values matching the schema order'
+        )
+    })
+  )
+  .output(
+    z.object({
+      audienceId: z.string().describe('The audience ID'),
+      numReceived: z.number().optional().describe('Number of records received'),
+      numInvalid: z.number().optional().describe('Number of invalid records')
+    })
+  )
+  .handleInvocation(async ctx => {
+    validateAudienceRows(ctx.input.schema, ctx.input.userData);
+
+    let client = new MetaAdsClient({
+      token: ctx.auth.token,
+      adAccountId: ctx.config.adAccountId,
+      apiVersion: ctx.config.apiVersion
+    });
+
+    let result = await client.removeUsersFromCustomAudience(ctx.input.audienceId, {
+      payload: JSON.stringify({
+        schema: ctx.input.schema,
+        data: ctx.input.userData
+      })
+    });
+
+    return {
+      output: {
+        audienceId: ctx.input.audienceId,
+        numReceived: result.num_received,
+        numInvalid: result.num_invalid_entries
+      },
+      message: `Removed users from audience \`${ctx.input.audienceId}\`: **${result.num_received || 0}** received, **${result.num_invalid_entries || 0}** invalid.`
+    };
+  })
+  .build();
+
 export let createCustomAudience = SlateTool.create(spec, {
   name: 'Create Custom Audience',
   key: 'create_custom_audience',
@@ -176,6 +248,22 @@ export let createCustomAudience = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.subtype === 'CUSTOM' && !ctx.input.customerFileSource) {
+      throw metaAdsServiceError(
+        'customerFileSource is required when creating a CUSTOM customer-list audience.'
+      );
+    }
+
+    if (ctx.input.subtype === 'LOOKALIKE' && !ctx.input.lookalikeSpec) {
+      throw metaAdsServiceError(
+        'lookalikeSpec is required when creating a LOOKALIKE audience.'
+      );
+    }
+
+    if (ctx.input.subtype !== 'LOOKALIKE' && ctx.input.lookalikeSpec) {
+      throw metaAdsServiceError('lookalikeSpec can only be used with subtype LOOKALIKE.');
+    }
+
     let client = new MetaAdsClient({
       token: ctx.auth.token,
       adAccountId: ctx.config.adAccountId,
@@ -248,6 +336,8 @@ export let addUsersToAudience = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateAudienceRows(ctx.input.schema, ctx.input.userData);
+
     let client = new MetaAdsClient({
       token: ctx.auth.token,
       adAccountId: ctx.config.adAccountId,

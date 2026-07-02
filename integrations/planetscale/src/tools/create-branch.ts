@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { planetscaleServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createBranch = SlateTool.create(spec, {
@@ -29,13 +30,33 @@ export let createBranch = SlateTool.create(spec, {
         .optional()
         .describe('Point-in-time restore timestamp (PostgreSQL only, ISO 8601)'),
       seedData: z
-        .string()
+        .enum(['last_successful_backup'])
         .optional()
-        .describe('Seed data strategy, e.g. "last_successful_backup"'),
+        .describe('Seed the branch with data from the last successful backup'),
       clusterSize: z
         .string()
         .optional()
-        .describe('Cluster size (required when restoring from backup)')
+        .describe('Cluster size (required when restoring from backup)'),
+      majorVersion: z
+        .string()
+        .optional()
+        .describe('PostgreSQL major version for the new branch'),
+      createDatabaseIfMissing: z
+        .boolean()
+        .optional()
+        .describe('Create the database if it does not exist. Requires kind.'),
+      kind: z
+        .enum(['mysql', 'postgresql'])
+        .optional()
+        .describe('Branch kind. Required when createDatabaseIfMissing is true.'),
+      minimumStorageBytes: z
+        .number()
+        .optional()
+        .describe('Minimum storage size in bytes for branches that support storage bounds'),
+      maximumStorageBytes: z
+        .number()
+        .optional()
+        .describe('Maximum storage size in bytes for branches that support storage bounds')
     })
   )
   .output(
@@ -52,6 +73,16 @@ export let createBranch = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.backupId && !ctx.input.clusterSize) {
+      throw planetscaleServiceError(
+        'clusterSize is required when creating a branch from backupId.'
+      );
+    }
+
+    if (ctx.input.createDatabaseIfMissing && !ctx.input.kind) {
+      throw planetscaleServiceError('kind is required when createDatabaseIfMissing is true.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       authType: ctx.auth.authType,
@@ -65,7 +96,14 @@ export let createBranch = SlateTool.create(spec, {
       region: ctx.input.region,
       restorePoint: ctx.input.restorePoint,
       seedData: ctx.input.seedData,
-      clusterSize: ctx.input.clusterSize
+      clusterSize: ctx.input.clusterSize,
+      majorVersion: ctx.input.majorVersion,
+      createDatabaseIfMissing: ctx.input.createDatabaseIfMissing,
+      kind: ctx.input.kind,
+      storage: {
+        minimumStorageBytes: ctx.input.minimumStorageBytes,
+        maximumStorageBytes: ctx.input.maximumStorageBytes
+      }
     });
 
     return {

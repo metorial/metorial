@@ -2,7 +2,7 @@
 
 ## Overview
 
-PandaDoc is a document automation platform for creating, sending, tracking, and electronically signing documents such as proposals, contracts, and quotes. It provides APIs for programmatic document generation from templates or file uploads, embedded signing experiences, and workflow automation. The platform is SOC 2 certified and compliant with E-SIGN, UETA, HIPAA, and GDPR.
+PandaDoc is a document automation platform for creating, sending, tracking, and electronically signing documents such as proposals, contracts, and quotes. It provides APIs for programmatic document generation from templates or publicly available PDF URLs, embedded signing experiences, and workflow automation. The platform is SOC 2 certified and compliant with E-SIGN, UETA, HIPAA, and GDPR.
 
 ## Authentication
 
@@ -34,12 +34,11 @@ Eventually, access_token will expire, and accessing an API method will return 40
 
 ### Document Creation and Management
 
-Create documents programmatically from PandaDoc templates (populating them with dynamic data such as tokens, fields, recipients, and pricing), from file uploads (PDF, DOCX), or from publicly available PDF URLs. You can list and filter documents, change document status manually, update document ownership, transfer all documents ownership, send documents, share document links, download documents, and delete documents. Documents can be organized into folders.
+Create documents programmatically from PandaDoc templates (populating them with dynamic data such as tokens, fields, recipients, and pricing) or from publicly available PDF URLs. You can list and filter documents, update draft document content, poll document status, change document status manually, send documents, share document links, download documents as Slate attachments, and delete documents. Documents can be placed into folders at creation time.
 
 - Documents support recipients (signers, approvers, CC), fields, tokens, content placeholders, and pricing tables.
-- Document sections (bundles) allow appending additional content to a document after creation.
-- Documents can have attachments added and managed.
 - Document settings, reminders (automatic and manual), and audit trails are configurable.
+- PandaDoc's folder API supports listing, creating, and renaming folders. It does not support deleting folders or moving existing documents into folders through the public API.
 
 ### Template Management
 

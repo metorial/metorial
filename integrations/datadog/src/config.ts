@@ -10,6 +10,7 @@ export let config = SlateConfig.create(
         'us5.datadoghq.com',
         'datadoghq.eu',
         'ap1.datadoghq.com',
+        'ap2.datadoghq.com',
         'ddog-gov.com'
       ])
       .default('datadoghq.com')

@@ -1,6 +1,6 @@
 # Pdfmonkey
 
-Generate PDF documents and images from HTML/CSS templates populated with dynamic JSON data. Create, update, and publish templates with configurable page layouts, styles, headers/footers, and password protection. Generate documents synchronously or asynchronously, retrieve download and public share links, manage document lifecycle with automatic deletion (TTL), and organize templates into folders with reusable snippets. Supports webhooks for document generation events and provides account quota information.
+Generate PDF documents and images from HTML/CSS templates populated with dynamic JSON data. Create, update, and delete templates with configurable page layouts, output types, PDF engines, folders, and automatic deletion TTL. Generate documents synchronously or asynchronously, update document payloads or metadata, retrieve fresh download and public share links, and download generated files as Slate attachments. Supports webhooks for document generation events and provides account quota information.
 
 ## License
 

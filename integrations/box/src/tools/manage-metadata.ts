@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { boxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageMetadata = SlateTool.create(spec, {
@@ -118,7 +119,7 @@ export let manageMetadata = SlateTool.create(spec, {
     let { action, fileId, scope, templateKey, metadata, operations } = ctx.input;
 
     if (action === 'list_templates') {
-      if (!scope) throw new Error('scope is required for list_templates action');
+      if (!scope) throw boxServiceError('scope is required for list_templates action');
       let templates = await client.getMetadataTemplates(scope);
       let mapped = templates.map((t: any) => ({
         templateKey: t.templateKey,
@@ -138,7 +139,7 @@ export let manageMetadata = SlateTool.create(spec, {
 
     if (action === 'get_template') {
       if (!scope || !templateKey)
-        throw new Error('scope and templateKey are required for get_template action');
+        throw boxServiceError('scope and templateKey are required for get_template action');
       let tmpl = await client.getMetadataTemplate(scope, templateKey);
       return {
         output: {
@@ -158,7 +159,7 @@ export let manageMetadata = SlateTool.create(spec, {
       };
     }
 
-    if (!fileId) throw new Error('fileId is required for this action');
+    if (!fileId) throw boxServiceError('fileId is required for this action');
 
     if (action === 'get_all') {
       let entries = await client.getAllFileMetadata(fileId);
@@ -169,7 +170,7 @@ export let manageMetadata = SlateTool.create(spec, {
     }
 
     if (!scope || !templateKey)
-      throw new Error('scope and templateKey are required for this action');
+      throw boxServiceError('scope and templateKey are required for this action');
 
     if (action === 'get') {
       let md = await client.getFileMetadata(fileId, scope, templateKey);
@@ -180,7 +181,7 @@ export let manageMetadata = SlateTool.create(spec, {
     }
 
     if (action === 'apply') {
-      if (!metadata) throw new Error('metadata is required for apply action');
+      if (!metadata) throw boxServiceError('metadata is required for apply action');
       let md = await client.applyFileMetadata(fileId, scope, templateKey, metadata);
       return {
         output: { metadata: md },
@@ -189,7 +190,7 @@ export let manageMetadata = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!operations) throw new Error('operations are required for update action');
+      if (!operations) throw boxServiceError('operations are required for update action');
       let md = await client.updateFileMetadata(fileId, scope, templateKey, operations);
       return {
         output: { metadata: md },

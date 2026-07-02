@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { cognitoServiceError } from '../lib/errors';
 import { createCognitoClient, formatAttributes } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -57,8 +58,9 @@ export let manageGroupMembership = SlateTool.create(spec, {
     let { action, userPoolId } = ctx.input;
 
     if (action === 'add_user') {
-      if (!ctx.input.username || !ctx.input.groupName)
-        throw new Error('username and groupName are required');
+      if (!ctx.input.username || !ctx.input.groupName) {
+        throw cognitoServiceError('username and groupName are required');
+      }
       await client.adminAddUserToGroup(userPoolId, ctx.input.username, ctx.input.groupName);
       return {
         output: { success: true },
@@ -67,8 +69,9 @@ export let manageGroupMembership = SlateTool.create(spec, {
     }
 
     if (action === 'remove_user') {
-      if (!ctx.input.username || !ctx.input.groupName)
-        throw new Error('username and groupName are required');
+      if (!ctx.input.username || !ctx.input.groupName) {
+        throw cognitoServiceError('username and groupName are required');
+      }
       await client.adminRemoveUserFromGroup(
         userPoolId,
         ctx.input.username,
@@ -81,7 +84,9 @@ export let manageGroupMembership = SlateTool.create(spec, {
     }
 
     if (action === 'list_users_in_group') {
-      if (!ctx.input.groupName) throw new Error('groupName is required');
+      if (!ctx.input.groupName) {
+        throw cognitoServiceError('groupName is required');
+      }
       let result = await client.listUsersInGroup(
         userPoolId,
         ctx.input.groupName,
@@ -103,7 +108,9 @@ export let manageGroupMembership = SlateTool.create(spec, {
     }
 
     if (action === 'list_groups_for_user') {
-      if (!ctx.input.username) throw new Error('username is required');
+      if (!ctx.input.username) {
+        throw cognitoServiceError('username is required');
+      }
       let result = await client.adminListGroupsForUser(
         userPoolId,
         ctx.input.username,
@@ -123,6 +130,6 @@ export let manageGroupMembership = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw cognitoServiceError(`Unknown action: ${action}`);
   })
   .build();

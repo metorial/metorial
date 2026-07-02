@@ -1,6 +1,6 @@
 {
   "name": "@metorial/freshsales",
-  "description": "Manage leads, contacts, accounts, and deals in Freshsales CRM. Create, view, update, delete, and list leads with lead scoring and conversion to contacts. Manage contacts and associate them with accounts. Track and manage deals through pipelines. Create and manage tasks, appointments, notes, and sales activities. Search across entities using keywords, filter records with saved views, and retrieve activity timelines. Log sales activities such as calls and emails. Manage files and documents on records. Retrieve field metadata and configure custom modules.",
+  "description": "Manage leads, contacts, accounts, and deals in Freshsales CRM. Create, view, update, delete, and list leads with lead scoring and conversion to contacts. Manage contacts and accounts. Track and manage deals through pipelines. Create, view, update, delete, and list tasks, appointments, notes, and sales activities. Search across entities using keywords or exact contact filters, work with saved views, and retrieve field metadata.",
   "categories": ["crm-and-sales-tools", "task-and-project-management"],
   "skills": [
     "manage leads",
@@ -9,10 +9,10 @@
     "manage accounts",
     "create tasks and appointments",
     "log sales activities",
-    "search and filter records",
+    "search and filter contacts",
     "track activity timelines",
     "create and manage notes",
-    "manage files and documents"
+    "complete tasks"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/freshsales.png"
 }

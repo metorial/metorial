@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { ConnectClient } from '../lib/client';
+import { createConnectClient } from '../lib/connect-tool';
 import { spec } from '../spec';
 
 export let listItems = SlateTool.create(spec, {
@@ -42,14 +42,7 @@ export let listItems = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.config.connectServerUrl) {
-      throw new Error('Connect server URL is required. Set it in the configuration.');
-    }
-
-    let client = new ConnectClient({
-      token: ctx.auth.token,
-      serverUrl: ctx.config.connectServerUrl
-    });
+    let client = createConnectClient(ctx);
 
     ctx.progress('Fetching items...');
     let items = await client.listItems(ctx.input.vaultId, ctx.input.filter);

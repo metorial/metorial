@@ -28,6 +28,10 @@ export let generateImages = SlateTool.create(spec, {
       llmProviderKey: z.string().describe('API key for the image generation provider'),
       width: z.number().optional().describe('Width of the generated image in pixels'),
       height: z.number().optional().describe('Height of the generated image in pixels'),
+      size: z
+        .string()
+        .optional()
+        .describe('Provider size string, e.g. "1024x1024", for models that support it'),
       n: z.number().optional().describe('Number of images to generate'),
       steps: z.number().optional().describe('Number of generation steps (provider-dependent)'),
       imageUrl: z.string().optional().describe('Base image URL for image-to-image generation')
@@ -50,6 +54,7 @@ export let generateImages = SlateTool.create(spec, {
 
     if (ctx.input.width !== undefined) body.width = ctx.input.width;
     if (ctx.input.height !== undefined) body.height = ctx.input.height;
+    if (ctx.input.size !== undefined) body.size = ctx.input.size;
     if (ctx.input.n !== undefined) body.n = ctx.input.n;
     if (ctx.input.steps !== undefined) body.steps = ctx.input.steps;
     if (ctx.input.imageUrl !== undefined) body.image_url = ctx.input.imageUrl;
@@ -58,7 +63,7 @@ export let generateImages = SlateTool.create(spec, {
 
     let images = (result.choices ?? []).flatMap((c: any) =>
       (c.message?.images ?? []).map((img: any) => ({
-        url: img.url ?? ''
+        url: img.image_url?.url ?? img.url ?? ''
       }))
     );
 

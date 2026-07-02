@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { activeCampaignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageContactTags = SlateTool.create(spec, {
@@ -45,7 +46,7 @@ export let manageContactTags = SlateTool.create(spec, {
 
     if (ctx.input.action === 'add') {
       if (!ctx.input.tagId) {
-        throw new Error('tagId is required when adding a tag');
+        throw activeCampaignServiceError('tagId is required when adding a tag');
       }
       let result = await client.addTagToContact(ctx.input.contactId, ctx.input.tagId);
       return {
@@ -57,7 +58,7 @@ export let manageContactTags = SlateTool.create(spec, {
       };
     } else {
       if (!ctx.input.contactTagId) {
-        throw new Error('contactTagId is required when removing a tag');
+        throw activeCampaignServiceError('contactTagId is required when removing a tag');
       }
       await client.removeTagFromContact(ctx.input.contactTagId);
       return {

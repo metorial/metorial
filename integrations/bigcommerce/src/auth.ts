@@ -1,9 +1,15 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { bigcommerceApiError } from './lib/errors';
 
 let loginAxios = createAxios({
   baseURL: 'https://login.bigcommerce.com'
 });
+
+loginAxios.interceptors.response.use(
+  response => response,
+  error => Promise.reject(bigcommerceApiError(error, 'OAuth request'))
+);
 
 export let auth = SlateAuth.create()
   .output(
@@ -123,6 +129,16 @@ export let auth = SlateAuth.create()
         title: 'Store Information',
         description: 'Read and modify store profile and settings',
         scope: 'store_v2_information'
+      },
+      {
+        title: 'Store Inventory (Read-Only)',
+        description: 'View location-aware inventory items and locations',
+        scope: 'store_inventory_read_only'
+      },
+      {
+        title: 'Store Inventory',
+        description: 'Read and modify location-aware inventory levels',
+        scope: 'store_inventory'
       },
       {
         title: 'Storefront API Tokens',

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DocsClient } from '../lib/docs-client';
+import { helpscoutServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageDocs = SlateTool.create(spec, {
@@ -119,7 +120,7 @@ export let manageDocs = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     if (!ctx.auth.docsApiKey) {
-      throw new Error(
+      throw helpscoutServiceError(
         'Docs API key is not configured. Please set it during authentication setup.'
       );
     }
@@ -141,7 +142,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'list_collections': {
-        if (!ctx.input.siteId) throw new Error('Site ID is required');
+        if (!ctx.input.siteId) throw helpscoutServiceError('Site ID is required');
         let data = await client.listCollections(ctx.input.siteId, { page: ctx.input.page });
         let collections = (data?.collections?.items ?? data?.items ?? []).map((c: any) => ({
           collectionId: c.id,
@@ -156,7 +157,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'get_collection': {
-        if (!ctx.input.collectionId) throw new Error('Collection ID is required');
+        if (!ctx.input.collectionId) throw helpscoutServiceError('Collection ID is required');
         let data = await client.getCollection(ctx.input.collectionId);
         let c = data?.collection ?? data;
         return {
@@ -170,7 +171,7 @@ export let manageDocs = SlateTool.create(spec, {
 
       case 'create_collection': {
         if (!ctx.input.siteId || !ctx.input.name)
-          throw new Error('Site ID and name are required');
+          throw helpscoutServiceError('Site ID and name are required');
         let data = await client.createCollection({
           siteId: ctx.input.siteId,
           name: ctx.input.name,
@@ -192,7 +193,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'update_collection': {
-        if (!ctx.input.collectionId) throw new Error('Collection ID is required');
+        if (!ctx.input.collectionId) throw helpscoutServiceError('Collection ID is required');
         await client.updateCollection(ctx.input.collectionId, {
           name: ctx.input.name,
           visibility: ctx.input.visibility,
@@ -205,7 +206,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'delete_collection': {
-        if (!ctx.input.collectionId) throw new Error('Collection ID is required');
+        if (!ctx.input.collectionId) throw helpscoutServiceError('Collection ID is required');
         await client.deleteCollection(ctx.input.collectionId);
         return {
           output: { success: true },
@@ -214,7 +215,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'list_categories': {
-        if (!ctx.input.collectionId) throw new Error('Collection ID is required');
+        if (!ctx.input.collectionId) throw helpscoutServiceError('Collection ID is required');
         let data = await client.listCategories(ctx.input.collectionId, {
           page: ctx.input.page
         });
@@ -232,7 +233,7 @@ export let manageDocs = SlateTool.create(spec, {
 
       case 'create_category': {
         if (!ctx.input.collectionId || !ctx.input.name)
-          throw new Error('Collection ID and name are required');
+          throw helpscoutServiceError('Collection ID and name are required');
         await client.createCategory(ctx.input.collectionId, {
           name: ctx.input.name,
           description: ctx.input.description,
@@ -245,7 +246,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'update_category': {
-        if (!ctx.input.categoryId) throw new Error('Category ID is required');
+        if (!ctx.input.categoryId) throw helpscoutServiceError('Category ID is required');
         await client.updateCategory(ctx.input.categoryId, {
           name: ctx.input.name,
           description: ctx.input.description,
@@ -258,7 +259,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'delete_category': {
-        if (!ctx.input.categoryId) throw new Error('Category ID is required');
+        if (!ctx.input.categoryId) throw helpscoutServiceError('Category ID is required');
         await client.deleteCategory(ctx.input.categoryId);
         return {
           output: { success: true },
@@ -267,7 +268,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'list_articles': {
-        if (!ctx.input.collectionId) throw new Error('Collection ID is required');
+        if (!ctx.input.collectionId) throw helpscoutServiceError('Collection ID is required');
         let data = await client.listArticles(ctx.input.collectionId, {
           page: ctx.input.page,
           status: ctx.input.status,
@@ -287,7 +288,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'get_article': {
-        if (!ctx.input.articleId) throw new Error('Article ID is required');
+        if (!ctx.input.articleId) throw helpscoutServiceError('Article ID is required');
         let data = await client.getArticle(ctx.input.articleId);
         let a = data?.article ?? data;
         return {
@@ -309,7 +310,7 @@ export let manageDocs = SlateTool.create(spec, {
 
       case 'create_article': {
         if (!ctx.input.collectionId || !ctx.input.name || !ctx.input.text) {
-          throw new Error('Collection ID, name, and text are required');
+          throw helpscoutServiceError('Collection ID, name, and text are required');
         }
         let data = await client.createArticle(ctx.input.collectionId, {
           name: ctx.input.name,
@@ -333,7 +334,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'update_article': {
-        if (!ctx.input.articleId) throw new Error('Article ID is required');
+        if (!ctx.input.articleId) throw helpscoutServiceError('Article ID is required');
         await client.updateArticle(ctx.input.articleId, {
           name: ctx.input.name,
           text: ctx.input.text,
@@ -348,7 +349,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'delete_article': {
-        if (!ctx.input.articleId) throw new Error('Article ID is required');
+        if (!ctx.input.articleId) throw helpscoutServiceError('Article ID is required');
         await client.deleteArticle(ctx.input.articleId);
         return {
           output: { success: true },
@@ -357,7 +358,7 @@ export let manageDocs = SlateTool.create(spec, {
       }
 
       case 'search_articles': {
-        if (!ctx.input.query) throw new Error('Search query is required');
+        if (!ctx.input.query) throw helpscoutServiceError('Search query is required');
         let data = await client.searchArticles(ctx.input.query, {
           collectionId: ctx.input.collectionId,
           page: ctx.input.page,

@@ -1,6 +1,7 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let alertWebhookTrigger = SlateTrigger.create(spec, {
@@ -60,7 +61,9 @@ export let alertWebhookTrigger = SlateTrigger.create(spec, {
     autoRegisterWebhook: async ctx => {
       let projectId = ctx.config.projectId;
       if (!projectId)
-        throw new Error('projectId is required in configuration to auto-register webhooks');
+        throw mongodbServiceError(
+          'projectId is required in configuration to auto-register webhooks'
+        );
 
       let client = new AtlasClient(ctx.auth);
       let result = await client.configureWebhookIntegration(projectId, {

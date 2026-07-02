@@ -1,5 +1,35 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { webflowApiError } from './lib/errors';
+
+let getProfileFromToken = async (token: string, operation: string) => {
+  let http = createAxios({
+    baseURL: 'https://api.webflow.com/v2',
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+
+  try {
+    let response = await http.get('/token/authorized_by');
+    let user = response.data as {
+      id?: string;
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+    };
+
+    return {
+      profile: {
+        id: user.id,
+        email: user.email,
+        name: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined
+      }
+    };
+  } catch (error) {
+    throw webflowApiError(error, operation);
+  }
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -15,7 +45,7 @@ export let auth = SlateAuth.create()
       {
         type: 'docs.auth.oauth',
         name: 'OAuth documentation',
-        url: 'https://developers.webflow.com/data/reference/oauth-app'
+        url: 'https://developers.webflow.com/data/reference/oauth'
       },
       {
         type: 'docs.auth.oauth_scopes',
@@ -168,15 +198,25 @@ export let auth = SlateAuth.create()
         baseURL: 'https://api.webflow.com'
       });
 
-      let response = await http.post('/oauth/access_token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        code: ctx.code,
-        grant_type: 'authorization_code',
-        redirect_uri: ctx.redirectUri
-      });
+      let response: { data: unknown };
+      try {
+        response = await http.post('/oauth/access_token', {
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          code: ctx.code,
+          grant_type: 'authorization_code',
+          redirect_uri: ctx.redirectUri
+        });
+      } catch (error) {
+        throw webflowApiError(error, 'OAuth token exchange');
+      }
 
       let data = response.data as { access_token: string };
+      if (!data.access_token) {
+        throw createApiServiceError(
+          'Webflow OAuth token response did not include an access token.'
+        );
+      }
 
       return {
         output: {
@@ -186,28 +226,7 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.webflow.com/v2',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let response = await http.get('/token/authorized_by');
-      let user = response.data as {
-        id?: string;
-        email?: string;
-        firstName?: string;
-        lastName?: string;
-      };
-
-      return {
-        profile: {
-          id: user.id,
-          email: user.email,
-          name: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined
-        }
-      };
+      return getProfileFromToken(ctx.output.token, 'OAuth profile');
     }
   })
   .addTokenAuth({
@@ -228,29 +247,8 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: any) => {
-      let http = createAxios({
-        baseURL: 'https://api.webflow.com/v2',
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
       try {
-        let response = await http.get('/token/authorized_by');
-        let user = response.data as {
-          id?: string;
-          email?: string;
-          firstName?: string;
-          lastName?: string;
-        };
-
-        return {
-          profile: {
-            id: user.id,
-            email: user.email,
-            name: [user.firstName, user.lastName].filter(Boolean).join(' ') || undefined
-          }
-        };
+        return await getProfileFromToken(ctx.output.token, 'site token profile');
       } catch {
         return {
           profile: {}

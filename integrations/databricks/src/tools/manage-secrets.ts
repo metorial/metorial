@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageSecrets = SlateTool.create(spec, {
@@ -84,7 +85,7 @@ export let manageSecrets = SlateTool.create(spec, {
         };
       }
       case 'create_scope': {
-        if (!ctx.input.scope) throw new Error('scope is required');
+        if (!ctx.input.scope) throw databricksServiceError('scope is required');
         await client.createSecretScope(ctx.input.scope, ctx.input.initialManagePrincipal);
         return {
           output: { success: true },
@@ -92,7 +93,7 @@ export let manageSecrets = SlateTool.create(spec, {
         };
       }
       case 'delete_scope': {
-        if (!ctx.input.scope) throw new Error('scope is required');
+        if (!ctx.input.scope) throw databricksServiceError('scope is required');
         await client.deleteSecretScope(ctx.input.scope);
         return {
           output: { success: true },
@@ -100,7 +101,7 @@ export let manageSecrets = SlateTool.create(spec, {
         };
       }
       case 'list_secrets': {
-        if (!ctx.input.scope) throw new Error('scope is required');
+        if (!ctx.input.scope) throw databricksServiceError('scope is required');
         let secrets = await client.listSecrets(ctx.input.scope);
         let mapped = secrets.map((s: any) => ({
           secretKey: s.key,
@@ -115,7 +116,7 @@ export let manageSecrets = SlateTool.create(spec, {
       }
       case 'put_secret': {
         if (!ctx.input.scope || !ctx.input.secretKey || !ctx.input.secretValue) {
-          throw new Error('scope, secretKey, and secretValue are required');
+          throw databricksServiceError('scope, secretKey, and secretValue are required');
         }
         await client.putSecret(ctx.input.scope, ctx.input.secretKey, ctx.input.secretValue);
         return {
@@ -125,7 +126,7 @@ export let manageSecrets = SlateTool.create(spec, {
       }
       case 'delete_secret': {
         if (!ctx.input.scope || !ctx.input.secretKey) {
-          throw new Error('scope and secretKey are required');
+          throw databricksServiceError('scope and secretKey are required');
         }
         await client.deleteSecret(ctx.input.scope, ctx.input.secretKey);
         return {

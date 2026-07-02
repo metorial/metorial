@@ -16,6 +16,46 @@ let mediaOutputSchema = z.object({
   height: z.number().describe('Height in pixels (0 for non-image files)')
 });
 
+export let uploadMediaTool = SlateTool.create(spec, {
+  name: 'Upload Media',
+  key: 'upload_media',
+  description: `Upload an image, document, or other supported file to the WordPress media library from a publicly accessible URL. Returns the created media item ID and URL for use as a featured image or attachment.`,
+  instructions: [
+    'Provide a publicly accessible HTTP/HTTPS fileUrl.',
+    'Use the returned mediaId as featuredImageId when creating or updating posts and pages.'
+  ],
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      fileUrl: z.string().describe('Publicly accessible HTTP/HTTPS URL of the file to upload'),
+      fileName: z.string().describe('File name including extension, such as "image.png"'),
+      title: z.string().optional().describe('Media title'),
+      caption: z.string().optional().describe('Media caption'),
+      altText: z.string().optional().describe('Alternative text for accessibility'),
+      description: z.string().optional().describe('Media description'),
+      mimeType: z
+        .string()
+        .optional()
+        .describe('MIME type to send for self-hosted uploads when it cannot be inferred'),
+      postId: z.string().optional().describe('Optional post or page ID to attach the media to')
+    })
+  )
+  .output(mediaOutputSchema)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    let media = await client.uploadMedia(ctx.input);
+    let result = extractMediaSummary(media, ctx.config.apiType);
+    return {
+      output: result,
+      message: `Uploaded media **"${result.title || ctx.input.fileName}"** (ID: ${result.mediaId}). [View](${result.url})`
+    };
+  })
+  .build();
+
 export let listMediaTool = SlateTool.create(spec, {
   name: 'List Media',
   key: 'list_media',

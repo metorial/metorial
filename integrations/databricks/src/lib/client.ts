@@ -1,4 +1,29 @@
 import { createAxios } from 'slates';
+import { databricksApiError } from './errors';
+
+let encodeMultiSegmentPath = (path: string) => {
+  let normalized = path.startsWith('/') ? path : `/${path}`;
+  return normalized
+    .split('/')
+    .map((part, index) => (index === 0 ? '' : encodeURIComponent(part)))
+    .join('/');
+};
+
+let toBase64 = (data: unknown) => {
+  if (Buffer.isBuffer(data)) {
+    return data.toString('base64');
+  }
+
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data).toString('base64');
+  }
+
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString('base64');
+  }
+
+  return Buffer.from(String(data)).toString('base64');
+};
 
 export class DatabricksClient {
   private http: ReturnType<typeof createAxios>;
@@ -12,17 +37,21 @@ export class DatabricksClient {
         'Content-Type': 'application/json'
       }
     });
+    this.http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(databricksApiError(error))
+    );
   }
 
   // ─── Clusters ────────────────────────────────────────────────────────
 
   async listClusters() {
-    let response = await this.http.get('/api/2.0/clusters/list');
+    let response = await this.http.get('/api/2.1/clusters/list');
     return (response.data as any).clusters ?? [];
   }
 
   async getCluster(clusterId: string) {
-    let response = await this.http.get('/api/2.0/clusters/get', {
+    let response = await this.http.get('/api/2.1/clusters/get', {
       params: { cluster_id: clusterId }
     });
     return response.data as any;
@@ -56,7 +85,7 @@ export class DatabricksClient {
     if (params.sparkConf) body.spark_conf = params.sparkConf;
     if (params.customTags) body.custom_tags = params.customTags;
 
-    let response = await this.http.post('/api/2.0/clusters/create', body);
+    let response = await this.http.post('/api/2.1/clusters/create', body);
     return response.data as any;
   }
 
@@ -93,43 +122,43 @@ export class DatabricksClient {
     if (params.autoterminationMinutes !== undefined)
       body.autotermination_minutes = params.autoterminationMinutes;
 
-    let response = await this.http.post('/api/2.0/clusters/edit', body);
+    let response = await this.http.post('/api/2.1/clusters/edit', body);
     return response.data as any;
   }
 
   async startCluster(clusterId: string) {
-    await this.http.post('/api/2.0/clusters/start', { cluster_id: clusterId });
+    await this.http.post('/api/2.1/clusters/start', { cluster_id: clusterId });
   }
 
   async restartCluster(clusterId: string) {
-    await this.http.post('/api/2.0/clusters/restart', { cluster_id: clusterId });
+    await this.http.post('/api/2.1/clusters/restart', { cluster_id: clusterId });
   }
 
   async terminateCluster(clusterId: string) {
-    await this.http.post('/api/2.0/clusters/delete', { cluster_id: clusterId });
+    await this.http.post('/api/2.1/clusters/delete', { cluster_id: clusterId });
   }
 
   async permanentDeleteCluster(clusterId: string) {
-    await this.http.post('/api/2.0/clusters/permanent-delete', { cluster_id: clusterId });
+    await this.http.post('/api/2.1/clusters/permanent-delete', { cluster_id: clusterId });
   }
 
   // ─── Jobs ────────────────────────────────────────────────────────────
 
   async listJobs(
-    params: { limit?: number; offset?: number; name?: string; expandTasks?: boolean } = {}
+    params: { limit?: number; pageToken?: string; name?: string; expandTasks?: boolean } = {}
   ) {
     let query: Record<string, any> = {};
     if (params.limit !== undefined) query.limit = params.limit;
-    if (params.offset !== undefined) query.offset = params.offset;
+    if (params.pageToken) query.page_token = params.pageToken;
     if (params.name) query.name = params.name;
     if (params.expandTasks) query.expand_tasks = true;
 
-    let response = await this.http.get('/api/2.1/jobs/list', { params: query });
+    let response = await this.http.get('/api/2.2/jobs/list', { params: query });
     return response.data as any;
   }
 
   async getJob(jobId: string) {
-    let response = await this.http.get('/api/2.1/jobs/get', {
+    let response = await this.http.get('/api/2.2/jobs/get', {
       params: { job_id: jobId }
     });
     return response.data as any;
@@ -163,12 +192,45 @@ export class DatabricksClient {
     if (params.webhookNotifications) body.webhook_notifications = params.webhookNotifications;
     if (params.tags) body.tags = params.tags;
 
-    let response = await this.http.post('/api/2.1/jobs/create', body);
+    let response = await this.http.post('/api/2.2/jobs/create', body);
     return response.data as any;
   }
 
+  async updateJob(
+    jobId: string,
+    params: {
+      name?: string;
+      tasks?: any[];
+      schedule?: { quartzCronExpression: string; timezoneId: string; pauseStatus?: string };
+      maxConcurrentRuns?: number;
+      timeoutSeconds?: number;
+      tags?: Record<string, string>;
+    }
+  ) {
+    let newSettings: Record<string, any> = {};
+    if (params.name) newSettings.name = params.name;
+    if (params.tasks) newSettings.tasks = params.tasks.map((t: any) => this.mapTaskToApi(t));
+    if (params.schedule) {
+      newSettings.schedule = {
+        quartz_cron_expression: params.schedule.quartzCronExpression,
+        timezone_id: params.schedule.timezoneId,
+        pause_status: params.schedule.pauseStatus ?? 'UNPAUSED'
+      };
+    }
+    if (params.maxConcurrentRuns !== undefined)
+      newSettings.max_concurrent_runs = params.maxConcurrentRuns;
+    if (params.timeoutSeconds !== undefined)
+      newSettings.timeout_seconds = params.timeoutSeconds;
+    if (params.tags) newSettings.tags = params.tags;
+
+    await this.http.post('/api/2.2/jobs/update', {
+      job_id: Number(jobId),
+      new_settings: newSettings
+    });
+  }
+
   async deleteJob(jobId: string) {
-    await this.http.post('/api/2.1/jobs/delete', { job_id: jobId });
+    await this.http.post('/api/2.2/jobs/delete', { job_id: jobId });
   }
 
   async runJobNow(
@@ -186,16 +248,16 @@ export class DatabricksClient {
     if (params.jarParams) body.jar_params = params.jarParams;
     if (params.sparkSubmitParams) body.spark_submit_params = params.sparkSubmitParams;
 
-    let response = await this.http.post('/api/2.1/jobs/run-now', body);
+    let response = await this.http.post('/api/2.2/jobs/run-now', body);
     return response.data as any;
   }
 
   async cancelJobRun(runId: string) {
-    await this.http.post('/api/2.1/jobs/runs/cancel', { run_id: runId });
+    await this.http.post('/api/2.2/jobs/runs/cancel', { run_id: runId });
   }
 
   async getJobRun(runId: string) {
-    let response = await this.http.get('/api/2.1/jobs/runs/get', {
+    let response = await this.http.get('/api/2.2/jobs/runs/get', {
       params: { run_id: runId }
     });
     return response.data as any;
@@ -207,7 +269,7 @@ export class DatabricksClient {
       activeOnly?: boolean;
       completedOnly?: boolean;
       limit?: number;
-      offset?: number;
+      pageToken?: string;
     } = {}
   ) {
     let query: Record<string, any> = {};
@@ -215,14 +277,14 @@ export class DatabricksClient {
     if (params.activeOnly) query.active_only = true;
     if (params.completedOnly) query.completed_only = true;
     if (params.limit !== undefined) query.limit = params.limit;
-    if (params.offset !== undefined) query.offset = params.offset;
+    if (params.pageToken) query.page_token = params.pageToken;
 
-    let response = await this.http.get('/api/2.1/jobs/runs/list', { params: query });
+    let response = await this.http.get('/api/2.2/jobs/runs/list', { params: query });
     return response.data as any;
   }
 
   async getJobRunOutput(runId: string) {
-    let response = await this.http.get('/api/2.1/jobs/runs/get-output', {
+    let response = await this.http.get('/api/2.2/jobs/runs/get-output', {
       params: { run_id: runId }
     });
     return response.data as any;
@@ -675,7 +737,9 @@ export class DatabricksClient {
   }
 
   async getVectorSearchEndpoint(endpointName: string) {
-    let response = await this.http.get(`/api/2.0/vector-search/endpoints/${endpointName}`);
+    let response = await this.http.get(
+      `/api/2.0/vector-search/endpoints/${encodeURIComponent(endpointName)}`
+    );
     return response.data as any;
   }
 
@@ -688,14 +752,27 @@ export class DatabricksClient {
   }
 
   async deleteVectorSearchEndpoint(endpointName: string) {
-    await this.http.delete(`/api/2.0/vector-search/endpoints/${endpointName}`);
+    await this.http.delete(
+      `/api/2.0/vector-search/endpoints/${encodeURIComponent(endpointName)}`
+    );
   }
 
   async listVectorSearchIndexes(endpointName: string) {
-    let response = await this.http.get(`/api/2.0/vector-search/indexes`, {
+    let response = await this.http.get('/api/2.0/vector-search/indexes', {
       params: { endpoint_name: endpointName }
     });
     return (response.data as any).vector_indexes ?? [];
+  }
+
+  async getVectorSearchIndex(indexName: string) {
+    let response = await this.http.get(
+      `/api/2.0/vector-search/indexes/${encodeURIComponent(indexName)}`
+    );
+    return response.data as any;
+  }
+
+  async deleteVectorSearchIndex(indexName: string) {
+    await this.http.delete(`/api/2.0/vector-search/indexes/${encodeURIComponent(indexName)}`);
   }
 
   async queryVectorSearchIndex(
@@ -717,10 +794,67 @@ export class DatabricksClient {
     if (params.filtersJson) body.filters_json = params.filtersJson;
 
     let response = await this.http.post(
-      `/api/2.0/vector-search/indexes/${indexName}/query`,
+      `/api/2.0/vector-search/indexes/${encodeURIComponent(indexName)}/query`,
       body
     );
     return response.data as any;
+  }
+
+  // ─── Files API (Workspace files and Unity Catalog Volumes) ───────────
+
+  async listFilesDirectory(
+    path: string,
+    params: { pageSize?: number; pageToken?: string } = {}
+  ) {
+    let response = await this.http.get(
+      `/api/2.0/fs/directories${encodeMultiSegmentPath(path)}`,
+      {
+        params: {
+          page_size: params.pageSize,
+          page_token: params.pageToken
+        }
+      }
+    );
+    return response.data as any;
+  }
+
+  async createFilesDirectory(path: string) {
+    await this.http.put(`/api/2.0/fs/directories${encodeMultiSegmentPath(path)}`);
+  }
+
+  async deleteFilesDirectory(path: string) {
+    await this.http.delete(`/api/2.0/fs/directories${encodeMultiSegmentPath(path)}`);
+  }
+
+  async downloadFile(path: string, range?: string) {
+    let response = await this.http.get(`/api/2.0/fs/files${encodeMultiSegmentPath(path)}`, {
+      responseType: 'arraybuffer',
+      headers: range ? { Range: range } : undefined
+    });
+
+    return {
+      contentBase64: toBase64(response.data),
+      contentType: String(response.headers?.['content-type'] ?? 'application/octet-stream'),
+      contentLength: Number(response.headers?.['content-length'] ?? 0) || undefined,
+      lastModified: response.headers?.['last-modified']
+        ? String(response.headers['last-modified'])
+        : undefined
+    };
+  }
+
+  async uploadFile(path: string, contentBase64: string, overwrite?: boolean) {
+    await this.http.put(
+      `/api/2.0/fs/files${encodeMultiSegmentPath(path)}`,
+      Buffer.from(contentBase64, 'base64'),
+      {
+        params: overwrite === undefined ? undefined : { overwrite },
+        headers: { 'Content-Type': 'application/octet-stream' }
+      }
+    );
+  }
+
+  async deleteFile(path: string) {
+    await this.http.delete(`/api/2.0/fs/files${encodeMultiSegmentPath(path)}`);
   }
 
   // ─── DBFS ────────────────────────────────────────────────────────────

@@ -5,17 +5,25 @@ import {
   createContext,
   createSession,
   deleteContext,
+  deleteDownload,
   deleteExtension,
   fetchPage,
   getContext,
+  getDownload,
   getExtension,
+  getProject,
   getProjectUsage,
   getSession,
   getSessionDebugInfo,
   getSessionLogs,
   getSessionRecording,
+  listDownloads,
   listProjects,
-  listSessions
+  listSessions,
+  updateContext,
+  uploadExtension,
+  uploadSessionFile,
+  webSearch
 } from './tools';
 import { inboundWebhook, sessionStatusChange } from './triggers';
 
@@ -31,12 +39,20 @@ export let provider = Slate.create({
     getSessionRecording,
     createContext,
     getContext,
+    updateContext,
     deleteContext,
+    uploadExtension,
     getExtension,
     deleteExtension,
     listProjects,
+    getProject,
     getProjectUsage,
-    fetchPage
+    fetchPage,
+    webSearch,
+    uploadSessionFile,
+    listDownloads,
+    getDownload,
+    deleteDownload
   ],
   triggers: [inboundWebhook, sessionStatusChange]
 });

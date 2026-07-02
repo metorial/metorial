@@ -28,6 +28,10 @@ List all databases on the MySQL server. Returns database names, default characte
 
 List all tables in a MySQL database. Returns table names, types, engines, row estimates, and size information. Also supports listing views.
 
+### Manage Database
+
+Create or drop MySQL databases. Supports IF NOT EXISTS for creation, IF EXISTS for drops, and optional default character set and collation settings.
+
 ### Manage Indexes
 
 Create or drop indexes on MySQL tables. Supports standard, unique, fulltext, and spatial indexes. Useful for optimizing query performance by adding appropriate indexes.

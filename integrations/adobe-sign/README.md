@@ -20,21 +20,49 @@ Create an embeddable web form (widget) that generates a unique signing URL. Each
 
 Download the audit trail PDF for an agreement. The audit trail captures the complete history of events including creation, viewing, signing, delegation, and authentication actions.
 
+### Download Agreement Document
+
+List or download documents attached to an Adobe Acrobat Sign agreement. Downloads return the file through a Slate attachment; use documentId "combined" or omit documentId to download one combined PDF.
+
 ### Get Agreement
 
 Retrieve detailed information about a specific agreement including its status, participants, documents, and metadata. Optionally fetch signing URLs, form field data, or event history for the agreement.
 
+### Get Agreement Members
+
+Retrieve sender, participant set, next participant, CC, and share information for an Adobe Acrobat Sign agreement.
+
+### Get Bulk Send
+
+Retrieve detailed information about a Send in Bulk (MegaSign) parent agreement.
+
 ### Get Agreement Form Data
 
-Retrieve form field data from a completed or in-progress agreement. Returns the values that participants have entered into form fields, useful for extracting data from signed documents.
+Retrieve form field data from a completed or in-progress agreement as a Slate attachment.
+
+### Get Library Template
+
+Retrieve detailed information about an Adobe Acrobat Sign library template.
 
 ### Get Signing URLs
 
 Retrieve signing URLs for an agreement. These URLs can be used for embedded signing within your application. Only available when the agreement is waiting for one or more participants to sign.
 
+### Get User
+
+Retrieve detailed information for a user in the Adobe Acrobat Sign account.
+
+### Get Web Form
+
+Retrieve detailed information about an Adobe Acrobat Sign web form (widget).
+
 ### List Agreements
 
 List agreements in the account with optional filtering. Returns a paginated list of agreements with their basic details and current status.
+
+### List Bulk Sends
+
+List Send in Bulk (MegaSign) parent agreements in the Adobe Acrobat Sign account with pagination.
 
 ### List Library Templates
 
@@ -50,7 +78,7 @@ List web forms (widgets) in the account. Returns embeddable signing forms with t
 
 ### Send in Bulk
 
-Send the same agreement to a large number of recipients simultaneously (MegaSign). Each recipient receives a personalized signing experience. Useful for mass onboarding, policy acknowledgments, or form collection.
+Send the same agreement to many recipients using Adobe Acrobat Sign Send in Bulk (MegaSign). Current v6 bulk sends require a CSV transient document containing child agreement recipient information.
 
 ### Send Reminder
 
@@ -59,6 +87,18 @@ Send a reminder to participants who have not yet completed their actions on an a
 ### Update Agreement State
 
 Cancel or expire an agreement by updating its state. Use this to cancel agreements that are in progress, or to perform other state transitions.
+
+### Update Bulk Send State
+
+Update a Send in Bulk (MegaSign) parent agreement state, primarily to cancel an in-progress bulk send.
+
+### Update Library Template State
+
+Update the state of an Adobe Acrobat Sign library template, including activating, returning to authoring, or removing a template.
+
+### Update Web Form State
+
+Update an Adobe Acrobat Sign web form state, such as activating, deactivating, moving to authoring, or cancelling a web form.
 
 ### Upload Document
 

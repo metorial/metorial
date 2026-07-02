@@ -41,10 +41,18 @@ Supported OAuth scopes (with `openid` and `profile` always included):
 - `openid` – OpenID Connect identity
 - `profile` – User profile information
 - `email` – User email address
+- `read-billing` – Know whether the user has a payment method set up
 - `read-repos` – Read access to repositories
+- `gated-repos` – Read access to public gated repos the user has been granted access to
+- `contribute-repos` – Create repositories and access those created by the app
 - `write-repos` – Write access to repositories
 - `manage-repos` – Manage repositories (create, delete, update settings)
+- `read-collections` – Read access to collections
+- `write-collections` – Create, update, and delete collections
 - `inference-api` – Make inference requests on behalf of the user
+- `jobs` – Run Hugging Face Jobs
+- `webhooks` – Manage webhooks
+- `write-discussions` – Open and interact with discussions and pull requests
 
 ## Features
 

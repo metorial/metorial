@@ -1,11 +1,13 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CohereClient } from '../lib/client';
 import { spec } from '../spec';
 
 let messageSchema = z.object({
   role: z.enum(['system', 'user', 'assistant', 'tool']).describe('Role of the message sender'),
-  content: z.string().describe('Text content of the message')
+  content: z
+    .any()
+    .describe('Message content as a string or Cohere content blocks for multimodal inputs')
 });
 
 let toolDefinitionSchema = z.object({
@@ -18,11 +20,6 @@ let toolDefinitionSchema = z.object({
       .optional()
       .describe('JSON Schema describing the function parameters')
   })
-});
-
-let documentSchema = z.object({
-  id: z.string().optional().describe('Unique identifier for the document'),
-  data: z.record(z.string(), z.string()).describe('Key-value pairs of document content')
 });
 
 export let chatTool = SlateTool.create(spec, {
@@ -69,27 +66,73 @@ export let chatTool = SlateTool.create(spec, {
         .describe('Penalizes repeated tokens based on frequency (0 to 1)'),
       presencePenalty: z
         .number()
+        .min(0)
+        .max(1)
         .optional()
         .describe('Penalizes tokens that have already appeared (0 to 1)'),
+      k: z
+        .number()
+        .int()
+        .min(0)
+        .max(500)
+        .optional()
+        .describe('Top-k sampling parameter. Use 0 to disable k-sampling.'),
+      p: z
+        .number()
+        .min(0.01)
+        .max(0.99)
+        .optional()
+        .describe('Top-p nucleus sampling probability mass'),
       seed: z.number().optional().describe('Fixed seed for reproducible outputs'),
+      logprobs: z
+        .boolean()
+        .optional()
+        .describe('Include generated-token log probabilities in the raw Cohere response'),
       safetyMode: z
         .enum(['CONTEXTUAL', 'STRICT', 'OFF'])
         .optional()
         .describe('Safety filtering level for generated content'),
+      toolChoice: z
+        .enum(['REQUIRED', 'NONE'])
+        .optional()
+        .describe('Force tool use or force no tool use when tools are supplied'),
+      strictTools: z
+        .boolean()
+        .optional()
+        .describe('Require tool calls to strictly follow supplied tool definitions'),
+      priority: z
+        .number()
+        .int()
+        .min(0)
+        .max(999)
+        .optional()
+        .describe('Cohere request priority. Lower numbers are handled earlier.'),
+      citationOptions: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Cohere citation_options object for controlling citation generation'),
+      responseFormat: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Cohere response_format object, such as {"type":"json_object"}. Not supported with tools or documents.'
+        ),
       tools: z
         .array(toolDefinitionSchema)
         .optional()
         .describe('Function definitions the model can invoke'),
       documents: z
-        .array(documentSchema)
+        .array(z.any())
         .optional()
         .describe(
-          'Documents for RAG — the model will ground its response and generate citations'
+          'Documents for RAG as strings or Cohere document objects — the model will ground its response and generate citations'
         ),
       enableThinking: z
         .boolean()
         .optional()
-        .describe('Enable reasoning/thinking mode for complex tasks'),
+        .describe(
+          'Set false to disable thinking on reasoning models. True or omitted keeps Cohere default reasoning behavior.'
+        ),
       thinkingBudget: z
         .number()
         .optional()
@@ -117,6 +160,7 @@ export let chatTool = SlateTool.create(spec, {
         .array(z.any())
         .optional()
         .describe('Inline citations referencing provided documents'),
+      logprobs: z.array(z.any()).optional().describe('Generated-token log probabilities'),
       inputTokens: z.number().optional().describe('Number of input tokens consumed'),
       outputTokens: z.number().optional().describe('Number of output tokens generated')
     })
@@ -124,12 +168,19 @@ export let chatTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new CohereClient({ token: ctx.auth.token });
 
+    if (ctx.input.responseFormat && (ctx.input.tools || ctx.input.documents)) {
+      throw createApiServiceError('responseFormat is not supported with tools or documents.');
+    }
+
+    if (ctx.input.safetyMode && (ctx.input.tools || ctx.input.documents)) {
+      throw createApiServiceError('safetyMode is not supported with tools or documents.');
+    }
+
     let thinking: Record<string, any> | undefined;
-    if (ctx.input.enableThinking !== undefined) {
-      thinking = { enabled: ctx.input.enableThinking };
-      if (ctx.input.thinkingBudget !== undefined) {
-        thinking.budget_tokens = ctx.input.thinkingBudget;
-      }
+    if (ctx.input.enableThinking === false) {
+      thinking = { type: 'disabled' };
+    } else if (ctx.input.thinkingBudget !== undefined) {
+      thinking = { token_budget: ctx.input.thinkingBudget };
     }
 
     let result = await client.chat({
@@ -140,8 +191,16 @@ export let chatTool = SlateTool.create(spec, {
       stopSequences: ctx.input.stopSequences,
       frequencyPenalty: ctx.input.frequencyPenalty,
       presencePenalty: ctx.input.presencePenalty,
+      k: ctx.input.k,
+      p: ctx.input.p,
       seed: ctx.input.seed,
+      logprobs: ctx.input.logprobs,
       safetyMode: ctx.input.safetyMode,
+      toolChoice: ctx.input.toolChoice,
+      strictTools: ctx.input.strictTools,
+      priority: ctx.input.priority,
+      citationOptions: ctx.input.citationOptions,
+      responseFormat: ctx.input.responseFormat,
       tools: ctx.input.tools,
       documents: ctx.input.documents,
       thinking
@@ -188,6 +247,7 @@ export let chatTool = SlateTool.create(spec, {
       text,
       toolCalls,
       citations,
+      logprobs: result.logprobs,
       inputTokens,
       outputTokens
     };

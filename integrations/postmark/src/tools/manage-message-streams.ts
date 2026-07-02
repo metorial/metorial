@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { postmarkServiceError, requirePostmarkString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageMessageStreams = SlateTool.create(spec, {
@@ -104,9 +105,9 @@ export let manageMessageStreams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.streamId) throw new Error('streamId is required');
+      let streamId = requirePostmarkString(ctx.input.streamId, 'streamId', 'get');
 
-      let s = await client.getMessageStream(ctx.input.streamId);
+      let s = await client.getMessageStream(streamId);
 
       return {
         output: {
@@ -125,13 +126,15 @@ export let manageMessageStreams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.streamId || !ctx.input.name || !ctx.input.messageStreamType) {
-        throw new Error('streamId, name, and messageStreamType are required for creation');
+      let streamId = requirePostmarkString(ctx.input.streamId, 'streamId', 'create');
+      let name = requirePostmarkString(ctx.input.name, 'name', 'create');
+      if (!ctx.input.messageStreamType) {
+        throw postmarkServiceError('messageStreamType is required for "create".');
       }
 
       let s = await client.createMessageStream({
-        id: ctx.input.streamId,
-        name: ctx.input.name,
+        id: streamId,
+        name,
         messageStreamType: ctx.input.messageStreamType,
         description: ctx.input.description
       });
@@ -153,9 +156,9 @@ export let manageMessageStreams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.streamId) throw new Error('streamId is required');
+      let streamId = requirePostmarkString(ctx.input.streamId, 'streamId', 'update');
 
-      let s = await client.updateMessageStream(ctx.input.streamId, {
+      let s = await client.updateMessageStream(streamId, {
         name: ctx.input.name,
         description: ctx.input.description
       });
@@ -177,22 +180,22 @@ export let manageMessageStreams = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'archive') {
-      if (!ctx.input.streamId) throw new Error('streamId is required');
+      let streamId = requirePostmarkString(ctx.input.streamId, 'streamId', 'archive');
 
-      await client.archiveMessageStream(ctx.input.streamId);
+      await client.archiveMessageStream(streamId);
 
       return {
         output: {
           archived: true
         },
-        message: `Archived stream **${ctx.input.streamId}**.`
+        message: `Archived stream **${streamId}**.`
       };
     }
 
     // unarchive
-    if (!ctx.input.streamId) throw new Error('streamId is required');
+    let streamId = requirePostmarkString(ctx.input.streamId, 'streamId', 'unarchive');
 
-    let s = await client.unarchiveMessageStream(ctx.input.streamId);
+    let s = await client.unarchiveMessageStream(streamId);
 
     return {
       output: {

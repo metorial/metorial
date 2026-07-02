@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/finago",
+  "description": "Manage Finago Office (24SevenOffice) accounting and ERP workflows. Read organization context, accounts, taxes, currencies, payment methods, transaction types, customers, products, sales orders, account balances, and transaction lines. Create or update customers and products, create sales orders with lines, and upload or retrieve accounting documents.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "manage Finago Office organization context",
+    "list chart of accounts and tax codes",
+    "manage customers and products",
+    "create draft sales orders",
+    "analyze transaction lines and balances",
+    "upload and retrieve accounting documents"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/finago.svg"
+}

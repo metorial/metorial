@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { kibanaServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -151,7 +152,7 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
     }));
 
     if (action === 'get') {
-      if (!ruleId) throw new Error('ruleId is required for get action');
+      if (!ruleId) throw kibanaServiceError('ruleId is required for get action');
       let rule = await client.getRule(ruleId);
       return {
         output: mapRule(rule),
@@ -160,11 +161,11 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
-      if (!ruleTypeId) throw new Error('ruleTypeId is required for create action');
-      if (!consumer) throw new Error('consumer is required for create action');
-      if (!schedule) throw new Error('schedule is required for create action');
-      if (!ruleParams) throw new Error('ruleParams is required for create action');
+      if (!name) throw kibanaServiceError('name is required for create action');
+      if (!ruleTypeId) throw kibanaServiceError('ruleTypeId is required for create action');
+      if (!consumer) throw kibanaServiceError('consumer is required for create action');
+      if (!schedule) throw kibanaServiceError('schedule is required for create action');
+      if (!ruleParams) throw kibanaServiceError('ruleParams is required for create action');
 
       let rule = await client.createRule({
         name,
@@ -185,7 +186,7 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
     }
 
     if (action === 'update') {
-      if (!ruleId) throw new Error('ruleId is required for update action');
+      if (!ruleId) throw kibanaServiceError('ruleId is required for update action');
       let rule = await client.updateRule(ruleId, {
         name,
         schedule,
@@ -202,7 +203,7 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
     }
 
     if (action === 'delete') {
-      if (!ruleId) throw new Error('ruleId is required for delete action');
+      if (!ruleId) throw kibanaServiceError('ruleId is required for delete action');
       await client.deleteRule(ruleId);
       return {
         output: {
@@ -220,7 +221,7 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
     }
 
     if (action === 'enable') {
-      if (!ruleId) throw new Error('ruleId is required for enable action');
+      if (!ruleId) throw kibanaServiceError('ruleId is required for enable action');
       await client.enableRule(ruleId);
       let rule = await client.getRule(ruleId);
       return {
@@ -230,7 +231,7 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
     }
 
     if (action === 'disable') {
-      if (!ruleId) throw new Error('ruleId is required for disable action');
+      if (!ruleId) throw kibanaServiceError('ruleId is required for disable action');
       await client.disableRule(ruleId);
       let rule = await client.getRule(ruleId);
       return {
@@ -240,7 +241,7 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
     }
 
     if (action === 'mute') {
-      if (!ruleId) throw new Error('ruleId is required for mute action');
+      if (!ruleId) throw kibanaServiceError('ruleId is required for mute action');
       await client.muteAllAlerts(ruleId);
       let rule = await client.getRule(ruleId);
       return {
@@ -250,7 +251,7 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
     }
 
     if (action === 'unmute') {
-      if (!ruleId) throw new Error('ruleId is required for unmute action');
+      if (!ruleId) throw kibanaServiceError('ruleId is required for unmute action');
       await client.unmuteAllAlerts(ruleId);
       let rule = await client.getRule(ruleId);
       return {
@@ -259,6 +260,6 @@ Supports Elasticsearch query, index threshold, metric threshold, log threshold, 
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw kibanaServiceError(`Unknown action: ${action}`);
   })
   .build();

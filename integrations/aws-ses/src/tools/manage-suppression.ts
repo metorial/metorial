@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SesClient } from '../lib/client';
+import { requireAwsSesString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageSuppression = SlateTool.create(spec, {
@@ -69,15 +70,20 @@ export let manageSuppression = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'add') {
-      await client.putSuppressedDestination(ctx.input.emailAddress!, ctx.input.reason!);
+      let emailAddress = requireAwsSesString(ctx.input.emailAddress, 'emailAddress', action);
+      let reason = requireAwsSesString(ctx.input.reason, 'reason', action) as
+        | 'BOUNCE'
+        | 'COMPLAINT';
+      await client.putSuppressedDestination(emailAddress, reason);
       return {
-        output: { emailAddress: ctx.input.emailAddress, reason: ctx.input.reason },
-        message: `**${ctx.input.emailAddress}** added to suppression list (reason: ${ctx.input.reason}).`
+        output: { emailAddress, reason },
+        message: `**${emailAddress}** added to suppression list (reason: ${reason}).`
       };
     }
 
     if (action === 'get') {
-      let result = await client.getSuppressedDestination(ctx.input.emailAddress!);
+      let emailAddress = requireAwsSesString(ctx.input.emailAddress, 'emailAddress', action);
+      let result = await client.getSuppressedDestination(emailAddress);
       return {
         output: result,
         message: `**${result.emailAddress}** is suppressed (reason: ${result.reason}, since: ${result.lastUpdateTime}).`
@@ -85,10 +91,11 @@ export let manageSuppression = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      await client.deleteSuppressedDestination(ctx.input.emailAddress!);
+      let emailAddress = requireAwsSesString(ctx.input.emailAddress, 'emailAddress', action);
+      await client.deleteSuppressedDestination(emailAddress);
       return {
-        output: { emailAddress: ctx.input.emailAddress },
-        message: `**${ctx.input.emailAddress}** removed from suppression list.`
+        output: { emailAddress },
+        message: `**${emailAddress}** removed from suppression list.`
       };
     }
 

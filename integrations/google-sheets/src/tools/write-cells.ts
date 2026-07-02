@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SheetsClient } from '../lib/client';
 import { googleSheetsActionScopes } from '../scopes';
@@ -10,6 +10,7 @@ export let writeCells = SlateTool.create(spec, {
   description: `Writes values to one or more ranges in a spreadsheet. Supports single-range writes, multi-range batch writes, and appending data to the end of a table. Values can be written as raw data or interpreted as user input (parsing dates, formulas, etc.).`,
   instructions: [
     'Use A1 notation for ranges, e.g., "Sheet1!A1:B2".',
+    'Quote sheet names that contain spaces or special characters, e.g., "\'Draft summary\'!A1:Z80".',
     'Values are a 2D array where each inner array is a row.',
     'Set valueInputOption to "USER_ENTERED" to have values parsed as if typed in the UI (formulas, dates, etc.) or "RAW" for literal values.',
     'Use "append" mode to add rows to the end of a table detected at the given range.'
@@ -26,7 +27,9 @@ export let writeCells = SlateTool.create(spec, {
       range: z
         .string()
         .optional()
-        .describe('Target range in A1 notation for a single write or append'),
+        .describe(
+          'Target range in A1 notation for a single write or append (e.g., "Sheet1!A1:B2" or "\'Draft summary\'!A1:Z80")'
+        ),
       values: z
         .array(z.array(z.any()))
         .optional()
@@ -34,7 +37,11 @@ export let writeCells = SlateTool.create(spec, {
       rangeValues: z
         .array(
           z.object({
-            range: z.string().describe('Target range in A1 notation'),
+            range: z
+              .string()
+              .describe(
+                'Target range in A1 notation. Quote sheet names with spaces or special characters.'
+              ),
             values: z.array(z.array(z.any())).describe('2D array of values for this range')
           })
         )
@@ -102,7 +109,7 @@ export let writeCells = SlateTool.create(spec, {
     let values = ctx.input.values;
 
     if (!range || !values) {
-      throw new Error(
+      throw createApiServiceError(
         'Either "range" and "values" must be provided, or "rangeValues" for batch writes'
       );
     }

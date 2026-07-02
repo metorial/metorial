@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { squareServiceError } from '../lib/errors';
 import { createClient, generateIdempotencyKey } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -47,6 +48,18 @@ export let createCustomer = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.givenName &&
+      !ctx.input.familyName &&
+      !ctx.input.companyName &&
+      !ctx.input.emailAddress &&
+      !ctx.input.phoneNumber
+    ) {
+      throw squareServiceError(
+        'Provide at least one of givenName, familyName, companyName, emailAddress, or phoneNumber.'
+      );
+    }
+
     let client = createClient(ctx.auth, ctx.config);
 
     let addressInput = ctx.input.address

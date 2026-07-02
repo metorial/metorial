@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SheetsClient } from '../lib/client';
 import { googleSheetsActionScopes } from '../scopes';
@@ -10,6 +10,7 @@ export let readCells = SlateTool.create(spec, {
   description: `Reads values from one or more ranges in a spreadsheet. Supports A1 notation (e.g., "Sheet1!A1:B10") and named ranges. Can read a single range or multiple ranges at once. Returns values as formatted strings, raw values, or formulas.`,
   instructions: [
     'Use A1 notation to specify ranges, e.g., "Sheet1!A1:D10", "A1:B5", "Sheet1!A:A" for an entire column.',
+    'Quote sheet names that contain spaces or special characters, e.g., "\'Draft summary\'!A1:Z80".',
     'For multiple ranges, pass an array to the "ranges" field instead of using "range".'
   ],
   tags: {
@@ -24,8 +25,15 @@ export let readCells = SlateTool.create(spec, {
       range: z
         .string()
         .optional()
-        .describe('Single range in A1 notation (e.g., "Sheet1!A1:B10")'),
-      ranges: z.array(z.string()).optional().describe('Multiple ranges to read at once'),
+        .describe(
+          'Single range in A1 notation (e.g., "Sheet1!A1:B10" or "\'Draft summary\'!A1:Z80")'
+        ),
+      ranges: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Multiple ranges to read at once. Quote sheet names with spaces or special characters.'
+        ),
       valueRenderOption: z
         .enum(['FORMATTED_VALUE', 'UNFORMATTED_VALUE', 'FORMULA'])
         .optional()
@@ -95,7 +103,7 @@ export let readCells = SlateTool.create(spec, {
 
     let range = ctx.input.range;
     if (!range) {
-      throw new Error('Either "range" or "ranges" must be provided');
+      throw createApiServiceError('Either "range" or "ranges" must be provided');
     }
 
     let result = await client.getValues(ctx.input.spreadsheetId, range, options);

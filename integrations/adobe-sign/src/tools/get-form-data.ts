@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -20,9 +20,9 @@ export let getFormData = SlateTool.create(spec, {
   .output(
     z.object({
       agreementId: z.string().describe('ID of the agreement'),
-      formData: z
-        .any()
-        .describe('Form field data as CSV or structured content from the agreement')
+      mimeType: z.string().describe('MIME type of the returned attachment'),
+      byteLength: z.number().describe('Size of the returned attachment in bytes'),
+      attachmentCount: z.number().describe('Number of attachments returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -33,12 +33,16 @@ export let getFormData = SlateTool.create(spec, {
     });
 
     let result = await client.getAgreementFormData(ctx.input.agreementId);
+    let content = typeof result === 'string' ? result : JSON.stringify(result);
 
     return {
       output: {
         agreementId: ctx.input.agreementId,
-        formData: result
+        mimeType: 'text/csv',
+        byteLength: Buffer.byteLength(content, 'utf8'),
+        attachmentCount: 1
       },
+      attachments: [createTextAttachment(content, 'text/csv')],
       message: `Retrieved form data for agreement \`${ctx.input.agreementId}\`.`
     };
   });

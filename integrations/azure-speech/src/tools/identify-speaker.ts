@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpeakerRecognitionClient } from '../lib/client';
+import { azureSpeechServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let identifySpeaker = SlateTool.create(spec, {
@@ -45,7 +46,13 @@ Uses text-independent identification — the speaker can say anything.`,
     });
 
     if (ctx.input.profileIds.length > 50) {
-      throw new Error('Maximum 50 candidate profiles per identification request.');
+      throw azureSpeechServiceError(
+        'Maximum 50 candidate profiles per identification request.'
+      );
+    }
+
+    if (ctx.input.profileIds.length === 0) {
+      throw azureSpeechServiceError('At least one profileId is required.');
     }
 
     ctx.info(`Identifying speaker against ${ctx.input.profileIds.length} profiles...`);

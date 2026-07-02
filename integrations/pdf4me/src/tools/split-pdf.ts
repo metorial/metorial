@@ -1,7 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdf4meServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  attachmentMetadataSchema,
+  streamDocumentAttachment,
+  streamDocumentOutput
+} from './shared';
 
 export let splitPdf = SlateTool.create(spec, {
   name: 'Split PDF',
@@ -77,8 +83,7 @@ Returns an array of split document files.`,
       documents: z
         .array(
           z.object({
-            fileName: z.string().describe('Split document file name'),
-            fileContent: z.string().describe('Base64-encoded split document content'),
+            ...attachmentMetadataSchema.shape,
             barcodeText: z
               .string()
               .optional()
@@ -87,7 +92,8 @@ Returns an array of split document files.`,
           })
         )
         .describe('Array of split documents'),
-      documentCount: z.number().describe('Number of resulting documents')
+      documentCount: z.number().describe('Number of resulting documents'),
+      attachmentCount: z.number().describe('Number of split document attachments returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -95,7 +101,9 @@ Returns an array of split document files.`,
 
     if (ctx.input.splitMethod === 'byText') {
       if (!ctx.input.searchText || !ctx.input.textSplitType) {
-        throw new Error('searchText and textSplitType are required for text-based splitting');
+        throw pdf4meServiceError(
+          'searchText and textSplitType are required for text-based splitting'
+        );
       }
       let result = await client.splitByText({
         docContent: ctx.input.fileContent,
@@ -104,13 +112,19 @@ Returns an array of split document files.`,
         splitTextPage: ctx.input.textSplitType,
         fileNaming: ctx.input.fileNaming
       });
-      let documents = (result.splitedDocuments ?? []).map(doc => ({
-        fileName: doc.fileName,
-        fileContent: doc.streamFile,
+      let splitDocuments = result.splitedDocuments ?? [];
+      let documents = splitDocuments.map((doc, index) => ({
+        ...streamDocumentOutput(doc, index),
         extractedText: doc.docText
       }));
+      let attachments = splitDocuments.map(streamDocumentAttachment);
       return {
-        output: { documents, documentCount: documents.length },
+        output: {
+          documents,
+          documentCount: documents.length,
+          attachmentCount: attachments.length
+        },
+        attachments,
         message: `Split PDF into **${documents.length}** documents by text "${ctx.input.searchText}"`
       };
     }
@@ -122,7 +136,7 @@ Returns an array of split document files.`,
         !ctx.input.barcodeType ||
         !ctx.input.barcodeSplitPage
       ) {
-        throw new Error(
+        throw pdf4meServiceError(
           'barcodeFilter, barcodeSearchText, barcodeType, and barcodeSplitPage are required for barcode-based splitting'
         );
       }
@@ -134,13 +148,19 @@ Returns an array of split document files.`,
         barcodeType: ctx.input.barcodeType,
         splitBarcodePage: ctx.input.barcodeSplitPage
       });
-      let documents = (result.splitedDocuments ?? []).map(doc => ({
-        fileName: doc.fileName,
-        fileContent: doc.streamFile,
+      let splitDocuments = result.splitedDocuments ?? [];
+      let documents = splitDocuments.map((doc, index) => ({
+        ...streamDocumentOutput(doc, index),
         barcodeText: doc.barcodeText
       }));
+      let attachments = splitDocuments.map(streamDocumentAttachment);
       return {
-        output: { documents, documentCount: documents.length },
+        output: {
+          documents,
+          documentCount: documents.length,
+          attachmentCount: attachments.length
+        },
+        attachments,
         message: `Split PDF into **${documents.length}** documents by barcode`
       };
     }
@@ -166,13 +186,17 @@ Returns an array of split document files.`,
       fileNaming: ctx.input.fileNaming
     });
 
-    let documents = (result.splitedDocuments ?? []).map(doc => ({
-      fileName: doc.fileName,
-      fileContent: doc.streamFile
-    }));
+    let splitDocuments = result.splitedDocuments ?? [];
+    let documents = splitDocuments.map(streamDocumentOutput);
+    let attachments = splitDocuments.map(streamDocumentAttachment);
 
     return {
-      output: { documents, documentCount: documents.length },
+      output: {
+        documents,
+        documentCount: documents.length,
+        attachmentCount: attachments.length
+      },
+      attachments,
       message: `Split PDF into **${documents.length}** documents using ${ctx.input.splitMethod}`
     };
   })

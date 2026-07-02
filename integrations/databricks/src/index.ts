@@ -13,10 +13,12 @@ import {
   listWarehouses,
   manageCluster,
   manageDbfs,
+  manageFiles,
   manageJob,
   manageNotebook,
   managePipeline,
   manageSecrets,
+  manageVectorSearch,
   manageWarehouse,
   queryServingEndpoint,
   runJob,
@@ -46,7 +48,9 @@ export let provider = Slate.create({
     queryServingEndpoint,
     managePipeline,
     listPipelines,
-    manageDbfs
+    manageDbfs,
+    manageFiles,
+    manageVectorSearch
   ],
   triggers: [modelRegistryTrigger, jobRunsTrigger]
 });

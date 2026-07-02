@@ -2,7 +2,7 @@
 
 ## Overview
 
-Amazon Simple Queue Service (Amazon SQS) is a hosted queue service that lets you integrate and decouple distributed software systems and components. It stores messages on multiple servers for durability, supporting standard queues with at-least-once delivery and FIFO queues with exactly-once processing. Users can create unlimited queues with unlimited messages in any AWS region, with message payloads up to 256KB in any text format.
+Amazon Simple Queue Service (Amazon SQS) is a hosted queue service that lets you integrate and decouple distributed software systems and components. It stores messages on multiple servers for durability, supporting standard queues with at-least-once delivery and FIFO queues with exactly-once processing. Users can create unlimited queues with unlimited messages in any AWS region, with message payloads up to 1 MiB in any supported text format.
 
 ## Authentication
 
@@ -28,11 +28,11 @@ You control access in AWS by creating policies and attaching them to AWS identit
 
 ### Queue Management
 
-Create, configure, list, and delete message queues. Amazon SQS supports two types of queues: standard queues and FIFO queues. Standard queues provide maximum throughput with at-least-once delivery. FIFO queues deliver messages exactly once, and the order in which messages are sent and received is strictly preserved. Key configurable attributes include visibility timeout, message retention period, delay seconds, and maximum message size. You cannot rename a queue or convert between standard and FIFO types after creation.
+Create, configure, list, and delete message queues. Amazon SQS supports two types of queues: standard queues and FIFO queues. Standard queues provide maximum throughput with at-least-once delivery. FIFO queues deliver messages exactly once, and the order in which messages are sent and received is strictly preserved. Key configurable attributes include visibility timeout, message retention period, delay seconds, maximum message size, high-throughput FIFO settings, and encryption. You cannot rename a queue or convert between standard and FIFO types after creation.
 
 ### Sending Messages
 
-Send messages to a queue with an optional delay. Messages can include a body (up to 256KB), custom message attributes (metadata), and for FIFO queues, a message group ID and deduplication ID. To send messages larger than 256KB, you can use the Amazon SQS Extended Client Library for Java, which uses S3 to store the message payload.
+Send messages to a queue with an optional delay. Messages can include a body (up to 1 MiB), custom message attributes (metadata), and for FIFO queues, a message group ID and deduplication ID. For larger payload workflows, use an extended-client pattern that stores payloads outside SQS, such as in Amazon S3.
 
 ### Receiving and Deleting Messages
 
@@ -40,7 +40,7 @@ Receive messages from a queue using short polling or long polling. Long polling 
 
 ### Visibility Timeout Management
 
-Change the visibility timeout of individual messages after they have been received. This allows consumers to extend or shorten the processing window for specific messages. The default visibility timeout for a message is 30 seconds. The minimum is 0 seconds. The maximum is 12 hours.
+Change the visibility timeout of individual messages or batches of up to 10 messages after they have been received. This allows consumers to extend or shorten the processing window for specific messages. The default visibility timeout for a message is 30 seconds. The minimum is 0 seconds. The maximum is 12 hours.
 
 ### Dead-Letter Queues
 
@@ -52,7 +52,7 @@ Securely share Amazon SQS queues anonymously or with specific AWS accounts. Queu
 
 ### Message Move Tasks
 
-Start, list, and cancel message move tasks. This is used to move messages between queues, commonly from a dead-letter queue back to a source queue.
+Start, list, and cancel message move tasks. This is used to move messages between queues, commonly from a dead-letter queue back to a source queue. The integration also lists source queues associated with a dead-letter queue to support DLQ audits.
 
 ### Server-Side Encryption
 

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SheetsClient } from '../lib/client';
 import { googleSheetsActionScopes } from '../scopes';
@@ -7,12 +7,13 @@ import { spec } from '../spec';
 export let manageSheets = SlateTool.create(spec, {
   name: 'Manage Sheets',
   key: 'manage_sheets',
-  description: `Add, delete, duplicate, rename, or update individual sheet tabs within a spreadsheet. Configure sheet properties like grid size, frozen rows/columns, tab color, and visibility.`,
+  description: `Add, delete, duplicate, or update individual sheet tabs within a spreadsheet. Rename a tab by using action "update" with the numeric sheetId and new title. Configure sheet properties like grid size, frozen rows/columns, tab color, and visibility.`,
   instructions: [
     'To add a sheet, set action to "add" and provide a title.',
     'To delete a sheet, set action to "delete" and provide the sheetId (numeric, not the title).',
     'To duplicate a sheet, set action to "duplicate" and provide the sourceSheetId.',
-    'To update sheet properties (rename, freeze rows, etc.), set action to "update" and provide the sheetId along with the properties to change.'
+    'To rename or update sheet properties, set action to "update" and provide the sheetId along with title or the properties to change.',
+    'This tool performs one sheet-tab operation per call. For multiple raw Google Sheets API requests, use batch_update with a requests array.'
   ],
   tags: {
     destructive: false,
@@ -25,12 +26,15 @@ export let manageSheets = SlateTool.create(spec, {
       spreadsheetId: z.string().describe('Unique ID of the spreadsheet'),
       action: z
         .enum(['add', 'delete', 'duplicate', 'update'])
-        .describe('Operation to perform on the sheet tab'),
+        .describe('Operation to perform on the sheet tab. Use "update" with title to rename.'),
       sheetId: z
         .number()
         .optional()
         .describe('Numeric ID of the sheet tab (required for delete and update)'),
-      title: z.string().optional().describe('Title for the sheet (used in add and update)'),
+      title: z
+        .string()
+        .optional()
+        .describe('Title for a new sheet, or the new title when action is update'),
       sourceSheetId: z
         .number()
         .optional()
@@ -110,7 +114,8 @@ export let manageSheets = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (ctx.input.sheetId === undefined) throw new Error('sheetId is required for delete');
+      if (ctx.input.sheetId === undefined)
+        throw createApiServiceError('sheetId is required for delete');
       await client.deleteSheet(spreadsheetId, ctx.input.sheetId);
       return {
         output: {
@@ -123,7 +128,7 @@ export let manageSheets = SlateTool.create(spec, {
 
     if (action === 'duplicate') {
       if (ctx.input.sourceSheetId === undefined)
-        throw new Error('sourceSheetId is required for duplicate');
+        throw createApiServiceError('sourceSheetId is required for duplicate');
       let result = await client.duplicateSheet(
         spreadsheetId,
         ctx.input.sourceSheetId,
@@ -143,7 +148,8 @@ export let manageSheets = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (ctx.input.sheetId === undefined) throw new Error('sheetId is required for update');
+      if (ctx.input.sheetId === undefined)
+        throw createApiServiceError('sheetId is required for update');
 
       let properties: Record<string, any> = { sheetId: ctx.input.sheetId };
       let fields: string[] = [];
@@ -203,7 +209,7 @@ export let manageSheets = SlateTool.create(spec, {
 
       let allFields = [...fields, ...gridFields];
       if (allFields.length === 0)
-        throw new Error('At least one property must be provided to update');
+        throw createApiServiceError('At least one property must be provided to update');
 
       await client.updateSheetProperties(spreadsheetId, properties, allFields.join(','));
 
@@ -217,6 +223,6 @@ export let manageSheets = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { cognitoServiceError } from '../lib/errors';
 import { createCognitoClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -70,7 +71,9 @@ export let manageUserPool = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.poolName) throw new Error('poolName is required for create action');
+      if (!ctx.input.poolName) {
+        throw cognitoServiceError('poolName is required for create action');
+      }
 
       let params: Record<string, any> = { PoolName: ctx.input.poolName };
       if (ctx.input.mfaConfiguration) params.MfaConfiguration = ctx.input.mfaConfiguration;
@@ -112,7 +115,9 @@ export let manageUserPool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.userPoolId) throw new Error('userPoolId is required for get action');
+      if (!ctx.input.userPoolId) {
+        throw cognitoServiceError('userPoolId is required for get action');
+      }
       let result = await client.describeUserPool(ctx.input.userPoolId);
       let pool = result.UserPool;
 
@@ -132,7 +137,9 @@ export let manageUserPool = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.userPoolId) throw new Error('userPoolId is required for update action');
+      if (!ctx.input.userPoolId) {
+        throw cognitoServiceError('userPoolId is required for update action');
+      }
 
       let params: Record<string, any> = { UserPoolId: ctx.input.userPoolId };
       if (ctx.input.mfaConfiguration) params.MfaConfiguration = ctx.input.mfaConfiguration;
@@ -166,7 +173,9 @@ export let manageUserPool = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.userPoolId) throw new Error('userPoolId is required for delete action');
+      if (!ctx.input.userPoolId) {
+        throw cognitoServiceError('userPoolId is required for delete action');
+      }
       await client.deleteUserPool(ctx.input.userPoolId);
 
       return {
@@ -178,6 +187,6 @@ export let manageUserPool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw cognitoServiceError(`Unknown action: ${action}`);
   })
   .build();

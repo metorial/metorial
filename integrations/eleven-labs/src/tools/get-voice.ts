@@ -30,7 +30,8 @@ export let getVoice = SlateTool.create(spec, {
           stability: z.number().optional().describe('Voice stability setting'),
           similarityBoost: z.number().optional().describe('Similarity boost setting'),
           style: z.number().optional().describe('Style exaggeration setting'),
-          useSpeakerBoost: z.boolean().optional().describe('Speaker boost enabled')
+          useSpeakerBoost: z.boolean().optional().describe('Speaker boost enabled'),
+          speed: z.number().optional().describe('Voice speed setting')
         })
         .optional()
         .describe('Current voice settings')
@@ -54,7 +55,8 @@ export let getVoice = SlateTool.create(spec, {
               stability: settingsData.stability as number | undefined,
               similarityBoost: settingsData.similarity_boost as number | undefined,
               style: settingsData.style as number | undefined,
-              useSpeakerBoost: settingsData.use_speaker_boost as boolean | undefined
+              useSpeakerBoost: settingsData.use_speaker_boost as boolean | undefined,
+              speed: settingsData.speed as number | undefined
             }
           : undefined
       },

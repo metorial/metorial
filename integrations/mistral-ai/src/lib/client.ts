@@ -1,17 +1,49 @@
+import { Buffer } from 'node:buffer';
 import { createAxios } from 'slates';
+import { mistralApiError } from './errors';
+
+let appendFormField = (
+  formData: FormData,
+  key: string,
+  value: string | number | boolean | string[] | undefined
+) => {
+  if (value === undefined) {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (let item of value) {
+      formData.append(key, item);
+    }
+    return;
+  }
+
+  formData.append(key, String(value));
+};
 
 export class MistralClient {
-  private axios;
+  private axios: ReturnType<typeof createAxios>;
 
   constructor(private token: string) {
     this.axios = createAxios({
       baseURL: 'https://api.mistral.ai/v1'
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(mistralApiError(error))
+    );
   }
 
-  private get headers() {
+  private get authHeaders() {
     return {
-      Authorization: `Bearer ${this.token}`,
+      Authorization: `Bearer ${this.token}`
+    };
+  }
+
+  private get jsonHeaders() {
+    return {
+      ...this.authHeaders,
       'Content-Type': 'application/json'
     };
   }
@@ -41,6 +73,11 @@ export class MistralClient {
     toolChoice?: string | any;
     parallelToolCalls?: boolean;
     safePrompt?: boolean;
+    metadata?: Record<string, unknown>;
+    prediction?: Record<string, unknown>;
+    reasoningEffort?: 'high' | 'none';
+    guardrails?: Record<string, unknown>[];
+    promptCacheKey?: string;
   }) {
     let body: any = {
       model: params.model,
@@ -70,9 +107,14 @@ export class MistralClient {
     if (params.parallelToolCalls !== undefined)
       body.parallel_tool_calls = params.parallelToolCalls;
     if (params.safePrompt !== undefined) body.safe_prompt = params.safePrompt;
+    if (params.metadata !== undefined) body.metadata = params.metadata;
+    if (params.prediction !== undefined) body.prediction = params.prediction;
+    if (params.reasoningEffort !== undefined) body.reasoning_effort = params.reasoningEffort;
+    if (params.guardrails !== undefined) body.guardrails = params.guardrails;
+    if (params.promptCacheKey !== undefined) body.prompt_cache_key = params.promptCacheKey;
 
     let response = await this.axios.post('/chat/completions', body, {
-      headers: this.headers
+      headers: this.jsonHeaders
     });
 
     return response.data;
@@ -90,6 +132,8 @@ export class MistralClient {
     topP?: number;
     stop?: string | string[];
     randomSeed?: number;
+    metadata?: Record<string, unknown>;
+    promptCacheKey?: string;
   }) {
     let body: any = {
       model: params.model,
@@ -104,9 +148,11 @@ export class MistralClient {
     if (params.topP !== undefined) body.top_p = params.topP;
     if (params.stop !== undefined) body.stop = params.stop;
     if (params.randomSeed !== undefined) body.random_seed = params.randomSeed;
+    if (params.metadata !== undefined) body.metadata = params.metadata;
+    if (params.promptCacheKey !== undefined) body.prompt_cache_key = params.promptCacheKey;
 
     let response = await this.axios.post('/fim/completions', body, {
-      headers: this.headers
+      headers: this.jsonHeaders
     });
 
     return response.data;
@@ -149,7 +195,7 @@ export class MistralClient {
       body.frequency_penalty = params.frequencyPenalty;
 
     let response = await this.axios.post('/agents/completions', body, {
-      headers: this.headers
+      headers: this.jsonHeaders
     });
 
     return response.data;
@@ -163,6 +209,7 @@ export class MistralClient {
     encodingFormat?: string;
     outputDimension?: number;
     outputDtype?: string;
+    metadata?: Record<string, unknown>;
   }) {
     let body: any = {
       model: params.model,
@@ -172,9 +219,10 @@ export class MistralClient {
     if (params.encodingFormat !== undefined) body.encoding_format = params.encodingFormat;
     if (params.outputDimension !== undefined) body.output_dimension = params.outputDimension;
     if (params.outputDtype !== undefined) body.output_dtype = params.outputDtype;
+    if (params.metadata !== undefined) body.metadata = params.metadata;
 
     let response = await this.axios.post('/embeddings', body, {
-      headers: this.headers
+      headers: this.jsonHeaders
     });
 
     return response.data;
@@ -182,14 +230,20 @@ export class MistralClient {
 
   // ── Moderation ──
 
-  async moderate(params: { model: string; input: string | string[] }) {
-    let body = {
+  async moderate(params: {
+    model: string;
+    input: string | string[];
+    metadata?: Record<string, unknown>;
+  }) {
+    let body: any = {
       model: params.model,
       input: params.input
     };
 
+    if (params.metadata !== undefined) body.metadata = params.metadata;
+
     let response = await this.axios.post('/moderations', body, {
-      headers: this.headers
+      headers: this.jsonHeaders
     });
 
     return response.data;
@@ -198,14 +252,17 @@ export class MistralClient {
   async moderateChat(params: {
     model: string;
     input: Array<{ role: string; content: string }>;
+    metadata?: Record<string, unknown>;
   }) {
-    let body = {
+    let body: any = {
       model: params.model,
       input: params.input
     };
 
+    if (params.metadata !== undefined) body.metadata = params.metadata;
+
     let response = await this.axios.post('/chat/moderations', body, {
-      headers: this.headers
+      headers: this.jsonHeaders
     });
 
     return response.data;
@@ -223,6 +280,10 @@ export class MistralClient {
     tableFormat?: string;
     extractHeader?: boolean;
     extractFooter?: boolean;
+    bboxAnnotationFormat?: Record<string, unknown>;
+    documentAnnotationFormat?: Record<string, unknown>;
+    documentAnnotationPrompt?: string;
+    confidenceScoresGranularity?: 'word' | 'page';
   }) {
     let body: any = {
       model: params.model,
@@ -237,9 +298,17 @@ export class MistralClient {
     if (params.tableFormat !== undefined) body.table_format = params.tableFormat;
     if (params.extractHeader !== undefined) body.extract_header = params.extractHeader;
     if (params.extractFooter !== undefined) body.extract_footer = params.extractFooter;
+    if (params.bboxAnnotationFormat !== undefined)
+      body.bbox_annotation_format = params.bboxAnnotationFormat;
+    if (params.documentAnnotationFormat !== undefined)
+      body.document_annotation_format = params.documentAnnotationFormat;
+    if (params.documentAnnotationPrompt !== undefined)
+      body.document_annotation_prompt = params.documentAnnotationPrompt;
+    if (params.confidenceScoresGranularity !== undefined)
+      body.confidence_scores_granularity = params.confidenceScoresGranularity;
 
     let response = await this.axios.post('/ocr', body, {
-      headers: this.headers
+      headers: this.jsonHeaders
     });
 
     return response.data;
@@ -247,9 +316,14 @@ export class MistralClient {
 
   // ── Models ──
 
-  async listModels() {
+  async listModels(params?: { provider?: string; model?: string }) {
+    let queryParams: any = {};
+    if (params?.provider !== undefined) queryParams.provider = params.provider;
+    if (params?.model !== undefined) queryParams.model = params.model;
+
     let response = await this.axios.get('/models', {
-      headers: this.headers
+      headers: this.authHeaders,
+      params: queryParams
     });
 
     return response.data;
@@ -257,7 +331,7 @@ export class MistralClient {
 
   async getModel(modelId: string) {
     let response = await this.axios.get(`/models/${modelId}`, {
-      headers: this.headers
+      headers: this.authHeaders
     });
 
     return response.data;
@@ -265,7 +339,7 @@ export class MistralClient {
 
   async deleteModel(modelId: string) {
     let response = await this.axios.delete(`/models/${modelId}`, {
-      headers: this.headers
+      headers: this.authHeaders
     });
 
     return response.data;
@@ -273,13 +347,54 @@ export class MistralClient {
 
   // ── Files ──
 
-  async listFiles(params?: { page?: number; pageSize?: number }) {
+  async uploadFile(params: {
+    filename: string;
+    contentBase64: string;
+    mimeType?: string;
+    purpose?: 'fine-tune' | 'batch' | 'ocr';
+    visibility?: 'workspace' | 'user';
+    expiry?: number;
+  }) {
+    let fileBytes = Buffer.from(params.contentBase64, 'base64');
+    let formData = new FormData();
+    let blob = new Blob([fileBytes], {
+      type: params.mimeType ?? 'application/octet-stream'
+    });
+
+    formData.append('file', blob, params.filename);
+    appendFormField(formData, 'purpose', params.purpose);
+    appendFormField(formData, 'visibility', params.visibility);
+    appendFormField(formData, 'expiry', params.expiry);
+
+    let response = await this.axios.post('/files', formData, {
+      headers: this.authHeaders
+    });
+
+    return response.data;
+  }
+
+  async listFiles(params?: {
+    page?: number;
+    pageSize?: number;
+    includeTotal?: boolean;
+    sampleType?: string[];
+    source?: string[];
+    search?: string;
+    purpose?: 'fine-tune' | 'batch' | 'ocr';
+    mimetypes?: string[];
+  }) {
     let queryParams: any = {};
     if (params?.page !== undefined) queryParams.page = params.page;
     if (params?.pageSize !== undefined) queryParams.page_size = params.pageSize;
+    if (params?.includeTotal !== undefined) queryParams.include_total = params.includeTotal;
+    if (params?.sampleType !== undefined) queryParams.sample_type = params.sampleType;
+    if (params?.source !== undefined) queryParams.source = params.source;
+    if (params?.search !== undefined) queryParams.search = params.search;
+    if (params?.purpose !== undefined) queryParams.purpose = params.purpose;
+    if (params?.mimetypes !== undefined) queryParams.mimetypes = params.mimetypes;
 
     let response = await this.axios.get('/files', {
-      headers: this.headers,
+      headers: this.authHeaders,
       params: queryParams
     });
 
@@ -288,7 +403,7 @@ export class MistralClient {
 
   async getFile(fileId: string) {
     let response = await this.axios.get(`/files/${fileId}`, {
-      headers: this.headers
+      headers: this.authHeaders
     });
 
     return response.data;
@@ -296,10 +411,25 @@ export class MistralClient {
 
   async deleteFile(fileId: string) {
     let response = await this.axios.delete(`/files/${fileId}`, {
-      headers: this.headers
+      headers: this.authHeaders
     });
 
     return response.data;
+  }
+
+  async downloadFile(fileId: string) {
+    let response = await this.axios.get(`/files/${fileId}/content`, {
+      headers: this.authHeaders,
+      responseType: 'arraybuffer'
+    });
+    let content = Buffer.from(response.data as ArrayBuffer);
+    let contentType = response.headers['content-type'];
+
+    return {
+      contentBase64: content.toString('base64'),
+      contentType: typeof contentType === 'string' ? contentType : undefined,
+      byteLength: content.byteLength
+    };
   }
 
   async getFileUrl(fileId: string, expiry?: number) {
@@ -307,7 +437,87 @@ export class MistralClient {
     if (expiry !== undefined) queryParams.expiry = expiry;
 
     let response = await this.axios.get(`/files/${fileId}/url`, {
-      headers: this.headers,
+      headers: this.authHeaders,
+      params: queryParams
+    });
+
+    return response.data;
+  }
+
+  // ── Audio ──
+
+  async transcribeAudio(params: {
+    model: string;
+    sourceType: 'file_url' | 'file_id' | 'file_content';
+    fileUrl?: string;
+    fileId?: string;
+    filename?: string;
+    contentBase64?: string;
+    mimeType?: string;
+    language?: string;
+    temperature?: number;
+    diarize?: boolean;
+    contextBias?: string[];
+    timestampGranularities?: Array<'segment' | 'word'>;
+  }) {
+    let formData = new FormData();
+    appendFormField(formData, 'model', params.model);
+    appendFormField(formData, 'language', params.language);
+    appendFormField(formData, 'temperature', params.temperature);
+    appendFormField(formData, 'diarize', params.diarize);
+    appendFormField(formData, 'context_bias', params.contextBias);
+    appendFormField(formData, 'timestamp_granularities', params.timestampGranularities);
+
+    if (params.sourceType === 'file_url') {
+      appendFormField(formData, 'file_url', params.fileUrl);
+    } else if (params.sourceType === 'file_id') {
+      appendFormField(formData, 'file_id', params.fileId);
+    } else {
+      let fileBytes = Buffer.from(params.contentBase64 ?? '', 'base64');
+      let blob = new Blob([fileBytes], {
+        type: params.mimeType ?? 'application/octet-stream'
+      });
+      formData.append('file', blob, params.filename ?? 'audio');
+    }
+
+    let response = await this.axios.post('/audio/transcriptions', formData, {
+      headers: this.authHeaders
+    });
+
+    return response.data;
+  }
+
+  async generateSpeech(params: {
+    input: string;
+    model?: string;
+    voiceId?: string;
+    refAudio?: string;
+    responseFormat?: 'pcm' | 'wav' | 'mp3' | 'flac' | 'opus';
+  }) {
+    let body: any = {
+      input: params.input,
+      stream: false
+    };
+
+    if (params.model !== undefined) body.model = params.model;
+    if (params.voiceId !== undefined) body.voice_id = params.voiceId;
+    if (params.refAudio !== undefined) body.ref_audio = params.refAudio;
+    if (params.responseFormat !== undefined) body.response_format = params.responseFormat;
+
+    let response = await this.axios.post('/audio/speech', body, {
+      headers: this.jsonHeaders
+    });
+
+    return response.data;
+  }
+
+  async listVoices(params?: { limit?: number; offset?: number }) {
+    let queryParams: any = {};
+    if (params?.limit !== undefined) queryParams.limit = params.limit;
+    if (params?.offset !== undefined) queryParams.offset = params.offset;
+
+    let response = await this.axios.get('/audio/voices', {
+      headers: this.authHeaders,
       params: queryParams
     });
 
@@ -343,8 +553,7 @@ export class MistralClient {
 
     if (params.validationFiles !== undefined) body.validation_files = params.validationFiles;
     if (params.suffix !== undefined) body.suffix = params.suffix;
-    if (params.dryRun !== undefined) body.dry_run = params.dryRun;
-    if (params.autoStart !== undefined) body.auto_start = params.autoStart;
+    body.auto_start = params.autoStart ?? false;
 
     if (params.hyperparameters) {
       let hp: any = {};
@@ -365,8 +574,12 @@ export class MistralClient {
       body.hyperparameters = hp;
     }
 
+    let queryParams: any = {};
+    if (params.dryRun !== undefined) queryParams.dry_run = params.dryRun;
+
     let response = await this.axios.post('/fine_tuning/jobs', body, {
-      headers: this.headers
+      headers: this.jsonHeaders,
+      params: queryParams
     });
 
     return response.data;
@@ -378,7 +591,7 @@ export class MistralClient {
     if (params?.pageSize !== undefined) queryParams.page_size = params.pageSize;
 
     let response = await this.axios.get('/fine_tuning/jobs', {
-      headers: this.headers,
+      headers: this.authHeaders,
       params: queryParams
     });
 
@@ -387,7 +600,7 @@ export class MistralClient {
 
   async getFineTuningJob(jobId: string) {
     let response = await this.axios.get(`/fine_tuning/jobs/${jobId}`, {
-      headers: this.headers
+      headers: this.authHeaders
     });
 
     return response.data;
@@ -398,7 +611,7 @@ export class MistralClient {
       `/fine_tuning/jobs/${jobId}/cancel`,
       {},
       {
-        headers: this.headers
+        headers: this.jsonHeaders
       }
     );
 
@@ -410,7 +623,7 @@ export class MistralClient {
       `/fine_tuning/jobs/${jobId}/start`,
       {},
       {
-        headers: this.headers
+        headers: this.jsonHeaders
       }
     );
 
@@ -436,7 +649,7 @@ export class MistralClient {
     if (params.metadata !== undefined) body.metadata = params.metadata;
 
     let response = await this.axios.post('/batch/jobs', body, {
-      headers: this.headers
+      headers: this.jsonHeaders
     });
 
     return response.data;
@@ -449,7 +662,7 @@ export class MistralClient {
     if (params?.pageSize !== undefined) queryParams.page_size = params.pageSize;
 
     let response = await this.axios.get('/batch/jobs', {
-      headers: this.headers,
+      headers: this.authHeaders,
       params: queryParams
     });
 
@@ -458,7 +671,7 @@ export class MistralClient {
 
   async getBatchJob(jobId: string) {
     let response = await this.axios.get(`/batch/jobs/${jobId}`, {
-      headers: this.headers
+      headers: this.authHeaders
     });
 
     return response.data;
@@ -469,7 +682,7 @@ export class MistralClient {
       `/batch/jobs/${jobId}/cancel`,
       {},
       {
-        headers: this.headers
+        headers: this.jsonHeaders
       }
     );
 

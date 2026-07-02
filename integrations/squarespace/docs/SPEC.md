@@ -81,11 +81,19 @@ Access order history for one-time purchases and subscription orders or import or
 
 ### Product Management
 
-Manage physical, service, gift card, and download products, including their images and variants (if supported). This API allows products to be retrieved, added, deleted, or modified with information such as a name or URL slug, a variant's color, size, or weight, or a new product image. Also supports retrieving Store Pages (collections of products). Note: download products cannot be created or deleted via v2 API.
+Manage physical, service, gift card, and digital products. This API allows products to be retrieved, added, deleted, or modified with information such as a name, URL slug, SEO options, tags, and variant details. Also supports retrieving Store Pages (collections of products).
+
+### Contacts
+
+Manage customer contacts and address book entries for a website: create, read, update, delete, and query contacts; maintain addresses for shipping and fulfillment. Squarespace's current documentation says the legacy Profiles API is in maintenance mode and new integrations should use Contacts.
 
 ### Customer Profiles
 
-Retrieve customers, mailing list subscribers, and donors that are traditionally accessible through the Profiles panel. Profiles are read-only and can be filtered and retrieved in bulk or individually.
+Retrieve legacy customer profiles that are traditionally accessible through the Profiles panel. Profiles are read-only and can be filtered and retrieved in bulk or individually, but new contact workflows should use the Contacts API.
+
+### Contact Analytics
+
+Use the Analytics API to retrieve transaction summaries grouped by contact for order and donation activity.
 
 ### Financial Transactions
 
@@ -95,9 +103,6 @@ Use the Transactions API to access financial transactions for orders and donatio
 
 Use the Authorization API endpoint to identify which website is associated with an API key or OAuth token. The response provides basic site information including site name, URL, currency, measurement standard, language, time zone, and business location.
 
-### Forms (Zapier-only)
-
-Forms API (for Zapier integration) is available on Core, Plus, Advanced, Business, Commerce Basic, and Commerce Advanced plans. The Forms API is designed specifically for Zapier integration to receive form submission data. It is not part of the general Commerce API documentation and is used primarily to trigger automated workflows from form submissions.
 
 ## Events
 

@@ -1,8 +1,10 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  assignFiles,
   classifyImage,
   createModel,
+  deleteFiles,
   detectObjects,
   extractDocumentData,
   extractFullText,
@@ -12,6 +14,7 @@ import {
   retryFileProcessing,
   reviewFile,
   trainModel,
+  updateFileFields,
   uploadTrainingData
 } from './tools';
 import { documentProcessed } from './triggers';
@@ -25,6 +28,9 @@ export let provider = Slate.create({
     getPredictionResults,
     listProcessedFiles,
     reviewFile,
+    assignFiles,
+    updateFileFields,
+    deleteFiles,
     trainModel,
     uploadTrainingData,
     classifyImage,

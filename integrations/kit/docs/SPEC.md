@@ -1,5 +1,3 @@
-Now let me fetch the OAuth details page for more specifics on the OAuth flow.Now I have comprehensive information. Let me compile the specification.
-
 # Slates Specification for Kit
 
 ## Overview
@@ -62,11 +60,11 @@ List and manage sign-up forms and landing pages. Add subscribers to specific for
 
 ### Broadcasts
 
-Kit provides a fully functional Broadcast API with full HTML support and segmentation targeting. Create, update, list, and delete broadcast emails. Schedule broadcasts for future delivery and target specific subscriber segments.
+Kit provides a fully functional Broadcast API with full HTML support and segmentation targeting. Create, update, list, get, and delete broadcast emails. Schedule broadcasts for future delivery, target specific subscriber segments, retrieve broadcast stats, list sent broadcast stats, and inspect link click performance for sent broadcasts.
 
 ### Sequences (Email Courses)
 
-Manage email sequences (drip campaigns). List sequences, view subscribers for a sequence, and add subscribers to sequences.
+Manage email sequences (drip campaigns). Create, update, delete, and list sequences, view subscribers for a sequence, add subscribers to sequences, and manage the individual email steps inside a sequence.
 
 ### Segments
 
@@ -82,7 +80,15 @@ List available email templates for use with broadcasts.
 
 ### Account Information
 
-Retrieve account details and creator profile information, including plan type, timezone, and profile settings.
+Retrieve account details and creator profile information. Retrieve account-level email engagement stats and subscriber growth stats.
+
+### Posts
+
+List and get Kit posts. Include post content only when the body is needed.
+
+### Snippets
+
+Create, update, archive, restore, list, and get reusable snippets for Liquid-powered broadcast and sequence email content.
 
 ## Events
 

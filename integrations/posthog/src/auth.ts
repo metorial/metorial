@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { postHogApiError, postHogServiceError } from './lib/errors';
 
 type OAuthInput = {
   instanceUrl?: string;
@@ -17,6 +18,8 @@ type TokenInput = {
   apiKey: string;
   projectToken?: string;
 };
+
+let getOAuthBaseUrl = (input: OAuthInput) => input.instanceUrl || 'https://oauth.posthog.com';
 
 export let auth = SlateAuth.create()
   .output(
@@ -90,11 +93,31 @@ export let auth = SlateAuth.create()
         description: 'Create and update insights',
         scope: 'insight:write'
       },
+      {
+        title: 'Read Groups',
+        description: 'Read groups and group types',
+        scope: 'group:read'
+      },
+      {
+        title: 'Write Groups',
+        description: 'Create and update group properties',
+        scope: 'group:write'
+      },
       { title: 'Read Persons', description: 'Read person profiles', scope: 'person:read' },
       {
         title: 'Write Persons',
         description: 'Update and delete person profiles',
         scope: 'person:write'
+      },
+      {
+        title: 'Read Organizations',
+        description: 'Read organizations and discover projects',
+        scope: 'organization:read'
+      },
+      {
+        title: 'Read Users',
+        description: 'Read the current user profile',
+        scope: 'user:read'
       },
       { title: 'Read Projects', description: 'Read project settings', scope: 'project:read' },
       {
@@ -138,7 +161,7 @@ export let auth = SlateAuth.create()
     }),
 
     getAuthorizationUrl: async ctx => {
-      let baseUrl = ctx.input.instanceUrl || 'https://app.posthog.com';
+      let baseUrl = getOAuthBaseUrl(ctx.input);
       let params = new URLSearchParams({
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
@@ -154,16 +177,21 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let baseUrl = ctx.input.instanceUrl || 'https://app.posthog.com';
+      let baseUrl = getOAuthBaseUrl(ctx.input);
       let http = createAxios({ baseURL: baseUrl });
 
-      let response = await http.post('/oauth/token', {
-        grant_type: 'authorization_code',
-        code: ctx.code,
-        redirect_uri: ctx.redirectUri,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
+      let response: any;
+      try {
+        response = await http.post('/oauth/token', {
+          grant_type: 'authorization_code',
+          code: ctx.code,
+          redirect_uri: ctx.redirectUri,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret
+        });
+      } catch (error) {
+        throw postHogApiError(error, 'exchange OAuth authorization code');
+      }
 
       let data = response.data;
       let expiresAt = data.expires_in
@@ -182,15 +210,26 @@ export let auth = SlateAuth.create()
     },
 
     handleTokenRefresh: async (ctx: any) => {
-      let baseUrl = ctx.input.instanceUrl || 'https://app.posthog.com';
+      if (!ctx.output.refreshToken) {
+        throw postHogServiceError(
+          'PostHog OAuth refresh token is missing. Reconnect the account.'
+        );
+      }
+
+      let baseUrl = getOAuthBaseUrl(ctx.input);
       let http = createAxios({ baseURL: baseUrl });
 
-      let response = await http.post('/oauth/token', {
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken,
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret
-      });
+      let response: any;
+      try {
+        response = await http.post('/oauth/token', {
+          grant_type: 'refresh_token',
+          refresh_token: ctx.output.refreshToken,
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret
+        });
+      } catch (error) {
+        throw postHogApiError(error, 'refresh OAuth token');
+      }
 
       let data = response.data;
       let expiresAt = data.expires_in
@@ -200,7 +239,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
-          refreshToken: data.refresh_token,
+          refreshToken: data.refresh_token || ctx.output.refreshToken,
           expiresAt,
           projectToken: ctx.output.projectToken
         },
@@ -215,7 +254,12 @@ export let auth = SlateAuth.create()
         headers: { Authorization: `Bearer ${ctx.output.token}` }
       });
 
-      let response = await http.get('/api/users/@me/');
+      let response: any;
+      try {
+        response = await http.get('/api/users/@me/');
+      } catch (error) {
+        throw postHogApiError(error, 'get OAuth profile');
+      }
       let user = response.data;
 
       return {
@@ -266,8 +310,8 @@ export let auth = SlateAuth.create()
             name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || undefined
           }
         };
-      } catch {
-        return { profile: {} };
+      } catch (error) {
+        throw postHogApiError(error, 'get token auth profile');
       }
     }
   });

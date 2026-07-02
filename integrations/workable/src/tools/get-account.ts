@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { WorkableClient } from '../lib/client';
+import { compact, mapMember } from '../lib/shapes';
 import { spec } from '../spec';
 
 export let getAccountTool = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account',
-  description: `Retrieve account information and optionally list hiring team members. Use this to verify account details, check team configuration, or look up member IDs for other operations.`,
+  description: `Retrieve the configured Workable account information. Use list_members for member lookup; includeMembers remains available as a small convenience.`,
   tags: {
     readOnly: true
   }
@@ -41,23 +42,18 @@ export let getAccountTool = SlateTool.create(spec, {
       subdomain: ctx.config.subdomain
     });
 
-    let account = await client.getAccount();
+    let accountResult = await client.getAccount();
+    let account = accountResult.account || accountResult;
 
-    let output: any = {
+    let output: any = compact({
       accountName: account.name,
       subdomain: account.subdomain,
       description: account.description
-    };
+    });
 
     if (ctx.input.includeMembers) {
-      let membersResult = await client.getMembers();
-      output.members = (membersResult.members || []).map((m: any) => ({
-        memberId: m.id,
-        name: m.name,
-        email: m.email,
-        headline: m.headline,
-        role: m.role
-      }));
+      let membersResult = await client.listMembers({ limit: 100 });
+      output.members = (membersResult.members || []).map(mapMember);
     }
 
     return {

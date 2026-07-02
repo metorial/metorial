@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { requireReceiptSource } from '../lib/validation';
 import { spec } from '../spec';
 
 let confidenceFieldSchema = z
@@ -234,13 +235,7 @@ Use **simple** mode for core fields (total, tax, date, merchant) or **verbose** 
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-
-    let hasUrl = !!ctx.input.sourceUrl;
-    let hasBase64 = !!ctx.input.image;
-
-    if (!hasUrl && !hasBase64) {
-      throw new Error('Either sourceUrl or image (base64) must be provided.');
-    }
+    let source = requireReceiptSource(ctx.input);
 
     let options = {
       refresh: ctx.input.refresh,
@@ -258,24 +253,19 @@ Use **simple** mode for core fields (total, tax, date, merchant) or **verbose** 
     let isVerbose = ctx.input.detailLevel === 'verbose';
     let result: any;
 
-    if (hasUrl) {
+    if (source.type === 'url') {
       let urlInput = {
-        url: ctx.input.sourceUrl!,
-        customHeaderKey: ctx.input.customHeaderKey
+        url: source.sourceUrl,
+        customHeaderKey: source.customHeaderKey
       };
       result = isVerbose
         ? await client.extractReceiptVerboseFromUrl(urlInput, options)
         : await client.extractReceiptSimpleFromUrl(urlInput, options);
     } else {
-      if (!ctx.input.filename || !ctx.input.contentType) {
-        throw new Error(
-          'filename and contentType are required when using base64 image input.'
-        );
-      }
       let base64Input = {
-        image: ctx.input.image!,
-        filename: ctx.input.filename,
-        contentType: ctx.input.contentType
+        image: source.image,
+        filename: source.filename,
+        contentType: source.contentType
       };
       result = isVerbose
         ? await client.extractReceiptVerboseFromBase64(base64Input, options)

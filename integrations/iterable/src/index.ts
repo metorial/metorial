@@ -5,6 +5,7 @@ import {
   exportData,
   getChannels,
   getUser,
+  listJourneys,
   manageCampaigns,
   manageCatalogs,
   manageLists,
@@ -36,7 +37,8 @@ export let provider = Slate.create({
     sendMessage,
     updateSubscriptions,
     getChannels,
-    exportData
+    exportData,
+    listJourneys
   ],
   triggers: [systemWebhook]
 });

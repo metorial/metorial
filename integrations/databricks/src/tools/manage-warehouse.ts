@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageWarehouse = SlateTool.create(spec, {
@@ -47,7 +48,7 @@ export let manageWarehouse = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name || !ctx.input.clusterSize) {
-        throw new Error('name and clusterSize are required for create');
+        throw databricksServiceError('name and clusterSize are required for create');
       }
       let result = await client.createWarehouse({
         name: ctx.input.name,
@@ -64,7 +65,7 @@ export let manageWarehouse = SlateTool.create(spec, {
       };
     }
 
-    if (!warehouseId) throw new Error('warehouseId is required for this action');
+    if (!warehouseId) throw databricksServiceError('warehouseId is required for this action');
 
     switch (action) {
       case 'start':

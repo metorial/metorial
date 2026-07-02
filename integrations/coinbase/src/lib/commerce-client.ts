@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { coinbaseApiError, coinbaseServiceError } from './errors';
 
 export interface CommerceClientConfig {
   token: string;
@@ -8,6 +9,10 @@ export class CommerceClient {
   private api: ReturnType<typeof createAxios>;
 
   constructor(config: CommerceClientConfig) {
+    if (!config.token?.trim()) {
+      throw coinbaseServiceError('Coinbase Commerce API key is required.');
+    }
+
     this.api = createAxios({
       baseURL: 'https://api.commerce.coinbase.com',
       headers: {
@@ -16,6 +21,13 @@ export class CommerceClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.api.interceptors.response.use(
+      response => response,
+      error => {
+        throw coinbaseApiError(error, 'Commerce request');
+      }
+    );
   }
 
   // --- Charges ---

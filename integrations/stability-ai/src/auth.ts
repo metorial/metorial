@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { stabilityApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -33,19 +34,23 @@ export let auth = SlateAuth.create()
         baseURL: 'https://api.stability.ai'
       });
 
-      let response = await axios.get('/v1/user/account', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      try {
+        let response = await axios.get('/v1/user/account', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
 
-      return {
-        profile: {
-          id: response.data.id,
-          email: response.data.email,
-          name: response.data.email,
-          imageUrl: response.data.profile_picture
-        }
-      };
+        return {
+          profile: {
+            id: response.data.id,
+            email: response.data.email,
+            name: response.data.email,
+            imageUrl: response.data.profile_picture
+          }
+        };
+      } catch (error) {
+        throw stabilityApiError(error, 'get profile');
+      }
     }
   });

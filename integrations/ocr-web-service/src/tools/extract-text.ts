@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { ocrWebServiceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let zoneSchema = z.object({
@@ -62,9 +63,9 @@ let languageEnum = z.enum([
 export let extractText = SlateTool.create(spec, {
   name: 'Extract Text',
   key: 'extract_text',
-  description: `Extracts text from a scanned document or image using OCR. Supports 46 recognition languages and can process specific page ranges from multi-page documents. Optionally define rectangular zones to extract text from specific regions of the document. Provide either base64-encoded file content or a publicly accessible file URL.`,
+  description: `Extracts text from a scanned document or image using OCR. Supports 46 recognition languages and can process specific page ranges from multi-page documents. Optionally define rectangular zones to extract text from specific regions of the document. Provide either base64-encoded file content or a publicly accessible file URL that Slates can download and upload to OCR Web Service.`,
   instructions: [
-    'Provide either fileContent (base64) with fileName, or fileUrl — not both.',
+    'Provide either fileContent (base64) with fileName, or fileUrl - not both.',
     'For multi-language documents, specify multiple languages in the languages array.',
     'Use zones for targeted text extraction from specific regions of the document.'
   ],
@@ -91,9 +92,10 @@ export let extractText = SlateTool.create(spec, {
         ),
       fileUrl: z
         .string()
+        .url()
         .optional()
         .describe(
-          'Publicly accessible URL of the document or image to process. Use this instead of fileContent.'
+          'Publicly accessible URL of the document or image to process. Slates downloads this URL and uploads the file bytes to OCR Web Service.'
         ),
       languages: z
         .array(languageEnum)
@@ -129,10 +131,16 @@ export let extractText = SlateTool.create(spec, {
       ocrText: z
         .array(z.array(z.string()))
         .describe(
-          'Extracted text organized as a two-dimensional array: first dimension is pages, second dimension is zones'
+          'Extracted text organized as a two-dimensional array: first dimension is zones, second dimension is pages'
         ),
       processedPages: z.number().describe('Number of pages processed'),
-      availablePages: z.number().describe('Remaining page balance on the account')
+      availablePages: z.number().describe('Remaining page balance on the account'),
+      wordCoordinates: z
+        .array(z.unknown())
+        .optional()
+        .describe(
+          'Provider word-coordinate payload returned when includeWordCoordinates is true'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -145,15 +153,15 @@ export let extractText = SlateTool.create(spec, {
     let hasUrl = !!ctx.input.fileUrl;
 
     if (!hasFile && !hasUrl) {
-      throw new Error('Either fileContent or fileUrl must be provided.');
+      throw ocrWebServiceServiceError('Either fileContent or fileUrl must be provided.');
     }
 
     if (hasFile && hasUrl) {
-      throw new Error('Provide either fileContent or fileUrl, not both.');
+      throw ocrWebServiceServiceError('Provide either fileContent or fileUrl, not both.');
     }
 
     if (hasFile && !ctx.input.fileName) {
-      throw new Error('fileName is required when providing fileContent.');
+      throw ocrWebServiceServiceError('fileName is required when providing fileContent.');
     }
 
     let params = {
@@ -170,15 +178,20 @@ export let extractText = SlateTool.create(spec, {
 
     let result = hasFile
       ? await client.processDocument(ctx.input.fileContent!, ctx.input.fileName!, params)
-      : await client.processDocumentFromUrl(ctx.input.fileUrl!, params);
+      : await client.processDocumentFromUrl(ctx.input.fileUrl!, ctx.input.fileName, params);
 
     let textPreview = (result.OCRText || []).flat().join(' ').substring(0, 200);
+    let wordCoordinates =
+      result.OCRWords ??
+      result.OCRWSWords ??
+      (ctx.input.includeWordCoordinates ? result.Reserved : undefined);
 
     return {
       output: {
         ocrText: result.OCRText || [],
         processedPages: result.ProcessedPages,
-        availablePages: result.AvailablePages
+        availablePages: result.AvailablePages,
+        ...(Array.isArray(wordCoordinates) ? { wordCoordinates } : {})
       },
       message: `Successfully extracted text from **${result.ProcessedPages}** page(s). Preview: "${textPreview}${textPreview.length >= 200 ? '...' : ''}"`
     };

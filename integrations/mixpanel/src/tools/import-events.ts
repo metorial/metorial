@@ -1,6 +1,10 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import {
+  createClientFromContext,
+  requireNonEmptyStringArray,
+  requireServiceAccount
+} from '../lib/helpers';
 import { spec } from '../spec';
 
 export let importEvents = SlateTool.create(spec, {
@@ -31,7 +35,7 @@ Up to **2000 events** per request.`,
             eventName: z.string().describe('Name of the event'),
             distinctId: z.string().describe('Unique identifier for the user'),
             time: z.number().describe('Unix timestamp in seconds when the event occurred'),
-            insertId: z.string().optional().describe('Unique ID for deduplication'),
+            insertId: z.string().describe('Unique ID for deduplication'),
             properties: z
               .record(z.string(), z.unknown())
               .optional()
@@ -59,6 +63,12 @@ Up to **2000 events** per request.`,
     })
   )
   .handleInvocation(async ctx => {
+    requireServiceAccount(ctx);
+    requireNonEmptyStringArray(
+      ctx.input.events.map(event => event.eventName),
+      'events'
+    );
+
     let client = createClientFromContext(ctx);
 
     let events = ctx.input.events.map(e => ({

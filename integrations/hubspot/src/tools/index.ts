@@ -7,5 +7,6 @@ export * from './manage-lists';
 export * from './manage-owners';
 export * from './manage-pipelines';
 export * from './manage-properties';
+export * from './manage-sequences';
 export * from './manage-tickets';
 export * from './search-crm';

@@ -176,6 +176,7 @@ export let MICROSOFT_OAUTH_INTEGRATION_KEYS = new Set([
   'azure-repos',
   'dynamics-365',
   'excel-online',
+  'microsoft-fabric',
   'microsoft-teams',
   'onedrive',
   'onenote',

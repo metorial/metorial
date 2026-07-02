@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { kibanaServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -81,7 +82,7 @@ Provide the action to perform along with the object type and ID.`,
     let mappedRefs = references?.map(r => ({ id: r.referenceId, name: r.name, type: r.type }));
 
     if (action === 'get') {
-      if (!objectId) throw new Error('objectId is required for get action');
+      if (!objectId) throw kibanaServiceError('objectId is required for get action');
       let obj = await client.getSavedObject(objectType, objectId);
       return {
         output: {
@@ -100,7 +101,7 @@ Provide the action to perform along with the object type and ID.`,
     }
 
     if (action === 'create') {
-      if (!attributes) throw new Error('attributes are required for create action');
+      if (!attributes) throw kibanaServiceError('attributes are required for create action');
       let obj = await client.createSavedObject(objectType, attributes, {
         objectId,
         references: mappedRefs,
@@ -123,8 +124,8 @@ Provide the action to perform along with the object type and ID.`,
     }
 
     if (action === 'update') {
-      if (!objectId) throw new Error('objectId is required for update action');
-      if (!attributes) throw new Error('attributes are required for update action');
+      if (!objectId) throw kibanaServiceError('objectId is required for update action');
+      if (!attributes) throw kibanaServiceError('attributes are required for update action');
       let obj = await client.updateSavedObject(objectType, objectId, attributes, {
         references: mappedRefs
       });
@@ -145,7 +146,7 @@ Provide the action to perform along with the object type and ID.`,
     }
 
     if (action === 'delete') {
-      if (!objectId) throw new Error('objectId is required for delete action');
+      if (!objectId) throw kibanaServiceError('objectId is required for delete action');
       await client.deleteSavedObject(objectType, objectId, force);
       return {
         output: {
@@ -157,6 +158,6 @@ Provide the action to perform along with the object type and ID.`,
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw kibanaServiceError(`Unknown action: ${action}`);
   })
   .build();

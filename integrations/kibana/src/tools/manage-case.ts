@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { kibanaServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -155,7 +156,7 @@ export let manageCase = SlateTool.create(spec, {
     } = ctx.input;
 
     if (action === 'get') {
-      if (!caseId) throw new Error('caseId is required for get action');
+      if (!caseId) throw kibanaServiceError('caseId is required for get action');
       let c = await client.getCase(caseId, includeComments);
       return {
         output: mapCase(c),
@@ -164,9 +165,9 @@ export let manageCase = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!title) throw new Error('title is required for create action');
-      if (!description) throw new Error('description is required for create action');
-      if (!owner) throw new Error('owner is required for create action');
+      if (!title) throw kibanaServiceError('title is required for create action');
+      if (!description) throw kibanaServiceError('description is required for create action');
+      if (!owner) throw kibanaServiceError('owner is required for create action');
       let c = await client.createCase({
         title,
         description,
@@ -181,8 +182,8 @@ export let manageCase = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!caseId) throw new Error('caseId is required for update action');
-      if (!version) throw new Error('version is required for update action');
+      if (!caseId) throw kibanaServiceError('caseId is required for update action');
+      if (!version) throw kibanaServiceError('version is required for update action');
       let result = await client.updateCase(caseId, version, {
         title,
         description,
@@ -198,7 +199,7 @@ export let manageCase = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!caseId) throw new Error('caseId is required for delete action');
+      if (!caseId) throw kibanaServiceError('caseId is required for delete action');
       await client.deleteCases([caseId]);
       return {
         output: {
@@ -210,7 +211,7 @@ export let manageCase = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw kibanaServiceError(`Unknown action: ${action}`);
   })
   .build();
 
@@ -249,6 +250,12 @@ export let addCaseComment = SlateTool.create(spec, {
     let { caseId, owner, comment, alertId, alertIndex } = ctx.input;
 
     let type = alertId ? 'alert' : 'user';
+    if (type === 'user' && !comment) {
+      throw kibanaServiceError('comment is required when adding a user comment');
+    }
+    if (type === 'alert' && !alertIndex) {
+      throw kibanaServiceError('alertIndex is required when adding an alert comment');
+    }
 
     let result = await client.addCaseComment(caseId, {
       type,

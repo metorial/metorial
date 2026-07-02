@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SegmentClient } from '../lib/client';
+import { segmentServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageSource = SlateTool.create(spec, {
@@ -58,7 +59,7 @@ To create a new source, provide the **metadataId** (from the catalog) and a **sl
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.metadataId || !ctx.input.slug) {
-        throw new Error('metadataId and slug are required to create a source');
+        throw segmentServiceError('metadataId and slug are required to create a source');
       }
       let source = await client.createSource({
         metadataId: ctx.input.metadataId,
@@ -80,7 +81,7 @@ To create a new source, provide the **metadataId** (from the catalog) and a **sl
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.sourceId) {
-        throw new Error('sourceId is required to update a source');
+        throw segmentServiceError('sourceId is required to update a source');
       }
       let updateData: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
@@ -103,7 +104,7 @@ To create a new source, provide the **metadataId** (from the catalog) and a **sl
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.sourceId) {
-        throw new Error('sourceId is required to delete a source');
+        throw segmentServiceError('sourceId is required to delete a source');
       }
       await client.deleteSource(ctx.input.sourceId);
       return {
@@ -115,6 +116,6 @@ To create a new source, provide the **metadataId** (from the catalog) and a **sl
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw segmentServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

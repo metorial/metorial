@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCluster = SlateTool.create(spec, {
@@ -73,7 +74,9 @@ To **start/restart/stop/delete**, provide \`clusterId\` and the corresponding \`
 
     if (action === 'create') {
       if (!ctx.input.clusterName || !ctx.input.sparkVersion || !ctx.input.nodeTypeId) {
-        throw new Error('clusterName, sparkVersion, and nodeTypeId are required for create');
+        throw databricksServiceError(
+          'clusterName, sparkVersion, and nodeTypeId are required for create'
+        );
       }
       let result = await client.createCluster({
         clusterName: ctx.input.clusterName,
@@ -92,7 +95,7 @@ To **start/restart/stop/delete**, provide \`clusterId\` and the corresponding \`
     }
 
     if (!clusterId) {
-      throw new Error('clusterId is required for this action');
+      throw databricksServiceError('clusterId is required for this action');
     }
 
     switch (action) {

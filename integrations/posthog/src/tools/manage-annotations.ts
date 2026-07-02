@@ -58,6 +58,36 @@ export let listAnnotationsTool = SlateTool.create(spec, {
   })
   .build();
 
+export let getAnnotationTool = SlateTool.create(spec, {
+  name: 'Get Annotation',
+  key: 'get_annotation',
+  description: `Retrieve a specific PostHog annotation by ID.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      annotationId: z.string().describe('Annotation ID')
+    })
+  )
+  .output(annotationOutput)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    let a = await client.getAnnotation(ctx.input.annotationId);
+
+    return {
+      output: {
+        annotationId: String(a.id),
+        content: a.content,
+        dateMarker: a.date_marker,
+        scope: a.scope,
+        createdAt: a.created_at,
+        createdBy: a.created_by ? String(a.created_by.id || a.created_by) : undefined
+      },
+      message: `Retrieved annotation **${a.id}**.`
+    };
+  })
+  .build();
+
 export let createAnnotationTool = SlateTool.create(spec, {
   name: 'Create Annotation',
   key: 'create_annotation',
@@ -95,6 +125,47 @@ export let createAnnotationTool = SlateTool.create(spec, {
         createdBy: a.created_by ? String(a.created_by.id || a.created_by) : undefined
       },
       message: `Created annotation on **${ctx.input.dateMarker}**: "${ctx.input.content}".`
+    };
+  })
+  .build();
+
+export let updateAnnotationTool = SlateTool.create(spec, {
+  name: 'Update Annotation',
+  key: 'update_annotation',
+  description: `Update an annotation's content, date marker, or scope.`,
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      annotationId: z.string().describe('Annotation ID to update'),
+      content: z.string().optional().describe('Updated annotation text content'),
+      dateMarker: z.string().optional().describe('Updated ISO 8601 date marker'),
+      scope: z
+        .enum(['organization', 'project'])
+        .optional()
+        .describe('Updated annotation scope')
+    })
+  )
+  .output(annotationOutput)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    let payload: Record<string, any> = {};
+    if (ctx.input.content !== undefined) payload.content = ctx.input.content;
+    if (ctx.input.dateMarker !== undefined) payload.date_marker = ctx.input.dateMarker;
+    if (ctx.input.scope !== undefined) payload.scope = ctx.input.scope;
+
+    let a = await client.updateAnnotation(ctx.input.annotationId, payload);
+
+    return {
+      output: {
+        annotationId: String(a.id),
+        content: a.content,
+        dateMarker: a.date_marker,
+        scope: a.scope,
+        createdAt: a.created_at,
+        createdBy: a.created_by ? String(a.created_by.id || a.created_by) : undefined
+      },
+      message: `Updated annotation **${a.id}**.`
     };
   })
   .build();

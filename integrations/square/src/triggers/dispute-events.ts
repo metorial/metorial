@@ -45,7 +45,7 @@ export let disputeEvents = SlateTrigger.create(spec, {
       let subscription = await client.createWebhookSubscription({
         idempotencyKey: crypto.randomUUID(),
         subscription: {
-          name: 'Slates Dispute Events',
+          name: 'Square Dispute Events',
           eventTypes: DISPUTE_EVENT_TYPES,
           notificationUrl: ctx.input.webhookBaseUrl
         }

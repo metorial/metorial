@@ -1,6 +1,6 @@
 {
   "name": "slates",
-  "version": "1.0.0-rc.14",
+  "version": "1.0.0-rc.15",
   "publishConfig": {
     "access": "public"
   },
@@ -32,7 +32,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "@slates/provider": "1.0.0-rc.15"
+    "@slates/provider": "1.0.0-rc.16"
   },
   "devDependencies": {
     "microbundle": "^0.15.1",

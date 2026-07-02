@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { klaviyoServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -33,7 +34,7 @@ The profile and all associated data will be permanently deleted.`,
     let client = createClient(ctx);
 
     if (!ctx.input.profileId && !ctx.input.email && !ctx.input.phoneNumber) {
-      throw new Error(
+      throw klaviyoServiceError(
         'At least one identifier (profileId, email, or phoneNumber) is required'
       );
     }

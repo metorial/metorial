@@ -45,8 +45,8 @@ export let getSubscriber = SlateTool.create(spec, {
         groups: s.groups,
         subscribedAt: s.subscribed_at,
         createdAt: s.created_at,
-        openedCount: s.opened_count,
-        clickedCount: s.clicked_count
+        openedCount: s.opens_count,
+        clickedCount: s.clicks_count
       },
       message: `Found subscriber **${s.email}** (status: **${s.status}**).`
     };

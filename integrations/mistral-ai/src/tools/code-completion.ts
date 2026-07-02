@@ -25,13 +25,16 @@ export let codeCompletionTool = SlateTool.create(spec, {
       prompt: z.string().describe('Code/text before the completion point'),
       suffix: z.string().optional().describe('Code/text after the completion point'),
       maxTokens: z.number().optional().describe('Maximum tokens to generate'),
-      temperature: z.number().min(0).max(2).optional().describe('Sampling temperature'),
+      temperature: z.number().min(0).max(1.5).optional().describe('Sampling temperature'),
       topP: z.number().min(0).max(1).optional().describe('Nucleus sampling threshold'),
+      minTokens: z.number().optional().describe('Minimum tokens to generate'),
       stop: z
         .union([z.string(), z.array(z.string())])
         .optional()
         .describe('Stop sequence(s)'),
-      randomSeed: z.number().optional().describe('Seed for deterministic output')
+      randomSeed: z.number().optional().describe('Seed for deterministic output'),
+      metadata: z.record(z.string(), z.any()).optional().describe('Request metadata'),
+      promptCacheKey: z.string().optional().describe('Cache key for reusable prompt prefixes')
     })
   )
   .output(
@@ -55,10 +58,13 @@ export let codeCompletionTool = SlateTool.create(spec, {
       prompt: ctx.input.prompt,
       suffix: ctx.input.suffix,
       maxTokens: ctx.input.maxTokens,
+      minTokens: ctx.input.minTokens,
       temperature: ctx.input.temperature,
       topP: ctx.input.topP,
       stop: ctx.input.stop,
-      randomSeed: ctx.input.randomSeed
+      randomSeed: ctx.input.randomSeed,
+      metadata: ctx.input.metadata,
+      promptCacheKey: ctx.input.promptCacheKey
     });
 
     let choice = result.choices?.[0];

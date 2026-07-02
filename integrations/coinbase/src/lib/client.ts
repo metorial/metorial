@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { coinbaseApiError, coinbaseServiceError } from './errors';
 
 export interface CoinbaseClientConfig {
   token: string;
@@ -8,6 +9,10 @@ export class CoinbaseClient {
   private v2: ReturnType<typeof createAxios>;
 
   constructor(config: CoinbaseClientConfig) {
+    if (!config.token?.trim()) {
+      throw coinbaseServiceError('Coinbase OAuth access token is required.');
+    }
+
     this.v2 = createAxios({
       baseURL: 'https://api.coinbase.com/v2',
       headers: {
@@ -16,6 +21,13 @@ export class CoinbaseClient {
         'CB-VERSION': '2024-01-01'
       }
     });
+
+    this.v2.interceptors.response.use(
+      response => response,
+      error => {
+        throw coinbaseApiError(error);
+      }
+    );
   }
 
   // --- User ---

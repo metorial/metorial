@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import { invalidAction, requireString, resolveProjectId } from '../lib/validation';
 import { spec } from '../spec';
 
 let notificationSchema = z.object({
@@ -125,8 +126,7 @@ Also allows viewing and acknowledging active alerts.`,
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
     let { action } = ctx.input;
 
@@ -140,11 +140,11 @@ Also allows viewing and acknowledging active alerts.`,
     }
 
     if (action === 'get_config') {
-      if (!ctx.input.alertConfigId) throw new Error('alertConfigId is required.');
-      let config = await client.getAlertConfiguration(projectId, ctx.input.alertConfigId);
+      let alertConfigId = requireString(ctx.input.alertConfigId, 'alertConfigId');
+      let config = await client.getAlertConfiguration(projectId, alertConfigId);
       return {
         output: { alertConfig: config },
-        message: `Retrieved alert config **${ctx.input.alertConfigId}**.`
+        message: `Retrieved alert config **${alertConfigId}**.`
       };
     }
 
@@ -166,7 +166,7 @@ Also allows viewing and acknowledging active alerts.`,
     }
 
     if (action === 'update_config') {
-      if (!ctx.input.alertConfigId) throw new Error('alertConfigId is required.');
+      let alertConfigId = requireString(ctx.input.alertConfigId, 'alertConfigId');
       let data: any = {};
       if (ctx.input.enabled !== undefined) data.enabled = ctx.input.enabled;
       if (ctx.input.eventTypeName) data.eventTypeName = ctx.input.eventTypeName;
@@ -175,23 +175,19 @@ Also allows viewing and acknowledging active alerts.`,
       if (ctx.input.notifications) data.notifications = ctx.input.notifications;
       if (ctx.input.matchers) data.matchers = ctx.input.matchers;
 
-      let config = await client.updateAlertConfiguration(
-        projectId,
-        ctx.input.alertConfigId,
-        data
-      );
+      let config = await client.updateAlertConfiguration(projectId, alertConfigId, data);
       return {
         output: { alertConfig: config },
-        message: `Updated alert config **${ctx.input.alertConfigId}**.`
+        message: `Updated alert config **${alertConfigId}**.`
       };
     }
 
     if (action === 'delete_config') {
-      if (!ctx.input.alertConfigId) throw new Error('alertConfigId is required.');
-      await client.deleteAlertConfiguration(projectId, ctx.input.alertConfigId);
+      let alertConfigId = requireString(ctx.input.alertConfigId, 'alertConfigId');
+      await client.deleteAlertConfiguration(projectId, alertConfigId);
       return {
         output: {},
-        message: `Deleted alert config **${ctx.input.alertConfigId}**.`
+        message: `Deleted alert config **${alertConfigId}**.`
       };
     }
 
@@ -207,27 +203,27 @@ Also allows viewing and acknowledging active alerts.`,
     }
 
     if (action === 'get_alert') {
-      if (!ctx.input.alertId) throw new Error('alertId is required.');
-      let alert = await client.getAlert(projectId, ctx.input.alertId);
+      let alertId = requireString(ctx.input.alertId, 'alertId');
+      let alert = await client.getAlert(projectId, alertId);
       return {
         output: { alert },
-        message: `Retrieved alert **${ctx.input.alertId}** (status: ${alert.status}).`
+        message: `Retrieved alert **${alertId}** (status: ${alert.status}).`
       };
     }
 
     if (action === 'acknowledge') {
-      if (!ctx.input.alertId) throw new Error('alertId is required.');
-      if (!ctx.input.acknowledgedUntil) throw new Error('acknowledgedUntil is required.');
-      let alert = await client.acknowledgeAlert(projectId, ctx.input.alertId, {
-        acknowledgedUntil: ctx.input.acknowledgedUntil,
+      let alertId = requireString(ctx.input.alertId, 'alertId');
+      let acknowledgedUntil = requireString(ctx.input.acknowledgedUntil, 'acknowledgedUntil');
+      let alert = await client.acknowledgeAlert(projectId, alertId, {
+        acknowledgedUntil,
         acknowledgementComment: ctx.input.acknowledgementComment
       });
       return {
         output: { alert },
-        message: `Acknowledged alert **${ctx.input.alertId}** until ${ctx.input.acknowledgedUntil}.`
+        message: `Acknowledged alert **${alertId}** until ${acknowledgedUntil}.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

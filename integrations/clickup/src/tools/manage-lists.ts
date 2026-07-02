@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClickUpClient } from '../lib/client';
+import { clickupServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getLists = SlateTool.create(spec, {
@@ -41,7 +42,7 @@ export let getLists = SlateTool.create(spec, {
     } else if (ctx.input.spaceId) {
       lists = await client.getFolderlessLists(ctx.input.spaceId, ctx.input.archived);
     } else {
-      throw new Error('Either folderId or spaceId must be provided');
+      throw clickupServiceError('Either folderId or spaceId must be provided.');
     }
 
     return {
@@ -100,7 +101,7 @@ export let createList = SlateTool.create(spec, {
     } else if (ctx.input.spaceId) {
       list = await client.createFolderlessList(ctx.input.spaceId, data);
     } else {
-      throw new Error('Either folderId or spaceId must be provided');
+      throw clickupServiceError('Either folderId or spaceId must be provided.');
     }
 
     return {

@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { brevoApiError } from './errors';
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
@@ -9,6 +10,7 @@ export class Client {
     });
 
     this.axios.interceptors.request.use((reqConfig: any) => {
+      reqConfig.headers ??= {};
       if (config.authType === 'oauth') {
         reqConfig.headers.Authorization = `Bearer ${config.token}`;
       } else {
@@ -17,6 +19,11 @@ export class Client {
       reqConfig.headers.Accept = 'application/json';
       return reqConfig;
     });
+
+    this.axios.interceptors.response.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(brevoApiError(error))
+    );
   }
 
   // ---- Account ----
@@ -36,6 +43,8 @@ export class Client {
     emailBlacklisted?: boolean;
     smsBlacklisted?: boolean;
     updateEnabled?: boolean;
+    forceMerge?: boolean;
+    getId?: boolean;
   }): Promise<{ contactId: number }> {
     let body: Record<string, any> = {};
     if (params.email) body.email = params.email;
@@ -45,6 +54,8 @@ export class Client {
     if (params.emailBlacklisted !== undefined) body.emailBlacklisted = params.emailBlacklisted;
     if (params.smsBlacklisted !== undefined) body.smsBlacklisted = params.smsBlacklisted;
     if (params.updateEnabled !== undefined) body.updateEnabled = params.updateEnabled;
+    if (params.forceMerge !== undefined) body.forceMerge = params.forceMerge;
+    if (params.getId !== undefined) body.getId = params.getId;
 
     let response = await this.axios.post('/contacts', body);
     return { contactId: response.data.id };
@@ -269,6 +280,26 @@ export class Client {
     return { campaignId: response.data.id };
   }
 
+  async updateEmailCampaign(
+    campaignId: number,
+    params: {
+      name?: string;
+      sender?: { name?: string; email?: string; id?: number };
+      subject?: string;
+      htmlContent?: string;
+      htmlUrl?: string;
+      templateId?: number;
+      scheduledAt?: string;
+      replyTo?: string;
+      recipients?: { listIds?: number[]; exclusionListIds?: number[] };
+      tag?: string;
+      inlineImageActivation?: boolean;
+      params?: Record<string, any>;
+    }
+  ): Promise<void> {
+    await this.axios.put(`/emailCampaigns/${campaignId}`, params);
+  }
+
   async getEmailCampaign(campaignId: number): Promise<any> {
     let response = await this.axios.get(`/emailCampaigns/${campaignId}`);
     return response.data;
@@ -300,6 +331,10 @@ export class Client {
 
   async sendEmailCampaignNow(campaignId: number): Promise<void> {
     await this.axios.post(`/emailCampaigns/${campaignId}/sendNow`);
+  }
+
+  async deleteEmailCampaign(campaignId: number): Promise<void> {
+    await this.axios.delete(`/emailCampaigns/${campaignId}`);
   }
 
   async sendTestEmail(campaignId: number, emailTo: string[]): Promise<void> {
@@ -369,11 +404,38 @@ export class Client {
   async createCompany(params: {
     name: string;
     attributes?: Record<string, any>;
+    countryCode?: number;
     linkedContactsIds?: number[];
     linkedDealsIds?: string[];
   }): Promise<{ companyId: string }> {
     let response = await this.axios.post('/companies', params);
     return { companyId: response.data.id };
+  }
+
+  async listCompanies(params: {
+    limit?: number;
+    page?: number;
+    sort?: string;
+    sortBy?: string;
+    modifiedSince?: string;
+    createdSince?: string;
+    name?: string;
+    linkedContactId?: number;
+    linkedDealId?: string;
+  }): Promise<any> {
+    let query: Record<string, any> = {};
+    if (params.limit !== undefined) query.limit = params.limit;
+    if (params.page !== undefined) query.page = params.page;
+    if (params.sort) query.sort = params.sort;
+    if (params.sortBy) query.sortBy = params.sortBy;
+    if (params.modifiedSince) query.modifiedSince = params.modifiedSince;
+    if (params.createdSince) query.createdSince = params.createdSince;
+    if (params.name) query['filters[attributes.name]'] = params.name;
+    if (params.linkedContactId !== undefined) query.linkedContactsIds = params.linkedContactId;
+    if (params.linkedDealId) query.linkedDealsIds = params.linkedDealId;
+
+    let response = await this.axios.get('/companies', { params: query });
+    return response.data;
   }
 
   async getCompany(companyId: string): Promise<any> {
@@ -421,6 +483,11 @@ export class Client {
     return response.data;
   }
 
+  async getWebhook(webhookId: number): Promise<any> {
+    let response = await this.axios.get(`/webhooks/${webhookId}`);
+    return response.data;
+  }
+
   async deleteWebhook(webhookId: number): Promise<void> {
     await this.axios.delete(`/webhooks/${webhookId}`);
   }
@@ -430,7 +497,13 @@ export class Client {
     params: {
       url?: string;
       events?: string[];
+      type?: string;
+      channel?: string;
       description?: string;
+      batched?: boolean;
+      auth?: { type: string; token: string };
+      headers?: { key: string; value: string }[];
+      domain?: string;
     }
   ): Promise<void> {
     await this.axios.put(`/webhooks/${webhookId}`, params);
@@ -447,11 +520,35 @@ export class Client {
 
   async trackEvent(params: {
     email?: string;
+    contactId?: number;
+    extId?: string;
+    phone?: string;
+    whatsapp?: string;
+    landlineNumber?: string;
     eventName: string;
-    eventData?: Record<string, any>;
-    properties?: Record<string, any>;
+    eventDate?: string;
+    contactProperties?: Record<string, string | number | boolean>;
+    eventProperties?: Record<string, any>;
+    object?: Record<string, any>;
   }): Promise<void> {
-    await this.axios.post('/events', params);
+    let identifiers: Record<string, string | number> = {};
+    if (params.email) identifiers.email_id = params.email;
+    if (params.contactId !== undefined) identifiers.contact_id = params.contactId;
+    if (params.extId) identifiers.ext_id = params.extId;
+    if (params.phone) identifiers.phone_id = params.phone;
+    if (params.whatsapp) identifiers.whatsapp_id = params.whatsapp;
+    if (params.landlineNumber) identifiers.landline_number_id = params.landlineNumber;
+
+    let body: Record<string, any> = {
+      event_name: params.eventName,
+      identifiers
+    };
+    if (params.contactProperties) body.contact_properties = params.contactProperties;
+    if (params.eventDate) body.event_date = params.eventDate;
+    if (params.eventProperties) body.event_properties = params.eventProperties;
+    if (params.object) body.object = params.object;
+
+    await this.axios.post('/events', body);
   }
 
   // ---- Folders ----
@@ -470,5 +567,35 @@ export class Client {
   async createFolder(name: string): Promise<{ folderId: number }> {
     let response = await this.axios.post('/contacts/folders', { name });
     return { folderId: response.data.id };
+  }
+
+  async getFolder(folderId: number): Promise<any> {
+    let response = await this.axios.get(`/contacts/folders/${folderId}`);
+    return response.data;
+  }
+
+  async updateFolder(folderId: number, name: string): Promise<void> {
+    await this.axios.put(`/contacts/folders/${folderId}`, { name });
+  }
+
+  async deleteFolder(folderId: number): Promise<void> {
+    await this.axios.delete(`/contacts/folders/${folderId}`);
+  }
+
+  async getListsInFolder(params: {
+    folderId: number;
+    limit?: number;
+    offset?: number;
+    sort?: string;
+  }): Promise<{ lists: any[]; count: number }> {
+    let query: Record<string, any> = {};
+    if (params.limit !== undefined) query.limit = params.limit;
+    if (params.offset !== undefined) query.offset = params.offset;
+    if (params.sort) query.sort = params.sort;
+
+    let response = await this.axios.get(`/contacts/folders/${params.folderId}/lists`, {
+      params: query
+    });
+    return response.data;
   }
 }

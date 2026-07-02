@@ -23,6 +23,7 @@ describe('@slates/oauth-microsoft', () => {
   });
 
   it('detects Microsoft OAuth integrations', () => {
+    expect(usesMicrosoftOAuth('microsoft-fabric')).toBe(true);
     expect(usesMicrosoftOAuth('sharepoint')).toBe(true);
     expect(usesMicrosoftOAuth('github')).toBe(false);
   });
@@ -30,6 +31,12 @@ describe('@slates/oauth-microsoft', () => {
   it('only normalizes redirect URIs for Microsoft OAuth integrations', () => {
     expect(
       normalizeMicrosoftRedirectUriForIntegration('outlook', 'http://127.0.0.1:45873/callback')
+    ).toBe('http://localhost:45873/callback');
+    expect(
+      normalizeMicrosoftRedirectUriForIntegration(
+        'microsoft-fabric',
+        'http://127.0.0.1:45873/callback'
+      )
     ).toBe('http://localhost:45873/callback');
     expect(
       normalizeMicrosoftRedirectUriForIntegration('github', 'http://127.0.0.1:45873/callback')

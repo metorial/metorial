@@ -41,6 +41,47 @@ export let listWebhooks = SlateTool.create(spec, {
   })
   .build();
 
+// ==================== Get Webhook ====================
+
+export let getWebhook = SlateTool.create(spec, {
+  name: 'Get Webhook',
+  key: 'get_webhook',
+  description: `Get configured webhook URLs for one Mailgun domain event type.`,
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Domain name'),
+      eventType: z
+        .enum([
+          'accepted',
+          'delivered',
+          'opened',
+          'clicked',
+          'unsubscribed',
+          'complained',
+          'permanent_fail',
+          'temporary_fail'
+        ])
+        .describe('Event type webhook to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      webhook: z.unknown().describe('Webhook details returned by Mailgun')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    let result = await client.getWebhook(ctx.input.domain, ctx.input.eventType);
+
+    return {
+      output: { webhook: result },
+      message: `Retrieved webhook for **${ctx.input.eventType}** events on **${ctx.input.domain}**.`
+    };
+  })
+  .build();
+
 // ==================== Create Webhook ====================
 
 export let createWebhook = SlateTool.create(spec, {
@@ -83,6 +124,49 @@ export let createWebhook = SlateTool.create(spec, {
     return {
       output: { success: true },
       message: `Webhook for **${ctx.input.eventType}** events created on **${ctx.input.domain}**.`
+    };
+  })
+  .build();
+
+// ==================== Update Webhook ====================
+
+export let updateWebhook = SlateTool.create(spec, {
+  name: 'Update Webhook',
+  key: 'update_webhook',
+  description: `Replace the webhook URL list for a Mailgun domain event type with a new URL.`,
+  constraints: ['Mailgun replaces the URL list for the event type with the provided URL.'],
+  tags: { destructive: false }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Domain name'),
+      eventType: z
+        .enum([
+          'accepted',
+          'delivered',
+          'opened',
+          'clicked',
+          'unsubscribed',
+          'complained',
+          'permanent_fail',
+          'temporary_fail'
+        ])
+        .describe('Event type to update'),
+      url: z.string().describe('Webhook URL to set')
+    })
+  )
+  .output(
+    z.object({
+      success: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
+    await client.updateWebhook(ctx.input.domain, ctx.input.eventType, ctx.input.url);
+
+    return {
+      output: { success: true },
+      message: `Webhook for **${ctx.input.eventType}** events updated on **${ctx.input.domain}**.`
     };
   })
   .build();

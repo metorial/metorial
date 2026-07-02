@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { hellosignApiError, hellosignServiceError } from './errors';
 
 export interface ClientConfig {
   token: string;
@@ -41,6 +42,7 @@ export interface SendSignatureRequestParams {
   signingRedirectUrl?: string;
   testMode?: boolean;
   clientId?: string;
+  embeddedSigning?: boolean;
 }
 
 export interface SendWithTemplateParams {
@@ -55,6 +57,26 @@ export interface SendWithTemplateParams {
   signingRedirectUrl?: string;
   testMode?: boolean;
   clientId?: string;
+  embeddedSigning?: boolean;
+}
+
+export interface BulkSignerListEntry {
+  signers: { role: string; name: string; emailAddress: string; pin?: string }[];
+  customFields?: { name: string; value: string }[];
+}
+
+export interface BulkSendWithTemplateParams {
+  templateIds: string[];
+  signerList: BulkSignerListEntry[];
+  title?: string;
+  subject?: string;
+  message?: string;
+  ccs?: { role: string; emailAddress: string }[];
+  metadata?: Record<string, string>;
+  signingRedirectUrl?: string;
+  testMode?: boolean;
+  clientId?: string;
+  embeddedSigning?: boolean;
 }
 
 export interface UpdateSignatureRequestParams {
@@ -76,11 +98,46 @@ export interface CreateTemplateParams {
   testMode?: boolean;
 }
 
+let toBuffer = (data: unknown) => {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+  if (ArrayBuffer.isView(data)) {
+    return Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  }
+  if (typeof data === 'string') {
+    return Buffer.from(data, 'binary');
+  }
+  return Buffer.from(data as any);
+};
+
+let getHeaderValue = (headers: Record<string, any>, name: string) => {
+  let value = headers[name] ?? headers[name.toLowerCase()];
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return typeof value === 'string' ? value : undefined;
+};
+
+let cleanObject = <T extends Record<string, any>>(value: T) => {
+  for (let key of Object.keys(value)) {
+    if (value[key] === undefined) {
+      delete value[key];
+    }
+  }
+  return value;
+};
+
 export class Client {
   private axios: ReturnType<typeof createAxios>;
 
   constructor(config: ClientConfig) {
-    let headers: Record<string, string> = {};
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
 
     if (config.authMethod === 'oauth') {
       headers.Authorization = `Bearer ${config.token}`;
@@ -93,6 +150,11 @@ export class Client {
       baseURL: 'https://api.hellosign.com/v3',
       headers
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(hellosignApiError(error, 'request'))
+    );
   }
 
   // ---- Account ----
@@ -114,91 +176,132 @@ export class Client {
   // ---- Signature Requests ----
 
   async sendSignatureRequest(params: SendSignatureRequestParams): Promise<any> {
-    let body: Record<string, any> = {};
+    if (params.embeddedSigning && !params.clientId) {
+      throw hellosignServiceError('clientId is required for embedded signature requests.');
+    }
 
-    if (params.title) body.title = params.title;
-    if (params.subject) body.subject = params.subject;
-    if (params.message) body.message = params.message;
-    if (params.allowDecline) body.allow_decline = 1;
-    if (params.allowReassign) body.allow_reassign = 1;
-    if (params.useTextTags) body.use_text_tags = 1;
-    if (params.signingRedirectUrl) body.signing_redirect_url = params.signingRedirectUrl;
-    if (params.testMode) body.test_mode = 1;
-    if (params.clientId) body.client_id = params.clientId;
-
-    params.signers.forEach((signer, i) => {
-      body[`signers[${i}][email_address]`] = signer.emailAddress;
-      body[`signers[${i}][name]`] = signer.name;
-      if (signer.order !== undefined) body[`signers[${i}][order]`] = signer.order;
-      if (signer.pin) body[`signers[${i}][pin]`] = signer.pin;
-      if (signer.smsPhoneNumber)
-        body[`signers[${i}][sms_phone_number]`] = signer.smsPhoneNumber;
-      if (signer.smsPhoneNumberType)
-        body[`signers[${i}][sms_phone_number_type]`] = signer.smsPhoneNumberType;
+    let body = cleanObject({
+      title: params.title,
+      subject: params.subject,
+      message: params.message,
+      signers: params.signers.map(signer =>
+        cleanObject({
+          email_address: signer.emailAddress,
+          name: signer.name,
+          order: signer.order,
+          pin: signer.pin,
+          sms_phone_number: signer.smsPhoneNumber,
+          sms_phone_number_type: signer.smsPhoneNumberType
+        })
+      ),
+      cc_email_addresses: params.ccEmailAddresses,
+      file_urls: params.fileUrls,
+      metadata: params.metadata,
+      allow_decline: params.allowDecline,
+      allow_reassign: params.allowReassign,
+      use_text_tags: params.useTextTags,
+      signing_redirect_url: params.signingRedirectUrl,
+      test_mode: params.testMode,
+      client_id: params.clientId
     });
 
-    if (params.ccEmailAddresses) {
-      params.ccEmailAddresses.forEach((email, i) => {
-        body[`cc_email_addresses[${i}]`] = email;
-      });
-    }
-
-    if (params.fileUrls) {
-      params.fileUrls.forEach((url, i) => {
-        body[`file_url[${i}]`] = url;
-      });
-    }
-
-    if (params.metadata) {
-      for (let [key, value] of Object.entries(params.metadata)) {
-        body[`metadata[${key}]`] = value;
-      }
-    }
-
-    let response = await this.axios.post('/signature_request/send', body);
+    let endpoint = params.embeddedSigning
+      ? '/signature_request/create_embedded'
+      : '/signature_request/send';
+    let response = await this.axios.post(endpoint, body);
     return response.data.signature_request;
   }
 
   async sendSignatureRequestWithTemplate(params: SendWithTemplateParams): Promise<any> {
-    let body: Record<string, any> = {};
+    if (params.embeddedSigning && !params.clientId) {
+      throw hellosignServiceError(
+        'clientId is required for embedded template signature requests.'
+      );
+    }
 
-    if (params.title) body.title = params.title;
-    if (params.subject) body.subject = params.subject;
-    if (params.message) body.message = params.message;
-    if (params.signingRedirectUrl) body.signing_redirect_url = params.signingRedirectUrl;
-    if (params.testMode) body.test_mode = 1;
-    if (params.clientId) body.client_id = params.clientId;
-
-    params.templateIds.forEach((id, i) => {
-      body[`template_ids[${i}]`] = id;
+    let body = cleanObject({
+      title: params.title,
+      subject: params.subject,
+      message: params.message,
+      signing_redirect_url: params.signingRedirectUrl,
+      test_mode: params.testMode,
+      client_id: params.clientId,
+      template_ids: params.templateIds,
+      signers: params.signers.map(signer =>
+        cleanObject({
+          role: signer.role,
+          email_address: signer.emailAddress,
+          name: signer.name,
+          pin: signer.pin
+        })
+      ),
+      ccs: params.ccs?.map(cc => ({
+        role: cc.role,
+        email_address: cc.emailAddress
+      })),
+      custom_fields: params.customFields?.map(field => ({
+        name: field.name,
+        value: field.value
+      })),
+      metadata: params.metadata
     });
 
-    params.signers.forEach((signer, _i) => {
-      body[`signers[${signer.role}][email_address]`] = signer.emailAddress;
-      body[`signers[${signer.role}][name]`] = signer.name;
-      if (signer.pin) body[`signers[${signer.role}][pin]`] = signer.pin;
+    let endpoint = params.embeddedSigning
+      ? '/signature_request/create_embedded_with_template'
+      : '/signature_request/send_with_template';
+    let response = await this.axios.post(endpoint, body);
+    return response.data.signature_request;
+  }
+
+  async bulkSendSignatureRequestWithTemplate(
+    params: BulkSendWithTemplateParams
+  ): Promise<any> {
+    if (params.embeddedSigning && !params.clientId) {
+      throw hellosignServiceError('clientId is required for embedded bulk sends.');
+    }
+
+    let body = cleanObject({
+      title: params.title,
+      subject: params.subject,
+      message: params.message,
+      signing_redirect_url: params.signingRedirectUrl,
+      test_mode: params.testMode,
+      client_id: params.clientId,
+      template_ids: params.templateIds,
+      signer_list: params.signerList.map(entry =>
+        cleanObject({
+          signers: entry.signers.map(signer =>
+            cleanObject({
+              role: signer.role,
+              name: signer.name,
+              email_address: signer.emailAddress,
+              pin: signer.pin
+            })
+          ),
+          custom_fields: entry.customFields?.map(field => ({
+            name: field.name,
+            value: field.value
+          }))
+        })
+      ),
+      ccs: params.ccs?.map(cc => ({
+        role: cc.role,
+        email_address: cc.emailAddress
+      })),
+      metadata: params.metadata
     });
 
-    if (params.ccs) {
-      params.ccs.forEach(cc => {
-        body[`ccs[${cc.role}][email_address]`] = cc.emailAddress;
-      });
-    }
+    let endpoint = params.embeddedSigning
+      ? '/signature_request/bulk_create_embedded_with_template'
+      : '/signature_request/bulk_send_with_template';
+    let response = await this.axios.post(endpoint, body);
+    return response.data.bulk_send_job;
+  }
 
-    if (params.customFields) {
-      params.customFields.forEach((field, i) => {
-        body[`custom_fields[${i}][name]`] = field.name;
-        body[`custom_fields[${i}][value]`] = field.value;
-      });
-    }
-
-    if (params.metadata) {
-      for (let [key, value] of Object.entries(params.metadata)) {
-        body[`metadata[${key}]`] = value;
-      }
-    }
-
-    let response = await this.axios.post('/signature_request/send_with_template', body);
+  async releaseOnHoldSignatureRequest(signatureRequestId: string): Promise<any> {
+    let response = await this.axios.post(
+      `/signature_request/release_hold/${signatureRequestId}`
+    );
     return response.data.signature_request;
   }
 
@@ -252,7 +355,7 @@ export class Client {
     if (params.signatureId) body.signature_id = params.signatureId;
     if (params.emailAddress) body.email_address = params.emailAddress;
     if (params.signerName) body.signer_name = params.signerName;
-    if (params.expiresAt) body.expires_at = params.expiresAt;
+    if (params.expiresAt !== undefined) body.expires_at = params.expiresAt;
 
     let response = await this.axios.post(
       `/signature_request/update/${params.signatureRequestId}`,
@@ -264,14 +367,22 @@ export class Client {
   async getSignatureRequestFiles(
     signatureRequestId: string,
     fileType?: 'pdf' | 'zip'
-  ): Promise<{ fileUrl: string }> {
-    let params: Record<string, any> = { get_url: true };
+  ): Promise<{ contentBase64: string; mimeType: string; byteLength: number }> {
+    let params: Record<string, any> = {};
     if (fileType) params.file_type = fileType;
 
     let response = await this.axios.get(`/signature_request/files/${signatureRequestId}`, {
-      params
+      params,
+      responseType: 'arraybuffer'
     });
-    return { fileUrl: response.data.file_url };
+    let content = toBuffer(response.data);
+    return {
+      contentBase64: content.toString('base64'),
+      mimeType:
+        getHeaderValue(response.headers as Record<string, any>, 'content-type') ??
+        (fileType === 'zip' ? 'application/zip' : 'application/pdf'),
+      byteLength: content.byteLength
+    };
   }
 
   // ---- Templates ----
@@ -338,12 +449,22 @@ export class Client {
   async getTemplateFiles(
     templateId: string,
     fileType?: 'pdf' | 'zip'
-  ): Promise<{ fileUrl: string }> {
-    let params: Record<string, any> = { get_url: true };
+  ): Promise<{ contentBase64: string; mimeType: string; byteLength: number }> {
+    let params: Record<string, any> = {};
     if (fileType) params.file_type = fileType;
 
-    let response = await this.axios.get(`/template/files/${templateId}`, { params });
-    return { fileUrl: response.data.file_url };
+    let response = await this.axios.get(`/template/files/${templateId}`, {
+      params,
+      responseType: 'arraybuffer'
+    });
+    let content = toBuffer(response.data);
+    return {
+      contentBase64: content.toString('base64'),
+      mimeType:
+        getHeaderValue(response.headers as Record<string, any>, 'content-type') ??
+        (fileType === 'zip' ? 'application/zip' : 'application/pdf'),
+      byteLength: content.byteLength
+    };
   }
 
   // ---- Team ----
@@ -442,7 +563,7 @@ export class Client {
       end_date: endDate,
       report_type: reportType
     });
-    return response.data;
+    return response.data.report ?? response.data;
   }
 
   // ---- Helpers ----

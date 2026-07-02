@@ -9,13 +9,16 @@ import {
   getOrganization,
   listAuditLogs,
   listBranches,
+  listClusterSizes,
   listDatabases,
   listDeployRequests,
   listMembers,
+  listRegions,
   manageBackup,
   manageBranch,
   manageDeployRequest,
   managePassword,
+  manageServiceToken,
   manageWebhook,
   updateDatabase
 } from './tools';
@@ -30,6 +33,8 @@ export let provider = Slate.create({
     updateDatabase,
     deleteDatabase,
     listBranches,
+    listRegions,
+    listClusterSizes,
     createBranch,
     manageBranch,
     listDeployRequests,
@@ -38,6 +43,7 @@ export let provider = Slate.create({
     managePassword,
     manageBackup,
     manageWebhook,
+    manageServiceToken,
     getOrganization,
     listMembers,
     listAuditLogs

@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { applyOktaErrorInterceptor } from './errors';
 import type {
   OktaApplication,
   OktaEventHook,
@@ -10,20 +11,25 @@ import type {
   PaginatedResponse
 } from './types';
 
+export type OktaAuthMethod = 'api_token' | 'oauth';
+
 export class OktaClient {
   private http: ReturnType<typeof createAxios>;
 
-  constructor(params: { domain: string; token: string }) {
+  constructor(params: { domain: string; token: string; authMethod?: OktaAuthMethod }) {
     let domain = params.domain.replace(/\/+$/, '');
+    let authorization =
+      params.authMethod === 'oauth' ? `Bearer ${params.token}` : `SSWS ${params.token}`;
 
     this.http = createAxios({
       baseURL: `${domain}/api/v1`,
       headers: {
-        Authorization: `SSWS ${params.token}`,
+        Authorization: authorization,
         Accept: 'application/json',
         'Content-Type': 'application/json'
       }
     });
+    applyOktaErrorInterceptor(this.http);
   }
 
   // --- Pagination helper ---

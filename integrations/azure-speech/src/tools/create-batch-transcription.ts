@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SpeechToTextClient } from '../lib/client';
+import { azureSpeechServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createBatchTranscription = SlateTool.create(spec, {
@@ -39,6 +40,12 @@ The job runs asynchronously — use the **Get Batch Transcription** tool to chec
         .describe(
           'Azure Blob Storage container URL containing audio files. Mutually exclusive with contentUrls.'
         ),
+      destinationContainerUrl: z
+        .string()
+        .optional()
+        .describe(
+          'Optional Azure Blob Storage container URL where transcription result files should be written.'
+        ),
       timeToLiveHours: z
         .number()
         .optional()
@@ -47,18 +54,22 @@ The job runs asynchronously — use the **Get Batch Transcription** tool to chec
         .boolean()
         .optional()
         .describe('Include word-level timestamps in results'),
+      displayFormWordLevelTimestampsEnabled: z
+        .boolean()
+        .optional()
+        .describe('Include word-level timestamps for the display-form transcript'),
+      channels: z
+        .array(z.number())
+        .optional()
+        .describe('Zero-based audio channels to transcribe separately, such as [0, 1]'),
       diarizationEnabled: z
         .boolean()
         .optional()
-        .describe('Enable speaker diarization for 2 speakers'),
-      diarizationMinSpeakers: z
-        .number()
-        .optional()
-        .describe('Minimum number of speakers for diarization (for 3+ speakers)'),
+        .describe('Enable speaker diarization for single-channel audio'),
       diarizationMaxSpeakers: z
         .number()
         .optional()
-        .describe('Maximum number of speakers for diarization (max 36)'),
+        .describe('Maximum expected speakers for diarization (2-35)'),
       punctuationMode: z
         .enum(['None', 'Dictated', 'Automatic', 'DictatedAndAutomatic'])
         .optional()
@@ -76,7 +87,11 @@ The job runs asynchronously — use the **Get Batch Transcription** tool to chec
       languageIdentificationLocales: z
         .array(z.string())
         .optional()
-        .describe('Candidate locales for language identification (2-10 locales)')
+        .describe('Candidate locales for language identification (2-10 locales)'),
+      languageIdentificationMode: z
+        .enum(['Continuous', 'Single'])
+        .optional()
+        .describe('Language identification mode. Defaults to Continuous.')
     })
   )
   .output(
@@ -94,8 +109,45 @@ The job runs asynchronously — use the **Get Batch Transcription** tool to chec
   .handleInvocation(async ctx => {
     let input = ctx.input;
 
-    if (!input.contentUrls && !input.contentContainerUrl) {
-      throw new Error('Either contentUrls or contentContainerUrl must be provided.');
+    if (!input.contentUrls?.length && !input.contentContainerUrl) {
+      throw azureSpeechServiceError(
+        'Either contentUrls or contentContainerUrl must be provided.'
+      );
+    }
+
+    if (input.contentUrls?.length && input.contentContainerUrl) {
+      throw azureSpeechServiceError(
+        'contentUrls and contentContainerUrl are mutually exclusive.'
+      );
+    }
+
+    if (input.contentUrls && input.contentUrls.length > 1000) {
+      throw azureSpeechServiceError('contentUrls can include at most 1000 audio URLs.');
+    }
+
+    if (
+      input.timeToLiveHours !== undefined &&
+      (input.timeToLiveHours < 6 || input.timeToLiveHours > 744)
+    ) {
+      throw azureSpeechServiceError('timeToLiveHours must be between 6 and 744.');
+    }
+
+    if (
+      input.diarizationMaxSpeakers !== undefined &&
+      (input.diarizationMaxSpeakers < 2 || input.diarizationMaxSpeakers > 35)
+    ) {
+      throw azureSpeechServiceError('diarizationMaxSpeakers must be between 2 and 35.');
+    }
+
+    if (
+      input.languageIdentificationLocales &&
+      (input.languageIdentificationLocales.length < 2 ||
+        (input.languageIdentificationMode !== 'Single' &&
+          input.languageIdentificationLocales.length > 10))
+    ) {
+      throw azureSpeechServiceError(
+        'languageIdentificationLocales must include 2-10 locales unless languageIdentificationMode is "Single".'
+      );
     }
 
     let client = new SpeechToTextClient({
@@ -104,17 +156,17 @@ The job runs asynchronously — use the **Get Batch Transcription** tool to chec
     });
 
     let diarization =
-      input.diarizationMinSpeakers || input.diarizationMaxSpeakers
+      input.diarizationEnabled !== undefined || input.diarizationMaxSpeakers !== undefined
         ? {
-            minCount: input.diarizationMinSpeakers,
-            maxCount: input.diarizationMaxSpeakers
+            enabled: input.diarizationEnabled ?? true,
+            maxSpeakers: input.diarizationMaxSpeakers
           }
         : undefined;
 
     let languageIdentification = input.languageIdentificationLocales
       ? {
           candidateLocales: input.languageIdentificationLocales,
-          mode: 'Continuous' as const
+          mode: input.languageIdentificationMode ?? 'Continuous'
         }
       : undefined;
 
@@ -125,9 +177,11 @@ The job runs asynchronously — use the **Get Batch Transcription** tool to chec
       locale: input.locale,
       contentUrls: input.contentUrls,
       contentContainerUrl: input.contentContainerUrl,
+      destinationContainerUrl: input.destinationContainerUrl,
       timeToLiveHours: input.timeToLiveHours,
       wordLevelTimestampsEnabled: input.wordLevelTimestampsEnabled,
-      diarizationEnabled: input.diarizationEnabled,
+      displayFormWordLevelTimestampsEnabled: input.displayFormWordLevelTimestampsEnabled,
+      channels: input.channels,
       diarization,
       punctuationMode: input.punctuationMode,
       profanityFilterMode: input.profanityFilterMode,

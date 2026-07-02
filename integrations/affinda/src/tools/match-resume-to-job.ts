@@ -20,6 +20,10 @@ Both the resume and job description must already be uploaded and parsed in Affin
         .string()
         .describe('Identifier of the parsed job description document.'),
       indexName: z.string().optional().describe('Specific index to use for matching.'),
+      searchExpression: z
+        .string()
+        .optional()
+        .describe('Keywords to add to the search criteria.'),
       jobTitlesWeight: z.number().optional().describe('Weight for job titles (0 to 1).'),
       skillsWeight: z.number().optional().describe('Weight for skills (0 to 1).'),
       educationWeight: z.number().optional().describe('Weight for education (0 to 1).'),
@@ -32,7 +36,12 @@ Both the resume and job description must already be uploaded and parsed in Affin
       managementLevelWeight: z
         .number()
         .optional()
-        .describe('Weight for management level (0 to 1).')
+        .describe('Weight for management level (0 to 1).'),
+      searchExpressionWeight: z
+        .number()
+        .optional()
+        .describe('Weight for keyword search expression (0 to 1).'),
+      socCodesWeight: z.number().optional().describe('Weight for SOC codes (0 to 1).')
     })
   )
   .output(
@@ -49,6 +58,7 @@ Both the resume and job description must already be uploaded and parsed in Affin
 
     let extraParams: Record<string, any> = {};
     if (ctx.input.indexName) extraParams.index = ctx.input.indexName;
+    if (ctx.input.searchExpression) extraParams.search_expression = ctx.input.searchExpression;
     if (ctx.input.jobTitlesWeight !== undefined)
       extraParams.job_titles_weight = ctx.input.jobTitlesWeight;
     if (ctx.input.skillsWeight !== undefined)
@@ -63,6 +73,10 @@ Both the resume and job description must already be uploaded and parsed in Affin
       extraParams.languages_weight = ctx.input.languagesWeight;
     if (ctx.input.managementLevelWeight !== undefined)
       extraParams.management_level_weight = ctx.input.managementLevelWeight;
+    if (ctx.input.searchExpressionWeight !== undefined)
+      extraParams.search_expression_weight = ctx.input.searchExpressionWeight;
+    if (ctx.input.socCodesWeight !== undefined)
+      extraParams.soc_codes_weight = ctx.input.socCodesWeight;
 
     let result = await client.matchResumeToJob(
       ctx.input.resumeIdentifier,

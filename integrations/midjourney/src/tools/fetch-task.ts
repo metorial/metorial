@@ -51,7 +51,10 @@ export let fetchTask = SlateTool.create(spec, {
         .array(z.string())
         .optional()
         .describe('Prompt suggestions (for describe tasks)'),
-      styleReference: z.string().optional().describe('Style reference code if applicable')
+      videoUrls: z.array(z.string()).optional().describe('Generated video URLs'),
+      seed: z.string().optional().describe('Seed value returned by seed tasks'),
+      styleReference: z.string().optional().describe('Style reference code if applicable'),
+      error: z.string().optional().describe('Provider error message when the task failed')
     })
   )
   .handleInvocation(async ctx => {
@@ -75,10 +78,13 @@ export let fetchTask = SlateTool.create(spec, {
         imageUrls: result.image_urls,
         imageUrl: result.image_url,
         prompts: result.content,
-        styleReference: result.sref
+        videoUrls: result.video_urls,
+        seed: result.seed,
+        styleReference: result.sref,
+        error: result.error
       },
       message: isComplete
-        ? `Task **${result.task_id}** (${result.task_type}) is **completed**.${result.image_urls ? ` ${result.image_urls.length} images available.` : ''}${result.image_url ? ` Image: ${result.image_url}` : ''}${result.content ? ` ${result.content.length} prompts generated.` : ''}`
+        ? `Task **${result.task_id}** (${result.task_type}) is **${status}**.${result.image_urls ? ` ${result.image_urls.length} images available.` : ''}${result.image_url ? ` Image: ${result.image_url}` : ''}${result.video_urls ? ` ${result.video_urls.length} videos available.` : ''}${result.content ? ` ${result.content.length} prompts generated.` : ''}${result.seed ? ` Seed: ${result.seed}.` : ''}${result.error ? ` Error: ${result.error}` : ''}`
         : `Task **${result.task_id}** (${result.task_type}) is **${status}**${result.percentage ? ` (${result.percentage}%)` : ''}.`
     };
   })

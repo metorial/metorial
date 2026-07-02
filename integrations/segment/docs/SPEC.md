@@ -36,11 +36,11 @@ Choose between writeKey authentication, basic authentication and OAuth to authen
 
 ### Source Management
 
-Create, list, update, and delete data sources that collect customer data. Sources represent websites, mobile apps, servers, or cloud services that send data into Segment. You can manage write keys, configure schema settings, and view connected destinations and warehouses for each source.
+Create, list, update, and delete data sources that collect customer data. Sources represent websites, mobile apps, servers, or cloud services that send data into Segment. You can rotate and remove source write keys, configure schema settings, and view connected destinations and warehouses for each source.
 
 ### Destination Management
 
-Create, configure, enable/disable, and delete destinations where Segment routes collected data (e.g., analytics tools, data warehouses, marketing platforms). Supports destination subscriptions (action-based mappings) and delivery metrics monitoring.
+Create, configure, enable/disable, and delete destinations where Segment routes collected data (e.g., analytics tools, data warehouses, marketing platforms). Supports destination subscriptions (action-based mappings), including listing, retrieving, creating, updating, and removing subscriptions where the workspace has the feature enabled. Also supports delivery metrics monitoring.
 
 ### Destination Filters
 
@@ -97,7 +97,7 @@ Browse the full catalog of available source, destination, and warehouse integrat
 
 ### Usage and Monitoring
 
-Query workspace-level and per-source API call usage, monthly tracked users (MTU), and event volume metrics. Monitor event delivery with detailed ingress/egress success and failure metrics.
+Query current workspace-level and per-source daily API call usage, daily monthly tracked users (MTU), workspace event volume metrics, and destination delivery metrics. Monitor event delivery with detailed ingress/egress success and failure metrics.
 
 ### Deletion and Suppression
 

@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { requireNonEmptyString } from './shared';
 
 export let getTemplate = SlateTool.create(spec, {
   name: 'Get Template',
@@ -39,8 +40,9 @@ export let getTemplate = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    let templateId = requireNonEmptyString(ctx.input.templateId, 'templateId');
 
-    let template = await client.getTemplate(ctx.input.templateId);
+    let template = await client.getTemplate(templateId);
 
     return {
       output: {
@@ -50,13 +52,13 @@ export let getTemplate = SlateTool.create(spec, {
         teamName: template.team_name,
         teamId: template.team_id,
         createdAt: template.created_at,
-        meta: template.meta as Record<string, unknown>,
-        variables: template.variables.map(v => ({
+        meta: (template.meta ?? {}) as Record<string, unknown>,
+        variables: (template.variables ?? []).map(v => ({
           name: v.name,
           type: v.type
         }))
       },
-      message: `Retrieved template **${template.name}** (${template.type}) with **${template.variables.length}** variable(s).`
+      message: `Retrieved template **${template.name}** (${template.type}) with **${(template.variables ?? []).length}** variable(s).`
     };
   })
   .build();

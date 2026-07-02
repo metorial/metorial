@@ -6,15 +6,21 @@ import {
   createTable,
   deleteItem,
   deleteTable,
+  describeBackup,
+  describeStream,
   describeTable,
   executePartiql,
   getItem,
+  getStreamRecords,
+  listStreams,
   listTables,
   manageBackups,
   manageTtl,
   putItem,
   queryItems,
+  restoreTableFromBackup,
   scanItems,
+  transactGetItems,
   transactWrite,
   updateItem,
   updateTable
@@ -38,9 +44,15 @@ export let provider = Slate.create({
     executePartiql,
     batchWriteItems,
     batchGetItems,
+    transactGetItems,
     transactWrite,
+    listStreams,
+    describeStream,
+    getStreamRecords,
     manageTtl,
-    manageBackups
+    manageBackups,
+    describeBackup,
+    restoreTableFromBackup
   ],
   triggers: [inboundWebhook, streamChanges]
 });

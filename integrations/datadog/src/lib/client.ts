@@ -1,21 +1,34 @@
 import { createAxios } from 'slates';
+import { datadogApiError, datadogServiceError } from './errors';
 import type {
   Dashboard,
   DatadogAuthConfig,
   LogSearchParams,
+  MetricSeriesInput,
   MetricsQueryParams,
   Monitor,
   MonitorOptions
 } from './types';
 
 export class DatadogClient {
-  private http;
+  private http: ReturnType<typeof createAxios>;
+  private logIntakeHttp: ReturnType<typeof createAxios>;
   private authConfig: DatadogAuthConfig;
 
   constructor(authConfig: DatadogAuthConfig) {
     this.authConfig = authConfig;
     let baseURL = `https://api.${authConfig.site}`;
     this.http = createAxios({ baseURL });
+    this.logIntakeHttp = createAxios({
+      baseURL: `https://http-intake.logs.${authConfig.site}`
+    });
+
+    for (let http of [this.http, this.logIntakeHttp]) {
+      http.interceptors.response.use(
+        response => response,
+        error => Promise.reject(datadogApiError(error))
+      );
+    }
   }
 
   private getHeaders(): Record<string, string> {
@@ -28,6 +41,23 @@ export class DatadogClient {
     return {
       'DD-API-KEY': this.authConfig.apiKey || this.authConfig.token,
       'DD-APPLICATION-KEY': this.authConfig.appKey || '',
+      'Content-Type': 'application/json'
+    };
+  }
+
+  private getApiKeyOnlyHeaders(): Record<string, string> {
+    let apiKey =
+      this.authConfig.apiKey ??
+      (this.authConfig.authMethod === 'apikey' ? this.authConfig.token : undefined);
+
+    if (!apiKey) {
+      throw datadogServiceError(
+        'This Datadog endpoint requires API key authentication. Reconnect Datadog with API Key + Application Key credentials.'
+      );
+    }
+
+    return {
+      'DD-API-KEY': apiKey,
       'Content-Type': 'application/json'
     };
   }
@@ -65,22 +95,21 @@ export class DatadogClient {
     return response.data;
   }
 
-  async submitMetrics(
-    series: Array<{
-      metric: string;
-      type?: number;
-      points: [number, number][];
-      host?: string;
-      tags?: string[];
-    }>
-  ): Promise<any> {
-    let response = await this.http.post(
-      '/api/v1/series',
-      { series },
-      {
-        headers: this.getHeaders()
-      }
-    );
+  async submitMetrics(series: MetricSeriesInput[]): Promise<any> {
+    let body = {
+      series: series.map(s => ({
+        metric: s.metric,
+        type: s.type,
+        points: s.points.map(([timestamp, value]) => ({ timestamp, value })),
+        tags: s.tags,
+        resources: s.resources ?? (s.host ? [{ name: s.host, type: 'host' }] : undefined),
+        unit: s.unit
+      }))
+    };
+
+    let response = await this.http.post('/api/v2/series', body, {
+      headers: this.getApiKeyOnlyHeaders()
+    });
     return response.data;
   }
 
@@ -468,8 +497,8 @@ export class DatadogClient {
       service?: string;
     }>
   ): Promise<any> {
-    let response = await this.http.post('/api/v2/logs', logs, {
-      headers: this.getHeaders()
+    let response = await this.logIntakeHttp.post('/api/v2/logs', logs, {
+      headers: this.getApiKeyOnlyHeaders()
     });
     return response.data;
   }
@@ -657,8 +686,20 @@ export class DatadogClient {
 
   // ─── Downtime ──────────────────────────────────────────
 
-  async listDowntimes(): Promise<any> {
+  async listDowntimes(params?: { pageLimit?: number; pageOffset?: number }): Promise<any> {
+    let queryParams: Record<string, any> = {};
+    if (params?.pageLimit !== undefined) queryParams['page[limit]'] = params.pageLimit;
+    if (params?.pageOffset !== undefined) queryParams['page[offset]'] = params.pageOffset;
+
     let response = await this.http.get('/api/v2/downtime', {
+      headers: this.getHeaders(),
+      params: queryParams
+    });
+    return response.data;
+  }
+
+  async getDowntime(downtimeId: string): Promise<any> {
+    let response = await this.http.get(`/api/v2/downtime/${encodeURIComponent(downtimeId)}`, {
       headers: this.getHeaders()
     });
     return response.data;
@@ -707,6 +748,12 @@ export class DatadogClient {
       headers: this.getHeaders()
     });
     return response.data;
+  }
+
+  async cancelDowntime(downtimeId: string): Promise<void> {
+    await this.http.delete(`/api/v2/downtime/${encodeURIComponent(downtimeId)}`, {
+      headers: this.getHeaders()
+    });
   }
 
   // ─── Webhooks Integration ──────────────────────────────

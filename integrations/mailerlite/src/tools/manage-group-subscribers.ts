@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mailerLiteServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageGroupSubscribers = SlateTool.create(spec, {
@@ -56,7 +57,7 @@ export let manageGroupSubscribers = SlateTool.create(spec, {
 
     if (ctx.input.action === 'assign') {
       if (!ctx.input.subscriberId)
-        throw new Error('Subscriber ID is required for assign action');
+        throw mailerLiteServiceError('Subscriber ID is required for assign action');
       await client.assignSubscriberToGroup(ctx.input.subscriberId, ctx.input.groupId);
       return {
         output: { success: true },
@@ -66,7 +67,7 @@ export let manageGroupSubscribers = SlateTool.create(spec, {
 
     if (ctx.input.action === 'unassign') {
       if (!ctx.input.subscriberId)
-        throw new Error('Subscriber ID is required for unassign action');
+        throw mailerLiteServiceError('Subscriber ID is required for unassign action');
       await client.unassignSubscriberFromGroup(ctx.input.subscriberId, ctx.input.groupId);
       return {
         output: { success: true },

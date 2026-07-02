@@ -1,4 +1,7 @@
 import { createAxios } from 'slates';
+import { klaviyoApiError } from './errors';
+
+const DEFAULT_KLAVIYO_API_REVISION = '2026-04-15';
 
 export interface KlaviyoClientConfig {
   token: string;
@@ -42,11 +45,16 @@ export class KlaviyoClient {
       baseURL: 'https://a.klaviyo.com/api',
       headers: {
         Authorization: authHeader,
-        revision: config.revision ?? '2025-01-15',
+        revision: config.revision ?? DEFAULT_KLAVIYO_API_REVISION,
         Accept: 'application/vnd.api+json',
         'Content-Type': 'application/vnd.api+json'
       }
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(klaviyoApiError(error))
+    );
   }
 
   // --- Profiles ---
@@ -939,34 +947,81 @@ export class KlaviyoClient {
 
   // --- Reporting ---
 
-  async queryCampaignValues(body: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/campaign-values-reports/', {
-      data: {
-        type: 'campaign-values-report',
-        attributes: body
-      }
-    });
+  private async queryReport(
+    path: string,
+    type: string,
+    attributes: Record<string, any>,
+    params?: { fields?: string[]; pageCursor?: string }
+  ): Promise<any> {
+    let query: Record<string, any> = {};
+    if (params?.fields?.length) query[`fields[${type}]`] = params.fields.join(',');
+    if (params?.pageCursor) query.page_cursor = params.pageCursor;
+
+    let response = await this.axios.post(
+      path,
+      {
+        data: {
+          type,
+          attributes
+        }
+      },
+      { params: query }
+    );
     return response.data;
   }
 
-  async queryFlowValues(body: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/flow-values-reports/', {
-      data: {
-        type: 'flow-values-report',
-        attributes: body
-      }
-    });
-    return response.data;
+  async queryCampaignValues(
+    body: Record<string, any>,
+    params?: { fields?: string[]; pageCursor?: string }
+  ): Promise<any> {
+    return this.queryReport(
+      '/campaign-values-reports/',
+      'campaign-values-report',
+      body,
+      params
+    );
   }
 
-  async queryFlowSeries(body: Record<string, any>): Promise<any> {
-    let response = await this.axios.post('/flow-series-reports/', {
-      data: {
-        type: 'flow-series-report',
-        attributes: body
-      }
-    });
-    return response.data;
+  async queryFlowValues(
+    body: Record<string, any>,
+    params?: { fields?: string[]; pageCursor?: string }
+  ): Promise<any> {
+    return this.queryReport('/flow-values-reports/', 'flow-values-report', body, params);
+  }
+
+  async queryFlowSeries(
+    body: Record<string, any>,
+    params?: { fields?: string[]; pageCursor?: string }
+  ): Promise<any> {
+    return this.queryReport('/flow-series-reports/', 'flow-series-report', body, params);
+  }
+
+  async queryFormValues(
+    body: Record<string, any>,
+    params?: { fields?: string[] }
+  ): Promise<any> {
+    return this.queryReport('/form-values-reports/', 'form-values-report', body, params);
+  }
+
+  async queryFormSeries(
+    body: Record<string, any>,
+    params?: { fields?: string[] }
+  ): Promise<any> {
+    return this.queryReport('/form-series-reports/', 'form-series-report', body, params);
+  }
+
+  async querySegmentValues(
+    body: Record<string, any>,
+    params?: { fields?: string[] }
+  ): Promise<any> {
+    return this.queryReport('/segment-values-reports/', 'segment-values-report', body, params);
+  }
+
+  async querySegmentSeries(
+    body: Record<string, any>,
+    params?: { fields?: string[] }
+  ): Promise<any> {
+    return this.queryReport('/segment-series-reports/', 'segment-series-report', body, params);
   }
 
   // --- Data Privacy ---
@@ -1000,8 +1055,11 @@ export class KlaviyoClient {
 
   // --- Accounts ---
 
-  async getAccounts(): Promise<PaginatedResponse> {
-    let response = await this.axios.get('/accounts/');
+  async getAccounts(params?: { fields?: string[] }): Promise<PaginatedResponse> {
+    let query: Record<string, any> = {};
+    if (params?.fields?.length) query['fields[account]'] = params.fields.join(',');
+
+    let response = await this.axios.get('/accounts/', { params: query });
     return response.data;
   }
 
@@ -1050,14 +1108,36 @@ export class KlaviyoClient {
     return response.data;
   }
 
+  async getImage(imageId: string): Promise<JsonApiResponse> {
+    let response = await this.axios.get(`/images/${imageId}/`);
+    return response.data;
+  }
+
   async uploadImage(attributes: {
     name?: string;
-    import_url: string;
+    import_from_url: string;
     hidden?: boolean;
   }): Promise<JsonApiResponse> {
     let response = await this.axios.post('/images/', {
       data: {
         type: 'image',
+        attributes
+      }
+    });
+    return response.data;
+  }
+
+  async updateImage(
+    imageId: string,
+    attributes: {
+      name?: string;
+      hidden?: boolean;
+    }
+  ): Promise<JsonApiResponse> {
+    let response = await this.axios.patch(`/images/${imageId}/`, {
+      data: {
+        type: 'image',
+        id: imageId,
         attributes
       }
     });

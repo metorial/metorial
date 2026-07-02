@@ -38,7 +38,7 @@ FIFO topics are designed to enhance messaging between applications when the orde
 
 ### Message Publishing
 
-Publish messages to topics or directly to specific endpoints (phone numbers, platform endpoints). Each message can contain up to 256KB of data. You can set MessageStructure to JSON to send a different message for each protocol, e.g., a short message to SMS subscribers and a longer message to email subscribers. Messages can include custom message attributes for metadata.
+Publish messages to topics or directly to specific endpoints (phone numbers, platform endpoints). PublishBatch sends up to 10 messages to one topic in a single request and reports per-entry success or failure. Each message can contain up to 256KB of data. You can set MessageStructure to JSON to send a different message for each protocol, e.g., a short message to SMS subscribers and a longer message to email subscribers. Messages can include custom message attributes for metadata.
 
 ### Subscription Management
 
@@ -50,11 +50,11 @@ Subscriber applications can create filter policies so they receive only the noti
 
 ### SMS Messaging
 
-Amazon SNS supports sending SMS text messages at scale to 200+ countries. You can control your originating identity by using a sender ID, long codes, or short codes, and use the SNS sandbox to validate SMS workloads before moving to production. SMS messages can be sent directly to a phone number or via a topic subscription.
+Amazon SNS supports sending SMS text messages at scale to 200+ countries. You can control your originating identity by using a sender ID, long codes, or short codes, and use the SNS sandbox to validate SMS workloads before moving to production. SMS messages can be sent directly to a phone number or via a topic subscription. This integration can inspect SMS account settings and sandbox status, update default SMS settings, list dedicated origination numbers, and check whether a phone number is opted out.
 
 ### Mobile Push Notifications
 
-Amazon SNS mobile notifications allow you to fan out mobile push notifications to iOS, Android, Fire, Windows, and Baidu devices. You create platform applications for supported push services (APNs, FCM, ADM, WNS, etc.) and register device endpoints to receive messages.
+Amazon SNS mobile notifications allow you to fan out mobile push notifications to existing platform endpoints for iOS, Android, Fire, Windows, and Baidu devices. This integration can publish to an existing platform endpoint ARN; it does not create or manage platform applications or device endpoints.
 
 ### Message Archiving and Replay
 

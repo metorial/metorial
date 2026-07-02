@@ -16,18 +16,27 @@ export let createCampaign = SlateTool.create(spec, {
     z.object({
       name: z.string().describe('Campaign name'),
       type: z.enum(['regular', 'ab', 'resend']).describe('Campaign type'),
+      languageId: z
+        .number()
+        .optional()
+        .describe('Campaign language ID for unsubscribe templates'),
       emails: z
         .array(
           z.object({
             subject: z.string().describe('Email subject line'),
             fromName: z.string().describe('Sender name'),
             from: z.string().describe('Sender email address'),
+            replyTo: z.string().optional().describe('Verified reply-to email address'),
             content: z.string().optional().describe('Email HTML content')
           })
         )
         .describe('Email configurations (one for regular, multiple for A/B)'),
       groupIds: z.array(z.string()).optional().describe('Target group IDs'),
-      segmentIds: z.array(z.string()).optional().describe('Target segment IDs')
+      segmentIds: z.array(z.string()).optional().describe('Target segment IDs'),
+      ecommerceTracking: z
+        .boolean()
+        .optional()
+        .describe('Enable e-commerce link tracking for campaign content')
     })
   )
   .output(
@@ -45,14 +54,20 @@ export let createCampaign = SlateTool.create(spec, {
     let result = await client.createCampaign({
       name: ctx.input.name,
       type: ctx.input.type,
+      language_id: ctx.input.languageId,
       emails: ctx.input.emails.map(e => ({
         subject: e.subject,
         from_name: e.fromName,
         from: e.from,
+        reply_to: e.replyTo,
         content: e.content
       })),
       groups: ctx.input.groupIds,
-      segments: ctx.input.segmentIds
+      segments: ctx.input.segmentIds,
+      settings:
+        ctx.input.ecommerceTracking === undefined
+          ? undefined
+          : { ecommerce_tracking: ctx.input.ecommerceTracking }
     });
 
     let campaign = result.data;

@@ -38,7 +38,6 @@ Gmail API offers granular scopes to limit access:
 | `https://www.googleapis.com/auth/gmail.modify`            | All read/write operations except permanent deletion bypassing Trash (restricted)                                                               |
 | `https://www.googleapis.com/auth/gmail.labels`            | Create, read, update, and delete labels only (non-sensitive)                                                                                   |
 | `https://www.googleapis.com/auth/gmail.insert`            | Insert and import messages only (restricted)                                                                                                   |
-| `https://www.googleapis.com/auth/gmail.metadata`          | Read metadata including labels, history records, and email headers, but not the body or attachments (restricted)                               |
 | `https://www.googleapis.com/auth/gmail.settings.basic`    | Manage basic mail settings (restricted)                                                                                                        |
 | `https://www.googleapis.com/auth/gmail.settings.sharing`  | Manage sensitive mail settings including forwarding rules and aliases; restricted to service accounts with domain-wide delegation (restricted) |
 | `https://www.googleapis.com/auth/contacts.readonly`       | Optional read-only access to Google Contacts through the People API                                                                            |

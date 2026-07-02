@@ -44,6 +44,43 @@ export let listAclRoles = SlateTool.create(spec, {
   })
   .build();
 
+export let getAclRole = SlateTool.create(spec, {
+  name: 'Get ACL Role',
+  key: 'get_acl_role',
+  description: `Retrieve a single Redis ACL role by ID, including associated Redis rules and assigned users when returned by Redis Cloud.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      roleId: z.number().describe('ACL role ID to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      role: aclRoleSchema.describe('ACL role details'),
+      raw: z.any().describe('Full API response')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new RedisCloudClient(ctx.auth);
+    let data = await client.getAclRole(ctx.input.roleId);
+
+    let role = {
+      roleId: data.id,
+      name: data.name,
+      redisRules: data.redisRules,
+      users: data.users
+    };
+
+    return {
+      output: { role, raw: data },
+      message: `ACL role **${ctx.input.roleId}** retrieved.`
+    };
+  })
+  .build();
+
 export let createAclRole = SlateTool.create(spec, {
   name: 'Create ACL Role',
   key: 'create_acl_role',

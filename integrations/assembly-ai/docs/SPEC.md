@@ -2,7 +2,7 @@
 
 ## Overview
 
-AssemblyAI is a Speech AI platform that provides APIs for speech-to-text transcription (both async and real-time streaming), audio intelligence models (summarization, sentiment analysis, entity detection, etc.), and an LLM Gateway for applying large language models to transcribed speech data. It offers models for converting audio files, video files, and live speech into text, an LLM Gateway framework for applying LLMs to spoken data, and models for interpreting audio for business and personal workflows.
+AssemblyAI is a Speech AI platform that provides APIs for speech-to-text transcription (both async and real-time streaming), audio intelligence models (sentiment analysis, entity detection, topic detection, key phrases, content moderation, PII redaction, etc.), Speech Understanding, and an LLM Gateway for applying large language models to transcribed speech data. It offers models for converting audio files, video files, and live speech into text, current LLM Gateway endpoints for transcript-aware reasoning, and models for interpreting audio for business and personal workflows.
 
 ## Authentication
 
@@ -36,8 +36,8 @@ Transcribe pre-recorded audio and video files by submitting a URL or uploading t
 - **Speaker diarization**: Identifies and labels different speakers within audio.
 - **Advanced Speaker Identification**: Maps speaker clusters to real names or roles via the Speech Understanding API, using audio context and optional known values you provide.
 - **Multichannel transcription**: Transcribe each audio channel separately.
-- **Custom vocabulary / word boost**: Provide a list of specific words or terms to improve recognition accuracy.
-- **Speech model selection**: Choose between different models (e.g., Universal, Slam-1) depending on accuracy and language needs.
+- **Keyterms prompting**: Provide a list of domain-specific words or phrases to improve recognition accuracy.
+- **Speech model selection**: Provide a priority list of speech models (for example Universal-3 Pro and Universal-2) depending on accuracy and language needs.
 - **Subtitle/caption generation**: Get transcripts formatted as SRT or VTT subtitles.
 - **Paragraph and sentence segmentation**: Retrieve transcripts split into semantically meaningful paragraphs or sentences.
 
@@ -52,14 +52,12 @@ Transcribe live audio streams in real-time via WebSocket connections. Provides p
 
 ### Audio Intelligence
 
-A suite of models that run alongside transcription to extract insights, including: summarization, content moderation, sentiment analysis, entity detection, topic detection, auto chapters, key phrases, and PII redaction.
+A suite of models that run alongside transcription to extract insights, including: content moderation, sentiment analysis, entity detection, topic detection, key phrases, and PII redaction. Flexible summaries and chapters should be generated through LLM Gateway with transcript injection rather than deprecated transcript-time summary parameters.
 
-- **Summarization**: Choose summary types (bullets, bullets_verbose, gist, headline, paragraph) and models (informative, conversational, catchy).
 - **Sentiment Analysis**: Detects positive, negative, and neutral sentiments in speech segments.
 - **Entity Detection**: Supports 44 entity types to automatically identify and categorize key information in transcripts with timestamps.
 - **Topic Detection**: Predicts topics spoken in audio using the standardized IAB Taxonomy.
 - **Content Moderation**: Detects sensitive content with confidence and severity scores.
-- **Auto Chapters**: Automatically segments transcripts into chapters with summaries.
 - **Key Phrases**: Extracts key phrases from the transcript.
 - **PII Redaction**: Automatically identifies and removes personally identifiable information from transcripts. Supports text redaction (hash or entity name substitution) and audio redaction (beeping out sensitive data). Configurable PII policies (names, credit cards, SSNs, etc.). Available in multiple languages.
 
@@ -67,14 +65,14 @@ A suite of models that run alongside transcription to extract insights, includin
 
 A unified interface that allows you to connect with multiple LLM providers including Claude, GPT, and Gemini to build sophisticated AI applications through a single API.
 
-- Provides access to 15+ models with support for basic chat completions, multi-turn conversations, tool/function calling, and agentic workflows.
-- Can be used standalone or combined with transcripts to apply LLMs to spoken data (summarization, Q&A, custom analysis).
+- Provides access to multiple models with support for chat completions, multi-turn conversations, tool/function calling, and agentic workflows.
+- Can be used standalone or combined with transcripts by injecting transcript text into prompts for summarization, Q&A, custom analysis, and chapter generation.
 - Unified billing and usage tracking across all providers.
-- LLM Gateway is not currently supported in the EU.
+- Uses the `https://llm-gateway.assemblyai.com` base URL in the default region and `https://llm-gateway.eu.assemblyai.com` for EU data residency.
 
 ### Speech Understanding
 
-Pre-built, LLM-powered features that transform raw transcripts into structured, actionable data. Includes translation (99+ languages), advanced speaker identification, text normalization (dates, phone numbers, emails), and customizable summarization.
+Pre-built, LLM-powered features that transform completed transcripts into structured, actionable data. Includes translation, advanced speaker identification, and custom formatting for dates, phone numbers, and emails.
 
 ### File Upload
 

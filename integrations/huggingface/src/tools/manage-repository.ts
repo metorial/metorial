@@ -98,6 +98,71 @@ export let deleteRepositoryTool = SlateTool.create(spec, {
   })
   .build();
 
+export let duplicateRepositoryTool = SlateTool.create(spec, {
+  name: 'Duplicate Repository',
+  key: 'duplicate_repository',
+  description: `Duplicate a Hugging Face Space repository to a new Space. The current Hub API exposes repository duplication for Spaces.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      repoType: z
+        .enum(['space'])
+        .default('space')
+        .describe(
+          'Repository type to duplicate. Hugging Face currently supports Space duplication.'
+        ),
+      sourceRepoId: z.string().describe('Source Space ID (e.g. "owner/source-space")'),
+      destinationRepoId: z
+        .string()
+        .describe('Destination Space ID or name for the duplicated repository'),
+      private: z
+        .boolean()
+        .optional()
+        .describe('Whether the duplicated Space should be private'),
+      visibility: z
+        .enum(['private', 'public', 'protected'])
+        .optional()
+        .describe('Visibility for the duplicated Space'),
+      hardware: z
+        .string()
+        .optional()
+        .describe('Optional hardware flavor for the duplicated Space'),
+      sleepTimeSeconds: z
+        .number()
+        .optional()
+        .describe('Optional Space sleep timeout in seconds, or -1 to disable sleep')
+    })
+  )
+  .output(
+    z.object({
+      url: z.string().optional().describe('URL of the duplicated repository'),
+      repoId: z.string().describe('Destination repository ID')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new HubClient({ token: ctx.auth.token });
+    let result = await client.duplicateSpace({
+      sourceRepoId: ctx.input.sourceRepoId,
+      destinationRepoId: ctx.input.destinationRepoId,
+      private: ctx.input.private,
+      visibility: ctx.input.visibility,
+      hardware: ctx.input.hardware,
+      sleepTimeSeconds: ctx.input.sleepTimeSeconds
+    });
+
+    return {
+      output: {
+        url: result.url,
+        repoId: ctx.input.destinationRepoId
+      },
+      message: `Duplicated Space **${ctx.input.sourceRepoId}** to **${ctx.input.destinationRepoId}**.`
+    };
+  })
+  .build();
+
 export let getRepositoryInfoTool = SlateTool.create(spec, {
   name: 'Get Repository Info',
   key: 'get_repository_info',

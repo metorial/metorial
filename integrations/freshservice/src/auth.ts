@@ -1,5 +1,19 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { freshserviceApiError, freshserviceServiceError } from './lib/errors';
+
+let normalizeFreshworksDomain = (domain: string) => {
+  let normalized = domain
+    .trim()
+    .replace(/^https?:\/\//, '')
+    .replace(/\/$/, '');
+  if (!normalized || !/^[a-z0-9][a-z0-9.-]*$/i.test(normalized)) {
+    throw freshserviceServiceError(
+      'Freshworks organization domain must be a host such as "mycompany.myfreshworks.com".'
+    );
+  }
+  return normalized;
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -48,7 +62,7 @@ export let auth = SlateAuth.create()
       {
         title: 'Update Tickets',
         description: 'Update tickets and service requests',
-        scope: 'freshservice.tickets.update'
+        scope: 'freshservice.tickets.edit'
       },
       {
         title: 'Delete Tickets',
@@ -68,12 +82,17 @@ export let auth = SlateAuth.create()
       {
         title: 'Update Problems',
         description: 'Update problems',
-        scope: 'freshservice.problems.update'
+        scope: 'freshservice.problems.edit'
       },
       {
         title: 'Delete Problems',
         description: 'Delete problems',
         scope: 'freshservice.problems.delete'
+      },
+      {
+        title: 'View Problem Fields',
+        description: 'View problem form field metadata',
+        scope: 'freshservice.problems.fields.view'
       },
       {
         title: 'View Changes',
@@ -88,12 +107,37 @@ export let auth = SlateAuth.create()
       {
         title: 'Update Changes',
         description: 'Update change requests',
-        scope: 'freshservice.changes.update'
+        scope: 'freshservice.changes.edit'
       },
       {
         title: 'Delete Changes',
         description: 'Delete change requests',
         scope: 'freshservice.changes.delete'
+      },
+      {
+        title: 'View Ticket Conversations',
+        description: 'View ticket replies and notes',
+        scope: 'freshservice.tickets.conversations.view'
+      },
+      {
+        title: 'Create Ticket Conversations',
+        description: 'Create ticket replies and notes',
+        scope: 'freshservice.tickets.conversations.create'
+      },
+      {
+        title: 'Edit Ticket Conversations',
+        description: 'Update ticket conversation bodies',
+        scope: 'freshservice.tickets.conversations.edit'
+      },
+      {
+        title: 'Delete Ticket Conversations',
+        description: 'Delete ticket conversations',
+        scope: 'freshservice.tickets.conversations.delete'
+      },
+      {
+        title: 'Manage Ticket Fields',
+        description: 'View ticket form field metadata',
+        scope: 'freshservice.tickets.fields.manage'
       },
       { title: 'View Assets', description: 'View assets', scope: 'freshservice.assets.view' },
       {
@@ -102,14 +146,24 @@ export let auth = SlateAuth.create()
         scope: 'freshservice.assets.manage'
       },
       {
+        title: 'Delete Assets',
+        description: 'Delete or restore assets',
+        scope: 'freshservice.assets.delete'
+      },
+      {
         title: 'View Solutions',
         description: 'View knowledge base articles',
         scope: 'freshservice.solutions.view'
       },
       {
-        title: 'Manage Solutions',
-        description: 'Manage knowledge base articles',
-        scope: 'freshservice.solutions.manage'
+        title: 'Publish Solutions',
+        description: 'Create and update knowledge base articles',
+        scope: 'freshservice.solutions.publish'
+      },
+      {
+        title: 'Delete Solutions',
+        description: 'Delete or restore knowledge base articles',
+        scope: 'freshservice.solutions.delete'
       },
       {
         title: 'View Releases',
@@ -117,9 +171,19 @@ export let auth = SlateAuth.create()
         scope: 'freshservice.releases.view'
       },
       {
-        title: 'Manage Releases',
-        description: 'Create and manage releases',
-        scope: 'freshservice.releases.manage'
+        title: 'Create Releases',
+        description: 'Create releases',
+        scope: 'freshservice.releases.create'
+      },
+      {
+        title: 'Edit Releases',
+        description: 'Update releases',
+        scope: 'freshservice.releases.edit'
+      },
+      {
+        title: 'Delete Releases',
+        description: 'Delete or restore releases',
+        scope: 'freshservice.releases.delete'
       },
       {
         title: 'View Requesters',
@@ -127,15 +191,69 @@ export let auth = SlateAuth.create()
         scope: 'freshservice.requesters.view'
       },
       {
-        title: 'Manage Requesters',
-        description: 'Manage requesters',
-        scope: 'freshservice.requesters.manage'
+        title: 'Create Requesters',
+        description: 'Create requesters',
+        scope: 'freshservice.requesters.create'
       },
-      { title: 'View Agents', description: 'View agents', scope: 'freshservice.agents.view' },
+      {
+        title: 'Edit Requesters',
+        description: 'Update requesters',
+        scope: 'freshservice.requesters.edit'
+      },
+      {
+        title: 'Delete Requesters',
+        description: 'Deactivate or reactivate requesters',
+        scope: 'freshservice.requesters.delete'
+      },
       {
         title: 'Manage Agents',
-        description: 'Manage agents',
+        description: 'View agent records',
         scope: 'freshservice.agents.manage'
+      },
+      {
+        title: 'View Departments',
+        description: 'View departments and department fields',
+        scope: 'freshservice.departments.view'
+      },
+      {
+        title: 'View Department Fields',
+        description: 'View department field metadata',
+        scope: 'freshservice.departments.fields.view'
+      },
+      {
+        title: 'View Agent Fields',
+        description: 'View agent field metadata',
+        scope: 'freshservice.agents.fields.view'
+      },
+      {
+        title: 'View Requester Fields',
+        description: 'View requester field metadata',
+        scope: 'freshservice.requesters.fields.view'
+      },
+      {
+        title: 'Manage Agent Groups',
+        description: 'View agent group records',
+        scope: 'freshservice.agentgroups.manage'
+      },
+      {
+        title: 'View Locations',
+        description: 'View locations',
+        scope: 'freshservice.locations.view'
+      },
+      {
+        title: 'View Vendors',
+        description: 'View vendors',
+        scope: 'freshservice.vendors.view'
+      },
+      {
+        title: 'View Service Catalog',
+        description: 'View service catalog items',
+        scope: 'freshservice.service_catalog.view'
+      },
+      {
+        title: 'Edit Service Catalog',
+        description: 'View service catalog item details and metadata',
+        scope: 'freshservice.service_catalog.edit'
       }
     ],
     inputSchema: z.object({
@@ -144,7 +262,7 @@ export let auth = SlateAuth.create()
         .describe('Your Freshworks organization domain (e.g. "mycompany.myfreshworks.com")')
     }),
     getAuthorizationUrl: async ctx => {
-      let domain = ctx.input.organizationDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      let domain = normalizeFreshworksDomain(ctx.input.organizationDomain);
       let params = new URLSearchParams({
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
@@ -158,24 +276,29 @@ export let auth = SlateAuth.create()
       };
     },
     handleCallback: async ctx => {
-      let domain = ctx.input.organizationDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+      let domain = normalizeFreshworksDomain(ctx.input.organizationDomain);
       let axios = createAxios();
 
       let encoded = Buffer.from(`${ctx.clientId}:${ctx.clientSecret}`).toString('base64');
-      let response = await axios.post(
-        `https://${domain}/oauth/token`,
-        {
-          code: ctx.code,
-          grant_type: 'authorization_code',
-          redirect_uri: ctx.redirectUri
-        },
-        {
-          headers: {
-            Authorization: `Basic ${encoded}`,
-            'Content-Type': 'application/json'
+      let response: any;
+      try {
+        response = await axios.post(
+          `https://${domain}/oauth/token`,
+          {
+            code: ctx.code,
+            grant_type: 'authorization_code',
+            redirect_uri: ctx.redirectUri
+          },
+          {
+            headers: {
+              Authorization: `Basic ${encoded}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw freshserviceApiError(error, 'exchange OAuth authorization code');
+      }
       let expiresAt = response.data.expires_in
         ? new Date(Date.now() + response.data.expires_in * 1000).toISOString()
         : undefined;
@@ -193,23 +316,33 @@ export let auth = SlateAuth.create()
     handleTokenRefresh: async (ctx: any) => {
       let domain =
         ctx.output.organizationDomain ||
-        ctx.input.organizationDomain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        normalizeFreshworksDomain(ctx.input.organizationDomain);
+      if (!ctx.output.refreshToken) {
+        throw freshserviceServiceError(
+          'Freshservice OAuth refresh token is missing. Reconnect the Freshservice authentication profile.'
+        );
+      }
       let axios = createAxios();
 
       let encoded = Buffer.from(`${ctx.clientId}:${ctx.clientSecret}`).toString('base64');
-      let response = await axios.post(
-        `https://${domain}/oauth/token`,
-        {
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        },
-        {
-          headers: {
-            Authorization: `Basic ${encoded}`,
-            'Content-Type': 'application/json'
+      let response: any;
+      try {
+        response = await axios.post(
+          `https://${domain}/oauth/token`,
+          {
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken
+          },
+          {
+            headers: {
+              Authorization: `Basic ${encoded}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw freshserviceApiError(error, 'refresh OAuth token');
+      }
       let expiresAt = response.data.expires_in
         ? new Date(Date.now() + response.data.expires_in * 1000).toISOString()
         : undefined;

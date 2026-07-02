@@ -2,10 +2,14 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import { functionToolSchema, mapFunctionTools, mapMemoryNames } from './shared';
 
 let messageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system', 'tool']).describe('Role of the message sender'),
-  content: z.string().describe('Content of the message'),
+  content: z
+    .string()
+    .nullable()
+    .describe('Content of the message. Tool messages may use null.'),
   name: z.string().optional().describe('Name identifier'),
   toolCallId: z.string().optional().describe('Tool call ID for tool response messages')
 });
@@ -41,7 +45,15 @@ export let runPipe = SlateTool.create(spec, {
       llmProviderKey: z
         .string()
         .optional()
-        .describe('LLM provider API key to override the default one configured in the pipe')
+        .describe('LLM provider API key to override the default one configured in the pipe'),
+      memoryNames: z
+        .array(z.string())
+        .optional()
+        .describe('Memory names to use at runtime instead of the pipe default memories'),
+      tools: z
+        .array(functionToolSchema)
+        .optional()
+        .describe('Function tools the model may call during this run')
     })
   )
   .output(
@@ -68,6 +80,8 @@ export let runPipe = SlateTool.create(spec, {
 
     if (ctx.input.threadId) body.threadId = ctx.input.threadId;
     if (ctx.input.variables) body.variables = ctx.input.variables;
+    if (ctx.input.memoryNames) body.memory = mapMemoryNames(ctx.input.memoryNames);
+    if (ctx.input.tools) body.tools = mapFunctionTools(ctx.input.tools);
 
     let result = await client.runPipe(body, {
       pipeApiKey: ctx.input.pipeApiKey,

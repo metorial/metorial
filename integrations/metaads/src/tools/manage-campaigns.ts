@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetaAdsClient } from '../lib/client';
+import { metaAdsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let campaignSchema = z.object({
@@ -196,6 +197,10 @@ export let createCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.dailyBudget && ctx.input.lifetimeBudget) {
+      throw metaAdsServiceError('Provide either dailyBudget or lifetimeBudget, not both.');
+    }
+
     let client = new MetaAdsClient({
       token: ctx.auth.token,
       adAccountId: ctx.config.adAccountId,
@@ -255,6 +260,20 @@ export let updateCampaign = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      !ctx.input.name &&
+      !ctx.input.status &&
+      !ctx.input.dailyBudget &&
+      !ctx.input.lifetimeBudget &&
+      !ctx.input.bidStrategy
+    ) {
+      throw metaAdsServiceError('Provide at least one campaign field to update.');
+    }
+
+    if (ctx.input.dailyBudget && ctx.input.lifetimeBudget) {
+      throw metaAdsServiceError('Provide either dailyBudget or lifetimeBudget, not both.');
+    }
+
     let client = new MetaAdsClient({
       token: ctx.auth.token,
       adAccountId: ctx.config.adAccountId,

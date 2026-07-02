@@ -12,7 +12,7 @@ export let newMessage = SlateTrigger.create(spec, {
   .input(
     z.object({
       sessionId: z.string(),
-      fingerprint: z.string(),
+      fingerprint: z.number(),
       type: z.string(),
       from: z.string(),
       origin: z.string().optional(),
@@ -24,7 +24,7 @@ export let newMessage = SlateTrigger.create(spec, {
   .output(
     z.object({
       sessionId: z.string().describe('Session ID of the conversation'),
-      fingerprint: z.string().describe('Unique message fingerprint'),
+      fingerprint: z.number().describe('Unique message fingerprint'),
       type: z.string().describe('Message type (text, note, file, etc.)'),
       from: z.string().describe('Sender: operator or user'),
       origin: z.string().optional().describe('Origin channel'),
@@ -39,7 +39,11 @@ export let newMessage = SlateTrigger.create(spec, {
     },
 
     pollEvents: async ctx => {
-      let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+      let client = new Client({
+        token: ctx.auth.token,
+        websiteId: ctx.config.websiteId,
+        tier: ctx.auth.tier
+      });
 
       let conversations = await client.listConversations({
         pageNumber: 1,
@@ -90,7 +94,7 @@ export let newMessage = SlateTrigger.create(spec, {
     handleEvent: async ctx => {
       return {
         type: `message.${ctx.input.from === 'operator' ? 'sent' : 'received'}`,
-        id: ctx.input.fingerprint,
+        id: String(ctx.input.fingerprint),
         output: {
           sessionId: ctx.input.sessionId,
           fingerprint: ctx.input.fingerprint,

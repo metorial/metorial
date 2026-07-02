@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { kibanaServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -106,7 +107,7 @@ Supported types include email, Slack, PagerDuty, webhook, Jira, ServiceNow, Micr
     let { action, connectorId, name, connectorTypeId, config, secrets } = ctx.input;
 
     if (action === 'get') {
-      if (!connectorId) throw new Error('connectorId is required for get action');
+      if (!connectorId) throw kibanaServiceError('connectorId is required for get action');
       let c = await client.getConnector(connectorId);
       return {
         output: {
@@ -123,8 +124,9 @@ Supported types include email, Slack, PagerDuty, webhook, Jira, ServiceNow, Micr
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
-      if (!connectorTypeId) throw new Error('connectorTypeId is required for create action');
+      if (!name) throw kibanaServiceError('name is required for create action');
+      if (!connectorTypeId)
+        throw kibanaServiceError('connectorTypeId is required for create action');
       let c = await client.createConnector({ name, connectorTypeId, config, secrets });
       return {
         output: {
@@ -140,7 +142,7 @@ Supported types include email, Slack, PagerDuty, webhook, Jira, ServiceNow, Micr
     }
 
     if (action === 'update') {
-      if (!connectorId) throw new Error('connectorId is required for update action');
+      if (!connectorId) throw kibanaServiceError('connectorId is required for update action');
       let c = await client.updateConnector(connectorId, { name, config, secrets });
       return {
         output: {
@@ -154,7 +156,7 @@ Supported types include email, Slack, PagerDuty, webhook, Jira, ServiceNow, Micr
     }
 
     if (action === 'delete') {
-      if (!connectorId) throw new Error('connectorId is required for delete action');
+      if (!connectorId) throw kibanaServiceError('connectorId is required for delete action');
       await client.deleteConnector(connectorId);
       return {
         output: {
@@ -167,7 +169,7 @@ Supported types include email, Slack, PagerDuty, webhook, Jira, ServiceNow, Micr
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw kibanaServiceError(`Unknown action: ${action}`);
   })
   .build();
 

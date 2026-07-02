@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DriftClient } from '../lib/client';
+import { driftServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateContact = SlateTool.create(spec, {
@@ -39,6 +40,12 @@ export let updateContact = SlateTool.create(spec, {
     if (ctx.input.email) attributes.email = ctx.input.email;
     if (ctx.input.name) attributes.name = ctx.input.name;
     if (ctx.input.phone) attributes.phone = ctx.input.phone;
+
+    if (Object.keys(attributes).length === 0) {
+      throw driftServiceError(
+        'At least one contact attribute is required to update a contact.'
+      );
+    }
 
     let contact = await client.updateContact(ctx.input.contactId, attributes);
 

@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { mysqlServiceError } from '../lib/errors';
 import { createClient, escapeIdentifier, qualifiedTableName } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -28,7 +29,12 @@ Useful for optimizing query performance by adding appropriate indexes.`,
         .array(
           z.object({
             columnName: z.string().describe('Column name to include in the index'),
-            length: z.number().optional().describe('Prefix length for string columns'),
+            length: z
+              .number()
+              .int()
+              .positive()
+              .optional()
+              .describe('Prefix length for string columns'),
             order: z.enum(['ASC', 'DESC']).optional().describe('Sort order for the column')
           })
         )
@@ -57,7 +63,7 @@ Useful for optimizing query performance by adding appropriate indexes.`,
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.columns || ctx.input.columns.length === 0) {
-        throw new Error('Columns are required for creating an index');
+        throw mysqlServiceError('Columns are required for creating an index');
       }
 
       let columnList = ctx.input.columns

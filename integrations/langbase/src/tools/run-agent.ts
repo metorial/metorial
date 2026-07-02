@@ -1,11 +1,16 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { langbaseServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import { functionToolSchema, mapFunctionTools, requireExactlyOneDefined } from './shared';
 
 let inputMessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system', 'tool']).describe('Role of the message sender'),
-  content: z.string().describe('Content of the message'),
+  content: z
+    .string()
+    .nullable()
+    .describe('Content of the message. Tool messages may use null.'),
   name: z.string().optional().describe('Name identifier'),
   toolCallId: z.string().optional().describe('Tool call ID for tool response messages')
 });
@@ -28,19 +33,44 @@ export let runAgent = SlateTool.create(spec, {
       model: z
         .string()
         .describe('LLM model in provider:model format, e.g. "openai:gpt-4o-mini"'),
-      input: z
-        .union([z.string(), z.array(inputMessageSchema)])
-        .describe('Input text or array of messages'),
+      inputText: z
+        .string()
+        .optional()
+        .describe('Plain text input. Provide exactly one of inputText or messages.'),
+      messages: z
+        .array(inputMessageSchema)
+        .optional()
+        .describe('Message array input. Provide exactly one of inputText or messages.'),
       llmProviderKey: z
         .string()
         .describe('API key for the LLM provider (e.g. OpenAI API key)'),
       instructions: z.string().optional().describe('System-level instructions for the agent'),
+      tools: z
+        .array(functionToolSchema)
+        .optional()
+        .describe('Function tools the model may call'),
+      toolChoice: z
+        .enum(['auto', 'required'])
+        .optional()
+        .describe('Controls whether the model may or must call tools'),
+      toolChoiceFunctionName: z
+        .string()
+        .optional()
+        .describe('Force the model to call this specific function tool by name'),
+      parallelToolCalls: z
+        .boolean()
+        .optional()
+        .describe('Whether the model may call multiple tools in parallel'),
       temperature: z.number().optional().describe('Temperature for response randomness (0-2)'),
       topP: z.number().optional().describe('Top-p sampling parameter (0-1)'),
       maxTokens: z.number().optional().describe('Maximum number of tokens to generate'),
       presencePenalty: z.number().optional().describe('Presence penalty (-2 to 2)'),
       frequencyPenalty: z.number().optional().describe('Frequency penalty (-2 to 2)'),
-      stop: z.array(z.string()).optional().describe('Stop sequences')
+      stop: z.array(z.string()).optional().describe('Stop sequences'),
+      customModelParams: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Additional model-specific parameters passed through to the provider')
     })
   )
   .output(
@@ -59,10 +89,17 @@ export let runAgent = SlateTool.create(spec, {
       model: ctx.input.model
     };
 
-    if (typeof ctx.input.input === 'string') {
-      body.input = ctx.input.input;
+    let inputSource = requireExactlyOneDefined(
+      ctx.input,
+      'inputText',
+      'messages',
+      'Provide exactly one of inputText or messages.'
+    );
+
+    if (inputSource === 'inputText') {
+      body.input = ctx.input.inputText;
     } else {
-      body.input = ctx.input.input.map(m => ({
+      body.input = (ctx.input.messages ?? []).map(m => ({
         role: m.role,
         content: m.content,
         ...(m.name ? { name: m.name } : {}),
@@ -71,6 +108,25 @@ export let runAgent = SlateTool.create(spec, {
     }
 
     if (ctx.input.instructions !== undefined) body.instructions = ctx.input.instructions;
+    if (ctx.input.tools !== undefined) body.tools = mapFunctionTools(ctx.input.tools);
+    if (ctx.input.toolChoiceFunctionName !== undefined) {
+      let matchingTool = ctx.input.tools?.some(
+        tool => tool.name === ctx.input.toolChoiceFunctionName
+      );
+      if (!matchingTool) {
+        throw langbaseServiceError(
+          'toolChoiceFunctionName must match one of the provided tools.'
+        );
+      }
+      body.tool_choice = {
+        type: 'function',
+        function: { name: ctx.input.toolChoiceFunctionName }
+      };
+    } else if (ctx.input.toolChoice !== undefined) {
+      body.tool_choice = ctx.input.toolChoice;
+    }
+    if (ctx.input.parallelToolCalls !== undefined)
+      body.parallel_tool_calls = ctx.input.parallelToolCalls;
     if (ctx.input.temperature !== undefined) body.temperature = ctx.input.temperature;
     if (ctx.input.topP !== undefined) body.top_p = ctx.input.topP;
     if (ctx.input.maxTokens !== undefined) body.max_tokens = ctx.input.maxTokens;
@@ -79,6 +135,8 @@ export let runAgent = SlateTool.create(spec, {
     if (ctx.input.frequencyPenalty !== undefined)
       body.frequency_penalty = ctx.input.frequencyPenalty;
     if (ctx.input.stop !== undefined) body.stop = ctx.input.stop;
+    if (ctx.input.customModelParams !== undefined)
+      body.customModelParams = ctx.input.customModelParams;
 
     let result = await client.runAgent(body, ctx.input.llmProviderKey);
 

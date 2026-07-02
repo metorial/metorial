@@ -1,3 +1,4 @@
+import { braintreeServiceError } from './errors';
 import { parseXml } from './xml';
 
 /**
@@ -21,7 +22,7 @@ export let verifyAndParseWebhook = (params: {
   });
 
   if (!matchingPair) {
-    throw new Error('No matching signature found for the configured public key');
+    throw braintreeServiceError('No matching signature found for the configured public key');
   }
 
   let signature = matchingPair.split('|')[1] || '';
@@ -40,7 +41,7 @@ export let verifyAndParseWebhook = (params: {
     !secureCompare(signature, expectedSignature) &&
     !secureCompare(signature, expectedSignatureWithNewline)
   ) {
-    throw new Error('Webhook signature verification failed');
+    throw braintreeServiceError('Webhook signature verification failed');
   }
 
   // Decode and parse payload

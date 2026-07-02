@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { boxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageWebLink = SlateTool.create(spec, {
@@ -45,8 +46,9 @@ export let manageWebLink = SlateTool.create(spec, {
     let { action, webLinkId, url, parentFolderId, name, description } = ctx.input;
 
     if (action === 'create') {
-      if (!url) throw new Error('url is required for create action');
-      if (!parentFolderId) throw new Error('parentFolderId is required for create action');
+      if (!url) throw boxServiceError('url is required for create action');
+      if (!parentFolderId)
+        throw boxServiceError('parentFolderId is required for create action');
       let wl = await client.createWebLink(url, parentFolderId, name, description);
       return {
         output: {
@@ -60,7 +62,7 @@ export let manageWebLink = SlateTool.create(spec, {
       };
     }
 
-    if (!webLinkId) throw new Error('webLinkId is required for this action');
+    if (!webLinkId) throw boxServiceError('webLinkId is required for this action');
 
     if (action === 'get') {
       let wl = await client.getWebLink(webLinkId);

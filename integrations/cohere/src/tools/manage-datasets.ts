@@ -12,6 +12,97 @@ let datasetOutputSchema = z.object({
   updatedAt: z.string().optional().describe('ISO 8601 timestamp of last update')
 });
 
+export let createDatasetTool = SlateTool.create(spec, {
+  name: 'Create Dataset',
+  key: 'create_dataset',
+  description: `Create a Cohere hosted dataset by uploading a CSV, JSONL, or text file. Embed-input datasets can be used later with batch embed jobs.`,
+  instructions: [
+    'Provide exactly one of "fileContent" or "fileContentBase64" for the required data file.',
+    'For batch embedding, use datasetType "embed-input" and include a text field in each row.'
+  ],
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      name: z.string().describe('Name for the uploaded dataset'),
+      datasetType: z
+        .string()
+        .default('embed-input')
+        .describe('Cohere dataset type. Use "embed-input" for Embed Jobs.'),
+      fileName: z.string().describe('Name of the dataset file, such as "embed.jsonl"'),
+      fileContent: z.string().optional().describe('Dataset file content as a text string'),
+      fileContentBase64: z.string().optional().describe('Base64-encoded dataset file bytes'),
+      mimeType: z.string().optional().describe('MIME type for the dataset file'),
+      evalFileName: z.string().optional().describe('Optional evaluation dataset file name'),
+      evalFileContent: z
+        .string()
+        .optional()
+        .describe('Optional evaluation dataset file content as a text string'),
+      evalFileContentBase64: z
+        .string()
+        .optional()
+        .describe('Optional base64-encoded evaluation dataset file bytes'),
+      evalMimeType: z.string().optional().describe('MIME type for the evaluation file'),
+      keepOriginalFile: z
+        .boolean()
+        .optional()
+        .describe('Whether Cohere should store the original uploaded file'),
+      skipMalformedInput: z
+        .boolean()
+        .optional()
+        .describe('Drop malformed rows instead of failing validation'),
+      keepFields: z
+        .array(z.string())
+        .optional()
+        .describe('Field names that must be preserved in the hosted dataset'),
+      optionalFields: z
+        .array(z.string())
+        .optional()
+        .describe('Field names that should be preserved when present'),
+      textSeparator: z
+        .string()
+        .optional()
+        .describe('Separator for splitting raw text uploads'),
+      csvDelimiter: z.string().optional().describe('Delimiter used for CSV uploads')
+    })
+  )
+  .output(
+    z.object({
+      datasetId: z.string().describe('ID of the created dataset')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new CohereClient({ token: ctx.auth.token });
+    let result = await client.createDataset({
+      name: ctx.input.name,
+      datasetType: ctx.input.datasetType,
+      fileName: ctx.input.fileName,
+      fileContent: ctx.input.fileContent,
+      fileContentBase64: ctx.input.fileContentBase64,
+      mimeType: ctx.input.mimeType,
+      evalFileName: ctx.input.evalFileName,
+      evalFileContent: ctx.input.evalFileContent,
+      evalFileContentBase64: ctx.input.evalFileContentBase64,
+      evalMimeType: ctx.input.evalMimeType,
+      keepOriginalFile: ctx.input.keepOriginalFile,
+      skipMalformedInput: ctx.input.skipMalformedInput,
+      keepFields: ctx.input.keepFields,
+      optionalFields: ctx.input.optionalFields,
+      textSeparator: ctx.input.textSeparator,
+      csvDelimiter: ctx.input.csvDelimiter
+    });
+
+    return {
+      output: {
+        datasetId: result.id || ''
+      },
+      message: `Created dataset **${result.id || ctx.input.name}**.`
+    };
+  })
+  .build();
+
 export let listDatasetsTool = SlateTool.create(spec, {
   name: 'List Datasets',
   key: 'list_datasets',
@@ -71,6 +162,35 @@ export let listDatasetsTool = SlateTool.create(spec, {
     return {
       output: { datasets },
       message: `Found **${datasets.length}** dataset(s).`
+    };
+  })
+  .build();
+
+export let getDatasetUsageTool = SlateTool.create(spec, {
+  name: 'Get Dataset Usage',
+  key: 'get_dataset_usage',
+  description: `View total Cohere hosted dataset storage usage for the organization.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(z.object({}))
+  .output(
+    z.object({
+      organizationUsageBytes: z
+        .number()
+        .describe('Total dataset storage used by the organization')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new CohereClient({ token: ctx.auth.token });
+    let result = await client.getDatasetUsage();
+
+    return {
+      output: {
+        organizationUsageBytes: result.organization_usage ?? 0
+      },
+      message: `Cohere dataset storage usage is **${result.organization_usage ?? 0}** bytes.`
     };
   })
   .build();

@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/fiken",
+  "description": "Connect to Fiken accounting data for Norwegian companies. Discover accessible companies, manage contacts, inspect invoices and invoice drafts, create reviewable invoice drafts, manage products and projects, list purchases and sales, and read bookkeeping accounts and balances.",
+  "categories": ["accounting", "erp", "finance"],
+  "skills": [
+    "discover Fiken companies",
+    "manage customer and supplier contacts",
+    "review invoices and invoice drafts",
+    "create invoice drafts for review",
+    "manage products and projects",
+    "inspect purchases and sales",
+    "read bookkeeping accounts and balances"
+  ],
+  "logoUrl": "https://cdn.fiken.no/logo-2026.png"
+}

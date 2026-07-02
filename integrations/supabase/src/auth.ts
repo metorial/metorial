@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { supabaseApiError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -145,63 +146,71 @@ export let auth = SlateAuth.create()
       let http = createAxios();
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
-      let response = await http.post(
-        'https://api.supabase.com/v1/oauth/token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
+      try {
+        let response = await http.post(
+          'https://api.supabase.com/v1/oauth/token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri
+          }).toString(),
+          {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
 
-      let data = response.data;
+        let data = response.data;
 
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: data.expires_at ? String(data.expires_at) : undefined
-        }
-      };
+        return {
+          output: {
+            token: data.access_token,
+            refreshToken: data.refresh_token,
+            expiresAt: data.expires_at ? String(data.expires_at) : undefined
+          }
+        };
+      } catch (error) {
+        throw supabaseApiError(error, 'OAuth token exchange');
+      }
     },
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        return { output: ctx.output };
+        throw createApiServiceError('Supabase OAuth refresh requires a refresh token.');
       }
 
       let http = createAxios();
       let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
-      let response = await http.post(
-        'https://api.supabase.com/v1/oauth/token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken
-        }).toString(),
-        {
-          headers: {
-            Authorization: `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded'
+      try {
+        let response = await http.post(
+          'https://api.supabase.com/v1/oauth/token',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken
+          }).toString(),
+          {
+            headers: {
+              Authorization: `Basic ${credentials}`,
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
 
-      let data = response.data;
+        let data = response.data;
 
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt: data.expires_at ? String(data.expires_at) : undefined
-        }
-      };
+        return {
+          output: {
+            token: data.access_token,
+            refreshToken: data.refresh_token ?? ctx.output.refreshToken,
+            expiresAt: data.expires_at ? String(data.expires_at) : undefined
+          }
+        };
+      } catch (error) {
+        throw supabaseApiError(error, 'OAuth token refresh');
+      }
     },
 
     getProfile: async (ctx: any) => {
@@ -212,16 +221,20 @@ export let auth = SlateAuth.create()
         }
       });
 
-      let response = await http.get('/organizations');
-      let orgs = response.data;
-      let firstOrg = Array.isArray(orgs) && orgs.length > 0 ? orgs[0] : null;
+      try {
+        let response = await http.get('/organizations');
+        let orgs = response.data;
+        let firstOrg = Array.isArray(orgs) && orgs.length > 0 ? orgs[0] : null;
 
-      return {
-        profile: {
-          id: firstOrg?.id ?? undefined,
-          name: firstOrg?.name ?? 'Supabase User'
-        }
-      };
+        return {
+          profile: {
+            id: firstOrg?.id ?? undefined,
+            name: firstOrg?.name ?? 'Supabase User'
+          }
+        };
+      } catch (error) {
+        throw supabaseApiError(error, 'OAuth profile lookup');
+      }
     }
   })
   .addTokenAuth({
@@ -249,15 +262,19 @@ export let auth = SlateAuth.create()
         }
       });
 
-      let response = await http.get('/organizations');
-      let orgs = response.data;
-      let firstOrg = Array.isArray(orgs) && orgs.length > 0 ? orgs[0] : null;
+      try {
+        let response = await http.get('/organizations');
+        let orgs = response.data;
+        let firstOrg = Array.isArray(orgs) && orgs.length > 0 ? orgs[0] : null;
 
-      return {
-        profile: {
-          id: firstOrg?.id ?? undefined,
-          name: firstOrg?.name ?? 'Supabase User'
-        }
-      };
+        return {
+          profile: {
+            id: firstOrg?.id ?? undefined,
+            name: firstOrg?.name ?? 'Supabase User'
+          }
+        };
+      } catch (error) {
+        throw supabaseApiError(error, 'token profile lookup');
+      }
     }
   });

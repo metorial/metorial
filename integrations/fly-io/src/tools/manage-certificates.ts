@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { flyIoServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -90,7 +91,7 @@ export let manageCertificates = SlateTool.create(spec, {
         };
       }
       case 'get': {
-        if (!hostname) throw new Error('hostname is required for get action');
+        if (!hostname) throw flyIoServiceError('hostname is required for get action');
         let cert = await client.getCertificate(appName, hostname);
         return {
           output: { certificate: cert },
@@ -98,7 +99,7 @@ export let manageCertificates = SlateTool.create(spec, {
         };
       }
       case 'request_acme': {
-        if (!hostname) throw new Error('hostname is required for request_acme action');
+        if (!hostname) throw flyIoServiceError('hostname is required for request_acme action');
         let cert = await client.requestAcmeCertificate(appName, hostname);
         return {
           output: { certificate: cert },
@@ -106,7 +107,7 @@ export let manageCertificates = SlateTool.create(spec, {
         };
       }
       case 'check': {
-        if (!hostname) throw new Error('hostname is required for check action');
+        if (!hostname) throw flyIoServiceError('hostname is required for check action');
         let cert = await client.checkCertificate(appName, hostname);
         return {
           output: { certificate: cert },
@@ -114,7 +115,7 @@ export let manageCertificates = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!hostname) throw new Error('hostname is required for delete action');
+        if (!hostname) throw flyIoServiceError('hostname is required for delete action');
         await client.deleteCertificate(appName, hostname);
         return {
           output: { deleted: true },

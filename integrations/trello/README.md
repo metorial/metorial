@@ -36,6 +36,18 @@ Get cards from a specific list or an entire board. Returns card summaries includ
 
 Get all lists on a Trello board. Lists represent columns (e.g. "To Do", "In Progress", "Done"). Use to discover list IDs needed for creating or moving cards.
 
+### Get Notifications
+
+List Trello notifications for the authenticated user or another accessible member. Use to review recent card, board, and workspace activity without marking notifications read.
+
+### Get Workspaces
+
+List Trello workspaces accessible to the authenticated user, or retrieve one workspace by ID. Use to discover workspace IDs for board filtering and organization-owned boards.
+
+### Manage Attachments
+
+List, add URL attachments, or delete attachments on a Trello card. Use to inspect and manage external links attached to cards.
+
 ### Manage Board
 
 Create, update, or delete a Trello board. Use to set up new boards, rename them, change descriptions, update preferences, or archive/delete boards.
@@ -51,6 +63,14 @@ Create, update, move, or delete a Trello card. Supports setting name, descriptio
 ### Manage Checklist
 
 Create, delete checklists on cards, and add, update, or remove checklist items. Also retrieves all checklists with their items for a given card.
+
+### Manage Comments
+
+List, add, update, or delete Trello card comments. Use this for full comment lifecycle management on a card.
+
+### Manage Custom Fields
+
+List, create, update, or delete Trello custom fields on a board, and read or set custom field values on cards.
 
 ### Manage Labels
 

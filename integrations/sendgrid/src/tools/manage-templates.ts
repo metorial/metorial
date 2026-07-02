@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -228,6 +228,12 @@ export let updateTemplate = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, region: ctx.config.region });
     let actions: string[] = [];
+
+    if (!ctx.input.name && !ctx.input.createVersion && !ctx.input.updateVersion) {
+      throw createApiServiceError(
+        'Provide name, createVersion, or updateVersion when updating a template.'
+      );
+    }
 
     let templateName = ctx.input.name;
     if (ctx.input.name) {

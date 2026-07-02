@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { twilioSendGridApiError } from './errors';
 
 export class Client {
   private http: ReturnType<typeof createAxios>;
@@ -16,6 +17,11 @@ export class Client {
         'Content-Type': 'application/json'
       }
     });
+
+    this.http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(twilioSendGridApiError(error))
+    );
   }
 
   // ---- Mail Send ----
@@ -57,6 +63,9 @@ export class Client {
         html?: string;
         substitutionTag?: string;
       };
+    };
+    mailSettings?: {
+      sandboxMode?: { enable?: boolean };
     };
   }) {
     let body: Record<string, any> = {
@@ -108,6 +117,12 @@ export class Client {
           html: params.trackingSettings.subscriptionTracking.html,
           substitution_tag: params.trackingSettings.subscriptionTracking.substitutionTag
         };
+      }
+    }
+    if (params.mailSettings) {
+      body.mail_settings = {};
+      if (params.mailSettings.sandboxMode) {
+        body.mail_settings.sandbox_mode = params.mailSettings.sandboxMode;
       }
     }
 
@@ -259,6 +274,11 @@ export class Client {
     await this.http.delete(`/templates/${templateId}`);
   }
 
+  async getTemplateVersion(templateId: string, versionId: string) {
+    let response = await this.http.get(`/templates/${templateId}/versions/${versionId}`);
+    return response.data;
+  }
+
   async createTemplateVersion(
     templateId: string,
     version: {
@@ -279,6 +299,44 @@ export class Client {
 
     let response = await this.http.post(`/templates/${templateId}/versions`, body);
     return response.data;
+  }
+
+  async updateTemplateVersion(
+    templateId: string,
+    versionId: string,
+    version: {
+      name?: string;
+      subject?: string;
+      htmlContent?: string;
+      plainContent?: string;
+      active?: number;
+      testData?: string;
+    }
+  ) {
+    let body: Record<string, any> = {};
+    if (version.name !== undefined) body.name = version.name;
+    if (version.subject !== undefined) body.subject = version.subject;
+    if (version.htmlContent !== undefined) body.html_content = version.htmlContent;
+    if (version.plainContent !== undefined) body.plain_content = version.plainContent;
+    if (version.active !== undefined) body.active = version.active;
+    if (version.testData !== undefined) body.test_data = version.testData;
+
+    let response = await this.http.patch(
+      `/templates/${templateId}/versions/${versionId}`,
+      body
+    );
+    return response.data;
+  }
+
+  async activateTemplateVersion(templateId: string, versionId: string) {
+    let response = await this.http.post(
+      `/templates/${templateId}/versions/${versionId}/activate`
+    );
+    return response.data;
+  }
+
+  async deleteTemplateVersion(templateId: string, versionId: string) {
+    await this.http.delete(`/templates/${templateId}/versions/${versionId}`);
   }
 
   // ---- Suppressions ----
@@ -426,14 +484,24 @@ export class Client {
 
   // ---- Event Webhook ----
 
-  async getEventWebhookSettings() {
-    let response = await this.http.get('/user/webhooks/event/settings');
+  async listEventWebhooks(includeAccountStatusChange?: boolean) {
+    let response = await this.http.get('/user/webhooks/event/settings/all', {
+      params: includeAccountStatusChange ? { include: 'account_status_change' } : undefined
+    });
     return response.data;
   }
 
-  async updateEventWebhookSettings(settings: {
+  async getEventWebhook(webhookId: string, includeAccountStatusChange?: boolean) {
+    let response = await this.http.get(`/user/webhooks/event/settings/${webhookId}`, {
+      params: includeAccountStatusChange ? { include: 'account_status_change' } : undefined
+    });
+    return response.data;
+  }
+
+  async createEventWebhook(settings: {
     enabled: boolean;
     url: string;
+    friendlyName?: string;
     groupResubscribe?: boolean;
     delivered?: boolean;
     groupUnsubscribe?: boolean;
@@ -445,11 +513,132 @@ export class Client {
     open?: boolean;
     click?: boolean;
     dropped?: boolean;
+    accountStatusChange?: boolean;
+    oauthClientId?: string;
+    oauthClientSecret?: string;
+    oauthTokenUrl?: string;
   }) {
-    let body: Record<string, any> = {
+    let response = await this.http.post('/user/webhooks/event/settings', {
+      ...this.mapEventWebhookSettings(settings),
       enabled: settings.enabled,
       url: settings.url
-    };
+    });
+    return response.data;
+  }
+
+  async updateEventWebhookSettings(
+    webhookId: string,
+    settings: {
+      enabled?: boolean;
+      url?: string;
+      friendlyName?: string;
+      groupResubscribe?: boolean;
+      delivered?: boolean;
+      groupUnsubscribe?: boolean;
+      spamReport?: boolean;
+      bounce?: boolean;
+      deferred?: boolean;
+      unsubscribe?: boolean;
+      processed?: boolean;
+      open?: boolean;
+      click?: boolean;
+      dropped?: boolean;
+      accountStatusChange?: boolean;
+      oauthClientId?: string;
+      oauthClientSecret?: string;
+      oauthTokenUrl?: string;
+    }
+  ) {
+    let response = await this.http.patch(
+      `/user/webhooks/event/settings/${webhookId}`,
+      this.mapEventWebhookSettings(settings)
+    );
+    return response.data;
+  }
+
+  async deleteEventWebhook(webhookId: string) {
+    await this.http.delete(`/user/webhooks/event/settings/${webhookId}`);
+  }
+
+  async toggleEventWebhookSignatureVerification(webhookId: string, enabled: boolean) {
+    let response = await this.http.patch(`/user/webhooks/event/settings/signed/${webhookId}`, {
+      enabled
+    });
+    return response.data;
+  }
+
+  // ---- Scheduled Sends ----
+
+  async createBatchId() {
+    let response = await this.http.post('/mail/batch');
+    return response.data;
+  }
+
+  async validateBatchId(batchId: string) {
+    let response = await this.http.get(`/mail/batch/${batchId}`);
+    return response.data;
+  }
+
+  async getScheduledSends() {
+    let response = await this.http.get('/user/scheduled_sends');
+    return response.data;
+  }
+
+  async getScheduledSend(batchId: string) {
+    let response = await this.http.get(`/user/scheduled_sends/${batchId}`);
+    return response.data;
+  }
+
+  async createScheduledSendStatus(batchId: string, status: 'pause' | 'cancel') {
+    let response = await this.http.post('/user/scheduled_sends', {
+      batch_id: batchId,
+      status
+    });
+    return response.data;
+  }
+
+  async updateScheduledSendStatus(batchId: string, status: 'pause' | 'cancel') {
+    let response = await this.http.patch(`/user/scheduled_sends/${batchId}`, {
+      status
+    });
+    return response.data;
+  }
+
+  async clearScheduledSendStatus(batchId: string) {
+    await this.http.delete(`/user/scheduled_sends/${batchId}`);
+  }
+
+  // ---- Inbound Parse ----
+
+  async getInboundParseSettings() {
+    let response = await this.http.get('/user/webhooks/parse/settings');
+    return response.data;
+  }
+
+  private mapEventWebhookSettings(settings: {
+    enabled?: boolean;
+    url?: string;
+    friendlyName?: string;
+    groupResubscribe?: boolean;
+    delivered?: boolean;
+    groupUnsubscribe?: boolean;
+    spamReport?: boolean;
+    bounce?: boolean;
+    deferred?: boolean;
+    unsubscribe?: boolean;
+    processed?: boolean;
+    open?: boolean;
+    click?: boolean;
+    dropped?: boolean;
+    accountStatusChange?: boolean;
+    oauthClientId?: string;
+    oauthClientSecret?: string;
+    oauthTokenUrl?: string;
+  }) {
+    let body: Record<string, any> = {};
+    if (settings.enabled !== undefined) body.enabled = settings.enabled;
+    if (settings.url !== undefined) body.url = settings.url;
+    if (settings.friendlyName !== undefined) body.friendly_name = settings.friendlyName;
     if (settings.groupResubscribe !== undefined)
       body.group_resubscribe = settings.groupResubscribe;
     if (settings.delivered !== undefined) body.delivered = settings.delivered;
@@ -463,15 +652,13 @@ export class Client {
     if (settings.open !== undefined) body.open = settings.open;
     if (settings.click !== undefined) body.click = settings.click;
     if (settings.dropped !== undefined) body.dropped = settings.dropped;
+    if (settings.accountStatusChange !== undefined)
+      body.account_status_change = settings.accountStatusChange;
+    if (settings.oauthClientId !== undefined) body.oauth_client_id = settings.oauthClientId;
+    if (settings.oauthClientSecret !== undefined)
+      body.oauth_client_secret = settings.oauthClientSecret;
+    if (settings.oauthTokenUrl !== undefined) body.oauth_token_url = settings.oauthTokenUrl;
 
-    let response = await this.http.patch('/user/webhooks/event/settings', body);
-    return response.data;
-  }
-
-  // ---- Inbound Parse ----
-
-  async getInboundParseSettings() {
-    let response = await this.http.get('/user/webhooks/parse/settings');
-    return response.data;
+    return body;
   }
 }

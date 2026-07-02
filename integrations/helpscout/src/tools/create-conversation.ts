@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HelpScoutClient } from '../lib/client';
+import { helpscoutServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createConversation = SlateTool.create(spec, {
@@ -32,7 +33,13 @@ export let createConversation = SlateTool.create(spec, {
         .enum(['active', 'pending', 'closed'])
         .optional()
         .describe('Initial conversation status'),
-      assignTo: z.number().optional().describe('User ID to assign the conversation to'),
+      assignTo: z
+        .number()
+        .nullable()
+        .optional()
+        .describe(
+          'User ID to assign the conversation to. Use null to keep it explicitly unassigned.'
+        ),
       autoReply: z.boolean().optional().describe('Whether to send auto-reply to the customer')
     })
   )
@@ -52,6 +59,12 @@ export let createConversation = SlateTool.create(spec, {
       customer.id = ctx.input.customerId;
     } else if (ctx.input.customerEmail) {
       customer.email = ctx.input.customerEmail;
+    }
+
+    if (!customer.id && !customer.email) {
+      throw helpscoutServiceError(
+        'Customer ID or customer email is required to create a conversation.'
+      );
     }
 
     let result = await client.createConversation({

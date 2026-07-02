@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { dynamoDbServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -107,7 +108,18 @@ All actions succeed or all fail together (ACID). Supports Put, Update, Delete, a
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
 
-    let transactItems = ctx.input.transactItems.map(item => {
+    let transactItems = ctx.input.transactItems.map((item, index) => {
+      let actionCount =
+        (item.put ? 1 : 0) +
+        (item.update ? 1 : 0) +
+        (item.delete ? 1 : 0) +
+        (item.conditionCheck ? 1 : 0);
+      if (actionCount !== 1) {
+        throw dynamoDbServiceError(
+          `Transaction item ${index + 1} must include exactly one of put, update, delete, or conditionCheck.`
+        );
+      }
+
       let result: any = {};
       if (item.put) {
         result.Put = {

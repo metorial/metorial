@@ -81,17 +81,13 @@ export let manageLicenseKeyTool = SlateTool.create(spec, {
 
     let instances: any[] | undefined;
     if (action === 'get') {
-      try {
-        let instancesResponse = await client.listLicenseKeyInstances({ licenseKeyId });
-        instances = (instancesResponse.data || []).map((inst: any) => ({
-          instanceId: inst.id,
-          identifier: inst.attributes.identifier,
-          name: inst.attributes.name,
-          createdAt: inst.attributes.created_at
-        }));
-      } catch {
-        instances = [];
-      }
+      let instancesResponse = await client.listLicenseKeyInstances({ licenseKeyId });
+      instances = (instancesResponse.data || []).map((inst: any) => ({
+        instanceId: inst.id,
+        identifier: inst.attributes.identifier,
+        name: inst.attributes.name,
+        createdAt: inst.attributes.created_at
+      }));
     }
 
     let output = {

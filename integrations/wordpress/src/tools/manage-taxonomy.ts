@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { wordpressServiceError } from '../lib/errors';
 import { createClient, extractCategorySummary, extractTagSummary } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -87,6 +88,69 @@ export let createCategoryTool = SlateTool.create(spec, {
   })
   .build();
 
+export let getCategoryTool = SlateTool.create(spec, {
+  name: 'Get Category',
+  key: 'get_category',
+  description: `Retrieve a single post category by ID. For WordPress.com, a category slug is also accepted.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      categoryId: z.string().describe('Category ID, or category slug for WordPress.com')
+    })
+  )
+  .output(categoryOutputSchema)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    let category = await client.getCategory(ctx.input.categoryId);
+    let result = extractCategorySummary(category, ctx.config.apiType);
+    return {
+      output: result,
+      message: `Retrieved category **"${result.name}"** (ID: ${result.categoryId}).`
+    };
+  })
+  .build();
+
+export let updateCategoryTool = SlateTool.create(spec, {
+  name: 'Update Category',
+  key: 'update_category',
+  description: `Update a post category name, description, parent, or slug. For WordPress.com, categoryId may be the numeric ID returned by list/create tools or the category slug.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      categoryId: z.string().describe('Category ID, or category slug for WordPress.com'),
+      name: z.string().optional().describe('New category name'),
+      description: z.string().optional().describe('New category description'),
+      parentId: z.string().optional().describe('New parent category ID'),
+      slug: z
+        .string()
+        .optional()
+        .describe('New URL slug. Supported by self-hosted WordPress sites.')
+    })
+  )
+  .output(categoryOutputSchema)
+  .handleInvocation(async ctx => {
+    let { categoryId, ...updateData } = ctx.input;
+    if (Object.values(updateData).every(value => value === undefined)) {
+      throw wordpressServiceError('Provide at least one category field to update.');
+    }
+
+    let client = createClient(ctx.config, ctx.auth);
+    let category = await client.updateCategory(categoryId, updateData);
+    let result = extractCategorySummary(category, ctx.config.apiType);
+    return {
+      output: result,
+      message: `Updated category **"${result.name}"** (ID: ${result.categoryId}).`
+    };
+  })
+  .build();
+
 export let deleteCategoryTool = SlateTool.create(spec, {
   name: 'Delete Category',
   key: 'delete_category',
@@ -98,7 +162,7 @@ export let deleteCategoryTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      categoryId: z.string().describe('ID of the category to delete')
+      categoryId: z.string().describe('Category ID, or category slug for WordPress.com')
     })
   )
   .output(
@@ -183,6 +247,68 @@ export let createTagTool = SlateTool.create(spec, {
   })
   .build();
 
+export let getTagTool = SlateTool.create(spec, {
+  name: 'Get Tag',
+  key: 'get_tag',
+  description: `Retrieve a single post tag by ID. For WordPress.com, a tag slug is also accepted.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      tagId: z.string().describe('Tag ID, or tag slug for WordPress.com')
+    })
+  )
+  .output(tagOutputSchema)
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    let tag = await client.getTag(ctx.input.tagId);
+    let result = extractTagSummary(tag, ctx.config.apiType);
+    return {
+      output: result,
+      message: `Retrieved tag **"${result.name}"** (ID: ${result.tagId}).`
+    };
+  })
+  .build();
+
+export let updateTagTool = SlateTool.create(spec, {
+  name: 'Update Tag',
+  key: 'update_tag',
+  description: `Update a post tag name, description, or slug. For WordPress.com, tagId may be the numeric ID returned by list/create tools or the tag slug.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      tagId: z.string().describe('Tag ID, or tag slug for WordPress.com'),
+      name: z.string().optional().describe('New tag name'),
+      description: z.string().optional().describe('New tag description'),
+      slug: z
+        .string()
+        .optional()
+        .describe('New URL slug. Supported by self-hosted WordPress sites.')
+    })
+  )
+  .output(tagOutputSchema)
+  .handleInvocation(async ctx => {
+    let { tagId, ...updateData } = ctx.input;
+    if (Object.values(updateData).every(value => value === undefined)) {
+      throw wordpressServiceError('Provide at least one tag field to update.');
+    }
+
+    let client = createClient(ctx.config, ctx.auth);
+    let tag = await client.updateTag(tagId, updateData);
+    let result = extractTagSummary(tag, ctx.config.apiType);
+    return {
+      output: result,
+      message: `Updated tag **"${result.name}"** (ID: ${result.tagId}).`
+    };
+  })
+  .build();
+
 export let deleteTagTool = SlateTool.create(spec, {
   name: 'Delete Tag',
   key: 'delete_tag',
@@ -194,7 +320,7 @@ export let deleteTagTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      tagId: z.string().describe('ID of the tag to delete')
+      tagId: z.string().describe('Tag ID, or tag slug for WordPress.com')
     })
   )
   .output(

@@ -32,13 +32,25 @@ Create, get, update, or delete a group in a Cognito user pool. Groups provide ro
 
 Create, get, update, delete, or list Cognito identity pools (federated identities). Identity pools issue temporary AWS credentials to authenticated and guest users, enabling direct access to AWS services.
 
+### Manage Identity Pool Roles
+
+Get or set IAM roles for a Cognito identity pool. Identity pool roles control the AWS credentials issued to authenticated and unauthenticated identities.
+
 ### Manage Identity Provider
 
 Create, get, update, delete, or list federated identity providers (SAML, OIDC, Google, Facebook, Apple, Amazon) in a Cognito user pool. Manages federation configuration for external sign-in sources.
 
+### Manage Resource Server
+
+Create, get, update, delete, or list Cognito resource servers for a user pool. Resource servers define custom OAuth scopes for external APIs and machine-to-machine authorization.
+
 ### Manage User Pool
 
 Create, update, get, or delete a Cognito user pool. When creating, only the pool name is required. When updating, provide the user pool ID and the fields to change. Supports configuring password policies, MFA, auto-verification, and deletion protection.
+
+### Manage User Pool Domain
+
+Create, get, update, or delete a Cognito user pool domain. User pool domains host managed login, OAuth authorization endpoints, and authentication pages for applications.
 
 ### Manage User
 

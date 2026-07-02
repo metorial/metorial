@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BraintreeGraphQLClient } from '../lib/client';
+import { braintreeServiceError } from '../lib/errors';
 import { REFUND_TRANSACTION, REVERSE_TRANSACTION } from '../lib/graphql-queries';
 import { spec } from '../spec';
 
@@ -30,7 +31,11 @@ Use "refund" for settled transactions and "reverse" to automatically void or ref
         .string()
         .optional()
         .describe('Amount to refund. Omit for full refund. Only applies to mode "refund".'),
-      orderId: z.string().optional().describe('Order ID to associate with the refund')
+      orderId: z.string().optional().describe('Order ID to associate with the refund'),
+      apiRequestKey: z
+        .string()
+        .optional()
+        .describe('Optional idempotency key to prevent duplicate refund or reversal creation.')
     })
   )
   .output(
@@ -44,6 +49,12 @@ Use "refund" for settled transactions and "reverse" to automatically void or ref
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.mode === 'reverse' && (ctx.input.amount || ctx.input.orderId)) {
+      throw braintreeServiceError(
+        'amount and orderId only apply to mode "refund"; remove them when using mode "reverse".'
+      );
+    }
+
     let client = new BraintreeGraphQLClient({
       token: ctx.auth.token,
       environment: ctx.config.environment
@@ -53,7 +64,8 @@ Use "refund" for settled transactions and "reverse" to automatically void or ref
       let input: Record<string, any> = {
         transactionId: ctx.input.transactionId
       };
-      let result = await client.query(REVERSE_TRANSACTION, { input });
+      if (ctx.input.apiRequestKey) input.apiRequestKey = ctx.input.apiRequestKey;
+      let result = await client.query(REVERSE_TRANSACTION, { input }, 'reverse transaction');
       let reversal = result.reverseTransaction.reversal;
 
       return {
@@ -72,6 +84,7 @@ Use "refund" for settled transactions and "reverse" to automatically void or ref
     let input: Record<string, any> = {
       transactionId: ctx.input.transactionId
     };
+    if (ctx.input.apiRequestKey) input.apiRequestKey = ctx.input.apiRequestKey;
     if (ctx.input.amount) {
       input.refund = { amount: ctx.input.amount };
     }
@@ -79,7 +92,7 @@ Use "refund" for settled transactions and "reverse" to automatically void or ref
       input.refund = { ...input.refund, orderId: ctx.input.orderId };
     }
 
-    let result = await client.query(REFUND_TRANSACTION, { input });
+    let result = await client.query(REFUND_TRANSACTION, { input }, 'refund transaction');
     let refund = result.refundTransaction.refund;
 
     return {

@@ -1,10 +1,90 @@
 import { createAxios } from 'slates';
 import { type AwsCredentials, signRequest } from './aws-signer';
+import { transcribeApiError } from './errors';
 
 export interface TranscribeClientConfig {
   credentials: AwsCredentials;
   region: string;
 }
+
+let mapLanguageIdSettings = (settings: Record<string, LanguageIdSetting>) =>
+  Object.fromEntries(
+    Object.entries(settings).map(([languageCode, setting]) => [
+      languageCode,
+      {
+        ...(setting.languageModelName ? { LanguageModelName: setting.languageModelName } : {}),
+        ...(setting.vocabularyName ? { VocabularyName: setting.vocabularyName } : {}),
+        ...(setting.vocabularyFilterName
+          ? { VocabularyFilterName: setting.vocabularyFilterName }
+          : {})
+      }
+    ])
+  );
+
+let mapTimeRange = (range: TimeRange | undefined) => {
+  if (!range) {
+    return undefined;
+  }
+
+  return {
+    ...(range.first !== undefined ? { First: range.first } : {}),
+    ...(range.last !== undefined ? { Last: range.last } : {})
+  };
+};
+
+let mapCallAnalyticsRule = (rule: CallAnalyticsCategoryRule): Record<string, any> => {
+  let base = {
+    ...(rule.absoluteTimeRange
+      ? { AbsoluteTimeRange: mapTimeRange(rule.absoluteTimeRange) }
+      : {}),
+    ...(rule.relativeTimeRange
+      ? { RelativeTimeRange: mapTimeRange(rule.relativeTimeRange) }
+      : {}),
+    ...(rule.negate !== undefined ? { Negate: rule.negate } : {}),
+    ...(rule.participantRole ? { ParticipantRole: rule.participantRole } : {})
+  };
+
+  if (rule.ruleType === 'transcript') {
+    return {
+      TranscriptFilter: {
+        ...base,
+        Targets: rule.targets,
+        TranscriptFilterType: rule.transcriptFilterType || 'EXACT'
+      }
+    };
+  }
+
+  if (rule.ruleType === 'sentiment') {
+    return {
+      SentimentFilter: {
+        ...base,
+        Sentiments: rule.sentiments
+      }
+    };
+  }
+
+  if (rule.ruleType === 'interruption') {
+    return {
+      InterruptionFilter: {
+        ...base,
+        ...(rule.threshold !== undefined ? { Threshold: rule.threshold } : {})
+      }
+    };
+  }
+
+  return {
+    NonTalkTimeFilter: {
+      ...(rule.absoluteTimeRange
+        ? { AbsoluteTimeRange: mapTimeRange(rule.absoluteTimeRange) }
+        : {}),
+      ...(rule.relativeTimeRange
+        ? { RelativeTimeRange: mapTimeRange(rule.relativeTimeRange) }
+        : {}),
+      ...(rule.negate !== undefined ? { Negate: rule.negate } : {}),
+      ...(rule.threshold !== undefined ? { Threshold: rule.threshold } : {})
+    }
+  };
+};
 
 export class TranscribeClient {
   private credentials: AwsCredentials;
@@ -37,22 +117,31 @@ export class TranscribeClient {
       service: 'transcribe'
     });
 
-    let response = await ax.post(url, body, {
-      headers: {
-        ...headers,
-        ...sigHeaders
-      }
-    });
+    try {
+      let response = await ax.post(url, body, {
+        headers: {
+          ...headers,
+          ...sigHeaders
+        }
+      });
 
-    return response.data;
+      return response.data;
+    } catch (error) {
+      throw transcribeApiError(error, target);
+    }
   }
 
   // ---- Transcription Jobs ----
 
   async startTranscriptionJob(params: StartTranscriptionJobParams): Promise<any> {
+    let media: Record<string, any> = { MediaFileUri: params.mediaFileUri };
+    if (params.redactedMediaFileUri) {
+      media.RedactedMediaFileUri = params.redactedMediaFileUri;
+    }
+
     let payload: Record<string, any> = {
       TranscriptionJobName: params.jobName,
-      Media: { MediaFileUri: params.mediaFileUri }
+      Media: media
     };
 
     if (params.languageCode) payload.LanguageCode = params.languageCode;
@@ -67,6 +156,10 @@ export class TranscribeClient {
     if (params.outputKey) payload.OutputKey = params.outputKey;
     if (params.outputEncryptionKmsKeyId)
       payload.OutputEncryptionKMSKeyId = params.outputEncryptionKmsKeyId;
+    if (params.kmsEncryptionContext)
+      payload.KMSEncryptionContext = params.kmsEncryptionContext;
+    if (params.languageIdSettings)
+      payload.LanguageIdSettings = mapLanguageIdSettings(params.languageIdSettings);
 
     if (params.settings) {
       let settings: Record<string, any> = {};
@@ -154,9 +247,14 @@ export class TranscribeClient {
   // ---- Call Analytics Jobs ----
 
   async startCallAnalyticsJob(params: StartCallAnalyticsJobParams): Promise<any> {
+    let media: Record<string, any> = { MediaFileUri: params.mediaFileUri };
+    if (params.redactedMediaFileUri) {
+      media.RedactedMediaFileUri = params.redactedMediaFileUri;
+    }
+
     let payload: Record<string, any> = {
       CallAnalyticsJobName: params.jobName,
-      Media: { MediaFileUri: params.mediaFileUri }
+      Media: media
     };
 
     if (params.dataAccessRoleArn) payload.DataAccessRoleArn = params.dataAccessRoleArn;
@@ -183,6 +281,10 @@ export class TranscribeClient {
         settings.LanguageModelName = params.settings.languageModelName;
       if (params.settings.languageOptions)
         settings.LanguageOptions = params.settings.languageOptions;
+      if (params.settings.languageIdSettings)
+        settings.LanguageIdSettings = mapLanguageIdSettings(
+          params.settings.languageIdSettings
+        );
       if (params.settings.summarization !== undefined) {
         settings.Summarization = { GenerateAbstractiveSummary: params.settings.summarization };
       }
@@ -227,6 +329,48 @@ export class TranscribeClient {
     });
   }
 
+  // ---- Call Analytics Categories ----
+
+  async createCallAnalyticsCategory(params: CreateCallAnalyticsCategoryParams): Promise<any> {
+    let payload: Record<string, any> = {
+      CategoryName: params.categoryName,
+      Rules: params.rules.map(mapCallAnalyticsRule)
+    };
+    if (params.inputType) payload.InputType = params.inputType;
+    if (params.tags) {
+      payload.Tags = params.tags.map(t => ({ Key: t.key, Value: t.value }));
+    }
+    return this.request('CreateCallAnalyticsCategory', payload);
+  }
+
+  async updateCallAnalyticsCategory(params: UpdateCallAnalyticsCategoryParams): Promise<any> {
+    let payload: Record<string, any> = {
+      CategoryName: params.categoryName,
+      Rules: params.rules.map(mapCallAnalyticsRule)
+    };
+    if (params.inputType) payload.InputType = params.inputType;
+    return this.request('UpdateCallAnalyticsCategory', payload);
+  }
+
+  async getCallAnalyticsCategory(categoryName: string): Promise<any> {
+    return this.request('GetCallAnalyticsCategory', {
+      CategoryName: categoryName
+    });
+  }
+
+  async deleteCallAnalyticsCategory(categoryName: string): Promise<any> {
+    return this.request('DeleteCallAnalyticsCategory', {
+      CategoryName: categoryName
+    });
+  }
+
+  async listCallAnalyticsCategories(params?: ListCallAnalyticsCategoriesParams): Promise<any> {
+    let payload: Record<string, any> = {};
+    if (params?.maxResults) payload.MaxResults = params.maxResults;
+    if (params?.nextToken) payload.NextToken = params.nextToken;
+    return this.request('ListCallAnalyticsCategories', payload);
+  }
+
   // ---- Medical Transcription Jobs ----
 
   async startMedicalTranscriptionJob(
@@ -244,6 +388,8 @@ export class TranscribeClient {
     if (params.outputKey) payload.OutputKey = params.outputKey;
     if (params.outputEncryptionKmsKeyId)
       payload.OutputEncryptionKMSKeyId = params.outputEncryptionKmsKeyId;
+    if (params.kmsEncryptionContext)
+      payload.KMSEncryptionContext = params.kmsEncryptionContext;
     if (params.mediaFormat) payload.MediaFormat = params.mediaFormat;
     if (params.mediaSampleRateHertz)
       payload.MediaSampleRateHertz = params.mediaSampleRateHertz;
@@ -345,6 +491,49 @@ export class TranscribeClient {
     return this.request('ListVocabularies', payload);
   }
 
+  // ---- Medical Vocabularies ----
+
+  async createMedicalVocabulary(params: CreateMedicalVocabularyParams): Promise<any> {
+    let payload: Record<string, any> = {
+      VocabularyName: params.vocabularyName,
+      LanguageCode: params.languageCode,
+      VocabularyFileUri: params.vocabularyFileUri
+    };
+    if (params.tags) {
+      payload.Tags = params.tags.map(t => ({ Key: t.key, Value: t.value }));
+    }
+    return this.request('CreateMedicalVocabulary', payload);
+  }
+
+  async getMedicalVocabulary(vocabularyName: string): Promise<any> {
+    return this.request('GetMedicalVocabulary', {
+      VocabularyName: vocabularyName
+    });
+  }
+
+  async updateMedicalVocabulary(params: UpdateMedicalVocabularyParams): Promise<any> {
+    return this.request('UpdateMedicalVocabulary', {
+      VocabularyName: params.vocabularyName,
+      LanguageCode: params.languageCode,
+      VocabularyFileUri: params.vocabularyFileUri
+    });
+  }
+
+  async deleteMedicalVocabulary(vocabularyName: string): Promise<any> {
+    return this.request('DeleteMedicalVocabulary', {
+      VocabularyName: vocabularyName
+    });
+  }
+
+  async listMedicalVocabularies(params?: ListMedicalVocabulariesParams): Promise<any> {
+    let payload: Record<string, any> = {};
+    if (params?.stateEquals) payload.StateEquals = params.stateEquals;
+    if (params?.nameContains) payload.NameContains = params.nameContains;
+    if (params?.maxResults) payload.MaxResults = params.maxResults;
+    if (params?.nextToken) payload.NextToken = params.nextToken;
+    return this.request('ListMedicalVocabularies', payload);
+  }
+
   // ---- Vocabulary Filters ----
 
   async createVocabularyFilter(params: CreateVocabularyFilterParams): Promise<any> {
@@ -422,15 +611,18 @@ export class TranscribeClient {
 export interface StartTranscriptionJobParams {
   jobName: string;
   mediaFileUri: string;
+  redactedMediaFileUri?: string;
   languageCode?: string;
   identifyLanguage?: boolean;
   identifyMultipleLanguages?: boolean;
+  languageIdSettings?: Record<string, LanguageIdSetting>;
   languageOptions?: string[];
   mediaFormat?: string;
   mediaSampleRateHertz?: number;
   outputBucketName?: string;
   outputKey?: string;
   outputEncryptionKmsKeyId?: string;
+  kmsEncryptionContext?: Record<string, string>;
   settings?: {
     vocabularyName?: string;
     showSpeakerLabels?: boolean;
@@ -471,6 +663,7 @@ export interface ListTranscriptionJobsParams {
 export interface StartCallAnalyticsJobParams {
   jobName: string;
   mediaFileUri: string;
+  redactedMediaFileUri?: string;
   dataAccessRoleArn?: string;
   outputLocation?: string;
   outputEncryptionKmsKeyId?: string;
@@ -484,6 +677,7 @@ export interface StartCallAnalyticsJobParams {
     vocabularyFilterMethod?: string;
     languageModelName?: string;
     languageOptions?: string[];
+    languageIdSettings?: Record<string, LanguageIdSetting>;
     summarization?: boolean;
     contentRedaction?: {
       redactionType: string;
@@ -501,6 +695,53 @@ export interface ListCallAnalyticsJobsParams {
   nextToken?: string;
 }
 
+export interface TimeRange {
+  first?: number;
+  last?: number;
+}
+
+export interface LanguageIdSetting {
+  languageModelName?: string;
+  vocabularyName?: string;
+  vocabularyFilterName?: string;
+}
+
+export type CallAnalyticsRuleType =
+  | 'transcript'
+  | 'sentiment'
+  | 'interruption'
+  | 'non_talk_time';
+
+export interface CallAnalyticsCategoryRule {
+  ruleType: CallAnalyticsRuleType;
+  targets?: string[];
+  transcriptFilterType?: 'EXACT';
+  sentiments?: Array<'POSITIVE' | 'NEGATIVE' | 'NEUTRAL' | 'MIXED'>;
+  participantRole?: 'AGENT' | 'CUSTOMER';
+  negate?: boolean;
+  threshold?: number;
+  absoluteTimeRange?: TimeRange;
+  relativeTimeRange?: TimeRange;
+}
+
+export interface CreateCallAnalyticsCategoryParams {
+  categoryName: string;
+  inputType?: string;
+  rules: CallAnalyticsCategoryRule[];
+  tags?: Array<{ key: string; value: string }>;
+}
+
+export interface UpdateCallAnalyticsCategoryParams {
+  categoryName: string;
+  inputType?: string;
+  rules: CallAnalyticsCategoryRule[];
+}
+
+export interface ListCallAnalyticsCategoriesParams {
+  maxResults?: number;
+  nextToken?: string;
+}
+
 export interface StartMedicalTranscriptionJobParams {
   jobName: string;
   mediaFileUri: string;
@@ -510,6 +751,7 @@ export interface StartMedicalTranscriptionJobParams {
   outputBucketName: string;
   outputKey?: string;
   outputEncryptionKmsKeyId?: string;
+  kmsEncryptionContext?: Record<string, string>;
   mediaFormat?: string;
   mediaSampleRateHertz?: number;
   settings?: {
@@ -547,6 +789,26 @@ export interface UpdateVocabularyParams {
 }
 
 export interface ListVocabulariesParams {
+  stateEquals?: string;
+  nameContains?: string;
+  maxResults?: number;
+  nextToken?: string;
+}
+
+export interface CreateMedicalVocabularyParams {
+  vocabularyName: string;
+  languageCode: string;
+  vocabularyFileUri: string;
+  tags?: Array<{ key: string; value: string }>;
+}
+
+export interface UpdateMedicalVocabularyParams {
+  vocabularyName: string;
+  languageCode: string;
+  vocabularyFileUri: string;
+}
+
+export interface ListMedicalVocabulariesParams {
   stateEquals?: string;
   nameContains?: string;
   maxResults?: number;

@@ -1,5 +1,6 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { asanaApiError, asanaServiceError } from './lib/errors';
 
 let asanaApi = createAxios({
   baseURL: 'https://app.asana.com/api/1.0'
@@ -18,11 +19,16 @@ let outputSchema = z.object({
 type AuthOutput = z.infer<typeof outputSchema>;
 
 let fetchProfile = async (token: string) => {
-  let response = await asanaApi.get('/users/me', {
-    headers: {
-      Authorization: `Bearer ${token}`
-    }
-  });
+  let response: any;
+  try {
+    response = await asanaApi.get('/users/me', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+  } catch (error) {
+    throw asanaApiError(error, 'fetch profile');
+  }
 
   let user = response.data.data;
 
@@ -176,7 +182,7 @@ export let auth = SlateAuth.create()
       {
         title: 'Typeahead Read',
         description: 'Use workspace typeahead search',
-        scope: 'workspace.typeahead:read'
+        scope: 'workspaces.typeahead:read'
       },
       {
         title: 'OpenID Connect',
@@ -202,23 +208,32 @@ export let auth = SlateAuth.create()
     },
 
     handleCallback: async ctx => {
-      let response = await asanaAuth.post(
-        '/-/oauth_token',
-        new URLSearchParams({
-          grant_type: 'authorization_code',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          redirect_uri: ctx.redirectUri,
-          code: ctx.code
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+      let response: any;
+      try {
+        response = await asanaAuth.post(
+          '/-/oauth_token',
+          new URLSearchParams({
+            grant_type: 'authorization_code',
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            redirect_uri: ctx.redirectUri,
+            code: ctx.code
+          }).toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw asanaApiError(error, 'exchange OAuth code');
+      }
 
       let data = response.data;
+      if (!data.access_token) {
+        throw asanaServiceError('Asana OAuth token exchange did not return an access token.');
+      }
+
       let expiresAt = data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : undefined;
@@ -234,25 +249,34 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw asanaServiceError('No Asana refresh token is available.');
       }
 
-      let response = await asanaAuth.post(
-        '/-/oauth_token',
-        new URLSearchParams({
-          grant_type: 'refresh_token',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken
-        }).toString(),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
+      let response: any;
+      try {
+        response = await asanaAuth.post(
+          '/-/oauth_token',
+          new URLSearchParams({
+            grant_type: 'refresh_token',
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret,
+            refresh_token: ctx.output.refreshToken
+          }).toString(),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
           }
-        }
-      );
+        );
+      } catch (error) {
+        throw asanaApiError(error, 'refresh OAuth token');
+      }
 
       let data = response.data;
+      if (!data.access_token) {
+        throw asanaServiceError('Asana OAuth refresh did not return an access token.');
+      }
+
       let expiresAt = data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : undefined;

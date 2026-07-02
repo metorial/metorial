@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listSubscribers = SlateTool.create(spec, {
   name: 'List Subscribers',
   key: 'list_subscribers',
-  description: `Retrieves a paginated list of subscribers. Can filter by subscriber status (active, unsubscribed, unconfirmed, bounced, junk). Use cursor-based pagination to iterate through large lists.`,
+  description: `Retrieves a paginated list of subscribers. Can filter by subscriber status (active, unsubscribed, unconfirmed, bounced, junk), include group memberships, or request the total subscriber count with limit 0. Use cursor-based pagination to iterate through large lists.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -21,8 +21,14 @@ export let listSubscribers = SlateTool.create(spec, {
       limit: z
         .number()
         .optional()
-        .describe('Number of subscribers to return per page (default 25, max 50)'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+        .describe(
+          'Number of subscribers to return per page. Use 0 to fetch total count only.'
+        ),
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      includeGroups: z
+        .boolean()
+        .optional()
+        .describe('Include each subscriber group memberships in the response')
     })
   )
   .output(
@@ -34,11 +40,19 @@ export let listSubscribers = SlateTool.create(spec, {
             email: z.string().describe('Email address'),
             status: z.string().describe('Subscriber status'),
             fields: z.record(z.string(), z.any()).optional().describe('Custom field values'),
+            groups: z
+              .array(z.any())
+              .optional()
+              .describe('Groups included for this subscriber'),
             subscribedAt: z.string().optional().describe('Subscription timestamp'),
             createdAt: z.string().optional().describe('Creation timestamp')
           })
         )
         .describe('List of subscribers'),
+      total: z
+        .number()
+        .optional()
+        .describe('Total subscriber count when returned by MailerLite'),
       nextCursor: z
         .string()
         .optional()
@@ -52,7 +66,8 @@ export let listSubscribers = SlateTool.create(spec, {
     let result = await client.listSubscribers({
       status: ctx.input.status,
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      includeGroups: ctx.input.includeGroups
     });
 
     let subscribers = (result.data || []).map((s: any) => ({
@@ -60,6 +75,7 @@ export let listSubscribers = SlateTool.create(spec, {
       email: s.email,
       status: s.status,
       fields: s.fields,
+      groups: s.groups,
       subscribedAt: s.subscribed_at,
       createdAt: s.created_at
     }));
@@ -67,6 +83,7 @@ export let listSubscribers = SlateTool.create(spec, {
     return {
       output: {
         subscribers,
+        total: result.total ?? result.meta?.total,
         nextCursor: result.meta?.next_cursor || null
       },
       message: `Retrieved **${subscribers.length}** subscribers${ctx.input.status ? ` with status **${ctx.input.status}**` : ''}.`

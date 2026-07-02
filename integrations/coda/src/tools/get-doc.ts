@@ -38,7 +38,7 @@ export let getDocTool = SlateTool.create(spec, {
       output: {
         docId: doc.id,
         name: doc.name,
-        ownerName: doc.owner,
+        ownerName: doc.ownerName ?? doc.owner,
         createdAt: doc.createdAt,
         updatedAt: doc.updatedAt,
         workspaceId: doc.workspace?.id,

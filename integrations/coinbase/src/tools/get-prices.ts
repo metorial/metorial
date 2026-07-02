@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { coinbaseOAuthAuthMethods } from '../lib/auth-methods';
 import { CoinbaseClient } from '../lib/client';
 import { spec } from '../spec';
 
@@ -12,6 +13,7 @@ export let getPrices = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(coinbaseOAuthAuthMethods)
   .input(
     z.object({
       currencyPair: z.string().describe('Currency pair (e.g., "BTC-USD", "ETH-EUR")'),

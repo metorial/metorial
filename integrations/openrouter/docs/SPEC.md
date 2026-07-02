@@ -1,4 +1,4 @@
-Now let me check the features like plugins, guardrails, and the analytics/credits APIs:# Slates Specification for Openrouter
+# Slates Specification for Openrouter
 
 ## Overview
 
@@ -36,7 +36,7 @@ OpenRouter supports OAuth PKCE to let third-party applications authenticate end-
 3. Exchange the authorization code for an API key by POSTing to `https://openrouter.ai/api/v1/auth/keys` with the `code`, optional `code_verifier`, and `code_challenge_method`.
 4. Store the API key securely within the user's browser or in your own database, and use it to make OpenRouter requests.
 
-The callback_url is required and must be a URI. Only HTTPS URLs on ports 443 and 3000 are allowed.
+The callback_url is required. Public callbacks must use HTTPS. Local development callbacks can use localhost or 127.0.0.1 with any port, which supports Slates CLI OAuth flows.
 
 ### 3. Bring Your Own Key (BYOK)
 
@@ -69,10 +69,6 @@ The Responses API supports comprehensive tool calling capabilities, allowing mod
 
 Embeddings are numerical representations of text that capture semantic meaning. They convert text into vectors (arrays of numbers) that can be used for various machine learning tasks. OpenRouter provides a unified API to access embedding models from multiple providers. Multiple texts can be sent in a single batch request.
 
-### Image Generation
-
-OpenRouter supports image generation through select models like Google Gemini image generation models. Configurable parameters include aspect ratio, image size/quality, and number of images.
-
 ### Plugins
 
 OpenRouter plugins extend model capabilities with features like web search, PDF processing, and response healing. Enable plugins by adding a plugins array to your request. The `:online` model variant can also be used to automatically attach web search results to prompts.
@@ -83,11 +79,11 @@ Guardrails let organizations control how their members and API keys can use Open
 
 ### API Key Management
 
-API keys can be created, listed, and deleted programmatically. Enterprise deployments typically require programmatic API key management for automated provisioning, rotation, and lifecycle management. Create a Management API key to manage API keys programmatically, enabling automated key creation, programmatic key rotation, and usage monitoring with automatic limit enforcement.
+API keys can be listed, created, retrieved, updated, and deleted programmatically. Enterprise deployments typically require programmatic API key management for automated provisioning, rotation, and lifecycle management. Create a Management API key to manage API keys programmatically, enabling automated key creation, programmatic key rotation, and usage monitoring with automatic limit enforcement.
 
 ### Model Discovery
 
-The Models API makes information about all LLMs freely available. It returns a standardized JSON response format that provides comprehensive metadata for each available model, including pricing, context window, and supported parameters. Models can be filtered by supported features like tool calling.
+The Models API makes information about all LLMs freely available. It returns a standardized JSON response format that provides comprehensive metadata for each available model, including pricing, context window, architecture, and supported parameters. Models can be filtered by category, supported parameters, output modalities, and sort order. The integration also exposes the user-filtered model list, embedding model discovery, model endpoint discovery, and provider discovery.
 
 ### Usage Analytics and Generation Stats
 

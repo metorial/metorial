@@ -1,5 +1,6 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { pdfApiIoServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
@@ -17,9 +18,15 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async ctx => {
+      let token = ctx.input.token.trim();
+
+      if (!token) {
+        throw pdfApiIoServiceError('API token is required.');
+      }
+
       return {
         output: {
-          token: ctx.input.token
+          token
         }
       };
     }

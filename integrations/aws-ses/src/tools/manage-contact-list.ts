@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SesClient } from '../lib/client';
+import { requireAwsSesString } from '../lib/errors';
 import { spec } from '../spec';
 
 let topicSchema = z.object({
@@ -76,19 +77,29 @@ export let manageContactList = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      let contactListName = requireAwsSesString(
+        ctx.input.contactListName,
+        'contactListName',
+        action
+      );
       await client.createContactList({
-        contactListName: ctx.input.contactListName!,
+        contactListName,
         description: ctx.input.description,
         topics: ctx.input.topics
       });
       return {
-        output: { contactListName: ctx.input.contactListName },
-        message: `Contact list **${ctx.input.contactListName}** created.`
+        output: { contactListName },
+        message: `Contact list **${contactListName}** created.`
       };
     }
 
     if (action === 'get') {
-      let result = await client.getContactList(ctx.input.contactListName!);
+      let contactListName = requireAwsSesString(
+        ctx.input.contactListName,
+        'contactListName',
+        action
+      );
+      let result = await client.getContactList(contactListName);
       return {
         output: result,
         message: `Retrieved contact list **${result.contactListName}**${result.topics ? ` with ${result.topics.length} topic(s)` : ''}.`
@@ -96,22 +107,32 @@ export let manageContactList = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
+      let contactListName = requireAwsSesString(
+        ctx.input.contactListName,
+        'contactListName',
+        action
+      );
       await client.updateContactList({
-        contactListName: ctx.input.contactListName!,
+        contactListName,
         description: ctx.input.description,
         topics: ctx.input.topics
       });
       return {
-        output: { contactListName: ctx.input.contactListName },
-        message: `Contact list **${ctx.input.contactListName}** updated.`
+        output: { contactListName },
+        message: `Contact list **${contactListName}** updated.`
       };
     }
 
     if (action === 'delete') {
-      await client.deleteContactList(ctx.input.contactListName!);
+      let contactListName = requireAwsSesString(
+        ctx.input.contactListName,
+        'contactListName',
+        action
+      );
+      await client.deleteContactList(contactListName);
       return {
-        output: { contactListName: ctx.input.contactListName },
-        message: `Contact list **${ctx.input.contactListName}** deleted.`
+        output: { contactListName },
+        message: `Contact list **${contactListName}** deleted.`
       };
     }
 

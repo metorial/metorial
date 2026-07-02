@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { createClient } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCustomFields = SlateTool.create(spec, {
@@ -54,7 +55,7 @@ export let manageCustomFields = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = createClient(ctx.auth);
     let input = ctx.input;
 
     if (input.action === 'list') {
@@ -79,7 +80,7 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (input.action === 'create') {
-      if (!input.label) throw new Error('label is required for create');
+      if (!input.label) throw kitServiceError('label is required for create');
       let f = await client.createCustomField(input.label);
       return {
         output: {
@@ -95,8 +96,8 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (input.action === 'update') {
-      if (!input.fieldId) throw new Error('fieldId is required for update');
-      if (!input.label) throw new Error('label is required for update');
+      if (!input.fieldId) throw kitServiceError('fieldId is required for update');
+      if (!input.label) throw kitServiceError('label is required for update');
       let f = await client.updateCustomField(input.fieldId, input.label);
       return {
         output: {
@@ -112,7 +113,7 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (input.action === 'delete') {
-      if (!input.fieldId) throw new Error('fieldId is required for delete');
+      if (!input.fieldId) throw kitServiceError('fieldId is required for delete');
       await client.deleteCustomField(input.fieldId);
       return {
         output: {},
@@ -120,5 +121,5 @@ export let manageCustomFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw kitServiceError(`Unknown action: ${input.action}`);
   });

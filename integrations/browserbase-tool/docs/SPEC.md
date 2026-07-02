@@ -2,7 +2,7 @@
 
 ## Overview
 
-Browserbase is a cloud platform for running headless browsers. It provides infrastructure for running headless browsers, enabling automations that interact with websites, fill out forms, or replicate user actions, so users don't have to maintain their own fleet of headless browsers. It supports Playwright, Puppeteer, and Selenium at scale with stealth mode, session persistence, and debugging tools.
+Browserbase is a cloud platform for running browser agents and headless browser automation. It provides cloud browsers, page fetching, web search, persistent contexts, session observability, file uploads/downloads, and debugging tools so users do not have to maintain their own browser fleet.
 
 ## Authentication
 
@@ -26,6 +26,7 @@ A browser session is the fundamental building block — it represents a single b
 - **Proxy configuration** can be set to `true` for a default proxy, or provided as an array of proxy configurations with geolocation options.
 - Arbitrary **user metadata** can be attached to sessions.
 - Sessions expose both a **WebSocket URL** and an **HTTP URL** for connecting via browser automation frameworks.
+- Sessions can receive uploaded files through the session uploads endpoint.
 
 ### Session Observability
 
@@ -51,7 +52,11 @@ Custom Chrome extensions can be uploaded and loaded into browser sessions. Creat
 
 ### File Uploads and Downloads
 
-The API supports file uploads, downloads, and custom browser extensions. Files can be uploaded to sessions and downloads from sessions can be retrieved.
+The API supports file uploads, downloads, and custom browser extensions. Files can be uploaded to sessions and downloads from sessions can be listed, retrieved, and deleted. Downloaded file bytes must be returned through Slate attachments, with output fields limited to metadata such as filename, MIME type, size, checksum, and attachment count.
+
+### Search and Fetch
+
+Browserbase exposes Search and Fetch APIs alongside browser sessions. Search returns structured result metadata. Fetch retrieves a page as raw content, markdown, or JSON extracted by a caller-provided schema.
 
 ### Project Management
 

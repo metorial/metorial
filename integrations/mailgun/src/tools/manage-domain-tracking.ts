@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MailgunClient } from '../lib/client';
+import { mailgunServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getDomainTracking = SlateTool.create(spec, {
@@ -76,6 +77,15 @@ export let updateDomainTracking = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.trackingType !== 'unsubscribe' &&
+      (ctx.input.htmlFooter !== undefined || ctx.input.textFooter !== undefined)
+    ) {
+      throw mailgunServiceError(
+        'htmlFooter and textFooter only apply to unsubscribe tracking.'
+      );
+    }
+
     let client = new MailgunClient({ token: ctx.auth.token, region: ctx.config.region });
     await client.updateDomainTracking(ctx.input.domainName, ctx.input.trackingType, {
       active: ctx.input.active,

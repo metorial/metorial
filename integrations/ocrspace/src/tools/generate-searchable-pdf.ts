@@ -1,48 +1,19 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { ocrspaceServiceError } from '../lib/errors';
 import { spec } from '../spec';
-
-let languageEnum = z.enum([
-  'ara',
-  'bul',
-  'chs',
-  'cht',
-  'hrv',
-  'cze',
-  'dan',
-  'dut',
-  'eng',
-  'fin',
-  'fre',
-  'ger',
-  'gre',
-  'hun',
-  'kor',
-  'ita',
-  'jpn',
-  'pol',
-  'por',
-  'rus',
-  'slv',
-  'spa',
-  'swe',
-  'tha',
-  'tur',
-  'ukr',
-  'vnm',
-  'auto'
-]);
+import { languageEnum, validateLanguageForEngine, validateSingleSource } from './shared';
 
 export let generateSearchablePdf = SlateTool.create(spec, {
   name: 'Generate Searchable PDF',
   key: 'generate_searchable_pdf',
   description: `Converts a scanned image or PDF into a searchable (sandwich) PDF with an embedded text layer. The generated PDF can be searched, copied from, and indexed.
 
-Returns a download URL for the generated PDF (valid for **1 hour**) along with the extracted text.`,
+Returns the generated PDF as a Slate attachment, plus metadata and extracted text.`,
   instructions: [
     'Provide exactly one of "sourceUrl" or "base64Image" as the input source.',
-    'The download URL expires after 1 hour — download or share it promptly.',
+    'The generated PDF bytes are returned as a Slate attachment; the provider download URL is temporary and only included as metadata.',
     'Set "hideTextLayer" to true if you want the text layer to be invisible (useful for archival purposes).'
   ],
   constraints: [
@@ -96,7 +67,12 @@ Returns a download URL for the generated PDF (valid for **1 hour**) along with t
     z.object({
       searchablePdfUrl: z
         .string()
-        .describe('Download URL for the generated searchable PDF (valid for 1 hour)'),
+        .describe(
+          'Temporary OCR.space download URL used to fetch the attached searchable PDF (valid for 1 hour)'
+        ),
+      mimeType: z.string().describe('MIME type of the returned PDF attachment'),
+      byteLength: z.number().describe('Decoded byte length of the returned PDF attachment'),
+      attachmentCount: z.number().describe('Number of Slate attachments returned'),
       extractedText: z.string().describe('Full extracted text from all pages'),
       pages: z
         .array(
@@ -110,9 +86,8 @@ Returns a download URL for the generated PDF (valid for **1 hour**) along with t
     })
   )
   .handleInvocation(async ctx => {
-    if (!ctx.input.sourceUrl && !ctx.input.base64Image) {
-      throw new Error('Either "sourceUrl" or "base64Image" must be provided.');
-    }
+    validateSingleSource(ctx.input);
+    validateLanguageForEngine(ctx.input.language, ctx.input.ocrEngine);
 
     let client = new Client({ token: ctx.auth.token });
 
@@ -130,10 +105,12 @@ Returns a download URL for the generated PDF (valid for **1 hour**) along with t
     });
 
     if (!result.searchablePdfUrl) {
-      throw new Error(
+      throw ocrspaceServiceError(
         'Searchable PDF generation failed — no download URL was returned. Ensure you are not using Engine 3.'
       );
     }
+
+    let pdf = await client.downloadFile(result.searchablePdfUrl, 'application/pdf');
 
     let pages = result.parsedResults.map((r, i) => ({
       pageNumber: i + 1,
@@ -145,11 +122,15 @@ Returns a download URL for the generated PDF (valid for **1 hour**) along with t
     return {
       output: {
         searchablePdfUrl: result.searchablePdfUrl,
+        mimeType: pdf.mimeType,
+        byteLength: pdf.byteLength,
+        attachmentCount: 1,
         extractedText,
         pages,
         processingTimeMs: result.processingTimeInMilliseconds
       },
-      message: `Searchable PDF generated in ${result.processingTimeInMilliseconds}ms with ${pages.length} page(s). [Download PDF](${result.searchablePdfUrl}) (link valid for 1 hour).`
+      attachments: [createBase64Attachment(pdf.contentBase64, pdf.mimeType)],
+      message: `Searchable PDF generated and returned as an attachment in ${result.processingTimeInMilliseconds}ms with ${pages.length} page(s).`
     };
   })
   .build();

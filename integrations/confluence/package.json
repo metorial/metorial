@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
+    "test": "vitest run --config vitest.config.ts --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -15,5 +16,5 @@
   "devDependencies": {
     "typescript": "^5"
   },
-  "version": "0.2.0-rc.12"
+  "version": "0.2.0-rc.13"
 }

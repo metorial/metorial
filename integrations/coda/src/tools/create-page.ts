@@ -25,8 +25,8 @@ export let createPageTool = SlateTool.create(spec, {
   .output(
     z.object({
       pageId: z.string().describe('ID of the created page'),
-      name: z.string().describe('Name of the created page'),
-      browserLink: z.string().optional().describe('URL to open the page')
+      requestId: z.string().describe('ID to track the asynchronous page creation'),
+      name: z.string().describe('Requested name of the created page')
     })
   )
   .handleInvocation(async ctx => {
@@ -43,7 +43,10 @@ export let createPageTool = SlateTool.create(spec, {
     if (ctx.input.content) {
       body.pageContent = {
         type: 'canvas',
-        body: ctx.input.content
+        canvasContent: {
+          format: 'html',
+          content: ctx.input.content
+        }
       };
     }
 
@@ -52,10 +55,10 @@ export let createPageTool = SlateTool.create(spec, {
     return {
       output: {
         pageId: page.id,
-        name: page.name,
-        browserLink: page.browserLink
+        requestId: page.requestId,
+        name: ctx.input.name
       },
-      message: `Created page **${page.name}** in doc **${ctx.input.docId}**.`
+      message: `Queued creation of page **${ctx.input.name}** in doc **${ctx.input.docId}**. Request ID: ${page.requestId}`
     };
   })
   .build();

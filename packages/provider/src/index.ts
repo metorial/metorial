@@ -6,5 +6,7 @@ export * from './config';
 export * from './context';
 export * from './docs';
 export * from './error';
+export * from './file';
 export * from './logger';
+export * from './object';
 export * from './specification';

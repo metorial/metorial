@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { woocommerceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -51,7 +52,7 @@ export let managePaymentGateways = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.gatewayId) throw new Error('gatewayId is required');
+      if (!ctx.input.gatewayId) throw woocommerceServiceError('gatewayId is required');
       let gateway = await client.getPaymentGateway(ctx.input.gatewayId);
       return {
         output: { gateway: mapGateway(gateway) },
@@ -60,7 +61,7 @@ export let managePaymentGateways = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.gatewayId) throw new Error('gatewayId is required');
+      if (!ctx.input.gatewayId) throw woocommerceServiceError('gatewayId is required');
 
       let data: Record<string, any> = {};
       if (ctx.input.enabled !== undefined) data.enabled = ctx.input.enabled;
@@ -75,7 +76,7 @@ export let managePaymentGateways = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw woocommerceServiceError(`Unknown action: ${action}`);
   })
   .build();
 

@@ -26,7 +26,11 @@ export let manageWebsiteSettings = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+    let client = new Client({
+      token: ctx.auth.token,
+      websiteId: ctx.config.websiteId,
+      tier: ctx.auth.tier
+    });
 
     if (ctx.input.settings && Object.keys(ctx.input.settings).length > 0) {
       await client.updateWebsiteSettings(ctx.input.settings);

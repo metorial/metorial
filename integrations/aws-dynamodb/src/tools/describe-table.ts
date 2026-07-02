@@ -81,7 +81,11 @@ export let describeTable = SlateTool.create(spec, {
       streamEnabled: z.boolean().optional(),
       streamViewType: z.string().optional(),
       latestStreamArn: z.string().optional(),
-      tableClass: z.string().optional()
+      tableClass: z.string().optional(),
+      deletionProtectionEnabled: z
+        .boolean()
+        .optional()
+        .describe('Whether deletion protection is enabled')
     })
   )
   .handleInvocation(async ctx => {
@@ -134,7 +138,8 @@ export let describeTable = SlateTool.create(spec, {
         streamEnabled: table.StreamSpecification?.StreamEnabled,
         streamViewType: table.StreamSpecification?.StreamViewType,
         latestStreamArn: table.LatestStreamArn,
-        tableClass: table.TableClassSummary?.TableClass
+        tableClass: table.TableClassSummary?.TableClass,
+        deletionProtectionEnabled: table.DeletionProtectionEnabled
       },
       message: `Table **${table.TableName}** is ${table.TableStatus} with ~${table.ItemCount ?? 0} items (${table.TableSizeBytes ?? 0} bytes)`
     };

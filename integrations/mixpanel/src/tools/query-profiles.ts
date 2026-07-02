@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import { createClientFromContext, requireServiceAccount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let queryProfiles = SlateTool.create(spec, {
@@ -54,6 +54,8 @@ Returns paginated results with profile properties. Use sessionId and page for pa
     })
   )
   .handleInvocation(async ctx => {
+    requireServiceAccount(ctx);
+
     let client = createClientFromContext(ctx);
 
     let result = await client.queryProfiles({

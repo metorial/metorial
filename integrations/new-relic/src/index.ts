@@ -3,7 +3,9 @@ import { spec } from './spec';
 import {
   createChangeTrackingMarker,
   ingestData,
+  listAlertIssues,
   manageAlertCondition,
+  manageAlertPolicy,
   manageDashboard,
   manageEntityTags,
   manageSyntheticMonitor,
@@ -17,6 +19,8 @@ export let provider = Slate.create({
   tools: [
     runNrqlQuery,
     searchEntities,
+    manageAlertPolicy,
+    listAlertIssues,
     manageAlertCondition,
     manageDashboard,
     manageSyntheticMonitor,

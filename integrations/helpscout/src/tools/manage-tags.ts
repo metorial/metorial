@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HelpScoutClient } from '../lib/client';
+import { helpscoutServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -57,7 +58,8 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Tag name is required for create action');
+      if (!ctx.input.name)
+        throw helpscoutServiceError('Tag name is required for create action');
       await client.createTag(ctx.input.name);
       return {
         output: { success: true },
@@ -66,8 +68,10 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.tagId) throw new Error('Tag ID is required for update action');
-      if (!ctx.input.name) throw new Error('Tag name is required for update action');
+      if (!ctx.input.tagId)
+        throw helpscoutServiceError('Tag ID is required for update action');
+      if (!ctx.input.name)
+        throw helpscoutServiceError('Tag name is required for update action');
       await client.updateTag(ctx.input.tagId, ctx.input.name);
       return {
         output: { success: true },
@@ -76,7 +80,8 @@ export let manageTags = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.tagId) throw new Error('Tag ID is required for delete action');
+      if (!ctx.input.tagId)
+        throw helpscoutServiceError('Tag ID is required for delete action');
       await client.deleteTag(ctx.input.tagId);
       return {
         output: { success: true },

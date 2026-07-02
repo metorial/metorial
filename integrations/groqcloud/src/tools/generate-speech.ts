@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let generateSpeech = SlateTool.create(spec, {
   instructions: [
     'Specify the text to convert, a model, and a voice.',
     'For expressive output with the Orpheus English model, embed vocal direction tags in the input text (e.g., "[cheerful] Hello there!").',
-    'Returns base64-encoded audio data.'
+    'Returns generated audio as a Slate attachment.'
   ],
   tags: {
     readOnly: true
@@ -32,7 +32,7 @@ export let generateSpeech = SlateTool.create(spec, {
       voice: z.string().describe('Voice to use for speech generation'),
       responseFormat: z
         .enum(['flac', 'mp3', 'mulaw', 'ogg', 'wav'])
-        .optional()
+        .default('wav')
         .describe('Audio output format'),
       sampleRate: z
         .enum(['8000', '16000', '22050', '24000', '32000', '44100', '48000'])
@@ -48,14 +48,16 @@ export let generateSpeech = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      audioBase64: z.string().describe('Base64-encoded audio data'),
-      format: z.string().describe('Audio format of the output')
+      format: z.string().describe('Audio format of the output'),
+      mimeType: z.string().describe('MIME type of the returned audio attachment'),
+      sizeBytes: z.number().describe('Size of the generated audio in bytes'),
+      attachmentCount: z.number().describe('Number of audio attachments returned')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client(ctx.auth.token);
 
-    let audioBase64 = await client.createSpeech({
+    let audio = await client.createSpeech({
       model: ctx.input.model,
       input: ctx.input.text,
       voice: ctx.input.voice,
@@ -64,13 +66,17 @@ export let generateSpeech = SlateTool.create(spec, {
       speed: ctx.input.speed
     });
 
-    let format = ctx.input.responseFormat ?? 'wav';
+    let format = ctx.input.responseFormat;
+    let mimeType = audio.contentType ?? `audio/${format === 'mulaw' ? 'mulaw' : format}`;
 
     return {
       output: {
-        audioBase64,
-        format
+        format,
+        mimeType,
+        sizeBytes: audio.sizeBytes,
+        attachmentCount: 1
       },
+      attachments: [createBase64Attachment(audio.audioBase64, mimeType)],
       message: `Generated speech audio in **${format}** format using **${ctx.input.model}** with voice "${ctx.input.voice}".`
     };
   })

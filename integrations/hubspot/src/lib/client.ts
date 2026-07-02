@@ -361,6 +361,53 @@ export class HubSpotClient {
     return response.data;
   }
 
+  // ── Sequences ──
+
+  async listSequences(userId: string, limit: number = 10, after?: string): Promise<any> {
+    let params: Record<string, any> = { userId, limit };
+    if (after) {
+      params.after = after;
+    }
+    let response = await this.http.get('/automation/sequences/2026-03', { params });
+    return response.data;
+  }
+
+  async getSequence(sequenceId: string, userId: string): Promise<any> {
+    let response = await this.http.get(`/automation/sequences/2026-03/${sequenceId}`, {
+      params: { userId }
+    });
+    return response.data;
+  }
+
+  async enrollContactInSequence(
+    userId: string,
+    input: {
+      sequenceId: string;
+      contactId: string;
+      senderEmail: string;
+    }
+  ): Promise<any> {
+    let response = await this.http.post('/automation/sequences/2026-03/enrollments', input, {
+      params: { userId }
+    });
+    return response.data;
+  }
+
+  async getSequenceEnrollmentStatus(contactId: string): Promise<any | null> {
+    let response = await this.http.get(
+      `/automation/sequences/2026-03/enrollments/contact/${contactId}`,
+      {
+        validateStatus: status => (status >= 200 && status < 300) || status === 404
+      }
+    );
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    return response.data;
+  }
+
   // ── Owners ──
 
   async listOwners(limit: number = 100, after?: string, email?: string): Promise<any> {

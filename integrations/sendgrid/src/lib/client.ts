@@ -1,7 +1,39 @@
-import { createAxios } from 'slates';
+import { createAuthenticatedAxios } from 'slates';
+import { sendgridApiError } from './errors';
+
+type ContactInput = {
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  city?: string;
+  stateProvinceRegion?: string;
+  postalCode?: string;
+  country?: string;
+  phone?: string;
+  alternateEmails?: string[];
+  customFields?: Record<string, any>;
+};
+
+let mapContactInput = (contact: ContactInput) => {
+  let mapped: Record<string, any> = { email: contact.email };
+  if (contact.firstName) mapped.first_name = contact.firstName;
+  if (contact.lastName) mapped.last_name = contact.lastName;
+  if (contact.addressLine1) mapped.address_line_1 = contact.addressLine1;
+  if (contact.addressLine2) mapped.address_line_2 = contact.addressLine2;
+  if (contact.city) mapped.city = contact.city;
+  if (contact.stateProvinceRegion) mapped.state_province_region = contact.stateProvinceRegion;
+  if (contact.postalCode) mapped.postal_code = contact.postalCode;
+  if (contact.country) mapped.country = contact.country;
+  if (contact.phone) mapped.phone_number = contact.phone;
+  if (contact.alternateEmails) mapped.alternate_emails = contact.alternateEmails;
+  if (contact.customFields) mapped.custom_fields = contact.customFields;
+  return mapped;
+};
 
 export class Client {
-  private http: ReturnType<typeof createAxios>;
+  private http: ReturnType<typeof createAuthenticatedAxios>;
 
   constructor(config: { token: string; region?: string }) {
     let baseURL =
@@ -9,12 +41,12 @@ export class Client {
         ? 'https://api.eu.sendgrid.com/v3'
         : 'https://api.sendgrid.com/v3';
 
-    this.http = createAxios({
+    this.http = createAuthenticatedAxios({
       baseURL,
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
-      }
+      authHeader: {
+        value: `Bearer ${config.token}`
+      },
+      errorAdapter: sendgridApiError
     });
   }
 
@@ -248,40 +280,18 @@ export class Client {
 
   // ── Contacts ──
 
-  async upsertContacts(
-    contacts: Array<{
-      email: string;
-      firstName?: string;
-      lastName?: string;
-      addressLine1?: string;
-      addressLine2?: string;
-      city?: string;
-      stateProvinceRegion?: string;
-      postalCode?: string;
-      country?: string;
-      phone?: string;
-      alternateEmails?: string[];
-      customFields?: Record<string, any>;
-    }>
-  ) {
-    let body = {
-      contacts: contacts.map(c => {
-        let contact: Record<string, any> = { email: c.email };
-        if (c.firstName) contact.first_name = c.firstName;
-        if (c.lastName) contact.last_name = c.lastName;
-        if (c.addressLine1) contact.address_line_1 = c.addressLine1;
-        if (c.addressLine2) contact.address_line_2 = c.addressLine2;
-        if (c.city) contact.city = c.city;
-        if (c.stateProvinceRegion) contact.state_province_region = c.stateProvinceRegion;
-        if (c.postalCode) contact.postal_code = c.postalCode;
-        if (c.country) contact.country = c.country;
-        if (c.phone) contact.phone_number = c.phone;
-        if (c.alternateEmails) contact.alternate_emails = c.alternateEmails;
-        if (c.customFields) contact.custom_fields = c.customFields;
-        return contact;
-      })
+  async upsertContacts(contacts: ContactInput[], listIds?: string[]) {
+    let body: Record<string, any> = {
+      contacts: contacts.map(mapContactInput)
     };
+    if (listIds && listIds.length > 0) body.list_ids = listIds;
+
     let response = await this.http.put('/marketing/contacts', body);
+    return response.data;
+  }
+
+  async getContactImportStatus(jobId: string) {
+    let response = await this.http.get(`/marketing/contacts/imports/${jobId}`);
     return response.data;
   }
 
@@ -330,6 +340,11 @@ export class Client {
     return response.data;
   }
 
+  async getContactListContactCount(listId: string) {
+    let response = await this.http.get(`/marketing/lists/${listId}/contacts/count`);
+    return response.data;
+  }
+
   async createContactList(name: string) {
     let response = await this.http.post('/marketing/lists', { name });
     return response.data;
@@ -346,10 +361,10 @@ export class Client {
     await this.http.delete(`/marketing/lists/${listId}`, { params });
   }
 
-  async addContactsToList(listId: string, contactIds: string[]) {
+  async addContactsToList(listId: string, contacts: ContactInput[]) {
     let response = await this.http.put('/marketing/contacts', {
       list_ids: [listId],
-      contacts: contactIds.map(id => ({ email: id }))
+      contacts: contacts.map(mapContactInput)
     });
     return response.data;
   }
@@ -586,12 +601,15 @@ export class Client {
 
   // ── Event Webhook ──
 
-  async getEventWebhookSettings() {
-    let response = await this.http.get('/user/webhooks/event/settings');
+  async listEventWebhooks(includeAccountStatusChange?: boolean) {
+    let params: Record<string, string> = {};
+    if (includeAccountStatusChange) params.include = 'account_status_change';
+    let response = await this.http.get('/user/webhooks/event/settings/all', { params });
     return response.data;
   }
 
   async updateEventWebhookSettings(params: {
+    webhookId?: string;
     enabled: boolean;
     url: string;
     groupResubscribe?: boolean;
@@ -630,7 +648,10 @@ export class Client {
     if (params.oauthClientSecret) body.oauth_client_secret = params.oauthClientSecret;
     if (params.oauthTokenUrl) body.oauth_token_url = params.oauthTokenUrl;
 
-    let response = await this.http.patch('/user/webhooks/event/settings', body);
+    let path = params.webhookId
+      ? `/user/webhooks/event/settings/${params.webhookId}`
+      : '/user/webhooks/event/settings';
+    let response = await this.http.patch(path, body);
     return response.data;
   }
 

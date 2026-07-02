@@ -1,19 +1,21 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DeepSeekClient } from '../lib/client';
+import { deepSeekServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let fimCompletion = SlateTool.create(spec, {
   name: 'FIM Completion',
   key: 'fim_completion',
-  description: `Fill In the Middle (FIM) completion for code and content. Provide a prefix and optional suffix, and the model generates the content that belongs in between.
-Commonly used for code completion, inserting missing code segments, and content gap-filling.`,
+  description: `Fill In the Middle (FIM) completion for code and content. Provide a prefix and optional suffix, and DeepSeek generates the content that belongs in between.`,
   instructions: [
     'Provide the code or text before the insertion point as `prefix`, and optionally the code after the insertion point as `suffix`.',
-    'This is a Beta feature that always uses the Beta API endpoint regardless of the configured base URL.'
+    'This is a beta feature that always uses `https://api.deepseek.com/beta` regardless of the configured base URL.',
+    'Use this for code completion, inserting missing code segments, and content gap-filling.'
   ],
   constraints: [
-    'Not available in thinking/reasoning mode.',
+    'The current DeepSeek FIM API accepts `deepseek-v4-pro`.',
+    'FIM completion maxTokens is limited to 4096.',
     'Stop sequences are limited to 16.'
   ],
   tags: {
@@ -24,9 +26,9 @@ Commonly used for code completion, inserting missing code segments, and content 
   .input(
     z.object({
       model: z
-        .string()
-        .default('deepseek-chat')
-        .describe('Model to use. Defaults to deepseek-chat.'),
+        .enum(['deepseek-v4-pro'])
+        .default('deepseek-v4-pro')
+        .describe('Model to use for FIM completion'),
       prefix: z
         .string()
         .describe('Text/code before the point where completion should be inserted'),
@@ -38,30 +40,26 @@ Commonly used for code completion, inserting missing code segments, and content 
         .number()
         .int()
         .positive()
+        .max(4096)
         .optional()
-        .describe('Maximum number of tokens to generate'),
+        .describe('Maximum number of tokens to generate, up to 4096'),
       temperature: z.number().min(0).max(2).optional().describe('Sampling temperature (0-2)'),
       topP: z.number().min(0).max(1).optional().describe('Nucleus sampling parameter (0-1)'),
-      frequencyPenalty: z
-        .number()
-        .min(-2)
-        .max(2)
-        .optional()
-        .describe('Penalizes repeated tokens (-2 to 2)'),
-      presencePenalty: z
-        .number()
-        .min(-2)
-        .max(2)
-        .optional()
-        .describe('Encourages new topics (-2 to 2)'),
       stop: z
-        .union([z.string(), z.array(z.string())])
+        .union([z.string(), z.array(z.string()).max(16)])
         .optional()
-        .describe('Stop sequences that halt generation'),
+        .describe('Stop sequences that halt generation. Arrays are limited to 16 strings.'),
       echo: z
         .boolean()
         .optional()
-        .describe('Whether to echo the prompt alongside the completion')
+        .describe('Whether to echo the prompt alongside the completion'),
+      logprobs: z
+        .number()
+        .int()
+        .min(0)
+        .max(20)
+        .optional()
+        .describe('Return log probabilities for up to this many likely output tokens')
     })
   )
   .output(
@@ -98,13 +96,15 @@ Commonly used for code completion, inserting missing code segments, and content 
       max_tokens: ctx.input.maxTokens,
       temperature: ctx.input.temperature,
       top_p: ctx.input.topP,
-      frequency_penalty: ctx.input.frequencyPenalty,
-      presence_penalty: ctx.input.presencePenalty,
       stop: ctx.input.stop,
-      echo: ctx.input.echo
+      echo: ctx.input.echo,
+      logprobs: ctx.input.logprobs
     });
 
-    let choice = result.choices[0]!;
+    let choice = result.choices[0];
+    if (!choice) {
+      throw deepSeekServiceError('DeepSeek FIM completion response did not include a choice.');
+    }
 
     let output = {
       completionId: result.id,

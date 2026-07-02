@@ -1,9 +1,15 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { clickupApiError } from './lib/errors';
 
 let axios = createAxios({
   baseURL: 'https://api.clickup.com/api/v2'
 });
+
+axios.interceptors.response.use(
+  response => response,
+  error => Promise.reject(clickupApiError(error))
+);
 
 export let auth = SlateAuth.create()
   .output(

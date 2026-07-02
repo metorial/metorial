@@ -30,7 +30,7 @@ export let predictionCompleted = SlateTrigger.create(spec, {
       predictionId: z.string().describe('Prediction ID'),
       model: z.string().optional().describe('Model identifier (owner/name)'),
       version: z.string().optional().describe('Model version ID'),
-      status: z.string().describe('Terminal status: succeeded, failed, or canceled'),
+      status: z.string().describe('Terminal status: succeeded, failed, canceled, or aborted'),
       input: z.any().optional().describe('Input provided to the model'),
       output: z.any().optional().describe('Model output'),
       error: z.string().optional().nullable().describe('Error message if prediction failed'),
@@ -58,7 +58,7 @@ export let predictionCompleted = SlateTrigger.create(spec, {
       let predictions = (result.results || []) as any[];
 
       // Filter to terminal predictions created after last seen
-      let terminalStatuses = ['succeeded', 'failed', 'canceled'];
+      let terminalStatuses = ['succeeded', 'failed', 'canceled', 'aborted'];
       let newPredictions = predictions.filter((p: any) => {
         if (!terminalStatuses.includes(p.status)) return false;
         if (!p.completed_at) return false;

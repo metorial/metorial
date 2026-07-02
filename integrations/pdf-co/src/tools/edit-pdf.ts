@@ -1,7 +1,14 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  createPdfCoAttachment,
+  downloadPdfCoOutput,
+  fileAttachmentOutputFields,
+  toFileOutput
+} from './shared';
 
 export let editPdf = SlateTool.create(spec, {
   name: 'Edit PDF',
@@ -89,7 +96,7 @@ Combines multiple editing capabilities in a single tool — specify which operat
   )
   .output(
     z.object({
-      outputUrl: z.string().describe('URL to download the edited PDF'),
+      ...fileAttachmentOutputFields,
       pageCount: z.number().describe('Number of pages in the output PDF'),
       creditsUsed: z.number().describe('API credits consumed'),
       remainingCredits: z.number().describe('Credits remaining on the account')
@@ -159,23 +166,20 @@ Combines multiple editing capabilities in a single tool — specify which operat
     }
 
     if (!result) {
-      throw new Error(
+      throw createApiServiceError(
         'No editing operations specified. Please provide at least one edit action.'
       );
     }
 
     if (result.error) {
-      throw new Error(`PDF editing failed: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('PDF editing failed', result);
     }
+    let file = await downloadPdfCoOutput(client, result, 'application/pdf');
 
     return {
-      output: {
-        outputUrl: result.url,
-        pageCount: result.pageCount,
-        creditsUsed: result.credits,
-        remainingCredits: result.remainingCredits
-      },
-      message: `Edited PDF — ${operations.join(', ')}. ${result.pageCount} page(s). [Download edited PDF](${result.url})`
+      output: toFileOutput(result, file),
+      attachments: [createPdfCoAttachment(file)],
+      message: `Edited PDF — ${operations.join(', ')}. ${result.pageCount} page(s), returned as an attachment.`
     };
   })
   .build();

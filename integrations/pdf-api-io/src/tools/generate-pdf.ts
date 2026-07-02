@@ -2,14 +2,23 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import {
+  outputOptionForDelivery,
+  pdfAttachments,
+  pdfDeliverySchema,
+  pdfOutput,
+  pdfOutputSchema,
+  requireNonEmptyString
+} from './shared';
 
 export let generatePdf = SlateTool.create(spec, {
   name: 'Generate PDF',
   key: 'generate_pdf',
-  description: `Generate a PDF document from a template by populating its dynamic variables with provided data. Supports text, images, tables, barcodes, QR codes, charts, and conditional elements. Returns either a base64-encoded PDF string or a temporary download URL (valid for 15 minutes).`,
+  description: `Generate a PDF document from a template by populating its dynamic variables with provided data. Supports text, images, tables, barcodes, QR codes, charts, and conditional elements. Returns either a Slate PDF attachment or a temporary download URL (valid for 15 minutes).`,
   instructions: [
     'Use the **List Templates** or **Get Template** tools first to discover available templates and their expected variables.',
-    'For table data with repeatable rows, pass an array of objects as the variable value.'
+    'For table data with repeatable rows, pass an array of objects as the variable value.',
+    'Use outputFormat="attachment" when you need the generated PDF file bytes. The file is returned as a Slate attachment, not inline base64.'
   ],
   constraints: [
     'Rate limit: 60 requests per minute by default.',
@@ -24,46 +33,34 @@ export let generatePdf = SlateTool.create(spec, {
         .describe(
           'Key-value pairs matching the template variables. Supports strings and arrays of objects for table rows.'
         ),
-      outputFormat: z
-        .enum(['base64', 'url'])
-        .default('base64')
-        .describe(
-          'Output format: "base64" returns the PDF as a base64-encoded string, "url" returns a temporary download URL valid for 15 minutes'
-        )
+      outputFormat: pdfDeliverySchema
     })
   )
   .output(
-    z.object({
-      base64: z
-        .string()
-        .optional()
-        .describe('Base64-encoded PDF content (when outputFormat is "base64")'),
-      downloadUrl: z
-        .string()
-        .optional()
-        .describe(
-          'Temporary download URL for the generated PDF, valid for 15 minutes (when outputFormat is "url")'
-        )
+    pdfOutputSchema.extend({
+      templateId: z.string().describe('ID of the template used to generate the PDF')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
+    let templateId = requireNonEmptyString(ctx.input.templateId, 'templateId');
 
-    let outputOption = ctx.input.outputFormat === 'url' ? ('url' as const) : ('pdf' as const);
-
-    let result = await client.generatePdf(ctx.input.templateId, ctx.input.templateData, {
-      output: outputOption
+    let result = await client.generatePdf(templateId, ctx.input.templateData, {
+      output: outputOptionForDelivery(ctx.input.outputFormat)
     });
 
+    let output = {
+      templateId,
+      ...pdfOutput(result)
+    };
+
     return {
-      output: {
-        base64: result.base64,
-        downloadUrl: result.url
-      },
+      output,
+      attachments: pdfAttachments(result),
       message:
-        ctx.input.outputFormat === 'url'
+        output.delivery === 'url'
           ? `PDF generated successfully. Download URL provided (expires in 15 minutes).`
-          : `PDF generated successfully as base64-encoded content.`
+          : `PDF generated successfully and returned as a Slate attachment (${output.byteLength} bytes).`
     };
   })
   .build();

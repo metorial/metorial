@@ -1,10 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { calComServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let availabilitySchema = z.object({
-  days: z.array(z.number()).describe('Days of the week (0=Sunday, 1=Monday, ... 6=Saturday)'),
+  days: z
+    .array(z.string())
+    .describe('Weekday names for this availability window, such as monday or friday'),
   startTime: z.string().describe('Start time in 24h format (e.g., "09:00")'),
   endTime: z.string().describe('End time in 24h format (e.g., "17:00")')
 });
@@ -18,20 +21,22 @@ let overrideSchema = z.object({
 export let manageSchedule = SlateTool.create(spec, {
   name: 'Manage Schedule',
   key: 'manage_schedule',
-  description: `Create, update, or delete an availability schedule. Schedules define when a user can be booked. Each user can have multiple schedules with one set as default. Use action "create" to make a new schedule, "update" to modify an existing one, "delete" to remove one, or "list" to view all schedules.`,
+  description: `Create, update, delete, retrieve, or list availability schedules. Schedules define when a user can be booked. Each user can have multiple schedules with one set as default.`,
   instructions: [
     'Availability times use 24-hour format (e.g., "08:00", "17:00").',
-    'Days of the week: 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday.',
+    'Availability days use weekday strings such as monday, tuesday, wednesday.',
     'Default availability is Mon-Fri 09:00-17:00 if not specified.'
   ]
 })
   .input(
     z.object({
-      action: z.enum(['list', 'create', 'update', 'delete']).describe('Action to perform'),
+      action: z
+        .enum(['list', 'get', 'get_default', 'create', 'update', 'delete'])
+        .describe('Action to perform'),
       scheduleId: z
         .number()
         .optional()
-        .describe('Schedule ID (required for update and delete)'),
+        .describe('Schedule ID (required for get, update, and delete)'),
       name: z.string().optional().describe('Name of the schedule'),
       timeZone: z
         .string()
@@ -67,7 +72,29 @@ export let manageSchedule = SlateTool.create(spec, {
           message: `Found **${list.length}** schedule(s).`
         };
       }
+      case 'get': {
+        if (!ctx.input.scheduleId) {
+          throw calComServiceError('scheduleId is required for get.');
+        }
+
+        let schedule = await client.getSchedule(ctx.input.scheduleId);
+        return {
+          output: { schedule },
+          message: `Schedule **${ctx.input.scheduleId}** retrieved.`
+        };
+      }
+      case 'get_default': {
+        let schedule = await client.getDefaultSchedule();
+        return {
+          output: { schedule },
+          message: 'Default schedule retrieved.'
+        };
+      }
       case 'create': {
+        if (!ctx.input.name) {
+          throw calComServiceError('name is required for create.');
+        }
+
         let body: Record<string, any> = {};
         if (ctx.input.name) body.name = ctx.input.name;
         if (ctx.input.timeZone) body.timeZone = ctx.input.timeZone;
@@ -81,7 +108,10 @@ export let manageSchedule = SlateTool.create(spec, {
         };
       }
       case 'update': {
-        if (!ctx.input.scheduleId) throw new Error('scheduleId is required for update');
+        if (!ctx.input.scheduleId) {
+          throw calComServiceError('scheduleId is required for update.');
+        }
+
         let body: Record<string, any> = {};
         if (ctx.input.name) body.name = ctx.input.name;
         if (ctx.input.timeZone) body.timeZone = ctx.input.timeZone;
@@ -95,7 +125,10 @@ export let manageSchedule = SlateTool.create(spec, {
         };
       }
       case 'delete': {
-        if (!ctx.input.scheduleId) throw new Error('scheduleId is required for delete');
+        if (!ctx.input.scheduleId) {
+          throw calComServiceError('scheduleId is required for delete.');
+        }
+
         let result = await client.deleteSchedule(ctx.input.scheduleId);
         return {
           output: { result },
@@ -104,6 +137,6 @@ export let manageSchedule = SlateTool.create(spec, {
       }
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw calComServiceError(`Unsupported schedule action: ${ctx.input.action}`);
   })
   .build();

@@ -8,6 +8,12 @@ export interface Api2PdfResponse {
   error?: string;
 }
 
+export interface Api2PdfFileAttachment {
+  contentBase64: string;
+  mimeType: string;
+  byteLength: number;
+}
+
 export interface ChromePdfOptions {
   delay?: number;
   scale?: number;
@@ -43,6 +49,8 @@ export interface ChromeImageOptions {
     isLandscape?: boolean;
     hasTouch?: boolean;
   };
+  puppeteerWaitForMethod?: string;
+  puppeteerWaitForValue?: string;
 }
 
 export interface StorageOptions {

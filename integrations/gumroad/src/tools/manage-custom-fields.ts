@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GumroadClient } from '../lib/client';
+import { gumroadServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let customFieldSchema = z.object({
@@ -62,7 +63,7 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!name) throw new Error('name is required for create action');
+      if (!name) throw gumroadServiceError('name is required for create action.');
       let field = await client.createCustomField(productId, {
         name,
         required: ctx.input.required
@@ -80,7 +81,7 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!name) throw new Error('name is required for update action');
+      if (!name) throw gumroadServiceError('name is required for update action.');
       let field = await client.updateCustomField(productId, name, {
         required: ctx.input.required
       });
@@ -97,7 +98,7 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!name) throw new Error('name is required for delete action');
+      if (!name) throw gumroadServiceError('name is required for delete action.');
       await client.deleteCustomField(productId, name);
       return {
         output: { deleted: true },
@@ -105,6 +106,6 @@ export let manageCustomFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw gumroadServiceError(`Unknown action: ${action}`);
   })
   .build();

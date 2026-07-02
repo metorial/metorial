@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DropboxClient } from '../lib/client';
+import { dropboxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let fileRevisions = SlateTool.create(spec, {
@@ -21,6 +22,12 @@ export let fileRevisions = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Revision ID to restore (required for "restore" action)'),
+      mode: z
+        .enum(['path', 'id'])
+        .optional()
+        .describe(
+          'For "list", whether to return revisions for the current path or stable file ID'
+        ),
       limit: z
         .number()
         .optional()
@@ -60,7 +67,11 @@ export let fileRevisions = SlateTool.create(spec, {
     let client = new DropboxClient(ctx.auth.token);
 
     if (ctx.input.action === 'list') {
-      let result = await client.listRevisions(ctx.input.path, ctx.input.limit);
+      let result = await client.listRevisions(
+        ctx.input.path,
+        ctx.input.limit,
+        ctx.input.mode ?? 'path'
+      );
       let revisions = (result.entries || []).map((entry: any) => ({
         rev: entry.rev,
         name: entry.name,
@@ -77,7 +88,9 @@ export let fileRevisions = SlateTool.create(spec, {
     }
 
     // restore
-    if (!ctx.input.rev) throw new Error('Revision ID is required for restore');
+    if (!ctx.input.rev) {
+      throw dropboxServiceError('rev is required for restore.');
+    }
     let result = await client.restoreRevision(ctx.input.path, ctx.input.rev);
 
     return {

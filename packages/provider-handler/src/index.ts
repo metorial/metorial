@@ -228,6 +228,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     let getAuthConfig = (): Record<string, any> => config.get()?.value ?? {};
 
     let getEmptyContext = () => new SlateContext({}, {}, {}, slate.spec as any, logger);
+    let getAuthContext = () =>
+      new SlateContext(getAuthConfig(), {}, {}, slate.spec as any, logger);
     let withRequestTraces = <Result extends Record<string, any>>(
       context: SlateContext<any, any, any>,
       result: Result
@@ -487,7 +489,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       }
 
       if ('getOutput' in authMethod) {
-        let context = getEmptyContext();
+        let context = getAuthContext();
         let outputRes = await traceProviderCall(
           {
             component: 'auth',
@@ -500,12 +502,22 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
               inputKeyCount: getObjectKeyCount(input)
             },
             onSuccess: result => ({
-              outputKeyCount: getObjectKeyCount(result.output)
+              outputKeyCount: getObjectKeyCount(result.output),
+              scopeCount: result.scopes?.length ?? 0
             })
           },
-          () => runWithContext(context, () => authMethod.getOutput({ input }))
+          () =>
+            runWithContext(context, () =>
+              authMethod.getOutput({
+                input,
+                config: getAuthConfig()
+              })
+            )
         );
-        return withRequestTraces(context, { output: outputRes.output });
+        return withRequestTraces(context, {
+          output: outputRes.output,
+          scopes: outputRes.scopes
+        });
       }
 
       return { output: input as any };
@@ -622,7 +634,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let authMethod = getAuthMethod(slate, params.authenticationMethodId);
 
       if (authMethod.getProfile) {
-        let context = getEmptyContext();
+        let context = getAuthContext();
         let profileRes = await traceProviderCall(
           {
             component: 'auth',
@@ -653,7 +665,9 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
               return authMethod.getProfile!({
                 output: params.output as any,
-                input: params.input
+                input: params.input,
+                scopes: params.scopes,
+                config: getAuthConfig()
               })!;
             })
         );
@@ -675,7 +689,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       let authMethod = getAuthMethod(slate, params.authenticationMethodId);
 
       if ('handleTokenRefresh' in authMethod && authMethod.handleTokenRefresh) {
-        let context = getEmptyContext();
+        let context = getAuthContext();
         let refreshRes = await traceProviderCall(
           {
             component: 'auth',
@@ -712,7 +726,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
                 input: params.input,
                 clientId: params.clientId,
                 clientSecret: params.clientSecret,
-                scopes: params.scopes
+                scopes: params.scopes,
+                config: getAuthConfig()
               });
             })
         );

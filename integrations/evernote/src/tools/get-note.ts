@@ -57,13 +57,12 @@ export let getNoteTool = SlateTool.create(spec, {
       noteStoreUrl: ctx.auth.noteStoreUrl
     });
 
-    let note = await client.getNote(
-      ctx.input.noteGuid,
-      ctx.input.includeContent ?? true,
-      false, // withResourcesData
-      false, // withResourcesRecognition
-      false // withResourcesAlternateData
-    );
+    let note = await client.getNoteWithResultSpec(ctx.input.noteGuid, {
+      includeContent: ctx.input.includeContent ?? true,
+      includeResourcesData: false,
+      includeResourcesRecognition: false,
+      includeResourcesAlternateData: false
+    });
 
     let tagNames: string[] | undefined;
     if (note.tagGuids && note.tagGuids.length > 0) {

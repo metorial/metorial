@@ -1,4 +1,6 @@
+import { ServiceError } from '@lowerdeck/error';
 import { createAxios } from 'slates';
+import { snsApiError } from './errors';
 import { signRequest } from './sigv4';
 import { parseAwsError, parseXml } from './xml-parser';
 
@@ -16,6 +18,7 @@ export interface TopicAttributes {
   kmsMasterKeyId?: string;
   fifoTopic?: boolean;
   contentBasedDeduplication?: boolean;
+  fifoThroughputScope?: string;
   tracingConfig?: string;
   archivePolicy?: string;
 }
@@ -35,6 +38,19 @@ export interface PublishParams {
   >;
 }
 
+export interface PublishBatchEntry {
+  id: string;
+  message: string;
+  subject?: string;
+  messageStructure?: string;
+  messageGroupId?: string;
+  messageDeduplicationId?: string;
+  messageAttributes?: Record<
+    string,
+    { dataType: string; stringValue?: string; binaryValue?: string }
+  >;
+}
+
 export interface SubscribeParams {
   topicArn: string;
   protocol: string;
@@ -42,6 +58,49 @@ export interface SubscribeParams {
   returnSubscriptionArn?: boolean;
   attributes?: Record<string, string>;
 }
+
+export interface Subscription {
+  subscriptionArn: string;
+  owner: string;
+  protocol: string;
+  endpoint: string;
+  topicArn: string;
+}
+
+export interface OriginationNumber {
+  createdAt?: string;
+  iso2CountryCode?: string;
+  numberCapabilities: string[];
+  phoneNumber: string;
+  routeType?: string;
+  status?: string;
+}
+
+let asArray = <T>(value: T | T[] | undefined): T[] => {
+  if (value === undefined) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+let addMessageAttributes = (
+  params: Record<string, string>,
+  prefix: string,
+  attributes?: Record<string, { dataType: string; stringValue?: string; binaryValue?: string }>
+) => {
+  if (!attributes) return;
+
+  let attrIndex = 1;
+  for (let [name, attr] of Object.entries(attributes)) {
+    params[`${prefix}.entry.${attrIndex}.Name`] = name;
+    params[`${prefix}.entry.${attrIndex}.Value.DataType`] = attr.dataType;
+    if (attr.stringValue !== undefined) {
+      params[`${prefix}.entry.${attrIndex}.Value.StringValue`] = attr.stringValue;
+    }
+    if (attr.binaryValue !== undefined) {
+      params[`${prefix}.entry.${attrIndex}.Value.BinaryValue`] = attr.binaryValue;
+    }
+    attrIndex++;
+  }
+};
 
 export class SnsClient {
   private region: string;
@@ -59,6 +118,7 @@ export class SnsClient {
   }
 
   private async request(params: Record<string, string>): Promise<Record<string, any>> {
+    let operation = params.Action || 'request';
     let allParams: Record<string, string> = {
       ...params,
       Version: '2010-03-31'
@@ -88,23 +148,40 @@ export class SnsClient {
       baseURL: this.baseUrl
     });
 
-    let response = await ax.post('/', body, {
-      headers: {
-        ...headers,
-        ...sigHeaders
-      },
-      validateStatus: () => true
-    });
+    try {
+      let response = await ax.post('/', body, {
+        headers: {
+          ...headers,
+          ...sigHeaders
+        },
+        validateStatus: () => true
+      });
 
-    let responseText =
-      typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+      let responseText =
+        typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
 
-    if (response.status >= 400) {
-      let error = parseAwsError(responseText);
-      throw new Error(`AWS SNS Error (${error.code}): ${error.message}`);
+      if (response.status >= 400) {
+        let error = parseAwsError(responseText);
+        throw snsApiError({
+          operation,
+          status: response.status,
+          code: error.code,
+          message: error.message
+        });
+      }
+
+      return parseXml(responseText);
+    } catch (error) {
+      if (error instanceof ServiceError) {
+        throw error;
+      }
+
+      throw snsApiError({
+        operation,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        parent: error
+      });
     }
-
-    return parseXml(responseText);
   }
 
   // Topic Management
@@ -151,6 +228,11 @@ export class SnsClient {
         params[`Attributes.entry.${attrIndex}.value`] = String(
           attributes.contentBasedDeduplication
         );
+        attrIndex++;
+      }
+      if (attributes.fifoThroughputScope !== undefined) {
+        params[`Attributes.entry.${attrIndex}.key`] = 'FifoThroughputScope';
+        params[`Attributes.entry.${attrIndex}.value`] = attributes.fifoThroughputScope;
         attrIndex++;
       }
       if (attributes.tracingConfig !== undefined) {
@@ -255,20 +337,7 @@ export class SnsClient {
     if (publishParams.messageDeduplicationId)
       params.MessageDeduplicationId = publishParams.messageDeduplicationId;
 
-    if (publishParams.messageAttributes) {
-      let attrIndex = 1;
-      for (let [name, attr] of Object.entries(publishParams.messageAttributes)) {
-        params[`MessageAttributes.entry.${attrIndex}.Name`] = name;
-        params[`MessageAttributes.entry.${attrIndex}.Value.DataType`] = attr.dataType;
-        if (attr.stringValue !== undefined) {
-          params[`MessageAttributes.entry.${attrIndex}.Value.StringValue`] = attr.stringValue;
-        }
-        if (attr.binaryValue !== undefined) {
-          params[`MessageAttributes.entry.${attrIndex}.Value.BinaryValue`] = attr.binaryValue;
-        }
-        attrIndex++;
-      }
-    }
+    addMessageAttributes(params, 'MessageAttributes', publishParams.messageAttributes);
 
     let result = await this.request(params);
     let publishResult = result?.PublishResponse?.PublishResult;
@@ -276,6 +345,50 @@ export class SnsClient {
     return {
       messageId: publishResult?.MessageId || '',
       sequenceNumber: publishResult?.SequenceNumber || undefined
+    };
+  }
+
+  async publishBatch(
+    topicArn: string,
+    entries: PublishBatchEntry[]
+  ): Promise<{
+    successful: Array<{ id: string; messageId: string; sequenceNumber?: string }>;
+    failed: Array<{ id: string; code: string; message?: string; senderFault: boolean }>;
+  }> {
+    let params: Record<string, string> = {
+      Action: 'PublishBatch',
+      TopicArn: topicArn
+    };
+
+    entries.forEach((entry, index) => {
+      let prefix = `PublishBatchRequestEntries.member.${index + 1}`;
+      params[`${prefix}.Id`] = entry.id;
+      params[`${prefix}.Message`] = entry.message;
+      if (entry.subject) params[`${prefix}.Subject`] = entry.subject;
+      if (entry.messageStructure)
+        params[`${prefix}.MessageStructure`] = entry.messageStructure;
+      if (entry.messageGroupId) params[`${prefix}.MessageGroupId`] = entry.messageGroupId;
+      if (entry.messageDeduplicationId) {
+        params[`${prefix}.MessageDeduplicationId`] = entry.messageDeduplicationId;
+      }
+      addMessageAttributes(params, `${prefix}.MessageAttributes`, entry.messageAttributes);
+    });
+
+    let result = await this.request(params);
+    let batchResult = result?.PublishBatchResponse?.PublishBatchResult;
+
+    return {
+      successful: asArray<any>(batchResult?.Successful).map(entry => ({
+        id: entry.Id || '',
+        messageId: entry.MessageId || '',
+        sequenceNumber: entry.SequenceNumber || undefined
+      })),
+      failed: asArray<any>(batchResult?.Failed).map(entry => ({
+        id: entry.Id || '',
+        code: entry.Code || '',
+        message: entry.Message || undefined,
+        senderFault: entry.SenderFault === true || entry.SenderFault === 'true'
+      }))
     };
   }
 
@@ -338,13 +451,7 @@ export class SnsClient {
     topicArn: string,
     nextToken?: string
   ): Promise<{
-    subscriptions: Array<{
-      subscriptionArn: string;
-      owner: string;
-      protocol: string;
-      endpoint: string;
-      topicArn: string;
-    }>;
+    subscriptions: Subscription[];
     nextToken?: string;
   }> {
     let params: Record<string, string> = {
@@ -359,13 +466,7 @@ export class SnsClient {
     let subResult = result?.ListSubscriptionsByTopicResponse?.ListSubscriptionsByTopicResult;
 
     let rawSubs = subResult?.Subscriptions;
-    let subscriptions: Array<{
-      subscriptionArn: string;
-      owner: string;
-      protocol: string;
-      endpoint: string;
-      topicArn: string;
-    }> = [];
+    let subscriptions: Subscription[] = [];
 
     if (Array.isArray(rawSubs)) {
       subscriptions = rawSubs.map((s: any) => ({
@@ -394,13 +495,7 @@ export class SnsClient {
   }
 
   async listSubscriptions(nextToken?: string): Promise<{
-    subscriptions: Array<{
-      subscriptionArn: string;
-      owner: string;
-      protocol: string;
-      endpoint: string;
-      topicArn: string;
-    }>;
+    subscriptions: Subscription[];
     nextToken?: string;
   }> {
     let params: Record<string, string> = {
@@ -414,13 +509,7 @@ export class SnsClient {
     let subResult = result?.ListSubscriptionsResponse?.ListSubscriptionsResult;
 
     let rawSubs = subResult?.Subscriptions;
-    let subscriptions: Array<{
-      subscriptionArn: string;
-      owner: string;
-      protocol: string;
-      endpoint: string;
-      topicArn: string;
-    }> = [];
+    let subscriptions: Subscription[] = [];
 
     if (Array.isArray(rawSubs)) {
       subscriptions = rawSubs.map((s: any) => ({
@@ -521,12 +610,43 @@ export class SnsClient {
 
   // SMS
 
-  async getSMSAttributes(): Promise<Record<string, string>> {
-    let result = await this.request({
+  async getSMSAttributes(attributeNames?: string[]): Promise<Record<string, string>> {
+    let params: Record<string, string> = {
       Action: 'GetSMSAttributes'
+    };
+    attributeNames?.forEach((name, index) => {
+      params[`attributes.member.${index + 1}`] = name;
     });
+
+    let result = await this.request(params);
     let attrs = result?.GetSMSAttributesResponse?.GetSMSAttributesResult?.attributes;
     return attrs || {};
+  }
+
+  async setSMSAttributes(attributes: Record<string, string>): Promise<void> {
+    let params: Record<string, string> = {
+      Action: 'SetSMSAttributes'
+    };
+
+    let attrIndex = 1;
+    for (let [key, value] of Object.entries(attributes)) {
+      params[`attributes.entry.${attrIndex}.key`] = key;
+      params[`attributes.entry.${attrIndex}.value`] = value;
+      attrIndex++;
+    }
+
+    await this.request(params);
+  }
+
+  async getSMSSandboxAccountStatus(): Promise<{ isInSandbox: boolean }> {
+    let result = await this.request({
+      Action: 'GetSMSSandboxAccountStatus'
+    });
+    let isInSandbox =
+      result?.GetSMSSandboxAccountStatusResponse?.GetSMSSandboxAccountStatusResult
+        ?.IsInSandbox;
+
+    return { isInSandbox: isInSandbox === true || isInSandbox === 'true' };
   }
 
   async checkIfPhoneNumberIsOptedOut(phoneNumber: string): Promise<boolean> {
@@ -537,6 +657,55 @@ export class SnsClient {
     let isOptedOut =
       result?.CheckIfPhoneNumberIsOptedOutResponse?.CheckIfPhoneNumberIsOptedOutResult
         ?.isOptedOut;
-    return isOptedOut === 'true';
+    return isOptedOut === true || isOptedOut === 'true';
+  }
+
+  async listPhoneNumbersOptedOut(
+    nextToken?: string
+  ): Promise<{ phoneNumbers: string[]; nextToken?: string }> {
+    let params: Record<string, string> = {
+      Action: 'ListPhoneNumbersOptedOut'
+    };
+    if (nextToken) {
+      params.nextToken = nextToken;
+    }
+
+    let result = await this.request(params);
+    let listResult = result?.ListPhoneNumbersOptedOutResponse?.ListPhoneNumbersOptedOutResult;
+
+    return {
+      phoneNumbers: asArray<string>(listResult?.phoneNumbers).filter(Boolean),
+      nextToken: listResult?.nextToken || undefined
+    };
+  }
+
+  async listOriginationNumbers(paramsInput?: {
+    maxResults?: number;
+    nextToken?: string;
+  }): Promise<{ phoneNumbers: OriginationNumber[]; nextToken?: string }> {
+    let params: Record<string, string> = {
+      Action: 'ListOriginationNumbers'
+    };
+    if (paramsInput?.maxResults !== undefined) {
+      params.MaxResults = String(paramsInput.maxResults);
+    }
+    if (paramsInput?.nextToken) {
+      params.NextToken = paramsInput.nextToken;
+    }
+
+    let result = await this.request(params);
+    let listResult = result?.ListOriginationNumbersResponse?.ListOriginationNumbersResult;
+
+    return {
+      phoneNumbers: asArray<any>(listResult?.PhoneNumbers).map(phoneNumber => ({
+        createdAt: phoneNumber.CreatedAt || undefined,
+        iso2CountryCode: phoneNumber.Iso2CountryCode || undefined,
+        numberCapabilities: asArray<string>(phoneNumber.NumberCapabilities).filter(Boolean),
+        phoneNumber: phoneNumber.PhoneNumber || '',
+        routeType: phoneNumber.RouteType || undefined,
+        status: phoneNumber.Status || undefined
+      })),
+      nextToken: listResult?.NextToken || undefined
+    };
   }
 }

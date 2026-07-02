@@ -24,6 +24,7 @@ export let listTrainings = SlateTool.create(spec, {
           model: z.string().optional().describe('Base model'),
           version: z.string().optional().describe('Base model version'),
           status: z.string().describe('Training status'),
+          source: z.enum(['api', 'web']).optional().describe('How the training was created'),
           createdAt: z.string().describe('Creation timestamp'),
           completedAt: z.string().optional().nullable().describe('Completion timestamp')
         })
@@ -40,6 +41,7 @@ export let listTrainings = SlateTool.create(spec, {
       model: t.model,
       version: t.version,
       status: t.status,
+      source: t.source,
       createdAt: t.created_at,
       completedAt: t.completed_at
     }));

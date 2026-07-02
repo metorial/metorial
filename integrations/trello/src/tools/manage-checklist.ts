@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TrelloClient } from '../lib/client';
+import { requireAtLeastOneTrelloField, requireTrelloString } from '../lib/errors';
 import { spec } from '../spec';
 
 let checkItemSchema = z.object({
@@ -81,7 +82,8 @@ export let manageChecklist = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'get') {
-      let rawChecklists = await client.getChecklists(ctx.input.cardId!);
+      let cardId = requireTrelloString(ctx.input.cardId, 'cardId', action);
+      let rawChecklists = await client.getChecklists(cardId);
       let checklists = rawChecklists.map((cl: any) => ({
         checklistId: cl.id,
         name: cl.name,
@@ -101,11 +103,9 @@ export let manageChecklist = SlateTool.create(spec, {
     }
 
     if (action === 'create_checklist') {
-      let cl = await client.createChecklist(
-        ctx.input.cardId!,
-        ctx.input.name!,
-        ctx.input.position
-      );
+      let cardId = requireTrelloString(ctx.input.cardId, 'cardId', action);
+      let name = requireTrelloString(ctx.input.name, 'name', action);
+      let cl = await client.createChecklist(cardId, name, ctx.input.position);
       return {
         output: {
           checklist: {
@@ -119,17 +119,24 @@ export let manageChecklist = SlateTool.create(spec, {
     }
 
     if (action === 'delete_checklist') {
-      await client.deleteChecklist(ctx.input.checklistId!);
+      let checklistId = requireTrelloString(ctx.input.checklistId, 'checklistId', action);
+      await client.deleteChecklist(checklistId);
       return {
         output: {},
-        message: `Deleted checklist \`${ctx.input.checklistId}\`.`
+        message: `Deleted checklist \`${checklistId}\`.`
       };
     }
 
     if (action === 'add_item') {
+      let checklistId = requireTrelloString(ctx.input.checklistId, 'checklistId', action);
+      let itemName = requireTrelloString(
+        ctx.input.itemName || ctx.input.name,
+        'itemName',
+        action
+      );
       let item = await client.addCheckItem(
-        ctx.input.checklistId!,
-        ctx.input.itemName || ctx.input.name!,
+        checklistId,
+        itemName,
         undefined,
         ctx.input.position
       );
@@ -147,16 +154,24 @@ export let manageChecklist = SlateTool.create(spec, {
     }
 
     if (action === 'update_item') {
+      let cardId = requireTrelloString(ctx.input.cardId, 'cardId', action);
+      let checkItemId = requireTrelloString(ctx.input.checkItemId, 'checkItemId', action);
+      requireAtLeastOneTrelloField(
+        {
+          name: ctx.input.name,
+          state: ctx.input.state,
+          position: ctx.input.position
+        },
+        'check item field to update',
+        action
+      );
+
       let updateData: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
       if (ctx.input.state !== undefined) updateData.state = ctx.input.state;
       if (ctx.input.position !== undefined) updateData.pos = ctx.input.position;
 
-      let item = await client.updateCheckItem(
-        ctx.input.cardId!,
-        ctx.input.checkItemId!,
-        updateData
-      );
+      let item = await client.updateCheckItem(cardId, checkItemId, updateData);
       return {
         output: {
           checkItem: {
@@ -171,10 +186,12 @@ export let manageChecklist = SlateTool.create(spec, {
     }
 
     // delete_item
-    await client.deleteCheckItem(ctx.input.checklistId!, ctx.input.checkItemId!);
+    let checklistId = requireTrelloString(ctx.input.checklistId, 'checklistId', action);
+    let checkItemId = requireTrelloString(ctx.input.checkItemId, 'checkItemId', action);
+    await client.deleteCheckItem(checklistId, checkItemId);
     return {
       output: {},
-      message: `Deleted check item \`${ctx.input.checkItemId}\`.`
+      message: `Deleted check item \`${checkItemId}\`.`
     };
   })
   .build();

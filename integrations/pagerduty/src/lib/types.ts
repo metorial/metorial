@@ -74,9 +74,27 @@ export interface PagerDutyIntegration {
   self?: string;
   html_url?: string;
   name?: string;
+  created_at?: string;
   integration_key?: string;
   integration_email?: string;
+  email_incident_creation?: string;
+  email_filter_mode?: string;
+  service?: PagerDutyReference;
   vendor?: PagerDutyReference;
+}
+
+export interface PagerDutyBusinessService {
+  id: string;
+  type: string;
+  summary?: string;
+  self?: string;
+  html_url?: string;
+  name?: string;
+  description?: string | null;
+  point_of_contact?: string | null;
+  team?: PagerDutyReference | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PagerDutyUser {

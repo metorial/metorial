@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'midjourney',
   name: 'Midjourney',
   description:
-    'Generate images from text prompts, create variations, upscale, blend images, and describe images using Midjourney via unofficial third-party API providers.',
+    'Generate and edit Midjourney images, create and extend short videos, fetch asynchronous tasks, and inspect APIFRAME account credits via APIFRAME.',
   metadata: {},
   config,
   auth

@@ -7,35 +7,42 @@ import { spec } from '../spec';
 export let getDocumentTool = SlateTool.create(spec, {
   name: 'Get Document',
   key: 'get_document',
-  description: `Retrieve one or more documents by ID from an Elasticsearch index. Supports fetching a single document or multiple documents across indices using multi-get.`,
+  description: `Retrieve one or more known Elasticsearch documents by ID. This tool is for direct document ID lookups only; use search_documents for Query DSL searches, size limits, sorting, filtering, and unknown document discovery.`,
+  instructions: [
+    'Use documentId with indexName when the exact document ID is known',
+    'Use documentIds with indexName or documents for multi-get by known IDs',
+    'Do not pass Query DSL, size, sort, or pagination fields here; use search_documents for those search-shaped requests'
+  ],
   tags: {
     destructive: false,
     readOnly: true
   }
 })
   .input(
-    z.object({
-      indexName: z
-        .string()
-        .optional()
-        .describe(
-          'Name of the index to retrieve the document from. Required for documentId and documentIds requests'
-        ),
-      documentId: z.string().optional().describe('ID of a single document to retrieve'),
-      documentIds: z
-        .array(z.string())
-        .optional()
-        .describe('Array of document IDs for multi-get from indexName'),
-      documents: z
-        .array(
-          z.object({
-            indexName: z.string().describe('Index containing this document'),
-            documentId: z.string().describe('Document ID to retrieve')
-          })
-        )
-        .optional()
-        .describe('Documents to retrieve across one or more indices')
-    })
+    z
+      .object({
+        indexName: z
+          .string()
+          .optional()
+          .describe(
+            'Name of the index to retrieve the document from. Required for documentId and documentIds requests'
+          ),
+        documentId: z.string().optional().describe('ID of a single document to retrieve'),
+        documentIds: z
+          .array(z.string())
+          .optional()
+          .describe('Array of document IDs for multi-get from indexName'),
+        documents: z
+          .array(
+            z.object({
+              indexName: z.string().describe('Index containing this document'),
+              documentId: z.string().describe('Document ID to retrieve')
+            })
+          )
+          .optional()
+          .describe('Documents to retrieve across one or more indices')
+      })
+      .strict()
   )
   .output(
     z.object({

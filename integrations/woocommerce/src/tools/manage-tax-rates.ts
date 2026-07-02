@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { woocommerceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -86,7 +87,7 @@ export let manageTaxRates = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.taxRateId) throw new Error('taxRateId is required');
+      if (!ctx.input.taxRateId) throw woocommerceServiceError('taxRateId is required');
       let rate = await client.getTaxRate(ctx.input.taxRateId);
       return {
         output: { taxRate: mapTaxRate(rate) },
@@ -115,7 +116,7 @@ export let manageTaxRates = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.taxRateId) throw new Error('taxRateId is required');
+      if (!ctx.input.taxRateId) throw woocommerceServiceError('taxRateId is required');
 
       let data: Record<string, any> = {};
       if (ctx.input.country) data.country = ctx.input.country;
@@ -137,7 +138,7 @@ export let manageTaxRates = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.taxRateId) throw new Error('taxRateId is required');
+      if (!ctx.input.taxRateId) throw woocommerceServiceError('taxRateId is required');
       await client.deleteTaxRate(ctx.input.taxRateId, ctx.input.force);
       return {
         output: { deleted: true },
@@ -157,7 +158,7 @@ export let manageTaxRates = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw woocommerceServiceError(`Unknown action: ${action}`);
   })
   .build();
 

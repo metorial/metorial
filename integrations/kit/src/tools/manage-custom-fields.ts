@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { kitServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageCustomFields = SlateTool.create(spec, {
@@ -67,7 +68,9 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.label) throw new Error('Label is required for create');
+      if (!ctx.input.label) {
+        throw kitServiceError('Label is required for create');
+      }
       let data = await client.createCustomField(ctx.input.label);
       let f = data.custom_field;
       return {
@@ -83,8 +86,12 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.customFieldId) throw new Error('Custom field ID is required for update');
-      if (!ctx.input.label) throw new Error('Label is required for update');
+      if (!ctx.input.customFieldId) {
+        throw kitServiceError('Custom field ID is required for update');
+      }
+      if (!ctx.input.label) {
+        throw kitServiceError('Label is required for update');
+      }
       let data = await client.updateCustomField(ctx.input.customFieldId, ctx.input.label);
       let f = data.custom_field;
       return {
@@ -100,7 +107,9 @@ export let manageCustomFields = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.customFieldId) throw new Error('Custom field ID is required for delete');
+      if (!ctx.input.customFieldId) {
+        throw kitServiceError('Custom field ID is required for delete');
+      }
       await client.deleteCustomField(ctx.input.customFieldId);
       return {
         output: { deleted: true },
@@ -108,6 +117,6 @@ export let manageCustomFields = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw kitServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

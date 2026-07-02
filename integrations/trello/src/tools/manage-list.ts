@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TrelloClient } from '../lib/client';
+import { requireAtLeastOneTrelloField, requireTrelloString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageList = SlateTool.create(spec, {
@@ -39,9 +40,11 @@ export let manageList = SlateTool.create(spec, {
     let client = new TrelloClient({ apiKey: ctx.auth.apiKey, token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
+      let name = requireTrelloString(ctx.input.name, 'name', ctx.input.action);
+      let boardId = requireTrelloString(ctx.input.boardId, 'boardId', ctx.input.action);
       let list = await client.createList({
-        name: ctx.input.name!,
-        idBoard: ctx.input.boardId!,
+        name,
+        idBoard: boardId,
         pos: ctx.input.position
       });
 
@@ -57,12 +60,23 @@ export let manageList = SlateTool.create(spec, {
       };
     }
 
+    let listId = requireTrelloString(ctx.input.listId, 'listId', ctx.input.action);
+    requireAtLeastOneTrelloField(
+      {
+        name: ctx.input.name,
+        closed: ctx.input.closed,
+        position: ctx.input.position
+      },
+      'list field to update',
+      ctx.input.action
+    );
+
     let updateData: Record<string, any> = {};
     if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
     if (ctx.input.closed !== undefined) updateData.closed = ctx.input.closed;
     if (ctx.input.position !== undefined) updateData.pos = ctx.input.position;
 
-    let list = await client.updateList(ctx.input.listId!, updateData);
+    let list = await client.updateList(listId, updateData);
 
     return {
       output: {

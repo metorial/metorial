@@ -1,111 +1,179 @@
-import { createAxios } from 'slates';
+import { Buffer } from 'node:buffer';
+import { createAxios, requestAxios, requestAxiosData } from 'slates';
+import { replicateApiError } from './errors';
 
 let axios = createAxios({
   baseURL: 'https://api.replicate.com/v1'
 });
 
+type PredictionParams = {
+  input: Record<string, any>;
+  webhook?: string;
+  webhookEventsFilter?: string[];
+  waitSeconds?: number;
+  cancelAfter?: string;
+  stream?: boolean;
+};
+
+type FileUploadParams = {
+  filename: string;
+  contentType?: string;
+  contentBase64?: string;
+  contentText?: string;
+  metadata?: Record<string, any>;
+};
+
+let encodeSegment = (value: string) => encodeURIComponent(value);
+
+let paginationParams = (params?: { cursor?: string }) =>
+  params?.cursor ? { cursor: params.cursor } : undefined;
+
+let appendDefined = (body: Record<string, any>, values: Record<string, any>) => {
+  for (let [key, value] of Object.entries(values)) {
+    if (value !== undefined) {
+      body[key] = value;
+    }
+  }
+};
+
+let toBuffer = (value: unknown) => {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof ArrayBuffer) return Buffer.from(value);
+  if (ArrayBuffer.isView(value)) {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (typeof value === 'string') return Buffer.from(value, 'binary');
+  return Buffer.from([]);
+};
+
 export class Client {
   private headers: Record<string, string>;
+  private authHeaders: Record<string, string>;
 
   constructor(config: { token: string }) {
+    this.authHeaders = {
+      Authorization: `Bearer ${config.token}`
+    };
     this.headers = {
-      Authorization: `Bearer ${config.token}`,
+      ...this.authHeaders,
       'Content-Type': 'application/json'
     };
   }
 
-  // ─── Account ───
+  private async request<T = any>(operation: string, config: Record<string, any>): Promise<T> {
+    return await requestAxiosData<T>(
+      operation,
+      () => axios.request(config),
+      replicateApiError
+    );
+  }
+
+  private async requestRaw(operation: string, config: Record<string, any>): Promise<any> {
+    return await requestAxios(operation, () => axios.request(config), replicateApiError);
+  }
+
+  private predictionHeaders(params: Pick<PredictionParams, 'waitSeconds' | 'cancelAfter'>) {
+    let headers = { ...this.headers };
+
+    if (params.waitSeconds !== undefined) {
+      headers.Prefer = `wait=${params.waitSeconds}`;
+    }
+    if (params.cancelAfter !== undefined) {
+      headers['Cancel-After'] = params.cancelAfter;
+    }
+
+    return headers;
+  }
+
+  private predictionBody(params: PredictionParams & { version?: string }) {
+    let body: Record<string, any> = { input: params.input };
+
+    appendDefined(body, {
+      version: params.version,
+      webhook: params.webhook,
+      webhook_events_filter: params.webhookEventsFilter,
+      stream: params.stream
+    });
+
+    return body;
+  }
+
+  // Account
 
   async getAccount() {
-    let response = await axios.get('/account', { headers: this.headers });
-    return response.data;
-  }
-
-  // ─── Predictions ───
-
-  async createPrediction(params: {
-    version?: string;
-    model?: string;
-    input: Record<string, any>;
-    webhook?: string;
-    webhookEventsFilter?: string[];
-    stream?: boolean;
-  }) {
-    let body: Record<string, any> = { input: params.input };
-    if (params.version) body.version = params.version;
-    if (params.model) body.model = params.model;
-    if (params.webhook) body.webhook = params.webhook;
-    if (params.webhookEventsFilter) body.webhook_events_filter = params.webhookEventsFilter;
-    if (params.stream !== undefined) body.stream = params.stream;
-
-    let response = await axios.post('/predictions', body, { headers: this.headers });
-    return response.data;
-  }
-
-  async createModelPrediction(
-    owner: string,
-    name: string,
-    params: {
-      input: Record<string, any>;
-      webhook?: string;
-      webhookEventsFilter?: string[];
-      stream?: boolean;
-    }
-  ) {
-    let body: Record<string, any> = { input: params.input };
-    if (params.webhook) body.webhook = params.webhook;
-    if (params.webhookEventsFilter) body.webhook_events_filter = params.webhookEventsFilter;
-    if (params.stream !== undefined) body.stream = params.stream;
-
-    let response = await axios.post(`/models/${owner}/${name}/predictions`, body, {
+    return await this.request('get account', {
+      method: 'get',
+      url: '/account',
       headers: this.headers
     });
-    return response.data;
   }
 
-  async createDeploymentPrediction(
-    owner: string,
-    name: string,
-    params: {
-      input: Record<string, any>;
-      webhook?: string;
-      webhookEventsFilter?: string[];
-      stream?: boolean;
-    }
-  ) {
-    let body: Record<string, any> = { input: params.input };
-    if (params.webhook) body.webhook = params.webhook;
-    if (params.webhookEventsFilter) body.webhook_events_filter = params.webhookEventsFilter;
-    if (params.stream !== undefined) body.stream = params.stream;
+  // Predictions
 
-    let response = await axios.post(`/deployments/${owner}/${name}/predictions`, body, {
-      headers: this.headers
+  async createPrediction(params: PredictionParams & { version: string }) {
+    return await this.request('create prediction', {
+      method: 'post',
+      url: '/predictions',
+      data: this.predictionBody(params),
+      headers: this.predictionHeaders(params)
     });
-    return response.data;
+  }
+
+  async createModelPrediction(owner: string, name: string, params: PredictionParams) {
+    return await this.request('create model prediction', {
+      method: 'post',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}/predictions`,
+      data: this.predictionBody(params),
+      headers: this.predictionHeaders(params)
+    });
+  }
+
+  async createDeploymentPrediction(owner: string, name: string, params: PredictionParams) {
+    return await this.request('create deployment prediction', {
+      method: 'post',
+      url: `/deployments/${encodeSegment(owner)}/${encodeSegment(name)}/predictions`,
+      data: this.predictionBody(params),
+      headers: this.predictionHeaders(params)
+    });
   }
 
   async getPrediction(predictionId: string) {
-    let response = await axios.get(`/predictions/${predictionId}`, { headers: this.headers });
-    return response.data;
+    return await this.request('get prediction', {
+      method: 'get',
+      url: `/predictions/${encodeSegment(predictionId)}`,
+      headers: this.headers
+    });
   }
 
-  async listPredictions(params?: { cursor?: string }) {
-    let url = '/predictions';
-    if (params?.cursor) url += `?cursor=${params.cursor}`;
-    let response = await axios.get(url, { headers: this.headers });
-    return response.data;
+  async listPredictions(params?: {
+    cursor?: string;
+    createdAfter?: string;
+    createdBefore?: string;
+    source?: 'api' | 'web';
+  }) {
+    return await this.request('list predictions', {
+      method: 'get',
+      url: '/predictions',
+      params: {
+        cursor: params?.cursor,
+        created_after: params?.createdAfter,
+        created_before: params?.createdBefore,
+        source: params?.source
+      },
+      headers: this.headers
+    });
   }
 
   async cancelPrediction(predictionId: string) {
-    let response = await axios.post(
-      `/predictions/${predictionId}/cancel`,
-      {},
-      { headers: this.headers }
-    );
-    return response.data;
+    return await this.request('cancel prediction', {
+      method: 'post',
+      url: `/predictions/${encodeSegment(predictionId)}/cancel`,
+      data: {},
+      headers: this.headers
+    });
   }
 
-  // ─── Models ───
+  // Models
 
   async createModel(params: {
     owner: string;
@@ -124,26 +192,45 @@ export class Client {
       visibility: params.visibility,
       hardware: params.hardware
     };
-    if (params.description) body.description = params.description;
-    if (params.githubUrl) body.github_url = params.githubUrl;
-    if (params.paperUrl) body.paper_url = params.paperUrl;
-    if (params.licenseUrl) body.license_url = params.licenseUrl;
-    if (params.coverImageUrl) body.cover_image_url = params.coverImageUrl;
+    appendDefined(body, {
+      description: params.description,
+      github_url: params.githubUrl,
+      paper_url: params.paperUrl,
+      license_url: params.licenseUrl,
+      cover_image_url: params.coverImageUrl
+    });
 
-    let response = await axios.post('/models', body, { headers: this.headers });
-    return response.data;
+    return await this.request('create model', {
+      method: 'post',
+      url: '/models',
+      data: body,
+      headers: this.headers
+    });
   }
 
   async getModel(owner: string, name: string) {
-    let response = await axios.get(`/models/${owner}/${name}`, { headers: this.headers });
-    return response.data;
+    return await this.request('get model', {
+      method: 'get',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}`,
+      headers: this.headers
+    });
   }
 
-  async listModels(params?: { cursor?: string }) {
-    let url = '/models';
-    if (params?.cursor) url += `?cursor=${params.cursor}`;
-    let response = await axios.get(url, { headers: this.headers });
-    return response.data;
+  async listModels(params?: {
+    cursor?: string;
+    sortBy?: 'model_created_at' | 'latest_version_created_at';
+    sortDirection?: 'asc' | 'desc';
+  }) {
+    return await this.request('list models', {
+      method: 'get',
+      url: '/models',
+      params: {
+        cursor: params?.cursor,
+        sort_by: params?.sortBy,
+        sort_direction: params?.sortDirection
+      },
+      headers: this.headers
+    });
   }
 
   async updateModel(
@@ -156,47 +243,86 @@ export class Client {
       paperUrl?: string;
       licenseUrl?: string;
       coverImageUrl?: string;
+      weightsUrl?: string;
     }
   ) {
     let body: Record<string, any> = {};
-    if (params.description !== undefined) body.description = params.description;
-    if (params.readme !== undefined) body.readme = params.readme;
-    if (params.githubUrl !== undefined) body.github_url = params.githubUrl;
-    if (params.paperUrl !== undefined) body.paper_url = params.paperUrl;
-    if (params.licenseUrl !== undefined) body.license_url = params.licenseUrl;
-    if (params.coverImageUrl !== undefined) body.cover_image_url = params.coverImageUrl;
+    appendDefined(body, {
+      description: params.description,
+      readme: params.readme,
+      github_url: params.githubUrl,
+      paper_url: params.paperUrl,
+      license_url: params.licenseUrl,
+      cover_image_url: params.coverImageUrl,
+      weights_url: params.weightsUrl
+    });
 
-    let response = await axios.patch(`/models/${owner}/${name}`, body, {
+    return await this.request('update model', {
+      method: 'patch',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}`,
+      data: body,
       headers: this.headers
     });
-    return response.data;
   }
 
   async deleteModel(owner: string, name: string) {
-    await axios.delete(`/models/${owner}/${name}`, { headers: this.headers });
+    await this.request('delete model', {
+      method: 'delete',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}`,
+      headers: this.headers
+    });
   }
 
   async listModelVersions(owner: string, name: string, params?: { cursor?: string }) {
-    let url = `/models/${owner}/${name}/versions`;
-    if (params?.cursor) url += `?cursor=${params.cursor}`;
-    let response = await axios.get(url, { headers: this.headers });
-    return response.data;
+    return await this.request('list model versions', {
+      method: 'get',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}/versions`,
+      params: paginationParams(params),
+      headers: this.headers
+    });
   }
 
   async getModelVersion(owner: string, name: string, versionId: string) {
-    let response = await axios.get(`/models/${owner}/${name}/versions/${versionId}`, {
+    return await this.request('get model version', {
+      method: 'get',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}/versions/${encodeSegment(
+        versionId
+      )}`,
       headers: this.headers
     });
-    return response.data;
   }
 
   async deleteModelVersion(owner: string, name: string, versionId: string) {
-    await axios.delete(`/models/${owner}/${name}/versions/${versionId}`, {
+    await this.request('delete model version', {
+      method: 'delete',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}/versions/${encodeSegment(
+        versionId
+      )}`,
       headers: this.headers
     });
   }
 
-  // ─── Trainings ───
+  async listModelExamples(owner: string, name: string, params?: { cursor?: string }) {
+    return await this.request('list model examples', {
+      method: 'get',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}/examples`,
+      params: paginationParams(params),
+      headers: this.headers
+    });
+  }
+
+  async getModelReadme(owner: string, name: string) {
+    return await this.request<string>('get model readme', {
+      method: 'get',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}/readme`,
+      headers: {
+        ...this.authHeaders,
+        Accept: 'text/plain'
+      }
+    });
+  }
+
+  // Trainings
 
   async createTraining(
     owner: string,
@@ -213,34 +339,48 @@ export class Client {
       destination: params.destination,
       input: params.input
     };
-    if (params.webhook) body.webhook = params.webhook;
-    if (params.webhookEventsFilter) body.webhook_events_filter = params.webhookEventsFilter;
+    appendDefined(body, {
+      webhook: params.webhook,
+      webhook_events_filter: params.webhookEventsFilter
+    });
 
-    let response = await axios.post(
-      `/models/${owner}/${name}/versions/${versionId}/trainings`,
-      body,
-      { headers: this.headers }
-    );
-    return response.data;
+    return await this.request('create training', {
+      method: 'post',
+      url: `/models/${encodeSegment(owner)}/${encodeSegment(name)}/versions/${encodeSegment(
+        versionId
+      )}/trainings`,
+      data: body,
+      headers: this.headers
+    });
   }
 
   async getTraining(trainingId: string) {
-    let response = await axios.get(`/trainings/${trainingId}`, { headers: this.headers });
-    return response.data;
+    return await this.request('get training', {
+      method: 'get',
+      url: `/trainings/${encodeSegment(trainingId)}`,
+      headers: this.headers
+    });
   }
 
   async listTrainings(params?: { cursor?: string }) {
-    let url = '/trainings';
-    if (params?.cursor) url += `?cursor=${params.cursor}`;
-    let response = await axios.get(url, { headers: this.headers });
-    return response.data;
+    return await this.request('list trainings', {
+      method: 'get',
+      url: '/trainings',
+      params: paginationParams(params),
+      headers: this.headers
+    });
   }
 
   async cancelTraining(trainingId: string) {
-    await axios.post(`/trainings/${trainingId}/cancel`, {}, { headers: this.headers });
+    return await this.request('cancel training', {
+      method: 'post',
+      url: `/trainings/${encodeSegment(trainingId)}/cancel`,
+      data: {},
+      headers: this.headers
+    });
   }
 
-  // ─── Deployments ───
+  // Deployments
 
   async createDeployment(params: {
     name: string;
@@ -258,20 +398,30 @@ export class Client {
       min_instances: params.minInstances,
       max_instances: params.maxInstances
     };
-    let response = await axios.post('/deployments', body, { headers: this.headers });
-    return response.data;
+
+    return await this.request('create deployment', {
+      method: 'post',
+      url: '/deployments',
+      data: body,
+      headers: this.headers
+    });
   }
 
   async getDeployment(owner: string, name: string) {
-    let response = await axios.get(`/deployments/${owner}/${name}`, { headers: this.headers });
-    return response.data;
+    return await this.request('get deployment', {
+      method: 'get',
+      url: `/deployments/${encodeSegment(owner)}/${encodeSegment(name)}`,
+      headers: this.headers
+    });
   }
 
   async listDeployments(params?: { cursor?: string }) {
-    let url = '/deployments';
-    if (params?.cursor) url += `?cursor=${params.cursor}`;
-    let response = await axios.get(url, { headers: this.headers });
-    return response.data;
+    return await this.request('list deployments', {
+      method: 'get',
+      url: '/deployments',
+      params: paginationParams(params),
+      headers: this.headers
+    });
   }
 
   async updateDeployment(
@@ -285,73 +435,151 @@ export class Client {
     }
   ) {
     let body: Record<string, any> = {};
-    if (params.version !== undefined) body.version = params.version;
-    if (params.hardware !== undefined) body.hardware = params.hardware;
-    if (params.minInstances !== undefined) body.min_instances = params.minInstances;
-    if (params.maxInstances !== undefined) body.max_instances = params.maxInstances;
+    appendDefined(body, {
+      version: params.version,
+      hardware: params.hardware,
+      min_instances: params.minInstances,
+      max_instances: params.maxInstances
+    });
 
-    let response = await axios.patch(`/deployments/${owner}/${name}`, body, {
+    return await this.request('update deployment', {
+      method: 'patch',
+      url: `/deployments/${encodeSegment(owner)}/${encodeSegment(name)}`,
+      data: body,
       headers: this.headers
     });
-    return response.data;
   }
 
   async deleteDeployment(owner: string, name: string) {
-    await axios.delete(`/deployments/${owner}/${name}`, { headers: this.headers });
+    await this.request('delete deployment', {
+      method: 'delete',
+      url: `/deployments/${encodeSegment(owner)}/${encodeSegment(name)}`,
+      headers: this.headers
+    });
   }
 
-  // ─── Collections ───
+  // Collections
 
   async listCollections(params?: { cursor?: string }) {
-    let url = '/collections';
-    if (params?.cursor) url += `?cursor=${params.cursor}`;
-    let response = await axios.get(url, { headers: this.headers });
-    return response.data;
+    return await this.request('list collections', {
+      method: 'get',
+      url: '/collections',
+      params: paginationParams(params),
+      headers: this.headers
+    });
   }
 
   async getCollection(slug: string) {
-    let response = await axios.get(`/collections/${slug}`, { headers: this.headers });
-    return response.data;
+    return await this.request('get collection', {
+      method: 'get',
+      url: `/collections/${encodeSegment(slug)}`,
+      headers: this.headers
+    });
   }
 
-  // ─── Files ───
+  // Files
+
+  async createFile(params: FileUploadParams) {
+    let contentType = params.contentType ?? 'application/octet-stream';
+    let form = new FormData();
+    let content =
+      params.contentBase64 !== undefined
+        ? Buffer.from(params.contentBase64, 'base64')
+        : (params.contentText ?? '');
+
+    form.append('content', new Blob([content], { type: contentType }), params.filename);
+    form.append('filename', params.filename);
+    form.append('type', contentType);
+
+    if (params.metadata !== undefined) {
+      form.append('metadata', JSON.stringify(params.metadata));
+    }
+
+    return await this.request('create file', {
+      method: 'post',
+      url: '/files',
+      data: form,
+      headers: this.authHeaders
+    });
+  }
 
   async listFiles(params?: { cursor?: string }) {
-    let url = '/files';
-    if (params?.cursor) url += `?cursor=${params.cursor}`;
-    let response = await axios.get(url, { headers: this.headers });
-    return response.data;
+    return await this.request('list files', {
+      method: 'get',
+      url: '/files',
+      params: paginationParams(params),
+      headers: this.headers
+    });
   }
 
   async getFile(fileId: string) {
-    let response = await axios.get(`/files/${fileId}`, { headers: this.headers });
-    return response.data;
+    return await this.request('get file', {
+      method: 'get',
+      url: `/files/${encodeSegment(fileId)}`,
+      headers: this.headers
+    });
+  }
+
+  async downloadFile(
+    fileId: string,
+    params: { owner: string; expiry: string; signature: string }
+  ) {
+    let response = await this.requestRaw('download file', {
+      method: 'get',
+      url: `/files/${encodeSegment(fileId)}/download`,
+      params,
+      headers: this.authHeaders,
+      responseType: 'arraybuffer'
+    });
+    let contentType =
+      response.headers?.['content-type'] ??
+      response.headers?.get?.('content-type') ??
+      'application/octet-stream';
+    let buffer = toBuffer(response.data);
+
+    return {
+      contentBase64: buffer.toString('base64'),
+      contentType,
+      size: buffer.byteLength
+    };
   }
 
   async deleteFile(fileId: string) {
-    await axios.delete(`/files/${fileId}`, { headers: this.headers });
+    await this.request('delete file', {
+      method: 'delete',
+      url: `/files/${encodeSegment(fileId)}`,
+      headers: this.headers
+    });
   }
 
-  // ─── Hardware ───
+  // Hardware
 
   async listHardware() {
-    let response = await axios.get('/hardware', { headers: this.headers });
-    return response.data;
+    return await this.request('list hardware', {
+      method: 'get',
+      url: '/hardware',
+      headers: this.headers
+    });
   }
 
-  // ─── Search ───
+  // Search
 
   async search(query: string, limit?: number) {
-    let url = `/search?query=${encodeURIComponent(query)}`;
-    if (limit) url += `&limit=${limit}`;
-    let response = await axios.get(url, { headers: this.headers });
-    return response.data;
+    return await this.request('search', {
+      method: 'get',
+      url: '/search',
+      params: { query, limit },
+      headers: this.headers
+    });
   }
 
-  // ─── Webhooks ───
+  // Webhooks
 
   async getWebhookSigningSecret() {
-    let response = await axios.get('/webhooks/default/secret', { headers: this.headers });
-    return response.data;
+    return await this.request('get webhook signing secret', {
+      method: 'get',
+      url: '/webhooks/default/secret',
+      headers: this.headers
+    });
   }
 }

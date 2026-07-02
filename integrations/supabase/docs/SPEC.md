@@ -29,17 +29,25 @@ The Management API at `https://api.supabase.com/v1/` supports two authentication
 
 ### 2. Project Data API (accessing a specific project's database, auth, storage, etc.)
 
-Each Supabase project exposes APIs at `https://<project_ref>.supabase.co/`. There are 4 types of API keys: anon and service*role keys are based on the project's JWT secret. Supabase is transitioning to new `publishable` and `secret` key types (prefixed `sb_publishable*`and`sb*secret*`).
+Each Supabase project exposes APIs at `https://<project_ref>.supabase.co/`. There are four API key families: legacy `anon` and `service_role` keys based on the project's JWT secret, plus newer `publishable` and `secret` keys.
 
-- **Anon / Publishable key**: Safe to use client-side, subject to Row Level Security (RLS) policies.
-- **Service Role / Secret key**: Bypasses RLS, must be kept server-side only.
+- **Anon / publishable key**: Safe to use client-side, subject to Row Level Security (RLS) policies.
+- **Service role / secret key**: Bypasses RLS, must be kept server-side only.
 - Keys are passed via the `apikey` header, and user JWTs (from Supabase Auth) are passed via the `Authorization: Bearer <jwt>` header.
+- Management API key retrieval supports revealing key material when the caller is authorized; otherwise key metadata such as key ID, type, prefix, and creation time may be returned without the secret value.
 
 ## Features
 
 ### Database (Auto-generated REST & GraphQL API)
 
-Supabase auto-generates an API directly from your database schema allowing you to connect to your database through a RESTful interface. This supports full CRUD operations (insert, select, update, delete, upsert) with filtering, ordering, and pagination. Fast GraphQL APIs are also available using a custom Postgres GraphQL extension. Data access is governed by Row Level Security policies tied to the authenticated user.
+Supabase auto-generates an API directly from your database schema allowing you to connect to your database through a RESTful interface. This supports full CRUD operations (insert, select, update, delete, upsert) with filtering, ordering, and pagination. Data access is governed by Row Level Security policies tied to the authenticated user.
+
+The Management API can also generate database development artifacts:
+
+- PostgREST OpenAPI schema for a selected database schema.
+- TypeScript database types for selected schemas.
+
+Generated artifacts are returned as Slate attachments rather than inline file fields.
 
 ### Authentication & User Management
 
@@ -47,7 +55,15 @@ Users can authenticate via password, magic link, one-time password (OTP), social
 
 ### File Storage
 
-Store, organize, transform, and serve large files—fully integrated with your Postgres database with Row Level Security access policies. Storage also supports interaction via the S3 protocol. Files are organized in buckets and can be managed (upload, download, list, delete) via the Storage API.
+Store, organize, transform, and serve large files, fully integrated with your Postgres database with Row Level Security access policies. Storage also supports interaction via the S3 protocol. Files are organized in buckets and can be managed via the Storage API.
+
+The integration supports high-value object operations:
+
+- List and search objects by bucket and prefix.
+- Inspect object metadata.
+- Upload and update text or base64 content.
+- Download objects as Slate attachments.
+- Move, copy, delete, and generate public or signed URLs.
 
 ### Realtime
 
@@ -61,11 +77,13 @@ Realtime must be explicitly enabled per table via replication settings. To recei
 
 ### Edge Functions
 
-Edge Functions are server-side TypeScript functions, distributed globally at the edge—close to your users. They can be used for listening to webhooks or integrating your Supabase project with third-parties. They run on a Deno-compatible runtime with TypeScript-first support. Edge Functions can be deployed and managed via the Management API or CLI.
+Edge Functions are server-side TypeScript functions, distributed globally at the edge, close to your users. They can be used for listening to webhooks or integrating your Supabase project with third parties. They run on a Deno-compatible runtime with TypeScript-first support.
+
+The integration deploys Edge Functions through the current Management API deploy endpoint using multipart source and metadata, and can return function source as a Slate text attachment on read.
 
 ### Project & Organization Management (Management API)
 
-The Management API allows you to manage your Supabase organizations and projects programmatically. This includes creating and deleting projects, managing project configuration (auth settings, custom domains, network restrictions), retrieving API keys, querying project logs, and managing organization members. It also supports managing database configuration, secrets for Edge Functions, and custom SMTP settings.
+The Management API allows you to manage your Supabase organizations and projects programmatically. This includes creating and deleting projects, managing project configuration, retrieving API keys, querying project logs, checking project health, and managing organization access. It also supports database metadata exports and secrets for Edge Functions.
 
 ## Events
 

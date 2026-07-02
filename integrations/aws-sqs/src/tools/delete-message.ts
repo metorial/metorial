@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SqsClient } from '../lib/client';
+import { sqsServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let deleteMessage = SlateTool.create(spec, {
@@ -88,7 +89,7 @@ export let deleteMessage = SlateTool.create(spec, {
     }
 
     if (!ctx.input.receiptHandle) {
-      throw new Error(
+      throw sqsServiceError(
         'Either "receiptHandle" for single deletion or "entries" for batch deletion must be provided.'
       );
     }

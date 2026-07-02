@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HubClient } from '../lib/client';
+import { requireHuggingFaceInput } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getSpaceRuntimeTool = SlateTool.create(spec, {
@@ -85,12 +86,14 @@ export let controlSpaceTool = SlateTool.create(spec, {
     } else if (ctx.input.action === 'restart') {
       result = await client.restartSpace({ repoId: ctx.input.repoId });
     } else if (ctx.input.action === 'set_hardware') {
-      if (!ctx.input.hardware) {
-        throw new Error('Hardware flavor is required for set_hardware action');
-      }
+      let hardware = requireHuggingFaceInput(
+        ctx.input.hardware,
+        'Hardware flavor',
+        'set_hardware'
+      );
       result = await client.setSpaceHardware({
         repoId: ctx.input.repoId,
-        hardware: ctx.input.hardware
+        hardware
       });
     }
 
@@ -108,7 +111,7 @@ export let controlSpaceTool = SlateTool.create(spec, {
 export let manageSpaceSecretsTool = SlateTool.create(spec, {
   name: 'Manage Space Secrets',
   key: 'manage_space_secrets',
-  description: `Add or delete secrets on a Space. Secrets are encrypted environment variables available at runtime.`,
+  description: `List, add, or delete secrets on a Space. Secrets are encrypted environment variables available at runtime.`,
   tags: {
     destructive: false
   }
@@ -116,34 +119,64 @@ export let manageSpaceSecretsTool = SlateTool.create(spec, {
   .input(
     z.object({
       repoId: z.string().describe('Full Space ID (e.g. "username/space-name")'),
-      action: z.enum(['add', 'delete']).describe('Whether to add or delete a secret'),
-      key: z.string().describe('Secret key name'),
-      value: z.string().optional().describe('Secret value (required when adding)')
+      action: z
+        .enum(['list', 'add', 'delete'])
+        .describe('Whether to list, add, or delete a secret'),
+      key: z.string().optional().describe('Secret key name (required for add/delete)'),
+      value: z.string().optional().describe('Secret value (required when adding)'),
+      description: z.string().optional().describe('Optional description when adding a secret')
     })
   )
   .output(
     z.object({
       repoId: z.string().describe('Space ID'),
       action: z.string().describe('Action performed'),
-      key: z.string().describe('Secret key')
+      key: z.string().optional().describe('Secret key'),
+      secrets: z
+        .array(
+          z.object({
+            key: z.string().optional().describe('Secret key'),
+            updatedAt: z.string().optional().describe('Last update timestamp'),
+            description: z.string().optional().describe('Secret description')
+          })
+        )
+        .optional()
+        .describe('Secrets returned for list action')
     })
   )
   .handleInvocation(async ctx => {
     let client = new HubClient({ token: ctx.auth.token });
 
+    if (ctx.input.action === 'list') {
+      let secrets = await client.listSpaceSecrets({ repoId: ctx.input.repoId });
+      return {
+        output: {
+          repoId: ctx.input.repoId,
+          action: ctx.input.action,
+          secrets: (secrets || []).map((secret: any) => ({
+            key: secret.key || secret.name,
+            updatedAt: secret.updatedAt,
+            description: secret.description
+          }))
+        },
+        message: `Found **${secrets?.length || 0}** secret(s) on Space **${ctx.input.repoId}**.`
+      };
+    }
+
     if (ctx.input.action === 'add') {
-      if (!ctx.input.value) {
-        throw new Error('Value is required when adding a secret');
-      }
+      let key = requireHuggingFaceInput(ctx.input.key, 'Secret key', 'add secret');
+      let value = requireHuggingFaceInput(ctx.input.value, 'Value', 'add secret');
       await client.addSpaceSecret({
         repoId: ctx.input.repoId,
-        key: ctx.input.key,
-        value: ctx.input.value
+        key,
+        value,
+        description: ctx.input.description
       });
     } else {
+      let key = requireHuggingFaceInput(ctx.input.key, 'Secret key', 'delete secret');
       await client.deleteSpaceSecret({
         repoId: ctx.input.repoId,
-        key: ctx.input.key
+        key
       });
     }
 
@@ -161,7 +194,7 @@ export let manageSpaceSecretsTool = SlateTool.create(spec, {
 export let manageSpaceVariablesTool = SlateTool.create(spec, {
   name: 'Manage Space Variables',
   key: 'manage_space_variables',
-  description: `Add or delete environment variables on a Space. Variables are public configuration values available at runtime.`,
+  description: `List, add, or delete environment variables on a Space. Variables are public configuration values available at runtime.`,
   tags: {
     destructive: false
   }
@@ -169,34 +202,69 @@ export let manageSpaceVariablesTool = SlateTool.create(spec, {
   .input(
     z.object({
       repoId: z.string().describe('Full Space ID (e.g. "username/space-name")'),
-      action: z.enum(['add', 'delete']).describe('Whether to add or delete a variable'),
-      key: z.string().describe('Variable key name'),
-      value: z.string().optional().describe('Variable value (required when adding)')
+      action: z
+        .enum(['list', 'add', 'delete'])
+        .describe('Whether to list, add, or delete a variable'),
+      key: z.string().optional().describe('Variable key name (required for add/delete)'),
+      value: z.string().optional().describe('Variable value (required when adding)'),
+      description: z
+        .string()
+        .optional()
+        .describe('Optional description when adding a variable')
     })
   )
   .output(
     z.object({
       repoId: z.string().describe('Space ID'),
       action: z.string().describe('Action performed'),
-      key: z.string().describe('Variable key')
+      key: z.string().optional().describe('Variable key'),
+      variables: z
+        .array(
+          z.object({
+            key: z.string().optional().describe('Variable key'),
+            value: z.string().optional().describe('Variable value'),
+            updatedAt: z.string().optional().describe('Last update timestamp'),
+            description: z.string().optional().describe('Variable description')
+          })
+        )
+        .optional()
+        .describe('Variables returned for list action')
     })
   )
   .handleInvocation(async ctx => {
     let client = new HubClient({ token: ctx.auth.token });
 
+    if (ctx.input.action === 'list') {
+      let variables = await client.listSpaceVariables({ repoId: ctx.input.repoId });
+      return {
+        output: {
+          repoId: ctx.input.repoId,
+          action: ctx.input.action,
+          variables: (variables || []).map((variable: any) => ({
+            key: variable.key || variable.name,
+            value: variable.value,
+            updatedAt: variable.updatedAt,
+            description: variable.description
+          }))
+        },
+        message: `Found **${variables?.length || 0}** variable(s) on Space **${ctx.input.repoId}**.`
+      };
+    }
+
     if (ctx.input.action === 'add') {
-      if (!ctx.input.value) {
-        throw new Error('Value is required when adding a variable');
-      }
+      let key = requireHuggingFaceInput(ctx.input.key, 'Variable key', 'add variable');
+      let value = requireHuggingFaceInput(ctx.input.value, 'Value', 'add variable');
       await client.addSpaceVariable({
         repoId: ctx.input.repoId,
-        key: ctx.input.key,
-        value: ctx.input.value
+        key,
+        value,
+        description: ctx.input.description
       });
     } else {
+      let key = requireHuggingFaceInput(ctx.input.key, 'Variable key', 'delete variable');
       await client.deleteSpaceVariable({
         repoId: ctx.input.repoId,
-        key: ctx.input.key
+        key
       });
     }
 

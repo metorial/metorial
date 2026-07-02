@@ -1,16 +1,20 @@
 import { createAxios } from 'slates';
+import { grafanaApiError } from './errors';
 
 export interface GrafanaClientConfig {
   instanceUrl: string;
   token: string;
   organizationId?: string;
+  apiNamespace?: string;
 }
 
 export class GrafanaClient {
   private axios: ReturnType<typeof createAxios>;
+  private apiNamespace: string;
 
   constructor(config: GrafanaClientConfig) {
     let baseUrl = config.instanceUrl.replace(/\/+$/, '');
+    let organizationId = config.organizationId?.trim();
     let headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
@@ -21,14 +25,22 @@ export class GrafanaClient {
       headers.Authorization = `Bearer ${config.token}`;
     }
 
-    if (config.organizationId) {
-      headers['X-Grafana-Org-Id'] = config.organizationId;
+    if (organizationId) {
+      headers['X-Grafana-Org-Id'] = organizationId;
     }
 
     this.axios = createAxios({
       baseURL: baseUrl,
       headers
     });
+    this.apiNamespace =
+      config.apiNamespace?.trim() ||
+      (organizationId && organizationId !== '1' ? `org-${organizationId}` : 'default');
+
+    this.axios.interceptors?.response?.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(grafanaApiError(error))
+    );
   }
 
   // ---- Dashboards ----
@@ -141,6 +153,7 @@ export class GrafanaClient {
     access?: string;
     url?: string;
     isDefault?: boolean;
+    database?: string;
     jsonData?: Record<string, any>;
     secureJsonData?: Record<string, any>;
   }): Promise<any> {
@@ -241,6 +254,13 @@ export class GrafanaClient {
 
   async listMuteTimings(): Promise<any[]> {
     let response = await this.axios.get('/api/v1/provisioning/mute-timings');
+    return response.data;
+  }
+
+  async getMuteTiming(name: string): Promise<any> {
+    let response = await this.axios.get(
+      `/api/v1/provisioning/mute-timings/${encodeURIComponent(name)}`
+    );
     return response.data;
   }
 
@@ -444,22 +464,41 @@ export class GrafanaClient {
 
   // ---- Playlists ----
 
-  async listPlaylists(): Promise<any[]> {
-    let response = await this.axios.get('/api/playlists');
+  async listPlaylists(): Promise<any> {
+    let response = await this.axios.get(
+      `/apis/playlist.grafana.app/v1/namespaces/${encodeURIComponent(this.apiNamespace)}/playlists`
+    );
     return response.data;
   }
 
   async getPlaylist(uid: string): Promise<any> {
-    let response = await this.axios.get(`/api/playlists/${uid}`);
+    let response = await this.axios.get(
+      `/apis/playlist.grafana.app/v1/namespaces/${encodeURIComponent(this.apiNamespace)}/playlists/${encodeURIComponent(uid)}`
+    );
     return response.data;
   }
 
   async createPlaylist(playlist: {
+    uid: string;
     name: string;
     interval: string;
     items: Array<{ type: string; value: string }>;
   }): Promise<any> {
-    let response = await this.axios.post('/api/playlists', playlist);
+    let response = await this.axios.post(
+      `/apis/playlist.grafana.app/v1/namespaces/${encodeURIComponent(this.apiNamespace)}/playlists`,
+      {
+        kind: 'Playlist',
+        apiVersion: 'playlist.grafana.app/v1',
+        metadata: {
+          name: playlist.uid
+        },
+        spec: {
+          title: playlist.name,
+          interval: playlist.interval,
+          items: playlist.items
+        }
+      }
+    );
     return response.data;
   }
 
@@ -469,14 +508,32 @@ export class GrafanaClient {
       name: string;
       interval: string;
       items: Array<{ type: string; value: string }>;
+      resourceVersion?: string;
     }
   ): Promise<any> {
-    let response = await this.axios.put(`/api/playlists/${uid}`, playlist);
+    let metadata: Record<string, any> = { name: uid };
+    if (playlist.resourceVersion) metadata.resourceVersion = playlist.resourceVersion;
+
+    let response = await this.axios.put(
+      `/apis/playlist.grafana.app/v1/namespaces/${encodeURIComponent(this.apiNamespace)}/playlists/${encodeURIComponent(uid)}`,
+      {
+        kind: 'Playlist',
+        apiVersion: 'playlist.grafana.app/v1',
+        metadata,
+        spec: {
+          title: playlist.name,
+          interval: playlist.interval,
+          items: playlist.items
+        }
+      }
+    );
     return response.data;
   }
 
   async deletePlaylist(uid: string): Promise<any> {
-    let response = await this.axios.delete(`/api/playlists/${uid}`);
+    let response = await this.axios.delete(
+      `/apis/playlist.grafana.app/v1/namespaces/${encodeURIComponent(this.apiNamespace)}/playlists/${encodeURIComponent(uid)}`
+    );
     return response.data;
   }
 

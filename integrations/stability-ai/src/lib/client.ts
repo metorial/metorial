@@ -1,4 +1,37 @@
-import { createAxios } from 'slates';
+import { Buffer } from 'node:buffer';
+import { createAxios, getBase64ByteLength } from 'slates';
+import { stabilityApiError, stabilityServiceError } from './errors';
+
+export type ImageOutputFormat = 'png' | 'jpeg' | 'webp';
+export type AudioOutputFormat = 'mp3' | 'wav';
+
+export type MediaResult = {
+  contentBase64: string;
+  mimeType: string;
+  byteLength: number;
+  seed?: number;
+  finishReason?: string;
+  generationId?: string;
+};
+
+type AsyncMediaResult =
+  | {
+      status: 'in-progress';
+    }
+  | ({
+      status: 'complete';
+    } & MediaResult);
+
+type GenerationStart = {
+  id?: string;
+};
+
+type StabilityMediaJson = {
+  image?: string;
+  audio?: string;
+  seed?: number;
+  finish_reason?: string;
+};
 
 export class Client {
   private token: string;
@@ -13,13 +46,196 @@ export class Client {
     });
   }
 
-  private authHeaders() {
+  private authHeaders(accept = 'application/json') {
     return {
-      Authorization: `Bearer ${this.token}`
+      Authorization: `Bearer ${this.token}`,
+      Accept: accept
     };
   }
 
-  // ─── Account ────────────────────────────────────────────
+  private appendOptional(formData: FormData, key: string, value: unknown) {
+    if (value === undefined || value === null) return;
+    formData.append(key, String(value));
+  }
+
+  private normalizeBase64(label: string, base64: string) {
+    let normalized = base64.includes(',') ? base64.slice(base64.indexOf(',') + 1) : base64;
+    normalized = normalized.replace(/\s+/g, '');
+
+    if (
+      !normalized ||
+      normalized.length % 4 === 1 ||
+      !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)
+    ) {
+      throw stabilityServiceError(`${label} must be valid non-empty base64 data.`);
+    }
+
+    return normalized;
+  }
+
+  private base64ToBlob(label: string, base64: string, mimeType = 'application/octet-stream') {
+    let bytes = Buffer.from(this.normalizeBase64(label, base64), 'base64');
+    if (bytes.length === 0) {
+      throw stabilityServiceError(`${label} must contain at least one byte.`);
+    }
+
+    return new Blob([bytes], { type: mimeType });
+  }
+
+  private appendBase64File(
+    formData: FormData,
+    key: string,
+    label: string,
+    base64: string,
+    filename: string,
+    mimeType = 'application/octet-stream'
+  ) {
+    formData.append(key, this.base64ToBlob(label, base64, mimeType), filename);
+  }
+
+  private imageMimeType(outputFormat?: ImageOutputFormat) {
+    return `image/${outputFormat ?? 'png'}`;
+  }
+
+  private audioMimeType(outputFormat?: AudioOutputFormat) {
+    return outputFormat === 'wav' ? 'audio/wav' : 'audio/mpeg';
+  }
+
+  private mediaResultFromJson(
+    data: StabilityMediaJson,
+    mediaKey: 'image' | 'audio',
+    mimeType: string,
+    generationId?: string
+  ): MediaResult {
+    let contentBase64 = data[mediaKey];
+    if (typeof contentBase64 !== 'string' || contentBase64.length === 0) {
+      throw stabilityServiceError('Stability AI response did not include generated media.');
+    }
+
+    return {
+      contentBase64,
+      mimeType,
+      byteLength: getBase64ByteLength(contentBase64),
+      seed: typeof data.seed === 'number' ? data.seed : undefined,
+      finishReason: data.finish_reason,
+      generationId
+    };
+  }
+
+  private async postFormJson<T>(
+    path: string,
+    formData: FormData,
+    operation: string,
+    expectedStatus?: number
+  ) {
+    let axios = this.createAxiosInstance();
+
+    try {
+      let options: {
+        headers: ReturnType<Client['authHeaders']>;
+        validateStatus?: (status: number) => boolean;
+      } = {
+        headers: this.authHeaders('application/json')
+      };
+      if (expectedStatus !== undefined) {
+        options.validateStatus = (status: number) => status === expectedStatus;
+      }
+
+      let response = await axios.post(path, formData, options);
+      return response.data as T;
+    } catch (error) {
+      throw stabilityApiError(error, operation);
+    }
+  }
+
+  private async postFormBinary(path: string, formData: FormData, operation: string) {
+    let axios = this.createAxiosInstance();
+
+    try {
+      let response = await axios.post(path, formData, {
+        headers: this.authHeaders('model/gltf-binary'),
+        responseType: 'arraybuffer'
+      });
+      let buffer = Buffer.from(response.data);
+
+      return {
+        contentBase64: buffer.toString('base64'),
+        mimeType: 'model/gltf-binary',
+        byteLength: buffer.byteLength
+      } satisfies MediaResult;
+    } catch (error) {
+      throw stabilityApiError(error, operation);
+    }
+  }
+
+  private async getAsyncMediaResult(params: {
+    path: string;
+    mediaKey: 'image' | 'audio';
+    mimeType: string;
+    generationId: string;
+    operation: string;
+  }): Promise<AsyncMediaResult> {
+    let axios = this.createAxiosInstance();
+
+    try {
+      let response = await axios.get(params.path, {
+        headers: this.authHeaders('application/json'),
+        validateStatus: (status: number) => status === 200 || status === 202
+      });
+
+      if (response.status === 202) {
+        return { status: 'in-progress' };
+      }
+
+      return {
+        status: 'complete',
+        ...this.mediaResultFromJson(
+          response.data,
+          params.mediaKey,
+          params.mimeType,
+          params.generationId
+        )
+      };
+    } catch (error) {
+      throw stabilityApiError(error, params.operation);
+    }
+  }
+
+  private async pollAsyncMediaResult(params: {
+    path: string;
+    mediaKey: 'image' | 'audio';
+    mimeType: string;
+    generationId: string;
+    operation: string;
+    maxAttempts?: number;
+    intervalMs?: number;
+  }): Promise<MediaResult> {
+    let maxAttempts = params.maxAttempts ?? 30;
+    let intervalMs = params.intervalMs ?? 10_000;
+
+    for (let i = 0; i < maxAttempts; i++) {
+      let result = await this.getAsyncMediaResult(params);
+      if (result.status === 'complete') {
+        return result;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+
+    throw stabilityServiceError(
+      `Stability AI ${params.operation} ${params.generationId} did not complete within the expected time.`
+    );
+  }
+
+  private assertGenerationId(response: GenerationStart, operation: string) {
+    if (!response.id) {
+      throw stabilityServiceError(
+        `Stability AI ${operation} response did not include a generation ID.`
+      );
+    }
+
+    return response.id;
+  }
 
   async getAccount(): Promise<{
     id: string;
@@ -28,66 +244,80 @@ export class Client {
     organizations: Array<{ id: string; name: string; role: string; isDefault: boolean }>;
   }> {
     let axios = this.createAxiosInstance();
-    let response = await axios.get('/v1/user/account', {
-      headers: this.authHeaders()
-    });
-    return {
-      id: response.data.id,
-      email: response.data.email,
-      profilePicture: response.data.profile_picture,
-      organizations: (response.data.organizations || []).map((org: any) => ({
-        id: org.id,
-        name: org.name,
-        role: org.role,
-        isDefault: org.is_default
-      }))
-    };
+
+    try {
+      let response = await axios.get('/v1/user/account', {
+        headers: this.authHeaders()
+      });
+      return {
+        id: response.data.id,
+        email: response.data.email,
+        profilePicture: response.data.profile_picture,
+        organizations: (response.data.organizations || []).map((org: any) => ({
+          id: org.id,
+          name: org.name,
+          role: org.role,
+          isDefault: org.is_default
+        }))
+      };
+    } catch (error) {
+      throw stabilityApiError(error, 'get account');
+    }
   }
 
   async getBalance(): Promise<{ credits: number }> {
     let axios = this.createAxiosInstance();
-    let response = await axios.get('/v1/user/balance', {
-      headers: this.authHeaders()
-    });
-    return { credits: response.data.credits };
-  }
 
-  // ─── Image Generation ───────────────────────────────────
+    try {
+      let response = await axios.get('/v1/user/balance', {
+        headers: this.authHeaders()
+      });
+      return { credits: response.data.credits };
+    } catch (error) {
+      throw stabilityApiError(error, 'get balance');
+    }
+  }
 
   async generateImageUltra(params: {
     prompt: string;
     negativePrompt?: string;
-    aspectRatio?: string;
+    aspectRatio?: ImageOutputFormat | string;
     seed?: number;
-    outputFormat?: string;
+    outputFormat?: ImageOutputFormat;
     image?: string;
     strength?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+    stylePreset?: string;
+  }): Promise<MediaResult> {
     let formData = new FormData();
     formData.append('prompt', params.prompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.aspectRatio) formData.append('aspect_ratio', params.aspectRatio);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'aspect_ratio', params.aspectRatio);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
+    this.appendOptional(formData, 'strength', params.strength);
     if (params.image) {
-      let imageBlob = this.base64ToBlob(params.image);
-      formData.append('image', imageBlob, 'image.png');
+      this.appendBase64File(
+        formData,
+        'image',
+        'referenceImage',
+        params.image,
+        'reference.png',
+        'image/png'
+      );
     }
-    if (params.strength !== undefined) formData.append('strength', String(params.strength));
 
-    let response = await axios.post('/v2beta/stable-image/generate/ultra', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/generate/ultra',
+      formData,
+      'generate image ultra'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async generateImageCore(params: {
@@ -95,30 +325,28 @@ export class Client {
     negativePrompt?: string;
     aspectRatio?: string;
     seed?: number;
-    outputFormat?: string;
+    outputFormat?: ImageOutputFormat;
     stylePreset?: string;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+  }): Promise<MediaResult> {
     let formData = new FormData();
     formData.append('prompt', params.prompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.aspectRatio) formData.append('aspect_ratio', params.aspectRatio);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.stylePreset) formData.append('style_preset', params.stylePreset);
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'aspect_ratio', params.aspectRatio);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
 
-    let response = await axios.post('/v2beta/stable-image/generate/core', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/generate/core',
+      formData,
+      'generate image core'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async generateImageSD3(params: {
@@ -126,68 +354,77 @@ export class Client {
     negativePrompt?: string;
     aspectRatio?: string;
     seed?: number;
-    outputFormat?: string;
+    outputFormat?: ImageOutputFormat;
     model?: string;
     image?: string;
     strength?: number;
     cfgScale?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+    stylePreset?: string;
+  }): Promise<MediaResult> {
     let formData = new FormData();
     formData.append('prompt', params.prompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.aspectRatio) formData.append('aspect_ratio', params.aspectRatio);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.model) formData.append('model', params.model);
+    formData.append('mode', params.image ? 'image-to-image' : 'text-to-image');
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'aspect_ratio', params.aspectRatio);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'model', params.model);
+    this.appendOptional(formData, 'strength', params.strength);
+    this.appendOptional(formData, 'cfg_scale', params.cfgScale);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
     if (params.image) {
-      let imageBlob = this.base64ToBlob(params.image);
-      formData.append('image', imageBlob, 'image.png');
+      this.appendBase64File(
+        formData,
+        'image',
+        'referenceImage',
+        params.image,
+        'reference.png',
+        'image/png'
+      );
     }
-    if (params.strength !== undefined) formData.append('strength', String(params.strength));
-    if (params.cfgScale !== undefined) formData.append('cfg_scale', String(params.cfgScale));
 
-    let response = await axios.post('/v2beta/stable-image/generate/sd3', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/generate/sd3',
+      formData,
+      'generate image sd3'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
-
-  // ─── Image Editing ──────────────────────────────────────
 
   async eraseImage(params: {
     image: string;
+    prompt: string;
     mask?: string;
-    outputFormat?: string;
+    growMask?: number;
+    outputFormat?: ImageOutputFormat;
     seed?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
-    if (params.mask) formData.append('mask', this.base64ToBlob(params.mask), 'mask.png');
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
+    formData.append('prompt', params.prompt);
+    if (params.mask) {
+      this.appendBase64File(formData, 'mask', 'mask', params.mask, 'mask.png', 'image/png');
+    }
+    this.appendOptional(formData, 'grow_mask', params.growMask);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'seed', params.seed);
 
-    let response = await axios.post('/v2beta/stable-image/edit/erase', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/edit/erase',
+      formData,
+      'erase image'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async inpaintImage(params: {
@@ -195,30 +432,34 @@ export class Client {
     prompt: string;
     mask?: string;
     negativePrompt?: string;
-    outputFormat?: string;
+    growMask?: number;
+    stylePreset?: string;
+    outputFormat?: ImageOutputFormat;
     seed?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
     formData.append('prompt', params.prompt);
-    if (params.mask) formData.append('mask', this.base64ToBlob(params.mask), 'mask.png');
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
+    if (params.mask) {
+      this.appendBase64File(formData, 'mask', 'mask', params.mask, 'mask.png', 'image/png');
+    }
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'grow_mask', params.growMask);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'seed', params.seed);
 
-    let response = await axios.post('/v2beta/stable-image/edit/inpaint', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/edit/inpaint',
+      formData,
+      'inpaint image'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async outpaintImage(params: {
@@ -228,32 +469,34 @@ export class Client {
     right?: number;
     up?: number;
     down?: number;
-    outputFormat?: string;
+    creativity?: number;
+    stylePreset?: string;
+    outputFormat?: ImageOutputFormat;
     seed?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
-    if (params.prompt) formData.append('prompt', params.prompt);
-    if (params.left !== undefined) formData.append('left', String(params.left));
-    if (params.right !== undefined) formData.append('right', String(params.right));
-    if (params.up !== undefined) formData.append('up', String(params.up));
-    if (params.down !== undefined) formData.append('down', String(params.down));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
+    this.appendOptional(formData, 'prompt', params.prompt);
+    this.appendOptional(formData, 'left', params.left);
+    this.appendOptional(formData, 'right', params.right);
+    this.appendOptional(formData, 'up', params.up);
+    this.appendOptional(formData, 'down', params.down);
+    this.appendOptional(formData, 'creativity', params.creativity);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'seed', params.seed);
 
-    let response = await axios.post('/v2beta/stable-image/edit/outpaint', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/edit/outpaint',
+      formData,
+      'outpaint image'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async searchAndReplace(params: {
@@ -261,30 +504,32 @@ export class Client {
     prompt: string;
     searchPrompt: string;
     negativePrompt?: string;
-    outputFormat?: string;
+    growMask?: number;
+    stylePreset?: string;
+    outputFormat?: ImageOutputFormat;
     seed?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
     formData.append('prompt', params.prompt);
     formData.append('search_prompt', params.searchPrompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'grow_mask', params.growMask);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'seed', params.seed);
 
-    let response = await axios.post('/v2beta/stable-image/edit/search-and-replace', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/edit/search-and-replace',
+      formData,
+      'search and replace'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async searchAndRecolor(params: {
@@ -292,52 +537,53 @@ export class Client {
     prompt: string;
     selectPrompt: string;
     negativePrompt?: string;
-    outputFormat?: string;
+    growMask?: number;
+    stylePreset?: string;
+    outputFormat?: ImageOutputFormat;
     seed?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
     formData.append('prompt', params.prompt);
     formData.append('select_prompt', params.selectPrompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'grow_mask', params.growMask);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'seed', params.seed);
 
-    let response = await axios.post('/v2beta/stable-image/edit/search-and-recolor', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/edit/search-and-recolor',
+      formData,
+      'search and recolor'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async removeBackground(params: {
     image: string;
-    outputFormat?: string;
-  }): Promise<{ base64Image: string; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+    outputFormat?: 'png' | 'webp';
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
+    this.appendOptional(formData, 'output_format', params.outputFormat);
 
-    let response = await axios.post('/v2beta/stable-image/edit/remove-background', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/edit/remove-background',
+      formData,
+      'remove background'
+    );
 
-    return {
-      base64Image: response.data.image,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async replaceBackgroundAndRelight(params: {
@@ -345,191 +591,161 @@ export class Client {
     backgroundPrompt?: string;
     backgroundReference?: string;
     foregroundPrompt?: string;
+    negativePrompt?: string;
+    preserveOriginalSubject?: number;
+    originalBackgroundDepth?: number;
+    keepOriginalBackground?: boolean;
     lightSourceDirection?: string;
+    lightReference?: string;
     lightSourceStrength?: number;
-    outputFormat?: string;
+    outputFormat?: ImageOutputFormat;
     seed?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('subject_image', this.base64ToBlob(params.subjectImage), 'subject.png');
-    if (params.backgroundPrompt) formData.append('background_prompt', params.backgroundPrompt);
-    if (params.backgroundReference)
-      formData.append(
+    this.appendBase64File(
+      formData,
+      'subject_image',
+      'subjectImage',
+      params.subjectImage,
+      'subject.png',
+      'image/png'
+    );
+    if (params.backgroundReference) {
+      this.appendBase64File(
+        formData,
         'background_reference',
-        this.base64ToBlob(params.backgroundReference),
-        'bg_reference.png'
+        'backgroundReference',
+        params.backgroundReference,
+        'background-reference.png',
+        'image/png'
       );
-    if (params.foregroundPrompt) formData.append('foreground_prompt', params.foregroundPrompt);
-    if (params.lightSourceDirection)
-      formData.append('light_source_direction', params.lightSourceDirection);
-    if (params.lightSourceStrength !== undefined)
-      formData.append('light_source_strength', String(params.lightSourceStrength));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
+    }
+    if (params.lightReference) {
+      this.appendBase64File(
+        formData,
+        'light_reference',
+        'lightReference',
+        params.lightReference,
+        'light-reference.png',
+        'image/png'
+      );
+    }
+    this.appendOptional(formData, 'background_prompt', params.backgroundPrompt);
+    this.appendOptional(formData, 'foreground_prompt', params.foregroundPrompt);
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'preserve_original_subject', params.preserveOriginalSubject);
+    this.appendOptional(formData, 'original_background_depth', params.originalBackgroundDepth);
+    this.appendOptional(
+      formData,
+      'keep_original_background',
+      params.keepOriginalBackground === undefined
+        ? undefined
+        : String(params.keepOriginalBackground)
+    );
+    this.appendOptional(formData, 'light_source_direction', params.lightSourceDirection);
+    this.appendOptional(formData, 'light_source_strength', params.lightSourceStrength);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'seed', params.seed);
 
-    let response = await axios.post(
+    let response = await this.postFormJson<GenerationStart>(
       '/v2beta/stable-image/edit/replace-background-and-relight',
       formData,
-      {
-        headers: {
-          ...this.authHeaders(),
-          Accept: 'application/json'
-        }
-      }
+      'replace background and relight'
     );
+    let generationId = this.assertGenerationId(response, 'replace background and relight');
 
-    // This endpoint may be async - handle both sync and async responses
-    if (response.data.id) {
-      return await this.pollAsyncResult(response.data.id);
-    }
-
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return await this.pollAsyncMediaResult({
+      path: `/v2beta/results/${generationId}`,
+      mediaKey: 'image',
+      mimeType: this.imageMimeType(params.outputFormat),
+      generationId,
+      operation: 'replace background and relight'
+    });
   }
-
-  // ─── Image Upscaling ───────────────────────────────────
 
   async upscaleFast(params: {
     image: string;
-    outputFormat?: string;
-  }): Promise<{ base64Image: string; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+    outputFormat?: ImageOutputFormat;
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
+    this.appendOptional(formData, 'output_format', params.outputFormat);
 
-    let response = await axios.post('/v2beta/stable-image/upscale/fast', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/upscale/fast',
+      formData,
+      'fast upscale'
+    );
 
-    return {
-      base64Image: response.data.image,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async upscaleConservative(params: {
     image: string;
     prompt: string;
     negativePrompt?: string;
-    outputFormat?: string;
+    outputFormat?: ImageOutputFormat;
     seed?: number;
     creativity?: number;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
     formData.append('prompt', params.prompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
-    if (params.creativity !== undefined)
-      formData.append('creativity', String(params.creativity));
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'creativity', params.creativity);
 
-    let response = await axios.post('/v2beta/stable-image/upscale/conservative', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/upscale/conservative',
+      formData,
+      'conservative upscale'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
-  }
-
-  async upscaleCreativeStart(params: {
-    image: string;
-    prompt: string;
-    negativePrompt?: string;
-    outputFormat?: string;
-    seed?: number;
-    creativity?: number;
-  }): Promise<{ generationId: string }> {
-    let axios = this.createAxiosInstance();
-    let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
-    formData.append('prompt', params.prompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
-    if (params.creativity !== undefined)
-      formData.append('creativity', String(params.creativity));
-
-    let response = await axios.post('/v2beta/stable-image/upscale/creative', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
-
-    return {
-      generationId: response.data.id
-    };
-  }
-
-  async fetchAsyncResult(generationId: string): Promise<{
-    status: string;
-    base64Image?: string;
-    seed?: number;
-    finishReason?: string;
-  }> {
-    let axios = this.createAxiosInstance();
-    let response = await axios.get(`/v2beta/results/${generationId}`, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      },
-      validateStatus: (status: number) => status === 200 || status === 202
-    });
-
-    if (response.status === 202) {
-      return { status: 'in-progress' };
-    }
-
-    return {
-      status: 'complete',
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
-  }
-
-  async pollAsyncResult(
-    generationId: string,
-    maxAttempts: number = 30,
-    intervalMs: number = 10000
-  ): Promise<{
-    base64Image: string;
-    seed: number;
-    finishReason: string;
-  }> {
-    for (let i = 0; i < maxAttempts; i++) {
-      let result = await this.fetchAsyncResult(generationId);
-      if (result.status === 'complete' && result.base64Image) {
-        return {
-          base64Image: result.base64Image,
-          seed: result.seed!,
-          finishReason: result.finishReason!
-        };
-      }
-      await new Promise(resolve => setTimeout(resolve, intervalMs));
-    }
-    throw new Error(
-      `Async generation ${generationId} did not complete within the expected time.`
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
     );
   }
 
-  // ─── Image Control ─────────────────────────────────────
+  async upscaleCreative(params: {
+    image: string;
+    prompt: string;
+    negativePrompt?: string;
+    outputFormat?: ImageOutputFormat;
+    seed?: number;
+    creativity?: number;
+    stylePreset?: string;
+  }): Promise<MediaResult> {
+    let formData = new FormData();
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
+    formData.append('prompt', params.prompt);
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'creativity', params.creativity);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
+
+    let response = await this.postFormJson<GenerationStart>(
+      '/v2beta/stable-image/upscale/creative',
+      formData,
+      'creative upscale'
+    );
+    let generationId = this.assertGenerationId(response, 'creative upscale');
+
+    return await this.pollAsyncMediaResult({
+      path: `/v2beta/stable-image/upscale/creative/result/${generationId}`,
+      mediaKey: 'image',
+      mimeType: this.imageMimeType(params.outputFormat),
+      generationId,
+      operation: 'creative upscale'
+    });
+  }
 
   async controlSketch(params: {
     image: string;
@@ -537,30 +753,29 @@ export class Client {
     negativePrompt?: string;
     controlStrength?: number;
     seed?: number;
-    outputFormat?: string;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+    outputFormat?: ImageOutputFormat;
+    stylePreset?: string;
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
     formData.append('prompt', params.prompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.controlStrength !== undefined)
-      formData.append('control_strength', String(params.controlStrength));
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'control_strength', params.controlStrength);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
 
-    let response = await axios.post('/v2beta/stable-image/control/sketch', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/control/sketch',
+      formData,
+      'control sketch'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async controlStructure(params: {
@@ -569,30 +784,29 @@ export class Client {
     negativePrompt?: string;
     controlStrength?: number;
     seed?: number;
-    outputFormat?: string;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+    outputFormat?: ImageOutputFormat;
+    stylePreset?: string;
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
     formData.append('prompt', params.prompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.controlStrength !== undefined)
-      formData.append('control_strength', String(params.controlStrength));
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'control_strength', params.controlStrength);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
 
-    let response = await axios.post('/v2beta/stable-image/control/structure', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/control/structure',
+      formData,
+      'control structure'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
   async controlStyle(params: {
@@ -601,90 +815,155 @@ export class Client {
     negativePrompt?: string;
     fidelity?: number;
     seed?: number;
-    outputFormat?: string;
-  }): Promise<{ base64Image: string; seed: number; finishReason: string }> {
-    let axios = this.createAxiosInstance();
+    outputFormat?: ImageOutputFormat;
+    stylePreset?: string;
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
     formData.append('prompt', params.prompt);
-    if (params.negativePrompt) formData.append('negative_prompt', params.negativePrompt);
-    if (params.fidelity !== undefined) formData.append('fidelity', String(params.fidelity));
-    if (params.seed !== undefined) formData.append('seed', String(params.seed));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'fidelity', params.fidelity);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'style_preset', params.stylePreset);
 
-    let response = await axios.post('/v2beta/stable-image/control/style', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
-    });
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/control/style',
+      formData,
+      'control style'
+    );
 
-    return {
-      base64Image: response.data.image,
-      seed: response.data.seed,
-      finishReason: response.data.finish_reason
-    };
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
   }
 
-  // ─── Audio Generation ──────────────────────────────────
+  async styleTransfer(params: {
+    initImage: string;
+    styleImage: string;
+    prompt?: string;
+    negativePrompt?: string;
+    seed?: number;
+    styleStrength?: number;
+    compositionFidelity?: number;
+    changeStrength?: number;
+    outputFormat?: ImageOutputFormat;
+  }): Promise<MediaResult> {
+    let formData = new FormData();
+    this.appendBase64File(
+      formData,
+      'init_image',
+      'image',
+      params.initImage,
+      'init-image.png',
+      'image/png'
+    );
+    this.appendBase64File(
+      formData,
+      'style_image',
+      'styleImage',
+      params.styleImage,
+      'style-image.png',
+      'image/png'
+    );
+    this.appendOptional(formData, 'prompt', params.prompt);
+    this.appendOptional(formData, 'negative_prompt', params.negativePrompt);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'style_strength', params.styleStrength);
+    this.appendOptional(formData, 'composition_fidelity', params.compositionFidelity);
+    this.appendOptional(formData, 'change_strength', params.changeStrength);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+
+    let response = await this.postFormJson<StabilityMediaJson>(
+      '/v2beta/stable-image/control/style-transfer',
+      formData,
+      'style transfer'
+    );
+
+    return this.mediaResultFromJson(
+      response,
+      'image',
+      this.imageMimeType(params.outputFormat)
+    );
+  }
 
   async generateAudio(params: {
+    mode: 'text-to-audio' | 'audio-to-audio' | 'inpaint';
     prompt: string;
+    model?: 'stable-audio-3' | 'stable-audio-2.5' | 'stable-audio-2';
     duration?: number;
-    outputFormat?: string;
-  }): Promise<{ base64Audio: string }> {
-    let axios = this.createAxiosInstance();
+    seed?: number;
+    steps?: number;
+    cfgScale?: number;
+    outputFormat?: AudioOutputFormat;
+    audio?: string;
+    strength?: number;
+    maskStart?: number;
+    maskEnd?: number;
+  }): Promise<MediaResult> {
+    let model = params.model ?? 'stable-audio-3';
+    let endpointFamily = model === 'stable-audio-3' ? 'stable-audio' : 'stable-audio-2';
     let formData = new FormData();
     formData.append('prompt', params.prompt);
-    if (params.duration !== undefined) formData.append('duration', String(params.duration));
-    if (params.outputFormat) formData.append('output_format', params.outputFormat);
+    formData.append('model', model);
+    this.appendOptional(formData, 'duration', params.duration);
+    this.appendOptional(formData, 'seed', params.seed);
+    this.appendOptional(formData, 'steps', params.steps);
+    this.appendOptional(formData, 'cfg_scale', params.cfgScale);
+    this.appendOptional(formData, 'output_format', params.outputFormat);
+    this.appendOptional(formData, 'strength', params.strength);
+    this.appendOptional(formData, 'mask_start', params.maskStart);
+    this.appendOptional(formData, 'mask_end', params.maskEnd);
+    if (params.audio) {
+      this.appendBase64File(
+        formData,
+        'audio',
+        'audio',
+        params.audio,
+        'audio.wav',
+        'audio/wav'
+      );
+    }
 
-    let response = await axios.post('/v2beta/audio/stable-audio/generate', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      }
+    let response = await this.postFormJson<GenerationStart>(
+      `/v2beta/audio/${endpointFamily}/${params.mode}`,
+      formData,
+      `generate audio ${params.mode}`,
+      202
+    );
+    let generationId = this.assertGenerationId(response, `generate audio ${params.mode}`);
+
+    return await this.pollAsyncMediaResult({
+      path: `/v2beta/audio/results/${generationId}`,
+      mediaKey: 'audio',
+      mimeType: this.audioMimeType(params.outputFormat),
+      generationId,
+      operation: `generate audio ${params.mode}`,
+      maxAttempts: 60
     });
-
-    return {
-      base64Audio: response.data.audio
-    };
   }
-
-  // ─── 3D Generation ─────────────────────────────────────
 
   async generateFast3D(params: {
     image: string;
     textureResolution?: string;
     foregroundRatio?: number;
     remesh?: string;
-  }): Promise<{ base64Model: string }> {
-    let axios = this.createAxiosInstance();
+    vertexCount?: number;
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
-    if (params.textureResolution)
-      formData.append('texture_resolution', params.textureResolution);
-    if (params.foregroundRatio !== undefined)
-      formData.append('foreground_ratio', String(params.foregroundRatio));
-    if (params.remesh) formData.append('remesh', params.remesh);
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
+    this.appendOptional(formData, 'texture_resolution', params.textureResolution);
+    this.appendOptional(formData, 'foreground_ratio', params.foregroundRatio);
+    this.appendOptional(formData, 'remesh', params.remesh);
+    this.appendOptional(formData, 'vertex_count', params.vertexCount);
 
-    let response = await axios.post('/v2beta/3d/stable-fast-3d', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      },
-      responseType: 'arraybuffer'
-    });
-
-    // Response is a GLB binary, encode it as base64
-    let bytes = new Uint8Array(response.data);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]!);
-    }
-    let base64Model = btoa(binary);
-
-    return { base64Model };
+    return await this.postFormBinary(
+      '/v2beta/3d/stable-fast-3d',
+      formData,
+      'generate stable fast 3d'
+    );
   }
 
   async generateSpar3D(params: {
@@ -692,43 +971,25 @@ export class Client {
     textureResolution?: string;
     foregroundRatio?: number;
     remesh?: string;
-  }): Promise<{ base64Model: string }> {
-    let axios = this.createAxiosInstance();
+    targetType?: string;
+    targetCount?: number;
+    guidanceScale?: number;
+    seed?: number;
+  }): Promise<MediaResult> {
     let formData = new FormData();
-    formData.append('image', this.base64ToBlob(params.image), 'image.png');
-    if (params.textureResolution)
-      formData.append('texture_resolution', params.textureResolution);
-    if (params.foregroundRatio !== undefined)
-      formData.append('foreground_ratio', String(params.foregroundRatio));
-    if (params.remesh) formData.append('remesh', params.remesh);
+    this.appendBase64File(formData, 'image', 'image', params.image, 'image.png', 'image/png');
+    this.appendOptional(formData, 'texture_resolution', params.textureResolution);
+    this.appendOptional(formData, 'foreground_ratio', params.foregroundRatio);
+    this.appendOptional(formData, 'remesh', params.remesh);
+    this.appendOptional(formData, 'target_type', params.targetType);
+    this.appendOptional(formData, 'target_count', params.targetCount);
+    this.appendOptional(formData, 'guidance_scale', params.guidanceScale);
+    this.appendOptional(formData, 'seed', params.seed);
 
-    let response = await axios.post('/v2beta/3d/stable-point-aware-3d', formData, {
-      headers: {
-        ...this.authHeaders(),
-        Accept: 'application/json'
-      },
-      responseType: 'arraybuffer'
-    });
-
-    let bytes = new Uint8Array(response.data);
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]!);
-    }
-    let base64Model = btoa(binary);
-
-    return { base64Model };
-  }
-
-  // ─── Helpers ────────────────────────────────────────────
-
-  private base64ToBlob(base64: string): Blob {
-    let binaryStr = atob(base64);
-    let len = binaryStr.length;
-    let bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryStr.charCodeAt(i);
-    }
-    return new Blob([bytes]);
+    return await this.postFormBinary(
+      '/v2beta/3d/stable-point-aware-3d',
+      formData,
+      'generate stable point aware 3d'
+    );
   }
 }

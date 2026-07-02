@@ -1,12 +1,23 @@
 import { KlaviyoClient } from './client';
 
 export let createClient = (ctx: {
-  auth: { token: string };
+  auth: {
+    token: string;
+    authType?: 'oauth' | 'private_api_key';
+    refreshToken?: string;
+    expiresAt?: string;
+  };
   config: { revision?: string };
 }): KlaviyoClient => {
+  let isOAuth =
+    ctx.auth.authType === 'oauth' ||
+    (ctx.auth.authType === undefined &&
+      (ctx.auth.refreshToken !== undefined || ctx.auth.expiresAt !== undefined));
+
   return new KlaviyoClient({
     token: ctx.auth.token,
-    revision: ctx.config.revision
+    revision: ctx.config.revision,
+    isOAuth
   });
 };
 

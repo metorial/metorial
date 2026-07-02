@@ -59,7 +59,8 @@ export let userLifecycleTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OktaClient({
       domain: ctx.config.domain,
-      token: ctx.auth.token
+      token: ctx.auth.token,
+      authMethod: ctx.auth.authMethod
     });
 
     let { userId, action, sendEmail } = ctx.input;

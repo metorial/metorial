@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import { createClientFromContext, requireServiceAccount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let querySegmentation = SlateTool.create(spec, {
@@ -44,6 +44,8 @@ Useful for understanding how often an event occurs, broken down by property valu
     })
   )
   .handleInvocation(async ctx => {
+    requireServiceAccount(ctx);
+
     let client = createClientFromContext(ctx);
 
     let result = await client.querySegmentation({

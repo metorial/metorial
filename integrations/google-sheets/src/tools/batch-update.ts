@@ -11,7 +11,8 @@ export let batchUpdate = SlateTool.create(spec, {
 
 Use this for complex updates that need to be applied together, or when you need to perform operations not covered by other tools (e.g., conditional formatting rules, merge cells, add charts, pivot tables, filter views).`,
   instructions: [
-    'Each request in the array is a Google Sheets API batchUpdate request object.',
+    'Pass requests as a JSON array, not as a stringified JSON blob or an operations field.',
+    'Each item in requests is a Google Sheets API batchUpdate request object.',
     'See Google Sheets API documentation for the full list of supported request types.',
     'Common request types: addSheet, deleteSheet, updateCells, mergeCells, unmergeCells, addConditionalFormatRule, addChart, updateChartSpec, addFilterView, addProtectedRange, addNamedRange, etc.'
   ],

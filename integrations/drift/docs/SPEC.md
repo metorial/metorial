@@ -88,6 +88,18 @@ IT admins can provision and manage user accounts with the Drift SCIM 2.0 API, us
 
 Admins can trigger a remote app uninstall on behalf of a client, as well as retrieve token information and metadata including the org, scopes, and app for a token.
 
+### Implemented Tool Surface
+
+The integration exposes practical day-to-day API coverage for contacts, conversations, messages, users, accounts, meetings, playbooks, teams, and app-token diagnostics:
+
+- Contacts: create, retrieve by ID or email, update, delete, list custom attributes, and post timeline events.
+- Conversations and messages: create a conversation, list conversations, retrieve a conversation with optional messages, send chat messages or private notes, export formatted or JSON transcripts as Slate attachments, and read conversation status counts.
+- Users and teams: list users, retrieve a user by ID, update user availability, list org teams, and list teams for a user.
+- Accounts: create, retrieve, list, update, and delete accounts.
+- Other read-only operations: get booked meetings, list playbooks, and inspect current token metadata.
+
+GDPR and SCIM APIs are documented by Drift, but they are admin-oriented and are not exposed as tools in this practical surface.
+
 ## Events
 
 Drift supports webhooks that deliver real-time event notifications via HTTP POST requests to a configured URL. Webhooks are configured in the app settings on dev.drift.com, where you provide a request URL and choose the events to subscribe to. A Verification Token is provided under App Credentials to verify that data sent to your endpoint is actually from Drift.

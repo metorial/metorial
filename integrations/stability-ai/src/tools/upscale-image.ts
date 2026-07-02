@@ -1,7 +1,15 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { stabilityServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  createMediaAttachment,
+  imageOutputFormatEnum,
+  mediaAttachmentOutputSchema,
+  stylePresetEnum,
+  toMediaAttachmentOutput
+} from './shared';
 
 export let upscaleImage = SlateTool.create(spec, {
   name: 'Upscale Image',
@@ -39,21 +47,18 @@ export let upscaleImage = SlateTool.create(spec, {
         .min(0.1)
         .max(0.5)
         .optional()
-        .describe('Creativity level for conservative/creative upscale.'),
+        .describe(
+          'Creativity level. Conservative requires 0.2-0.5; creative supports 0.1-0.5.'
+        ),
       seed: z
         .number()
         .optional()
         .describe('Seed for reproducible results. Used by conservative and creative modes.'),
-      outputFormat: z.enum(['png', 'jpeg', 'webp']).optional().describe('Output image format.')
+      stylePreset: stylePresetEnum,
+      outputFormat: imageOutputFormatEnum
     })
   )
-  .output(
-    z.object({
-      base64Image: z.string().describe('Base64-encoded upscaled image.'),
-      seed: z.number().optional().describe('Seed used for this upscale.'),
-      finishReason: z.string().describe('Reason the operation finished.')
-    })
-  )
+  .output(mediaAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
     let input = ctx.input;
@@ -64,18 +69,24 @@ export let upscaleImage = SlateTool.create(spec, {
         outputFormat: input.outputFormat
       });
       return {
-        output: {
-          base64Image: result.base64Image,
-          finishReason: result.finishReason
-        },
-        message: `Upscaled image using **fast** mode. Finish reason: ${result.finishReason}.`
+        output: toMediaAttachmentOutput(result),
+        attachments: [createMediaAttachment(result)],
+        message: `Upscaled image using **fast** mode. Attachment MIME: \`${result.mimeType}\`.`
       };
     }
 
     if (!input.prompt)
-      throw new Error('Prompt is required for conservative and creative upscale modes.');
+      throw stabilityServiceError(
+        'Prompt is required for conservative and creative upscale modes.'
+      );
 
     if (input.mode === 'conservative') {
+      if (input.creativity !== undefined && input.creativity < 0.2) {
+        throw stabilityServiceError(
+          'Conservative upscale creativity must be between 0.2 and 0.5.'
+        );
+      }
+
       let result = await client.upscaleConservative({
         image: input.image,
         prompt: input.prompt,
@@ -85,38 +96,28 @@ export let upscaleImage = SlateTool.create(spec, {
         creativity: input.creativity
       });
       return {
-        output: {
-          base64Image: result.base64Image,
-          seed: result.seed,
-          finishReason: result.finishReason
-        },
-        message: `Upscaled image using **conservative** mode with seed **${result.seed}**. Finish reason: ${result.finishReason}.`
+        output: toMediaAttachmentOutput(result),
+        attachments: [createMediaAttachment(result)],
+        message: `Upscaled image using **conservative** mode. Attachment MIME: \`${result.mimeType}\`.`
       };
     }
 
     // Creative upscale is async
     ctx.info('Starting creative upscale. This may take a few minutes...');
-    let startResult = await client.upscaleCreativeStart({
+    let startResult = await client.upscaleCreative({
       image: input.image,
       prompt: input.prompt,
       negativePrompt: input.negativePrompt,
       outputFormat: input.outputFormat,
       seed: input.seed,
-      creativity: input.creativity
+      creativity: input.creativity,
+      stylePreset: input.stylePreset
     });
 
-    ctx.info(
-      `Creative upscale started with generation ID: ${startResult.generationId}. Polling for results...`
-    );
-    let result = await client.pollAsyncResult(startResult.generationId);
-
     return {
-      output: {
-        base64Image: result.base64Image,
-        seed: result.seed,
-        finishReason: result.finishReason
-      },
-      message: `Upscaled image using **creative** mode with seed **${result.seed}**. Finish reason: ${result.finishReason}.`
+      output: toMediaAttachmentOutput(startResult),
+      attachments: [createMediaAttachment(startResult)],
+      message: `Upscaled image using **creative** mode. Attachment MIME: \`${startResult.mimeType}\`.`
     };
   })
   .build();

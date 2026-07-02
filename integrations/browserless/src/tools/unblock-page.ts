@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrowserlessClient } from '../lib/client';
 import { spec } from '../spec';
+import { base64ByteLength, base64FileAttachment, requireHttpUrl } from './shared';
 
 export let unblockPage = SlateTool.create(spec, {
   name: 'Unblock Page',
@@ -19,7 +20,18 @@ export let unblockPage = SlateTool.create(spec, {
       url: z.string().describe('URL of the protected page to access'),
       returnContent: z.boolean().optional().describe('Return the full HTML page content'),
       returnCookies: z.boolean().optional().describe('Return cookies from the session'),
-      returnScreenshot: z.boolean().optional().describe('Return a base64-encoded screenshot'),
+      returnScreenshot: z
+        .boolean()
+        .optional()
+        .describe('Return a screenshot as a Slate attachment'),
+      returnBrowserWSEndpoint: z
+        .boolean()
+        .optional()
+        .describe('Return a Browserless WebSocket endpoint for the unblocked browser session'),
+      proxy: z
+        .enum(['residential', 'datacenter'])
+        .optional()
+        .describe('Proxy network to route through when unblocking'),
       ttl: z.number().optional().describe('Session time-to-live in milliseconds')
     })
   )
@@ -41,37 +53,65 @@ export let unblockPage = SlateTool.create(spec, {
           })
         )
         .describe('Cookies from the session'),
-      screenshotBase64: z
+      browserWSEndpoint: z
         .string()
         .nullable()
-        .describe('Base64-encoded screenshot, or null if not requested')
+        .describe('Browserless WebSocket endpoint, or null if not requested'),
+      screenshotMimeType: z
+        .string()
+        .optional()
+        .describe('MIME type of the screenshot attachment, when returned'),
+      screenshotByteLength: z
+        .number()
+        .optional()
+        .describe('Decoded byte length of the screenshot attachment, when returned'),
+      attachmentCount: z.number().describe('Number of Slate attachments returned')
     })
   )
   .handleInvocation(async ctx => {
+    requireHttpUrl(ctx.input.url);
+
     let client = new BrowserlessClient({
       token: ctx.auth.token,
       region: ctx.config.region
     });
 
-    let result = await client.unblock({
-      url: ctx.input.url,
-      content: ctx.input.returnContent,
-      cookies: ctx.input.returnCookies,
-      screenshot: ctx.input.returnScreenshot,
-      ttl: ctx.input.ttl
-    });
+    let result = await client.unblock(
+      {
+        url: ctx.input.url,
+        content: ctx.input.returnContent,
+        cookies: ctx.input.returnCookies,
+        screenshot: ctx.input.returnScreenshot,
+        browserWSEndpoint: ctx.input.returnBrowserWSEndpoint,
+        ttl: ctx.input.ttl
+      },
+      {
+        proxy: ctx.input.proxy
+      }
+    );
 
     let parts: string[] = [];
     if (result.content) parts.push('HTML content');
     if (result.cookies?.length) parts.push(`${result.cookies.length} cookie(s)`);
     if (result.screenshot) parts.push('screenshot');
+    if (result.browserWSEndpoint) parts.push('browser WebSocket endpoint');
+
+    let attachments = result.screenshot
+      ? [base64FileAttachment(result.screenshot, 'image/png')]
+      : [];
 
     return {
       output: {
-        pageContent: result.content,
+        pageContent: result.content ?? null,
         cookies: result.cookies ?? [],
-        screenshotBase64: result.screenshot
+        browserWSEndpoint: result.browserWSEndpoint ?? null,
+        screenshotMimeType: result.screenshot ? 'image/png' : undefined,
+        screenshotByteLength: result.screenshot
+          ? base64ByteLength(result.screenshot)
+          : undefined,
+        attachmentCount: attachments.length
       },
+      attachments,
       message: `Unblocked ${ctx.input.url}. Retrieved: ${parts.length > 0 ? parts.join(', ') : 'no data (enable return options)'}.`
     };
   })

@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { cognitoApiError } from './errors';
 import { signRequest } from './signing';
 
 export interface IdentityClientConfig {
@@ -45,8 +46,12 @@ export class CognitoIdentityClient {
       baseURL: `https://${host}`
     });
 
-    let response = await ax.post('/', bodyStr, { headers });
-    return response.data;
+    try {
+      let response = await ax.post('/', bodyStr, { headers });
+      return response.data;
+    } catch (error) {
+      throw cognitoApiError(error, action);
+    }
   }
 
   async listIdentityPools(maxResults: number = 60, nextToken?: string): Promise<any> {

@@ -9,15 +9,19 @@ import {
   getSubscriber,
   getSubscriberActivity,
   listAutomations,
+  listCampaignLanguages,
   listCampaigns,
   listForms,
   listGroups,
   listSegments,
   listSubscribers,
+  listTimezones,
   manageCustomField,
   manageGroup,
   manageGroupSubscribers,
-  scheduleOrSendCampaign
+  manageWebhook,
+  scheduleOrSendCampaign,
+  updateCampaign
 } from './tools';
 import { campaignEvents, subscriberEvents } from './triggers';
 
@@ -35,12 +39,16 @@ export let provider = Slate.create({
     listSegments,
     manageCustomField,
     createCampaign,
+    updateCampaign,
     listCampaigns,
     scheduleOrSendCampaign,
     deleteCampaign,
     getCampaignReport,
     listAutomations,
-    listForms
+    listForms,
+    manageWebhook,
+    listTimezones,
+    listCampaignLanguages
   ],
   triggers: [subscriberEvents, campaignEvents]
 });

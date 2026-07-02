@@ -2,11 +2,12 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
+import { jsonObjectSchema, requireArray } from './shared';
 
 export let pushDatasetItems = SlateTool.create(spec, {
   name: 'Push Dataset Items',
   key: 'push_dataset_items',
-  description: `Append items to an Apify dataset. Datasets are append-only structured storage. Use this to add scraped data, processed results, or any structured records to a dataset.`,
+  description: `Append JSON objects to an Apify dataset. Datasets are append-only and are commonly used for Actor output records.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -14,28 +15,29 @@ export let pushDatasetItems = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      datasetId: z.string().describe('Dataset ID to push items to'),
-      items: z
-        .array(z.record(z.string(), z.any()))
-        .describe('Array of JSON objects to append to the dataset')
+      datasetId: z.string().describe('Dataset ID to append items to'),
+      items: z.array(jsonObjectSchema).describe('Non-empty array of JSON objects to append')
     })
   )
   .output(
     z.object({
-      pushed: z.boolean().describe('Whether the items were successfully pushed'),
+      datasetId: z.string().describe('Dataset ID'),
+      pushed: z.boolean().describe('Whether the items were pushed'),
       itemCount: z.number().describe('Number of items pushed')
     })
   )
   .handleInvocation(async ctx => {
+    let items = requireArray(ctx.input.items, 'items');
     let client = new ApifyClient({ token: ctx.auth.token });
-    await client.pushDatasetItems(ctx.input.datasetId, ctx.input.items);
+    await client.pushDatasetItems(ctx.input.datasetId, items);
 
     return {
       output: {
+        datasetId: ctx.input.datasetId,
         pushed: true,
-        itemCount: ctx.input.items.length
+        itemCount: items.length
       },
-      message: `Pushed **${ctx.input.items.length}** item(s) to dataset \`${ctx.input.datasetId}\`.`
+      message: `Pushed **${items.length}** item(s) to dataset \`${ctx.input.datasetId}\`.`
     };
   })
   .build();

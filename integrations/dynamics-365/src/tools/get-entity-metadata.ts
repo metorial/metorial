@@ -1,13 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { DynamicsClient } from '../lib/client';
-import { resolveDynamicsInstanceUrl } from '../lib/resolve-instance-url';
+import { createDynamicsClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let listEntities = SlateTool.create(spec, {
   name: 'List Entity Definitions',
   key: 'list_entities',
-  description: `List all entity (table) definitions in the Dynamics 365 environment. Returns metadata about available entities including their logical names, display names, and entity set names. Useful for discovering which entities are available and their OData entity set names.`,
+  description: `List Dataverse table definitions in the Dynamics 365 environment. Returns metadata including logical names, display names, entity set names, primary columns, and ownership details.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -30,29 +29,47 @@ export let listEntities = SlateTool.create(spec, {
             displayName: z.string().describe('Display name of the entity'),
             entitySetName: z.string().describe('OData entity set name for API calls'),
             isCustomEntity: z.boolean().describe('Whether this is a custom entity'),
-            description: z.string().describe('Entity description')
+            description: z.string().describe('Entity description'),
+            primaryIdAttribute: z.string().optional().describe('Primary ID column'),
+            primaryNameAttribute: z.string().optional().describe('Primary name column'),
+            ownershipType: z.string().optional().describe('Dataverse ownership type'),
+            isActivity: z.boolean().optional().describe('Whether the table is an activity'),
+            metadataId: z.string().optional().describe('Dataverse metadata ID')
           })
         )
         .describe('List of entity definitions')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new DynamicsClient({
-      token: ctx.auth.token,
-      instanceUrl: resolveDynamicsInstanceUrl(ctx)
-    });
+    let client = createDynamicsClient(ctx);
 
     let entities = await client.getEntityDefinitions({
-      select: ['LogicalName', 'DisplayName', 'EntitySetName', 'IsCustomEntity', 'Description'],
+      select: [
+        'LogicalName',
+        'DisplayName',
+        'EntitySetName',
+        'IsCustomEntity',
+        'Description',
+        'PrimaryIdAttribute',
+        'PrimaryNameAttribute',
+        'OwnershipType',
+        'IsActivity',
+        'MetadataId'
+      ],
       filter: ctx.input.filter
     });
 
     let mapped = entities.map((e: any) => ({
-      logicalName: e.LogicalName || '',
-      displayName: e.DisplayName?.UserLocalizedLabel?.Label || e.LogicalName || '',
-      entitySetName: e.EntitySetName || '',
-      isCustomEntity: e.IsCustomEntity || false,
-      description: e.Description?.UserLocalizedLabel?.Label || ''
+      logicalName: e.logicalName || '',
+      displayName: e.displayName || e.logicalName || '',
+      entitySetName: e.entitySetName || '',
+      isCustomEntity: false,
+      description: e.description || '',
+      primaryIdAttribute: e.primaryIdAttribute,
+      primaryNameAttribute: e.primaryNameAttribute,
+      ownershipType: e.ownershipType,
+      isActivity: e.isActivity,
+      metadataId: e.metadataId
     }));
 
     return {
@@ -65,7 +82,7 @@ export let listEntities = SlateTool.create(spec, {
 export let getEntityAttributes = SlateTool.create(spec, {
   name: 'Get Entity Attributes',
   key: 'get_entity_attributes',
-  description: `Retrieve all attribute (column) definitions for a specific Dynamics 365 entity. Returns field names, types, required levels, and whether they can be used in create/update operations. Essential for understanding the schema of an entity before creating or updating records.`,
+  description: `Retrieve attribute (column) definitions for a specific Dynamics 365 Dataverse table. Returns field names, types, required levels, read/create/update capabilities, lookup targets, and metadata IDs.`,
   instructions: [
     'Use the entity logical name (singular, lowercase), not the entity set name. For example, use "account" not "accounts".'
   ],
@@ -103,27 +120,42 @@ export let getEntityAttributes = SlateTool.create(spec, {
               .describe('Whether the attribute can be set during creation'),
             isValidForUpdate: z
               .boolean()
-              .describe('Whether the attribute can be modified during updates')
+              .describe('Whether the attribute can be modified during updates'),
+            isValidForRead: z
+              .boolean()
+              .optional()
+              .describe('Whether the attribute can be read'),
+            schemaName: z.string().optional().describe('Schema name of the attribute'),
+            description: z.string().optional().describe('Attribute description'),
+            targets: z.array(z.string()).optional().describe('Lookup target logical names'),
+            attributeOf: z
+              .string()
+              .optional()
+              .describe('Parent attribute for calculated fields'),
+            metadataId: z.string().optional().describe('Dataverse metadata ID')
           })
         )
         .describe('List of attribute definitions')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new DynamicsClient({
-      token: ctx.auth.token,
-      instanceUrl: resolveDynamicsInstanceUrl(ctx)
-    });
+    let client = createDynamicsClient(ctx);
 
     let attributes = await client.getEntityAttributes(ctx.input.entityLogicalName);
 
     let mapped = attributes.map((a: any) => ({
-      logicalName: a.LogicalName || '',
-      displayName: a.DisplayName?.UserLocalizedLabel?.Label || a.LogicalName || '',
-      attributeType: a.AttributeType || '',
-      requiredLevel: a.RequiredLevel?.Value || 'None',
-      isValidForCreate: a.IsValidForCreate ?? false,
-      isValidForUpdate: a.IsValidForUpdate ?? false
+      logicalName: a.logicalName || '',
+      displayName: a.displayName || a.logicalName || '',
+      attributeType: a.type || '',
+      requiredLevel: a.requiredLevel || 'None',
+      isValidForCreate: a.isValidForCreate ?? false,
+      isValidForUpdate: a.isValidForUpdate ?? false,
+      isValidForRead: a.isValidForRead,
+      schemaName: a.schemaName,
+      description: a.description,
+      targets: a.targets,
+      attributeOf: a.attributeOf,
+      metadataId: a.metadataId
     }));
 
     return {

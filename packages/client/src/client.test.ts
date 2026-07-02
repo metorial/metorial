@@ -30,15 +30,17 @@ let createDemoSlate = () => {
     z.object({
       prefix: z.string()
     })
-  ).getDefaultConfig(() => ({
-    prefix: 'Hello'
-  })).docs([
-    {
-      type: 'docs.config.general',
-      name: 'Demo config docs',
-      url: 'https://example.com/docs/config'
-    }
-  ]);
+  )
+    .getDefaultConfig(() => ({
+      prefix: 'Hello'
+    }))
+    .docs([
+      {
+        type: 'docs.config.general',
+        name: 'Demo config docs',
+        url: 'https://example.com/docs/config'
+      }
+    ]);
 
   let demoAuth = SlateAuth.create<{ token: string }>()
     .output(
@@ -71,7 +73,8 @@ let createDemoSlate = () => {
       getOutput: async (ctx: { input: { token: string } }) => ({
         output: {
           token: ctx.input.token
-        }
+        },
+        scopes: [`scope:${ctx.input.token}`]
       }),
       getProfile: async (ctx: { output: { token: string } }) => ({
         profile: {
@@ -123,6 +126,7 @@ let createDemoSlate = () => {
         }
       ]
     })
+    .authMethods(['token_auth'])
     .handleInvocation(async ctx => ({
       output: {
         greeting: `${ctx.config.prefix} ${ctx.input.name}`,
@@ -425,6 +429,83 @@ let createOauthConfigSlate = (seenConfig: SeenOAuthConfig) => {
   });
 };
 
+type TokenConfig = {
+  prefix: string;
+};
+
+type SeenTokenConfig = Partial<Record<'output' | 'profile', TokenConfig>>;
+
+let getRequiredTokenConfig = (ctx: { config?: Record<string, unknown> }): TokenConfig => {
+  expect(ctx.config).toBeDefined();
+  return ctx.config as TokenConfig;
+};
+
+type TokenAuthOutputContext = {
+  input: { token: string };
+  config?: Record<string, unknown>;
+};
+
+type TokenAuthProfileContext = {
+  output: { token: string };
+  config?: Record<string, unknown>;
+};
+
+let createTokenConfigSlate = (seenConfig: SeenTokenConfig) => {
+  let config = SlateConfig.create(
+    z.object({
+      prefix: z.string()
+    })
+  );
+
+  let auth = SlateAuth.create<{ token: string }>()
+    .output(
+      z.object({
+        token: z.string()
+      })
+    )
+    .addTokenAuth({
+      type: 'auth.token',
+      key: 'token_auth',
+      name: 'Token Auth',
+      inputSchema: z.object({
+        token: z.string()
+      }),
+      getOutput: async (ctx: TokenAuthOutputContext) => {
+        let currentConfig = getRequiredTokenConfig(ctx);
+        seenConfig.output = currentConfig;
+        return {
+          output: {
+            token: `${currentConfig.prefix}:${ctx.input.token}`
+          }
+        };
+      },
+      getProfile: async (ctx: TokenAuthProfileContext) => {
+        let currentConfig = getRequiredTokenConfig(ctx);
+        seenConfig.profile = currentConfig;
+        return {
+          profile: {
+            prefix: currentConfig.prefix,
+            token: ctx.output.token
+          }
+        };
+      }
+    });
+
+  let spec = SlateSpecification.create({
+    key: 'token-config-slate',
+    name: 'Token Config Slate',
+    description: 'A slate that reads config in token auth hooks',
+    config,
+    auth
+  });
+
+  return Slate.create({
+    spec,
+    tools: [],
+    triggers: []
+  });
+};
+
 describe('@slates/client local transport', () => {
   it('discovers auth/config and invokes tools with session state', async () => {
     let slate = createDemoSlate();
@@ -458,6 +539,7 @@ describe('@slates/client local transport', () => {
         }
       ]
     });
+    expect(actions[0]!.authMethods).toEqual(['token_auth']);
 
     let configSchema = await client.getConfigSchema();
     expect(configSchema.schema.properties.prefix.type).toBe('string');
@@ -498,6 +580,7 @@ describe('@slates/client local transport', () => {
       input: changedInput.input ?? { token: '' }
     });
     expect(authOutput.output).toEqual({ token: 'trimmed-token' });
+    expect(authOutput.scopes).toEqual(['scope:trimmed-token']);
 
     client.setConfig({ prefix: 'Hi' });
     client.setAuth({
@@ -723,6 +806,49 @@ describe('@slates/client local transport', () => {
       callback: { loginHost: 'sandbox.example.com' },
       refresh: { loginHost: 'sandbox.example.com' },
       profile: { loginHost: 'sandbox.example.com' }
+    });
+  });
+
+  it('passes current profile config into token auth callbacks', async () => {
+    let seenConfig: SeenTokenConfig = {};
+    let client = createSlatesClient({
+      transport: createLocalSlateTransport({
+        slate: createTokenConfigSlate(seenConfig)
+      }),
+      state: {
+        config: {
+          prefix: 'configured'
+        }
+      }
+    });
+
+    let authOutput = await client.getAuthOutput({
+      authenticationMethodId: 'token_auth',
+      input: {
+        token: 'secret-token'
+      }
+    });
+
+    expect(authOutput.output).toEqual({
+      token: 'configured:secret-token'
+    });
+
+    let profile = await client.getAuthProfile({
+      authenticationMethodId: 'token_auth',
+      output: authOutput.output,
+      input: {
+        token: 'secret-token'
+      },
+      scopes: []
+    });
+
+    expect(profile.profile).toEqual({
+      prefix: 'configured',
+      token: 'configured:secret-token'
+    });
+    expect(seenConfig).toEqual({
+      output: { prefix: 'configured' },
+      profile: { prefix: 'configured' }
     });
   });
 

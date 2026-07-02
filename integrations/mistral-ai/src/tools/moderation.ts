@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MistralClient } from '../lib/client';
+import { mistralServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let categoryResultSchema = z.object({
@@ -30,20 +31,40 @@ let categoryResultSchema = z.object({
   })
 });
 
+let chatModerationMessageSchema = z.object({
+  role: z.enum(['system', 'user', 'assistant', 'tool']).describe('Message role'),
+  content: z.string().describe('Message content')
+});
+
 export let moderateContentTool = SlateTool.create(spec, {
   name: 'Moderate Content',
   key: 'moderate_content',
-  description: `Analyze text for harmful content across multiple safety categories. Returns boolean flags and confidence scores for categories including sexual content, hate/discrimination, violence, dangerous content, self-harm, health/financial/legal misinformation, and PII detection.`,
+  description: `Analyze plain text or chat messages for harmful content across multiple safety categories. Returns boolean flags and confidence scores for categories including sexual content, hate/discrimination, violence, dangerous content, self-harm, health/financial/legal misinformation, and PII detection.`,
+  instructions: [
+    'Use mode "text" with input for standalone strings.',
+    'Use mode "chat" with messages to moderate a conversation.'
+  ],
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      mode: z
+        .enum(['text', 'chat'])
+        .optional()
+        .default('text')
+        .describe('Whether to moderate standalone text input or chat messages'),
       input: z
         .union([z.string(), z.array(z.string())])
-        .describe('Text or array of texts to moderate'),
-      model: z.string().default('mistral-moderation-latest').describe('Moderation model ID')
+        .optional()
+        .describe('Text or array of texts to moderate when mode is "text"'),
+      messages: z
+        .array(chatModerationMessageSchema)
+        .optional()
+        .describe('Chat messages to moderate when mode is "chat"'),
+      model: z.string().default('mistral-moderation-latest').describe('Moderation model ID'),
+      metadata: z.record(z.string(), z.any()).optional().describe('Request metadata')
     })
   )
   .output(
@@ -56,10 +77,27 @@ export let moderateContentTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new MistralClient(ctx.auth.token);
 
-    let result = await client.moderate({
-      model: ctx.input.model,
-      input: ctx.input.input
-    });
+    let mode = ctx.input.mode ?? 'text';
+    let result =
+      mode === 'chat'
+        ? await client.moderateChat({
+            model: ctx.input.model,
+            input:
+              ctx.input.messages ??
+              (() => {
+                throw mistralServiceError('messages is required when mode is "chat"');
+              })(),
+            metadata: ctx.input.metadata
+          })
+        : await client.moderate({
+            model: ctx.input.model,
+            input:
+              ctx.input.input ??
+              (() => {
+                throw mistralServiceError('input is required when mode is "text"');
+              })(),
+            metadata: ctx.input.metadata
+          });
 
     let mapResult = (r: any) => ({
       categories: {

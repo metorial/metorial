@@ -38,6 +38,7 @@ export let listDocuments = SlateTool.create(spec, {
             previewUrl: z.string().nullable().describe('Preview URL'),
             publicShareLink: z.string().nullable().describe('Public share link'),
             filename: z.string().nullable().describe('Document filename'),
+            outputType: z.string().nullable().describe('Output format: pdf or image'),
             failureCause: z.string().nullable().describe('Error message if failed'),
             createdAt: z.string().describe('Creation timestamp'),
             updatedAt: z.string().describe('Last update timestamp')
@@ -68,6 +69,7 @@ export let listDocuments = SlateTool.create(spec, {
       previewUrl: doc.preview_url ? String(doc.preview_url) : null,
       publicShareLink: doc.public_share_link ? String(doc.public_share_link) : null,
       filename: doc.filename ? String(doc.filename) : null,
+      outputType: doc.output_type ? String(doc.output_type) : null,
       failureCause: doc.failure_cause ? String(doc.failure_cause) : null,
       createdAt: String(doc.created_at),
       updatedAt: String(doc.updated_at)

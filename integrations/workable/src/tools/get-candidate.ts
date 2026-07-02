@@ -1,25 +1,51 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { WorkableClient } from '../lib/client';
+import {
+  mapCandidateActivity,
+  mapCandidateDetails,
+  mapCandidateFile,
+  unwrapCandidate
+} from '../lib/shapes';
 import { spec } from '../spec';
 
 export let getCandidateTool = SlateTool.create(spec, {
   name: 'Get Candidate Details',
   key: 'get_candidate',
-  description: `Retrieve full details for a specific candidate in a job, including their profile, answers to custom questions, tags, social profiles, education, experience, and optionally their activity feed and offer details.`,
+  description: `Retrieve a Workable candidate by candidate ID. Optionally include the candidate activity feed, files, and current offer details.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
-      jobShortcode: z.string().describe('The shortcode of the job the candidate belongs to'),
       candidateId: z.string().describe('The candidate ID'),
       includeActivities: z
         .boolean()
         .optional()
         .describe('Also fetch the candidate activity feed'),
-      includeOffer: z.boolean().optional().describe('Also fetch the candidate offer details')
+      activityLimit: z
+        .number()
+        .optional()
+        .describe('Maximum number of activity records to fetch'),
+      activitySinceId: z
+        .string()
+        .optional()
+        .describe('Return activities with ID greater than this ID'),
+      activityMaxId: z
+        .string()
+        .optional()
+        .describe('Return activities with ID less than this ID'),
+      activityActions: z
+        .array(z.string())
+        .optional()
+        .describe('Filter activities by Workable action names'),
+      activityUpdatedAfter: z
+        .string()
+        .optional()
+        .describe('Only return activities updated after this ISO 8601 timestamp'),
+      includeFiles: z.boolean().optional().describe('Also fetch candidate file metadata'),
+      includeOffer: z.boolean().optional().describe('Also fetch candidate offer details')
     })
   )
   .output(
@@ -32,72 +58,32 @@ export let getCandidateTool = SlateTool.create(spec, {
       email: z.string().optional().describe('Primary email'),
       phone: z.string().optional().describe('Phone number'),
       address: z.string().optional().describe('Address'),
+      location: z.any().optional().describe('Candidate location'),
       stage: z.string().optional().describe('Current pipeline stage'),
+      stageKind: z.string().optional().describe('Current pipeline stage kind'),
+      jobShortcode: z.string().optional().describe('Associated job shortcode'),
+      jobTitle: z.string().optional().describe('Associated job title'),
       disqualified: z.boolean().optional().describe('Whether disqualified'),
+      withdrew: z.boolean().optional().describe('Whether withdrew'),
       disqualificationReason: z.string().optional().describe('Disqualification reason'),
+      disqualifiedAt: z.string().optional().describe('Disqualification timestamp'),
       sourced: z.boolean().optional().describe('Whether sourced'),
       profileUrl: z.string().optional().describe('Workable profile URL'),
       imageUrl: z.string().optional().describe('Profile image URL'),
+      coverLetter: z.string().optional().describe('Cover letter'),
+      summary: z.string().optional().describe('Candidate summary'),
+      skills: z.array(z.any()).optional().describe('Candidate skills'),
+      resumeUrl: z.string().optional().describe('Resume URL'),
+      resumeMetadata: z.any().optional().describe('Resume metadata'),
       tags: z.array(z.string()).optional().describe('Candidate tags'),
-      socialProfiles: z
-        .array(
-          z.object({
-            type: z.string().describe('Social network type'),
-            url: z.string().describe('Profile URL')
-          })
-        )
-        .optional()
-        .describe('Social profiles'),
-      education: z
-        .array(
-          z.object({
-            school: z.string().optional(),
-            degree: z.string().optional(),
-            fieldOfStudy: z.string().optional(),
-            startDate: z.string().optional(),
-            endDate: z.string().optional()
-          })
-        )
-        .optional()
-        .describe('Education entries'),
-      experience: z
-        .array(
-          z.object({
-            title: z.string().optional(),
-            company: z.string().optional(),
-            industry: z.string().optional(),
-            summary: z.string().optional(),
-            startDate: z.string().optional(),
-            endDate: z.string().optional(),
-            current: z.boolean().optional()
-          })
-        )
-        .optional()
-        .describe('Experience entries'),
-      answers: z
-        .array(
-          z.object({
-            questionKey: z.string().optional(),
-            label: z.string().optional(),
-            body: z.any().optional()
-          })
-        )
-        .optional()
-        .describe('Answers to custom questions'),
+      socialProfiles: z.array(z.any()).optional().describe('Social profiles'),
+      education: z.array(z.any()).optional().describe('Education entries'),
+      experience: z.array(z.any()).optional().describe('Experience entries'),
+      answers: z.array(z.any()).optional().describe('Answers to custom questions'),
       createdAt: z.string().optional().describe('Creation timestamp'),
       updatedAt: z.string().optional().describe('Last update timestamp'),
-      activities: z
-        .array(
-          z.object({
-            activityId: z.string().optional(),
-            action: z.string().optional(),
-            body: z.string().optional(),
-            createdAt: z.string().optional(),
-            memberName: z.string().optional()
-          })
-        )
-        .optional()
-        .describe('Activity feed entries'),
+      activities: z.array(z.any()).optional().describe('Activity feed entries'),
+      files: z.array(z.any()).optional().describe('Candidate file metadata'),
       offer: z.any().optional().describe('Offer details')
     })
   )
@@ -107,77 +93,32 @@ export let getCandidateTool = SlateTool.create(spec, {
       subdomain: ctx.config.subdomain
     });
 
-    let result = await client.getCandidate(ctx.input.jobShortcode, ctx.input.candidateId);
-    let c = result.candidate || result;
-
-    let output: any = {
-      candidateId: c.id,
-      name: c.name,
-      firstname: c.firstname,
-      lastname: c.lastname,
-      headline: c.headline,
-      email: c.email,
-      phone: c.phone,
-      address: c.address,
-      stage: c.stage,
-      disqualified: c.disqualified,
-      disqualificationReason: c.disqualification_reason,
-      sourced: c.sourced,
-      profileUrl: c.profile_url,
-      imageUrl: c.image_url,
-      tags: c.tags,
-      socialProfiles: c.social_profiles?.map((sp: any) => ({
-        type: sp.type,
-        url: sp.url
-      })),
-      education: c.education_entries?.map((e: any) => ({
-        school: e.school,
-        degree: e.degree,
-        fieldOfStudy: e.field_of_study,
-        startDate: e.start_date,
-        endDate: e.end_date
-      })),
-      experience: c.experience_entries?.map((e: any) => ({
-        title: e.title,
-        company: e.company,
-        industry: e.industry,
-        summary: e.summary,
-        startDate: e.start_date,
-        endDate: e.end_date,
-        current: e.current
-      })),
-      answers: c.answers?.map((a: any) => ({
-        questionKey: a.question_key,
-        label: a.label,
-        body: a.body
-      })),
-      createdAt: c.created_at,
-      updatedAt: c.updated_at
-    };
+    let output: any = mapCandidateDetails(
+      unwrapCandidate(await client.getCandidate(ctx.input.candidateId))
+    );
 
     if (ctx.input.includeActivities) {
-      let activitiesResult = await client.getCandidateActivities(
-        ctx.input.jobShortcode,
-        ctx.input.candidateId
-      );
-      output.activities = (activitiesResult.activities || []).map((a: any) => ({
-        activityId: a.id,
-        action: a.action,
-        body: a.body,
-        createdAt: a.created_at,
-        memberName: a.member?.name
-      }));
+      let activitiesResult = await client.getCandidateActivities(ctx.input.candidateId, {
+        limit: ctx.input.activityLimit,
+        since_id: ctx.input.activitySinceId,
+        max_id: ctx.input.activityMaxId,
+        actions: ctx.input.activityActions?.join(','),
+        updated_after: ctx.input.activityUpdatedAfter
+      });
+      output.activities = (activitiesResult.activities || []).map(mapCandidateActivity);
+    }
+
+    if (ctx.input.includeFiles) {
+      let filesResult = await client.listCandidateFiles(ctx.input.candidateId);
+      output.files = (filesResult.files || []).map(mapCandidateFile);
     }
 
     if (ctx.input.includeOffer) {
       try {
-        let offerResult = await client.getCandidateOffer(
-          ctx.input.jobShortcode,
-          ctx.input.candidateId
-        );
-        output.offer = offerResult;
-      } catch {
-        // Offer may not exist for this candidate
+        output.offer = await client.getCandidateOffer(ctx.input.candidateId);
+      } catch (error) {
+        let message = error instanceof Error ? error.message : String(error);
+        if (!/404|not found/i.test(message)) throw error;
       }
     }
 

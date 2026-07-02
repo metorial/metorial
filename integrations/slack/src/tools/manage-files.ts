@@ -24,6 +24,7 @@ export let manageFiles = SlateTool.create(spec, {
   description: `Upload, list, get info about, or delete files in Slack. Upload text content as a file snippet, retrieve file metadata, or list files shared in a channel or by a user.`,
   instructions: [
     'To **upload**, provide content and optionally a filename, filetype, title, and channelIds to share to.',
+    'Use Slack snippet types such as "text", "python", "javascript", or "markdown"; common aliases like "txt", "py", "js", and "md" are normalized before upload.',
     'To **list**, optionally filter by channelId or userId.',
     'To **get** file info, provide the fileId.',
     'To **delete**, provide the fileId.'
@@ -43,12 +44,19 @@ export let manageFiles = SlateTool.create(spec, {
         .optional()
         .describe('Text content to upload as a file (for upload action)'),
       filename: z.string().optional().describe('Filename for the uploaded file'),
-      filetype: z.string().optional().describe('File type (e.g. "txt", "py", "json")'),
+      filetype: z
+        .string()
+        .optional()
+        .describe(
+          'Slack snippet type for uploaded text (e.g. "text", "python", "javascript", "markdown"). Common aliases like "txt", "py", "js", and "md" are accepted.'
+        ),
       title: z.string().optional().describe('Title for the uploaded file'),
       channelIds: z
         .string()
         .optional()
-        .describe('Comma-separated channel IDs to share the file to'),
+        .describe(
+          'Comma-separated Slack conversation IDs to share the file to, such as C..., G..., or D...; do not pass channel names like #general'
+        ),
       initialComment: z.string().optional().describe('Comment to add when sharing the file'),
       threadTs: z
         .string()

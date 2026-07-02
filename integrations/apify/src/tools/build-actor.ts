@@ -2,15 +2,16 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
+import { mapBuild, paginationInput, requireString } from './shared';
 
 export let buildActor = SlateTool.create(spec, {
   name: 'Build Actor',
   key: 'build_actor',
-  description: `Trigger a build for an Actor or retrieve build details. Builds compile Actor source code into runnable Docker images. You can specify version and tag, and list previous builds.`,
+  description: `Start an Apify Actor build, retrieve build details, or list builds for an Actor. Builds compile Actor versions into runnable Docker images.`,
   instructions: [
-    'Use action "build" with actorId to start a new build.',
-    'Use action "get" with buildId to check build status.',
-    'Use action "list" with actorId to list previous builds.'
+    'Use action=build with actorId and version to start a new build.',
+    'Use action=get with buildId to check status.',
+    'Use action=list with actorId to inspect previous builds.'
   ],
   tags: {
     destructive: false,
@@ -20,41 +21,29 @@ export let buildActor = SlateTool.create(spec, {
   .input(
     z.object({
       action: z.enum(['build', 'get', 'list']).describe('Action to perform'),
-      actorId: z.string().optional().describe('Actor ID (required for build and list)'),
-      buildId: z.string().optional().describe('Build ID (required for get)'),
-      version: z.string().optional().describe('Version number to build (for build action)'),
-      tag: z.string().optional().describe('Build tag (for build action, e.g. "latest")'),
-      useCache: z
-        .boolean()
+      actorId: z.string().optional().describe('Actor ID; required for build/list'),
+      buildId: z.string().optional().describe('Build ID; required for get'),
+      version: z.string().optional().describe('Actor version number; required for build'),
+      tag: z.string().optional().describe('Build tag, such as latest'),
+      useCache: z.boolean().optional().describe('Whether to use Docker layer cache'),
+      betaPackages: z.boolean().optional().describe('Whether to use beta Apify packages'),
+      waitForFinish: z
+        .number()
         .optional()
-        .describe('Whether to use Docker layer cache (for build action)'),
-      limit: z.number().optional().default(25).describe('Max items for list'),
-      offset: z.number().optional().default(0).describe('Pagination offset for list')
+        .describe('Seconds Apify should wait for the build to finish before returning'),
+      ...paginationInput
     })
   )
   .output(
     z.object({
       buildId: z.string().optional().describe('Build ID'),
       actorId: z.string().optional().describe('Actor ID'),
-      status: z
-        .string()
-        .optional()
-        .describe('Build status (READY, RUNNING, SUCCEEDED, FAILED, ABORTED, TIMED-OUT)'),
+      status: z.string().optional().describe('Build status'),
       startedAt: z.string().optional().describe('Build start timestamp'),
       finishedAt: z.string().optional().describe('Build finish timestamp'),
       buildNumber: z.string().optional().describe('Build number'),
-      builds: z
-        .array(
-          z.object({
-            buildId: z.string().describe('Build ID'),
-            status: z.string().describe('Build status'),
-            startedAt: z.string().optional().describe('Start timestamp'),
-            finishedAt: z.string().optional().describe('Finish timestamp'),
-            buildNumber: z.string().optional().describe('Build number')
-          })
-        )
-        .optional()
-        .describe('Build list (for list action)'),
+      versionNumber: z.string().optional().describe('Actor version number'),
+      builds: z.array(z.record(z.string(), z.any())).optional().describe('Build list'),
       total: z.number().optional().describe('Total builds')
     })
   )
@@ -62,57 +51,44 @@ export let buildActor = SlateTool.create(spec, {
     let client = new ApifyClient({ token: ctx.auth.token });
 
     if (ctx.input.action === 'build') {
-      let build = await client.buildActor(ctx.input.actorId!, {
-        version: ctx.input.version,
+      let actorId = requireString(ctx.input.actorId, 'actorId', 'build');
+      let version = requireString(ctx.input.version, 'version', 'build');
+      let build = await client.buildActor(actorId, {
+        version,
         tag: ctx.input.tag,
-        useCache: ctx.input.useCache
+        useCache: ctx.input.useCache,
+        betaPackages: ctx.input.betaPackages,
+        waitForFinish: ctx.input.waitForFinish
       });
+      let output = mapBuild(build);
 
       return {
-        output: {
-          buildId: build.id,
-          actorId: build.actId,
-          status: build.status,
-          startedAt: build.startedAt,
-          finishedAt: build.finishedAt,
-          buildNumber: build.buildNumber
-        },
-        message: `Build started for Actor \`${ctx.input.actorId}\`. Build ID: \`${build.id}\`, Status: **${build.status}**.`
+        output,
+        message: `Build started for Actor \`${actorId}\` version \`${version}\`. Build ID: \`${output.buildId}\`, status: **${output.status}**.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      let build = await client.getBuild(ctx.input.buildId!);
+      let buildId = requireString(ctx.input.buildId, 'buildId', 'get');
+      let build = await client.getBuild(buildId);
+      let output = mapBuild(build);
       return {
-        output: {
-          buildId: build.id,
-          actorId: build.actId,
-          status: build.status,
-          startedAt: build.startedAt,
-          finishedAt: build.finishedAt,
-          buildNumber: build.buildNumber
-        },
-        message: `Build \`${build.id}\` status: **${build.status}**.`
+        output,
+        message: `Build \`${output.buildId}\` status: **${output.status}**.`
       };
     }
 
-    // list
-    let result = await client.listBuilds(ctx.input.actorId!, {
+    let actorId = requireString(ctx.input.actorId, 'actorId', 'list');
+    let result = await client.listBuilds(actorId, {
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      desc: ctx.input.descending
     });
-
-    let builds = result.items.map(item => ({
-      buildId: item.id,
-      status: item.status,
-      startedAt: item.startedAt,
-      finishedAt: item.finishedAt,
-      buildNumber: item.buildNumber
-    }));
+    let builds = result.items.map(mapBuild);
 
     return {
       output: { builds, total: result.total },
-      message: `Found **${result.total}** build(s) for Actor \`${ctx.input.actorId}\`, showing **${builds.length}**.`
+      message: `Found **${result.total}** build(s) for Actor \`${actorId}\`, showing **${builds.length}**.`
     };
   })
   .build();

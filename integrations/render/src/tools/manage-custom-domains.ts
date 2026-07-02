@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -15,7 +15,7 @@ export let manageCustomDomains = SlateTool.create(spec, {
       domainId: z
         .string()
         .optional()
-        .describe('Custom domain ID (required for verify and delete)'),
+        .describe('Custom domain ID or domain name (required for verify and delete)'),
       domainName: z
         .string()
         .optional()
@@ -51,7 +51,8 @@ export let manageCustomDomains = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'list') {
-      if (!ctx.input.serviceId) throw new Error('serviceId is required for list action');
+      if (!ctx.input.serviceId)
+        throw createApiServiceError('serviceId is required for list action');
       let data = await client.listCustomDomains(ctx.input.serviceId);
       let domains = (data as any[]).map((item: any) => {
         let d = item.customDomain || item;
@@ -70,8 +71,10 @@ export let manageCustomDomains = SlateTool.create(spec, {
     }
 
     if (action === 'add') {
-      if (!ctx.input.serviceId) throw new Error('serviceId is required for add action');
-      if (!ctx.input.domainName) throw new Error('domainName is required for add action');
+      if (!ctx.input.serviceId)
+        throw createApiServiceError('serviceId is required for add action');
+      if (!ctx.input.domainName)
+        throw createApiServiceError('domainName is required for add action');
       let d = await client.addCustomDomain(ctx.input.serviceId, ctx.input.domainName);
       return {
         output: {
@@ -83,8 +86,11 @@ export let manageCustomDomains = SlateTool.create(spec, {
     }
 
     if (action === 'verify') {
-      if (!ctx.input.domainId) throw new Error('domainId is required for verify action');
-      let d = await client.verifyCustomDomain(ctx.input.domainId);
+      if (!ctx.input.serviceId)
+        throw createApiServiceError('serviceId is required for verify action');
+      if (!ctx.input.domainId)
+        throw createApiServiceError('domainId is required for verify action');
+      let d = await client.verifyCustomDomain(ctx.input.serviceId, ctx.input.domainId);
       return {
         output: {
           domain: { domainId: d.id, name: d.name, verificationStatus: d.verificationStatus },
@@ -95,8 +101,11 @@ export let manageCustomDomains = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.domainId) throw new Error('domainId is required for delete action');
-      await client.deleteCustomDomain(ctx.input.domainId);
+      if (!ctx.input.serviceId)
+        throw createApiServiceError('serviceId is required for delete action');
+      if (!ctx.input.domainId)
+        throw createApiServiceError('domainId is required for delete action');
+      await client.deleteCustomDomain(ctx.input.serviceId, ctx.input.domainId);
       return {
         output: { success: true },
         message: `Deleted custom domain \`${ctx.input.domainId}\`.`

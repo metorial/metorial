@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AtlasClient } from '../lib/client';
+import { mongodbServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageProjectTool = SlateTool.create(spec, {
@@ -34,7 +35,7 @@ export let manageProjectTool = SlateTool.create(spec, {
 
     if (ctx.input.action === 'get') {
       let pid = ctx.input.projectId || ctx.config.projectId;
-      if (!pid) throw new Error('projectId is required for get action');
+      if (!pid) throw mongodbServiceError('projectId is required for get action');
       let project = await client.getProject(pid);
       return {
         output: {
@@ -49,9 +50,9 @@ export let manageProjectTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) throw mongodbServiceError('name is required for create action');
       let orgId = ctx.input.organizationId || ctx.config.organizationId;
-      if (!orgId) throw new Error('organizationId is required for create action');
+      if (!orgId) throw mongodbServiceError('organizationId is required for create action');
       let project = await client.createProject({
         name: ctx.input.name,
         orgId
@@ -70,7 +71,7 @@ export let manageProjectTool = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       let pid = ctx.input.projectId || ctx.config.projectId;
-      if (!pid) throw new Error('projectId is required for delete action');
+      if (!pid) throw mongodbServiceError('projectId is required for delete action');
       await client.deleteProject(pid);
       return {
         output: {
@@ -81,6 +82,6 @@ export let manageProjectTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw mongodbServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

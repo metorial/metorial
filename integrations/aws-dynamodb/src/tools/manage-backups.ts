@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { dynamoDbServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -24,7 +25,15 @@ export let manageBackups = SlateTool.create(spec, {
         ),
       backupName: z.string().optional().describe('Name for the backup (required for create)'),
       backupArn: z.string().optional().describe('ARN of the backup (required for delete)'),
-      limit: z.number().optional().describe('Maximum number of backups to list')
+      limit: z.number().optional().describe('Maximum number of backups to list'),
+      exclusiveStartBackupArn: z
+        .string()
+        .optional()
+        .describe('Backup ARN from the previous page for list pagination'),
+      backupType: z
+        .enum(['USER', 'SYSTEM', 'AWS_BACKUP', 'ALL'])
+        .optional()
+        .describe('Backup type filter for list')
     })
   )
   .output(
@@ -52,7 +61,11 @@ export let manageBackups = SlateTool.create(spec, {
       latestRestorableTimestamp: z
         .string()
         .optional()
-        .describe('Latest point you can restore to')
+        .describe('Latest point you can restore to'),
+      lastEvaluatedBackupArn: z
+        .string()
+        .optional()
+        .describe('Pagination token for the next backup list page')
     })
   )
   .handleInvocation(async ctx => {
@@ -60,7 +73,9 @@ export let manageBackups = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.tableName || !ctx.input.backupName) {
-        throw new Error('tableName and backupName are required for creating a backup');
+        throw dynamoDbServiceError(
+          'tableName and backupName are required for creating a backup.'
+        );
       }
       let result = await client.createBackup({
         tableName: ctx.input.tableName,
@@ -79,7 +94,9 @@ export let manageBackups = SlateTool.create(spec, {
     if (ctx.input.action === 'list') {
       let result = await client.listBackups({
         tableName: ctx.input.tableName,
-        limit: ctx.input.limit
+        limit: ctx.input.limit,
+        exclusiveStartBackupArn: ctx.input.exclusiveStartBackupArn,
+        backupType: ctx.input.backupType
       });
       let backups = (result.BackupSummaries || []).map((b: any) => ({
         backupArn: b.BackupArn,
@@ -91,14 +108,14 @@ export let manageBackups = SlateTool.create(spec, {
           : undefined
       }));
       return {
-        output: { backups },
+        output: { backups, lastEvaluatedBackupArn: result.LastEvaluatedBackupArn },
         message: `Found **${backups.length}** backups${ctx.input.tableName ? ` for table **${ctx.input.tableName}**` : ''}`
       };
     }
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.backupArn) {
-        throw new Error('backupArn is required for deleting a backup');
+        throw dynamoDbServiceError('backupArn is required for deleting a backup.');
       }
       let result = await client.deleteBackup(ctx.input.backupArn);
       let details = result.BackupDescription?.BackupDetails;
@@ -113,7 +130,7 @@ export let manageBackups = SlateTool.create(spec, {
 
     if (ctx.input.action === 'describe_pitr') {
       if (!ctx.input.tableName) {
-        throw new Error('tableName is required for describing PITR');
+        throw dynamoDbServiceError('tableName is required for describing PITR.');
       }
       let result = await client.describeContinuousBackups(ctx.input.tableName);
       let pitr = result.ContinuousBackupsDescription?.PointInTimeRecoveryDescription;
@@ -134,7 +151,7 @@ export let manageBackups = SlateTool.create(spec, {
 
     if (ctx.input.action === 'enable_pitr' || ctx.input.action === 'disable_pitr') {
       if (!ctx.input.tableName) {
-        throw new Error('tableName is required for updating PITR');
+        throw dynamoDbServiceError('tableName is required for updating PITR.');
       }
       let enabled = ctx.input.action === 'enable_pitr';
       await client.updateContinuousBackups({
@@ -150,6 +167,6 @@ export let manageBackups = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw dynamoDbServiceError(`Unknown backup action: ${ctx.input.action}`);
   })
   .build();

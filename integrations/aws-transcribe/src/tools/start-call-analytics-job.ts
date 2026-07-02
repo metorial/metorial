@@ -2,6 +2,12 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TranscribeClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  languageIdSettingsSchema,
+  tagSchema,
+  validateLanguageIdSettings,
+  validateVocabularyFilterMethod
+} from './common';
 
 export let startCallAnalyticsJob = SlateTool.create(spec, {
   name: 'Start Call Analytics Job',
@@ -26,6 +32,12 @@ export let startCallAnalyticsJob = SlateTool.create(spec, {
         .string()
         .describe('Unique name for the call analytics job (1-200 chars, no spaces)'),
       mediaFileUri: z.string().describe('S3 URI of the call audio file'),
+      redactedMediaFileUri: z
+        .string()
+        .optional()
+        .describe(
+          'S3 URI where AWS should write redacted source audio when using PII redaction'
+        ),
       dataAccessRoleArn: z
         .string()
         .optional()
@@ -59,6 +71,7 @@ export let startCallAnalyticsJob = SlateTool.create(spec, {
             .array(z.string())
             .optional()
             .describe('Expected language codes for auto-identification'),
+          languageIdSettings: languageIdSettingsSchema,
           summarization: z.boolean().optional().describe('Enable AI-generated call summary'),
           contentRedaction: z
             .object({
@@ -76,15 +89,7 @@ export let startCallAnalyticsJob = SlateTool.create(spec, {
         })
         .optional()
         .describe('Call analytics settings'),
-      tags: z
-        .array(
-          z.object({
-            key: z.string().describe('Tag key'),
-            value: z.string().describe('Tag value')
-          })
-        )
-        .optional()
-        .describe('Tags to associate with the job')
+      tags: z.array(tagSchema).optional().describe('Tags to associate with the job')
     })
   )
   .output(
@@ -99,6 +104,15 @@ export let startCallAnalyticsJob = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateLanguageIdSettings(
+      ctx.input.settings?.languageIdSettings,
+      ctx.input.settings?.languageOptions
+    );
+    validateVocabularyFilterMethod(
+      ctx.input.settings?.vocabularyFilterName,
+      ctx.input.settings?.vocabularyFilterMethod
+    );
+
     let client = new TranscribeClient({
       credentials: {
         accessKeyId: ctx.auth.accessKeyId,

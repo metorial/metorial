@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SesClient } from '../lib/client';
+import { requireAwsSesString } from '../lib/errors';
 import { spec } from '../spec';
 
 let topicPreferenceSchema = z.object({
@@ -103,9 +104,10 @@ export let manageContact = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      let emailAddress = requireAwsSesString(ctx.input.emailAddress, 'emailAddress', action);
       await client.createContact({
         contactListName: ctx.input.contactListName,
-        emailAddress: ctx.input.emailAddress!,
+        emailAddress,
         topicPreferences: ctx.input.topicPreferences,
         unsubscribeAll: ctx.input.unsubscribeAll,
         attributesData: ctx.input.attributesData
@@ -113,14 +115,15 @@ export let manageContact = SlateTool.create(spec, {
       return {
         output: {
           contactListName: ctx.input.contactListName,
-          emailAddress: ctx.input.emailAddress
+          emailAddress
         },
-        message: `Contact **${ctx.input.emailAddress}** added to list **${ctx.input.contactListName}**.`
+        message: `Contact **${emailAddress}** added to list **${ctx.input.contactListName}**.`
       };
     }
 
     if (action === 'get') {
-      let result = await client.getContact(ctx.input.contactListName, ctx.input.emailAddress!);
+      let emailAddress = requireAwsSesString(ctx.input.emailAddress, 'emailAddress', action);
+      let result = await client.getContact(ctx.input.contactListName, emailAddress);
       return {
         output: result,
         message: `Retrieved contact **${result.emailAddress}** from list **${result.contactListName}**.`
@@ -128,9 +131,10 @@ export let manageContact = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
+      let emailAddress = requireAwsSesString(ctx.input.emailAddress, 'emailAddress', action);
       await client.updateContact({
         contactListName: ctx.input.contactListName,
-        emailAddress: ctx.input.emailAddress!,
+        emailAddress,
         topicPreferences: ctx.input.topicPreferences,
         unsubscribeAll: ctx.input.unsubscribeAll,
         attributesData: ctx.input.attributesData
@@ -138,20 +142,21 @@ export let manageContact = SlateTool.create(spec, {
       return {
         output: {
           contactListName: ctx.input.contactListName,
-          emailAddress: ctx.input.emailAddress
+          emailAddress
         },
-        message: `Contact **${ctx.input.emailAddress}** updated in list **${ctx.input.contactListName}**.`
+        message: `Contact **${emailAddress}** updated in list **${ctx.input.contactListName}**.`
       };
     }
 
     if (action === 'delete') {
-      await client.deleteContact(ctx.input.contactListName, ctx.input.emailAddress!);
+      let emailAddress = requireAwsSesString(ctx.input.emailAddress, 'emailAddress', action);
+      await client.deleteContact(ctx.input.contactListName, emailAddress);
       return {
         output: {
           contactListName: ctx.input.contactListName,
-          emailAddress: ctx.input.emailAddress
+          emailAddress
         },
-        message: `Contact **${ctx.input.emailAddress}** removed from list **${ctx.input.contactListName}**.`
+        message: `Contact **${emailAddress}** removed from list **${ctx.input.contactListName}**.`
       };
     }
 

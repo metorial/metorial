@@ -30,7 +30,7 @@ export let createProjectTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let project = await client.createProject({
       name: ctx.input.name,
       description: ctx.input.description,
@@ -77,7 +77,7 @@ export let updateProjectTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let { projectId, ...updateInput } = ctx.input;
     let project = await client.updateProject(projectId, updateInput);
 
@@ -111,12 +111,107 @@ export let deleteProjectTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     await client.deleteProject(ctx.input.projectId);
 
     return {
       output: { deleted: true },
       message: `Project deleted successfully.`
+    };
+  })
+  .build();
+
+export let getProjectMembersTool = SlateTool.create(spec, {
+  name: 'Get Project Members',
+  key: 'get_project_members',
+  description: `List members of a Railway project and their project roles.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      projectId: z.string().describe('ID of the project to list members for')
+    })
+  )
+  .output(
+    z.object({
+      members: z.array(
+        z.object({
+          userId: z.string().describe('Railway user ID'),
+          name: z.string().nullable().describe('Member display name'),
+          email: z.string().nullable().describe('Member email address'),
+          avatar: z.string().nullable().describe('Member avatar URL'),
+          role: z.string().describe('Project role')
+        })
+      )
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let members = await client.getProjectMembers(ctx.input.projectId);
+
+    let mapped = members.map((member: any) => ({
+      userId: member.id,
+      name: member.name ?? null,
+      email: member.email ?? null,
+      avatar: member.avatar ?? null,
+      role: member.role
+    }));
+
+    return {
+      output: { members: mapped },
+      message: `Found **${mapped.length}** project member(s).`
+    };
+  })
+  .build();
+
+export let listRegionsTool = SlateTool.create(spec, {
+  name: 'List Regions',
+  key: 'list_regions',
+  description: `List Railway deployment regions. Optionally provide a project ID to include project-specific availability.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      projectId: z
+        .string()
+        .optional()
+        .describe('Optional project ID for project-specific region availability')
+    })
+  )
+  .output(
+    z.object({
+      regions: z.array(
+        z.object({
+          regionId: z.string().describe('Region identifier'),
+          name: z.string().describe('Region display name'),
+          region: z.string().nullable().describe('Railway region code'),
+          country: z.string().nullable().describe('Country'),
+          location: z.string().nullable().describe('Region location'),
+          workspaceId: z.string().nullable().describe('Workspace ID when applicable')
+        })
+      )
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let regions = await client.listRegions(ctx.input.projectId);
+
+    let mapped = regions.map((region: any) => ({
+      regionId: region.id,
+      name: region.name,
+      region: region.region ?? null,
+      country: region.country ?? null,
+      location: region.location ?? null,
+      workspaceId: region.workspaceId ?? null
+    }));
+
+    return {
+      output: { regions: mapped },
+      message: `Found **${mapped.length}** Railway region(s).`
     };
   })
   .build();

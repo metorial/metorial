@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { flyIoServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -11,6 +12,7 @@ export let controlMachine = SlateTool.create(spec, {
     'Use "start" to boot a stopped or suspended machine.',
     'Use "stop" to gracefully shut down a running machine.',
     'Use "restart" to stop and re-start a running machine.',
+    'Use "signal" to send a Unix signal to a running machine.',
     'Use "suspend" to snapshot the machine state including memory.',
     'Use "cordon" to prevent Fly Proxy from routing requests to this machine.',
     'Use "uncordon" to resume request routing to this machine.'
@@ -21,19 +23,19 @@ export let controlMachine = SlateTool.create(spec, {
       appName: z.string().describe('Name of the Fly App'),
       machineId: z.string().describe('ID of the machine'),
       action: z
-        .enum(['start', 'stop', 'restart', 'suspend', 'cordon', 'uncordon'])
+        .enum(['start', 'stop', 'restart', 'signal', 'suspend', 'cordon', 'uncordon'])
         .describe('Action to perform'),
       signal: z
         .string()
         .optional()
         .describe(
-          'Stop/restart signal (e.g. "SIGTERM", "SIGINT"). Only used with stop and restart actions.'
+          'Unix signal (e.g. "SIGTERM", "SIGINT"). Used with stop, restart, and signal actions.'
         ),
       timeout: z
-        .number()
+        .string()
         .optional()
         .describe(
-          'Grace period in seconds before SIGKILL. Only used with stop and restart actions.'
+          'Grace period as a Go duration string or seconds string (for example "10s"). Only used with stop and restart actions.'
         )
     })
   )
@@ -70,6 +72,12 @@ export let controlMachine = SlateTool.create(spec, {
         break;
       case 'restart':
         await client.restartMachine(appName, machineId, { signal, timeout });
+        break;
+      case 'signal':
+        if (!signal) {
+          throw flyIoServiceError('signal is required for signal action');
+        }
+        await client.signalMachine(appName, machineId, signal);
         break;
       case 'suspend':
         await client.suspendMachine(appName, machineId);

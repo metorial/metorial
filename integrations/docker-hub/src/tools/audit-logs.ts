@@ -1,7 +1,29 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
+import { type AuditLogAction, type AuditLogActionGroup, Client } from '../lib/client';
 import { spec } from '../spec';
+
+let flattenAuditActions = (
+  actions: AuditLogAction[] | Record<string, AuditLogActionGroup> | undefined
+) => {
+  if (!actions) return [];
+
+  if (Array.isArray(actions)) {
+    return actions.map(action => ({
+      group: undefined,
+      groupLabel: undefined,
+      ...action
+    }));
+  }
+
+  return Object.entries(actions).flatMap(([group, value]) =>
+    (value.actions || []).map(action => ({
+      group,
+      groupLabel: value.label,
+      ...action
+    }))
+  );
+};
 
 export let listAuditLogs = SlateTool.create(spec, {
   name: 'List Audit Logs',
@@ -25,6 +47,16 @@ export let listAuditLogs = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter by specific action type (e.g., "repo.create", "repo.delete").'),
+      name: z
+        .string()
+        .optional()
+        .describe(
+          'Filter by resource name. For repository events this is the repository name.'
+        ),
+      actor: z
+        .string()
+        .optional()
+        .describe('Filter by the Docker Hub username that triggered the event.'),
       from: z
         .string()
         .optional()
@@ -56,9 +88,11 @@ export let listAuditLogs = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listAuditLogs(ctx.input.account, {
       action: ctx.input.action,
+      name: ctx.input.name,
+      actor: ctx.input.actor,
       from: ctx.input.from,
       to: ctx.input.to,
       page: ctx.input.page,
@@ -101,23 +135,30 @@ export let listAuditLogActions = SlateTool.create(spec, {
       actions: z.array(
         z.object({
           actionName: z.string().describe('Action type identifier (e.g., "repo.create").'),
-          description: z.string().describe('Human-readable description of the action.')
+          description: z.string().describe('Human-readable description of the action.'),
+          label: z.string().optional().describe('Human-readable label for the action.'),
+          group: z.string().optional().describe('Action group key.'),
+          groupLabel: z.string().optional().describe('Human-readable action group label.')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client(ctx.auth);
     let result = await client.listAuditLogActions(ctx.input.account);
+    let actions = flattenAuditActions(result.actions);
 
     return {
       output: {
-        actions: (result.actions || []).map(a => ({
+        actions: actions.map(a => ({
           actionName: a.name,
-          description: a.description || ''
+          description: a.description || '',
+          label: a.label,
+          group: a.group,
+          groupLabel: a.groupLabel
         }))
       },
-      message: `Found **${(result.actions || []).length}** audit log action types for **${ctx.input.account}**.`
+      message: `Found **${actions.length}** audit log action types for **${ctx.input.account}**.`
     };
   })
   .build();

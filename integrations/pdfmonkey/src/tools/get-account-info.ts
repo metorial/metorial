@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getAccountInfo = SlateTool.create(spec, {
   name: 'Get Account Info',
   key: 'get_account_info',
-  description: `Retrieve information about the authenticated PDFMonkey account, including available document quota, current plan, workspace ID, and user details. Useful for checking remaining quota or discovering your workspace ID.`,
+  description: `Retrieve information about the authenticated PDFMonkey account, including available document quota, current plan, and user details. Useful for checking remaining quota before generation.`,
   tags: {
     destructive: false,
     readOnly: true

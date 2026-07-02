@@ -91,7 +91,6 @@ Manage the cluster infrastructure itself:
 Scale workloads dynamically based on metrics:
 
 - **HorizontalPodAutoscaler** — adjusts the number of pod replicas based on CPU, memory, or custom metrics
-- **VerticalPodAutoscaler** (if installed) — adjusts resource requests/limits for containers
 
 ### Custom Resource Definitions (CRDs)
 

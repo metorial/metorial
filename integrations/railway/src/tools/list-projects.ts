@@ -33,7 +33,7 @@ export let listProjectsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let projects = await client.listProjects(ctx.input.workspaceId);
 
     let mapped = projects.map((p: any) => ({

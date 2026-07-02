@@ -1,18 +1,18 @@
+import { resolveDataverseInstanceUrl } from '@slates/microsoft-dataverse-recipes';
+
 export let resolveDynamicsInstanceUrl = (ctx: {
-  auth?: { instanceUrl?: unknown } | null;
-  config?: { instanceUrl?: unknown } | null;
+  auth?: { dataverseInstanceUrl?: unknown } | null;
+  config?: { dataverseInstanceUrl?: unknown } | null;
 }) => {
-  let authInstanceUrl = ctx.auth?.instanceUrl;
-  if (typeof authInstanceUrl === 'string' && authInstanceUrl.trim().length > 0) {
-    return authInstanceUrl.replace(/\/+$/, '');
-  }
+  let authInstanceUrl = ctx.auth?.dataverseInstanceUrl;
+  let configInstanceUrl = ctx.config?.dataverseInstanceUrl;
 
-  let configInstanceUrl = ctx.config?.instanceUrl;
-  if (typeof configInstanceUrl === 'string' && configInstanceUrl.trim().length > 0) {
-    return configInstanceUrl.replace(/\/+$/, '');
-  }
-
-  throw new Error(
-    'Missing Dynamics 365 instanceUrl. Run OAuth auth setup to discover it automatically, or set config.instanceUrl for client-credentials use.'
-  );
+  return resolveDataverseInstanceUrl({
+    auth: {
+      instanceUrl: typeof authInstanceUrl === 'string' ? authInstanceUrl : undefined
+    },
+    config: {
+      instanceUrl: typeof configInstanceUrl === 'string' ? configInstanceUrl : undefined
+    }
+  });
 };

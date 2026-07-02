@@ -1,10 +1,8 @@
-Let me get the full list of webhook event types.Now I have comprehensive information. Let me compile the specification.
-
 # Slates Specification for Lemon Squeezy
 
 ## Overview
 
-Lemon Squeezy is a merchant-of-record platform for selling digital products, software, and subscriptions. It handles payments, tax compliance, subscription billing, license key management, and digital product delivery. The API allows programmatic management of stores, products, orders, customers, subscriptions, discounts, license keys, and checkouts.
+Lemon Squeezy is a merchant-of-record platform for selling digital products, software, and subscriptions. It handles payments, tax compliance, subscription billing, license key management, and digital product delivery. The integration exposes high-value API operations for stores, products, variants, prices, files, checkouts, webhooks, orders, order items, customers, subscriptions, subscription invoices, subscription items, discounts, discount redemptions, and license keys.
 
 ## Authentication
 
@@ -28,9 +26,13 @@ You can build and test a full API integration with Lemon Squeezy using Test Mode
 
 Retrieve information about your Lemon Squeezy stores, including store details and settings. A store is the top-level entity that contains all products, orders, and other resources.
 
-### Product & Variant Management
+### Product, Variant, Price & File Management
 
 The API covers all data types used in your store such as Products, Customers, Discounts and Files. You can use the API to manage your store as well as set up payments for customers, access prior orders and manage ongoing subscriptions and software license keys. Products can have multiple variants representing different pricing tiers or configurations.
+
+- List products and variants, with product filtering for variants.
+- List prices for variants, including package, renewal, setup fee, trial, and tier metadata.
+- List files attached to variants, including file names, identifiers, version, size, status, and download URL metadata.
 
 ### Checkout Creation
 
@@ -43,7 +45,7 @@ A checkout represents a custom checkout page. Checkouts can be used to customize
 
 ### Order Management
 
-Access and manage orders placed in your store. Orders contain details about the customer, pricing (including tax and discounts), currency, and status. You can also issue refunds for orders via the API.
+Access and manage orders placed in your store. Orders contain details about the customer, pricing (including tax and discounts), currency, and status. You can also list order items and issue refunds for orders via the API.
 
 ### Subscription Management
 
@@ -52,7 +54,7 @@ The API covers essential subscription management tasks. You'll learn how to prog
 - Change subscription plans (upgrade/downgrade) by updating the variant.
 - Cancel and resume subscriptions during the grace period.
 - Pausing a subscription is a great option if you want to keep a subscription active but pause regular payment collection.
-- Access subscription invoices for billing history.
+- Access subscription invoices for billing history, including status and refund state filters.
 - Track usage-based billing through subscription items.
 
 ### Customer Management
@@ -72,8 +74,8 @@ Create and manage discount codes for your store.
 
 License keys are a feature in Lemon Squeezy, which lets you control access to your external application via orders and subscriptions. You can turn on license keys at a product and variant level. You have options for length of license and how many activations are allowed for each license.
 
-- Validate, activate, and deactivate license keys through a separate License API (does not require API key authentication).
 - Retrieve and list license keys and their activation instances.
+- Update administrative license key settings such as activation limits, disabled state, and expiration.
 - If your product is a subscription, the license length is tied to the subscription's lifecycle. When a subscription becomes expired, the related license key's status will automatically become expired.
 
 ### File Management

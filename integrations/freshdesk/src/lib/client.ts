@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { freshdeskApiError } from './errors';
 
 export interface FreshdeskClientConfig {
   subdomain: string;
@@ -17,6 +18,11 @@ export class FreshdeskClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(freshdeskApiError(error))
+    );
   }
 
   // ============ TICKETS ============
@@ -207,6 +213,21 @@ export class FreshdeskClient {
     return response.data;
   }
 
+  async listTicketFields(): Promise<any[]> {
+    let response = await this.axios.get('/ticket_fields');
+    return response.data;
+  }
+
+  async listContactFields(): Promise<any[]> {
+    let response = await this.axios.get('/contact_fields');
+    return response.data;
+  }
+
+  async listCompanyFields(): Promise<any[]> {
+    let response = await this.axios.get('/company_fields');
+    return response.data;
+  }
+
   // ============ GROUPS ============
 
   async listGroups(page?: number): Promise<any[]> {
@@ -319,6 +340,26 @@ export class FreshdeskClient {
 
   async getAccount(): Promise<any> {
     let response = await this.axios.get('/account');
+    return response.data;
+  }
+
+  async getHelpdeskSettings(): Promise<any> {
+    let response = await this.axios.get('/settings/helpdesk');
+    return response.data;
+  }
+
+  async listProducts(): Promise<any[]> {
+    let response = await this.axios.get('/products');
+    return response.data;
+  }
+
+  async listBusinessHours(): Promise<any[]> {
+    let response = await this.axios.get('/business_hours');
+    return response.data;
+  }
+
+  async listSlaPolicies(): Promise<any[]> {
+    let response = await this.axios.get('/sla_policies');
     return response.data;
   }
 }

@@ -2,6 +2,12 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Api2PdfClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  api2PdfFileOutputSchema,
+  fetchApi2PdfAttachment,
+  fileAttachment,
+  fileOutput
+} from './shared';
 
 export let protectPdf = SlateTool.create(spec, {
   name: 'Protect PDF',
@@ -33,17 +39,7 @@ export let protectPdf = SlateTool.create(spec, {
         .describe('Extra HTTP headers when fetching the source PDF')
     })
   )
-  .output(
-    z.object({
-      responseId: z
-        .string()
-        .describe('Unique ID for this request, can be used to delete the file later'),
-      fileUrl: z.string().describe('URL to download the password-protected PDF'),
-      mbOut: z.number().describe('Size of the generated file in megabytes'),
-      cost: z.number().describe('Cost of this API call in USD'),
-      seconds: z.number().describe('Processing time in seconds')
-    })
-  )
+  .output(api2PdfFileOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Api2PdfClient({
       token: ctx.auth.token,
@@ -59,19 +55,12 @@ export let protectPdf = SlateTool.create(spec, {
       extraHTTPHeaders: ctx.input.extraHttpHeaders
     });
 
-    if (!result.success) {
-      throw new Error(result.error || 'PDF password protection failed');
-    }
+    let file = await fetchApi2PdfAttachment(client, result, 'PDF password protection failed');
 
     return {
-      output: {
-        responseId: result.responseId,
-        fileUrl: result.fileUrl,
-        mbOut: result.mbOut,
-        cost: result.cost,
-        seconds: result.seconds
-      },
-      message: `Added password protection to PDF (${result.mbOut} MB, ${result.seconds}s). [Download](${result.fileUrl})`
+      output: fileOutput(result, file),
+      attachments: [fileAttachment(file)],
+      message: `Added password protection to PDF (${result.mbOut} MB, ${result.seconds}s) and returned it as a Slate attachment.`
     };
   })
   .build();

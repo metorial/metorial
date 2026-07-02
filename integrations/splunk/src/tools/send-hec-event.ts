@@ -81,8 +81,7 @@ export let sendHecRawEvent = SlateTool.create(spec, {
       index: z.string().optional().describe('Target index'),
       channel: z
         .string()
-        .optional()
-        .describe('Request channel GUID (required for raw endpoint)')
+        .describe('Request channel GUID required by Splunk for raw HEC events')
     })
   )
   .output(

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/planetscale.png" height="20"> Planetscale
 
-Manage PlanetScale databases, branches, and schema changes programmatically. Create, read, update, and delete databases and branches. Manage deploy requests for non-blocking schema migrations (Vitess). Create and rotate connection credentials (passwords) for branches. Create and restore backups. Monitor query performance with insights and anomaly detection. Manage organization members, teams, service tokens, and webhooks. Configure sharding, keyspaces, VSchemas, and Vitess workflows. Manage PostgreSQL-specific features like cluster extensions, PgBouncers, IP restrictions, and database roles.
+Manage PlanetScale databases, branches, and schema changes programmatically. Create, read, update, and delete databases and branches. Manage deploy requests for non-blocking schema migrations (Vitess). Create and rotate connection credentials (passwords) for branches. Create, protect, and restore backups. List regions and cluster sizes for database provisioning. Manage organization details, members, service tokens, audit logs, and webhooks.
 
 ## Tools
 
@@ -36,6 +36,10 @@ List audit log entries for the organization. Filter by action type, actor, or da
 
 List all branches for a PlanetScale database. Returns branch names, states, production status, and connection details.
 
+### List Cluster Sizes
+
+List PlanetScale cluster sizes available to the configured organization. Use this to choose clusterSize values for database creation and backup restores.
+
 ### List Databases
 
 List all databases in the configured PlanetScale organization. Supports search filtering and pagination. Returns database names, states, regions, branch counts, and engine type (Vitess/MySQL or PostgreSQL).
@@ -48,9 +52,13 @@ List deploy requests for a Vitess database. Deploy requests are similar to pull 
 
 List all members of the PlanetScale organization. Returns member names, emails, roles, and join dates.
 
+### List Regions
+
+List PlanetScale regions available to the configured organization. Use this before creating databases or branches that need an explicit region.
+
 ### Manage Backup
 
-Create, list, get, or delete backups for a database branch. Backups can be used to restore data to a new branch. Configure retention policies and trigger emergency backups (PostgreSQL).
+Create, list, get, update, or delete backups for a database branch. Backups can be used to restore data to a new branch. Configure retention policies, protect backups, and trigger emergency backups (PostgreSQL).
 
 ### Manage Branch
 
@@ -62,7 +70,11 @@ Perform lifecycle actions on a deploy request. Get details, queue for deployment
 
 ### Manage Password
 
-Create, list, update, renew, or delete connection credentials (passwords) for a database branch. Passwords are scoped to a specific branch and can be configured with specific roles. The plaintext password is only returned on creation.
+Create, list, update, renew, or delete connection credentials (passwords) for a database branch. Passwords are scoped to a specific branch and can be configured with TTLs, CIDR restrictions, and direct vtgate access. The plaintext password is only returned on creation.
+
+### Manage Service Token
+
+List, create, get, or delete PlanetScale service tokens for the configured organization.
 
 ### Manage Webhook
 

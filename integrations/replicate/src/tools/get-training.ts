@@ -23,12 +23,16 @@ export let getTraining = SlateTool.create(spec, {
       version: z.string().optional().describe('Base model version'),
       status: z
         .string()
-        .describe('Current status: starting, processing, succeeded, failed, canceled'),
+        .describe(
+          'Current status: starting, processing, succeeded, failed, canceled, or aborted'
+        ),
       input: z.any().optional().describe('Training input parameters'),
       output: z.any().optional().describe('Training output (version info and weights URL)'),
       error: z.string().optional().nullable().describe('Error message if training failed'),
       logs: z.string().optional().describe('Training log output'),
       metrics: z.record(z.string(), z.any()).optional().describe('Training metrics'),
+      source: z.enum(['api', 'web']).optional().describe('How the training was created'),
+      urls: z.record(z.string(), z.string()).optional().describe('Related URLs'),
       createdAt: z.string().describe('When the training was created'),
       startedAt: z.string().optional().nullable().describe('When training started'),
       completedAt: z.string().optional().nullable().describe('When training completed')
@@ -49,6 +53,8 @@ export let getTraining = SlateTool.create(spec, {
         error: result.error,
         logs: result.logs,
         metrics: result.metrics,
+        source: result.source,
+        urls: result.urls,
         createdAt: result.created_at,
         startedAt: result.started_at,
         completedAt: result.completed_at

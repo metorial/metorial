@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/clearbit.png" height="20"> Clearbit
 
-Enrich person and company data using email addresses and domain names. Look up detailed contact information, firmographic data, technographics, and social profiles. Identify anonymous website visitors by IP address to reveal associated companies. Prospect for leads by searching contacts by role, seniority, title, and location. Discover companies matching specific criteria like size, industry, and technology usage. Convert company names to domains, retrieve company logos, and score signups for fraud risk. Receive webhook notifications for enrichment results and audience segment matches.
+Enrich person and company data using email addresses and domain names. Look up detailed contact information, firmographic data, technographics, and social profiles. Identify anonymous website visitors by IP address to reveal associated companies. Prospect for leads by searching contacts by role, seniority, title, and location. Discover companies matching specific criteria like size, industry, and technology usage. Convert company names to domains and score signups for fraud risk. Receive webhook notifications for enrichment results and audience segment matches.
 
 ## Tools
 
@@ -31,10 +31,6 @@ Look up detailed information about a person using their email address. Returns d
 ### Find Prospects
 
 Search for contacts at a company using its domain name. Filter by role, seniority, title, or location to build targeted outreach lists. Returns names, email addresses, titles, and seniority information for matching contacts.
-
-### Get Company Logo
-
-Get a company's logo URL by its domain. Returns a direct URL to the company's logo image in the specified size and format. The logo is served from Clearbit's CDN.
 
 ### Name to Domain
 

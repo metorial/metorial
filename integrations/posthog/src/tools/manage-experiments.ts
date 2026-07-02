@@ -23,6 +23,12 @@ export let listExperimentsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
+      search: z.string().optional().describe('Search by experiment name'),
+      status: z
+        .enum(['all', 'complete', 'draft', 'paused', 'running', 'stopped'])
+        .optional()
+        .describe('Filter by experiment status'),
+      archived: z.boolean().optional().describe('Filter by archival state'),
       limit: z.number().optional().describe('Maximum number of results'),
       offset: z.number().optional().describe('Pagination offset')
     })
@@ -36,6 +42,9 @@ export let listExperimentsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = createClient(ctx.config, ctx.auth);
     let data = await client.listExperiments({
+      search: ctx.input.search,
+      status: ctx.input.status,
+      archived: ctx.input.archived,
       limit: ctx.input.limit,
       offset: ctx.input.offset
     });
@@ -180,6 +189,33 @@ export let updateExperimentTool = SlateTool.create(spec, {
         updatedAt: e.updated_at
       },
       message: `Updated experiment **${e.name}**.`
+    };
+  })
+  .build();
+
+export let deleteExperimentTool = SlateTool.create(spec, {
+  name: 'Delete Experiment',
+  key: 'delete_experiment',
+  description: `Permanently delete an experiment from PostHog.`,
+  tags: { destructive: true }
+})
+  .input(
+    z.object({
+      experimentId: z.string().describe('Experiment ID to delete')
+    })
+  )
+  .output(
+    z.object({
+      deleted: z.boolean().describe('Whether the experiment was deleted')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx.config, ctx.auth);
+    await client.deleteExperiment(ctx.input.experimentId);
+
+    return {
+      output: { deleted: true },
+      message: `Deleted experiment **${ctx.input.experimentId}**.`
     };
   })
   .build();

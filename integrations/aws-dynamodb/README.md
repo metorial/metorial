@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/amazon.svg" height="20"> Aws Dynamodb
 
-Create, manage, and delete DynamoDB tables with configurable capacity modes and key schemas. Perform CRUD operations on items using primary keys, including conditional writes and attribute-level updates. Query items by partition and sort key conditions, or scan entire tables with filter and projection expressions. Support PartiQL (SQL-compatible) syntax for data operations. Manage secondary indexes (GSI and LSI) for alternative query patterns. Execute multi-item transactions with all-or-nothing guarantees across tables. Configure global tables for multi-region active-active replication. Create and restore on-demand backups, enable point-in-time recovery, and set TTL for automatic item expiration. Import and export data between S3 and DynamoDB. Monitor table changes via DynamoDB Streams for near-real-time change data capture with configurable stream view types.
+Create, manage, and delete DynamoDB tables with configurable capacity modes, key schemas, deletion protection, secondary indexes, streams, and tags. Perform CRUD operations on items using primary keys, including conditional writes and attribute-level updates. Query items by partition and sort key conditions, or scan tables with filter and projection expressions. Support PartiQL (SQL-compatible) syntax for data operations. Execute multi-item read and write transactions with all-or-nothing guarantees across tables. Create, inspect, delete, and restore from on-demand backups, describe point-in-time recovery settings, and set TTL for automatic item expiration. Inspect DynamoDB Streams and read shard records for near-real-time change data capture.
 
 ## Tools
 
@@ -24,6 +24,14 @@ Delete a single item from a DynamoDB table by its primary key. Supports conditio
 
 Permanently delete a DynamoDB table and all of its items. This action cannot be undone.
 
+### Describe Backup
+
+Describe an existing DynamoDB on-demand backup, including backup status and source table details.
+
+### Describe Stream
+
+Describe a DynamoDB Stream, including status, table name, key schema, and shards.
+
 ### Describe Table
 
 Retrieve detailed information about a DynamoDB table including its key schema, provisioned throughput, indexes, stream configuration, and current status.
@@ -35,6 +43,14 @@ Execute a PartiQL statement against DynamoDB. PartiQL is a SQL-compatible query 
 ### Get Item
 
 Retrieve a single item from a DynamoDB table by its primary key. Returns the full item or specific attributes via projection expression. Supports strongly consistent reads.
+
+### Get Stream Records
+
+Read records from a DynamoDB Stream shard by creating a shard iterator and returning the next page of stream records.
+
+### List Streams
+
+List DynamoDB Streams in the configured region, optionally filtered to one table.
 
 ### List Tables
 
@@ -50,7 +66,7 @@ View or configure Time to Live (TTL) settings on a DynamoDB table. When enabled,
 
 ### Put Item
 
-Create or replace an item in a DynamoDB table. The entire item is replaced if an item with the same primary key exists. Use DynamoDB JSON format for attribute values (e.g., \
+Create or replace an item in a DynamoDB table. The entire item is replaced if an item with the same primary key exists. Use DynamoDB JSON format for attribute values (for example, `{"S": "hello"}` for strings or `{"N": "42"}` for numbers).
 
 ### Query Items
 
@@ -59,6 +75,14 @@ Query items from a DynamoDB table or secondary index using a key condition expre
 ### Scan Items
 
 Scan an entire DynamoDB table or secondary index, returning all items or those matching a filter expression. More flexible but less efficient than Query — reads every item in the table. Use Query when possible for better performance.
+
+### Restore Table From Backup
+
+Create a new DynamoDB table by restoring an existing on-demand backup.
+
+### Transact Get Items
+
+Atomically retrieve up to 100 items from one or more DynamoDB tables in the same account and region.
 
 ### Transact Write Items
 

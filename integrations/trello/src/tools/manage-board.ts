@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { TrelloClient } from '../lib/client';
+import { requireAtLeastOneTrelloField, requireTrelloString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageBoard = SlateTool.create(spec, {
@@ -55,8 +56,9 @@ export let manageBoard = SlateTool.create(spec, {
     let { action, boardId } = ctx.input;
 
     if (action === 'create') {
+      let name = requireTrelloString(ctx.input.name, 'name', action);
       let board = await client.createBoard({
-        name: ctx.input.name!,
+        name,
         desc: ctx.input.description,
         idOrganization: ctx.input.organizationId,
         defaultLists: ctx.input.defaultLists,
@@ -78,6 +80,20 @@ export let manageBoard = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
+      let targetBoardId = requireTrelloString(boardId, 'boardId', action);
+      requireAtLeastOneTrelloField(
+        {
+          name: ctx.input.name,
+          description: ctx.input.description,
+          closed: ctx.input.closed,
+          organizationId: ctx.input.organizationId,
+          permissionLevel: ctx.input.permissionLevel,
+          background: ctx.input.background
+        },
+        'board field to update',
+        action
+      );
+
       let updateData: Record<string, any> = {};
       if (ctx.input.name !== undefined) updateData.name = ctx.input.name;
       if (ctx.input.description !== undefined) updateData.desc = ctx.input.description;
@@ -89,7 +105,7 @@ export let manageBoard = SlateTool.create(spec, {
       if (ctx.input.background !== undefined)
         updateData['prefs/background'] = ctx.input.background;
 
-      let board = await client.updateBoard(boardId!, updateData);
+      let board = await client.updateBoard(targetBoardId, updateData);
 
       return {
         output: {
@@ -105,12 +121,13 @@ export let manageBoard = SlateTool.create(spec, {
     }
 
     // delete
-    await client.deleteBoard(boardId!);
+    let targetBoardId = requireTrelloString(boardId, 'boardId', action);
+    await client.deleteBoard(targetBoardId);
     return {
       output: {
-        boardId: boardId!
+        boardId: targetBoardId
       },
-      message: `Deleted board \`${boardId}\`.`
+      message: `Deleted board \`${targetBoardId}\`.`
     };
   })
   .build();

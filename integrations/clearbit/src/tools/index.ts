@@ -5,6 +5,5 @@ export * from './enrich-combined';
 export * from './enrich-company';
 export * from './enrich-person';
 export * from './find-prospects';
-export * from './get-logo';
 export * from './name-to-domain';
 export * from './reveal-company';

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { crispServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let batchConversationActions = SlateTool.create(spec, {
@@ -29,7 +30,15 @@ export let batchConversationActions = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token, websiteId: ctx.config.websiteId });
+    let client = new Client({
+      token: ctx.auth.token,
+      websiteId: ctx.config.websiteId,
+      tier: ctx.auth.tier
+    });
+
+    if (ctx.input.sessionIds.length === 0) {
+      throw crispServiceError('Provide at least one conversation session ID.');
+    }
 
     if (ctx.input.action === 'resolve') {
       await client.batchResolveConversations(ctx.input.sessionIds);

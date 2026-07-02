@@ -1,18 +1,21 @@
 {
   "name": "@metorial/midjourney",
-  "description": "Generate images from text prompts with configurable parameters including aspect ratio, model version, stylization, chaos, quality, and negative prompts. Create variations of generated images and upscale them to higher resolution. Blend multiple images into new compositions. Describe images to generate text prompt suggestions. Use image references, style references, character references, and omni references to influence generation. Inpaint specific regions of images using masks and new prompts. Pan and zoom to expand image canvases. Generate short videos from images. Apply personalized style profiles and use specialized anime/illustration modes. Note: Midjourney does not offer an official public API; programmatic access requires unofficial third-party providers, which may violate Midjourney's terms of service.",
+  "description": "Generate images from text prompts through APIFRAME's unofficial Midjourney API. Create variations, rerolls, upscales, blends, inpaints, pans, zoom-outs, seed lookups, short image-to-video tasks, and video extensions; fetch one or many asynchronous tasks; and inspect APIFRAME account credits. Note: Midjourney does not offer an official public API; programmatic access requires unofficial third-party providers, which may violate Midjourney's terms of service.",
   "categories": ["apis-and-http-requests", "document-processing"],
   "skills": [
     "generate images from text",
     "upscale image resolution",
     "create image variations",
+    "reroll image grids",
     "blend multiple images",
     "describe images as text",
     "inpaint image regions",
     "pan and zoom images",
     "generate video from images",
-    "apply style references",
-    "use character references"
+    "extend generated videos",
+    "fetch task statuses",
+    "get image seeds",
+    "check apiframe account credits"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/midjourney.png"
 }

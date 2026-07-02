@@ -38,7 +38,13 @@ export let editVoiceSettings = SlateTool.create(spec, {
       useSpeakerBoost: z
         .boolean()
         .optional()
-        .describe('Enable speaker boost for enhanced clarity')
+        .describe('Enable speaker boost for enhanced clarity'),
+      speed: z
+        .number()
+        .min(0.25)
+        .max(4.0)
+        .optional()
+        .describe('Speed multiplier (0.25-4.0). 1.0 is normal speed.')
     })
   )
   .output(
@@ -53,7 +59,8 @@ export let editVoiceSettings = SlateTool.create(spec, {
       stability: ctx.input.stability,
       similarityBoost: ctx.input.similarityBoost,
       style: ctx.input.style,
-      useSpeakerBoost: ctx.input.useSpeakerBoost
+      useSpeakerBoost: ctx.input.useSpeakerBoost,
+      speed: ctx.input.speed
     });
 
     return {

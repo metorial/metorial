@@ -1,6 +1,10 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import {
+  createClientFromContext,
+  requireNonEmptyStringArray,
+  requireServiceAccount
+} from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getActivityFeed = SlateTool.create(spec, {
@@ -33,6 +37,9 @@ export let getActivityFeed = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireServiceAccount(ctx);
+    requireNonEmptyStringArray(ctx.input.distinctIds, 'distinctIds');
+
     let client = createClientFromContext(ctx);
 
     let events = await client.queryActivityFeed({

@@ -1,8 +1,77 @@
 import { createAxios } from 'slates';
+import { mailgunApiError } from './errors';
 
 let BASE_URLS: Record<string, string> = {
   us: 'https://api.mailgun.net',
   eu: 'https://api.eu.mailgun.net'
+};
+
+let buildFilter = (filters?: MailgunFilter[]) => {
+  if (!filters || filters.length === 0) return undefined;
+
+  return {
+    AND: filters.map(filter => ({
+      attribute: filter.attribute,
+      comparator: filter.comparator,
+      values: filter.values?.map(value => ({
+        value: value.value,
+        label: value.label
+      }))
+    }))
+  };
+};
+
+let sanitizeMultipartHeader = (value: string) => value.replace(/[\r\n"]/g, '_');
+
+let appendMultipartField = (
+  parts: Buffer[],
+  boundary: string,
+  name: string,
+  value: string | number | boolean
+) => {
+  parts.push(
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${sanitizeMultipartHeader(name)}"\r\n\r\n${String(value)}\r\n`
+    )
+  );
+};
+
+let appendMultipartFile = (
+  parts: Buffer[],
+  boundary: string,
+  fieldName: string,
+  file: MailgunMessageFile
+) => {
+  parts.push(
+    Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${sanitizeMultipartHeader(file.filename)}"\r\nContent-Type: ${file.contentType ?? 'application/octet-stream'}\r\n\r\n`
+    )
+  );
+  parts.push(Buffer.from(file.contentBase64, 'base64'));
+  parts.push(Buffer.from('\r\n'));
+};
+
+let buildMultipartBody = (params: {
+  fields: [string, string | number | boolean][];
+  files?: Array<{ fieldName: string; file: MailgunMessageFile }>;
+}) => {
+  let boundary = `----SlatesMailgunBoundary${Date.now()}${Math.random().toString(16).slice(2)}`;
+  let parts: Buffer[] = [];
+
+  for (let [name, value] of params.fields) {
+    appendMultipartField(parts, boundary, name, value);
+  }
+
+  for (let file of params.files ?? []) {
+    appendMultipartFile(parts, boundary, file.fieldName, file.file);
+  }
+
+  parts.push(Buffer.from(`--${boundary}--\r\n`));
+
+  return {
+    body: Buffer.concat(parts),
+    contentType: `multipart/form-data; boundary=${boundary}`
+  };
 };
 
 export class MailgunClient {
@@ -17,6 +86,10 @@ export class MailgunClient {
         password: config.token
       }
     });
+    this.axios.interceptors?.response?.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(mailgunApiError(error))
+    );
   }
 
   // ==================== Messages ====================
@@ -48,75 +121,90 @@ export class MailgunClient {
       replyTo?: string;
       sendingIp?: string;
       sendingIpPool?: string;
+      attachments?: MailgunMessageFile[];
+      inlineAttachments?: MailgunMessageFile[];
     }
   ) {
-    let formData = new URLSearchParams();
-    formData.append('from', params.from);
+    let fields: [string, string | number | boolean][] = [];
+    fields.push(['from', params.from]);
 
     for (let recipient of params.to) {
-      formData.append('to', recipient);
+      fields.push(['to', recipient]);
     }
 
     if (params.cc) {
       for (let recipient of params.cc) {
-        formData.append('cc', recipient);
+        fields.push(['cc', recipient]);
       }
     }
 
     if (params.bcc) {
       for (let recipient of params.bcc) {
-        formData.append('bcc', recipient);
+        fields.push(['bcc', recipient]);
       }
     }
 
-    if (params.subject) formData.append('subject', params.subject);
-    if (params.text) formData.append('text', params.text);
-    if (params.html) formData.append('html', params.html);
-    if (params.template) formData.append('template', params.template);
-    if (params.templateVersion) formData.append('t:version', params.templateVersion);
+    if (params.subject) fields.push(['subject', params.subject]);
+    if (params.text) fields.push(['text', params.text]);
+    if (params.html) fields.push(['html', params.html]);
+    if (params.template) fields.push(['template', params.template]);
+    if (params.templateVersion) fields.push(['t:version', params.templateVersion]);
     if (params.templateVariables)
-      formData.append('t:variables', JSON.stringify(params.templateVariables));
-    if (params.replyTo) formData.append('h:Reply-To', params.replyTo);
+      fields.push(['t:variables', JSON.stringify(params.templateVariables)]);
+    if (params.replyTo) fields.push(['h:Reply-To', params.replyTo]);
 
     if (params.tags) {
       for (let tag of params.tags) {
-        formData.append('o:tag', tag);
+        fields.push(['o:tag', tag]);
       }
     }
 
-    if (params.deliveryTime) formData.append('o:deliverytime', params.deliveryTime);
-    if (params.testMode) formData.append('o:testmode', 'yes');
+    if (params.deliveryTime) fields.push(['o:deliverytime', params.deliveryTime]);
+    if (params.testMode) fields.push(['o:testmode', 'yes']);
     if (params.tracking !== undefined)
-      formData.append('o:tracking', params.tracking ? 'yes' : 'no');
-    if (params.trackingClicks) formData.append('o:tracking-clicks', params.trackingClicks);
+      fields.push(['o:tracking', params.tracking ? 'yes' : 'no']);
+    if (params.trackingClicks) fields.push(['o:tracking-clicks', params.trackingClicks]);
     if (params.trackingOpens !== undefined)
-      formData.append('o:tracking-opens', params.trackingOpens ? 'yes' : 'no');
-    if (params.requireTls) formData.append('o:require-tls', 'yes');
-    if (params.skipVerification) formData.append('o:skip-verification', 'yes');
-    if (params.sendingIp) formData.append('o:sending-ip', params.sendingIp);
-    if (params.sendingIpPool) formData.append('o:sending-ip-pool', params.sendingIpPool);
+      fields.push(['o:tracking-opens', params.trackingOpens ? 'yes' : 'no']);
+    if (params.requireTls) fields.push(['o:require-tls', 'yes']);
+    if (params.skipVerification) fields.push(['o:skip-verification', 'yes']);
+    if (params.sendingIp) fields.push(['o:sending-ip', params.sendingIp]);
+    if (params.sendingIpPool) fields.push(['o:sending-ip-pool', params.sendingIpPool]);
 
     if (params.customHeaders) {
       for (let [key, value] of Object.entries(params.customHeaders)) {
-        formData.append(`h:${key}`, value);
+        fields.push([`h:${key}`, value]);
       }
     }
 
     if (params.customVariables) {
       for (let [key, value] of Object.entries(params.customVariables)) {
-        formData.append(`v:${key}`, value);
+        fields.push([`v:${key}`, value]);
       }
     }
 
     if (params.recipientVariables) {
-      formData.append('recipient-variables', JSON.stringify(params.recipientVariables));
+      fields.push(['recipient-variables', JSON.stringify(params.recipientVariables)]);
     }
 
-    let response = await this.axios.post(`/v3/${domain}/messages`, formData.toString(), {
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    let files = [
+      ...(params.attachments ?? []).map(file => ({ fieldName: 'attachment', file })),
+      ...(params.inlineAttachments ?? []).map(file => ({ fieldName: 'inline', file }))
+    ];
+    let multipart = buildMultipartBody({ fields, files });
+
+    let response = await this.axios.post(`/v3/${domain}/messages`, multipart.body, {
+      headers: { 'Content-Type': multipart.contentType }
     });
 
     return response.data as { id: string; message: string };
+  }
+
+  async getStoredMessage(domain: string, storageKey: string) {
+    let response = await this.axios.get(
+      `/v3/domains/${encodeURIComponent(domain)}/messages/${encodeURIComponent(storageKey)}`
+    );
+    return response.data as StoredMessage;
   }
 
   // ==================== Domains ====================
@@ -164,7 +252,7 @@ export class MailgunClient {
   }
 
   async deleteDomain(domainName: string) {
-    let response = await this.axios.delete(`/v4/domains/${domainName}`);
+    let response = await this.axios.delete(`/v3/domains/${encodeURIComponent(domainName)}`);
     return response.data;
   }
 
@@ -334,6 +422,36 @@ export class MailgunClient {
   async deleteUnsubscribe(domain: string, address: string) {
     let response = await this.axios.delete(
       `/v3/${domain}/unsubscribes/${encodeURIComponent(address)}`
+    );
+    return response.data;
+  }
+
+  // ==================== Allowlist ====================
+
+  async listAllowlist(
+    domain: string,
+    params?: { limit?: number; page?: string; address?: string; term?: string }
+  ) {
+    let response = await this.axios.get(`/v3/${domain}/whitelists`, { params });
+    return response.data as { items: AllowlistItem[]; paging: PagingInfo };
+  }
+
+  async addAllowlistEntry(
+    domain: string,
+    params: { entryType: 'address' | 'domain'; value: string }
+  ) {
+    let formData = new URLSearchParams();
+    formData.append(params.entryType, params.value);
+
+    let response = await this.axios.post(`/v3/${domain}/whitelists`, formData.toString(), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+    return response.data;
+  }
+
+  async deleteAllowlistEntry(domain: string, value: string) {
+    let response = await this.axios.delete(
+      `/v3/${domain}/whitelists/${encodeURIComponent(value)}`
     );
     return response.data;
   }
@@ -561,11 +679,48 @@ export class MailgunClient {
     return response.data;
   }
 
+  async listTemplateVersions(
+    domain: string,
+    templateName: string,
+    params?: { page?: string; limit?: number; pivot?: string }
+  ) {
+    let queryParams: Record<string, string | number> = {};
+    if (params?.page) queryParams.page = params.page;
+    if (params?.limit) queryParams.limit = params.limit;
+    if (params?.pivot) queryParams.p = params.pivot;
+
+    let response = await this.axios.get(`/v3/${domain}/templates/${templateName}/versions`, {
+      params: queryParams
+    });
+    return response.data as { template: { versions: TemplateVersionItem[] } };
+  }
+
   async getTemplateVersion(domain: string, templateName: string, tag: string) {
     let response = await this.axios.get(
       `/v3/${domain}/templates/${templateName}/versions/${tag}`
     );
     return response.data as { template: TemplateItem };
+  }
+
+  async updateTemplateVersion(
+    domain: string,
+    templateName: string,
+    tag: string,
+    params: { template?: string; comment?: string; active?: boolean }
+  ) {
+    let formData = new URLSearchParams();
+    if (params.template) formData.append('template', params.template);
+    if (params.comment) formData.append('comment', params.comment);
+    if (params.active !== undefined) formData.append('active', params.active ? 'yes' : 'no');
+
+    let response = await this.axios.put(
+      `/v3/${domain}/templates/${templateName}/versions/${tag}`,
+      formData.toString(),
+      {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+      }
+    );
+    return response.data;
   }
 
   async deleteTemplateVersion(domain: string, templateName: string, tag: string) {
@@ -690,6 +845,40 @@ export class MailgunClient {
     return response.data;
   }
 
+  // ==================== Logs and Metrics ====================
+
+  async queryMetrics(params: MetricsQuery) {
+    let response = await this.axios.post('/v1/analytics/metrics', {
+      start: params.start,
+      end: params.end,
+      resolution: params.resolution,
+      duration: params.duration,
+      dimensions: params.dimensions,
+      metrics: params.metrics,
+      filter: buildFilter(params.filters),
+      include_subaccounts: params.includeSubaccounts,
+      include_aggregates: params.includeAggregates
+    });
+
+    return response.data as MetricsResponse;
+  }
+
+  async queryLogs(params: LogsQuery) {
+    let response = await this.axios.post('/v1/analytics/logs', {
+      start: params.start,
+      end: params.end,
+      duration: params.duration,
+      events: params.events,
+      metric_events: params.metricEvents,
+      filter: buildFilter(params.filters),
+      include_subaccounts: params.includeSubaccounts,
+      include_totals: params.includeTotals,
+      pagination: params.pagination
+    });
+
+    return response.data as LogsResponse;
+  }
+
   // ==================== Stats ====================
 
   async getStats(
@@ -776,6 +965,14 @@ export type EventItem = {
   [key: string]: unknown;
 };
 
+export type StoredMessage = Record<string, unknown>;
+
+export type MailgunMessageFile = {
+  filename: string;
+  contentBase64: string;
+  contentType?: string;
+};
+
 export type BounceItem = {
   address: string;
   code: string;
@@ -792,6 +989,13 @@ export type UnsubscribeItem = {
   address: string;
   tag: string;
   created_at: string;
+};
+
+export type AllowlistItem = {
+  type?: string;
+  value?: string;
+  reason?: string;
+  createdAt?: string;
 };
 
 export type MailingListItem = {
@@ -827,6 +1031,15 @@ export type TemplateItem = {
   };
 };
 
+export type TemplateVersionItem = {
+  tag: string;
+  template?: string;
+  engine?: string;
+  active?: boolean;
+  comment?: string;
+  createdAt?: string;
+};
+
 export type RouteItem = {
   id: string;
   priority: number;
@@ -850,6 +1063,69 @@ export type PagingInfo = {
   last: string;
   next: string;
   previous: string;
+};
+
+export type MailgunFilter = {
+  attribute: string;
+  comparator: string;
+  values?: Array<{
+    value: string;
+    label?: string;
+  }>;
+};
+
+export type MetricsQuery = {
+  start?: string;
+  end?: string;
+  resolution?: string;
+  duration?: string;
+  dimensions?: string[];
+  metrics?: string[];
+  filters?: MailgunFilter[];
+  includeSubaccounts?: boolean;
+  includeAggregates?: boolean;
+};
+
+export type MetricsResponse = {
+  start?: string;
+  end?: string;
+  resolution?: string;
+  duration?: string;
+  dimensions?: string[];
+  items: Array<{
+    dimensions?: Array<{
+      dimension?: string;
+      value?: string;
+      display_value?: string;
+    }>;
+    metrics?: Record<string, unknown>;
+  }>;
+  aggregates?: Record<string, unknown>;
+  pagination?: Record<string, unknown>;
+};
+
+export type LogsQuery = {
+  start?: string;
+  end?: string;
+  duration: string;
+  events?: string[];
+  metricEvents?: string[];
+  filters?: MailgunFilter[];
+  includeSubaccounts?: boolean;
+  includeTotals?: boolean;
+  pagination?: {
+    sort?: string;
+    token?: string;
+    limit?: number;
+  };
+};
+
+export type LogsResponse = {
+  start: string;
+  end: string;
+  items: Record<string, unknown>[];
+  pagination: Record<string, unknown>;
+  aggregates?: Record<string, unknown>;
 };
 
 export type StatsItem = {

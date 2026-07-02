@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { splunkApiError, splunkServiceError } from './errors';
 
 export interface SplunkClientConfig {
   token: string;
@@ -23,26 +24,40 @@ export class SplunkClient {
   }
 
   private get api() {
-    return createAxios({
+    let api = createAxios({
       baseURL: this.baseURL,
       headers: {
         Authorization: `Splunk ${this.token}`
       }
     });
+
+    api.interceptors.response.use(
+      response => response,
+      error => Promise.reject(splunkApiError(error, 'management request'))
+    );
+
+    return api;
   }
 
   private get hecApi() {
     if (!this.hecToken) {
-      throw new Error(
+      throw splunkServiceError(
         'HEC token is required for data ingestion. Please configure an HEC token in your authentication settings.'
       );
     }
-    return createAxios({
+    let api = createAxios({
       baseURL: this.hecBaseURL,
       headers: {
         Authorization: `Splunk ${this.hecToken}`
       }
     });
+
+    api.interceptors.response.use(
+      response => response,
+      error => Promise.reject(splunkApiError(error, 'HEC request'))
+    );
+
+    return api;
   }
 
   // ─── Search ────────────────────────────────────────────────────────────
@@ -112,7 +127,7 @@ export class SplunkClient {
     }
   ): Promise<{ results: Record<string, any>[]; resultCount: number }> {
     let response = await this.api.get(
-      `/services/search/jobs/${encodeURIComponent(searchId)}/results`,
+      `/services/search/v2/jobs/${encodeURIComponent(searchId)}/results`,
       {
         params: {
           output_mode: 'json',
@@ -125,6 +140,23 @@ export class SplunkClient {
       results: response.data?.results || [],
       resultCount: response.data?.results?.length || 0
     };
+  }
+
+  async controlSearchJob(
+    searchId: string,
+    action: 'cancel' | 'finalize' | 'pause' | 'unpause' | 'touch',
+    namespace?: { owner?: string; app?: string }
+  ): Promise<{ searchId: string; action: string }> {
+    let path =
+      namespace?.owner && namespace?.app
+        ? `/servicesNS/${encodeURIComponent(namespace.owner)}/${encodeURIComponent(namespace.app)}/search/jobs/${encodeURIComponent(searchId)}/control`
+        : `/services/search/jobs/${encodeURIComponent(searchId)}/control`;
+
+    await this.api.post(path, `action=${encodeURIComponent(action)}&output_mode=json`, {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    return { searchId, action };
   }
 
   async runOneshotSearch(params: {
@@ -209,6 +241,7 @@ export class SplunkClient {
     alertType?: string;
     alertComparator?: string;
     alertThreshold?: string;
+    alertCondition?: string;
     alertActions?: string;
     webhookUrl?: string;
     namespace?: { owner?: string; app?: string };
@@ -232,9 +265,11 @@ export class SplunkClient {
       formParts.push(`disabled=${params.disabled ? '1' : '0'}`);
     if (params.alertType) formParts.push(`alert_type=${encodeURIComponent(params.alertType)}`);
     if (params.alertComparator)
-      formParts.push(`alert.severity=${encodeURIComponent(params.alertComparator)}`);
+      formParts.push(`alert_comparator=${encodeURIComponent(params.alertComparator)}`);
     if (params.alertThreshold)
       formParts.push(`alert_threshold=${encodeURIComponent(params.alertThreshold)}`);
+    if (params.alertCondition)
+      formParts.push(`alert_condition=${encodeURIComponent(params.alertCondition)}`);
     if (params.alertActions)
       formParts.push(`actions=${encodeURIComponent(params.alertActions)}`);
     if (params.webhookUrl)
@@ -256,6 +291,11 @@ export class SplunkClient {
       description: entry?.content?.description,
       isScheduled: entry?.content?.is_scheduled,
       cronSchedule: entry?.content?.cron_schedule,
+      alertType: entry?.content?.alert_type,
+      alertComparator: entry?.content?.alert_comparator,
+      alertThreshold: entry?.content?.alert_threshold,
+      alertCondition: entry?.content?.alert_condition,
+      alertActions: entry?.content?.actions,
       owner: entry?.acl?.owner,
       app: entry?.acl?.app
     };
@@ -271,6 +311,10 @@ export class SplunkClient {
       earliestTime?: string;
       latestTime?: string;
       disabled?: boolean;
+      alertType?: string;
+      alertComparator?: string;
+      alertThreshold?: string;
+      alertCondition?: string;
       alertActions?: string;
       webhookUrl?: string;
       namespace?: { owner?: string; app?: string };
@@ -290,6 +334,13 @@ export class SplunkClient {
       formParts.push(`dispatch.latest_time=${encodeURIComponent(params.latestTime)}`);
     if (params.disabled !== undefined)
       formParts.push(`disabled=${params.disabled ? '1' : '0'}`);
+    if (params.alertType) formParts.push(`alert_type=${encodeURIComponent(params.alertType)}`);
+    if (params.alertComparator)
+      formParts.push(`alert_comparator=${encodeURIComponent(params.alertComparator)}`);
+    if (params.alertThreshold)
+      formParts.push(`alert_threshold=${encodeURIComponent(params.alertThreshold)}`);
+    if (params.alertCondition)
+      formParts.push(`alert_condition=${encodeURIComponent(params.alertCondition)}`);
     if (params.alertActions)
       formParts.push(`actions=${encodeURIComponent(params.alertActions)}`);
     if (params.webhookUrl)
@@ -311,6 +362,11 @@ export class SplunkClient {
       description: entry?.content?.description,
       isScheduled: entry?.content?.is_scheduled,
       cronSchedule: entry?.content?.cron_schedule,
+      alertType: entry?.content?.alert_type,
+      alertComparator: entry?.content?.alert_comparator,
+      alertThreshold: entry?.content?.alert_threshold,
+      alertCondition: entry?.content?.alert_condition,
+      alertActions: entry?.content?.actions,
       owner: entry?.acl?.owner,
       app: entry?.acl?.app
     };

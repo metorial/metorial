@@ -1,7 +1,14 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { chatMessageSchema, modelOptionsSchema, toolDefinitionSchema } from '../lib/schemas';
+import {
+  chatMessageSchema,
+  keepAliveSchema,
+  logprobSchema,
+  modelOptionsSchema,
+  thinkSchema,
+  toolDefinitionSchema
+} from '../lib/schemas';
 import { spec } from '../spec';
 
 export let chat = SlateTool.create(spec, {
@@ -35,14 +42,18 @@ export let chat = SlateTool.create(spec, {
         .describe(
           'Output format: "json" for JSON mode, or a JSON schema object for structured output.'
         ),
-      think: z
+      think: thinkSchema,
+      logprobs: z
         .boolean()
         .optional()
-        .describe('Enable reasoning/thinking output from the model.'),
-      keepAlive: z
-        .string()
+        .describe('Return log probabilities for generated tokens.'),
+      topLogprobs: z
+        .number()
+        .int()
+        .positive()
         .optional()
-        .describe('How long to keep the model loaded (e.g., "5m", "1h").'),
+        .describe('Number of likely alternative tokens to return when logprobs is enabled.'),
+      keepAlive: keepAliveSchema,
       options: modelOptionsSchema
     })
   )
@@ -77,7 +88,11 @@ export let chat = SlateTool.create(spec, {
       doneReason: z.string().optional().describe('Reason generation stopped.'),
       totalDuration: z.number().optional().describe('Total time in nanoseconds.'),
       promptEvalCount: z.number().optional().describe('Number of prompt tokens evaluated.'),
-      evalCount: z.number().optional().describe('Number of tokens generated.')
+      evalCount: z.number().optional().describe('Number of tokens generated.'),
+      logprobs: z
+        .array(logprobSchema)
+        .optional()
+        .describe('Log probability information when logprobs was requested.')
     })
   )
   .handleInvocation(async ctx => {
@@ -92,6 +107,8 @@ export let chat = SlateTool.create(spec, {
       tools: ctx.input.tools,
       format: ctx.input.format,
       think: ctx.input.think,
+      logprobs: ctx.input.logprobs,
+      topLogprobs: ctx.input.topLogprobs,
       keepAlive: ctx.input.keepAlive,
       options: ctx.input.options
     });
@@ -113,7 +130,8 @@ export let chat = SlateTool.create(spec, {
         doneReason: result.doneReason,
         totalDuration: result.totalDuration,
         promptEvalCount: result.promptEvalCount,
-        evalCount: result.evalCount
+        evalCount: result.evalCount,
+        logprobs: result.logprobs
       },
       message: `Chat response from **${result.model}**: "${contentPreview}"${toolCallInfo}`
     };

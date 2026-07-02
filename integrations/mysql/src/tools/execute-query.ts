@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { mysqlServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -28,6 +29,8 @@ Supports complex queries with joins, subqueries, CTEs, window functions, and agg
       sql: z.string().describe('The SQL query to execute'),
       maxRows: z
         .number()
+        .int()
+        .nonnegative()
         .optional()
         .describe(
           'Maximum number of rows to return. Overrides the default maxRows config. Only applicable for SELECT queries.'
@@ -60,6 +63,10 @@ Supports complex queries with joins, subqueries, CTEs, window functions, and agg
     let client = createClient(ctx.auth, ctx.config);
     let sql = ctx.input.sql.trim();
     let maxRows = ctx.input.maxRows ?? ctx.config.maxRows;
+
+    if (sql.length === 0) {
+      throw mysqlServiceError('sql must be a non-empty SQL statement.');
+    }
 
     let isSelect = /^\s*(SELECT|WITH)\b/i.test(sql);
     let hasLimit = /\bLIMIT\s+\d+/i.test(sql);

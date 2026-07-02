@@ -1,6 +1,15 @@
 export { blendImages } from './blend-images';
 export { createVariations } from './create-variations';
 export { describeImage } from './describe-image';
+export { extendVideo } from './extend-video';
+export { fetchManyTasks } from './fetch-many-tasks';
 export { fetchTask } from './fetch-task';
 export { generateImage } from './generate-image';
+export { generateVideo } from './generate-video';
+export { getAccountInfo } from './get-account-info';
+export { getSeed } from './get-seed';
+export { inpaintImage } from './inpaint-image';
+export { panImage } from './pan-image';
+export { rerollImage } from './reroll-image';
 export { upscaleImage } from './upscale-image';
+export { zoomOutImage } from './zoom-out-image';

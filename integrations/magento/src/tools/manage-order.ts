@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MagentoClient } from '../lib/client';
+import { magentoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let orderItemSchema = z.object({
@@ -128,7 +129,7 @@ export let manageOrder = SlateTool.create(spec, {
 
     if (ctx.input.action === 'comment') {
       if (!ctx.input.commentText) {
-        throw new Error('commentText is required for the comment action');
+        throw magentoServiceError('commentText is required for the comment action');
       }
       await client.addOrderComment(
         ctx.input.orderId,

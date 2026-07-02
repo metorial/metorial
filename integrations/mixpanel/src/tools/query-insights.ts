@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClientFromContext } from '../lib/helpers';
+import { createClientFromContext, requireServiceAccount } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let queryInsights = SlateTool.create(spec, {
@@ -25,6 +25,8 @@ export let queryInsights = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireServiceAccount(ctx);
+
     let client = createClientFromContext(ctx);
     let data = await client.queryInsights(ctx.input.bookmarkId);
 

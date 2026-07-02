@@ -1,0 +1,16 @@
+{
+  "name": "@sap/sap-s4hana",
+  "description": "Connect to SAP S/4HANA OData APIs for enterprise ERP read workflows. Read business partners, sales orders, billing documents, product master data, purchase orders, and supplier invoices from a configured tenant or SAP API Hub sandbox.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
+  "skills": [
+    "read business partners",
+    "inspect customer and supplier master data",
+    "list sales orders",
+    "review billing documents",
+    "read product master data",
+    "list purchase orders",
+    "review supplier invoices",
+    "query SAP OData pages"
+  ],
+  "logoUrl": "logo.svg"
+}

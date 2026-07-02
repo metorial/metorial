@@ -18,6 +18,7 @@ Each service account has a service account token that you can provide as an envi
 - Service account permissions, vault access, and Environment access are immutable. To change them, you must create a new service account.
 - Service accounts can't access your built-in Personal, Private, or Employee vault.
 - Created via 1Password.com (Developer > Directory) or via 1Password CLI.
+- 1Password service accounts are exposed through the 1Password CLI and SDKs, not the Connect REST endpoints used by this integration's item, vault, file, and server tools. Those tools require the Connect Server Token auth method and a Connect server URL.
 
 ### Connect Server Token (Connect REST API)
 
@@ -45,11 +46,11 @@ Retrieve individual secret values stored in 1Password using secret reference URI
 
 ### Item Management
 
-Full programmatic access to 1Password items, including creating, reading, updating, deleting, listing, and sharing information stored in vaults. Supported field types include API Keys, Passwords, Concealed fields, Text fields, Notes, SSH private keys, One-time passwords, URLs, Credit card numbers, Emails, File attachments, Document items, Passkeys, and more. Items can also be archived.
+Programmatic access to 1Password Connect vault items, including creating, reading, replacing, patching, deleting, listing, and searching items stored in accessible vaults. Supported field types include passwords, concealed fields, text fields, notes, one-time passwords, URLs, emails, and other Connect item fields. Items can be modified with JSON Patch operations where the Connect API supports them.
 
 ### Item Sharing
 
-Securely share items with anyone, whether or not they have a 1Password account. Creates shareable links with configurable expiration (1 hour to 30 days), optional recipient restrictions by email/domain, and one-time view settings. If you have a 1Password Business account, it will also validate the settings against the item sharing policy set by your account owner or administrator.
+1Password service accounts and SDKs support item sharing, but the Connect REST API does not expose item sharing. This integration does not currently provide an item sharing tool.
 
 ### Password Generation
 
@@ -57,17 +58,17 @@ Generate passwords using a PIN, Random, or Memorable password recipe. PIN codes 
 
 ### Vault Management
 
-Manage your team's vaults and the permissions groups have in them. Operations include retrieving, creating, updating, deleting, and listing vaults, as well as managing group vault permissions and user vault permissions.
+Retrieve and list vaults accessible to the Connect token. Creating, updating, deleting, and permission management for vaults are service-account/SDK or CLI workflows and are not exposed by this Connect-focused integration.
 
 ### User and Group Management
 
-Provision users, retrieve users, list users, suspend users, retrieve groups, list groups, create groups, and update group membership.
+1Password SDKs list user and group capabilities, but these are not exposed through the Connect REST API tools in this integration.
 
 - These operations typically require desktop app authentication rather than service account authentication.
 
 ### File Management
 
-Store and retrieve file attachments and document items in vaults. Files can be attached to items and shared via item sharing links.
+List file attachments on items, retrieve file metadata, and download file contents through Slate attachments. Connect exposes existing file attachments but does not provide an upload endpoint.
 
 ### Events Reporting
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MagentoClient } from '../lib/client';
+import { magentoServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let categoryOutputSchema = z.object({
@@ -107,7 +108,8 @@ export let manageCategory = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for get action');
+      if (!ctx.input.categoryId)
+        throw magentoServiceError('categoryId is required for get action');
       let category = await client.getCategory(ctx.input.categoryId);
       return {
         output: { category: mapCategory(category) },
@@ -116,7 +118,8 @@ export let manageCategory = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for delete action');
+      if (!ctx.input.categoryId)
+        throw magentoServiceError('categoryId is required for delete action');
       await client.deleteCategory(ctx.input.categoryId);
       return {
         output: { deleted: true },
@@ -125,8 +128,10 @@ export let manageCategory = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'assign_product') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for assign_product');
-      if (!ctx.input.productSku) throw new Error('productSku is required for assign_product');
+      if (!ctx.input.categoryId)
+        throw magentoServiceError('categoryId is required for assign_product');
+      if (!ctx.input.productSku)
+        throw magentoServiceError('productSku is required for assign_product');
       await client.assignProductToCategory(
         ctx.input.categoryId,
         ctx.input.productSku,
@@ -139,8 +144,10 @@ export let manageCategory = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'remove_product') {
-      if (!ctx.input.categoryId) throw new Error('categoryId is required for remove_product');
-      if (!ctx.input.productSku) throw new Error('productSku is required for remove_product');
+      if (!ctx.input.categoryId)
+        throw magentoServiceError('categoryId is required for remove_product');
+      if (!ctx.input.productSku)
+        throw magentoServiceError('productSku is required for remove_product');
       await client.removeProductFromCategory(ctx.input.categoryId, ctx.input.productSku);
       return {
         output: { success: true },
@@ -165,7 +172,8 @@ export let manageCategory = SlateTool.create(spec, {
     }
 
     // update
-    if (!ctx.input.categoryId) throw new Error('categoryId is required for update action');
+    if (!ctx.input.categoryId)
+      throw magentoServiceError('categoryId is required for update action');
     let category = await client.updateCategory(ctx.input.categoryId, categoryData);
     return {
       output: { category: mapCategory(category) },

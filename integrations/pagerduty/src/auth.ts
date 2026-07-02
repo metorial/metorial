@@ -1,11 +1,22 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { pagerDutyApiError, pagerDutyServiceError } from './lib/errors';
+
+let expiresAtFromSeconds = (expiresIn?: number) => {
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn)) {
+    return undefined;
+  }
+
+  return new Date(Date.now() + expiresIn * 1000).toISOString();
+};
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
-      tokenType: z.enum(['oauth', 'api_key']).optional()
+      tokenType: z.enum(['oauth', 'api_key']).optional(),
+      refreshToken: z.string().optional(),
+      expiresAt: z.string().optional()
     })
   )
   .addOauth({
@@ -48,6 +59,18 @@ export let auth = SlateAuth.create()
         title: 'Write Services',
         description: 'Write access to services',
         scope: 'services.write'
+      },
+
+      // Business Services
+      {
+        title: 'Read Business Services',
+        description: 'Read access to business services',
+        scope: 'business_services.read'
+      },
+      {
+        title: 'Write Business Services',
+        description: 'Write access to business services',
+        scope: 'business_services.write'
       },
 
       // Users
@@ -224,19 +247,24 @@ export let auth = SlateAuth.create()
     handleCallback: async ctx => {
       let client = createAxios({ baseURL: 'https://app.pagerduty.com' });
 
-      let response = await client.post(
-        '/oauth/token',
-        {
-          grant_type: 'authorization_code',
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        },
-        {
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+      let response: any;
+      try {
+        response = await client.post(
+          '/oauth/token',
+          {
+            grant_type: 'authorization_code',
+            code: ctx.code,
+            redirect_uri: ctx.redirectUri,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          },
+          {
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      } catch (error) {
+        throw pagerDutyApiError(error, 'OAuth token exchange');
+      }
 
       let data = response.data as {
         access_token?: string;
@@ -247,13 +275,17 @@ export let auth = SlateAuth.create()
       };
 
       if (!data.access_token) {
-        throw new Error(`PagerDuty OAuth error: ${data.error || 'No access token returned'}`);
+        throw pagerDutyServiceError(
+          `PagerDuty OAuth error: ${data.error || 'No access token returned'}`
+        );
       }
 
       return {
         output: {
           token: data.access_token,
-          tokenType: 'oauth' as const
+          tokenType: 'oauth' as const,
+          refreshToken: data.refresh_token,
+          expiresAt: expiresAtFromSeconds(data.expires_in)
         },
         input: ctx.input
       };
@@ -262,18 +294,27 @@ export let auth = SlateAuth.create()
     handleTokenRefresh: async (ctx: any) => {
       let client = createAxios({ baseURL: 'https://app.pagerduty.com' });
 
-      let response = await client.post(
-        '/oauth/token',
-        {
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.token,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        },
-        {
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
+      if (!ctx.output.refreshToken) {
+        throw pagerDutyServiceError('No PagerDuty refresh token is available.');
+      }
+
+      let response: any;
+      try {
+        response = await client.post(
+          '/oauth/token',
+          {
+            grant_type: 'refresh_token',
+            refresh_token: ctx.output.refreshToken,
+            client_id: ctx.clientId,
+            client_secret: ctx.clientSecret
+          },
+          {
+            headers: { 'Content-Type': 'application/json' }
+          }
+        );
+      } catch (error) {
+        throw pagerDutyApiError(error, 'OAuth token refresh');
+      }
 
       let data = response.data as {
         access_token?: string;
@@ -284,7 +325,7 @@ export let auth = SlateAuth.create()
       };
 
       if (!data.access_token) {
-        throw new Error(
+        throw pagerDutyServiceError(
           `PagerDuty token refresh error: ${data.error || 'No access token returned'}`
         );
       }
@@ -292,7 +333,9 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
-          tokenType: 'oauth' as const
+          tokenType: 'oauth' as const,
+          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
+          expiresAt: expiresAtFromSeconds(data.expires_in)
         },
         input: ctx.input
       };

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { IterableClient } from '../lib/client';
+import { requireUserIdentity } from '../lib/validation';
 import { spec } from '../spec';
 
 export let sendMessage = SlateTool.create(spec, {
@@ -47,6 +48,14 @@ export let sendMessage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireUserIdentity(
+      {
+        email: ctx.input.recipientEmail,
+        userId: ctx.input.recipientUserId
+      },
+      'recipient'
+    );
+
     let client = new IterableClient({
       token: ctx.auth.token,
       dataCenter: ctx.config.dataCenter

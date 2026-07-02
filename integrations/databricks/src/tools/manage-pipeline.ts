@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DatabricksClient } from '../lib/client';
+import { databricksServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let managePipeline = SlateTool.create(spec, {
@@ -61,7 +62,7 @@ export let managePipeline = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.name || !ctx.input.libraries)
-        throw new Error('name and libraries are required for create');
+        throw databricksServiceError('name and libraries are required for create');
       let result = await client.createPipeline({
         name: ctx.input.name,
         libraries: ctx.input.libraries,
@@ -76,7 +77,7 @@ export let managePipeline = SlateTool.create(spec, {
       };
     }
 
-    if (!pipelineId) throw new Error('pipelineId is required for this action');
+    if (!pipelineId) throw databricksServiceError('pipelineId is required for this action');
 
     switch (action) {
       case 'start': {

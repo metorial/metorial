@@ -1,12 +1,12 @@
-# <img src="https://provider-logos.metorial-cdn.com/stability-ai.png" height="20"> Stability Ai
+# <img src="https://provider-logos.metorial-cdn.com/stability-ai.png" height="20"> Stability AI
 
-Generate images from text prompts using Stable Diffusion models, edit images with tools like inpainting, outpainting, erase, search-and-replace, search-and-recolor, and background removal. Upscale images to 4K resolution with conservative, creative, or fast modes. Apply style transfer between images and generate images guided by structural inputs like sketches. Replace backgrounds and adjust lighting on subject images. Generate audio from text prompts or transform existing audio with style control. Create 3D assets from single images. Check account credit balance and usage.
+Generate images from text prompts using Stable Diffusion models, edit images with tools like inpainting, outpainting, erase, search-and-replace, search-and-recolor, and background removal. Upscale images to 4K resolution with conservative, creative, or fast modes. Apply style guide and style transfer controls to images guided by references. Replace backgrounds and adjust lighting on subject images. Generate or transform audio with Stable Audio text-to-audio, audio-to-audio, and inpaint workflows. Create 3D assets from single images. Check account credit balance and usage. Generated media is returned as Slate attachments with metadata in tool outputs.
 
 ## Tools
 
 ### Control Image Generation
 
-Generate images guided by structural inputs using Stability AI's control tools. Three control modes: - **sketch**: Generate production-grade images from hand-drawn sketches or line drawings. - **structure**: Generate images that maintain the structural composition and edges of a reference image. - **style**: Generate new content in the visual style of a reference image (style transfer). Each mode takes a reference image and a text prompt to guide the output.
+Generate images guided by structural inputs using Stability AI's control tools. Four control modes: - **sketch**: Generate production-grade images from hand-drawn sketches or line drawings. - **structure**: Generate images that maintain the structural composition and edges of a reference image. - **style**: Generate new content in the visual style of a reference image (Style Guide). - **style_transfer**: Restyle an existing image with a separate style reference while preserving composition.
 
 ### Edit Image
 
@@ -18,11 +18,11 @@ Generate 3D models from a single image using Stability AI's 3D generation models
 
 ### Generate Audio
 
-Generate audio tracks from text prompts using Stable Audio. Creates high-quality 44.1 kHz stereo audio with coherent musical structures. Supports melodies, sound effects, ambient audio, and various musical styles. Describe the desired audio including genre, mood, instruments, and style for best results.
+Generate or transform audio using Stable Audio 3, Stable Audio 2.5, or Stable Audio 2. Supports text-to-audio, audio-to-audio, and audio inpainting workflows. Describe the desired audio including genre, mood, instruments, tempo, and style for best results.
 
 ### Generate Image
 
-Generate images from text prompts using Stability AI models. Supports three model tiers: - **Ultra**: Top-tier quality powered by Stable Diffusion 3.5, excels at typography, complex compositions, and photorealism. - **Core**: Fast, affordable generation with good quality. Supports style presets. - **SD3.5**: Access to specific SD3.5 model variants with advanced controls like CFG scale. Optionally provide a reference image for image-to-image generation (Ultra and SD3.5 only).
+Generate images from text prompts using Stability AI models. Supports three model tiers: - **Ultra**: Top-tier quality powered by Stable Diffusion 3.5, excels at typography, complex compositions, and photorealism. - **Core**: Fast, affordable generation with good quality. - **SD3.5**: Access to specific SD3.5 model variants with advanced controls like CFG scale. Style presets are supported where Stability AI exposes them. Optionally provide a reference image for image-to-image generation (Ultra and SD3.5 only).
 
 ### Get Account Info
 

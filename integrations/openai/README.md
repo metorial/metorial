@@ -14,7 +14,7 @@ Generate a response using the OpenAI Responses API, the primary gateway for all 
 
 ### Generate Image
 
-Generate images from text prompts using OpenAI's image generation models (e.g. DALL·E 3, gpt-image-1). Returns URLs or base64-encoded images. Supports configurable size, quality, and style.
+Generate images from text prompts using OpenAI's image generation models (e.g. DALL·E 3, gpt-image-1). Returns generated image content as Slate attachments when the API returns base64 data. Supports configurable size, quality, and style.
 
 ### Generate Text
 

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/dropbox.svg" height="20"> Dropbox
 
-Upload, download, and manage files and folders in Dropbox cloud storage. Create, move, copy, and delete files and folders. Search files by name or content. Share files and folders via shared links with configurable access settings. Manage shared folder members and permissions. Create and manage file requests for document collection. Assign custom metadata properties to files and folders. View and restore file revisions. Retrieve user account information including storage quota. Administer Dropbox Business teams: add, remove, suspend, and update team members and groups. Create and manage team folders. Access team audit logs for change tracking. Receive webhook notifications for file changes.
+Upload, download, and manage files and folders in Dropbox cloud storage. Create, move, copy, and delete files and folders. Search files by name or content. Share files and folders via shared links with configurable access settings. Manage shared folder membership, create file requests for document collection, generate temporary links and thumbnails, use upload sessions for chunked uploads, view and restore file revisions, retrieve account quota information, and receive file-change notifications.
 
 ## Tools
 
@@ -14,7 +14,7 @@ Permanently delete a file or folder at the specified path. This action cannot be
 
 ### Download File
 
-Download a file's content from Dropbox. Returns the file content as text along with its metadata. Suitable for text-based files.
+Download a file's content from Dropbox. Returns the file content through a Slate attachment along with metadata.
 
 ### File Revisions
 
@@ -28,9 +28,21 @@ Retrieve the current user's Dropbox account information including name, email, s
 
 Retrieve detailed metadata for a file or folder at a given path or by ID. Returns type, size, modification dates, revision, sharing status, and media info where available.
 
+### Get Temporary Link
+
+Create a temporary streaming URL for a Dropbox file. Dropbox temporary links expire after about four hours.
+
+### Get Thumbnail
+
+Generate an image thumbnail and return it through a Slate attachment.
+
 ### List Folder
 
 List files and folders in a Dropbox directory. Supports recursive listing and pagination via cursor. Use path "/" or "" for the root directory.
+
+### Manage Upload Session
+
+Start, append to, or finish a Dropbox upload session for larger or chunked uploads.
 
 ### Manage File Request
 
@@ -54,7 +66,7 @@ Share a folder with other users or manage shared folder membership. Use action "
 
 ### Upload File
 
-Upload a text file to Dropbox at the specified path. Supports creating new files, overwriting existing files, or appending with autorename. Best for small text-based files (up to 150 MB).
+Upload a file to Dropbox at the specified path. Supports text or base64 content, creating new files, overwriting existing files, or updating a specific revision.
 
 ## License
 

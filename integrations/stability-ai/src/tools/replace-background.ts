@@ -2,6 +2,12 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
+import {
+  createMediaAttachment,
+  imageOutputFormatEnum,
+  mediaAttachmentOutputSchema,
+  toMediaAttachmentOutput
+} from './shared';
 
 export let replaceBackground = SlateTool.create(spec, {
   name: 'Replace Background & Relight',
@@ -35,10 +41,34 @@ Provide a subject image and describe the desired background. Optionally control 
         .string()
         .optional()
         .describe('Text prompt for enhancing or describing the subject lighting.'),
+      negativePrompt: z
+        .string()
+        .optional()
+        .describe('Text describing what to avoid in the generated background.'),
+      preserveOriginalSubject: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('How strongly to preserve the original subject.'),
+      originalBackgroundDepth: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Depth estimate for the original background.'),
+      keepOriginalBackground: z
+        .boolean()
+        .optional()
+        .describe('Whether to keep the original background while relighting.'),
       lightSourceDirection: z
         .enum(['above', 'below', 'left', 'right'])
         .optional()
         .describe('Direction of the light source.'),
+      lightReference: z
+        .string()
+        .optional()
+        .describe('Base64-encoded image to use as a lighting reference.'),
       lightSourceStrength: z
         .number()
         .min(0)
@@ -46,16 +76,10 @@ Provide a subject image and describe the desired background. Optionally control 
         .optional()
         .describe('Intensity of the light source (0-1).'),
       seed: z.number().optional().describe('Seed for reproducible results.'),
-      outputFormat: z.enum(['png', 'jpeg', 'webp']).optional().describe('Output image format.')
+      outputFormat: imageOutputFormatEnum
     })
   )
-  .output(
-    z.object({
-      base64Image: z.string().describe('Base64-encoded image with replaced background.'),
-      seed: z.number().describe('Seed used for this generation.'),
-      finishReason: z.string().describe('Reason the operation finished.')
-    })
-  )
+  .output(mediaAttachmentOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -66,15 +90,21 @@ Provide a subject image and describe the desired background. Optionally control 
       backgroundPrompt: ctx.input.backgroundPrompt,
       backgroundReference: ctx.input.backgroundReference,
       foregroundPrompt: ctx.input.foregroundPrompt,
+      negativePrompt: ctx.input.negativePrompt,
+      preserveOriginalSubject: ctx.input.preserveOriginalSubject,
+      originalBackgroundDepth: ctx.input.originalBackgroundDepth,
+      keepOriginalBackground: ctx.input.keepOriginalBackground,
       lightSourceDirection: ctx.input.lightSourceDirection,
+      lightReference: ctx.input.lightReference,
       lightSourceStrength: ctx.input.lightSourceStrength,
       outputFormat: ctx.input.outputFormat,
       seed: ctx.input.seed
     });
 
     return {
-      output: result,
-      message: `Replaced background with seed **${result.seed}**. Finish reason: ${result.finishReason}.`
+      output: toMediaAttachmentOutput(result),
+      attachments: [createMediaAttachment(result)],
+      message: `Replaced background. Attachment MIME: \`${result.mimeType}\`.`
     };
   })
   .build();

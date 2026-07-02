@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/amplitude.svg" height="20"> Amplitude
 
-Track user behavior, analyze engagement, and run experiments on a product analytics platform. Ingest event data via HTTP or batch APIs, query dashboard analytics including segmentation, funnels, retention, and session metrics. Export raw event data, look up user profiles, and manage behavioral cohorts. Create and manage feature flags and experiments, evaluate flag variants for users. Manage taxonomy (event types, event properties, user properties), upload lookup tables to enrich event data, and handle chart annotations. Modify user and group properties via Identify APIs, merge user identities, and manage user privacy including GDPR/CCPA deletion and data subject access requests. Provision users and permission groups via SCIM. Stream events, user updates, and cohort membership changes to external webhooks, and receive alerts when KPIs change.
+Track user behavior, query product analytics, export raw events, and maintain core Amplitude project data. Ingest events through HTTP V2 or Batch APIs, update user and group properties, map identities, query Dashboard REST analytics, retrieve saved chart CSV results, manage behavioral cohorts, maintain taxonomy metadata, handle chart annotations, look up US-region user profiles, and submit or inspect user privacy deletion jobs. Enterprise/admin-only APIs such as Experiment, SCIM, lookup tables, releases, DSAR exports, and outbound streaming are not exposed by this integration.
 
 ## Tools
 
@@ -8,9 +8,13 @@ Track user behavior, analyze engagement, and run experiments on a product analyt
 
 Request deletion of user data from Amplitude for privacy compliance (GDPR/CCPA). Supports deleting a single user or multiple users in bulk. You can also check the status of pending deletion jobs.
 
+### Export Events
+
+Export raw Amplitude event files for an uploaded-time range as a ZIP attachment. Structured output contains only metadata such as MIME type, byte length, and attachment count.
+
 ### Get Chart Results
 
-Fetch results from a saved chart in Amplitude by its chart ID. Returns the same data that the chart displays in the Amplitude dashboard. The chart ID can be found in the URL when viewing a chart.
+Fetch CSV results from a saved chart in Amplitude by its chart ID. The chart ID can be found in the URL when viewing a chart, and CSV content is returned as a Slate attachment.
 
 ### Get User Profile
 
@@ -26,7 +30,7 @@ Manage chart annotations in Amplitude. Annotations mark important events on time
 
 ### Manage Cohorts
 
-List, retrieve, create, or update behavioral cohorts in Amplitude. Cohorts are groups of users defined by shared behavior or characteristics. Use this to list all cohorts, get details of a specific cohort, or upload/update a cohort with specific user IDs.
+List cohorts, retrieve a cohort from the discoverable cohort list, check Behavioral Cohorts Download API usage, upload static cohorts, and incrementally add or remove cohort membership.
 
 ### Manage Taxonomy
 

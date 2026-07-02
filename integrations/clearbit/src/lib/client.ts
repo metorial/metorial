@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { clearbitApiError } from './errors';
 import type {
   ClearbitAutocompleteItem,
   ClearbitCombined,
@@ -28,6 +29,14 @@ export class ClearbitClient {
     });
   }
 
+  private async request<T>(operation: string, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      throw clearbitApiError(error, operation);
+    }
+  }
+
   // ─── Person Enrichment ─────────────────────────────────────────
 
   async findPerson(params: {
@@ -40,8 +49,10 @@ export class ClearbitClient {
     if (params.webhookUrl) query.webhook_url = params.webhookUrl;
     if (params.subscribe !== undefined) query.subscribe = params.subscribe;
 
-    let response = await client.get('/v2/people/find', { params: query });
-    return response.data as ClearbitPerson;
+    return this.request('find person', async () => {
+      let response = await client.get('/v2/people/find', { params: query });
+      return response.data as ClearbitPerson;
+    });
   }
 
   // ─── Company Enrichment ────────────────────────────────────────
@@ -54,8 +65,10 @@ export class ClearbitClient {
     let query: Record<string, any> = { domain: params.domain };
     if (params.webhookUrl) query.webhook_url = params.webhookUrl;
 
-    let response = await client.get('/v2/companies/find', { params: query });
-    return response.data as ClearbitCompany;
+    return this.request('find company', async () => {
+      let response = await client.get('/v2/companies/find', { params: query });
+      return response.data as ClearbitCompany;
+    });
   }
 
   // ─── Combined Enrichment ───────────────────────────────────────
@@ -68,18 +81,22 @@ export class ClearbitClient {
     let query: Record<string, any> = { email: params.email };
     if (params.webhookUrl) query.webhook_url = params.webhookUrl;
 
-    let response = await client.get('/v2/combined/find', { params: query });
-    return response.data as ClearbitCombined;
+    return this.request('find combined person and company', async () => {
+      let response = await client.get('/v2/combined/find', { params: query });
+      return response.data as ClearbitCombined;
+    });
   }
 
   // ─── Reveal (IP Intelligence) ──────────────────────────────────
 
   async reveal(params: { ip: string }): Promise<ClearbitReveal> {
     let client = this.createClient('https://reveal.clearbit.com');
-    let response = await client.get('/v1/companies/reveal', {
-      params: { ip: params.ip }
+    return this.request('reveal company by IP', async () => {
+      let response = await client.get('/v1/companies/reveal', {
+        params: { ip: params.ip }
+      });
+      return response.data as ClearbitReveal;
     });
-    return response.data as ClearbitReveal;
   }
 
   // ─── Prospector ────────────────────────────────────────────────
@@ -123,8 +140,10 @@ export class ClearbitClient {
     if (params.pageSize !== undefined) query.page_size = params.pageSize;
     if (params.suppression) query.suppression = params.suppression;
 
-    let response = await client.get('/v1/people/search', { params: query });
-    return response.data as ClearbitProspectorResponse;
+    return this.request('search prospects', async () => {
+      let response = await client.get('/v1/people/search', { params: query });
+      return response.data as ClearbitProspectorResponse;
+    });
   }
 
   // ─── Discovery ─────────────────────────────────────────────────
@@ -141,28 +160,34 @@ export class ClearbitClient {
     if (params.pageSize !== undefined) query.page_size = params.pageSize;
     if (params.sort) query.sort = params.sort;
 
-    let response = await client.get('/v1/companies/search', { params: query });
-    return response.data as ClearbitDiscoveryResponse;
+    return this.request('discover companies', async () => {
+      let response = await client.get('/v1/companies/search', { params: query });
+      return response.data as ClearbitDiscoveryResponse;
+    });
   }
 
   // ─── Name to Domain ────────────────────────────────────────────
 
   async nameToDomain(params: { name: string }): Promise<ClearbitNameToDomain> {
     let client = this.createClient('https://company.clearbit.com');
-    let response = await client.get('/v1/domains/find', {
-      params: { name: params.name }
+    return this.request('resolve company name to domain', async () => {
+      let response = await client.get('/v1/domains/find', {
+        params: { name: params.name }
+      });
+      return response.data as ClearbitNameToDomain;
     });
-    return response.data as ClearbitNameToDomain;
   }
 
   // ─── Autocomplete ──────────────────────────────────────────────
 
   async autocomplete(params: { query: string }): Promise<ClearbitAutocompleteItem[]> {
     let client = this.createClient('https://autocomplete.clearbit.com');
-    let response = await client.get('/v1/companies/suggest', {
-      params: { query: params.query }
+    return this.request('autocomplete companies', async () => {
+      let response = await client.get('/v1/companies/suggest', {
+        params: { query: params.query }
+      });
+      return response.data as ClearbitAutocompleteItem[];
     });
-    return response.data as ClearbitAutocompleteItem[];
   }
 
   // ─── Risk ──────────────────────────────────────────────────────
@@ -187,7 +212,9 @@ export class ClearbitClient {
     if (params.countryCode) body.country_code = params.countryCode;
     if (params.zipCode) body.zip_code = params.zipCode;
 
-    let response = await client.post('/v1/calculate', body);
-    return response.data as ClearbitRisk;
+    return this.request('calculate risk', async () => {
+      let response = await client.post('/v1/calculate', body);
+      return response.data as ClearbitRisk;
+    });
   }
 }

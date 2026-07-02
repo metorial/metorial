@@ -1,9 +1,9 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { codaApiError } from './lib/errors';
+import { createCodaHttp } from './lib/http';
 
-let http = createAxios({
-  baseURL: 'https://coda.io/apis/v1'
-});
+let http = createCodaHttp();
 
 export let auth = SlateAuth.create()
   .output(
@@ -31,11 +31,16 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await http.get('/whoami', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let response: any;
+      try {
+        response = await http.get('/whoami', {
+          headers: {
+            Authorization: `Bearer ${ctx.output.token}`
+          }
+        });
+      } catch (error) {
+        throw codaApiError(error, 'get profile');
+      }
 
       return {
         profile: {

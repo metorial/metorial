@@ -2,7 +2,7 @@ import { createAxios } from 'slates';
 import { buildMimeMessage, encodeBase64Url } from './mime';
 
 let gmailAxios = createAxios({
-  baseURL: 'https://gmail.googleapis.com/gmail/v1'
+  baseURL: 'https://gmail.googleapis.com/gmail/v1/'
 });
 
 export interface MessageHeader {
@@ -131,7 +131,7 @@ export class Client {
     threadsTotal: number;
     historyId: string;
   }> {
-    let response = await gmailAxios.get(`/users/${this.userId}/profile`, {
+    let response = await gmailAxios.get(`users/${this.userId}/profile`, {
       headers: this.headers()
     });
     return response.data;
@@ -150,7 +150,7 @@ export class Client {
     nextPageToken?: string;
     resultSizeEstimate: number;
   }> {
-    let response = await gmailAxios.get(`/users/${this.userId}/messages`, {
+    let response = await gmailAxios.get(`users/${this.userId}/messages`, {
       headers: this.headers(),
       params: {
         q: params.query,
@@ -168,7 +168,7 @@ export class Client {
   }
 
   async getMessage(messageId: string, format?: string): Promise<GmailMessage> {
-    let response = await gmailAxios.get(`/users/${this.userId}/messages/${messageId}`, {
+    let response = await gmailAxios.get(`users/${this.userId}/messages/${messageId}`, {
       headers: this.headers(),
       params: { format: format || 'full' }
     });
@@ -195,7 +195,7 @@ export class Client {
       payload.threadId = params.threadId;
     }
 
-    let response = await gmailAxios.post(`/users/${this.userId}/messages/send`, payload, {
+    let response = await gmailAxios.post(`users/${this.userId}/messages/send`, payload, {
       headers: this.headers()
     });
     return response.data;
@@ -207,7 +207,7 @@ export class Client {
     removeLabelIds?: string[]
   ): Promise<GmailMessage> {
     let response = await gmailAxios.post(
-      `/users/${this.userId}/messages/${messageId}/modify`,
+      `users/${this.userId}/messages/${messageId}/modify`,
       {
         addLabelIds: addLabelIds || [],
         removeLabelIds: removeLabelIds || []
@@ -221,7 +221,7 @@ export class Client {
 
   async trashMessage(messageId: string): Promise<GmailMessage> {
     let response = await gmailAxios.post(
-      `/users/${this.userId}/messages/${messageId}/trash`,
+      `users/${this.userId}/messages/${messageId}/trash`,
       {},
       {
         headers: this.headers()
@@ -232,7 +232,7 @@ export class Client {
 
   async untrashMessage(messageId: string): Promise<GmailMessage> {
     let response = await gmailAxios.post(
-      `/users/${this.userId}/messages/${messageId}/untrash`,
+      `users/${this.userId}/messages/${messageId}/untrash`,
       {},
       {
         headers: this.headers()
@@ -242,7 +242,7 @@ export class Client {
   }
 
   async deleteMessage(messageId: string): Promise<void> {
-    await gmailAxios.delete(`/users/${this.userId}/messages/${messageId}`, {
+    await gmailAxios.delete(`users/${this.userId}/messages/${messageId}`, {
       headers: this.headers()
     });
   }
@@ -253,7 +253,7 @@ export class Client {
     removeLabelIds?: string[]
   ): Promise<void> {
     await gmailAxios.post(
-      `/users/${this.userId}/messages/batchModify`,
+      `users/${this.userId}/messages/batchModify`,
       {
         ids: messageIds,
         addLabelIds: addLabelIds || [],
@@ -270,7 +270,7 @@ export class Client {
     attachmentId: string
   ): Promise<{ size: number; data: string }> {
     let response = await gmailAxios.get(
-      `/users/${this.userId}/messages/${messageId}/attachments/${attachmentId}`,
+      `users/${this.userId}/messages/${messageId}/attachments/${attachmentId}`,
       {
         headers: this.headers()
       }
@@ -291,7 +291,7 @@ export class Client {
     nextPageToken?: string;
     resultSizeEstimate: number;
   }> {
-    let response = await gmailAxios.get(`/users/${this.userId}/threads`, {
+    let response = await gmailAxios.get(`users/${this.userId}/threads`, {
       headers: this.headers(),
       params: {
         q: params.query,
@@ -309,7 +309,7 @@ export class Client {
   }
 
   async getThread(threadId: string, format?: string): Promise<GmailThread> {
-    let response = await gmailAxios.get(`/users/${this.userId}/threads/${threadId}`, {
+    let response = await gmailAxios.get(`users/${this.userId}/threads/${threadId}`, {
       headers: this.headers(),
       params: { format: format || 'full' }
     });
@@ -322,7 +322,7 @@ export class Client {
     removeLabelIds?: string[]
   ): Promise<GmailThread> {
     let response = await gmailAxios.post(
-      `/users/${this.userId}/threads/${threadId}/modify`,
+      `users/${this.userId}/threads/${threadId}/modify`,
       {
         addLabelIds: addLabelIds || [],
         removeLabelIds: removeLabelIds || []
@@ -336,7 +336,7 @@ export class Client {
 
   async trashThread(threadId: string): Promise<GmailThread> {
     let response = await gmailAxios.post(
-      `/users/${this.userId}/threads/${threadId}/trash`,
+      `users/${this.userId}/threads/${threadId}/trash`,
       {},
       {
         headers: this.headers()
@@ -347,7 +347,7 @@ export class Client {
 
   async untrashThread(threadId: string): Promise<GmailThread> {
     let response = await gmailAxios.post(
-      `/users/${this.userId}/threads/${threadId}/untrash`,
+      `users/${this.userId}/threads/${threadId}/untrash`,
       {},
       {
         headers: this.headers()
@@ -357,7 +357,7 @@ export class Client {
   }
 
   async deleteThread(threadId: string): Promise<void> {
-    await gmailAxios.delete(`/users/${this.userId}/threads/${threadId}`, {
+    await gmailAxios.delete(`users/${this.userId}/threads/${threadId}`, {
       headers: this.headers()
     });
   }
@@ -365,14 +365,14 @@ export class Client {
   // ── Labels ──
 
   async listLabels(): Promise<GmailLabel[]> {
-    let response = await gmailAxios.get(`/users/${this.userId}/labels`, {
+    let response = await gmailAxios.get(`users/${this.userId}/labels`, {
       headers: this.headers()
     });
     return response.data.labels || [];
   }
 
   async getLabel(labelId: string): Promise<GmailLabel> {
-    let response = await gmailAxios.get(`/users/${this.userId}/labels/${labelId}`, {
+    let response = await gmailAxios.get(`users/${this.userId}/labels/${labelId}`, {
       headers: this.headers()
     });
     return response.data;
@@ -396,7 +396,7 @@ export class Client {
         textColor: params.textColor
       };
     }
-    let response = await gmailAxios.post(`/users/${this.userId}/labels`, body, {
+    let response = await gmailAxios.post(`users/${this.userId}/labels`, body, {
       headers: this.headers()
     });
     return response.data;
@@ -426,14 +426,14 @@ export class Client {
         textColor: params.textColor
       };
     }
-    let response = await gmailAxios.patch(`/users/${this.userId}/labels/${labelId}`, body, {
+    let response = await gmailAxios.patch(`users/${this.userId}/labels/${labelId}`, body, {
       headers: this.headers()
     });
     return response.data;
   }
 
   async deleteLabel(labelId: string): Promise<void> {
-    await gmailAxios.delete(`/users/${this.userId}/labels/${labelId}`, {
+    await gmailAxios.delete(`users/${this.userId}/labels/${labelId}`, {
       headers: this.headers()
     });
   }
@@ -449,7 +449,7 @@ export class Client {
     nextPageToken?: string;
     resultSizeEstimate: number;
   }> {
-    let response = await gmailAxios.get(`/users/${this.userId}/drafts`, {
+    let response = await gmailAxios.get(`users/${this.userId}/drafts`, {
       headers: this.headers(),
       params: {
         maxResults: params.maxResults || 20,
@@ -465,7 +465,7 @@ export class Client {
   }
 
   async getDraft(draftId: string, format?: string): Promise<GmailDraft> {
-    let response = await gmailAxios.get(`/users/${this.userId}/drafts/${draftId}`, {
+    let response = await gmailAxios.get(`users/${this.userId}/drafts/${draftId}`, {
       headers: this.headers(),
       params: { format: format || 'full' }
     });
@@ -491,7 +491,7 @@ export class Client {
       payload.message.threadId = params.threadId;
     }
 
-    let response = await gmailAxios.post(`/users/${this.userId}/drafts`, payload, {
+    let response = await gmailAxios.post(`users/${this.userId}/drafts`, payload, {
       headers: this.headers()
     });
     return response.data;
@@ -519,7 +519,7 @@ export class Client {
       payload.message.threadId = params.threadId;
     }
 
-    let response = await gmailAxios.put(`/users/${this.userId}/drafts/${draftId}`, payload, {
+    let response = await gmailAxios.put(`users/${this.userId}/drafts/${draftId}`, payload, {
       headers: this.headers()
     });
     return response.data;
@@ -527,7 +527,7 @@ export class Client {
 
   async sendDraft(draftId: string): Promise<GmailMessage> {
     let response = await gmailAxios.post(
-      `/users/${this.userId}/drafts/send`,
+      `users/${this.userId}/drafts/send`,
       {
         id: draftId
       },
@@ -539,7 +539,7 @@ export class Client {
   }
 
   async deleteDraft(draftId: string): Promise<void> {
-    await gmailAxios.delete(`/users/${this.userId}/drafts/${draftId}`, {
+    await gmailAxios.delete(`users/${this.userId}/drafts/${draftId}`, {
       headers: this.headers()
     });
   }
@@ -553,7 +553,7 @@ export class Client {
     maxResults?: number;
     pageToken?: string;
   }): Promise<{ history: HistoryRecord[]; nextPageToken?: string; historyId: string }> {
-    let response = await gmailAxios.get(`/users/${this.userId}/history`, {
+    let response = await gmailAxios.get(`users/${this.userId}/history`, {
       headers: this.headers(),
       params: {
         startHistoryId: params.startHistoryId,
@@ -573,28 +573,28 @@ export class Client {
   // ── Settings ──
 
   async getVacationSettings(): Promise<VacationSettings> {
-    let response = await gmailAxios.get(`/users/${this.userId}/settings/vacation`, {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/vacation`, {
       headers: this.headers()
     });
     return response.data;
   }
 
   async updateVacationSettings(settings: VacationSettings): Promise<VacationSettings> {
-    let response = await gmailAxios.put(`/users/${this.userId}/settings/vacation`, settings, {
+    let response = await gmailAxios.put(`users/${this.userId}/settings/vacation`, settings, {
       headers: this.headers()
     });
     return response.data;
   }
 
   async listFilters(): Promise<GmailFilter[]> {
-    let response = await gmailAxios.get(`/users/${this.userId}/settings/filters`, {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/filters`, {
       headers: this.headers()
     });
     return response.data.filter || [];
   }
 
   async getFilter(filterId: string): Promise<GmailFilter> {
-    let response = await gmailAxios.get(`/users/${this.userId}/settings/filters/${filterId}`, {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/filters/${filterId}`, {
       headers: this.headers()
     });
     return response.data;
@@ -616,14 +616,14 @@ export class Client {
       forward?: string;
     };
   }): Promise<GmailFilter> {
-    let response = await gmailAxios.post(`/users/${this.userId}/settings/filters`, params, {
+    let response = await gmailAxios.post(`users/${this.userId}/settings/filters`, params, {
       headers: this.headers()
     });
     return response.data;
   }
 
   async deleteFilter(filterId: string): Promise<void> {
-    await gmailAxios.delete(`/users/${this.userId}/settings/filters/${filterId}`, {
+    await gmailAxios.delete(`users/${this.userId}/settings/filters/${filterId}`, {
       headers: this.headers()
     });
   }
@@ -631,7 +631,7 @@ export class Client {
   async listForwardingAddresses(): Promise<
     Array<{ forwardingEmail: string; verificationStatus: string }>
   > {
-    let response = await gmailAxios.get(`/users/${this.userId}/settings/forwardingAddresses`, {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/forwardingAddresses`, {
       headers: this.headers()
     });
     return response.data.forwardingAddresses || [];
@@ -647,7 +647,7 @@ export class Client {
       isDefault?: boolean;
     }>
   > {
-    let response = await gmailAxios.get(`/users/${this.userId}/settings/sendAs`, {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/sendAs`, {
       headers: this.headers()
     });
     return response.data.sendAs || [];
@@ -662,7 +662,7 @@ export class Client {
     }
   ): Promise<any> {
     let response = await gmailAxios.patch(
-      `/users/${this.userId}/settings/sendAs/${sendAsEmail}`,
+      `users/${this.userId}/settings/sendAs/${sendAsEmail}`,
       params,
       {
         headers: this.headers()

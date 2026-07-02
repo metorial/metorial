@@ -33,7 +33,7 @@ Global API Key is the previous authorization scheme for interacting with the Clo
 
 ### Worker Script Management
 
-Create, list, update, download, and delete Worker scripts within an account. Workers are standalone resources that can be created and configured without any code. Platform teams can provision Workers with the right settings, then hand them off to development teams for implementation.
+Create, list, update, download, and delete Worker scripts within an account. Worker code downloads are returned as Slate attachments, and code uploads use Cloudflare's multipart Worker upload APIs. Workers are standalone resources that can be created and configured without any code. Platform teams can provision Workers with the right settings, then hand them off to development teams for implementation.
 
 ### Version and Deployment Management
 

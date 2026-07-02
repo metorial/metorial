@@ -87,3 +87,72 @@ export let createComment = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let updateComment = SlateTool.create(spec, {
+  name: 'Update Task Comment',
+  key: 'update_task_comment',
+  description: `Update a ClickUp task comment's text, optional assignee, or resolved state.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      commentId: z.string().describe('The comment ID to update'),
+      commentText: z.string().describe('Replacement comment text'),
+      assignee: z.number().optional().describe('User ID to assign the comment to'),
+      resolved: z.boolean().optional().describe('Mark the comment resolved or unresolved')
+    })
+  )
+  .output(
+    z.object({
+      commentId: z.string(),
+      updated: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new ClickUpClient(ctx.auth.token);
+    await client.updateComment(ctx.input.commentId, {
+      commentText: ctx.input.commentText,
+      assignee: ctx.input.assignee,
+      resolved: ctx.input.resolved
+    });
+
+    return {
+      output: {
+        commentId: ctx.input.commentId,
+        updated: true
+      },
+      message: `Updated comment ${ctx.input.commentId}.`
+    };
+  })
+  .build();
+
+export let deleteComment = SlateTool.create(spec, {
+  name: 'Delete Task Comment',
+  key: 'delete_task_comment',
+  description: `Delete a ClickUp task comment by its comment ID.`,
+  tags: {
+    destructive: true
+  }
+})
+  .input(
+    z.object({
+      commentId: z.string().describe('The comment ID to delete')
+    })
+  )
+  .output(
+    z.object({
+      deleted: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new ClickUpClient(ctx.auth.token);
+    await client.deleteComment(ctx.input.commentId);
+
+    return {
+      output: { deleted: true },
+      message: `Deleted comment ${ctx.input.commentId}.`
+    };
+  })
+  .build();

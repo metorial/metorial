@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { PineconeDataPlaneClient } from '../lib/client';
+import { pineconeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let upsertVectorsTool = SlateTool.create(spec, {
@@ -48,6 +49,14 @@ export let upsertVectorsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    for (let vector of ctx.input.vectors) {
+      if (!vector.values && !vector.sparseValues) {
+        throw pineconeServiceError(
+          `Vector ${vector.vectorId} must include values or sparseValues.`
+        );
+      }
+    }
+
     let client = new PineconeDataPlaneClient({
       token: ctx.auth.token,
       indexHost: ctx.input.indexHost

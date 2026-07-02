@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Auth0Client } from '../lib/client';
+import { auth0ServiceError, requireField, requireNonEmptyArray } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageClientGrantsTool = SlateTool.create(spec, {
@@ -86,13 +87,13 @@ export let manageClientGrantsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.clientId) throw new Error('clientId is required for create action');
-      if (!ctx.input.audience) throw new Error('audience is required for create action');
-      if (!ctx.input.scope) throw new Error('scope is required for create action');
+      let clientId = requireField(ctx.input.clientId, 'clientId', 'create');
+      let audience = requireField(ctx.input.audience, 'audience', 'create');
+      let scope = requireNonEmptyArray(ctx.input.scope, 'scope', 'create');
       let grant = await client.createClientGrant({
-        clientId: ctx.input.clientId,
-        audience: ctx.input.audience,
-        scope: ctx.input.scope
+        clientId,
+        audience,
+        scope
       });
       return {
         output: { grant: mapGrant(grant) },
@@ -101,10 +102,10 @@ export let manageClientGrantsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.grantId) throw new Error('grantId is required for update action');
-      if (!ctx.input.scope) throw new Error('scope is required for update action');
-      let grant = await client.updateClientGrant(ctx.input.grantId, {
-        scope: ctx.input.scope
+      let grantId = requireField(ctx.input.grantId, 'grantId', 'update');
+      let scope = requireNonEmptyArray(ctx.input.scope, 'scope', 'update');
+      let grant = await client.updateClientGrant(grantId, {
+        scope
       });
       return {
         output: { grant: mapGrant(grant) },
@@ -113,14 +114,14 @@ export let manageClientGrantsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.grantId) throw new Error('grantId is required for delete action');
-      await client.deleteClientGrant(ctx.input.grantId);
+      let grantId = requireField(ctx.input.grantId, 'grantId', 'delete');
+      await client.deleteClientGrant(grantId);
       return {
         output: { deleted: true },
-        message: `Deleted client grant **${ctx.input.grantId}**.`
+        message: `Deleted client grant **${grantId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw auth0ServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

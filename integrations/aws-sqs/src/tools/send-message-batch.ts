@@ -9,7 +9,7 @@ export let sendMessageBatch = SlateTool.create(spec, {
   description: `Send up to 10 messages to an SQS queue in a single batch request. Each message can have its own body, delay, and attributes. Returns results for both successful and failed entries.`,
   constraints: [
     'Maximum 10 messages per batch.',
-    'Total payload size for the batch must not exceed 256 KB.',
+    'Total payload size for the batch must not exceed 1 MiB.',
     'Each entry requires a unique ID within the batch.'
   ],
   tags: {
@@ -59,6 +59,10 @@ export let sendMessageBatch = SlateTool.create(spec, {
             entryId: z.string().describe('Batch entry ID that succeeded'),
             sqsMessageId: z.string().describe('SQS-assigned message ID'),
             md5OfMessageBody: z.string().describe('MD5 digest of the message body'),
+            md5OfMessageAttributes: z
+              .string()
+              .optional()
+              .describe('MD5 digest of the message attributes when attributes were sent'),
             sequenceNumber: z.string().optional().describe('Sequence number for FIFO queues')
           })
         )
@@ -106,6 +110,7 @@ export let sendMessageBatch = SlateTool.create(spec, {
           entryId: s.messageId,
           sqsMessageId: s.sqsMessageId,
           md5OfMessageBody: s.md5OfMessageBody,
+          md5OfMessageAttributes: s.md5OfMessageAttributes,
           sequenceNumber: s.sequenceNumber
         })),
         failed: result.failed.map(f => ({

@@ -31,7 +31,16 @@ export let listBranches = SlateTool.create(spec, {
       projectId: z.string().describe('ID of the project to list branches for'),
       search: z.string().optional().describe('Search term to filter branches by name'),
       limit: z.number().optional().describe('Maximum number of branches to return'),
-      cursor: z.string().optional().describe('Pagination cursor for fetching next page')
+      cursor: z.string().optional().describe('Pagination cursor for fetching next page'),
+      sortBy: z
+        .enum(['name', 'created_at', 'updated_at'])
+        .optional()
+        .describe('Field to sort branches by'),
+      sortOrder: z.enum(['asc', 'desc']).optional().describe('Branch sort order'),
+      includeDeleted: z
+        .boolean()
+        .optional()
+        .describe('Whether to include recoverable deleted branches')
     })
   )
   .output(
@@ -46,7 +55,10 @@ export let listBranches = SlateTool.create(spec, {
     let result = await client.listBranches(ctx.input.projectId, {
       search: ctx.input.search,
       limit: ctx.input.limit,
-      cursor: ctx.input.cursor
+      cursor: ctx.input.cursor,
+      sortBy: ctx.input.sortBy,
+      sortOrder: ctx.input.sortOrder,
+      includeDeleted: ctx.input.includeDeleted
     });
 
     let branches = (result.branches || []).map((b: any) => ({
@@ -55,7 +67,7 @@ export let listBranches = SlateTool.create(spec, {
       name: b.name,
       parentId: b.parent_id,
       parentTimestamp: b.parent_timestamp,
-      primary: b.primary,
+      primary: b.primary ?? b.default,
       currentState: b.current_state,
       createdAt: b.created_at,
       updatedAt: b.updated_at

@@ -7,6 +7,7 @@ export * from './list-departments';
 export * from './list-employees';
 export * from './list-events';
 export * from './list-jobs';
+export * from './list-lookups';
 export * from './manage-candidate';
 export * from './manage-employee';
 export * from './manage-requisition';

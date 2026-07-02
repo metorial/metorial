@@ -3,6 +3,9 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
 
+let optionalString = (value: unknown) =>
+  typeof value === 'string' && value.length > 0 ? value : undefined;
+
 export let listUsers = SlateTool.create(spec, {
   name: 'List Users',
   key: 'list_users',
@@ -33,12 +36,12 @@ export let listUsers = SlateTool.create(spec, {
     let result = await client.listUsers();
 
     let users = result.users.map(u => ({
-      userId: u.id,
-      firstName: u.first_name,
-      lastName: u.last_name,
-      email: u.email,
-      imageUrl: u.image_url,
-      teamId: u.team_id
+      userId: optionalString(u.id),
+      firstName: optionalString(u.first_name),
+      lastName: optionalString(u.last_name),
+      email: optionalString(u.email),
+      imageUrl: optionalString(u.image_url),
+      teamId: optionalString(u.team_id)
     }));
 
     return {

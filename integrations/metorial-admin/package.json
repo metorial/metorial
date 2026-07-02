@@ -9,13 +9,14 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/provider": "1.0.0-rc.15",
+    "@slates/provider": "1.0.0-rc.16",
     "@types/node": "^20",
     "zod": "^4.2"
   },
   "devDependencies": {
+    "@slates/test": "1.0.0-rc.9",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.1.0-rc.6"
+  "version": "0.1.0-rc.7"
 }

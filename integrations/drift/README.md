@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/drift.png" height="20"> Drift
 
-Manage contacts, conversations, and messaging for conversational marketing and sales. Create, retrieve, update, and delete contacts with custom attributes. Start conversations, send bot messages, retrieve message history, and export transcripts. Manage accounts for account-based marketing and retrieve active playbooks. Schedule and track meetings booked by visitors. List teams and manage user availability. Handle GDPR data retrieval and deletion requests. Provision users via SCIM 2.0. Receive real-time webhooks for new conversations, messages, contact updates, meeting bookings, playbook goals, and user availability changes.
+Manage contacts, conversations, and messaging for conversational marketing and sales. Create, retrieve, update, and delete contacts with custom attributes, list custom contact fields, and post timeline events. Start conversations, send bot messages, retrieve message history, export transcripts through Slate attachments, and inspect conversation status counts. Manage accounts for account-based marketing, retrieve active playbooks, track booked meetings, list teams, inspect token metadata, and update user availability.
 
 ## Tools
 
@@ -28,6 +28,22 @@ Retrieve a Drift contact by their ID or email address. Returns contact attribute
 
 Retrieve detailed information about a specific Drift conversation, including participants, tags, status, and related playbook. Optionally include the message transcript.
 
+### Get Conversation Stats
+
+Get Drift conversation counts grouped by status for the connected organization.
+
+### Get Conversation Transcript
+
+Export a Drift conversation transcript as a Slate attachment. The transcript content is returned as an attachment, not inline output.
+
+### Get Token Info
+
+Inspect Drift metadata for the current access token, including organization ID, scopes, app credential ID, and expiration metadata.
+
+### List Custom Attributes
+
+List custom contact attributes configured in Drift. Use this before creating or updating contacts when you need the internal field names for custom attributes.
+
 ### List Conversations
 
 List conversations in Drift with optional status filtering and pagination. Returns conversations sorted by most recently updated.
@@ -48,6 +64,10 @@ List all users (agents) in the Drift organization. Returns the full list of user
 
 Create, retrieve, update, or delete an account in Drift. Accounts are used for personal account tracking and ABM (account-based marketing) targeting in playbooks.
 
+### Post Timeline Event
+
+Post an external activity event to a Drift contact timeline. Provide either a Drift contact ID or an external ID that Drift can match to a contact.
+
 ### Send Message
 
 Send a message in an existing Drift conversation. Can send chat messages visible to the contact or private notes visible only to agents. Supports interactive buttons.
@@ -55,6 +75,10 @@ Send a message in an existing Drift conversation. Can send chat messages visible
 ### Update Contact
 
 Update an existing Drift contact's attributes. Supports updating standard fields like name, email, phone, as well as any custom attributes.
+
+### Update User Availability
+
+Update a Drift user's availability. This is useful for external routing systems that need to mark an agent available or offline.
 
 ## License
 

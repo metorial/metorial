@@ -1,10 +1,8 @@
-Now I have enough information to write the specification.
-
 # Slates Specification for Ollama
 
 ## Overview
 
-Ollama is an open-source platform for running large language models locally or via its cloud service at ollama.com. It provides a REST API for text generation, chat completions, embeddings, and model management. It also offers OpenAI-compatible and Anthropic-compatible API endpoints.
+Ollama is an open-source platform for running large language models locally or via its cloud service at ollama.com. It provides a REST API for text generation, chat completions, embeddings, model status, model management, and server version checks. It also offers OpenAI-compatible and Anthropic-compatible API endpoints for applications that already speak those API shapes.
 
 ## Authentication
 
@@ -32,11 +30,11 @@ Users can also sign in from their local installation using `ollama signin`, and 
 
 ### Text Generation
 
-Generate text completions from a prompt using a specified model. Supports configurable parameters such as temperature, system prompt, and prompt template overrides. Responses can be streamed as JSON objects or returned as a single response by setting `stream: false`. Supports multimodal inputs (images) for vision-capable models.
+Generate text completions from a prompt using a specified model. Supports configurable parameters such as temperature, system prompt, prompt template overrides, structured output, multimodal image inputs for vision-capable models, thinking output, and log probability metadata. The integration requests non-streaming responses with `stream: false`.
 
 ### Chat Conversations
 
-Maintain conversational interactions by providing a history of messages with user, assistant, system, and tool roles. Supports the same model parameters and streaming options as text generation. Multimodal content (text and images) can be included in messages.
+Maintain conversational interactions by providing a history of messages with user, assistant, system, and tool roles. Supports model parameters, tool definitions, structured output, multimodal image inputs, thinking output, and log probability metadata. The integration requests non-streaming responses with `stream: false`.
 
 ### Tool Calling (Function Calling)
 
@@ -52,23 +50,20 @@ Generate vector embeddings from text using a specified model. Useful for semanti
 
 ### Model Management
 
-Manage models programmatically through the API:
+Manage models and server state programmatically through the API:
 
 - **List models**: Retrieve all locally available models and currently running/loaded models.
 - **Pull models**: Download models from the Ollama library.
 - **Push models**: Upload custom models to the Ollama model library (requires an ollama.com account).
-- **Create models**: Create new models from a Modelfile, including quantization of existing models and customization of system prompts, parameters, and templates.
+- **Create models**: Create new models from an existing model, including quantization, license metadata, message history, and customization of system prompts, parameters, and templates.
 - **Copy models**: Duplicate a model under a new name.
 - **Delete models**: Remove models from local storage.
-- **Show model details**: Retrieve model metadata including details, modelfile, template, and license information.
+- **Show model details**: Retrieve model metadata including details, capabilities, template, license, and verbose model information.
+- **Get version**: Retrieve the Ollama server version.
 
 ### OpenAI-Compatible API
 
 Ollama provides compatibility with parts of the OpenAI API to help connect existing applications to Ollama. Available at `/v1/` prefix, it supports chat completions, text completions, embeddings, and the Responses API. This enables drop-in compatibility with applications and libraries built for OpenAI's API. Tool calling is also supported through this compatibility layer.
-
-### Image Generation
-
-This endpoint is experimental and may change or be removed in future versions. Generate images using image generation models via the OpenAI-compatible `/v1/images/generations` endpoint.
 
 ## Events
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { fullStoryServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createEvent = SlateTool.create(spec, {
@@ -60,6 +61,23 @@ export let createEvent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.sessionId &&
+      (ctx.input.userId || ctx.input.uid || ctx.input.useMostRecent)
+    ) {
+      throw fullStoryServiceError(
+        'Provide sessionId by itself. FullStory rejects events that combine session.id with user fields or useMostRecent.'
+      );
+    }
+
+    if (ctx.input.userId && ctx.input.uid) {
+      throw fullStoryServiceError('Provide only one of userId or uid for a FullStory event.');
+    }
+
+    if (ctx.input.useMostRecent && !ctx.input.userId && !ctx.input.uid) {
+      throw fullStoryServiceError('useMostRecent requires either userId or uid.');
+    }
+
     let client = new Client({ token: ctx.auth.token });
 
     await client.createEvent({

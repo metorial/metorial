@@ -2,7 +2,7 @@
 
 ## Overview
 
-API2PDF is a REST API for PDF generation, document conversion, and file transformation. It supports HTML to PDF, URL to PDF, HTML to image, URL to image, Microsoft Office document conversion, email and image file conversion, PDF page extraction, PDF password protection, file zipping, barcode and QR code generation, markdown conversion, structured PDF data extraction, and image previews or thumbnails for PDF, office, and email files. It is built on engines including wkhtmltopdf, Headless Chrome, PdfSharp, LibreOffice, and related tools.
+API2PDF is a REST API for PDF generation, document conversion, and file transformation. It supports HTML to PDF, URL to PDF, HTML to image, URL to image, Microsoft Office document conversion, email and image file conversion, PDF page extraction, PDF password protection, file zipping, barcode and QR code generation, markdown conversion, structured PDF data extraction, and image previews or thumbnails for PDF, office, and email files. It is built on engines including Headless Chrome, PdfSharp, LibreOffice, wkhtmltopdf, and related tools.
 
 ## Authentication
 
@@ -22,15 +22,15 @@ The base URL for the API is `https://v2.api2pdf.com`. An XL cluster is also avai
 
 ### PDF Generation from HTML and URLs
 
-Convert raw HTML or a publicly accessible URL into a PDF document. Supports Markdown, HTML, and URLs to PDF using Headless Chrome. Also available via the wkhtmltopdf engine as an alternative renderer. Configurable options include landscape orientation, custom headers/footers, page size, margins, and extra HTTP headers for authenticated source URLs.
+Convert raw HTML, Markdown, or a publicly accessible URL into a PDF document using Headless Chrome. Configurable options include landscape orientation, custom headers/footers, page size, margins, tagged PDFs, outlines, print CSS, and extra HTTP headers for authenticated source URLs. The official API still exposes wkhtmltopdf endpoints, but recommends Chrome for new usage, so this integration keeps Chrome as the practical PDF generation surface.
 
 ### Screenshot / Image Capture
 
-Capture a website, URL, or raw HTML as a screenshot when PDF is not the deliverable. Uses Headless Chrome for rendering.
+Capture a website, URL, raw HTML, or Markdown as a screenshot when PDF is not the deliverable. Uses Headless Chrome for rendering and supports viewport and Puppeteer wait options.
 
 ### Office Document Conversion
 
-Convert Word, PowerPoint, Excel, and images into PDF with LibreOffice. Also supports converting HTML to Word (DOCX), HTML to Excel (XLSX), and PDF to HTML. Any file format that LibreOffice can open is supported as input.
+Convert Word, PowerPoint, Excel, images, and other LibreOffice-supported files into PDF. Also supports converting HTML or a URL to Word (DOCX), and HTML or a URL to Excel (XLSX).
 
 ### PDF Merging
 
@@ -64,9 +64,13 @@ Extract structured data from existing PDF documents for automated content proces
 
 Compress multiple files into a single ZIP archive.
 
+### API Status and Balance
+
+Check the current API2PDF service status and the remaining account balance for the authenticated API key.
+
 ### File Management
 
-By default, API2PDF will delete your generated file 24 hours after it has been generated. For those with high security needs, you can delete your file on command using the responseId returned from the original request.
+Generated files are returned as Slate attachments with metadata including response ID, source file URL, MIME type, byte length, API-reported file size, cost, and processing time. By default, API2PDF deletes generated files 24 hours after they have been generated. For high-security use cases, delete a generated file immediately using the responseId returned from the original request.
 
 ## Events
 

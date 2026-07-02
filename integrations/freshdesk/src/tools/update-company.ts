@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FreshdeskClient } from '../lib/client';
+import { freshdeskServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateCompany = SlateTool.create(spec, {
@@ -53,6 +54,10 @@ export let updateCompany = SlateTool.create(spec, {
     if (ctx.input.industry !== undefined) updateData.industry = ctx.input.industry;
     if (ctx.input.customFields !== undefined)
       updateData.custom_fields = ctx.input.customFields;
+
+    if (Object.keys(updateData).length === 0) {
+      throw freshdeskServiceError('Provide at least one field to update on the company.');
+    }
 
     let company = await client.updateCompany(ctx.input.companyId, updateData);
 

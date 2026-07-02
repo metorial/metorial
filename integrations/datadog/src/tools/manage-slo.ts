@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { datadogServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -95,7 +96,9 @@ export let manageSlo = SlateTool.create(spec, {
       });
     } else {
       if (!data.name || !data.type || !data.thresholds) {
-        throw new Error('name, type, and thresholds are required when creating a new SLO.');
+        throw datadogServiceError(
+          'name, type, and thresholds are required when creating a new SLO.'
+        );
       }
       result = await client.createSLO({
         name: data.name,

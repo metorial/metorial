@@ -8,6 +8,10 @@ Manage contacts, deals, and marketing automation for customer experience. Create
 
 Creates a note on a contact, deal, or account. Specify the resource type and ID along with the note content.
 
+### Associate Contact with Account
+
+Associates a contact with an account/company using ActiveCampaign account-contact relationships.
+
 ### Create or Update Account
 
 Creates a new company/organization account or updates an existing one. Accounts can be associated with contacts and deals. Supports custom fields.
@@ -24,6 +28,10 @@ Creates a new deal or updates an existing one. When creating, provide title, con
 
 Creates a new task or updates an existing one. Tasks are typically associated with deals. Supports setting title, due date, task type, assignee, and status.
 
+### Delete Account
+
+Deletes an ActiveCampaign account/company by ID.
+
 ### Delete Contact
 
 Permanently deletes a contact from ActiveCampaign. This removes the contact and all associated data.
@@ -32,6 +40,14 @@ Permanently deletes a contact from ActiveCampaign. This removes the contact and 
 
 Permanently deletes a deal from ActiveCampaign.
 
+### Delete Task
+
+Deletes a deal task from ActiveCampaign.
+
+### Get Account
+
+Retrieves an ActiveCampaign account/company by ID.
+
 ### Get Contact
 
 Retrieves a contact's full details including custom field values, tags, list subscriptions, and deal associations. Can look up by contact ID or search by email.
@@ -39,6 +55,10 @@ Retrieves a contact's full details including custom field values, tags, list sub
 ### Get Deal
 
 Retrieves the full details of a deal by its ID, including associated contact, pipeline, stage, and custom fields.
+
+### Get Task
+
+Retrieves a deal task by ID, including its related object and assignment fields.
 
 ### List Automations
 
@@ -55,6 +75,18 @@ Lists custom field definitions for contacts, deals, or accounts. Use this to dis
 ### List Pipelines and Stages
 
 Lists all deal pipelines and their stages. Useful for finding pipeline and stage IDs needed when creating or updating deals.
+
+### List Task Types
+
+Lists configured deal task types. Use this to find taskTypeId values before creating tasks.
+
+### List Tasks
+
+Lists deal tasks with filters for related object, status, task type, assignee, due date, and text fields.
+
+### List Users
+
+Lists ActiveCampaign account users. Use this to find owner, assignee, and list owner IDs for deals, tasks, and lists.
 
 ### Manage Contact Automation
 
@@ -75,6 +107,10 @@ Creates, updates, deletes, or retrieves mailing lists. Lists are used for organi
 ### Manage Tags
 
 Creates, updates, deletes, or lists tags. Tags can be of type "contact" or "template". Use this to manage tag definitions — to add/remove tags from contacts, use the Manage Contact Tags tool instead.
+
+### Manage Webhooks
+
+Creates, lists, or deletes ActiveCampaign webhooks for contact, campaign, deal, list, and SMS events.
 
 ### Search Accounts
 

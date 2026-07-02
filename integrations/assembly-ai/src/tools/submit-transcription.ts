@@ -1,17 +1,19 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { assemblyAiServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let submitTranscription = SlateTool.create(spec, {
   name: 'Submit Transcription',
   key: 'submit_transcription',
   description: `Submit an audio or video file for asynchronous transcription. Provide a publicly accessible URL to the media file.
-Optionally enable audio intelligence features like summarization, sentiment analysis, entity detection, topic detection, content moderation, key phrases, auto chapters, and PII redaction.
+Optionally enable audio intelligence features like sentiment analysis, entity detection, topic detection, content moderation, key phrases, and PII redaction.
 Returns the transcript object with a status of "queued" — poll using the **Get Transcript** tool to check for completion.`,
   instructions: [
     'The audio URL must be a direct link to a media file (not a webpage).',
-    'To enable summarization, set both summarization=true and provide summaryType and optionally summaryModel.',
+    'Use speechModels for current model selection. speechModel is deprecated by AssemblyAI and only remains for backwards compatibility.',
+    'For flexible summaries and chapters, prefer the Create Chat Completion tool with transcriptId over deprecated transcript-time summarization and auto chapters.',
     'PII redaction requires redactPii=true and at least one policy in redactPiiPolicies.'
   ],
   constraints: [
@@ -30,6 +32,10 @@ Returns the transcript object with a status of "queued" — poll using the **Get
         .string()
         .optional()
         .describe('Language code (e.g., "en_us", "es", "fr"). Defaults to "en_us".'),
+      languageCodes: z
+        .array(z.string())
+        .optional()
+        .describe('Language codes for code-switching audio that contains multiple languages.'),
       languageDetection: z
         .boolean()
         .optional()
@@ -41,7 +47,13 @@ Returns the transcript object with a status of "queued" — poll using the **Get
       speechModel: z
         .string()
         .optional()
-        .describe('Speech model to use (e.g., "universal", "slam-1").'),
+        .describe('Deprecated AssemblyAI speech_model parameter. Prefer speechModels.'),
+      speechModels: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'Current speech model priority list, such as ["universal-3-pro", "universal-2"].'
+        ),
       punctuate: z
         .boolean()
         .optional()
@@ -80,7 +92,12 @@ Returns the transcript object with a status of "queued" — poll using the **Get
         .optional()
         .describe('Custom header value for webhook authentication.'),
       autoHighlights: z.boolean().optional().describe('Enable key phrase extraction.'),
-      autoChapters: z.boolean().optional().describe('Enable automatic chapter generation.'),
+      autoChapters: z
+        .boolean()
+        .optional()
+        .describe(
+          'Deprecated AssemblyAI auto_chapters parameter. Prefer Create Chat Completion with transcriptId for flexible chapter summaries.'
+        ),
       entityDetection: z
         .boolean()
         .optional()
@@ -101,15 +118,24 @@ Returns the transcript object with a status of "queued" — poll using the **Get
         .boolean()
         .optional()
         .describe('Enable topic detection using IAB taxonomy.'),
-      summarization: z.boolean().optional().describe('Enable transcript summarization.'),
+      keytermsPrompt: z
+        .array(z.string())
+        .optional()
+        .describe('Domain-specific words or phrases to improve recognition accuracy.'),
+      summarization: z
+        .boolean()
+        .optional()
+        .describe(
+          'Deprecated AssemblyAI summarization parameter. Prefer Create Chat Completion with transcriptId.'
+        ),
       summaryModel: z
         .enum(['informative', 'conversational', 'catchy'])
         .optional()
-        .describe('Summarization model to use.'),
+        .describe('Deprecated summarization model to use.'),
       summaryType: z
         .enum(['bullets', 'bullets_verbose', 'gist', 'headline', 'paragraph'])
         .optional()
-        .describe('Summary output format.'),
+        .describe('Deprecated summary output format.'),
       redactPii: z
         .boolean()
         .optional()
@@ -132,6 +158,18 @@ Returns the transcript object with a status of "queued" — poll using the **Get
         .enum(['entity_name', 'hash'])
         .optional()
         .describe('How to replace PII in text: "entity_name" or "hash".'),
+      redactPiiReturnUnredacted: z
+        .boolean()
+        .optional()
+        .describe(
+          'Return unredacted text, words, and utterances alongside redacted fields. Requires redactPii=true.'
+        ),
+      redactStaticEntities: z
+        .record(z.string(), z.array(z.string()))
+        .optional()
+        .describe(
+          'User-defined exact terms to redact, keyed by redaction label. Requires redactPii=true.'
+        ),
       audioStartFrom: z
         .number()
         .optional()
@@ -149,6 +187,22 @@ Returns the transcript object with a status of "queued" — poll using the **Get
         .optional()
         .describe(
           'Natural language context (up to 1500 words) to guide transcription. Only supported for Universal-3-Pro.'
+        ),
+      temperature: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe('Universal-3 Pro transcription randomness.'),
+      domain: z
+        .enum(['medical-v1'])
+        .optional()
+        .describe('Domain-specific transcription model, currently "medical-v1".'),
+      removeAudioTags: z
+        .enum(['all', 'speaker'])
+        .optional()
+        .describe(
+          'Universal-3 Pro option to remove inline annotations: all annotations or speaker cues only.'
         )
     })
   )
@@ -170,6 +224,52 @@ Returns the transcript object with a status of "queued" — poll using the **Get
       token: ctx.auth.token,
       region: ctx.config.region
     });
+
+    if (ctx.input.languageCode && ctx.input.languageCodes?.length) {
+      throw assemblyAiServiceError('Provide either languageCode or languageCodes, not both.');
+    }
+
+    if (ctx.input.speechModel && ctx.input.speechModels?.length) {
+      throw assemblyAiServiceError(
+        'Provide either deprecated speechModel or current speechModels, not both.'
+      );
+    }
+
+    if (
+      (ctx.input.webhookAuthHeaderName && !ctx.input.webhookAuthHeaderValue) ||
+      (!ctx.input.webhookAuthHeaderName && ctx.input.webhookAuthHeaderValue)
+    ) {
+      throw assemblyAiServiceError(
+        'webhookAuthHeaderName and webhookAuthHeaderValue must be provided together.'
+      );
+    }
+
+    if (ctx.input.summarization && !ctx.input.summaryType) {
+      throw assemblyAiServiceError(
+        'summaryType is required when using deprecated summarization=true.'
+      );
+    }
+
+    if (
+      (ctx.input.redactPiiAudio ||
+        ctx.input.redactPiiReturnUnredacted ||
+        ctx.input.redactStaticEntities) &&
+      !ctx.input.redactPii
+    ) {
+      throw assemblyAiServiceError(
+        'redactPii must be true when using audio redaction, unredacted returns, or static entity redaction.'
+      );
+    }
+
+    if (
+      ctx.input.redactPii &&
+      !ctx.input.redactPiiPolicies?.length &&
+      !ctx.input.redactStaticEntities
+    ) {
+      throw assemblyAiServiceError(
+        'redactPiiPolicies or redactStaticEntities is required when redactPii is true.'
+      );
+    }
 
     let result = await client.submitTranscription(ctx.input);
 

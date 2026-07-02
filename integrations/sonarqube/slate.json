@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/sonarqube",
+  "description": "Connect to SonarQube Server or SonarQube Cloud to inspect project quality, issues, branches, pull requests, measures, quality gate status, and analysis task state.",
+  "categories": ["developer-tools", "apis-and-http-requests"],
+  "skills": [
+    "search SonarQube projects",
+    "inspect code quality measures",
+    "check quality gate status",
+    "search SonarQube issues",
+    "review issue changelogs",
+    "list project branches",
+    "list pull request analyses",
+    "check analysis task status",
+    "browse SonarQube components"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sonarcube.svg"
+}

@@ -1,6 +1,8 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  bulkSendTemplateRequest,
+  createReport,
   downloadFiles,
   getAccount,
   getEmbeddedUrls,
@@ -8,6 +10,7 @@ import {
   getTemplate,
   listSignatureRequests,
   listTemplates,
+  manageBulkSendJobs,
   manageSignatureRequest,
   manageTeam,
   manageTemplate,
@@ -21,16 +24,19 @@ export let provider = Slate.create({
   tools: [
     sendSignatureRequest,
     sendTemplateRequest,
+    bulkSendTemplateRequest,
     getSignatureRequest,
     listSignatureRequests,
     manageSignatureRequest,
     downloadFiles,
+    manageBulkSendJobs,
     listTemplates,
     getTemplate,
     manageTemplate,
     getAccount,
     getEmbeddedUrls,
-    manageTeam
+    manageTeam,
+    createReport
   ],
   triggers: [signatureRequestEvents, templateEvents]
 });

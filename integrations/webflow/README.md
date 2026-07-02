@@ -1,12 +1,28 @@
 # <img src="https://provider-logos.metorial-cdn.com/webflow.jpeg" height="20"> Webflow
 
-Manage Webflow sites, CMS content, ecommerce, and more programmatically. Create, read, update, and delete CMS collection items and collections. Manage ecommerce products, orders, and inventory. Publish sites, manage pages and components, upload and organize assets, retrieve form submissions, manage user accounts and access groups, and add custom code to sites and pages. Receive webhooks for form submissions, site publishes, page changes, ecommerce events, user account changes, and CMS item updates.
+Manage Webflow sites, CMS content, ecommerce, and operational site data programmatically. List and inspect sites, custom domains, pages, CMS collections and items, form submissions, comments, components, custom code, ecommerce products and orders, inventory, membership users, assets, and webhooks. Create, update, delete, publish, or transition supported resources through the current Webflow Data API. Receive webhooks for form submissions, site publishes, page changes, ecommerce events, user account changes, and CMS item updates.
 
 ## Tools
 
 ### Get Collection
 
 Retrieve detailed information about a CMS collection including its fields/schema. Useful for understanding the structure of a collection before creating or updating items.
+
+### Get Collection Item
+
+Retrieve one CMS collection item by ID from the staged or live collection item endpoint. Use this to inspect field data before updating, publishing, or deleting a CMS item.
+
+### Get Order
+
+Retrieve one Webflow ecommerce order by ID, including customer, status, shipping, payment, and purchased item details.
+
+### Get Page
+
+Retrieve metadata for a Webflow page, optionally including the page DOM content. Use this before updating page settings to inspect the current page title, slug, SEO, and Open Graph metadata.
+
+### Get Product
+
+Retrieve one Webflow ecommerce product and its SKUs by product ID. Use this before updating a product or inspecting variant data.
 
 ### Get Site
 
@@ -23,6 +39,22 @@ List CMS collection items (staged or live). Returns items with their field data 
 ### List Collections
 
 List all CMS collections for a Webflow site. Collections define the schema/structure for CMS content. Each collection contains fields and items.
+
+### List Comments
+
+List comment threads for a Webflow site. Use this to inspect unresolved design/content feedback connected to a site.
+
+### List Components
+
+List reusable components for a Webflow site. Use this to inspect component IDs and names before working with page content or site structure.
+
+### List Custom Code
+
+List custom code scripts configured at the site or page level. This is read-only inspection coverage; it does not create, update, or delete custom code.
+
+### List Custom Domains
+
+List custom domains configured on a Webflow site. Use this before publishing a site to a selected domain.
 
 ### List Form Submissions
 
@@ -64,6 +96,10 @@ Create or update an ecommerce product. Provide product details and optional SKU/
 
 Invite, update, or remove a user account on a membership-enabled Webflow site. Manage access group assignments to control gated content access.
 
+### Manage Webhook
+
+List, retrieve, create, or delete Webflow webhooks for a site. Creating webhooks requires an OAuth Data Client App token with sites:write scope; Site API tokens may not be accepted by Webflow for webhook creation.
+
 ### Publish Collection Items
 
 Publish one or more staged CMS collection items to make them live. This pushes draft changes to the published version of the items.
@@ -74,11 +110,11 @@ Publish a Webflow site to make staged changes live. Optionally specify which cus
 
 ### Update Order
 
-Update an ecommerce order's status or details. Use this to fulfill orders, add comments, or update shipping information.
+Update an ecommerce order's editable details, or transition it through Webflow's supported fulfill, unfulfill, and refund endpoints.
 
 ### Update Page Settings
 
-Update a page's metadata including title, slug, description, SEO settings, and Open Graph properties. Only the fields you provide will be updated.
+Update a page's metadata including title, slug, SEO settings, and Open Graph properties. Only the fields you provide will be updated.
 
 ## License
 

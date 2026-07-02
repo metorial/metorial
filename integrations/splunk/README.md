@@ -6,7 +6,11 @@ Search, monitor, and analyze machine-generated data such as logs, metrics, and e
 
 ### Get Search Results
 
-Retrieve the status and results of a previously created search job. Returns the job's dispatch state and, if the search is complete, the result rows. Supports pagination with count and offset.
+Retrieve the status and results of a previously created search job through Splunk's current v2 search-results endpoint. Returns the job's dispatch state and, if the search is complete, the result rows. Supports pagination with count and offset.
+
+### Control Search Job
+
+Cancel, finalize, pause, resume, or touch an async search job created by Run Search. Use this to clean up long-running searches or keep retained search artifacts alive when results are still needed.
 
 ### Get Server Info
 
@@ -15,6 +19,10 @@ Retrieve Splunk server information including server name, version, build number,
 ### List Fired Alerts
 
 List recently fired alerts on the Splunk instance. Returns alert names, trigger counts, and identifiers. Useful for monitoring alert activity.
+
+### List Apps
+
+List installed local Splunk apps. Returns name, label, version, visibility, disabled status, author, and description so users can discover app namespaces for searches, saved searches, and KV Store operations.
 
 ### List Users
 
@@ -30,7 +38,7 @@ List all KV Store collections within a given Splunk app. Returns collection name
 
 ### List Saved Searches
 
-List saved searches configured on the Splunk instance. Returns search name, query, schedule, and alert configuration. Supports filtering and pagination.
+List saved searches configured on the Splunk instance. Returns search name, query, schedule, alert trigger configuration, and alert actions. Supports filtering and pagination.
 
 ### Run Search
 

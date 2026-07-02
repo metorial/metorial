@@ -28,7 +28,25 @@ Useful for discovering field API names, data types, picklist values, and module 
       includeLayouts: z
         .boolean()
         .optional()
-        .describe('Include layout metadata when a module is specified (default: false)')
+        .describe('Include layout metadata when a module is specified (default: false)'),
+      includeCustomViews: z
+        .boolean()
+        .optional()
+        .describe('Include custom view metadata when a module is specified (default: false)'),
+      includeRelatedLists: z
+        .boolean()
+        .optional()
+        .describe('Include related list metadata when a module is specified (default: false)'),
+      customViewId: z
+        .string()
+        .optional()
+        .describe('Specific custom view ID to retrieve when includeCustomViews is true.'),
+      layoutId: z
+        .string()
+        .optional()
+        .describe(
+          'Layout ID to filter related list metadata when includeRelatedLists is true.'
+        )
     })
   )
   .output(
@@ -44,7 +62,15 @@ Useful for discovering field API names, data types, picklist values, and module 
       layouts: z
         .array(z.record(z.string(), z.any()))
         .optional()
-        .describe('Layout metadata for the specified module')
+        .describe('Layout metadata for the specified module'),
+      customViews: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Custom view metadata for the specified module'),
+      relatedLists: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Related list metadata for the specified module')
     })
   )
   .handleInvocation(async ctx => {
@@ -64,9 +90,13 @@ Useful for discovering field API names, data types, picklist values, and module 
 
     let includeFields = ctx.input.includeFields !== false;
     let includeLayouts = ctx.input.includeLayouts === true;
+    let includeCustomViews = ctx.input.includeCustomViews === true;
+    let includeRelatedLists = ctx.input.includeRelatedLists === true;
 
     let fields: any[] | undefined;
     let layouts: any[] | undefined;
+    let customViews: any[] | undefined;
+    let relatedLists: any[] | undefined;
 
     if (includeFields) {
       let fieldsResult = await client.getModuleFields(ctx.input.module);
@@ -78,12 +108,30 @@ Useful for discovering field API names, data types, picklist values, and module 
       layouts = layoutsResult?.layouts || [];
     }
 
+    if (includeCustomViews) {
+      let customViewsResult = await client.getCustomViews(
+        ctx.input.module,
+        ctx.input.customViewId
+      );
+      customViews = customViewsResult?.custom_views || [];
+    }
+
+    if (includeRelatedLists) {
+      let relatedListsResult = await client.getRelatedLists(
+        ctx.input.module,
+        ctx.input.layoutId
+      );
+      relatedLists = relatedListsResult?.related_lists || [];
+    }
+
     let parts: string[] = [];
     if (fields) parts.push(`**${fields.length}** fields`);
     if (layouts) parts.push(`**${layouts.length}** layouts`);
+    if (customViews) parts.push(`**${customViews.length}** custom views`);
+    if (relatedLists) parts.push(`**${relatedLists.length}** related lists`);
 
     return {
-      output: { fields, layouts },
+      output: { fields, layouts, customViews, relatedLists },
       message: `Retrieved ${parts.join(' and ')} for **${ctx.input.module}**.`
     };
   })

@@ -52,10 +52,6 @@ The Discovery API helps you find companies that meet your unique criteria. You m
 
 Convert a company name to its website domain. Provide Clearbit with a partial company name to retrieve more complete company information. This can return the company's full name, domain, and logo.
 
-### Logo
-
-Find a company's logo via the company's domain. Clearbit will return a logo by searching through various sources, including social media accounts.
-
 ### Risk Scoring
 
 Get a risk score for a new signup by checking their email and IP address against a number of factors, including if their name matches their email, if the email address is disposable, and if the IP or email address is blacklisted. Useful for fraud prevention and compliance checks.
@@ -63,6 +59,12 @@ Get a risk score for a new signup by checking their email and IP address against
 ### Autocomplete
 
 Provides company name autocomplete suggestions as users type, useful for building forms and search interfaces.
+
+### Deprecated or Discontinued Capabilities
+
+The public Clearbit Logo API is not exposed as a tool because Clearbit's current
+official logo page states that the Logo API is discontinued and unavailable for
+new users.
 
 ## Events
 

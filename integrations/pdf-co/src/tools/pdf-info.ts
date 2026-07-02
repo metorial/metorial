@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfCoApiError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getPdfInfo = SlateTool.create(spec, {
@@ -48,7 +49,7 @@ Use this to inspect a PDF's properties before performing other operations.`,
     });
 
     if (result.error) {
-      throw new Error(`Failed to read PDF info: ${result.message || 'Unknown error'}`);
+      throw pdfCoApiError('Failed to read PDF info', result);
     }
 
     let info = result.info;

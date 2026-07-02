@@ -1,11 +1,13 @@
 // Chat Completion types
 
 export type ChatMessage =
-  | { role: 'system'; content: string }
-  | { role: 'user'; content: string }
+  | { role: 'system'; content: string; name?: string }
+  | { role: 'user'; content: string; name?: string }
   | {
       role: 'assistant';
       content: string | null;
+      name?: string;
+      prefix?: boolean;
       reasoning_content?: string;
       tool_calls?: ToolCall[];
     }
@@ -26,6 +28,7 @@ export type ToolDefinition = {
     name: string;
     description?: string;
     parameters?: Record<string, unknown>;
+    strict?: boolean;
   };
 };
 
@@ -35,7 +38,6 @@ export type ResponseFormat = {
 
 export type ThinkingConfig = {
   type: 'enabled' | 'disabled';
-  budget_tokens?: number;
 };
 
 export type ChatCompletionRequest = {
@@ -44,16 +46,16 @@ export type ChatCompletionRequest = {
   temperature?: number;
   top_p?: number;
   max_tokens?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
   stop?: string | string[];
   stream?: boolean;
   response_format?: ResponseFormat;
   tools?: ToolDefinition[];
   tool_choice?: string | { type: 'function'; function: { name: string } };
   thinking?: ThinkingConfig;
+  reasoning_effort?: 'high' | 'max';
   logprobs?: boolean;
   top_logprobs?: number;
+  user_id?: string;
 };
 
 export type ChatCompletionChoice = {
@@ -99,8 +101,6 @@ export type FimCompletionRequest = {
   max_tokens?: number;
   temperature?: number;
   top_p?: number;
-  frequency_penalty?: number;
-  presence_penalty?: number;
   stop?: string | string[];
   logprobs?: number;
   stream?: boolean;

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { MondayClient } from '../lib/client';
+import { mondayServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let columnValueSchema = z.object({
@@ -35,14 +36,53 @@ export let listItemsTool = SlateTool.create(spec, {
       boardId: z.string().optional().describe('Board ID to list items from'),
       itemIds: z
         .array(z.string())
+        .max(100)
         .optional()
         .describe('Specific item IDs to retrieve (up to 100)'),
       groupId: z.string().optional().describe('Filter items by group ID (requires boardId)'),
       limit: z
         .number()
+        .int()
+        .min(1)
+        .max(500)
         .optional()
-        .describe('Maximum number of items to return (default: 500)'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response')
+        .describe('Maximum number of items to return (default: 25, max: 500)'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
+      filters: z
+        .array(
+          z.object({
+            columnId: z
+              .string()
+              .describe('Column ID to filter, such as name, group, status, people, or date'),
+            compareValue: z
+              .any()
+              .optional()
+              .describe('Value or values to compare against for this filter rule'),
+            operator: z
+              .string()
+              .optional()
+              .describe('monday.com filter operator, such as any_of or contains_text')
+          })
+        )
+        .optional()
+        .describe('items_page filter rules. Cannot be used together with cursor.'),
+      filterOperator: z
+        .enum(['and', 'or'])
+        .optional()
+        .describe('How to combine filter rules when filters are provided'),
+      orderBy: z
+        .array(
+          z.object({
+            columnId: z.string().describe('Column ID to sort by'),
+            direction: z.enum(['asc', 'desc']).optional().describe('Sort direction')
+          })
+        )
+        .optional()
+        .describe('items_page order_by rules. Cannot be used together with cursor.'),
+      hierarchyScopeConfig: z
+        .enum(['allItems', 'parentItems'])
+        .optional()
+        .describe('How multi-level board hierarchy is handled while filtering')
     })
   )
   .output(
@@ -57,17 +97,43 @@ export let listItemsTool = SlateTool.create(spec, {
     let cursor: string | null = null;
 
     if (ctx.input.itemIds?.length) {
+      if (ctx.input.boardId || ctx.input.groupId || ctx.input.filters || ctx.input.orderBy) {
+        throw mondayServiceError(
+          'itemIds cannot be combined with boardId, groupId, filters, or orderBy.'
+        );
+      }
       items = await client.getItems(ctx.input.itemIds);
     } else if (ctx.input.boardId) {
+      if (ctx.input.cursor && (ctx.input.filters?.length || ctx.input.orderBy?.length)) {
+        throw mondayServiceError(
+          'monday.com items_page does not allow cursor together with filters or orderBy.'
+        );
+      }
       let result = await client.getBoardItems(ctx.input.boardId, {
         limit: ctx.input.limit,
         cursor: ctx.input.cursor,
-        groupId: ctx.input.groupId
+        groupId: ctx.input.groupId,
+        hierarchyScopeConfig: ctx.input.hierarchyScopeConfig,
+        queryParams:
+          ctx.input.filters?.length || ctx.input.orderBy?.length
+            ? {
+                rules: ctx.input.filters?.map(filter => ({
+                  column_id: filter.columnId,
+                  compare_value: filter.compareValue ?? null,
+                  ...(filter.operator ? { operator: filter.operator } : {})
+                })),
+                operator: ctx.input.filterOperator,
+                order_by: ctx.input.orderBy?.map(order => ({
+                  column_id: order.columnId,
+                  ...(order.direction ? { direction: order.direction } : {})
+                }))
+              }
+            : undefined
       });
       items = result.items;
       cursor = result.cursor;
     } else {
-      throw new Error('Either boardId or itemIds must be provided');
+      throw mondayServiceError('Either boardId or itemIds must be provided.');
     }
 
     let mapped = items.map((item: any) => ({

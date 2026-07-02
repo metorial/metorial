@@ -1,18 +1,18 @@
 {
   "name": "@metorial/coinbase",
-  "description": "Buy, sell, send, and receive cryptocurrency. Manage wallets and accounts, create market/limit/stop-limit orders, and view transaction history. Access real-time and historical market data including prices, exchange rates, and order books. Accept crypto payments via Coinbase Commerce by creating charges and checkouts. Query onchain data such as balances and transaction history across supported networks. Stream live market data via WebSocket. Receive webhooks for account events, payment lifecycle changes, and onchain activity.",
+  "description": "Buy, sell, send, and receive cryptocurrency. Manage Coinbase App wallets and addresses, view transactions, list payment methods, preview and create Advanced Trade orders, inspect fills and portfolios, retrieve prices, exchange rates, candles, market trades, and order books, and manage Coinbase Commerce charges with a Commerce API key.",
   "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
   "skills": [
     "buy and sell cryptocurrency",
     "send and receive crypto",
     "manage crypto wallets",
-    "create trading orders",
+    "preview and create trading orders",
     "retrieve market prices",
     "accept crypto payments",
-    "query onchain data",
+    "inspect portfolio balances",
     "view transaction history",
-    "stream real-time market data",
-    "manage payment checkouts"
+    "view order fills",
+    "read market order books"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/coinbase.svg"
 }

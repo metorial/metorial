@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { AdvancedTradeClient } from '../lib/advanced-trade-client';
+import { coinbaseOAuthAuthMethods } from '../lib/auth-methods';
 import { spec } from '../spec';
 
 export let listProducts = SlateTool.create(spec, {
@@ -12,6 +13,7 @@ export let listProducts = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(coinbaseOAuthAuthMethods)
   .input(
     z.object({
       productId: z

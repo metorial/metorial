@@ -34,6 +34,11 @@ export let getDocument = SlateTool.create(spec, {
         .nullable()
         .describe('Public share link (Premium plans only)'),
       filename: z.string().nullable().describe('Filename of the generated document'),
+      outputType: z.string().nullable().describe('Output format: pdf or image'),
+      meta: z
+        .record(z.string(), z.unknown())
+        .nullable()
+        .describe('Document metadata returned by PDFMonkey'),
       failureCause: z.string().nullable().describe('Error message if generation failed'),
       checksum: z.string().nullable().describe('Checksum of the generated document'),
       generationLogs: z
@@ -64,6 +69,11 @@ export let getDocument = SlateTool.create(spec, {
       previewUrl: doc.preview_url ? String(doc.preview_url) : null,
       publicShareLink: doc.public_share_link ? String(doc.public_share_link) : null,
       filename: doc.filename ? String(doc.filename) : null,
+      outputType: doc.output_type ? String(doc.output_type) : null,
+      meta:
+        doc.meta && typeof doc.meta === 'object'
+          ? (doc.meta as Record<string, unknown>)
+          : null,
       failureCause: doc.failure_cause ? String(doc.failure_cause) : null,
       checksum: doc.checksum ? String(doc.checksum) : null,
       generationLogs: logs

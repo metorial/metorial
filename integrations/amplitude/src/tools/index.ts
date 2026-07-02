@@ -1,4 +1,5 @@
 export * from './delete-user-data';
+export * from './export-events';
 export * from './get-chart-results';
 export * from './get-user-profile';
 export * from './identify-user';

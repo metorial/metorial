@@ -24,6 +24,10 @@ List all datasets in the configured BigQuery project. Returns dataset IDs, frien
 
 List BigQuery jobs in the project. Jobs include queries, loads, exports, and copy operations. Filter by state, time range, or parent job.
 
+### List Models
+
+List BigQuery ML models in a dataset and inspect model metadata such as model type, labels, expiration, feature columns, and training runs. Model training and prediction remain SQL workflows through **Execute SQL Query**; model metadata can be retrieved, updated, and deleted with the model tools.
+
 ### List Routines
 
 List user-defined functions (UDFs), stored procedures, and table-valued functions in a BigQuery dataset.

@@ -1,9 +1,20 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { SQUARE_API_VERSION } from './lib/constants';
+import { squareApiError, squareServiceError } from './lib/errors';
 
 let squareAxios = createAxios({
-  baseURL: 'https://connect.squareup.com'
+  baseURL: 'https://connect.squareup.com',
+  headers: {
+    'Square-Version': SQUARE_API_VERSION,
+    'Content-Type': 'application/json'
+  }
 });
+
+squareAxios.interceptors.response.use(
+  response => response,
+  error => Promise.reject(squareApiError(error, 'authentication request'))
+);
 
 export let auth = SlateAuth.create()
   .output(
@@ -181,6 +192,10 @@ export let auth = SlateAuth.create()
       });
 
       let data = response.data;
+      if (!data.access_token) {
+        throw squareServiceError('Square OAuth response did not include an access token.');
+      }
+
       let expiresAt = data.expires_at ? new Date(data.expires_at).toISOString() : undefined;
 
       return {
@@ -194,6 +209,10 @@ export let auth = SlateAuth.create()
     },
 
     handleTokenRefresh: async (ctx: any) => {
+      if (!ctx.output?.refreshToken) {
+        throw squareServiceError('Square OAuth refresh requires a refresh token.');
+      }
+
       let response = await squareAxios.post('/oauth2/token', {
         client_id: ctx.clientId,
         client_secret: ctx.clientSecret,
@@ -202,12 +221,18 @@ export let auth = SlateAuth.create()
       });
 
       let data = response.data;
+      if (!data.access_token) {
+        throw squareServiceError(
+          'Square OAuth refresh response did not include an access token.'
+        );
+      }
+
       let expiresAt = data.expires_at ? new Date(data.expires_at).toISOString() : undefined;
 
       return {
         output: {
           token: data.access_token,
-          refreshToken: data.refresh_token,
+          refreshToken: data.refresh_token || ctx.output.refreshToken,
           expiresAt,
           merchantId: data.merchant_id || ctx.output.merchantId
         }
@@ -222,6 +247,10 @@ export let auth = SlateAuth.create()
       });
 
       let merchant = response.data.merchant;
+      if (!merchant?.id) {
+        throw squareServiceError('Square profile response did not include a merchant.');
+      }
+
       return {
         profile: {
           id: merchant.id,
@@ -260,6 +289,10 @@ export let auth = SlateAuth.create()
       });
 
       let merchant = response.data.merchant;
+      if (!merchant?.id) {
+        throw squareServiceError('Square profile response did not include a merchant.');
+      }
+
       return {
         profile: {
           id: merchant.id,

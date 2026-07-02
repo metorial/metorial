@@ -30,6 +30,12 @@ export let listOrders = SlateTool.create(spec, {
         .enum(['PENDING', 'FULFILLED', 'CANCELED'])
         .optional()
         .describe('Filter by fulfillment status'),
+      paymentStates: z
+        .string()
+        .optional()
+        .describe(
+          'Comma-separated payment states to include, e.g. "PAID,REFUNDED". Defaults to Squarespace API defaults when omitted.'
+        ),
       customerId: z.string().optional().describe('Filter orders by customer ID')
     })
   )
@@ -48,6 +54,7 @@ export let listOrders = SlateTool.create(spec, {
       modifiedBefore: ctx.input.modifiedBefore,
       cursor: ctx.input.cursor,
       fulfillmentStatus: ctx.input.fulfillmentStatus,
+      paymentStates: ctx.input.paymentStates,
       customerId: ctx.input.customerId
     });
 

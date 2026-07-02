@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createKubeClient } from '../lib/client';
+import { kubernetesServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let applyResource = SlateTool.create(spec, {
@@ -47,7 +48,9 @@ Accepts a full resource manifest as a JSON object. The kind, apiVersion, and met
     let manifest = ctx.input.manifest;
 
     if (!manifest.kind || !manifest.apiVersion || !manifest.metadata?.name) {
-      throw new Error('Manifest must include apiVersion, kind, and metadata.name');
+      throw kubernetesServiceError(
+        'Manifest must include apiVersion, kind, and metadata.name'
+      );
     }
 
     // Try to get the existing resource to determine if this is create or update

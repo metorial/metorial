@@ -1,9 +1,13 @@
 import { createAxios } from 'slates';
+import { ollamaApiError, ollamaServiceError } from './errors';
 
 export interface ClientConfig {
   baseUrl: string;
   token?: string;
 }
+
+export type ThinkMode = boolean | 'high' | 'medium' | 'low';
+export type KeepAlive = string | number;
 
 export interface ModelOptions {
   temperature?: number;
@@ -28,9 +32,22 @@ export interface GenerateParams {
   raw?: boolean;
   images?: string[];
   format?: string | Record<string, unknown>;
-  keepAlive?: string;
-  think?: boolean;
+  keepAlive?: KeepAlive;
+  think?: ThinkMode;
+  logprobs?: boolean;
+  topLogprobs?: number;
   options?: ModelOptions;
+}
+
+export interface LogprobInfo {
+  token: string;
+  logprob: number;
+  bytes?: number[];
+  topLogprobs?: Array<{
+    token: string;
+    logprob: number;
+    bytes?: number[];
+  }>;
 }
 
 export interface GenerateResponse {
@@ -46,6 +63,7 @@ export interface GenerateResponse {
   promptEvalDuration?: number;
   evalCount?: number;
   evalDuration?: number;
+  logprobs?: LogprobInfo[];
 }
 
 export interface ChatMessage {
@@ -76,8 +94,10 @@ export interface ChatParams {
   messages: ChatMessage[];
   tools?: ToolDefinition[];
   format?: string | Record<string, unknown>;
-  keepAlive?: string;
-  think?: boolean;
+  keepAlive?: KeepAlive;
+  think?: ThinkMode;
+  logprobs?: boolean;
+  topLogprobs?: number;
   options?: ModelOptions;
 }
 
@@ -98,6 +118,7 @@ export interface ChatResponse {
   promptEvalDuration?: number;
   evalCount?: number;
   evalDuration?: number;
+  logprobs?: LogprobInfo[];
 }
 
 export interface EmbedParams {
@@ -120,10 +141,11 @@ export interface EmbedResponse {
 export interface ModelInfo {
   name: string;
   model: string;
-  modifiedAt: string;
+  modifiedAt?: string;
   size: number;
   digest: string;
   details: {
+    parentModel?: string;
     format?: string;
     family?: string;
     families?: string[];
@@ -139,11 +161,13 @@ export interface RunningModelInfo extends ModelInfo {
 }
 
 export interface ShowModelResponse {
-  modelfile: string;
-  parameters: string;
-  template: string;
-  system: string;
-  license: string;
+  modelfile?: string;
+  parameters?: string;
+  template?: string;
+  system?: string;
+  license?: string;
+  modifiedAt?: string;
+  capabilities?: string[];
   details: {
     parentModel?: string;
     format?: string;
@@ -164,13 +188,20 @@ export interface PullResponse {
 
 export interface CreateModelParams {
   model: string;
-  modelfile?: string;
   from?: string;
   quantize?: string;
+  license?: string | string[];
   system?: string;
   template?: string;
   parameters?: Record<string, unknown>;
+  messages?: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }>;
 }
+
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 let mapOptions = (options?: ModelOptions): Record<string, unknown> | undefined => {
   if (!options) return undefined;
@@ -187,6 +218,27 @@ let mapOptions = (options?: ModelOptions): Record<string, unknown> | undefined =
     frequency_penalty: options.frequencyPenalty,
     min_p: options.minP
   };
+};
+
+let mapLogprobs = (value: unknown): LogprobInfo[] | undefined => {
+  if (!Array.isArray(value)) return undefined;
+
+  return value.filter(isRecord).map(item => ({
+    token: typeof item.token === 'string' ? item.token : '',
+    logprob: typeof item.logprob === 'number' ? item.logprob : 0,
+    bytes: Array.isArray(item.bytes)
+      ? item.bytes.filter((byte): byte is number => typeof byte === 'number')
+      : undefined,
+    topLogprobs: Array.isArray(item.top_logprobs)
+      ? item.top_logprobs.filter(isRecord).map(top => ({
+          token: typeof top.token === 'string' ? top.token : '',
+          logprob: typeof top.logprob === 'number' ? top.logprob : 0,
+          bytes: Array.isArray(top.bytes)
+            ? top.bytes.filter((byte): byte is number => typeof byte === 'number')
+            : undefined
+        }))
+      : undefined
+  }));
 };
 
 let mapMessageToApi = (msg: ChatMessage): Record<string, unknown> => {
@@ -208,10 +260,41 @@ let mapMessageToApi = (msg: ChatMessage): Record<string, unknown> => {
   return result;
 };
 
+let mapModelDetails = (details: any) => ({
+  parentModel: details?.parent_model,
+  format: details?.format,
+  family: details?.family,
+  families: details?.families,
+  parameterSize: details?.parameter_size,
+  quantizationLevel: details?.quantization_level
+});
+
+let mapModelInfo = (model: any): ModelInfo => ({
+  name: model.name,
+  model: model.model,
+  modifiedAt: model.modified_at,
+  size: model.size,
+  digest: model.digest,
+  details: mapModelDetails(model.details)
+});
+
 export class Client {
   private axios: ReturnType<typeof createAxios>;
 
   constructor(config: ClientConfig) {
+    let baseUrl = config.baseUrl.replace(/\/+$/, '');
+    try {
+      new URL(baseUrl);
+    } catch (error) {
+      let serviceError = ollamaServiceError(
+        'Ollama baseUrl must be an absolute URL such as http://localhost:11434 or https://ollama.com.'
+      );
+      if (error instanceof Error) {
+        serviceError.setParent(error);
+      }
+      throw serviceError;
+    }
+
     let headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
@@ -219,9 +302,18 @@ export class Client {
       headers.Authorization = `Bearer ${config.token}`;
     }
     this.axios = createAxios({
-      baseURL: config.baseUrl,
+      baseURL: baseUrl,
       headers
     });
+  }
+
+  private async request<T>(operation: string, run: () => Promise<{ data: T }>): Promise<T> {
+    try {
+      let response = await run();
+      return response.data;
+    } catch (error) {
+      throw ollamaApiError(error, operation);
+    }
   }
 
   async generate(params: GenerateParams): Promise<GenerateResponse> {
@@ -238,10 +330,13 @@ export class Client {
     if (params.format !== undefined) body.format = params.format;
     if (params.keepAlive !== undefined) body.keep_alive = params.keepAlive;
     if (params.think !== undefined) body.think = params.think;
+    if (params.logprobs !== undefined) body.logprobs = params.logprobs;
+    if (params.topLogprobs !== undefined) body.top_logprobs = params.topLogprobs;
     if (params.options) body.options = mapOptions(params.options);
 
-    let response = await this.axios.post('/api/generate', body);
-    let data = response.data;
+    let data = await this.request<any>('generate response', () =>
+      this.axios.post('/api/generate', body)
+    );
 
     return {
       model: data.model,
@@ -255,7 +350,8 @@ export class Client {
       promptEvalCount: data.prompt_eval_count,
       promptEvalDuration: data.prompt_eval_duration,
       evalCount: data.eval_count,
-      evalDuration: data.eval_duration
+      evalDuration: data.eval_duration,
+      logprobs: mapLogprobs(data.logprobs)
     };
   }
 
@@ -269,10 +365,13 @@ export class Client {
     if (params.format !== undefined) body.format = params.format;
     if (params.keepAlive !== undefined) body.keep_alive = params.keepAlive;
     if (params.think !== undefined) body.think = params.think;
+    if (params.logprobs !== undefined) body.logprobs = params.logprobs;
+    if (params.topLogprobs !== undefined) body.top_logprobs = params.topLogprobs;
     if (params.options) body.options = mapOptions(params.options);
 
-    let response = await this.axios.post('/api/chat', body);
-    let data = response.data;
+    let data = await this.request<any>('generate chat message', () =>
+      this.axios.post('/api/chat', body)
+    );
 
     let message: ChatResponse['message'] = {
       role: data.message?.role || 'assistant',
@@ -301,7 +400,8 @@ export class Client {
       promptEvalCount: data.prompt_eval_count,
       promptEvalDuration: data.prompt_eval_duration,
       evalCount: data.eval_count,
-      evalDuration: data.eval_duration
+      evalDuration: data.eval_duration,
+      logprobs: mapLogprobs(data.logprobs)
     };
   }
 
@@ -315,8 +415,9 @@ export class Client {
     if (params.keepAlive !== undefined) body.keep_alive = params.keepAlive;
     if (params.options) body.options = mapOptions(params.options);
 
-    let response = await this.axios.post('/api/embed', body);
-    let data = response.data;
+    let data = await this.request<any>('generate embeddings', () =>
+      this.axios.post('/api/embed', body)
+    );
 
     return {
       model: data.model,
@@ -328,40 +429,16 @@ export class Client {
   }
 
   async listModels(): Promise<ModelInfo[]> {
-    let response = await this.axios.get('/api/tags');
-    let models = response.data.models || [];
-    return models.map((m: any) => ({
-      name: m.name,
-      model: m.model,
-      modifiedAt: m.modified_at,
-      size: m.size,
-      digest: m.digest,
-      details: {
-        format: m.details?.format,
-        family: m.details?.family,
-        families: m.details?.families,
-        parameterSize: m.details?.parameter_size,
-        quantizationLevel: m.details?.quantization_level
-      }
-    }));
+    let data = await this.request<any>('list models', () => this.axios.get('/api/tags'));
+    let models = data.models || [];
+    return models.map(mapModelInfo);
   }
 
   async listRunningModels(): Promise<RunningModelInfo[]> {
-    let response = await this.axios.get('/api/ps');
-    let models = response.data.models || [];
+    let data = await this.request<any>('list running models', () => this.axios.get('/api/ps'));
+    let models = data.models || [];
     return models.map((m: any) => ({
-      name: m.name,
-      model: m.model,
-      modifiedAt: m.modified_at,
-      size: m.size,
-      digest: m.digest,
-      details: {
-        format: m.details?.format,
-        family: m.details?.family,
-        families: m.details?.families,
-        parameterSize: m.details?.parameter_size,
-        quantizationLevel: m.details?.quantization_level
-      },
+      ...mapModelInfo(m),
       expiresAt: m.expires_at,
       sizeVram: m.size_vram,
       contextLength: m.context_length
@@ -369,55 +446,51 @@ export class Client {
   }
 
   async showModel(modelName: string, verbose?: boolean): Promise<ShowModelResponse> {
-    let body: Record<string, unknown> = { name: modelName };
+    let body: Record<string, unknown> = { model: modelName };
     if (verbose) body.verbose = true;
 
-    let response = await this.axios.post('/api/show', body);
-    let data = response.data;
+    let data = await this.request<any>('show model details', () =>
+      this.axios.post('/api/show', body)
+    );
 
     return {
-      modelfile: data.modelfile || '',
-      parameters: data.parameters || '',
-      template: data.template || '',
-      system: data.system || '',
-      license: data.license || '',
-      details: {
-        parentModel: data.details?.parent_model,
-        format: data.details?.format,
-        family: data.details?.family,
-        families: data.details?.families,
-        parameterSize: data.details?.parameter_size,
-        quantizationLevel: data.details?.quantization_level
-      },
+      modelfile: data.modelfile,
+      parameters: data.parameters,
+      template: data.template,
+      system: data.system,
+      license: data.license,
+      modifiedAt: data.modified_at,
+      capabilities: data.capabilities,
+      details: mapModelDetails(data.details),
       modelInfo: data.model_info
     };
   }
 
   async pullModel(modelName: string, insecure?: boolean): Promise<PullResponse> {
     let body: Record<string, unknown> = {
-      name: modelName,
+      model: modelName,
       stream: false
     };
     if (insecure !== undefined) body.insecure = insecure;
 
-    let response = await this.axios.post('/api/pull', body);
+    let data = await this.request<any>('pull model', () => this.axios.post('/api/pull', body));
     return {
-      status: response.data.status,
-      digest: response.data.digest,
-      total: response.data.total,
-      completed: response.data.completed
+      status: data.status,
+      digest: data.digest,
+      total: data.total,
+      completed: data.completed
     };
   }
 
   async pushModel(modelName: string, insecure?: boolean): Promise<{ status: string }> {
     let body: Record<string, unknown> = {
-      name: modelName,
+      model: modelName,
       stream: false
     };
     if (insecure !== undefined) body.insecure = insecure;
 
-    let response = await this.axios.post('/api/push', body);
-    return { status: response.data.status };
+    let data = await this.request<any>('push model', () => this.axios.post('/api/push', body));
+    return { status: data.status };
   }
 
   async createModel(params: CreateModelParams): Promise<{ status: string }> {
@@ -425,27 +498,38 @@ export class Client {
       model: params.model,
       stream: false
     };
-    if (params.modelfile !== undefined) body.modelfile = params.modelfile;
     if (params.from !== undefined) body.from = params.from;
     if (params.quantize !== undefined) body.quantize = params.quantize;
+    if (params.license !== undefined) body.license = params.license;
     if (params.system !== undefined) body.system = params.system;
     if (params.template !== undefined) body.template = params.template;
     if (params.parameters !== undefined) body.parameters = params.parameters;
+    if (params.messages !== undefined) body.messages = params.messages;
 
-    let response = await this.axios.post('/api/create', body);
-    return { status: response.data.status || 'success' };
+    let data = await this.request<any>('create model', () =>
+      this.axios.post('/api/create', body)
+    );
+    return { status: data.status || 'success' };
   }
 
   async copyModel(source: string, destination: string): Promise<void> {
-    await this.axios.post('/api/copy', {
-      source,
-      destination
-    });
+    await this.request('copy model', () =>
+      this.axios.post('/api/copy', {
+        source,
+        destination
+      })
+    );
   }
 
   async deleteModel(modelName: string): Promise<void> {
-    await this.axios.delete('/api/delete', {
-      data: { name: modelName }
-    });
+    await this.request('delete model', () =>
+      this.axios.delete('/api/delete', {
+        data: { model: modelName }
+      })
+    );
+  }
+
+  async getVersion(): Promise<{ version: string }> {
+    return await this.request('get version', () => this.axios.get('/api/version'));
   }
 }

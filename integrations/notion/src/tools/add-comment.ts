@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NotionClient } from '../lib/client';
 import { spec } from '../spec';
@@ -51,20 +51,20 @@ Comments can be placed at the top of a page or as a reply to an existing discuss
       value => value !== undefined
     ).length;
     if (targetCount !== 1) {
-      throw new Error('Provide exactly one of pageId or discussionId');
+      throw createApiServiceError('Provide exactly one of pageId or discussionId');
     }
 
     let contentCount = [ctx.input.text, ctx.input.richText].filter(
       value => value !== undefined
     ).length;
     if (contentCount !== 1) {
-      throw new Error('Provide exactly one of text or richText');
+      throw createApiServiceError('Provide exactly one of text or richText');
     }
     if (ctx.input.text !== undefined && ctx.input.text.length === 0) {
-      throw new Error('text must not be empty');
+      throw createApiServiceError('text must not be empty');
     }
     if (ctx.input.richText !== undefined && ctx.input.richText.length === 0) {
-      throw new Error('richText must contain at least one rich text object');
+      throw createApiServiceError('richText must contain at least one rich text object');
     }
 
     let richText = ctx.input.richText ?? [{ type: 'text', text: { content: ctx.input.text } }];

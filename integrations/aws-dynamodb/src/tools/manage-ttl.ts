@@ -1,5 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { dynamoDbServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -23,7 +24,9 @@ When enabled, items with an expired TTL attribute are automatically deleted. Use
       ttlAttributeName: z
         .string()
         .optional()
-        .describe('Name of the attribute containing the TTL timestamp (required for enable)')
+        .describe(
+          'Name of the attribute containing the TTL timestamp (required for enable and disable)'
+        )
     })
   )
   .output(
@@ -49,14 +52,16 @@ When enabled, items with an expired TTL attribute are automatically deleted. Use
       };
     }
 
-    if (!ctx.input.ttlAttributeName && ctx.input.action === 'enable') {
-      throw new Error('ttlAttributeName is required when enabling TTL');
+    if (!ctx.input.ttlAttributeName) {
+      throw dynamoDbServiceError(
+        'ttlAttributeName is required when enabling or disabling TTL.'
+      );
     }
 
     let result = await client.updateTimeToLive({
       tableName: ctx.input.tableName,
       enabled: ctx.input.action === 'enable',
-      attributeName: ctx.input.ttlAttributeName || ''
+      attributeName: ctx.input.ttlAttributeName!
     });
 
     let ttlSpec = result.TimeToLiveSpecification;

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { hotjarServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let userLookup = SlateTool.create(spec, {
@@ -54,16 +55,21 @@ export let userLookup = SlateTool.create(spec, {
     let organizationId = ctx.input.organizationId || ctx.config.organizationId;
 
     if (!organizationId) {
-      throw new Error(
+      throw hotjarServiceError(
         'Organization ID is required. Provide it as input or set it in the global configuration.'
       );
     }
 
     if (!ctx.input.email && !ctx.input.siteUserIdMap) {
-      throw new Error('At least one of email or siteUserIdMap must be provided.');
+      throw hotjarServiceError('At least one of email or siteUserIdMap must be provided.');
     }
 
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({
+      token: ctx.auth.token,
+      clientId: ctx.auth.clientId,
+      clientSecret: ctx.auth.clientSecret,
+      expiresAt: ctx.auth.expiresAt
+    });
 
     let requestBody: {
       data_subject_email?: string;

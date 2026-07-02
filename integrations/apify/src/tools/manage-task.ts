@@ -2,18 +2,45 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  ensureAtLeastOne,
+  jsonObjectSchema,
+  mapRun,
+  paginationInput,
+  pickDefined,
+  requireString,
+  validateRunOptions
+} from './shared';
+
+let taskOutput = (task: Record<string, any>) => ({
+  taskId: task.id,
+  actorId: task.actId,
+  name: task.name,
+  title: task.title,
+  input: task.input,
+  options: task.options ?? undefined,
+  createdAt: task.createdAt,
+  modifiedAt: task.modifiedAt
+});
+
+let taskOptions = (params: { timeout?: number; memory?: number; build?: string }) => {
+  validateRunOptions(params);
+  let options = pickDefined({
+    timeoutSecs: params.timeout,
+    memoryMbytes: params.memory,
+    build: params.build
+  });
+  return Object.keys(options).length > 0 ? options : undefined;
+};
 
 export let manageTask = SlateTool.create(spec, {
   name: 'Manage Task',
   key: 'manage_task',
-  description: `Create, get, update, delete, list, or run Actor Tasks. Tasks are reusable saved configurations for running Actors with pre-defined input and options.`,
+  description: `Create, get, update, delete, list, or run Apify Actor Tasks. Tasks save reusable Actor input and run options.`,
   instructions: [
-    'To list tasks, set action to "list".',
-    'To get a task, provide taskId with action "get".',
-    'To create a task, provide actorId, name, and input with action "create".',
-    'To update a task, provide taskId with action "update" and fields to change.',
-    'To delete a task, provide taskId with action "delete".',
-    'To run a task, provide taskId with action "run". Optionally override input.'
+    'Use action=create with actorId and name to save a reusable task.',
+    'Use action=run with taskId to start a run from saved task settings.',
+    'Run options on action=run override saved task options for that run only.'
   ],
   tags: {
     destructive: true,
@@ -25,25 +52,20 @@ export let manageTask = SlateTool.create(spec, {
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete', 'run'])
         .describe('Action to perform'),
-      taskId: z
-        .string()
-        .optional()
-        .describe('Task ID or name (required for get/update/delete/run)'),
-      actorId: z
-        .string()
-        .optional()
-        .describe('Actor ID to associate with the task (required for create)'),
-      name: z.string().optional().describe('Task name (required for create)'),
+      taskId: z.string().optional().describe('Task ID or name for get/update/delete/run'),
+      actorId: z.string().optional().describe('Actor ID; required for create'),
+      name: z.string().optional().describe('Task name; required for create'),
       title: z.string().optional().describe('Human-readable title'),
-      input: z
-        .any()
-        .optional()
-        .describe('Input configuration for the task (for create/update/run)'),
-      timeout: z.number().optional().describe('Timeout in seconds (for run)'),
-      memory: z.number().optional().describe('Memory in MB (for run, must be power of 2)'),
-      build: z.string().optional().describe('Build tag (for run)'),
-      limit: z.number().optional().default(25).describe('Max items for list'),
-      offset: z.number().optional().default(0).describe('Pagination offset for list')
+      input: z.any().optional().describe('Saved task input or per-run input override'),
+      timeout: z.number().optional().describe('Run timeout in seconds'),
+      memory: z.number().optional().describe('Run memory in MB; must be a power of 2'),
+      build: z.string().optional().describe('Build tag or number'),
+      waitForFinish: z.number().optional().describe('Seconds to wait before returning run'),
+      maxItems: z.number().optional().describe('Maximum dataset items for a run'),
+      maxTotalChargeUsd: z.number().optional().describe('Maximum total charge in USD'),
+      restartOnError: z.boolean().optional().describe('Whether Apify should restart on error'),
+      webhooks: z.array(jsonObjectSchema).optional().describe('Ad-hoc webhooks for a run'),
+      ...paginationInput
     })
   )
   .output(
@@ -52,24 +74,17 @@ export let manageTask = SlateTool.create(spec, {
       actorId: z.string().optional().describe('Associated Actor ID'),
       name: z.string().optional().describe('Task name'),
       title: z.string().optional().describe('Task title'),
-      input: z.any().optional().describe('Task input configuration'),
-      createdAt: z.string().optional().describe('ISO creation timestamp'),
-      modifiedAt: z.string().optional().describe('ISO last modification timestamp'),
-      tasks: z
-        .array(
-          z.object({
-            taskId: z.string().describe('Task ID'),
-            actorId: z.string().describe('Actor ID'),
-            name: z.string().describe('Task name'),
-            title: z.string().optional().describe('Task title'),
-            createdAt: z.string().optional().describe('Creation timestamp')
-          })
-        )
-        .optional()
-        .describe('Task list (for list action)'),
-      total: z.number().optional().describe('Total tasks (for list action)'),
-      runId: z.string().optional().describe('Run ID (for run action)'),
-      runStatus: z.string().optional().describe('Run status (for run action)'),
+      input: z.any().optional().describe('Task input'),
+      options: z.record(z.string(), z.any()).optional().describe('Task run options'),
+      createdAt: z.string().optional(),
+      modifiedAt: z.string().optional(),
+      tasks: z.array(z.record(z.string(), z.any())).optional().describe('Task list'),
+      total: z.number().optional().describe('Total tasks'),
+      runId: z.string().optional().describe('Run ID when action=run'),
+      runStatus: z.string().optional().describe('Run status when action=run'),
+      defaultDatasetId: z.string().optional(),
+      defaultKeyValueStoreId: z.string().optional(),
+      defaultRequestQueueId: z.string().optional(),
       deleted: z.boolean().optional().describe('Whether the task was deleted')
     })
   )
@@ -79,17 +94,10 @@ export let manageTask = SlateTool.create(spec, {
     if (ctx.input.action === 'list') {
       let result = await client.listTasks({
         limit: ctx.input.limit,
-        offset: ctx.input.offset
+        offset: ctx.input.offset,
+        desc: ctx.input.descending
       });
-
-      let tasks = result.items.map(item => ({
-        taskId: item.id,
-        actorId: item.actId,
-        name: item.name,
-        title: item.title,
-        createdAt: item.createdAt
-      }));
-
+      let tasks = result.items.map(taskOutput);
       return {
         output: { tasks, total: result.total },
         message: `Found **${result.total}** task(s), showing **${tasks.length}**.`
@@ -97,88 +105,81 @@ export let manageTask = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      let task = await client.getTask(ctx.input.taskId!);
+      let taskId = requireString(ctx.input.taskId, 'taskId', 'get');
+      let task = await client.getTask(taskId);
       return {
-        output: {
-          taskId: task.id,
-          actorId: task.actId,
-          name: task.name,
-          title: task.title,
-          input: task.input,
-          createdAt: task.createdAt,
-          modifiedAt: task.modifiedAt
-        },
-        message: `Retrieved task **${task.name}** (\`${task.id}\`).`
+        output: taskOutput(task),
+        message: `Retrieved task **${task.name ?? taskId}** (\`${task.id ?? taskId}\`).`
       };
     }
 
     if (ctx.input.action === 'create') {
-      let body: Record<string, any> = {
-        actId: ctx.input.actorId,
-        name: ctx.input.name
-      };
-      if (ctx.input.title !== undefined) body.title = ctx.input.title;
-      if (ctx.input.input !== undefined) body.input = ctx.input.input;
-
+      let actorId = requireString(ctx.input.actorId, 'actorId', 'create');
+      let name = requireString(ctx.input.name, 'name', 'create');
+      let body = pickDefined({
+        actId: actorId,
+        name,
+        title: ctx.input.title,
+        input: ctx.input.input,
+        options: taskOptions(ctx.input)
+      });
       let task = await client.createTask(body);
       return {
-        output: {
-          taskId: task.id,
-          actorId: task.actId,
-          name: task.name,
-          title: task.title,
-          input: task.input,
-          createdAt: task.createdAt,
-          modifiedAt: task.modifiedAt
-        },
-        message: `Created task **${task.name}** (\`${task.id}\`).`
+        output: taskOutput(task),
+        message: `Created task **${task.name ?? name}** (\`${task.id}\`).`
       };
     }
 
     if (ctx.input.action === 'update') {
-      let body: Record<string, any> = {};
-      if (ctx.input.name !== undefined) body.name = ctx.input.name;
-      if (ctx.input.title !== undefined) body.title = ctx.input.title;
-      if (ctx.input.input !== undefined) body.input = ctx.input.input;
-
-      let task = await client.updateTask(ctx.input.taskId!, body);
+      let taskId = requireString(ctx.input.taskId, 'taskId', 'update');
+      let body = pickDefined({
+        name: ctx.input.name,
+        title: ctx.input.title,
+        input: ctx.input.input,
+        options: taskOptions(ctx.input)
+      });
+      ensureAtLeastOne(body, 'update the task');
+      let task = await client.updateTask(taskId, body);
       return {
-        output: {
-          taskId: task.id,
-          actorId: task.actId,
-          name: task.name,
-          title: task.title,
-          input: task.input,
-          createdAt: task.createdAt,
-          modifiedAt: task.modifiedAt
-        },
-        message: `Updated task **${task.name}** (\`${task.id}\`).`
+        output: taskOutput(task),
+        message: `Updated task **${task.name ?? taskId}** (\`${task.id ?? taskId}\`).`
       };
     }
 
     if (ctx.input.action === 'delete') {
-      await client.deleteTask(ctx.input.taskId!);
+      let taskId = requireString(ctx.input.taskId, 'taskId', 'delete');
+      await client.deleteTask(taskId);
       return {
-        output: { taskId: ctx.input.taskId, deleted: true },
-        message: `Deleted task \`${ctx.input.taskId}\`.`
+        output: { taskId, deleted: true },
+        message: `Deleted task \`${taskId}\`.`
       };
     }
 
-    // run
-    let run = await client.runTask(ctx.input.taskId!, {
+    let taskId = requireString(ctx.input.taskId, 'taskId', 'run');
+    validateRunOptions(ctx.input);
+    let run = await client.runTask(taskId, {
       input: ctx.input.input,
       timeout: ctx.input.timeout,
       memory: ctx.input.memory,
-      build: ctx.input.build
+      build: ctx.input.build,
+      waitForFinish: ctx.input.waitForFinish,
+      maxItems: ctx.input.maxItems,
+      maxTotalChargeUsd: ctx.input.maxTotalChargeUsd,
+      restartOnError: ctx.input.restartOnError,
+      webhooks: ctx.input.webhooks
     });
+    let mapped = mapRun(run);
 
     return {
       output: {
-        taskId: ctx.input.taskId,
-        runId: run.id,
-        runStatus: run.status
+        taskId,
+        runId: mapped.runId,
+        runStatus: mapped.status,
+        defaultDatasetId: mapped.defaultDatasetId,
+        defaultKeyValueStoreId: mapped.defaultKeyValueStoreId,
+        defaultRequestQueueId: mapped.defaultRequestQueueId
       },
-      message: `Task \`${ctx.input.taskId}\` run started. Run ID: \`${run.id}\`, Status: **${run.status}**.`
+      message: `Task \`${taskId}\` run started. Run ID: \`${mapped.runId}\`, status: **${mapped.status}**.`
     };
   })
   .build();

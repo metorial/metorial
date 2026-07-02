@@ -1,4 +1,12 @@
 import { createAxios } from 'slates';
+import { brazeApiError } from './errors';
+
+type UserAlias = { aliasName: string; aliasLabel: string };
+
+let mapUserAlias = (alias: UserAlias) => ({
+  alias_name: alias.aliasName,
+  alias_label: alias.aliasLabel
+});
 
 export class BrazeClient {
   private axios;
@@ -12,6 +20,11 @@ export class BrazeClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.axios.interceptors.response.use(
+      response => response,
+      error => Promise.reject(brazeApiError(error))
+    );
   }
 
   // ─── User Data ───────────────────────────────────────────────
@@ -28,35 +41,55 @@ export class BrazeClient {
   async deleteUsers(params: {
     externalIds?: string[];
     brazeIds?: string[];
-    userAliases?: { aliasName: string; aliasLabel: string }[];
+    userAliases?: UserAlias[];
   }) {
     let body: Record<string, any> = {};
     if (params.externalIds) body.external_ids = params.externalIds;
     if (params.brazeIds) body.braze_ids = params.brazeIds;
-    if (params.userAliases)
-      body.user_aliases = params.userAliases.map(a => ({
-        alias_name: a.aliasName,
-        alias_label: a.aliasLabel
-      }));
+    if (params.userAliases) body.user_aliases = params.userAliases.map(mapUserAlias);
     let resp = await this.axios.post('/users/delete', body);
     return resp.data;
   }
 
-  async identifyUsers(
-    aliases: {
+  async identifyUsers(params: {
+    aliasesToIdentify?: {
       externalId: string;
-      userAlias: { aliasName: string; aliasLabel: string };
-    }[]
-  ) {
-    let resp = await this.axios.post('/users/identify', {
-      aliases_to_identify: aliases.map(a => ({
+      userAlias: UserAlias;
+    }[];
+    emailsToIdentify?: {
+      externalId: string;
+      email: string;
+      prioritization: string[];
+    }[];
+    phoneNumbersToIdentify?: {
+      externalId: string;
+      phone: string;
+      prioritization: string[];
+    }[];
+  }) {
+    let body: Record<string, any> = {};
+    if (params.aliasesToIdentify) {
+      body.aliases_to_identify = params.aliasesToIdentify.map(a => ({
         external_id: a.externalId,
-        user_alias: {
-          alias_name: a.userAlias.aliasName,
-          alias_label: a.userAlias.aliasLabel
-        }
-      }))
-    });
+        user_alias: mapUserAlias(a.userAlias)
+      }));
+    }
+    if (params.emailsToIdentify) {
+      body.emails_to_identify = params.emailsToIdentify.map(e => ({
+        external_id: e.externalId,
+        email: e.email,
+        prioritization: e.prioritization
+      }));
+    }
+    if (params.phoneNumbersToIdentify) {
+      body.phone_numbers_to_identify = params.phoneNumbersToIdentify.map(p => ({
+        external_id: p.externalId,
+        phone: p.phone,
+        prioritization: p.prioritization
+      }));
+    }
+
+    let resp = await this.axios.post('/users/identify', body);
     return resp.data;
   }
 
@@ -94,22 +127,20 @@ export class BrazeClient {
 
   async exportUsersByIds(params: {
     externalIds?: string[];
-    brazeIds?: string[];
-    userAliases?: { aliasName: string; aliasLabel: string }[];
-    emails?: string[];
-    phones?: string[];
+    brazeId?: string;
+    deviceId?: string;
+    userAliases?: UserAlias[];
+    email?: string;
+    phone?: string;
     fieldsToExport?: string[];
   }) {
     let body: Record<string, any> = {};
     if (params.externalIds) body.external_ids = params.externalIds;
-    if (params.brazeIds) body.braze_ids = params.brazeIds;
-    if (params.userAliases)
-      body.user_aliases = params.userAliases.map(a => ({
-        alias_name: a.aliasName,
-        alias_label: a.aliasLabel
-      }));
-    if (params.emails) body.email_address = params.emails;
-    if (params.phones) body.phone = params.phones;
+    if (params.brazeId) body.braze_id = params.brazeId;
+    if (params.deviceId) body.device_id = params.deviceId;
+    if (params.userAliases) body.user_aliases = params.userAliases.map(mapUserAlias);
+    if (params.email) body.email_address = params.email;
+    if (params.phone) body.phone = params.phone;
     if (params.fieldsToExport) body.fields_to_export = params.fieldsToExport;
     let resp = await this.axios.post('/users/export/ids', body);
     return resp.data;
@@ -126,14 +157,28 @@ export class BrazeClient {
 
   async sendMessages(params: {
     externalUserIds?: string[];
+    userAliases?: UserAlias[];
     segmentId?: string;
+    audience?: Record<string, any>;
     broadcast?: boolean;
+    campaignId?: string;
+    sendId?: string;
+    overrideFrequencyCapping?: boolean;
+    recipientSubscriptionState?: string;
     messages?: Record<string, any>;
-    overrideMessageSettings?: Record<string, any>;
   }) {
     let body: Record<string, any> = {};
     if (params.externalUserIds) body.external_user_ids = params.externalUserIds;
+    if (params.userAliases) body.user_aliases = params.userAliases.map(mapUserAlias);
+    if (params.segmentId) body.segment_id = params.segmentId;
+    if (params.audience) body.audience = params.audience;
     if (params.broadcast !== undefined) body.broadcast = params.broadcast;
+    if (params.campaignId) body.campaign_id = params.campaignId;
+    if (params.sendId) body.send_id = params.sendId;
+    if (params.overrideFrequencyCapping !== undefined)
+      body.override_frequency_capping = params.overrideFrequencyCapping;
+    if (params.recipientSubscriptionState)
+      body.recipient_subscription_state = params.recipientSubscriptionState;
     if (params.messages) body.messages = params.messages;
     let resp = await this.axios.post('/messages/send', body);
     return resp.data;
@@ -143,6 +188,7 @@ export class BrazeClient {
     campaignId: string;
     recipients?: {
       externalUserId?: string;
+      userAlias?: UserAlias;
       triggerProperties?: Record<string, any>;
       sendToExistingOnly?: boolean;
       attributes?: Record<string, any>;
@@ -159,6 +205,7 @@ export class BrazeClient {
       body.recipients = params.recipients.map(r => {
         let rec: Record<string, any> = {};
         if (r.externalUserId) rec.external_user_id = r.externalUserId;
+        if (r.userAlias) rec.user_alias = mapUserAlias(r.userAlias);
         if (r.triggerProperties) rec.trigger_properties = r.triggerProperties;
         if (r.sendToExistingOnly !== undefined)
           rec.send_to_existing_only = r.sendToExistingOnly;
@@ -174,6 +221,7 @@ export class BrazeClient {
     canvasId: string;
     recipients?: {
       externalUserId?: string;
+      userAlias?: UserAlias;
       canvasEntryProperties?: Record<string, any>;
       sendToExistingOnly?: boolean;
     }[];
@@ -190,6 +238,7 @@ export class BrazeClient {
       body.recipients = params.recipients.map(r => {
         let rec: Record<string, any> = {};
         if (r.externalUserId) rec.external_user_id = r.externalUserId;
+        if (r.userAlias) rec.user_alias = mapUserAlias(r.userAlias);
         if (r.canvasEntryProperties) rec.canvas_entry_properties = r.canvasEntryProperties;
         if (r.sendToExistingOnly !== undefined)
           rec.send_to_existing_only = r.sendToExistingOnly;
@@ -205,6 +254,13 @@ export class BrazeClient {
   async scheduleMessage(params: {
     broadcast?: boolean;
     externalUserIds?: string[];
+    userAliases?: UserAlias[];
+    segmentId?: string;
+    audience?: Record<string, any>;
+    campaignId?: string;
+    sendId?: string;
+    overrideFrequencyCapping?: boolean;
+    recipientSubscriptionState?: string;
     messages?: Record<string, any>;
     schedule: { time: string; inLocalTime?: boolean };
   }) {
@@ -215,6 +271,15 @@ export class BrazeClient {
       body.schedule.in_local_time = params.schedule.inLocalTime;
     if (params.broadcast !== undefined) body.broadcast = params.broadcast;
     if (params.externalUserIds) body.external_user_ids = params.externalUserIds;
+    if (params.userAliases) body.user_aliases = params.userAliases.map(mapUserAlias);
+    if (params.segmentId) body.segment_id = params.segmentId;
+    if (params.audience) body.audience = params.audience;
+    if (params.campaignId) body.campaign_id = params.campaignId;
+    if (params.sendId) body.send_id = params.sendId;
+    if (params.overrideFrequencyCapping !== undefined)
+      body.override_frequency_capping = params.overrideFrequencyCapping;
+    if (params.recipientSubscriptionState)
+      body.recipient_subscription_state = params.recipientSubscriptionState;
     if (params.messages) body.messages = params.messages;
     let resp = await this.axios.post('/messages/schedule/create', body);
     return resp.data;
@@ -432,6 +497,11 @@ export class BrazeClient {
 
   async removeFromSpamList(emails: string[]) {
     let resp = await this.axios.post('/email/spam/remove', { email: emails });
+    return resp.data;
+  }
+
+  async blocklistEmails(emails: string[]) {
+    let resp = await this.axios.post('/email/blocklist', { email: emails });
     return resp.data;
   }
 

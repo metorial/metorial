@@ -2,6 +2,12 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Api2PdfClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  api2PdfFileOutputSchema,
+  fetchApi2PdfAttachment,
+  fileAttachment,
+  fileOutput
+} from './shared';
 
 export let convertToMarkdown = SlateTool.create(spec, {
   name: 'Convert to Markdown',
@@ -21,23 +27,17 @@ export let convertToMarkdown = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Desired file name for the output Markdown file'),
+      inline: z
+        .boolean()
+        .optional()
+        .describe('If true, opens in browser; if false, triggers download'),
       extraHttpHeaders: z
         .record(z.string(), z.string())
         .optional()
         .describe('Extra HTTP headers when fetching the source document')
     })
   )
-  .output(
-    z.object({
-      responseId: z
-        .string()
-        .describe('Unique ID for this request, can be used to delete the file later'),
-      fileUrl: z.string().describe('URL to download the generated Markdown file'),
-      mbOut: z.number().describe('Size of the generated file in megabytes'),
-      cost: z.number().describe('Cost of this API call in USD'),
-      seconds: z.number().describe('Processing time in seconds')
-    })
-  )
+  .output(api2PdfFileOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Api2PdfClient({
       token: ctx.auth.token,
@@ -47,22 +47,16 @@ export let convertToMarkdown = SlateTool.create(spec, {
     let result = await client.convertToMarkdown({
       url: ctx.input.url,
       fileName: ctx.input.fileName,
+      inline: ctx.input.inline,
       extraHTTPHeaders: ctx.input.extraHttpHeaders
     });
 
-    if (!result.success) {
-      throw new Error(result.error || 'Markdown conversion failed');
-    }
+    let file = await fetchApi2PdfAttachment(client, result, 'Markdown conversion failed');
 
     return {
-      output: {
-        responseId: result.responseId,
-        fileUrl: result.fileUrl,
-        mbOut: result.mbOut,
-        cost: result.cost,
-        seconds: result.seconds
-      },
-      message: `Converted document to Markdown (${result.mbOut} MB, ${result.seconds}s). [Download](${result.fileUrl})`
+      output: fileOutput(result, file),
+      attachments: [fileAttachment(file)],
+      message: `Converted document to Markdown (${result.mbOut} MB, ${result.seconds}s) and returned it as a Slate attachment.`
     };
   })
   .build();

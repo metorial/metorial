@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
 import type {
   ChangeListResponse,
   CommentListResponse,
@@ -20,6 +20,56 @@ let FILE_FIELDS =
 
 /** Max bytes returned in one **Download File** response (base64 in JSON); avoids MCP / JSON payload limits. */
 export let MAX_DRIVE_DOWNLOAD_BYTES = 6 * 1024 * 1024;
+export let GOOGLE_DRIVE_DEFAULT_PAGE_SIZE = 100;
+export let GOOGLE_DRIVE_MAX_PAGE_SIZE = 100;
+
+const GOOGLE_WORKSPACE_MIME_PREFIX = 'application/vnd.google-apps.';
+const INVALID_PAGE_TOKEN_PLACEHOLDERS = new Set([
+  '(no output)',
+  'no output',
+  'undefined',
+  'null'
+]);
+
+const TEXT_MIME_BY_EXTENSION: Record<string, string> = {
+  csv: 'text/csv',
+  html: 'text/html',
+  htm: 'text/html',
+  json: 'application/json',
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  txt: 'text/plain',
+  xml: 'application/xml'
+};
+
+const getFileExtension = (name: string) => {
+  let index = name.lastIndexOf('.');
+  if (index === -1 || index === name.length - 1) return undefined;
+  return name.slice(index + 1).toLowerCase();
+};
+
+const inferUploadContentType = (params: {
+  name: string;
+  mimeType?: string;
+  sourceMimeType?: string;
+  contentEncoding?: 'base64' | 'text';
+}) => {
+  if (params.sourceMimeType?.trim()) return params.sourceMimeType.trim();
+
+  if (params.mimeType && !params.mimeType.startsWith(GOOGLE_WORKSPACE_MIME_PREFIX)) {
+    return params.mimeType;
+  }
+
+  if (params.contentEncoding !== 'base64') {
+    let extension = getFileExtension(params.name);
+    if (extension && TEXT_MIME_BY_EXTENSION[extension]) {
+      return TEXT_MIME_BY_EXTENSION[extension];
+    }
+    return 'text/plain';
+  }
+
+  return 'application/octet-stream';
+};
 
 let mapFile = (raw: any): DriveFile => ({
   fileId: raw.id,
@@ -138,13 +188,46 @@ function httpStatusFromAxiosError(e: unknown): number | undefined {
   return typeof s === 'number' ? s : undefined;
 }
 
+export function normalizeGoogleDrivePageToken(pageToken?: string): string | undefined {
+  if (pageToken === undefined) return undefined;
+
+  let trimmed = pageToken.trim();
+  if (!trimmed) return undefined;
+
+  if (INVALID_PAGE_TOKEN_PLACEHOLDERS.has(trimmed.toLowerCase())) {
+    throw createApiServiceError(
+      `Invalid pageToken "${trimmed}". Omit pageToken unless it is exactly the nextPageToken returned by a previous Google Drive response.`,
+      { reason: 'invalid_page_token' }
+    );
+  }
+
+  return trimmed;
+}
+
+export function normalizeGoogleDrivePageSize(pageSize?: number): number {
+  if (pageSize === undefined) return GOOGLE_DRIVE_DEFAULT_PAGE_SIZE;
+
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > GOOGLE_DRIVE_MAX_PAGE_SIZE) {
+    throw createApiServiceError(
+      `pageSize must be an integer between 1 and ${GOOGLE_DRIVE_MAX_PAGE_SIZE}.`,
+      { reason: 'invalid_page_size' }
+    );
+  }
+
+  return pageSize;
+}
+
 /** Replace generic axios 404 with something actionable (wrong id, wrong account, no access). */
-function driveFileNotFoundError(fileId: string): Error {
-  return new Error(
+function driveFileNotFoundError(fileId: string) {
+  return createApiServiceError(
     `Drive returned 404 for file id "${fileId}". ` +
       `Google does not expose that id to the signed-in Google account (wrong id, deleted/trashed file, or different account than in the browser). ` +
-      `Copy the id from the open tab URL (/file/d/…, /document/d/…, etc.), confirm Slates Hub / this app uses the same Google user, ` +
-      `and check for typos (I vs l, O vs 0).`
+      `Copy the id from the open tab URL (/file/d/..., /document/d/..., etc.), confirm Slates Hub / this app uses the same Google user, ` +
+      `and check for typos (I vs l, O vs 0).`,
+    {
+      reason: 'drive_file_not_found',
+      upstreamStatus: 404
+    }
   );
 }
 
@@ -206,15 +289,16 @@ export class GoogleDriveClient {
     driveId?: string;
     spaces?: string;
   }): Promise<FileListResponse> {
+    let pageToken = normalizeGoogleDrivePageToken(params.pageToken);
     let requestParams: Record<string, any> = {
       fields: `nextPageToken,incompleteSearch,files(${FILE_FIELDS})`,
-      pageSize: params.pageSize || 100,
+      pageSize: normalizeGoogleDrivePageSize(params.pageSize),
       supportsAllDrives: true,
       includeItemsFromAllDrives: true
     };
 
     if (params.query) requestParams.q = params.query;
-    if (params.pageToken) requestParams.pageToken = params.pageToken;
+    if (pageToken) requestParams.pageToken = pageToken;
     if (params.orderBy) requestParams.orderBy = params.orderBy;
     if (params.driveId) {
       requestParams.driveId = params.driveId;
@@ -222,7 +306,23 @@ export class GoogleDriveClient {
     }
     if (params.spaces) requestParams.spaces = params.spaces;
 
-    let response = await this.api.get('/files', { params: requestParams });
+    let response: any;
+    try {
+      response = await this.api.get('/files', { params: requestParams });
+    } catch (e) {
+      if (pageToken && httpStatusFromAxiosError(e) === 400) {
+        throw createApiServiceError(
+          'Google Drive rejected pageToken. Discard the token and restart pagination by omitting pageToken; only reuse the exact nextPageToken from a previous response with the same query, orderBy, driveId, and spaces.',
+          {
+            reason: 'invalid_page_token',
+            upstreamStatus: 400,
+            parent: e
+          }
+        );
+      }
+      throw e;
+    }
+
     return {
       files: (response.data.files || []).map(mapFile),
       nextPageToken: response.data.nextPageToken,
@@ -260,6 +360,7 @@ export class GoogleDriveClient {
     description?: string;
     content: string;
     contentEncoding?: 'base64' | 'text';
+    sourceMimeType?: string;
     convertToGoogleFormat?: string;
   }): Promise<DriveFile> {
     let metadata: Record<string, any> = { name: params.name };
@@ -268,7 +369,7 @@ export class GoogleDriveClient {
     if (params.mimeType) metadata.mimeType = params.mimeType;
 
     let boundary = `-------slate_boundary_${Date.now()}`;
-    let contentType = params.mimeType || 'application/octet-stream';
+    let contentType = inferUploadContentType(params);
 
     let fileContent: string;
     if (params.contentEncoding === 'base64') {
@@ -285,7 +386,7 @@ export class GoogleDriveClient {
 
     let body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n${fileContent}\r\n--${boundary}--`;
 
-    let response = await this.uploadApi.post('/files', body, {
+    let response = await this.uploadApi.post('files', body, {
       params: uploadParams,
       headers: {
         'Content-Type': `multipart/related; boundary=${boundary}`
@@ -387,17 +488,19 @@ export class GoogleDriveClient {
   ): Promise<{ contentBase64: string; mimeType?: string; byteLength: number }> {
     let meta = await this.getFileLightMeta(fileId);
     if (meta.mimeType?.startsWith('application/vnd.google-apps.')) {
-      throw new Error(
+      throw createApiServiceError(
         `This file is Google Workspace format (${meta.mimeType}${meta.name ? `, "${meta.name}"` : ''}). ` +
           `Drive does not allow \`alt=media\` download for Docs/Sheets/Slides/etc. Use the **Export File** tool instead ` +
-          `(e.g. \`text/plain\`, \`application/pdf\`, or DOCX/XLSX depending on the source type).`
+          `(e.g. \`text/plain\`, \`application/pdf\`, or DOCX/XLSX depending on the source type).`,
+        { reason: 'google_workspace_download_requires_export' }
       );
     }
     let declaredBytes =
       meta.size !== undefined && meta.size !== '' ? Number(meta.size) : Number.NaN;
     if (Number.isFinite(declaredBytes) && declaredBytes > MAX_DRIVE_DOWNLOAD_BYTES) {
-      throw new Error(
-        `File size (~${declaredBytes} bytes) exceeds this tool’s limit of ${MAX_DRIVE_DOWNLOAD_BYTES} bytes for MCP-safe JSON payloads. Download via another path or split the file.`
+      throw createApiServiceError(
+        `File size (~${declaredBytes} bytes) exceeds this tool's limit of ${MAX_DRIVE_DOWNLOAD_BYTES} bytes for MCP-safe JSON payloads. Download via another path or split the file.`,
+        { reason: 'drive_download_too_large' }
       );
     }
 
@@ -415,8 +518,9 @@ export class GoogleDriveClient {
     }
     let buf = Buffer.from(response.data as ArrayBuffer);
     if (buf.length > MAX_DRIVE_DOWNLOAD_BYTES) {
-      throw new Error(
-        `Downloaded ${buf.length} bytes, which exceeds the tool limit of ${MAX_DRIVE_DOWNLOAD_BYTES} bytes for MCP-safe JSON.`
+      throw createApiServiceError(
+        `Downloaded ${buf.length} bytes, which exceeds the tool limit of ${MAX_DRIVE_DOWNLOAD_BYTES} bytes for MCP-safe JSON.`,
+        { reason: 'drive_download_too_large' }
       );
     }
     let ct = response.headers['content-type'];

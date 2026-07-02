@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { awsSesApiError } from './errors';
 import { signRequest } from './signing';
 
 export interface SesClientConfig {
@@ -7,6 +8,41 @@ export interface SesClientConfig {
   sessionToken?: string;
   region: string;
 }
+
+export interface SesAttachment {
+  fileName: string;
+  rawContentBase64: string;
+  contentType?: string;
+  contentDisposition?: 'ATTACHMENT' | 'INLINE';
+  contentDescription?: string;
+  contentId?: string;
+  contentTransferEncoding?: 'BASE64' | 'QUOTED_PRINTABLE' | 'SEVEN_BIT';
+}
+
+export interface SesHeader {
+  name: string;
+  value: string;
+}
+
+let mapHeaders = (headers?: SesHeader[]) =>
+  headers?.map(header => ({ Name: header.name, Value: header.value }));
+
+let mapAttachments = (attachments?: SesAttachment[]) =>
+  attachments?.map(attachment => ({
+    FileName: attachment.fileName,
+    RawContent: attachment.rawContentBase64,
+    ...(attachment.contentType ? { ContentType: attachment.contentType } : {}),
+    ...(attachment.contentDisposition
+      ? { ContentDisposition: attachment.contentDisposition }
+      : {}),
+    ...(attachment.contentDescription
+      ? { ContentDescription: attachment.contentDescription }
+      : {}),
+    ...(attachment.contentId ? { ContentId: attachment.contentId } : {}),
+    ...(attachment.contentTransferEncoding
+      ? { ContentTransferEncoding: attachment.contentTransferEncoding }
+      : {})
+  }));
 
 export class SesClient {
   private baseUrl: string;
@@ -52,15 +88,19 @@ export class SesClient {
       service: 'ses'
     });
 
-    let ax = createAxios({ baseURL: this.baseUrl });
-    let response = await ax.request({
-      method,
-      url,
-      data: bodyStr,
-      headers: signedHeaders
-    });
+    try {
+      let ax = createAxios({ baseURL: this.baseUrl });
+      let response = await ax.request({
+        method,
+        url,
+        data: bodyStr,
+        headers: signedHeaders
+      });
 
-    return response.data;
+      return response.data;
+    } catch (error) {
+      throw awsSesApiError(error, `${method.toUpperCase()} ${path}`);
+    }
   }
 
   // ==================== Email Sending ====================
@@ -79,18 +119,24 @@ export class SesClient {
           text?: { data: string; charset?: string };
           html?: { data: string; charset?: string };
         };
-        headers?: { name: string; value: string }[];
+        headers?: SesHeader[];
+        attachments?: SesAttachment[];
       };
       raw?: { data: string };
       template?: {
         templateName?: string;
         templateArn?: string;
         templateData?: string;
-        headers?: { name: string; value: string }[];
+        headers?: SesHeader[];
+        attachments?: SesAttachment[];
       };
     };
     replyToAddresses?: string[];
     feedbackForwardingEmailAddress?: string;
+    feedbackForwardingEmailAddressIdentityArn?: string;
+    fromEmailAddressIdentityArn?: string;
+    endpointId?: string;
+    tenantName?: string;
     emailTags?: { name: string; value: string }[];
     configurationSetName?: string;
     listManagementOptions?: {
@@ -101,6 +147,8 @@ export class SesClient {
     let body: any = {};
 
     if (params.fromEmailAddress) body.FromEmailAddress = params.fromEmailAddress;
+    if (params.fromEmailAddressIdentityArn)
+      body.FromEmailAddressIdentityArn = params.fromEmailAddressIdentityArn;
     if (params.destination) {
       body.Destination = {};
       if (params.destination.toAddresses)
@@ -135,7 +183,10 @@ export class SesClient {
         };
       }
       if (s.headers && s.headers.length > 0) {
-        body.Content.Simple.Headers = s.headers.map(h => ({ Name: h.name, Value: h.value }));
+        body.Content.Simple.Headers = mapHeaders(s.headers);
+      }
+      if (s.attachments && s.attachments.length > 0) {
+        body.Content.Simple.Attachments = mapAttachments(s.attachments);
       }
     } else if (params.content.raw) {
       body.Content = { Raw: { Data: params.content.raw.data } };
@@ -146,16 +197,24 @@ export class SesClient {
       if (t.templateArn) body.Content.Template.TemplateArn = t.templateArn;
       if (t.templateData) body.Content.Template.TemplateData = t.templateData;
       if (t.headers && t.headers.length > 0) {
-        body.Content.Template.Headers = t.headers.map(h => ({ Name: h.name, Value: h.value }));
+        body.Content.Template.Headers = mapHeaders(t.headers);
+      }
+      if (t.attachments && t.attachments.length > 0) {
+        body.Content.Template.Attachments = mapAttachments(t.attachments);
       }
     }
 
     if (params.replyToAddresses) body.ReplyToAddresses = params.replyToAddresses;
     if (params.feedbackForwardingEmailAddress)
       body.FeedbackForwardingEmailAddress = params.feedbackForwardingEmailAddress;
+    if (params.feedbackForwardingEmailAddressIdentityArn)
+      body.FeedbackForwardingEmailAddressIdentityArn =
+        params.feedbackForwardingEmailAddressIdentityArn;
     if (params.emailTags)
       body.EmailTags = params.emailTags.map(t => ({ Name: t.name, Value: t.value }));
     if (params.configurationSetName) body.ConfigurationSetName = params.configurationSetName;
+    if (params.endpointId) body.EndpointId = params.endpointId;
+    if (params.tenantName) body.TenantName = params.tenantName;
     if (params.listManagementOptions) {
       body.ListManagementOptions = {
         ContactListName: params.listManagementOptions.contactListName
@@ -177,12 +236,18 @@ export class SesClient {
     fromEmailAddress?: string;
     replyToAddresses?: string[];
     feedbackForwardingEmailAddress?: string;
+    feedbackForwardingEmailAddressIdentityArn?: string;
+    fromEmailAddressIdentityArn?: string;
+    endpointId?: string;
+    tenantName?: string;
     defaultEmailTags?: { name: string; value: string }[];
     defaultContent: {
       template: {
         templateName?: string;
         templateArn?: string;
         templateData?: string;
+        headers?: SesHeader[];
+        attachments?: SesAttachment[];
       };
     };
     configurationSetName?: string;
@@ -197,6 +262,7 @@ export class SesClient {
           replacementTemplateData?: string;
         };
       };
+      replacementHeaders?: SesHeader[];
       replacementTags?: { name: string; value: string }[];
     }[];
   }): Promise<{
@@ -205,21 +271,32 @@ export class SesClient {
     let body: any = {};
 
     if (params.fromEmailAddress) body.FromEmailAddress = params.fromEmailAddress;
+    if (params.fromEmailAddressIdentityArn)
+      body.FromEmailAddressIdentityArn = params.fromEmailAddressIdentityArn;
     if (params.replyToAddresses) body.ReplyToAddresses = params.replyToAddresses;
     if (params.feedbackForwardingEmailAddress)
       body.FeedbackForwardingEmailAddress = params.feedbackForwardingEmailAddress;
+    if (params.feedbackForwardingEmailAddressIdentityArn)
+      body.FeedbackForwardingEmailAddressIdentityArn =
+        params.feedbackForwardingEmailAddressIdentityArn;
     if (params.defaultEmailTags)
       body.DefaultEmailTags = params.defaultEmailTags.map(t => ({
         Name: t.name,
         Value: t.value
       }));
     if (params.configurationSetName) body.ConfigurationSetName = params.configurationSetName;
+    if (params.endpointId) body.EndpointId = params.endpointId;
+    if (params.tenantName) body.TenantName = params.tenantName;
 
     body.DefaultContent = { Template: {} };
     let dt = params.defaultContent.template;
     if (dt.templateName) body.DefaultContent.Template.TemplateName = dt.templateName;
     if (dt.templateArn) body.DefaultContent.Template.TemplateArn = dt.templateArn;
     if (dt.templateData) body.DefaultContent.Template.TemplateData = dt.templateData;
+    if (dt.headers && dt.headers.length > 0)
+      body.DefaultContent.Template.Headers = mapHeaders(dt.headers);
+    if (dt.attachments && dt.attachments.length > 0)
+      body.DefaultContent.Template.Attachments = mapAttachments(dt.attachments);
 
     body.BulkEmailEntries = params.bulkEmailEntries.map(entry => {
       let e: any = {
@@ -239,6 +316,9 @@ export class SesClient {
               entry.replacementEmailContent.replacementTemplate.replacementTemplateData
           }
         };
+      }
+      if (entry.replacementHeaders) {
+        e.ReplacementHeaders = mapHeaders(entry.replacementHeaders);
       }
       if (entry.replacementTags) {
         e.ReplacementTags = entry.replacementTags.map(t => ({ Name: t.name, Value: t.value }));
@@ -855,6 +935,7 @@ export class SesClient {
     deliveryOptions?: {
       sendingPoolName?: string;
       tlsPolicy?: 'REQUIRE' | 'OPTIONAL';
+      maxDeliverySeconds?: number;
     };
     reputationOptions?: {
       reputationMetricsEnabled?: boolean;
@@ -879,6 +960,8 @@ export class SesClient {
         body.DeliveryOptions.SendingPoolName = params.deliveryOptions.sendingPoolName;
       if (params.deliveryOptions.tlsPolicy)
         body.DeliveryOptions.TlsPolicy = params.deliveryOptions.tlsPolicy;
+      if (params.deliveryOptions.maxDeliverySeconds !== undefined)
+        body.DeliveryOptions.MaxDeliverySeconds = params.deliveryOptions.maxDeliverySeconds;
     }
     if (params.reputationOptions) {
       body.ReputationOptions = {};
@@ -918,6 +1001,7 @@ export class SesClient {
     deliveryOptions?: {
       sendingPoolName?: string;
       tlsPolicy?: string;
+      maxDeliverySeconds?: number;
     };
     reputationOptions?: {
       reputationMetricsEnabled?: boolean;
@@ -942,7 +1026,8 @@ export class SesClient {
       deliveryOptions: result.DeliveryOptions
         ? {
             sendingPoolName: result.DeliveryOptions.SendingPoolName,
-            tlsPolicy: result.DeliveryOptions.TlsPolicy
+            tlsPolicy: result.DeliveryOptions.TlsPolicy,
+            maxDeliverySeconds: result.DeliveryOptions.MaxDeliverySeconds
           }
         : undefined,
       reputationOptions: result.ReputationOptions
@@ -1003,6 +1088,28 @@ export class SesClient {
     );
   }
 
+  async putConfigurationSetDeliveryOptions(
+    configurationSetName: string,
+    deliveryOptions: {
+      sendingPoolName?: string;
+      tlsPolicy?: 'REQUIRE' | 'OPTIONAL';
+      maxDeliverySeconds?: number;
+    }
+  ): Promise<void> {
+    let body: any = {};
+    if (deliveryOptions.sendingPoolName !== undefined)
+      body.SendingPoolName = deliveryOptions.sendingPoolName;
+    if (deliveryOptions.tlsPolicy !== undefined) body.TlsPolicy = deliveryOptions.tlsPolicy;
+    if (deliveryOptions.maxDeliverySeconds !== undefined)
+      body.MaxDeliverySeconds = deliveryOptions.maxDeliverySeconds;
+
+    await this.request(
+      'PUT',
+      `/v2/email/configuration-sets/${encodeURIComponent(configurationSetName)}/delivery-options`,
+      body
+    );
+  }
+
   async putConfigurationSetReputationOptions(
     configurationSetName: string,
     reputationMetricsEnabled: boolean
@@ -1048,6 +1155,7 @@ export class SesClient {
     configurationSetName: string;
     eventDestinationName: string;
     matchingEventTypes: string[];
+    enabled?: boolean;
     snsDestination?: { topicArn: string };
     cloudWatchDestination?: {
       dimensionConfigurations: {
@@ -1057,12 +1165,14 @@ export class SesClient {
       }[];
     };
     eventBridgeDestination?: { eventBusArn: string };
+    kinesisFirehoseDestination?: { deliveryStreamArn: string; iamRoleArn: string };
+    pinpointDestination?: { applicationArn: string };
   }): Promise<void> {
     let body: any = {
       EventDestinationName: params.eventDestinationName,
       EventDestination: {
         MatchingEventTypes: params.matchingEventTypes,
-        Enabled: true
+        Enabled: params.enabled ?? true
       }
     };
     if (params.snsDestination) {
@@ -1084,10 +1194,81 @@ export class SesClient {
         EventBusArn: params.eventBridgeDestination.eventBusArn
       };
     }
+    if (params.kinesisFirehoseDestination) {
+      body.EventDestination.KinesisFirehoseDestination = {
+        DeliveryStreamArn: params.kinesisFirehoseDestination.deliveryStreamArn,
+        IamRoleArn: params.kinesisFirehoseDestination.iamRoleArn
+      };
+    }
+    if (params.pinpointDestination) {
+      body.EventDestination.PinpointDestination = {
+        ApplicationArn: params.pinpointDestination.applicationArn
+      };
+    }
     await this.request(
       'POST',
       `/v2/email/configuration-sets/${encodeURIComponent(params.configurationSetName)}/event-destinations`,
       body
+    );
+  }
+
+  async updateConfigurationSetEventDestination(params: {
+    configurationSetName: string;
+    eventDestinationName: string;
+    matchingEventTypes: string[];
+    enabled?: boolean;
+    snsDestination?: { topicArn: string };
+    cloudWatchDestination?: {
+      dimensionConfigurations: {
+        dimensionName: string;
+        dimensionValueSource: 'MESSAGE_TAG' | 'EMAIL_HEADER' | 'LINK_TAG';
+        defaultDimensionValue: string;
+      }[];
+    };
+    eventBridgeDestination?: { eventBusArn: string };
+    kinesisFirehoseDestination?: { deliveryStreamArn: string; iamRoleArn: string };
+    pinpointDestination?: { applicationArn: string };
+  }): Promise<void> {
+    let eventDestination: any = {
+      MatchingEventTypes: params.matchingEventTypes,
+      Enabled: params.enabled ?? true
+    };
+
+    if (params.snsDestination) {
+      eventDestination.SnsDestination = { TopicArn: params.snsDestination.topicArn };
+    }
+    if (params.cloudWatchDestination) {
+      eventDestination.CloudWatchDestination = {
+        DimensionConfigurations: params.cloudWatchDestination.dimensionConfigurations.map(
+          d => ({
+            DimensionName: d.dimensionName,
+            DimensionValueSource: d.dimensionValueSource,
+            DefaultDimensionValue: d.defaultDimensionValue
+          })
+        )
+      };
+    }
+    if (params.eventBridgeDestination) {
+      eventDestination.EventBridgeDestination = {
+        EventBusArn: params.eventBridgeDestination.eventBusArn
+      };
+    }
+    if (params.kinesisFirehoseDestination) {
+      eventDestination.KinesisFirehoseDestination = {
+        DeliveryStreamArn: params.kinesisFirehoseDestination.deliveryStreamArn,
+        IamRoleArn: params.kinesisFirehoseDestination.iamRoleArn
+      };
+    }
+    if (params.pinpointDestination) {
+      eventDestination.PinpointDestination = {
+        ApplicationArn: params.pinpointDestination.applicationArn
+      };
+    }
+
+    await this.request(
+      'PUT',
+      `/v2/email/configuration-sets/${encodeURIComponent(params.configurationSetName)}/event-destinations/${encodeURIComponent(params.eventDestinationName)}`,
+      { EventDestination: eventDestination }
     );
   }
 
@@ -1099,6 +1280,8 @@ export class SesClient {
       snsDestination?: { topicArn: string };
       cloudWatchDestination?: any;
       eventBridgeDestination?: { eventBusArn: string };
+      kinesisFirehoseDestination?: { deliveryStreamArn: string; iamRoleArn: string };
+      pinpointDestination?: { applicationArn: string };
     }[];
   }> {
     let result = await this.request<any>(
@@ -1114,6 +1297,15 @@ export class SesClient {
         cloudWatchDestination: d.CloudWatchDestination,
         eventBridgeDestination: d.EventBridgeDestination
           ? { eventBusArn: d.EventBridgeDestination.EventBusArn }
+          : undefined,
+        kinesisFirehoseDestination: d.KinesisFirehoseDestination
+          ? {
+              deliveryStreamArn: d.KinesisFirehoseDestination.DeliveryStreamArn,
+              iamRoleArn: d.KinesisFirehoseDestination.IamRoleArn
+            }
+          : undefined,
+        pinpointDestination: d.PinpointDestination
+          ? { applicationArn: d.PinpointDestination.ApplicationArn }
           : undefined
       }))
     };
@@ -1185,6 +1377,14 @@ export class SesClient {
 
   async getAccount(): Promise<{
     dedicatedIpAutoWarmupEnabled: boolean;
+    details?: {
+      additionalContactEmailAddresses?: string[];
+      contactLanguage?: string;
+      mailType?: string;
+      reviewDetails?: { caseId?: string; status?: string };
+      useCaseDescription?: string;
+      websiteUrl?: string;
+    };
     enforcementStatus: string;
     productionAccessEnabled: boolean;
     sendingEnabled: boolean;
@@ -1195,6 +1395,12 @@ export class SesClient {
     };
     suppressionAttributes?: {
       suppressedReasons: string[];
+      validationAttributes?: {
+        conditionThreshold?: {
+          conditionThresholdEnabled?: string;
+          overallConfidenceThreshold?: { confidenceVerdictThreshold?: string };
+        };
+      };
     };
     vdmAttributes?: {
       vdmEnabled: string;
@@ -1205,6 +1411,21 @@ export class SesClient {
     let result = await this.request<any>('GET', '/v2/email/account');
     return {
       dedicatedIpAutoWarmupEnabled: result.DedicatedIpAutoWarmupEnabled || false,
+      details: result.Details
+        ? {
+            additionalContactEmailAddresses: result.Details.AdditionalContactEmailAddresses,
+            contactLanguage: result.Details.ContactLanguage,
+            mailType: result.Details.MailType,
+            reviewDetails: result.Details.ReviewDetails
+              ? {
+                  caseId: result.Details.ReviewDetails.CaseId,
+                  status: result.Details.ReviewDetails.Status
+                }
+              : undefined,
+            useCaseDescription: result.Details.UseCaseDescription,
+            websiteUrl: result.Details.WebsiteURL
+          }
+        : undefined,
       enforcementStatus: result.EnforcementStatus || 'HEALTHY',
       productionAccessEnabled: result.ProductionAccessEnabled || false,
       sendingEnabled: result.SendingEnabled || false,
@@ -1214,7 +1435,30 @@ export class SesClient {
         sentLast24Hours: result.SendQuota?.SentLast24Hours || 0
       },
       suppressionAttributes: result.SuppressionAttributes
-        ? { suppressedReasons: result.SuppressionAttributes.SuppressedReasons || [] }
+        ? {
+            suppressedReasons: result.SuppressionAttributes.SuppressedReasons || [],
+            validationAttributes: result.SuppressionAttributes.ValidationAttributes
+              ? {
+                  conditionThreshold: result.SuppressionAttributes.ValidationAttributes
+                    .ConditionThreshold
+                    ? {
+                        conditionThresholdEnabled:
+                          result.SuppressionAttributes.ValidationAttributes.ConditionThreshold
+                            .ConditionThresholdEnabled,
+                        overallConfidenceThreshold: result.SuppressionAttributes
+                          .ValidationAttributes.ConditionThreshold.OverallConfidenceThreshold
+                          ? {
+                              confidenceVerdictThreshold:
+                                result.SuppressionAttributes.ValidationAttributes
+                                  .ConditionThreshold.OverallConfidenceThreshold
+                                  .ConfidenceVerdictThreshold
+                            }
+                          : undefined
+                      }
+                    : undefined
+                }
+              : undefined
+          }
         : undefined,
       vdmAttributes: result.VdmAttributes
         ? {
@@ -1239,6 +1483,58 @@ export class SesClient {
     await this.request('PUT', '/v2/email/account/sending', {
       SendingEnabled: sendingEnabled
     });
+  }
+
+  // ==================== Email Address Insights ====================
+
+  async getEmailAddressInsights(emailAddress: string): Promise<{
+    emailAddress: string;
+    mailboxValidation?: {
+      isValid?: { confidenceVerdict?: string };
+      evaluations?: Record<string, { confidenceVerdict?: string } | undefined>;
+    };
+  }> {
+    let result = await this.request<any>('POST', '/v2/email/email-address-insights/', {
+      EmailAddress: emailAddress
+    });
+    let evaluations = result.MailboxValidation?.Evaluations;
+
+    return {
+      emailAddress,
+      mailboxValidation: result.MailboxValidation
+        ? {
+            isValid: result.MailboxValidation.IsValid
+              ? {
+                  confidenceVerdict: result.MailboxValidation.IsValid.ConfidenceVerdict
+                }
+              : undefined,
+            evaluations: evaluations
+              ? {
+                  hasValidDnsRecords: evaluations.HasValidDnsRecords
+                    ? {
+                        confidenceVerdict: evaluations.HasValidDnsRecords.ConfidenceVerdict
+                      }
+                    : undefined,
+                  hasValidSyntax: evaluations.HasValidSyntax
+                    ? { confidenceVerdict: evaluations.HasValidSyntax.ConfidenceVerdict }
+                    : undefined,
+                  isDisposable: evaluations.IsDisposable
+                    ? { confidenceVerdict: evaluations.IsDisposable.ConfidenceVerdict }
+                    : undefined,
+                  isRandomInput: evaluations.IsRandomInput
+                    ? { confidenceVerdict: evaluations.IsRandomInput.ConfidenceVerdict }
+                    : undefined,
+                  isRoleAddress: evaluations.IsRoleAddress
+                    ? { confidenceVerdict: evaluations.IsRoleAddress.ConfidenceVerdict }
+                    : undefined,
+                  mailboxExists: evaluations.MailboxExists
+                    ? { confidenceVerdict: evaluations.MailboxExists.ConfidenceVerdict }
+                    : undefined
+                }
+              : undefined
+          }
+        : undefined
+    };
   }
 
   // ==================== Message Insights ====================

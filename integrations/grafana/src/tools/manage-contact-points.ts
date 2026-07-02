@@ -118,6 +118,71 @@ export let createContactPoint = SlateTool.create(spec, {
   })
   .build();
 
+export let updateContactPoint = SlateTool.create(spec, {
+  name: 'Update Contact Point',
+  key: 'update_contact_point',
+  description: `Update an existing alert notification contact point by UID. Provide the full receiver configuration, including name, integration type, and settings.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      contactPointUid: z.string().describe('UID of the contact point to update'),
+      name: z.string().describe('Updated contact point name'),
+      type: z
+        .string()
+        .describe(
+          'Integration type (e.g. slack, email, pagerduty, webhook, teams, opsgenie, discord)'
+        ),
+      settings: z
+        .record(z.string(), z.any())
+        .describe('Full integration-specific settings for the contact point'),
+      disableResolveMessage: z
+        .boolean()
+        .optional()
+        .describe('Disable sending resolve notifications')
+    })
+  )
+  .output(
+    z.object({
+      contactPointUid: z.string().describe('UID of the updated contact point'),
+      name: z.string().describe('Updated contact point name'),
+      type: z.string().describe('Integration type'),
+      message: z.string().describe('Confirmation message')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new GrafanaClient({
+      instanceUrl: ctx.config.instanceUrl,
+      token: ctx.auth.token,
+      organizationId: ctx.config.organizationId
+    });
+
+    let body: Record<string, any> = {
+      uid: ctx.input.contactPointUid,
+      name: ctx.input.name,
+      type: ctx.input.type,
+      settings: ctx.input.settings
+    };
+    if (ctx.input.disableResolveMessage !== undefined) {
+      body.disableResolveMessage = ctx.input.disableResolveMessage;
+    }
+
+    let result = await client.updateContactPoint(ctx.input.contactPointUid, body);
+
+    return {
+      output: {
+        contactPointUid: ctx.input.contactPointUid,
+        name: ctx.input.name,
+        type: ctx.input.type,
+        message: result.message || 'Contact point updated.'
+      },
+      message: `Contact point **${ctx.input.name}** (${ctx.input.type}) updated.`
+    };
+  })
+  .build();
+
 export let deleteContactPoint = SlateTool.create(spec, {
   name: 'Delete Contact Point',
   key: 'delete_contact_point',

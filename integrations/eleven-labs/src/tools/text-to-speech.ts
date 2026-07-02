@@ -2,11 +2,17 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ElevenLabsClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  audioAttachment,
+  audioOutput,
+  audioOutputSchema,
+  voiceSettingsSchema
+} from './shared';
 
 export let textToSpeech = SlateTool.create(spec, {
   name: 'Text to Speech',
   key: 'text_to_speech',
-  description: `Convert text into lifelike speech audio using ElevenLabs voices and models. Returns base64-encoded audio that can be saved or played back. Supports multiple languages, voice customization, and various output formats.`,
+  description: `Convert text into lifelike speech audio using ElevenLabs voices and models. Returns generated audio as a Slate attachment. Supports multiple languages, voice customization, and various output formats.`,
   instructions: [
     'Use the "listVoices" or "listModels" tools first to find available voice IDs and model IDs.',
     'The default model is "eleven_multilingual_v2". Use "eleven_flash_v2_5" for lower latency.'
@@ -42,49 +48,30 @@ export let textToSpeech = SlateTool.create(spec, {
         .enum(['auto', 'on', 'off'])
         .optional()
         .describe('Text normalization mode. Defaults to "auto".'),
-      voiceSettings: z
-        .object({
-          stability: z
-            .number()
-            .min(0)
-            .max(1)
-            .optional()
-            .describe('Voice stability (0-1). Lower values add more variability.'),
-          similarityBoost: z
-            .number()
-            .min(0)
-            .max(1)
-            .optional()
-            .describe(
-              'Similarity boost (0-1). Higher values are more faithful to the original voice.'
-            ),
-          style: z
-            .number()
-            .min(0)
-            .max(1)
-            .optional()
-            .describe('Style exaggeration (0-1). Higher values amplify the voice style.'),
-          useSpeakerBoost: z
-            .boolean()
-            .optional()
-            .describe('Enable speaker boost for enhanced clarity'),
-          speed: z
-            .number()
-            .min(0.25)
-            .max(4.0)
-            .optional()
-            .describe('Speed multiplier (0.25-4.0). 1.0 is normal speed.')
-        })
+      previousText: z
+        .string()
+        .optional()
+        .describe('Text immediately before this request, for continuity across chunks'),
+      nextText: z
+        .string()
+        .optional()
+        .describe('Text immediately after this request, for continuity across chunks'),
+      pronunciationDictionaryLocators: z
+        .array(
+          z.object({
+            pronunciationDictionaryId: z.string().describe('Pronunciation dictionary ID'),
+            versionId: z.string().describe('Pronunciation dictionary version ID')
+          })
+        )
+        .max(3)
+        .optional()
+        .describe('Up to 3 pronunciation dictionary locators to apply in order'),
+      voiceSettings: voiceSettingsSchema
         .optional()
         .describe('Voice settings overrides for this request')
     })
   )
-  .output(
-    z.object({
-      audioBase64: z.string().describe('Base64-encoded audio data'),
-      contentType: z.string().describe('MIME type of the audio (e.g. audio/mpeg)')
-    })
-  )
+  .output(audioOutputSchema)
   .handleInvocation(async ctx => {
     let client = new ElevenLabsClient(ctx.auth.token);
 
@@ -94,7 +81,10 @@ export let textToSpeech = SlateTool.create(spec, {
       languageCode: ctx.input.languageCode,
       outputFormat: ctx.input.outputFormat,
       seed: ctx.input.seed,
+      previousText: ctx.input.previousText,
+      nextText: ctx.input.nextText,
       applyTextNormalization: ctx.input.applyTextNormalization,
+      pronunciationDictionaryLocators: ctx.input.pronunciationDictionaryLocators,
       voiceSettings: ctx.input.voiceSettings
         ? {
             stability: ctx.input.voiceSettings.stability,
@@ -110,7 +100,8 @@ export let textToSpeech = SlateTool.create(spec, {
       ctx.input.text.length > 80 ? `${ctx.input.text.slice(0, 80)}...` : ctx.input.text;
 
     return {
-      output: result,
+      output: audioOutput(result),
+      attachments: [audioAttachment(result)],
       message: `Generated speech audio for: "${textPreview}" using voice \`${ctx.input.voiceId}\` (model: ${ctx.input.modelId || 'eleven_multilingual_v2'}).`
     };
   })

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { HubClient } from '../lib/client';
 import { spec } from '../spec';
@@ -84,14 +84,16 @@ export let getFileContentTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      content: z.string().describe('Text content of the file'),
-      filePath: z.string().describe('Path of the file read')
+      filePath: z.string().describe('Path of the file read'),
+      mimeType: z.string().optional().describe('MIME type reported by Hugging Face'),
+      size: z.number().describe('Downloaded content size in bytes'),
+      attachmentCount: z.number().describe('Number of returned Slate attachments')
     })
   )
   .handleInvocation(async ctx => {
     let client = new HubClient({ token: ctx.auth.token });
 
-    let content = await client.getFileContent({
+    let result = await client.getFileContent({
       repoType: ctx.input.repoType,
       repoId: ctx.input.repoId,
       filePath: ctx.input.filePath,
@@ -100,9 +102,12 @@ export let getFileContentTool = SlateTool.create(spec, {
 
     return {
       output: {
-        content,
-        filePath: ctx.input.filePath
+        filePath: ctx.input.filePath,
+        mimeType: result.contentType,
+        size: result.size,
+        attachmentCount: 1
       },
+      attachments: [createTextAttachment(result.content, result.contentType || 'text/plain')],
       message: `Retrieved content of **${ctx.input.filePath}** from **${ctx.input.repoId}**.`
     };
   })

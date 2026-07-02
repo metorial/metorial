@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { OktaClient } from '../lib/client';
+import { oktaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageAppAssignmentTool = SlateTool.create(spec, {
@@ -67,13 +68,14 @@ export let manageAppAssignmentTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new OktaClient({
       domain: ctx.config.domain,
-      token: ctx.auth.token
+      token: ctx.auth.token,
+      authMethod: ctx.auth.authMethod
     });
 
     let { action, appId, userId, groupId } = ctx.input;
 
     if (action === 'assign_user') {
-      if (!userId) throw new Error('User ID is required');
+      if (!userId) throw oktaServiceError('User ID is required');
       await client.assignUserToApplication(appId, { userId });
       return {
         output: { appId, action, success: true },
@@ -82,7 +84,7 @@ export let manageAppAssignmentTool = SlateTool.create(spec, {
     }
 
     if (action === 'unassign_user') {
-      if (!userId) throw new Error('User ID is required');
+      if (!userId) throw oktaServiceError('User ID is required');
       await client.removeUserFromApplication(appId, userId);
       return {
         output: { appId, action, success: true },
@@ -91,7 +93,7 @@ export let manageAppAssignmentTool = SlateTool.create(spec, {
     }
 
     if (action === 'assign_group') {
-      if (!groupId) throw new Error('Group ID is required');
+      if (!groupId) throw oktaServiceError('Group ID is required');
       await client.assignGroupToApplication(appId, groupId);
       return {
         output: { appId, action, success: true },
@@ -100,7 +102,7 @@ export let manageAppAssignmentTool = SlateTool.create(spec, {
     }
 
     if (action === 'unassign_group') {
-      if (!groupId) throw new Error('Group ID is required');
+      if (!groupId) throw oktaServiceError('Group ID is required');
       await client.removeGroupFromApplication(appId, groupId);
       return {
         output: { appId, action, success: true },
@@ -169,6 +171,6 @@ export let manageAppAssignmentTool = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw oktaServiceError(`Unknown action: ${action}`);
   })
   .build();

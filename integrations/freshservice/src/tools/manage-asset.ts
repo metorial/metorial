@@ -254,7 +254,7 @@ export let updateAsset = SlateTool.create(spec, {
 export let deleteAsset = SlateTool.create(spec, {
   name: 'Delete Asset',
   key: 'delete_asset',
-  description: `Permanently delete an asset by its ID.`,
+  description: `Delete an asset by its ID. Deleted assets can be restored unless permanently deleted outside this tool.`,
   tags: {
     destructive: true,
     readOnly: false
@@ -286,6 +286,104 @@ export let deleteAsset = SlateTool.create(spec, {
         deleted: true
       },
       message: `Deleted asset **#${ctx.input.assetId}**`
+    };
+  })
+  .build();
+
+export let restoreAsset = SlateTool.create(spec, {
+  name: 'Restore Asset',
+  key: 'restore_asset',
+  description: `Restore a deleted Freshservice asset by display ID.`,
+  tags: {
+    destructive: false,
+    readOnly: false
+  }
+})
+  .input(
+    z.object({
+      assetId: z.number().describe('Display ID of the deleted asset to restore')
+    })
+  )
+  .output(
+    z.object({
+      assetId: z.number().describe('ID of the restored asset'),
+      restored: z.boolean().describe('Whether the restore was accepted')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      subdomain: ctx.config.subdomain,
+      authType: ctx.auth.authType
+    });
+
+    await client.restoreAsset(ctx.input.assetId);
+
+    return {
+      output: {
+        assetId: ctx.input.assetId,
+        restored: true
+      },
+      message: `Restored asset **#${ctx.input.assetId}**`
+    };
+  })
+  .build();
+
+export let searchAssets = SlateTool.create(spec, {
+  name: 'Search Assets',
+  key: 'search_assets',
+  description: `Search Freshservice assets by name, serial number, MAC address, IP address, UUID, or IMEI.`,
+  tags: {
+    destructive: false,
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      query: z.string().describe('Asset search query'),
+      page: z.number().optional().describe('Page number')
+    })
+  )
+  .output(
+    z.object({
+      assets: z.array(
+        z.object({
+          assetId: z.number().describe('ID'),
+          name: z.string().describe('Name'),
+          assetTag: z.string().nullable().describe('Asset tag'),
+          assetTypeId: z.number().describe('Asset type ID'),
+          impact: z.string().nullable().describe('Impact'),
+          userId: z.number().nullable().describe('User ID'),
+          departmentId: z.number().nullable().describe('Department ID'),
+          createdAt: z.string().describe('Creation timestamp'),
+          updatedAt: z.string().describe('Last update timestamp')
+        })
+      )
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      subdomain: ctx.config.subdomain,
+      authType: ctx.auth.authType
+    });
+
+    let result = await client.searchAssets(ctx.input.query, ctx.input.page);
+    let assets = result.assets.map((a: Record<string, unknown>) => ({
+      assetId: a.id as number,
+      name: a.name as string,
+      assetTag: a.asset_tag as string | null,
+      assetTypeId: a.asset_type_id as number,
+      impact: a.impact as string | null,
+      userId: a.user_id as number | null,
+      departmentId: a.department_id as number | null,
+      createdAt: a.created_at as string,
+      updatedAt: a.updated_at as string
+    }));
+
+    return {
+      output: { assets },
+      message: `Found **${assets.length}** assets matching "${ctx.input.query}"`
     };
   })
   .build();

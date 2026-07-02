@@ -63,10 +63,10 @@ export let getAccountInfo = SlateTool.create(spec, {
       client.getSpaceUsage()
     ]);
 
-    let allocated = spaceUsage.allocation?.allocated;
-    if (!allocated && spaceUsage.allocation?.['.tag'] === 'individual') {
-      allocated = spaceUsage.allocation?.allocated;
-    }
+    let allocated =
+      spaceUsage.allocation?.allocated ??
+      spaceUsage.allocation?.user_within_team_space_allocated ??
+      spaceUsage.allocation?.team?.allocated;
 
     return {
       output: {

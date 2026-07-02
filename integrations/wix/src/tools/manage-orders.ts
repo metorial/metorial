@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createWixClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let manageOrders = SlateTool.create(spec, {
   name: 'Manage Orders',
   key: 'manage_orders',
   description: `Search, retrieve, create, or update eCommerce orders on a Wix site.
-Use **action** to specify the operation: \`get\`, \`search\`, \`create\`, or \`update\`.
+Use **action** to specify the operation: \`get\`, \`search\`, \`create\`, \`update\`, or \`cancel\`.
 Orders contain purchase details, line items, pricing, shipping/billing info, payment and fulfillment status.`,
   instructions: [
     'The "search" action supports free-text search and filters using the Wix Query Language.',
@@ -17,8 +17,11 @@ Orders contain purchase details, line items, pricing, shipping/billing info, pay
 })
   .input(
     z.object({
-      action: z.enum(['get', 'search', 'create', 'update']).describe('Operation to perform'),
-      orderId: z.string().optional().describe('Order ID (required for get and update)'),
+      action: z
+        .enum(['get', 'search', 'create', 'update', 'cancel'])
+        .describe('Operation to perform'),
+      orderId: z.string().optional().describe('Order ID (required for get, update, cancel)'),
+      cancelReason: z.string().optional().describe('Reason for cancel action'),
       searchExpression: z
         .string()
         .optional()
@@ -50,6 +53,7 @@ Orders contain purchase details, line items, pricing, shipping/billing info, pay
     z.object({
       order: z.any().optional().describe('Single order data'),
       orders: z.array(z.any()).optional().describe('List of orders'),
+      cancellation: z.any().optional().describe('Cancellation response data'),
       totalResults: z.number().optional().describe('Total number of matching orders')
     })
   )
@@ -58,7 +62,8 @@ Orders contain purchase details, line items, pricing, shipping/billing info, pay
 
     switch (ctx.input.action) {
       case 'get': {
-        if (!ctx.input.orderId) throw new Error('orderId is required for get action');
+        if (!ctx.input.orderId)
+          throw createApiServiceError('orderId is required for get action');
         let result = await client.getOrder(ctx.input.orderId);
         return {
           output: { order: result.order },
@@ -81,7 +86,8 @@ Orders contain purchase details, line items, pricing, shipping/billing info, pay
         };
       }
       case 'create': {
-        if (!ctx.input.orderData) throw new Error('orderData is required for create action');
+        if (!ctx.input.orderData)
+          throw createApiServiceError('orderData is required for create action');
         let result = await client.createOrder(ctx.input.orderData);
         return {
           output: { order: result.order },
@@ -89,12 +95,23 @@ Orders contain purchase details, line items, pricing, shipping/billing info, pay
         };
       }
       case 'update': {
-        if (!ctx.input.orderId) throw new Error('orderId is required for update action');
-        if (!ctx.input.orderData) throw new Error('orderData is required for update action');
+        if (!ctx.input.orderId)
+          throw createApiServiceError('orderId is required for update action');
+        if (!ctx.input.orderData)
+          throw createApiServiceError('orderData is required for update action');
         let result = await client.updateOrder(ctx.input.orderId, ctx.input.orderData);
         return {
           output: { order: result.order },
           message: `Updated order **${ctx.input.orderId}**`
+        };
+      }
+      case 'cancel': {
+        if (!ctx.input.orderId)
+          throw createApiServiceError('orderId is required for cancel action');
+        let result = await client.cancelOrder(ctx.input.orderId, ctx.input.cancelReason);
+        return {
+          output: { order: result.order, cancellation: result },
+          message: `Canceled order **${ctx.input.orderId}**`
         };
       }
     }

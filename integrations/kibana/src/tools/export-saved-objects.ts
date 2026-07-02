@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -39,7 +39,10 @@ Specify either object types to export all objects of those types, or provide spe
   )
   .output(
     z.object({
-      ndjson: z.string().describe('Exported saved objects in NDJSON format')
+      contentType: z.string().describe('MIME type of the exported attachment'),
+      contentLength: z.number().describe('Size of the exported NDJSON in bytes'),
+      lineCount: z.number().describe('Number of NDJSON lines returned by Kibana'),
+      attachmentCount: z.number().describe('Number of attachments returned')
     })
   )
   .handleInvocation(async ctx => {
@@ -54,10 +57,17 @@ Specify either object types to export all objects of those types, or provide spe
       excludeExportDetails: ctx.input.excludeExportDetails
     });
 
-    let lineCount = ndjson.trim().split('\n').length;
+    let lineCount = ndjson.trim() ? ndjson.trim().split('\n').length : 0;
+    let contentType = 'application/x-ndjson';
 
     return {
-      output: { ndjson },
+      output: {
+        contentType,
+        contentLength: Buffer.byteLength(ndjson, 'utf8'),
+        lineCount,
+        attachmentCount: 1
+      },
+      attachments: [createTextAttachment(ndjson, contentType)],
       message: `Exported **${lineCount}** saved objects in NDJSON format.`
     };
   })

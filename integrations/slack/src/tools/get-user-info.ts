@@ -1,8 +1,9 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SlackClient } from '../lib/client';
-import { missingRequiredAlternativeError } from '../lib/errors';
+import { isSlackApiErrorCode, missingRequiredAlternativeError } from '../lib/errors';
 import { slackActionScopes } from '../lib/scopes';
+import type { SlackUser } from '../lib/types';
 import { spec } from '../spec';
 
 let userOutputSchema = z.object({
@@ -85,7 +86,20 @@ export let getUserInfo = SlateTool.create(spec, {
     }
 
     if (ctx.input.email) {
-      let user = await client.lookupUserByEmail(ctx.input.email);
+      let user: SlackUser;
+      try {
+        user = await client.lookupUserByEmail(ctx.input.email);
+      } catch (error) {
+        if (isSlackApiErrorCode(error, 'users_not_found')) {
+          return {
+            output: { users: [] },
+            message: `No Slack user found for email **${ctx.input.email}**.`
+          };
+        }
+
+        throw error;
+      }
+
       return {
         output: { users: [mapUser(user)] },
         message: `Found user **${user.real_name || user.name}** (\`${user.id}\`) by email.`

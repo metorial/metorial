@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { RenderClient } from '../lib/client';
 import { spec } from '../spec';
@@ -18,7 +18,12 @@ export let manageProjects = SlateTool.create(spec, {
           'update',
           'delete',
           'list_environments',
-          'create_environment'
+          'create_environment',
+          'get_environment',
+          'update_environment',
+          'delete_environment',
+          'add_resources',
+          'remove_resources'
         ])
         .describe('Action to perform'),
       projectId: z
@@ -30,7 +35,14 @@ export let manageProjects = SlateTool.create(spec, {
       ownerId: z.string().optional().describe('Workspace ID (for list/create)'),
       name: z.string().optional().describe('Project or environment name (for create/update)'),
       description: z.string().optional().describe('Project description (for create/update)'),
-      environmentId: z.string().optional().describe('Environment ID'),
+      environmentId: z
+        .string()
+        .optional()
+        .describe('Environment ID (for environment get/update/delete/resource actions)'),
+      resourceIds: z
+        .array(z.string())
+        .optional()
+        .describe('Resource IDs to add or remove from an environment'),
       limit: z.number().optional().describe('Max results for list'),
       cursor: z.string().optional().describe('Pagination cursor')
     })
@@ -90,8 +102,8 @@ export let manageProjects = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.ownerId) throw new Error('ownerId is required for create');
-      if (!ctx.input.name) throw new Error('name is required for create');
+      if (!ctx.input.ownerId) throw createApiServiceError('ownerId is required for create');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create');
       let body: Record<string, any> = { ownerId: ctx.input.ownerId, name: ctx.input.name };
       if (ctx.input.description) body.description = ctx.input.description;
       let p = await client.createProject(body);
@@ -104,10 +116,17 @@ export let manageProjects = SlateTool.create(spec, {
       };
     }
 
-    if (!projectId) throw new Error('projectId is required');
+    if (
+      ['get', 'update', 'delete', 'list_environments', 'create_environment'].includes(
+        action
+      ) &&
+      !projectId
+    ) {
+      throw createApiServiceError('projectId is required');
+    }
 
     if (action === 'get') {
-      let p = await client.getProject(projectId);
+      let p = await client.getProject(projectId!);
       return {
         output: {
           project: { projectId: p.id, name: p.name, ownerId: p.ownerId },
@@ -121,7 +140,7 @@ export let manageProjects = SlateTool.create(spec, {
       let body: Record<string, any> = {};
       if (ctx.input.name) body.name = ctx.input.name;
       if (ctx.input.description) body.description = ctx.input.description;
-      let p = await client.updateProject(projectId, body);
+      let p = await client.updateProject(projectId!, body);
       return {
         output: { project: { projectId: p.id, name: p.name }, success: true },
         message: `Updated project **${p.name}**.`
@@ -129,7 +148,7 @@ export let manageProjects = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      await client.deleteProject(projectId);
+      await client.deleteProject(projectId!);
       return {
         output: { success: true },
         message: `Deleted project \`${projectId}\`.`
@@ -140,7 +159,7 @@ export let manageProjects = SlateTool.create(spec, {
       let params: Record<string, any> = {};
       if (ctx.input.limit) params.limit = ctx.input.limit;
       if (ctx.input.cursor) params.cursor = ctx.input.cursor;
-      let data = await client.listEnvironments(projectId, params);
+      let data = await client.listEnvironments(projectId!, params);
       let environments = (data as any[]).map((item: any) => {
         let e = item.environment || item;
         return { environmentId: e.id, name: e.name, projectId: e.projectId };
@@ -152,14 +171,80 @@ export let manageProjects = SlateTool.create(spec, {
     }
 
     if (action === 'create_environment') {
-      if (!ctx.input.name) throw new Error('name is required for create_environment');
-      let e = await client.createEnvironment(projectId, { name: ctx.input.name });
+      if (!ctx.input.name)
+        throw createApiServiceError('name is required for create_environment');
+      let e = await client.createEnvironment(projectId!, { name: ctx.input.name });
       return {
         output: {
           environments: [{ environmentId: e.id, name: e.name, projectId: e.projectId }],
           success: true
         },
         message: `Created environment **${e.name}** in project \`${projectId}\`.`
+      };
+    }
+
+    if (action === 'get_environment') {
+      if (!ctx.input.environmentId)
+        throw createApiServiceError('environmentId is required for get_environment');
+      let e = await client.getEnvironment(ctx.input.environmentId);
+      return {
+        output: {
+          environments: [{ environmentId: e.id, name: e.name, projectId: e.projectId }],
+          success: true
+        },
+        message: `Environment **${e.name}** (\`${e.id}\`).`
+      };
+    }
+
+    if (action === 'update_environment') {
+      if (!ctx.input.environmentId)
+        throw createApiServiceError('environmentId is required for update_environment');
+      let body: Record<string, any> = {};
+      if (ctx.input.name) body.name = ctx.input.name;
+      let e = await client.updateEnvironment(ctx.input.environmentId, body);
+      return {
+        output: {
+          environments: [{ environmentId: e.id, name: e.name, projectId: e.projectId }],
+          success: true
+        },
+        message: `Updated environment **${e.name}**.`
+      };
+    }
+
+    if (action === 'delete_environment') {
+      if (!ctx.input.environmentId)
+        throw createApiServiceError('environmentId is required for delete_environment');
+      await client.deleteEnvironment(ctx.input.environmentId);
+      return {
+        output: { success: true },
+        message: `Deleted environment \`${ctx.input.environmentId}\`.`
+      };
+    }
+
+    if (action === 'add_resources') {
+      if (!ctx.input.environmentId)
+        throw createApiServiceError('environmentId is required for add_resources');
+      if (!ctx.input.resourceIds || ctx.input.resourceIds.length === 0)
+        throw createApiServiceError('resourceIds is required for add_resources');
+      await client.addResourcesToEnvironment(ctx.input.environmentId, ctx.input.resourceIds);
+      return {
+        output: { success: true },
+        message: `Added **${ctx.input.resourceIds.length}** resource(s) to environment \`${ctx.input.environmentId}\`.`
+      };
+    }
+
+    if (action === 'remove_resources') {
+      if (!ctx.input.environmentId)
+        throw createApiServiceError('environmentId is required for remove_resources');
+      if (!ctx.input.resourceIds || ctx.input.resourceIds.length === 0)
+        throw createApiServiceError('resourceIds is required for remove_resources');
+      await client.removeResourcesFromEnvironment(
+        ctx.input.environmentId,
+        ctx.input.resourceIds
+      );
+      return {
+        output: { success: true },
+        message: `Removed **${ctx.input.resourceIds.length}** resource(s) from environment \`${ctx.input.environmentId}\`.`
       };
     }
 

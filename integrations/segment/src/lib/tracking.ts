@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { segmentApiError } from './errors';
 
 export class TrackingClient {
   private http: ReturnType<typeof createAxios>;
@@ -16,6 +17,11 @@ export class TrackingClient {
         'Content-Type': 'application/json'
       }
     });
+
+    this.http.interceptors.response.use(
+      (response: any) => response,
+      (error: unknown) => Promise.reject(segmentApiError(error, 'tracking request'))
+    );
   }
 
   async identify(data: {

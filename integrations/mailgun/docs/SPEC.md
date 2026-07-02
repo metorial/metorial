@@ -2,7 +2,7 @@
 
 ## Overview
 
-Mailgun is an email service provider (owned by Sinch) that offers APIs for sending, receiving, and tracking email. Mailgun allows the ability to send and receive email in both US and EU regions. It supports transactional and marketing email delivery, email validation, inbound email routing/parsing, and deliverability optimization tools.
+Mailgun is an email service provider (owned by Sinch) that offers APIs for sending, receiving, and tracking email. Mailgun allows the ability to send and receive email in both US and EU regions. This integration focuses on practical Mailgun Send workflows: sending messages, managing domains, tracking, logs, metrics, suppressions, allowlists, mailing lists, templates, inbound routes, stored messages, validation, and domain webhooks.
 
 ## Authentication
 
@@ -43,7 +43,7 @@ Mailgun uses the account's HTTP Webhook Signing Key to sign all HTTP payloads se
 
 ### Email Sending
 
-Send transactional and marketing emails programmatically via REST API or SMTP relay. With a single API call, you can send up to 1,000 fully personalized emails. Mailgun will properly assemble the MIME message and send the email to each user individually. Supports attachments, inline images, custom headers, scheduled delivery, and tagging.
+Send transactional and marketing emails programmatically via REST API. With a single API call, you can send up to 1,000 fully personalized emails. Mailgun will properly assemble the MIME message and send the email to each user individually. The integration supports attachments, inline attachments, custom headers, scheduled delivery, tracking options, test mode, templates, and tagging.
 
 ### Domain Management
 
@@ -59,7 +59,7 @@ Define a list of routes to handle incoming emails. When a message matches a rout
 
 ### Suppressions Management
 
-Mailgun automatically classifies and records bounce events (hard and soft), spam complaints, and unsubscribes into a Suppressions list. Once an address is added to your suppressions, Mailgun prevents further delivery attempts to protect your sending reputation. An allowlist API lets you prevent specific addresses from being added to the bounce list.
+Mailgun automatically classifies and records bounce events (hard and soft), spam complaints, and unsubscribes into suppression lists. Once an address is added to your suppressions, Mailgun prevents further delivery attempts to protect your sending reputation. The allowlist API lets you prevent specific addresses or domains from being added to the bounce list.
 
 ### Mailing Lists
 
@@ -71,31 +71,11 @@ Manage reusable email templates with variable substitution. Templates can be sto
 
 ### Analytics and Reporting
 
-The Metrics API provides programmatic access to detailed analytics data about your email sending activity, allowing you to query, filter, and analyze email performance metrics. Mailgun keeps track of every inbound and outbound message event and stores this log data. Using the Logs API, this data can be queried and filtered. You can tag messages for aggregate reporting.
+The current Metrics API provides programmatic access to detailed analytics data about email sending activity, allowing you to query, filter, and analyze email performance metrics. Mailgun keeps track of inbound and outbound message events and stores this log data. The current Logs API can query and filter those records. Legacy Events and Stats tools are retained for accounts or workflows that still rely on those endpoints.
 
 ### Email Validation
 
-Mailgun provides a real-time Email Validation API to quickly remove invalid and high-risk addresses. Supports both single-address validation and bulk list validation.
-
-### Deliverability Optimization (Mailgun Optimize)
-
-- IP blocklist monitoring allows you to take immediate action if your IP is listed.
-- Mailgun Optimize identifies and helps you avoid spam traps within your email lists.
-- Integration with Google Postmaster Tools allows you to gain insights into how your emails are performing within the Gmail ecosystem.
-- The Email Health Score API provides health scores for the overall account, as well as by domain, IP, and subaccount.
-- Bounce classification identifies critical bounces and classifies them by sending domain and mailbox provider/spam filter.
-
-### Send Alerts
-
-Mailgun allows you to get instant notifications on the sending metrics that matter most, configured specifically for your unique business needs. Route these alerts to the channels your team relies on.
-
-### IP Management
-
-Manage dedicated IPs, IP pools, and dynamic IP pools. Supports automated IP address warmup for new dedicated IPs.
-
-### Subaccounts
-
-Mailgun allows you to set limits on your subaccounts to help you manage usage and costs. You can create, update, retrieve, and delete limits for various pre-send features such as email previews and email validations.
+Mailgun provides a real-time Email Validation API to identify invalid and high-risk addresses. This integration exposes single-address validation.
 
 ## Events
 

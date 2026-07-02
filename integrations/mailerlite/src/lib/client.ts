@@ -1,13 +1,25 @@
 import { createAxios } from 'slates';
+import { mailerLiteApiError, mailerLiteServiceError } from './errors';
 
 let api = createAxios({
   baseURL: 'https://connect.mailerlite.com/api'
 });
 
+api.interceptors.response.use(
+  response => response,
+  error => {
+    throw mailerLiteApiError(error);
+  }
+);
+
 export class Client {
   private headers: Record<string, string>;
 
   constructor(config: { token: string }) {
+    if (!config.token?.trim()) {
+      throw mailerLiteServiceError('MailerLite API key is required.');
+    }
+
     this.headers = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -17,10 +29,20 @@ export class Client {
 
   // ── Subscribers ──────────────────────────────────────────────────
 
-  async listSubscribers(params?: { status?: string; limit?: number; cursor?: string }) {
+  async listSubscribers(params?: {
+    status?: string;
+    limit?: number;
+    cursor?: string;
+    includeGroups?: boolean;
+  }) {
     let response = await api.get('/subscribers', {
       headers: this.headers,
-      params
+      params: {
+        ...(params?.status ? { 'filter[status]': params.status } : {}),
+        limit: params?.limit,
+        cursor: params?.cursor,
+        ...(params?.includeGroups ? { include: 'groups' } : {})
+      }
     });
     return response.data;
   }
@@ -34,6 +56,8 @@ export class Client {
     ip_address?: string;
     opted_in_at?: string;
     optin_ip?: string;
+    unsubscribed_at?: string;
+    resubscribe?: boolean;
   }) {
     let response = await api.post('/subscribers', data, {
       headers: this.headers
@@ -54,6 +78,11 @@ export class Client {
       fields?: Record<string, any>;
       groups?: string[];
       status?: string;
+      subscribed_at?: string;
+      ip_address?: string;
+      opted_in_at?: string;
+      optin_ip?: string;
+      unsubscribed_at?: string;
     }
   ) {
     let response = await api.put(`/subscribers/${subscriberId}`, data, {
@@ -91,14 +120,18 @@ export class Client {
   async getSubscriberActivity(
     subscriberId: string,
     params?: {
-      type?: string;
+      logName?: string;
       limit?: number;
-      cursor?: string;
+      page?: number;
     }
   ) {
-    let response = await api.get(`/subscribers/${subscriberId}/activity`, {
+    let response = await api.get(`/subscribers/${subscriberId}/activity-log`, {
       headers: this.headers,
-      params
+      params: {
+        ...(params?.logName ? { 'filter[log_name]': params.logName } : {}),
+        limit: params?.limit,
+        page: params?.page
+      }
     });
     return response.data;
   }
@@ -312,15 +345,18 @@ export class Client {
   async createCampaign(data: {
     name: string;
     type: string;
+    language_id?: number;
     emails: Array<{
       subject: string;
       from_name: string;
       from: string;
+      reply_to?: string;
       content?: string;
     }>;
     groups?: string[];
     segments?: string[];
     filter?: Record<string, any>;
+    settings?: Record<string, any>;
   }) {
     let response = await api.post('/campaigns', data, {
       headers: this.headers
@@ -332,15 +368,18 @@ export class Client {
     campaignId: string,
     data: {
       name?: string;
+      language_id?: number;
       emails?: Array<{
         subject?: string;
         from_name?: string;
         from?: string;
+        reply_to?: string;
         content?: string;
       }>;
       groups?: string[];
       segments?: string[];
       filter?: Record<string, any>;
+      settings?: Record<string, any>;
     }
   ) {
     let response = await api.put(`/campaigns/${campaignId}`, data, {
@@ -357,12 +396,36 @@ export class Client {
       hours?: string;
       minutes?: string;
       timezone_id?: number;
-      resend?: string;
+      resend?: {
+        delivery?: string;
+        date?: string;
+        hours?: string;
+        minutes?: string;
+        timezone_id?: number;
+      };
     }
   ) {
-    let response = await api.post(`/campaigns/${campaignId}/schedule`, data, {
-      headers: this.headers
-    });
+    let schedule =
+      data.date || data.hours || data.minutes || data.timezone_id !== undefined
+        ? {
+            date: data.date,
+            hours: data.hours,
+            minutes: data.minutes,
+            timezone_id: data.timezone_id
+          }
+        : undefined;
+
+    let response = await api.post(
+      `/campaigns/${campaignId}/schedule`,
+      {
+        delivery: data.delivery,
+        ...(schedule ? { schedule } : {}),
+        ...(data.resend ? { resend: data.resend } : {})
+      },
+      {
+        headers: this.headers
+      }
+    );
     return response.data;
   }
 
@@ -388,13 +451,23 @@ export class Client {
     campaignId: string,
     params?: {
       type?: string;
+      search?: string;
       limit?: number;
       page?: number;
+      sort?: string;
+      include?: string;
     }
   ) {
     let response = await api.get(`/campaigns/${campaignId}/reports/subscriber-activity`, {
       headers: this.headers,
-      params
+      params: {
+        ...(params?.type ? { 'filter[type]': params.type } : {}),
+        ...(params?.search ? { 'filter[search]': params.search } : {}),
+        limit: params?.limit,
+        page: params?.page,
+        sort: params?.sort,
+        include: params?.include
+      }
     });
     return response.data;
   }
@@ -432,6 +505,10 @@ export class Client {
     automationId: string,
     params?: {
       status?: string;
+      date_from?: string;
+      date_to?: string;
+      scheduled_from?: string;
+      scheduled_to?: string;
       limit?: number;
       page?: number;
     }
@@ -440,6 +517,10 @@ export class Client {
       headers: this.headers,
       params: {
         ...(params?.status ? { 'filter[status]': params.status } : {}),
+        ...(params?.date_from ? { 'filter[date_from]': params.date_from } : {}),
+        ...(params?.date_to ? { 'filter[date_to]': params.date_to } : {}),
+        ...(params?.scheduled_from ? { 'filter[scheduled_from]': params.scheduled_from } : {}),
+        ...(params?.scheduled_to ? { 'filter[scheduled_to]': params.scheduled_to } : {}),
         limit: params?.limit,
         page: params?.page
       }
@@ -500,7 +581,7 @@ export class Client {
     params?: {
       status?: string;
       limit?: number;
-      page?: number;
+      cursor?: string;
     }
   ) {
     let response = await api.get(`/forms/${formId}/subscribers`, {
@@ -508,7 +589,7 @@ export class Client {
       params: {
         ...(params?.status ? { 'filter[status]': params.status } : {}),
         limit: params?.limit,
-        page: params?.page
+        cursor: params?.cursor
       }
     });
     return response.data;

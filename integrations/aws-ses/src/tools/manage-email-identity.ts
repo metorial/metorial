@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SesClient } from '../lib/client';
+import { requireAwsSesString } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageEmailIdentity = SlateTool.create(spec, {
@@ -106,8 +107,13 @@ export let manageEmailIdentity = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      let emailIdentity = requireAwsSesString(
+        ctx.input.emailIdentity,
+        'emailIdentity',
+        action
+      );
       let result = await client.createEmailIdentity({
-        emailIdentity: ctx.input.emailIdentity!,
+        emailIdentity,
         configurationSetName: ctx.input.configurationSetName
       });
       return {
@@ -116,23 +122,33 @@ export let manageEmailIdentity = SlateTool.create(spec, {
           verifiedForSendingStatus: result.verifiedForSendingStatus,
           dkimAttributes: result.dkimAttributes
         },
-        message: `Identity **${ctx.input.emailIdentity}** created (type: ${result.identityType}). Verified: ${result.verifiedForSendingStatus}.`
+        message: `Identity **${emailIdentity}** created (type: ${result.identityType}). Verified: ${result.verifiedForSendingStatus}.`
       };
     }
 
     if (action === 'get') {
-      let result = await client.getEmailIdentity(ctx.input.emailIdentity!);
+      let emailIdentity = requireAwsSesString(
+        ctx.input.emailIdentity,
+        'emailIdentity',
+        action
+      );
+      let result = await client.getEmailIdentity(emailIdentity);
       return {
         output: result,
-        message: `Identity **${ctx.input.emailIdentity}**: type=${result.identityType}, verified=${result.verifiedForSendingStatus}.`
+        message: `Identity **${emailIdentity}**: type=${result.identityType}, verified=${result.verifiedForSendingStatus}.`
       };
     }
 
     if (action === 'delete') {
-      await client.deleteEmailIdentity(ctx.input.emailIdentity!);
+      let emailIdentity = requireAwsSesString(
+        ctx.input.emailIdentity,
+        'emailIdentity',
+        action
+      );
+      await client.deleteEmailIdentity(emailIdentity);
       return {
-        output: { identityName: ctx.input.emailIdentity },
-        message: `Identity **${ctx.input.emailIdentity}** deleted.`
+        output: { identityName: emailIdentity },
+        message: `Identity **${emailIdentity}** deleted.`
       };
     }
 
@@ -151,36 +167,47 @@ export let manageEmailIdentity = SlateTool.create(spec, {
     }
 
     if (action === 'configureDkim') {
-      await client.putEmailIdentityDkimAttributes(
-        ctx.input.emailIdentity!,
-        ctx.input.dkimSigningEnabled ?? true
+      let emailIdentity = requireAwsSesString(
+        ctx.input.emailIdentity,
+        'emailIdentity',
+        action
       );
+      let signingEnabled = ctx.input.dkimSigningEnabled ?? true;
+      await client.putEmailIdentityDkimAttributes(emailIdentity, signingEnabled);
       return {
-        output: { identityName: ctx.input.emailIdentity },
-        message: `DKIM signing ${ctx.input.dkimSigningEnabled ? 'enabled' : 'disabled'} for **${ctx.input.emailIdentity}**.`
+        output: { identityName: emailIdentity },
+        message: `DKIM signing ${signingEnabled ? 'enabled' : 'disabled'} for **${emailIdentity}**.`
       };
     }
 
     if (action === 'configureMailFrom') {
+      let emailIdentity = requireAwsSesString(
+        ctx.input.emailIdentity,
+        'emailIdentity',
+        action
+      );
       await client.putEmailIdentityMailFromAttributes(
-        ctx.input.emailIdentity!,
+        emailIdentity,
         ctx.input.mailFromDomain,
         ctx.input.behaviorOnMxFailure
       );
       return {
-        output: { identityName: ctx.input.emailIdentity },
-        message: `MAIL FROM domain updated for **${ctx.input.emailIdentity}**.`
+        output: { identityName: emailIdentity },
+        message: `MAIL FROM domain updated for **${emailIdentity}**.`
       };
     }
 
     if (action === 'configureFeedback') {
-      await client.putEmailIdentityFeedbackAttributes(
-        ctx.input.emailIdentity!,
-        ctx.input.emailForwardingEnabled ?? true
+      let emailIdentity = requireAwsSesString(
+        ctx.input.emailIdentity,
+        'emailIdentity',
+        action
       );
+      let emailForwardingEnabled = ctx.input.emailForwardingEnabled ?? true;
+      await client.putEmailIdentityFeedbackAttributes(emailIdentity, emailForwardingEnabled);
       return {
-        output: { identityName: ctx.input.emailIdentity },
-        message: `Feedback forwarding ${ctx.input.emailForwardingEnabled ? 'enabled' : 'disabled'} for **${ctx.input.emailIdentity}**.`
+        output: { identityName: emailIdentity },
+        message: `Feedback forwarding ${emailForwardingEnabled ? 'enabled' : 'disabled'} for **${emailIdentity}**.`
       };
     }
 

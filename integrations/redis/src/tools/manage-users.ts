@@ -46,6 +46,44 @@ export let listUsers = SlateTool.create(spec, {
   })
   .build();
 
+export let getUser = SlateTool.create(spec, {
+  name: 'Get User',
+  key: 'get_user',
+  description: `Retrieve details for a single account-level Redis Cloud user by ID.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      userId: z.number().describe('User ID to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      user: userSchema.describe('Account user details'),
+      raw: z.any().describe('Full API response')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new RedisCloudClient(ctx.auth);
+    let data = await client.getUser(ctx.input.userId);
+
+    let user = {
+      userId: data.id,
+      name: data.name,
+      email: data.email,
+      role: data.role,
+      status: data.status
+    };
+
+    return {
+      output: { user, raw: data },
+      message: `User **${ctx.input.userId}** retrieved.`
+    };
+  })
+  .build();
+
 export let updateUser = SlateTool.create(spec, {
   name: 'Update User',
   key: 'update_user',

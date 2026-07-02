@@ -2,17 +2,46 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
+import {
+  ensureAtLeastOne,
+  paginationInput,
+  pickDefined,
+  requireArray,
+  requireString
+} from './shared';
+
+let mapWebhook = (webhook: Record<string, any>) => ({
+  webhookId: webhook.id,
+  eventTypes: webhook.eventTypes,
+  requestUrl: webhook.requestUrl,
+  condition: webhook.condition,
+  description: webhook.description,
+  isAdHoc: webhook.isAdHoc,
+  createdAt: webhook.createdAt,
+  modifiedAt: webhook.modifiedAt
+});
+
+let conditionFromInput = (input: {
+  actorId?: string;
+  actorTaskId?: string;
+  actorRunId?: string;
+}) => {
+  let condition = pickDefined({
+    actorId: input.actorId,
+    actorTaskId: input.actorTaskId,
+    actorRunId: input.actorRunId
+  });
+  return Object.keys(condition).length > 0 ? condition : undefined;
+};
 
 export let manageWebhook = SlateTool.create(spec, {
   name: 'Manage Webhook',
   key: 'manage_webhook',
-  description: `Create, get, update, delete, or list webhooks. Webhooks fire HTTP POST requests to a URL when Actor run or build events occur. Supports payload templates with variable interpolation.`,
+  description: `Create, get, update, test, delete, or list Apify webhooks for Actor run and build events.`,
   instructions: [
-    'Use action "list" to list all webhooks.',
-    'Use action "get" with webhookId to retrieve webhook details.',
-    'Use action "create" with eventTypes, requestUrl, and optionally a condition to scope it to an Actor or Task.',
-    'Use action "update" with webhookId and fields to change.',
-    'Use action "delete" with webhookId to remove a webhook.'
+    'Use create with eventTypes and requestUrl.',
+    'Use actorId, actorTaskId, or actorRunId to scope the webhook condition.',
+    'Use test to ask Apify to send a test webhook delivery.'
   ],
   tags: {
     destructive: true,
@@ -22,58 +51,45 @@ export let manageWebhook = SlateTool.create(spec, {
   .input(
     z.object({
       action: z
-        .enum(['list', 'get', 'create', 'update', 'delete'])
+        .enum(['list', 'get', 'create', 'update', 'test', 'delete'])
         .describe('Action to perform'),
-      webhookId: z.string().optional().describe('Webhook ID (required for get/update/delete)'),
+      webhookId: z.string().optional().describe('Webhook ID for get/update/test/delete'),
       eventTypes: z
         .array(z.string())
         .optional()
-        .describe(
-          'Event types to trigger on (e.g. ["ACTOR.RUN.SUCCEEDED", "ACTOR.RUN.FAILED"])'
-        ),
-      requestUrl: z.string().optional().describe('URL to send the webhook POST request to'),
-      actorId: z.string().optional().describe('Scope webhook to this Actor ID'),
-      actorTaskId: z.string().optional().describe('Scope webhook to this Actor Task ID'),
-      payloadTemplate: z
-        .string()
-        .optional()
-        .describe('JSON payload template with {{variable}} interpolation'),
-      headersTemplate: z
-        .string()
-        .optional()
-        .describe('JSON headers template with {{variable}} interpolation'),
+        .describe('Event types, such as ACTOR.RUN.SUCCEEDED'),
+      requestUrl: z.string().optional().describe('Target URL for webhook POST requests'),
+      actorId: z.string().optional().describe('Scope condition Actor ID'),
+      actorTaskId: z.string().optional().describe('Scope condition Actor Task ID'),
+      actorRunId: z.string().optional().describe('Scope condition Actor Run ID'),
+      payloadTemplate: z.string().optional().describe('Webhook payload template'),
+      headersTemplate: z.string().optional().describe('Webhook headers template'),
       description: z.string().optional().describe('Webhook description'),
-      ignoreSslErrors: z
+      ignoreSslErrors: z.boolean().optional().describe('Whether to ignore SSL errors'),
+      doNotRetry: z.boolean().optional().describe('Whether Apify should skip retries'),
+      isAdHoc: z.boolean().optional().describe('Whether this is an ad-hoc webhook'),
+      idempotencyKey: z.string().optional().describe('Idempotency key for create'),
+      shouldInterpolateStrings: z
         .boolean()
         .optional()
-        .describe('Whether to ignore SSL certificate errors'),
-      doNotRetry: z.boolean().optional().describe('Whether to skip retries on failure'),
-      limit: z.number().optional().default(25).describe('Max items for list'),
-      offset: z.number().optional().default(0).describe('Pagination offset for list')
+        .describe('Whether Apify should interpolate string values in templates'),
+      ...paginationInput
     })
   )
   .output(
     z.object({
-      webhookId: z.string().optional().describe('Webhook ID'),
-      eventTypes: z.array(z.string()).optional().describe('Event types'),
-      requestUrl: z.string().optional().describe('Target URL'),
-      condition: z.record(z.string(), z.any()).optional().describe('Webhook condition'),
-      description: z.string().optional().describe('Webhook description'),
-      createdAt: z.string().optional().describe('Creation timestamp'),
-      modifiedAt: z.string().optional().describe('Last modification timestamp'),
-      webhooks: z
-        .array(
-          z.object({
-            webhookId: z.string().describe('Webhook ID'),
-            eventTypes: z.array(z.string()).describe('Event types'),
-            requestUrl: z.string().describe('Target URL'),
-            description: z.string().optional().describe('Description')
-          })
-        )
-        .optional()
-        .describe('Webhook list (for list action)'),
-      total: z.number().optional().describe('Total webhooks'),
-      deleted: z.boolean().optional().describe('Whether deleted')
+      webhookId: z.string().optional(),
+      eventTypes: z.array(z.string()).optional(),
+      requestUrl: z.string().optional(),
+      condition: z.record(z.string(), z.any()).optional(),
+      description: z.string().optional(),
+      isAdHoc: z.boolean().optional(),
+      createdAt: z.string().optional(),
+      modifiedAt: z.string().optional(),
+      webhooks: z.array(z.record(z.string(), z.any())).optional(),
+      total: z.number().optional(),
+      testResult: z.record(z.string(), z.any()).optional(),
+      deleted: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
@@ -82,16 +98,10 @@ export let manageWebhook = SlateTool.create(spec, {
     if (ctx.input.action === 'list') {
       let result = await client.listWebhooks({
         limit: ctx.input.limit,
-        offset: ctx.input.offset
+        offset: ctx.input.offset,
+        desc: ctx.input.descending
       });
-
-      let webhooks = result.items.map(item => ({
-        webhookId: item.id,
-        eventTypes: item.eventTypes || [],
-        requestUrl: item.requestUrl,
-        description: item.description
-      }));
-
+      let webhooks = result.items.map(mapWebhook);
       return {
         output: { webhooks, total: result.total },
         message: `Found **${result.total}** webhook(s), showing **${webhooks.length}**.`
@@ -99,87 +109,75 @@ export let manageWebhook = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      let webhook = await client.getWebhook(ctx.input.webhookId!);
+      let webhookId = requireString(ctx.input.webhookId, 'webhookId', 'get');
+      let webhook = await client.getWebhook(webhookId);
       return {
-        output: {
-          webhookId: webhook.id,
-          eventTypes: webhook.eventTypes,
-          requestUrl: webhook.requestUrl,
-          condition: webhook.condition,
-          description: webhook.description,
-          createdAt: webhook.createdAt,
-          modifiedAt: webhook.modifiedAt
-        },
-        message: `Retrieved webhook \`${webhook.id}\`.`
+        output: mapWebhook(webhook),
+        message: `Retrieved webhook \`${webhook.id ?? webhookId}\`.`
       };
     }
 
     if (ctx.input.action === 'create') {
-      let condition: Record<string, any> = {};
-      if (ctx.input.actorId !== undefined) condition.actorId = ctx.input.actorId;
-      if (ctx.input.actorTaskId !== undefined) condition.actorTaskId = ctx.input.actorTaskId;
-
-      let webhook = await client.createWebhook({
-        eventTypes: ctx.input.eventTypes!,
-        requestUrl: ctx.input.requestUrl!,
-        condition: Object.keys(condition).length > 0 ? condition : undefined,
-        payloadTemplate: ctx.input.payloadTemplate,
-        headersTemplate: ctx.input.headersTemplate,
-        description: ctx.input.description,
-        ignoreSslErrors: ctx.input.ignoreSslErrors,
-        doNotRetry: ctx.input.doNotRetry
-      });
-
+      let eventTypes = requireArray(ctx.input.eventTypes, 'eventTypes', 'create');
+      let requestUrl = requireString(ctx.input.requestUrl, 'requestUrl', 'create');
+      let webhook = await client.createWebhook(
+        pickDefined({
+          eventTypes,
+          requestUrl,
+          condition: conditionFromInput(ctx.input),
+          payloadTemplate: ctx.input.payloadTemplate,
+          headersTemplate: ctx.input.headersTemplate,
+          description: ctx.input.description,
+          ignoreSslErrors: ctx.input.ignoreSslErrors,
+          doNotRetry: ctx.input.doNotRetry,
+          isAdHoc: ctx.input.isAdHoc,
+          idempotencyKey: ctx.input.idempotencyKey,
+          shouldInterpolateStrings: ctx.input.shouldInterpolateStrings
+        })
+      );
       return {
-        output: {
-          webhookId: webhook.id,
-          eventTypes: webhook.eventTypes,
-          requestUrl: webhook.requestUrl,
-          condition: webhook.condition,
-          description: webhook.description,
-          createdAt: webhook.createdAt
-        },
+        output: mapWebhook(webhook),
         message: `Created webhook \`${webhook.id}\` for events: ${(webhook.eventTypes || []).join(', ')}.`
       };
     }
 
     if (ctx.input.action === 'update') {
-      let body: Record<string, any> = {};
-      if (ctx.input.eventTypes !== undefined) body.eventTypes = ctx.input.eventTypes;
-      if (ctx.input.requestUrl !== undefined) body.requestUrl = ctx.input.requestUrl;
-      if (ctx.input.payloadTemplate !== undefined)
-        body.payloadTemplate = ctx.input.payloadTemplate;
-      if (ctx.input.headersTemplate !== undefined)
-        body.headersTemplate = ctx.input.headersTemplate;
-      if (ctx.input.description !== undefined) body.description = ctx.input.description;
-      if (ctx.input.ignoreSslErrors !== undefined)
-        body.ignoreSslErrors = ctx.input.ignoreSslErrors;
-      if (ctx.input.doNotRetry !== undefined) body.doNotRetry = ctx.input.doNotRetry;
-
-      let condition: Record<string, any> = {};
-      if (ctx.input.actorId !== undefined) condition.actorId = ctx.input.actorId;
-      if (ctx.input.actorTaskId !== undefined) condition.actorTaskId = ctx.input.actorTaskId;
-      if (Object.keys(condition).length > 0) body.condition = condition;
-
-      let webhook = await client.updateWebhook(ctx.input.webhookId!, body);
+      let webhookId = requireString(ctx.input.webhookId, 'webhookId', 'update');
+      let body = pickDefined({
+        eventTypes: ctx.input.eventTypes,
+        requestUrl: ctx.input.requestUrl,
+        condition: conditionFromInput(ctx.input),
+        payloadTemplate: ctx.input.payloadTemplate,
+        headersTemplate: ctx.input.headersTemplate,
+        description: ctx.input.description,
+        ignoreSslErrors: ctx.input.ignoreSslErrors,
+        doNotRetry: ctx.input.doNotRetry,
+        isAdHoc: ctx.input.isAdHoc,
+        idempotencyKey: ctx.input.idempotencyKey,
+        shouldInterpolateStrings: ctx.input.shouldInterpolateStrings
+      });
+      ensureAtLeastOne(body, 'update the webhook');
+      let webhook = await client.updateWebhook(webhookId, body);
       return {
-        output: {
-          webhookId: webhook.id,
-          eventTypes: webhook.eventTypes,
-          requestUrl: webhook.requestUrl,
-          condition: webhook.condition,
-          description: webhook.description,
-          modifiedAt: webhook.modifiedAt
-        },
-        message: `Updated webhook \`${webhook.id}\`.`
+        output: mapWebhook(webhook),
+        message: `Updated webhook \`${webhook.id ?? webhookId}\`.`
       };
     }
 
-    // delete
-    await client.deleteWebhook(ctx.input.webhookId!);
+    if (ctx.input.action === 'test') {
+      let webhookId = requireString(ctx.input.webhookId, 'webhookId', 'test');
+      let result = await client.testWebhook(webhookId);
+      return {
+        output: { webhookId, testResult: result },
+        message: `Requested a test delivery for webhook \`${webhookId}\`.`
+      };
+    }
+
+    let webhookId = requireString(ctx.input.webhookId, 'webhookId', 'delete');
+    await client.deleteWebhook(webhookId);
     return {
-      output: { webhookId: ctx.input.webhookId, deleted: true },
-      message: `Deleted webhook \`${ctx.input.webhookId}\`.`
+      output: { webhookId, deleted: true },
+      message: `Deleted webhook \`${webhookId}\`.`
     };
   })
   .build();

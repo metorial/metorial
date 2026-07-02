@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { DropboxClient } from '../lib/client';
+import { dropboxServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let searchFiles = SlateTool.create(spec, {
@@ -13,7 +14,14 @@ export let searchFiles = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      query: z.string().describe('Search query string'),
+      query: z
+        .string()
+        .optional()
+        .describe('Search query string. Required unless cursor is provided.'),
+      cursor: z
+        .string()
+        .optional()
+        .describe('Cursor from a previous search_files call to continue pagination'),
       path: z.string().optional().describe('Scope search to a specific folder path'),
       maxResults: z.number().optional().describe('Maximum number of results to return'),
       fileCategories: z
@@ -50,17 +58,24 @@ export let searchFiles = SlateTool.create(spec, {
           })
         )
         .describe('Search result matches'),
+      cursor: z.string().optional().describe('Cursor for fetching the next page of results'),
       hasMore: z.boolean().describe('Whether more results are available')
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.cursor && !ctx.input.query) {
+      throw dropboxServiceError('query is required unless cursor is provided.');
+    }
+
     let client = new DropboxClient(ctx.auth.token);
-    let result = await client.searchFiles(
-      ctx.input.query,
-      ctx.input.path,
-      ctx.input.maxResults,
-      ctx.input.fileCategories
-    );
+    let result = ctx.input.cursor
+      ? await client.searchFilesContinue(ctx.input.cursor)
+      : await client.searchFiles(
+          ctx.input.query!,
+          ctx.input.path,
+          ctx.input.maxResults,
+          ctx.input.fileCategories
+        );
 
     let matches = (result.matches || []).map((match: any) => {
       let metadata = match.metadata?.metadata || match.metadata;
@@ -78,9 +93,10 @@ export let searchFiles = SlateTool.create(spec, {
     return {
       output: {
         matches,
+        cursor: result.cursor,
         hasMore: result.has_more ?? false
       },
-      message: `Found **${matches.length}** results for "${ctx.input.query}"${result.has_more ? ' (more available)' : ''}.`
+      message: `Found **${matches.length}** results${ctx.input.query ? ` for "${ctx.input.query}"` : ''}${result.has_more ? ' (more available)' : ''}.`
     };
   })
   .build();

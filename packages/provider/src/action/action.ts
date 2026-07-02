@@ -27,6 +27,7 @@ export interface SlateActionParameters {
   };
   metadata?: Record<string, any>;
   scopes?: SlateActionScopes;
+  authMethods?: string[];
   docs?: SlateActionDocsReference[];
 }
 
@@ -204,6 +205,10 @@ export abstract class SlateAction<
 
   get scopes() {
     return this._params.scopes;
+  }
+
+  get authMethods() {
+    return this._params.authMethods;
   }
 
   get docs() {

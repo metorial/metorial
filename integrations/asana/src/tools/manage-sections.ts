@@ -80,3 +80,63 @@ export let createSection = SlateTool.create(spec, {
     };
   })
   .build();
+
+export let updateSection = SlateTool.create(spec, {
+  name: 'Update Section',
+  key: 'update_section',
+  description: `Rename an existing project section.`
+})
+  .input(
+    z.object({
+      sectionId: z.string().describe('Section GID to update'),
+      name: z.string().describe('New section name')
+    })
+  )
+  .output(
+    z.object({
+      sectionId: z.string(),
+      name: z.string()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    let section = await client.updateSection(ctx.input.sectionId, ctx.input.name);
+
+    return {
+      output: {
+        sectionId: section.gid,
+        name: section.name
+      },
+      message: `Updated section **${section.name}** (${section.gid}).`
+    };
+  })
+  .build();
+
+export let deleteSection = SlateTool.create(spec, {
+  name: 'Delete Section',
+  key: 'delete_section',
+  description: `Delete an empty project section. Asana does not allow deleting the last remaining section.`,
+  tags: {
+    destructive: true
+  }
+})
+  .input(
+    z.object({
+      sectionId: z.string().describe('Section GID to delete')
+    })
+  )
+  .output(
+    z.object({
+      deleted: z.boolean()
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token });
+    await client.deleteSection(ctx.input.sectionId);
+
+    return {
+      output: { deleted: true },
+      message: `Deleted section ${ctx.input.sectionId}.`
+    };
+  })
+  .build();

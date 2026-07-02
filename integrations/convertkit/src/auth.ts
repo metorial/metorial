@@ -1,12 +1,14 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { kitApiError, kitServiceError } from './lib/errors';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      authMethod: z.enum(['oauth', 'api_key']).optional()
     })
   )
   .addOauth({
@@ -35,29 +37,34 @@ export let auth = SlateAuth.create()
       }
 
       return {
-        url: `https://app.kit.com/oauth/authorize?${params.toString()}`
+        url: `https://api.kit.com/v4/oauth/authorize?${params.toString()}`
       };
     },
 
     handleCallback: async ctx => {
       let http = createAxios({
-        baseURL: 'https://api.kit.com'
+        baseURL: 'https://api.kit.com/v4'
       });
 
-      let response = await http.post('/oauth/token', {
-        client_id: ctx.clientId,
-        client_secret: ctx.clientSecret,
-        grant_type: 'authorization_code',
-        code: ctx.code,
-        redirect_uri: ctx.redirectUri
-      });
-
-      let data = response.data as {
+      let data: {
         access_token: string;
         refresh_token: string;
         expires_in: number;
         created_at: number;
       };
+
+      try {
+        let response = await http.post('/oauth/token', {
+          client_id: ctx.clientId,
+          client_secret: ctx.clientSecret,
+          grant_type: 'authorization_code',
+          code: ctx.code,
+          redirect_uri: ctx.redirectUri
+        });
+        data = response.data as typeof data;
+      } catch (error) {
+        throw kitApiError(error, 'OAuth token exchange');
+      }
 
       let expiresAt = new Date((data.created_at + data.expires_in) * 1000).toISOString();
 
@@ -65,28 +72,38 @@ export let auth = SlateAuth.create()
         output: {
           token: data.access_token,
           refreshToken: data.refresh_token,
-          expiresAt
+          expiresAt,
+          authMethod: 'oauth' as const
         }
       };
     },
 
     handleTokenRefresh: async (ctx: any) => {
+      if (!ctx.output.refreshToken) {
+        throw kitServiceError('Kit OAuth refresh token is missing.');
+      }
+
       let http = createAxios({
-        baseURL: 'https://api.kit.com'
+        baseURL: 'https://api.kit.com/v4'
       });
 
-      let response = await http.post('/oauth/token', {
-        client_id: ctx.clientId,
-        grant_type: 'refresh_token',
-        refresh_token: ctx.output.refreshToken
-      });
-
-      let data = response.data as {
+      let data: {
         access_token: string;
         refresh_token: string;
         expires_in: number;
         created_at: number;
       };
+
+      try {
+        let response = await http.post('/oauth/token', {
+          client_id: ctx.clientId,
+          grant_type: 'refresh_token',
+          refresh_token: ctx.output.refreshToken
+        });
+        data = response.data as typeof data;
+      } catch (error) {
+        throw kitApiError(error, 'OAuth token refresh');
+      }
 
       let expiresAt = new Date((data.created_at + data.expires_in) * 1000).toISOString();
 
@@ -94,7 +111,8 @@ export let auth = SlateAuth.create()
         output: {
           token: data.access_token,
           refreshToken: data.refresh_token,
-          expiresAt
+          expiresAt,
+          authMethod: 'oauth' as const
         }
       };
     },
@@ -107,11 +125,17 @@ export let auth = SlateAuth.create()
         }
       });
 
-      let response = await http.get('/account');
-      let data = response.data as {
+      let data: {
         user: { id: number; email: string };
         account: { id: number; name: string };
       };
+
+      try {
+        let response = await http.get('/account');
+        data = response.data as typeof data;
+      } catch (error) {
+        throw kitApiError(error, 'OAuth profile lookup');
+      }
 
       return {
         profile: {
@@ -136,7 +160,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey,
+          authMethod: 'api_key' as const
         }
       };
     },
@@ -149,11 +174,17 @@ export let auth = SlateAuth.create()
         }
       });
 
-      let response = await http.get('/account');
-      let data = response.data as {
+      let data: {
         user: { id: number; email: string };
         account: { id: number; name: string };
       };
+
+      try {
+        let response = await http.get('/account');
+        data = response.data as typeof data;
+      } catch (error) {
+        throw kitApiError(error, 'API key profile lookup');
+      }
 
       return {
         profile: {

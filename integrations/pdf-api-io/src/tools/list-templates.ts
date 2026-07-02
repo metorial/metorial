@@ -49,8 +49,8 @@ export let listTemplates = SlateTool.create(spec, {
       name: t.name,
       type: t.type,
       createdAt: t.created_at,
-      meta: t.meta as Record<string, unknown>,
-      variables: t.variables.map(v => ({
+      meta: (t.meta ?? {}) as Record<string, unknown>,
+      variables: (t.variables ?? []).map(v => ({
         name: v.name,
         type: v.type
       }))

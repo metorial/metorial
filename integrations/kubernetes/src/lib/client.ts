@@ -1,4 +1,6 @@
+import { Agent as HttpsAgent } from 'node:https';
 import { createAxios } from 'slates';
+import { kubernetesApiError, kubernetesServiceError } from './errors';
 
 export interface KubeClientConfig {
   clusterUrl: string;
@@ -66,12 +68,27 @@ export interface KubeEvent {
     [key: string]: any;
   };
   reason?: string;
+  note?: string;
   message?: string;
   type?: string;
+  eventTime?: string;
   firstTimestamp?: string;
   lastTimestamp?: string;
+  deprecatedFirstTimestamp?: string;
+  deprecatedLastTimestamp?: string;
+  deprecatedCount?: number;
+  deprecatedSource?: Record<string, any>;
   count?: number;
   source?: Record<string, any>;
+  reportingController?: string;
+  reportingInstance?: string;
+  regarding?: {
+    kind?: string;
+    namespace?: string;
+    name?: string;
+    uid?: string;
+    [key: string]: any;
+  };
   [key: string]: any;
 }
 
@@ -80,13 +97,14 @@ export let resourceApiPaths: Record<string, { apiBase: string; namespaced: boole
   services: { apiBase: '/api/v1', namespaced: true },
   configmaps: { apiBase: '/api/v1', namespaced: true },
   secrets: { apiBase: '/api/v1', namespaced: true },
+  podtemplates: { apiBase: '/api/v1', namespaced: true },
   namespaces: { apiBase: '/api/v1', namespaced: false },
   nodes: { apiBase: '/api/v1', namespaced: false },
   persistentvolumes: { apiBase: '/api/v1', namespaced: false },
   persistentvolumeclaims: { apiBase: '/api/v1', namespaced: true },
   serviceaccounts: { apiBase: '/api/v1', namespaced: true },
   endpoints: { apiBase: '/api/v1', namespaced: true },
-  events: { apiBase: '/api/v1', namespaced: true },
+  events: { apiBase: '/apis/events.k8s.io/v1', namespaced: true },
   resourcequotas: { apiBase: '/api/v1', namespaced: true },
   limitranges: { apiBase: '/api/v1', namespaced: true },
   replicationcontrollers: { apiBase: '/api/v1', namespaced: true },
@@ -96,8 +114,13 @@ export let resourceApiPaths: Record<string, { apiBase: string; namespaced: boole
   replicasets: { apiBase: '/apis/apps/v1', namespaced: true },
   jobs: { apiBase: '/apis/batch/v1', namespaced: true },
   cronjobs: { apiBase: '/apis/batch/v1', namespaced: true },
+  certificatesigningrequests: {
+    apiBase: '/apis/certificates.k8s.io/v1',
+    namespaced: false
+  },
   ingresses: { apiBase: '/apis/networking.k8s.io/v1', namespaced: true },
   networkpolicies: { apiBase: '/apis/networking.k8s.io/v1', namespaced: true },
+  poddisruptionbudgets: { apiBase: '/apis/policy/v1', namespaced: true },
   roles: { apiBase: '/apis/rbac.authorization.k8s.io/v1', namespaced: true },
   clusterroles: { apiBase: '/apis/rbac.authorization.k8s.io/v1', namespaced: false },
   rolebindings: { apiBase: '/apis/rbac.authorization.k8s.io/v1', namespaced: true },
@@ -108,7 +131,24 @@ export let resourceApiPaths: Record<string, { apiBase: string; namespaced: boole
   endpointslices: { apiBase: '/apis/discovery.k8s.io/v1', namespaced: true },
   priorityclasses: { apiBase: '/apis/scheduling.k8s.io/v1', namespaced: false },
   leases: { apiBase: '/apis/coordination.k8s.io/v1', namespaced: true },
+  apiservices: { apiBase: '/apis/apiregistration.k8s.io/v1', namespaced: false },
+  mutatingadmissionpolicies: {
+    apiBase: '/apis/admissionregistration.k8s.io/v1',
+    namespaced: false
+  },
+  mutatingadmissionpolicybindings: {
+    apiBase: '/apis/admissionregistration.k8s.io/v1',
+    namespaced: false
+  },
   mutatingwebhookconfigurations: {
+    apiBase: '/apis/admissionregistration.k8s.io/v1',
+    namespaced: false
+  },
+  validatingadmissionpolicies: {
+    apiBase: '/apis/admissionregistration.k8s.io/v1',
+    namespaced: false
+  },
+  validatingadmissionpolicybindings: {
     apiBase: '/apis/admissionregistration.k8s.io/v1',
     namespaced: false
   },
@@ -116,6 +156,38 @@ export let resourceApiPaths: Record<string, { apiBase: string; namespaced: boole
     apiBase: '/apis/admissionregistration.k8s.io/v1',
     namespaced: false
   }
+};
+
+let supportedResourceTypes = () => Object.keys(resourceApiPaths).join(', ');
+
+let unknownResourceTypeError = (resourceType: string) =>
+  kubernetesServiceError(
+    `Unknown resource type: ${resourceType}. Supported types: ${supportedResourceTypes()}`
+  );
+
+let createHttpsAgent = (config: KubeClientConfig) => {
+  let hasTlsOptions =
+    !!config.clientCertificate ||
+    !!config.clientKey ||
+    !!config.caCertificate ||
+    config.skipTlsVerify === true;
+  if (!hasTlsOptions) return undefined;
+
+  if (
+    (config.clientCertificate && !config.clientKey) ||
+    (!config.clientCertificate && config.clientKey)
+  ) {
+    throw kubernetesServiceError(
+      'Kubernetes client certificate authentication requires both clientCertificate and clientKey.'
+    );
+  }
+
+  return new HttpsAgent({
+    cert: config.clientCertificate,
+    key: config.clientKey,
+    ca: config.caCertificate,
+    rejectUnauthorized: config.skipTlsVerify === true ? false : undefined
+  });
 };
 
 export class KubeClient {
@@ -139,8 +211,18 @@ export class KubeClient {
 
     this.axios = createAxios({
       baseURL: this.clusterUrl,
-      headers
+      headers,
+      httpsAgent: createHttpsAgent(config)
     });
+  }
+
+  private async request<T>(operation: string, run: () => Promise<{ data: T }>): Promise<T> {
+    try {
+      let response = await run();
+      return response.data;
+    } catch (error) {
+      throw kubernetesApiError(error, operation);
+    }
   }
 
   private buildResourcePath(
@@ -151,9 +233,7 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(
-        `Unknown resource type: ${resourceType}. Supported types: ${Object.keys(resourceApiPaths).join(', ')}`
-      );
+      throw unknownResourceTypeError(resourceType);
     }
 
     let path = info.apiBase;
@@ -178,9 +258,7 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(
-        `Unknown resource type: ${resourceType}. Supported types: ${Object.keys(resourceApiPaths).join(', ')}`
-      );
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(options?.namespace) : undefined;
@@ -192,8 +270,7 @@ export class KubeClient {
     if (options?.limit) params.limit = String(options.limit);
     if (options?.continueToken) params.continue = options.continueToken;
 
-    let response = await this.axios.get(path, { params });
-    return response.data;
+    return await this.request(`list ${rt}`, () => this.axios.get(path, { params }));
   }
 
   async getResource(
@@ -204,16 +281,13 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(
-        `Unknown resource type: ${resourceType}. Supported types: ${Object.keys(resourceApiPaths).join(', ')}`
-      );
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(namespace) : undefined;
     let path = this.buildResourcePath(rt, ns, resourceName);
 
-    let response = await this.axios.get(path);
-    return response.data;
+    return await this.request(`get ${rt}/${resourceName}`, () => this.axios.get(path));
   }
 
   async createResource(
@@ -224,16 +298,13 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(
-        `Unknown resource type: ${resourceType}. Supported types: ${Object.keys(resourceApiPaths).join(', ')}`
-      );
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(namespace) : undefined;
     let path = this.buildResourcePath(rt, ns);
 
-    let response = await this.axios.post(path, body);
-    return response.data;
+    return await this.request(`create ${rt}`, () => this.axios.post(path, body));
   }
 
   async updateResource(
@@ -245,16 +316,15 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(
-        `Unknown resource type: ${resourceType}. Supported types: ${Object.keys(resourceApiPaths).join(', ')}`
-      );
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(namespace) : undefined;
     let path = this.buildResourcePath(rt, ns, resourceName);
 
-    let response = await this.axios.put(path, body);
-    return response.data;
+    return await this.request(`update ${rt}/${resourceName}`, () =>
+      this.axios.put(path, body)
+    );
   }
 
   async patchResource(
@@ -267,9 +337,7 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(
-        `Unknown resource type: ${resourceType}. Supported types: ${Object.keys(resourceApiPaths).join(', ')}`
-      );
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(namespace) : undefined;
@@ -281,10 +349,11 @@ export class KubeClient {
       json: 'application/json-patch+json'
     };
 
-    let response = await this.axios.patch(path, patch, {
-      headers: { 'Content-Type': contentTypeMap[patchType] }
-    });
-    return response.data;
+    return await this.request(`patch ${rt}/${resourceName}`, () =>
+      this.axios.patch(path, patch, {
+        headers: { 'Content-Type': contentTypeMap[patchType] }
+      })
+    );
   }
 
   async deleteResource(
@@ -296,9 +365,7 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(
-        `Unknown resource type: ${resourceType}. Supported types: ${Object.keys(resourceApiPaths).join(', ')}`
-      );
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(namespace) : undefined;
@@ -309,8 +376,9 @@ export class KubeClient {
       body = { propagationPolicy };
     }
 
-    let response = await this.axios.delete(path, { data: body });
-    return response.data;
+    return await this.request(`delete ${rt}/${resourceName}`, () =>
+      this.axios.delete(path, { data: body })
+    );
   }
 
   async getResourceScale(
@@ -321,14 +389,13 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(`Unknown resource type: ${resourceType}`);
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(namespace) : undefined;
     let path = `${this.buildResourcePath(rt, ns, resourceName)}/scale`;
 
-    let response = await this.axios.get(path);
-    return response.data;
+    return await this.request(`get ${rt}/${resourceName} scale`, () => this.axios.get(path));
   }
 
   async setResourceScale(
@@ -340,22 +407,23 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(`Unknown resource type: ${resourceType}`);
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(namespace) : undefined;
     let path = `${this.buildResourcePath(rt, ns, resourceName)}/scale`;
 
-    let response = await this.axios.patch(
-      path,
-      {
-        spec: { replicas }
-      },
-      {
-        headers: { 'Content-Type': 'application/merge-patch+json' }
-      }
+    return await this.request(`set ${rt}/${resourceName} scale`, () =>
+      this.axios.patch(
+        path,
+        {
+          spec: { replicas }
+        },
+        {
+          headers: { 'Content-Type': 'application/merge-patch+json' }
+        }
+      )
     );
-    return response.data;
   }
 
   async getResourceLogs(
@@ -377,11 +445,12 @@ export class KubeClient {
     if (options?.sinceSeconds) params.sinceSeconds = String(options.sinceSeconds);
     if (options?.previous) params.previous = 'true';
 
-    let response = await this.axios.get(path, {
-      params,
-      headers: { Accept: 'text/plain' }
-    });
-    return response.data;
+    return await this.request(`get pod ${podName} logs`, () =>
+      this.axios.get(path, {
+        params,
+        headers: { Accept: 'text/plain' }
+      })
+    );
   }
 
   async restartDeployment(deploymentName: string, namespace?: string): Promise<KubeResource> {
@@ -389,24 +458,25 @@ export class KubeClient {
     let path = this.buildResourcePath('deployments', ns, deploymentName);
 
     let now = new Date().toISOString();
-    let response = await this.axios.patch(
-      path,
-      {
-        spec: {
-          template: {
-            metadata: {
-              annotations: {
-                'kubectl.kubernetes.io/restartedAt': now
+    return await this.request(`restart deployment ${deploymentName}`, () =>
+      this.axios.patch(
+        path,
+        {
+          spec: {
+            template: {
+              metadata: {
+                annotations: {
+                  'kubectl.kubernetes.io/restartedAt': now
+                }
               }
             }
           }
+        },
+        {
+          headers: { 'Content-Type': 'application/strategic-merge-patch+json' }
         }
-      },
-      {
-        headers: { 'Content-Type': 'application/strategic-merge-patch+json' }
-      }
+      )
     );
-    return response.data;
   }
 
   async listEvents(
@@ -417,14 +487,15 @@ export class KubeClient {
     }
   ): Promise<KubeListResponse> {
     let ns = this.resolveNamespace(namespace);
-    let path = `/api/v1/namespaces/${ns}/events`;
+    let path = this.buildResourcePath('events', ns);
 
     let params: Record<string, string> = {};
     if (options?.fieldSelector) params.fieldSelector = options.fieldSelector;
     if (options?.limit) params.limit = String(options.limit);
 
-    let response = await this.axios.get(path, { params });
-    return response.data;
+    return await this.request(`list events in namespace ${ns}`, () =>
+      this.axios.get(path, { params })
+    );
   }
 
   async listClusterEvents(options?: {
@@ -432,15 +503,14 @@ export class KubeClient {
     limit?: number;
     labelSelector?: string;
   }): Promise<KubeListResponse> {
-    let path = `/api/v1/events`;
+    let path = this.buildResourcePath('events');
 
     let params: Record<string, string> = {};
     if (options?.fieldSelector) params.fieldSelector = options.fieldSelector;
     if (options?.limit) params.limit = String(options.limit);
     if (options?.labelSelector) params.labelSelector = options.labelSelector;
 
-    let response = await this.axios.get(path, { params });
-    return response.data;
+    return await this.request('list cluster events', () => this.axios.get(path, { params }));
   }
 
   async getClusterInfo(): Promise<{
@@ -448,14 +518,14 @@ export class KubeClient {
     nodeCount: number;
     nodes: any[];
   }> {
-    let [versionResp, nodesResp] = await Promise.all([
-      this.axios.get('/version'),
-      this.axios.get('/api/v1/nodes')
+    let [version, nodesResp] = await Promise.all([
+      this.request('get server version', () => this.axios.get('/version')),
+      this.request<KubeListResponse>('list nodes', () => this.axios.get('/api/v1/nodes'))
     ]);
 
-    let nodes = nodesResp.data.items || [];
+    let nodes = nodesResp.items || [];
     return {
-      version: versionResp.data,
+      version,
       nodeCount: nodes.length,
       nodes: nodes.map((n: any) => ({
         name: n.metadata?.name,
@@ -473,8 +543,7 @@ export class KubeClient {
   }
 
   async getNamespaces(): Promise<KubeListResponse> {
-    let response = await this.axios.get('/api/v1/namespaces');
-    return response.data;
+    return await this.request('list namespaces', () => this.axios.get('/api/v1/namespaces'));
   }
 
   async applyResource(body: Record<string, any>, namespace?: string): Promise<KubeResource> {
@@ -483,7 +552,7 @@ export class KubeClient {
     let name = body.metadata?.name;
     let info = resourceApiPaths[resourceType];
     if (!info) {
-      throw new Error(`Unknown resource kind: ${kind}`);
+      throw kubernetesServiceError(`Unknown resource kind: ${kind}`);
     }
 
     let ns = info.namespaced
@@ -512,20 +581,20 @@ export class KubeClient {
     let rt = resourceType.toLowerCase();
     let info = resourceApiPaths[rt];
     if (!info) {
-      throw new Error(`Unknown resource type: ${resourceType}`);
+      throw unknownResourceTypeError(resourceType);
     }
 
     let ns = info.namespaced ? this.resolveNamespace(namespace) : undefined;
     let path = `${this.buildResourcePath(rt, ns, resourceName)}/status`;
 
-    let response = await this.axios.get(path);
-    return response.data;
+    return await this.request(`get ${rt}/${resourceName} status`, () => this.axios.get(path));
   }
 }
 
 export let kindToResourceType = (kind: string): string => {
   let map: Record<string, string> = {
     Pod: 'pods',
+    PodTemplate: 'podtemplates',
     Service: 'services',
     ConfigMap: 'configmaps',
     Secret: 'secrets',
@@ -545,8 +614,10 @@ export let kindToResourceType = (kind: string): string => {
     ReplicaSet: 'replicasets',
     Job: 'jobs',
     CronJob: 'cronjobs',
+    CertificateSigningRequest: 'certificatesigningrequests',
     Ingress: 'ingresses',
     NetworkPolicy: 'networkpolicies',
+    PodDisruptionBudget: 'poddisruptionbudgets',
     Role: 'roles',
     ClusterRole: 'clusterroles',
     RoleBinding: 'rolebindings',
@@ -557,7 +628,12 @@ export let kindToResourceType = (kind: string): string => {
     EndpointSlice: 'endpointslices',
     PriorityClass: 'priorityclasses',
     Lease: 'leases',
+    APIService: 'apiservices',
+    MutatingAdmissionPolicy: 'mutatingadmissionpolicies',
+    MutatingAdmissionPolicyBinding: 'mutatingadmissionpolicybindings',
     MutatingWebhookConfiguration: 'mutatingwebhookconfigurations',
+    ValidatingAdmissionPolicy: 'validatingadmissionpolicies',
+    ValidatingAdmissionPolicyBinding: 'validatingadmissionpolicybindings',
     ValidatingWebhookConfiguration: 'validatingwebhookconfigurations'
   };
   return map[kind] || `${kind.toLowerCase()}s`;

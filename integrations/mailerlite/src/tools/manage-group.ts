@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mailerLiteServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageGroup = SlateTool.create(spec, {
@@ -38,7 +39,8 @@ export let manageGroup = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('Group name is required for create action');
+      if (!ctx.input.name)
+        throw mailerLiteServiceError('Group name is required for create action');
       let result = await client.createGroup(ctx.input.name);
       let group = result.data;
       return {
@@ -55,8 +57,10 @@ export let manageGroup = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.groupId) throw new Error('Group ID is required for update action');
-      if (!ctx.input.name) throw new Error('Group name is required for update action');
+      if (!ctx.input.groupId)
+        throw mailerLiteServiceError('Group ID is required for update action');
+      if (!ctx.input.name)
+        throw mailerLiteServiceError('Group name is required for update action');
       let result = await client.updateGroup(ctx.input.groupId, ctx.input.name);
       let group = result.data;
       return {
@@ -72,7 +76,8 @@ export let manageGroup = SlateTool.create(spec, {
       };
     }
 
-    if (!ctx.input.groupId) throw new Error('Group ID is required for delete action');
+    if (!ctx.input.groupId)
+      throw mailerLiteServiceError('Group ID is required for delete action');
     await client.deleteGroup(ctx.input.groupId);
     return {
       output: {

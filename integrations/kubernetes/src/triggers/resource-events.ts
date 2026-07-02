@@ -86,20 +86,38 @@ export let resourceEvents = SlateTrigger.create(spec, {
         };
       }
 
-      let inputs = newEvents.map(event => ({
-        eventUid: event.metadata?.uid || '',
-        eventType: event.type || 'Normal',
-        reason: event.reason || '',
-        message: event.message || '',
-        involvedObjectKind: event.involvedObject?.kind,
-        involvedObjectName: event.involvedObject?.name,
-        involvedObjectNamespace: event.involvedObject?.namespace,
-        resourceVersion: event.metadata?.resourceVersion,
-        firstTimestamp: event.firstTimestamp,
-        lastTimestamp: event.lastTimestamp,
-        count: event.count,
-        sourceComponent: event.source?.component
-      }));
+      let inputs = newEvents.map(event => {
+        let involvedObject = event.regarding || event.involvedObject;
+        let series = event.series as
+          | {
+              count?: number;
+              lastObservedTime?: string;
+            }
+          | undefined;
+
+        return {
+          eventUid: event.metadata?.uid || '',
+          eventType: event.type || 'Normal',
+          reason: event.reason || '',
+          message: event.note || event.message || '',
+          involvedObjectKind: involvedObject?.kind,
+          involvedObjectName: involvedObject?.name,
+          involvedObjectNamespace: involvedObject?.namespace,
+          resourceVersion: event.metadata?.resourceVersion,
+          firstTimestamp:
+            event.deprecatedFirstTimestamp || event.firstTimestamp || event.eventTime,
+          lastTimestamp:
+            event.deprecatedLastTimestamp ||
+            event.lastTimestamp ||
+            series?.lastObservedTime ||
+            event.eventTime,
+          count: event.deprecatedCount ?? event.count ?? series?.count,
+          sourceComponent:
+            event.reportingController ||
+            event.deprecatedSource?.component ||
+            event.source?.component
+        };
+      });
 
       let updatedUids = [
         ...seenUids,

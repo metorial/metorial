@@ -2,27 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BrowserlessClient } from '../lib/client';
 import { spec } from '../spec';
-
-let gotoOptionsSchema = z
-  .object({
-    waitUntil: z
-      .enum(['load', 'domcontentloaded', 'networkidle0', 'networkidle2'])
-      .optional()
-      .describe('When to consider navigation complete'),
-    timeout: z.number().optional().describe('Navigation timeout in milliseconds')
-  })
-  .optional()
-  .describe('Navigation options');
-
-let waitForSelectorSchema = z
-  .object({
-    selector: z.string().describe('CSS selector to wait for'),
-    timeout: z.number().optional().describe('Timeout in milliseconds'),
-    visible: z.boolean().optional().describe('Wait for element to be visible'),
-    hidden: z.boolean().optional().describe('Wait for element to be hidden')
-  })
-  .optional()
-  .describe('Wait for a CSS selector to appear on the page');
+import { gotoOptionsSchema, requireHttpUrl, waitForSelectorSchema } from './shared';
 
 export let scrapePage = SlateTool.create(spec, {
   name: 'Scrape Page',
@@ -100,6 +80,8 @@ export let scrapePage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireHttpUrl(ctx.input.url);
+
     let client = new BrowserlessClient({
       token: ctx.auth.token,
       region: ctx.config.region

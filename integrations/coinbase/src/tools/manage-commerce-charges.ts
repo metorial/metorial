@@ -1,6 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { coinbaseCommerceAuthMethods } from '../lib/auth-methods';
 import { CommerceClient } from '../lib/commerce-client';
+import { coinbaseServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 let chargeSchema = z.object({
@@ -40,6 +42,7 @@ export let manageCommerceCharges = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(coinbaseCommerceAuthMethods)
   .input(
     z.object({
       action: z
@@ -85,9 +88,19 @@ export let manageCommerceCharges = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create');
-      if (!ctx.input.description) throw new Error('description is required for create');
-      if (!ctx.input.pricingType) throw new Error('pricingType is required for create');
+      if (!ctx.input.name) throw coinbaseServiceError('name is required for create');
+      if (!ctx.input.description) {
+        throw coinbaseServiceError('description is required for create');
+      }
+      if (!ctx.input.pricingType) {
+        throw coinbaseServiceError('pricingType is required for create');
+      }
+      if (
+        ctx.input.pricingType === 'fixed_price' &&
+        (!ctx.input.amount || !ctx.input.currency)
+      ) {
+        throw coinbaseServiceError('amount and currency are required for fixed_price charges');
+      }
 
       let localPrice =
         ctx.input.pricingType === 'fixed_price' && ctx.input.amount && ctx.input.currency
@@ -113,7 +126,9 @@ export let manageCommerceCharges = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.chargeCodeOrId) throw new Error('chargeCodeOrId is required for get');
+      if (!ctx.input.chargeCodeOrId) {
+        throw coinbaseServiceError('chargeCodeOrId is required for get');
+      }
       let charge = await client.getCharge(ctx.input.chargeCodeOrId);
       return {
         output: { charge: mapCharge(charge) },
@@ -122,7 +137,9 @@ export let manageCommerceCharges = SlateTool.create(spec, {
     }
 
     if (action === 'cancel') {
-      if (!ctx.input.chargeCodeOrId) throw new Error('chargeCodeOrId is required for cancel');
+      if (!ctx.input.chargeCodeOrId) {
+        throw coinbaseServiceError('chargeCodeOrId is required for cancel');
+      }
       let charge = await client.cancelCharge(ctx.input.chargeCodeOrId);
       return {
         output: { charge: mapCharge(charge) },
@@ -131,7 +148,9 @@ export let manageCommerceCharges = SlateTool.create(spec, {
     }
 
     if (action === 'resolve') {
-      if (!ctx.input.chargeCodeOrId) throw new Error('chargeCodeOrId is required for resolve');
+      if (!ctx.input.chargeCodeOrId) {
+        throw coinbaseServiceError('chargeCodeOrId is required for resolve');
+      }
       let charge = await client.resolveCharge(ctx.input.chargeCodeOrId);
       return {
         output: { charge: mapCharge(charge) },

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Auth0Client } from '../lib/client';
+import { auth0ServiceError, requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageOrganizationsTool = SlateTool.create(spec, {
@@ -83,9 +84,8 @@ export let manageOrganizationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for get action');
-      let org = await client.getOrganization(ctx.input.organizationId);
+      let organizationId = requireField(ctx.input.organizationId, 'organizationId', 'get');
+      let org = await client.getOrganization(organizationId);
       return {
         output: { organization: mapOrg(org) },
         message: `Retrieved organization **${org.display_name || org.name}**.`
@@ -93,7 +93,7 @@ export let manageOrganizationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      let name = requireField(ctx.input.name, 'name', 'create');
       let branding =
         ctx.input.logoUrl || ctx.input.primaryColor || ctx.input.pageBackgroundColor
           ? {
@@ -107,7 +107,7 @@ export let manageOrganizationsTool = SlateTool.create(spec, {
             }
           : undefined;
       let org = await client.createOrganization({
-        name: ctx.input.name,
+        name,
         displayName: ctx.input.displayName,
         branding,
         metadata: ctx.input.metadata
@@ -119,8 +119,7 @@ export let manageOrganizationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for update action');
+      let organizationId = requireField(ctx.input.organizationId, 'organizationId', 'update');
       let branding =
         ctx.input.logoUrl || ctx.input.primaryColor || ctx.input.pageBackgroundColor
           ? {
@@ -133,7 +132,7 @@ export let manageOrganizationsTool = SlateTool.create(spec, {
               }
             }
           : undefined;
-      let org = await client.updateOrganization(ctx.input.organizationId, {
+      let org = await client.updateOrganization(organizationId, {
         name: ctx.input.name,
         displayName: ctx.input.displayName,
         branding,
@@ -146,15 +145,14 @@ export let manageOrganizationsTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.organizationId)
-        throw new Error('organizationId is required for delete action');
-      await client.deleteOrganization(ctx.input.organizationId);
+      let organizationId = requireField(ctx.input.organizationId, 'organizationId', 'delete');
+      await client.deleteOrganization(organizationId);
       return {
         output: { deleted: true },
-        message: `Deleted organization **${ctx.input.organizationId}**.`
+        message: `Deleted organization **${organizationId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw auth0ServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

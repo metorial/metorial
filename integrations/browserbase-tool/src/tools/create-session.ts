@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { browserbaseServiceError } from '../lib/errors';
 import type { ProxyConfig } from '../lib/types';
 import { spec } from '../spec';
 
@@ -129,10 +130,14 @@ export let createSession = SlateTool.create(spec, {
       };
     }
 
-    if (ctx.input.viewportWidth || ctx.input.viewportHeight) {
+    if ((ctx.input.viewportWidth === undefined) !== (ctx.input.viewportHeight === undefined)) {
+      throw browserbaseServiceError('Provide both viewportWidth and viewportHeight together.');
+    }
+
+    if (ctx.input.viewportWidth !== undefined && ctx.input.viewportHeight !== undefined) {
       browserSettings.viewport = {
-        ...(ctx.input.viewportWidth ? { width: ctx.input.viewportWidth } : {}),
-        ...(ctx.input.viewportHeight ? { height: ctx.input.viewportHeight } : {})
+        width: ctx.input.viewportWidth,
+        height: ctx.input.viewportHeight
       };
     }
 

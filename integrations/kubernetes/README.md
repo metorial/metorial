@@ -1,12 +1,12 @@
 # <img src="https://provider-logos.metorial-cdn.com/kubernetes.png" height="20"> Kubernetes
 
-Manage and orchestrate containerized applications on Kubernetes clusters. Create, update, scale, and delete workloads including Pods, Deployments, StatefulSets, DaemonSets, Jobs, and CronJobs. Configure service discovery and load balancing through Services, Ingress, and Endpoints. Manage configuration and storage with ConfigMaps, Secrets, PersistentVolumes, and StorageClasses. Control access with Namespaces, RBAC roles and bindings, ServiceAccounts, and NetworkPolicies. Administer cluster infrastructure including Nodes, ResourceQuotas, LimitRanges, and PriorityClasses. Autoscale workloads with HorizontalPodAutoscaler and VerticalPodAutoscaler. Define and manage Custom Resource Definitions (CRDs) to extend cluster functionality. Watch resources in real time for create, modify, and delete events. Configure admission webhooks to validate or mutate resources before persistence.
+Manage and orchestrate containerized applications on Kubernetes clusters. Create, update, scale, and delete workloads including Pods, Deployments, StatefulSets, DaemonSets, ReplicaSets, Jobs, and CronJobs. Configure service discovery and load balancing through Services, Ingress, Endpoints, and EndpointSlices. Manage configuration and storage with ConfigMaps, Secrets, PersistentVolumes, PersistentVolumeClaims, and StorageClasses. Control access with Namespaces, RBAC roles and bindings, ServiceAccounts, NetworkPolicies, and PodDisruptionBudgets. Administer cluster infrastructure including Nodes, ResourceQuotas, LimitRanges, PriorityClasses, APIService registrations, and certificate signing requests. Autoscale workloads with HorizontalPodAutoscaler. Define and manage Custom Resource Definitions (CRDs) to extend cluster functionality. Poll stable Kubernetes Events for operational changes. Configure admission webhooks and admission policies to validate or mutate resources before persistence.
 
 ## Tools
 
 ### Apply Resource
 
-Apply a Kubernetes resource manifest (similar to \
+Apply a Kubernetes resource manifest (similar to `kubectl apply`). Creates the resource if it does not exist, or updates it if it does.
 
 ### Cluster Info
 
@@ -35,10 +35,12 @@ Create, update, or get the status of a HorizontalPodAutoscaler (HPA). HPAs autom
 ### Manage ConfigMap or Secret
 
 Create or update Kubernetes ConfigMaps and Secrets. Supports setting key-value data directly, or providing a full manifest. For secrets, values should be provided as plain text — they will be base64-encoded automatically.
+Updates can remove specific data keys with `deleteKeys`.
 
 ### Manage Deployment
 
 Create, update, scale, or restart a Kubernetes Deployment. Combine multiple operations in one call — for example, update the image and scale replicas simultaneously. Also supports StatefulSets and DaemonSets for similar workload management.
+Scale operations are available for Deployments, StatefulSets, and ReplicaSets. DaemonSets can be updated or restarted, but do not expose a scale subresource.
 
 ### Manage Job
 

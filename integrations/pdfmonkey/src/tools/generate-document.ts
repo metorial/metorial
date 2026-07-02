@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { pdfmonkeyServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let generateDocument = SlateTool.create(spec, {
@@ -8,12 +9,13 @@ export let generateDocument = SlateTool.create(spec, {
   key: 'generate_document',
   description: `Generate a PDF or image document from a template with dynamic data. Supports both **synchronous** (waits for completion) and **asynchronous** (returns immediately, generation happens in the background) modes. Use synchronous mode when you need the download URL immediately; use asynchronous mode for large documents or batch processing.
 
-Optionally set a custom filename via the \`filename\` field, or password-protect the PDF via the \`password\` field. For image generation, use \`imageType\`, \`imageWidth\`, \`imageHeight\`, and \`imageQuality\` fields.`,
+Optionally set a custom filename via the \`filename\` field, password-protect the PDF via the \`password\` field, attach arbitrary document metadata via \`meta\`, or return a generated file attachment when using synchronous mode. For image generation, use \`imageType\`, \`imageWidth\`, \`imageHeight\`, and \`imageQuality\` fields.`,
   instructions: [
     'You must provide a valid template ID. List templates first if you do not know the template ID.',
     'The payload must match the dynamic data fields expected by the template.',
     'Synchronous generation blocks until the document is ready or fails. Use it for quick documents.',
-    'For image generation, the template must be configured for image output (Engine v5). Set imageType, imageWidth, imageHeight as needed.'
+    'For image generation, the template must be configured for image output. Set imageType, imageWidth, imageHeight as needed.',
+    'Set attachFile=true only with synchronous=true. The file bytes are returned as a Slate attachment, not inline output.'
   ],
   constraints: [
     'Download URLs expire after 1 hour. Fetch the document again if the URL has expired.',
@@ -33,6 +35,12 @@ Optionally set a custom filename via the \`filename\` field, or password-protect
         .optional()
         .describe(
           'Dynamic data to populate the template with. Must be a JSON object matching the template fields.'
+        ),
+      meta: z
+        .record(z.string(), z.unknown())
+        .optional()
+        .describe(
+          'Additional document metadata. Special keys such as _filename, _password, _type, _width, _height, and _quality are managed by the dedicated fields.'
         ),
       synchronous: z
         .boolean()
@@ -55,16 +63,30 @@ Optionally set a custom filename via the \`filename\` field, or password-protect
         .describe('Image output format (for image templates only)'),
       imageWidth: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Image width in pixels (for image templates only)'),
       imageHeight: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Image height in pixels (for image templates only)'),
       imageQuality: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
-        .describe('Image quality percentage for WebP (for image templates only, default 100)')
+        .describe('Image quality percentage from 1 to 100 for WebP image templates'),
+      attachFile: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          'When true, synchronous generation downloads the finished PDF/image and returns it as a Slate attachment.'
+        )
     })
   )
   .output(
@@ -83,7 +105,11 @@ Optionally set a custom filename via the \`filename\` field, or password-protect
         .nullable()
         .describe('Public share link (Premium plans only)'),
       filename: z.string().nullable().describe('Filename of the generated document'),
+      outputType: z.string().nullable().describe('Output format reported by PDFMonkey'),
       failureCause: z.string().nullable().describe('Error message if generation failed'),
+      mimeType: z.string().nullable().describe('MIME type of the returned attachment'),
+      byteLength: z.number().nullable().describe('Decoded byte length of the attachment'),
+      attachmentCount: z.number().describe('Number of Slate attachments returned'),
       createdAt: z.string().describe('Creation timestamp'),
       updatedAt: z.string().describe('Last update timestamp')
     })
@@ -91,7 +117,11 @@ Optionally set a custom filename via the \`filename\` field, or password-protect
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
-    let meta: Record<string, unknown> = {};
+    if (ctx.input.attachFile && !ctx.input.synchronous) {
+      throw pdfmonkeyServiceError('attachFile requires synchronous=true.');
+    }
+
+    let meta: Record<string, unknown> = { ...(ctx.input.meta ?? {}) };
     if (ctx.input.filename) meta._filename = ctx.input.filename;
     if (ctx.input.password) meta._password = ctx.input.password;
     if (ctx.input.imageType) meta._type = ctx.input.imageType;
@@ -114,6 +144,10 @@ Optionally set a custom filename via the \`filename\` field, or password-protect
       doc = await client.createDocument(params);
     }
 
+    let attachmentResult = ctx.input.attachFile
+      ? await client.downloadDocumentFile(String(doc.id))
+      : undefined;
+
     let output = {
       documentId: String(doc.id),
       status: String(doc.status),
@@ -121,7 +155,11 @@ Optionally set a custom filename via the \`filename\` field, or password-protect
       previewUrl: doc.preview_url ? String(doc.preview_url) : null,
       publicShareLink: doc.public_share_link ? String(doc.public_share_link) : null,
       filename: doc.filename ? String(doc.filename) : null,
+      outputType: doc.output_type ? String(doc.output_type) : null,
       failureCause: doc.failure_cause ? String(doc.failure_cause) : null,
+      mimeType: attachmentResult?.mimeType ?? null,
+      byteLength: attachmentResult?.byteLength ?? null,
+      attachmentCount: attachmentResult ? 1 : 0,
       createdAt: String(doc.created_at),
       updatedAt: String(doc.updated_at)
     };
@@ -133,10 +171,17 @@ Optionally set a custom filename via the \`filename\` field, or password-protect
           ? `Document **${output.documentId}** generation failed: ${output.failureCause}`
           : `Document **${output.documentId}** created with status **${output.status}**.`;
 
-    let downloadMsg = output.downloadUrl ? ` [Download](${output.downloadUrl})` : '';
+    let downloadMsg = attachmentResult
+      ? ` File returned as an attachment (${attachmentResult.byteLength} bytes).`
+      : output.downloadUrl
+        ? ` [Download](${output.downloadUrl})`
+        : '';
 
     return {
       output,
+      attachments: attachmentResult
+        ? [createBase64Attachment(attachmentResult.contentBase64, attachmentResult.mimeType)]
+        : [],
       message: `${statusMsg}${downloadMsg}`
     };
   })

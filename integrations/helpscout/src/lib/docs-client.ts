@@ -1,17 +1,21 @@
 import { createAxios } from 'slates';
+import { withHelpScoutErrorHandling } from './errors';
 
 export class DocsClient {
   private http: ReturnType<typeof createAxios>;
 
   constructor(apiKey: string) {
     let encoded = btoa(`${apiKey}:X`);
-    this.http = createAxios({
-      baseURL: 'https://docsapi.helpscout.net/v1',
-      headers: {
-        Authorization: `Basic ${encoded}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    this.http = withHelpScoutErrorHandling(
+      createAxios({
+        baseURL: 'https://docsapi.helpscout.net/v1',
+        headers: {
+          Authorization: `Basic ${encoded}`,
+          'Content-Type': 'application/json'
+        }
+      }),
+      'Docs API request'
+    );
   }
 
   // ─── Sites ──────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  addContactsToList,
   addSuppressedEmails,
   createContactList,
   createSuppressionGroup,
@@ -8,12 +9,19 @@ import {
   createVerifiedSender,
   deleteContactList,
   deleteContacts,
+  deleteSuppressionGroup,
   deleteTemplate,
   deleteVerifiedSender,
   getContact,
+  getContactCount,
+  getContactImportStatus,
+  getContactList,
+  getContactListCount,
   getEmailStats,
+  getSuppressionGroup,
   getTemplate,
   listContactLists,
+  listEventWebhooks,
   listSuppressionGroups,
   listSuppressions,
   listTemplates,
@@ -24,6 +32,7 @@ import {
   searchContacts,
   sendEmail,
   updateContactList,
+  updateSuppressionGroup,
   updateTemplate,
   upsertContacts
 } from './tools';
@@ -39,16 +48,24 @@ export let provider = Slate.create({
     updateTemplate.build(),
     deleteTemplate.build(),
     upsertContacts.build(),
+    getContactImportStatus.build(),
+    getContactCount.build(),
     searchContacts.build(),
     getContact.build(),
     deleteContacts.build(),
     listContactLists.build(),
+    getContactList.build(),
+    getContactListCount.build(),
     createContactList.build(),
+    addContactsToList.build(),
     updateContactList.build(),
     deleteContactList.build(),
     removeContactFromList.build(),
     listSuppressionGroups.build(),
+    getSuppressionGroup.build(),
     createSuppressionGroup.build(),
+    updateSuppressionGroup.build(),
+    deleteSuppressionGroup.build(),
     addSuppressedEmails.build(),
     removeSuppressedEmail.build(),
     listSuppressions.build(),
@@ -56,7 +73,8 @@ export let provider = Slate.create({
     listVerifiedSenders.build(),
     createVerifiedSender.build(),
     deleteVerifiedSender.build(),
-    resendSenderVerification.build()
+    resendSenderVerification.build(),
+    listEventWebhooks.build()
   ],
   triggers: [emailEvents.build(), inboundEmail.build()]
 });

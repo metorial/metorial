@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { PendoClient } from '../lib/client';
 import { spec } from '../spec';
+import { createPendoClient } from './helpers';
 
 export let updateVisitorMetadata = SlateTool.create(spec, {
   name: 'Update Visitor Metadata',
@@ -27,10 +27,7 @@ export let updateVisitorMetadata = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new PendoClient({
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createPendoClient(ctx);
 
     await client.updateVisitorMetadata(ctx.input.visitorId, ctx.input.metadata);
 

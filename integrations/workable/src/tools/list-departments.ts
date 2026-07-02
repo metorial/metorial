@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { WorkableClient } from '../lib/client';
+import { mapDepartment } from '../lib/shapes';
 import { spec } from '../spec';
 
 export let listDepartmentsTool = SlateTool.create(spec, {
   name: 'List Departments',
   key: 'list_departments',
-  description: `List all departments in the Workable account. Optionally create a new department. Use this to look up department names for filtering jobs/candidates or when creating requisitions.`,
+  description: `List all departments in the Workable account. Use this to look up department IDs for employee and requisition operations.`,
   tags: {
     readOnly: true
   }
@@ -33,12 +34,9 @@ export let listDepartmentsTool = SlateTool.create(spec, {
     });
 
     let result = await client.listDepartments();
-    let departments = (result.departments || []).map((d: any) => ({
-      departmentId: d.id,
-      name: d.name,
-      parentId: d.parent_id,
-      children: d.children
-    }));
+    let departments = (Array.isArray(result) ? result : result.departments || []).map(
+      mapDepartment
+    );
 
     return {
       output: { departments },

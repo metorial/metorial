@@ -70,13 +70,6 @@ export let auth = SlateAuth.create()
         scope: gmailScopes.gmailInsert
       },
       {
-        title: 'Metadata',
-        description:
-          'Read metadata including labels, history records, and email headers, but not the body or attachments.',
-        defaultChecked: false,
-        scope: gmailScopes.gmailMetadata
-      },
-      {
         title: 'Basic Settings',
         description: 'Manage basic mail settings.',
         scope: gmailScopes.gmailSettingsBasic
@@ -90,7 +83,7 @@ export let auth = SlateAuth.create()
       {
         title: 'Google Contacts (Read-only)',
         description: 'See and download your Google Contacts for address lookup.',
-        defaultChecked: false,
+        defaultChecked: true,
         scope: gmailScopes.contactsReadonly
       },
       {

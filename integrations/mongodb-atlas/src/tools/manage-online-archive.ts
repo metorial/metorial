@@ -1,6 +1,12 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
+import {
+  failValidation,
+  invalidAction,
+  requireString,
+  resolveProjectId
+} from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageOnlineArchiveTool = SlateTool.create(spec, {
@@ -63,10 +69,10 @@ export let manageOnlineArchiveTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth);
-    let projectId = ctx.input.projectId || ctx.config.projectId;
-    if (!projectId) throw new Error('projectId is required. Provide it in input or config.');
+    let projectId = resolveProjectId(ctx.input.projectId, ctx.config.projectId);
 
-    let { action, clusterName } = ctx.input;
+    let { action } = ctx.input;
+    let clusterName = requireString(ctx.input.clusterName, 'clusterName');
 
     if (action === 'list') {
       let result = await client.listOnlineArchives(projectId, clusterName);
@@ -78,26 +84,31 @@ export let manageOnlineArchiveTool = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.archiveId) throw new Error('archiveId is required.');
-      let archive = await client.getOnlineArchive(projectId, clusterName, ctx.input.archiveId);
+      let archiveId = requireString(ctx.input.archiveId, 'archiveId');
+      let archive = await client.getOnlineArchive(projectId, clusterName, archiveId);
       return {
         output: { archive },
-        message: `Retrieved online archive **${ctx.input.archiveId}** (state: ${archive.state}).`
+        message: `Retrieved online archive **${archiveId}** (state: ${archive.state}).`
       };
     }
 
     if (action === 'create') {
-      if (!ctx.input.databaseName || !ctx.input.collectionName) {
-        throw new Error(
-          'databaseName and collectionName are required for creating an online archive.'
-        );
-      }
+      let databaseName = requireString(
+        ctx.input.databaseName,
+        'databaseName',
+        'for creating an online archive'
+      );
+      let collectionName = requireString(
+        ctx.input.collectionName,
+        'collectionName',
+        'for creating an online archive'
+      );
       if (!ctx.input.criteria)
-        throw new Error('criteria is required for creating an online archive.');
+        failValidation('criteria is required for creating an online archive.');
 
       let data: any = {
-        dbName: ctx.input.databaseName,
-        collName: ctx.input.collectionName,
+        dbName: databaseName,
+        collName: collectionName,
         criteria: ctx.input.criteria
       };
       if (ctx.input.partitionFields) data.partitionFields = ctx.input.partitionFields;
@@ -105,37 +116,32 @@ export let manageOnlineArchiveTool = SlateTool.create(spec, {
       let archive = await client.createOnlineArchive(projectId, clusterName, data);
       return {
         output: { archive },
-        message: `Created online archive for **${ctx.input.databaseName}.${ctx.input.collectionName}**.`
+        message: `Created online archive for **${databaseName}.${collectionName}**.`
       };
     }
 
     if (action === 'update') {
-      if (!ctx.input.archiveId) throw new Error('archiveId is required.');
+      let archiveId = requireString(ctx.input.archiveId, 'archiveId');
       let data: any = {};
       if (ctx.input.criteria) data.criteria = ctx.input.criteria;
       if (ctx.input.paused !== undefined) data.paused = ctx.input.paused;
 
-      let archive = await client.updateOnlineArchive(
-        projectId,
-        clusterName,
-        ctx.input.archiveId,
-        data
-      );
+      let archive = await client.updateOnlineArchive(projectId, clusterName, archiveId, data);
       return {
         output: { archive },
-        message: `Updated online archive **${ctx.input.archiveId}**.`
+        message: `Updated online archive **${archiveId}**.`
       };
     }
 
     if (action === 'delete') {
-      if (!ctx.input.archiveId) throw new Error('archiveId is required.');
-      await client.deleteOnlineArchive(projectId, clusterName, ctx.input.archiveId);
+      let archiveId = requireString(ctx.input.archiveId, 'archiveId');
+      await client.deleteOnlineArchive(projectId, clusterName, archiveId);
       return {
         output: {},
-        message: `Deleted online archive **${ctx.input.archiveId}**.`
+        message: `Deleted online archive **${archiveId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    return invalidAction(action);
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { railwayServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getDomainsTool = SlateTool.create(spec, {
@@ -45,7 +46,7 @@ export let getDomainsTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
     let domains = await client.getDomains(
       ctx.input.projectId,
       ctx.input.environmentId,
@@ -124,7 +125,7 @@ export let createDomainTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
 
     if (ctx.input.customDomain) {
       let result = await client.createCustomDomain({
@@ -194,7 +195,7 @@ export let deleteDomainTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
 
     if (ctx.input.isCustom) {
       await client.deleteCustomDomain(ctx.input.domainId);
@@ -205,6 +206,137 @@ export let deleteDomainTool = SlateTool.create(spec, {
     return {
       output: { deleted: true },
       message: `Domain deleted successfully.`
+    };
+  })
+  .build();
+
+export let checkDomainAvailabilityTool = SlateTool.create(spec, {
+  name: 'Check Domain Availability',
+  key: 'check_domain_availability',
+  description: `Check whether a custom domain can be added to Railway.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      domain: z.string().describe('Custom domain name to check, such as "api.example.com"')
+    })
+  )
+  .output(
+    z.object({
+      available: z.boolean().describe('Whether Railway reports the domain as available'),
+      message: z.string().nullable().describe('Railway availability message')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let result = await client.checkCustomDomainAvailability(ctx.input.domain);
+
+    return {
+      output: {
+        available: result.available,
+        message: result.message ?? null
+      },
+      message: result.available
+        ? `Domain **${ctx.input.domain}** is available.`
+        : `Domain **${ctx.input.domain}** is not available.`
+    };
+  })
+  .build();
+
+export let getDomainStatusTool = SlateTool.create(spec, {
+  name: 'Get Domain Status',
+  key: 'get_domain_status',
+  description: `Get DNS and certificate status for a Railway custom domain.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      projectId: z.string().describe('ID of the project that owns the custom domain'),
+      domainId: z.string().describe('ID of the custom domain')
+    })
+  )
+  .output(
+    z.object({
+      cdnProvider: z.string().nullable(),
+      certificateStatus: z.string().nullable(),
+      certificateStatusDetailed: z.string().nullable(),
+      certificateErrorMessage: z.string().nullable(),
+      certificateErrorType: z.string().nullable(),
+      certificateRetryable: z.boolean().nullable(),
+      dnsRecords: z.array(
+        z.object({
+          hostlabel: z.string().nullable(),
+          requiredValue: z.string().nullable(),
+          currentValue: z.string().nullable(),
+          status: z.string().nullable()
+        })
+      )
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    let status = await client.getDomainStatus(ctx.input.domainId, ctx.input.projectId);
+    let dnsRecords = (status.dnsRecords || []).map((record: any) => ({
+      hostlabel: record.hostlabel ?? null,
+      requiredValue: record.requiredValue ?? null,
+      currentValue: record.currentValue ?? null,
+      status: record.status ?? null
+    }));
+
+    return {
+      output: {
+        cdnProvider: status.cdnProvider ?? null,
+        certificateStatus: status.certificateStatus ?? null,
+        certificateStatusDetailed: status.certificateStatusDetailed ?? null,
+        certificateErrorMessage: status.certificateErrorMessage ?? null,
+        certificateErrorType: status.certificateErrorType ?? null,
+        certificateRetryable: status.certificateRetryable ?? null,
+        dnsRecords
+      },
+      message: `Domain certificate status: **${status.certificateStatus ?? 'unknown'}**.`
+    };
+  })
+  .build();
+
+export let updateCustomDomainTool = SlateTool.create(spec, {
+  name: 'Update Custom Domain',
+  key: 'update_custom_domain',
+  description: `Update settings for a Railway custom domain, such as the target service port.`,
+  tags: {
+    destructive: false
+  }
+})
+  .input(
+    z.object({
+      domainId: z.string().describe('ID of the custom domain to update'),
+      environmentId: z.string().describe('ID of the environment for the custom domain'),
+      targetPort: z.number().optional().describe('Target port on the service')
+    })
+  )
+  .output(
+    z.object({
+      updated: z.boolean().describe('Whether the custom domain update was requested')
+    })
+  )
+  .handleInvocation(async ctx => {
+    if (ctx.input.targetPort === undefined) {
+      throw railwayServiceError('Provide targetPort to update a Railway custom domain.');
+    }
+
+    let client = new Client({ token: ctx.auth.token, tokenHeader: ctx.auth.tokenHeader });
+    await client.updateCustomDomain({
+      domainId: ctx.input.domainId,
+      environmentId: ctx.input.environmentId,
+      targetPort: ctx.input.targetPort
+    });
+
+    return {
+      output: { updated: true },
+      message: `Custom domain updated successfully.`
     };
   })
   .build();

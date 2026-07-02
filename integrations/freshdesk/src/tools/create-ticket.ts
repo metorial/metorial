@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { FreshdeskClient } from '../lib/client';
+import { freshdeskServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let createTicket = SlateTool.create(spec, {
@@ -66,6 +67,12 @@ export let createTicket = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (!ctx.input.requesterId && !ctx.input.email && !ctx.input.phone) {
+      throw freshdeskServiceError(
+        'Create Ticket requires requesterId, email, or phone to identify the requester.'
+      );
+    }
+
     let client = new FreshdeskClient({
       subdomain: ctx.config.subdomain,
       token: ctx.auth.token

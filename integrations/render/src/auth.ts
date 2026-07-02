@@ -1,5 +1,6 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { RenderClient } from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
@@ -25,20 +26,13 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: any) => {
-      let axios = createAxios({
-        baseURL: 'https://api.render.com/v1'
-      });
-
-      let response = await axios.get('/users', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
+      let client = new RenderClient(ctx.output.token);
+      let user = await client.getUser();
 
       return {
         profile: {
-          email: response.data.email,
-          name: response.data.name
+          email: user.email,
+          name: user.name
         }
       };
     }

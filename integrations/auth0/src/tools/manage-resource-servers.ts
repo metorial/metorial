@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Auth0Client } from '../lib/client';
+import { auth0ServiceError, requireField } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageResourceServersTool = SlateTool.create(spec, {
@@ -107,9 +108,12 @@ export let manageResourceServersTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.resourceServerId)
-        throw new Error('resourceServerId is required for get action');
-      let rs = await client.getResourceServer(ctx.input.resourceServerId);
+      let resourceServerId = requireField(
+        ctx.input.resourceServerId,
+        'resourceServerId',
+        'get'
+      );
+      let rs = await client.getResourceServer(resourceServerId);
       return {
         output: { resourceServer: mapRS(rs) },
         message: `Retrieved resource server **${rs.name}**.`
@@ -117,11 +121,11 @@ export let manageResourceServersTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      if (!ctx.input.identifier) throw new Error('identifier is required for create action');
+      let name = requireField(ctx.input.name, 'name', 'create');
+      let identifier = requireField(ctx.input.identifier, 'identifier', 'create');
       let rs = await client.createResourceServer({
-        name: ctx.input.name,
-        identifier: ctx.input.identifier,
+        name,
+        identifier,
         scopes: ctx.input.scopes,
         signingAlg: ctx.input.signingAlg,
         tokenLifetime: ctx.input.tokenLifetime,
@@ -135,9 +139,12 @@ export let manageResourceServersTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.resourceServerId)
-        throw new Error('resourceServerId is required for update action');
-      let rs = await client.updateResourceServer(ctx.input.resourceServerId, {
+      let resourceServerId = requireField(
+        ctx.input.resourceServerId,
+        'resourceServerId',
+        'update'
+      );
+      let rs = await client.updateResourceServer(resourceServerId, {
         name: ctx.input.name,
         scopes: ctx.input.scopes,
         signingAlg: ctx.input.signingAlg,
@@ -152,15 +159,18 @@ export let manageResourceServersTool = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.resourceServerId)
-        throw new Error('resourceServerId is required for delete action');
-      await client.deleteResourceServer(ctx.input.resourceServerId);
+      let resourceServerId = requireField(
+        ctx.input.resourceServerId,
+        'resourceServerId',
+        'delete'
+      );
+      await client.deleteResourceServer(resourceServerId);
       return {
         output: { deleted: true },
-        message: `Deleted resource server **${ctx.input.resourceServerId}**.`
+        message: `Deleted resource server **${resourceServerId}**.`
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw auth0ServiceError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

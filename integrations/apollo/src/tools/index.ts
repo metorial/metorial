@@ -9,5 +9,6 @@ export * from './manage-deals';
 export * from './manage-sequences';
 export * from './manage-tasks';
 export * from './organization-details';
+export * from './search-news-articles';
 export * from './search-organizations';
 export * from './search-people';

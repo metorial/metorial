@@ -7,6 +7,7 @@ export * from './manage-customer';
 export * from './manage-inventory';
 export * from './manage-order';
 export * from './manage-product';
+export * from './manage-product-media';
 export * from './search-customers';
 export * from './search-orders';
 export * from './search-products';

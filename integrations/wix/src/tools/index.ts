@@ -1,3 +1,4 @@
+export * from './get-catalog-version';
 export * from './get-site-properties';
 export * from './manage-blog';
 export * from './manage-bookings';
@@ -7,6 +8,7 @@ export * from './manage-data-items';
 export * from './manage-events';
 export * from './manage-media';
 export * from './manage-members';
+export * from './manage-order-fulfillments';
 export * from './manage-orders';
 export * from './manage-pricing-plans';
 export * from './manage-products';

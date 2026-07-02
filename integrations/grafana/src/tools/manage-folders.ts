@@ -56,6 +56,52 @@ export let listFolders = SlateTool.create(spec, {
   })
   .build();
 
+export let getFolder = SlateTool.create(spec, {
+  name: 'Get Folder',
+  key: 'get_folder',
+  description: `Retrieve a folder by UID, including its title, URL, parent folder, and version metadata.`,
+  tags: {
+    destructive: false,
+    readOnly: true
+  }
+})
+  .input(
+    z.object({
+      folderUid: z.string().describe('UID of the folder to retrieve')
+    })
+  )
+  .output(
+    z.object({
+      folderUid: z.string().describe('UID of the folder'),
+      title: z.string().describe('Folder title'),
+      folderUrl: z.string().optional().describe('URL to the folder'),
+      parentUid: z.string().optional().describe('UID of the parent folder'),
+      version: z.number().optional().describe('Folder version')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new GrafanaClient({
+      instanceUrl: ctx.config.instanceUrl,
+      token: ctx.auth.token,
+      organizationId: ctx.config.organizationId,
+      apiNamespace: ctx.config.apiNamespace
+    });
+
+    let folder = await client.getFolder(ctx.input.folderUid);
+
+    return {
+      output: {
+        folderUid: folder.uid,
+        title: folder.title,
+        folderUrl: folder.url,
+        parentUid: folder.parentUid,
+        version: folder.version
+      },
+      message: `Retrieved folder **${folder.title || ctx.input.folderUid}**.`
+    };
+  })
+  .build();
+
 export let createFolder = SlateTool.create(spec, {
   name: 'Create Folder',
   key: 'create_folder',
@@ -85,7 +131,8 @@ export let createFolder = SlateTool.create(spec, {
     let client = new GrafanaClient({
       instanceUrl: ctx.config.instanceUrl,
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.config.organizationId,
+      apiNamespace: ctx.config.apiNamespace
     });
 
     let result = await client.createFolder(
@@ -134,7 +181,8 @@ export let updateFolder = SlateTool.create(spec, {
     let client = new GrafanaClient({
       instanceUrl: ctx.config.instanceUrl,
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.config.organizationId,
+      apiNamespace: ctx.config.apiNamespace
     });
 
     let result = await client.updateFolder(
@@ -180,7 +228,8 @@ export let deleteFolder = SlateTool.create(spec, {
     let client = new GrafanaClient({
       instanceUrl: ctx.config.instanceUrl,
       token: ctx.auth.token,
-      organizationId: ctx.config.organizationId
+      organizationId: ctx.config.organizationId,
+      apiNamespace: ctx.config.apiNamespace
     });
 
     await client.deleteFolder(ctx.input.folderUid, ctx.input.forceDeleteRules);

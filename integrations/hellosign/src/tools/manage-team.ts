@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { hellosignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let manageTeam = SlateTool.create(spec, {
@@ -54,7 +55,7 @@ export let manageTeam = SlateTool.create(spec, {
 
       case 'update_name': {
         if (!ctx.input.teamName) {
-          throw new Error('teamName is required for "update_name" action');
+          throw hellosignServiceError('teamName is required for the "update_name" action.');
         }
         let team = await client.updateTeam(ctx.input.teamName);
         teamName = team.name;
@@ -62,6 +63,11 @@ export let manageTeam = SlateTool.create(spec, {
       }
 
       case 'add_member': {
+        if (!ctx.input.memberEmailAddress && !ctx.input.memberAccountId) {
+          throw hellosignServiceError(
+            'memberEmailAddress or memberAccountId is required for the "add_member" action.'
+          );
+        }
         let team = await client.addTeamMember({
           emailAddress: ctx.input.memberEmailAddress,
           accountId: ctx.input.memberAccountId,
@@ -72,6 +78,11 @@ export let manageTeam = SlateTool.create(spec, {
       }
 
       case 'remove_member': {
+        if (!ctx.input.memberEmailAddress && !ctx.input.memberAccountId) {
+          throw hellosignServiceError(
+            'memberEmailAddress or memberAccountId is required for the "remove_member" action.'
+          );
+        }
         let team = await client.removeTeamMember({
           emailAddress: ctx.input.memberEmailAddress,
           accountId: ctx.input.memberAccountId

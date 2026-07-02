@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NerdGraphClient } from '../lib/client';
 import { spec } from '../spec';
@@ -63,6 +63,14 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
         .optional()
         .default('STATIC')
         .describe('Condition type: STATIC (fixed threshold) or BASELINE (anomaly detection)'),
+      baselineDirection: z
+        .enum(['UPPER_ONLY', 'LOWER_ONLY', 'UPPER_AND_LOWER'])
+        .optional()
+        .describe('Baseline direction for BASELINE conditions'),
+      violationTimeLimitSeconds: z
+        .number()
+        .optional()
+        .describe('Maximum violation duration in seconds before automatic close'),
       critical: thresholdSchema.optional().describe('Critical threshold settings'),
       warning: thresholdSchema.optional().describe('Warning threshold settings'),
       description: z.string().optional().describe('Description for the alert condition'),
@@ -115,7 +123,8 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
     let { action } = ctx.input;
 
     if (action === 'delete') {
-      if (!ctx.input.conditionId) throw new Error('conditionId is required for delete action');
+      if (!ctx.input.conditionId)
+        throw createApiServiceError('conditionId is required for delete action');
       ctx.progress('Deleting alert condition...');
       await client.deleteAlertCondition(ctx.input.conditionId);
       return {
@@ -125,9 +134,13 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
     }
 
     if (action === 'create') {
-      if (!ctx.input.policyId) throw new Error('policyId is required for create action');
-      if (!ctx.input.name) throw new Error('name is required for create action');
-      if (!ctx.input.nrql) throw new Error('nrql is required for create action');
+      if (!ctx.input.policyId)
+        throw createApiServiceError('policyId is required for create action');
+      if (!ctx.input.name) throw createApiServiceError('name is required for create action');
+      if (!ctx.input.nrql) throw createApiServiceError('nrql is required for create action');
+      if (!ctx.input.critical && !ctx.input.warning) {
+        throw createApiServiceError('At least one threshold is required for create action');
+      }
 
       ctx.progress('Creating alert condition...');
       let result = await client.createNrqlAlertCondition(ctx.input.policyId, {
@@ -137,6 +150,8 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
         type: ctx.input.conditionType || 'STATIC',
         critical: ctx.input.critical,
         warning: ctx.input.warning,
+        baselineDirection: ctx.input.baselineDirection,
+        violationTimeLimitSeconds: ctx.input.violationTimeLimitSeconds,
         signal: ctx.input.signal,
         expiration: ctx.input.expiration,
         description: ctx.input.description
@@ -156,7 +171,8 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
     }
 
     // update
-    if (!ctx.input.conditionId) throw new Error('conditionId is required for update action');
+    if (!ctx.input.conditionId)
+      throw createApiServiceError('conditionId is required for update action');
 
     ctx.progress('Updating alert condition...');
     let result = await client.updateNrqlAlertCondition(ctx.input.conditionId, {
@@ -166,6 +182,8 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
       type: ctx.input.conditionType || 'STATIC',
       critical: ctx.input.critical,
       warning: ctx.input.warning,
+      baselineDirection: ctx.input.baselineDirection,
+      violationTimeLimitSeconds: ctx.input.violationTimeLimitSeconds,
       description: ctx.input.description
     });
 

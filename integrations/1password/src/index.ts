@@ -5,8 +5,14 @@ import {
   deleteItem,
   generatePassword,
   getFileContent,
+  getFileMetadata,
   getItem,
+  getPrometheusMetrics,
   getServerHealth,
+  getServerHeartbeat,
+  getVault,
+  listApiActivity,
+  listFiles,
   listItems,
   listVaults,
   searchItems,
@@ -23,6 +29,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     listVaults,
+    getVault,
     listItems,
     searchItems,
     getItem,
@@ -30,8 +37,13 @@ export let provider = Slate.create({
     updateItem,
     deleteItem,
     generatePassword,
+    listFiles,
+    getFileMetadata,
     getFileContent,
-    getServerHealth
+    listApiActivity,
+    getServerHeartbeat,
+    getServerHealth,
+    getPrometheusMetrics
   ],
   triggers: [
     inboundWebhook,

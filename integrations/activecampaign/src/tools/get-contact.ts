@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { activeCampaignServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getContact = SlateTool.create(spec, {
@@ -56,7 +57,16 @@ export let getContact = SlateTool.create(spec, {
           })
         )
         .optional()
-        .describe('List subscriptions')
+        .describe('List subscriptions'),
+      deals: z
+        .array(
+          z.object({
+            contactDealId: z.string().optional(),
+            dealId: z.string().optional()
+          })
+        )
+        .optional()
+        .describe('Deal associations for this contact')
     })
   )
   .handleInvocation(async ctx => {
@@ -72,12 +82,12 @@ export let getContact = SlateTool.create(spec, {
       if (searchResult.contacts && searchResult.contacts.length > 0) {
         contactId = searchResult.contacts[0].id;
       } else {
-        throw new Error(`No contact found with email: ${ctx.input.email}`);
+        throw activeCampaignServiceError(`No contact found with email: ${ctx.input.email}`);
       }
     }
 
     if (!contactId) {
-      throw new Error('Either contactId or email must be provided');
+      throw activeCampaignServiceError('Either contactId or email must be provided');
     }
 
     let result = await client.getContact(contactId);
@@ -101,6 +111,12 @@ export let getContact = SlateTool.create(spec, {
       status: String(cl.status)
     }));
 
+    let dealsResult = await client.getContactDeals(contactId);
+    let deals = (dealsResult.contactDeals || []).map((cd: any) => ({
+      contactDealId: cd.id || undefined,
+      dealId: cd.deal || cd.dealId || undefined
+    }));
+
     return {
       output: {
         contactId: contact.id,
@@ -112,7 +128,8 @@ export let getContact = SlateTool.create(spec, {
         updatedAt: contact.udate || undefined,
         tags,
         fieldValues,
-        lists
+        lists,
+        deals
       },
       message: `Retrieved contact **${contact.email}** (ID: ${contact.id}).`
     };

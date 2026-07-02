@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { HelpScoutClient } from '../lib/client';
+import { helpscoutServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let updateConversation = SlateTool.create(spec, {
@@ -15,7 +16,11 @@ export let updateConversation = SlateTool.create(spec, {
         .enum(['active', 'pending', 'closed', 'spam'])
         .optional()
         .describe('New conversation status'),
-      assignTo: z.number().optional().describe('User ID to assign the conversation to'),
+      assignTo: z
+        .number()
+        .nullable()
+        .optional()
+        .describe('User ID to assign the conversation to. Use null to unassign.'),
       subject: z.string().optional().describe('New conversation subject'),
       tags: z.array(z.string()).optional().describe('Replace all tags with this list'),
       customFields: z
@@ -67,6 +72,10 @@ export let updateConversation = SlateTool.create(spec, {
         ctx.input.customFields.map(f => ({ id: f.fieldId, value: f.value }))
       );
       updated.push('customFields');
+    }
+
+    if (updated.length === 0) {
+      throw helpscoutServiceError('Provide at least one conversation field to update.');
     }
 
     return {
