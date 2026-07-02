@@ -1,0 +1,100 @@
+{
+  "serverId": "idosal/git-mcp/git-mcp",
+  "version": "c487a29895dcfcb5b672247e646426a56e2051c1",
+  "manifest": {
+    "id": "git-mcp",
+    "fullId": "idosal/git-mcp/git-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "idosal",
+      "repo": "git-mcp",
+      "branch": "main",
+      "url": "https://github.com/idosal/git-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "GitMCP",
+    "description": "Put an end to hallucinations! GitMCP is a free, open-source, remote MCP server for any GitHub project"
+  },
+  "manifestHash": "788578a11cde3bd94cf8232abcb52d25",
+  "createdAt": "2026-07-02T07:07:53.143Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NIXPACKS_SPA_OUTPUT_DIR": "dist",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "staticAssets": {
+          "Caddyfile": "# global options\n{\n\tadmin off # theres no need for the admin api in railway's environment\n\tpersist_config off # storage isn't persistent anyway\n\tauto_https off # railway handles https for us, this would cause issues if left enabled\n\t# runtime logs\n\tlog {\n\t\tformat json # set runtime log format to json mode \n\t}\n\t# server options\n\tservers {\n\t\ttrusted_proxies static private_ranges 100.0.0.0/8 # trust railway's proxy\n\t}\n}\n\n# site block, listens on the $PORT environment variable, automatically assigned by railway\n:{$PORT:3000} {\n\t# access logs\n\tlog {\n\t\tformat json # set access log format to json mode\n\t}\n\n\t# health check for railway\n\trewrite /health /*\n\n\t# serve from the 'dist' folder (Vite builds into the 'dist' folder)\n    root * ../app/{$NIXPACKS_SPA_OUTPUT_DIR}\n\n\t# enable gzipping responses\n\tencode gzip\n\n\t# serve files from 'dist'\n\tfile_server \n\n\t# if path doesn't exist, redirect it to 'index.html' for client side routing\n\ttry_files {path} /index.html\n}"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "pnpm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "caddy": {
+            "dependsOn": [
+              "setup"
+            ],
+            "nixPkgs": [
+              "caddy"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "ba913eda2df8eb72147259189d55932012df6301",
+            "cmds": [
+              "caddy fmt --overwrite /assets/Caddyfile"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm install -g corepack@0.24.1 && corepack enable",
+              "pnpm i --frozen-lockfile"
+            ],
+            "cacheDirectories": [
+              "/root/.local/share/pnpm/store/v3"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "pnpm-10_x"
+            ],
+            "nixLibs": [
+              "gcc-unwrapped"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "exec caddy run --config /assets/Caddyfile --adapter caddyfile 2>&1"
+        }
+      }
+    }
+  ]
+}

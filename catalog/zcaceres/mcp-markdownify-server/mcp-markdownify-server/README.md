@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--zcaceres--mcp-markdownify-server--mc
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--zcaceres--mcp-markdownify-server--mcp-markdownify-server  "pnpm run start"
+ghcr.io/metorial/mcp-container--zcaceres--mcp-markdownify-server--mcp-markdownify-server  "bun run start"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -45,7 +45,7 @@ ghcr.io/metorial/mcp-container--zcaceres--mcp-markdownify-server--mcp-markdownif
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--zcaceres--mcp-markdownify-server--mcp-markdownify-server",
-        "pnpm run start"
+        "bun run start"
       ],
       "env": {}
     }

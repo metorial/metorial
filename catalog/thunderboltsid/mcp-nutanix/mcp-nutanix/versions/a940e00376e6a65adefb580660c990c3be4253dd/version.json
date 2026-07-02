@@ -1,0 +1,73 @@
+{
+  "serverId": "thunderboltsid/mcp-nutanix/mcp-nutanix",
+  "version": "a940e00376e6a65adefb580660c990c3be4253dd",
+  "manifest": {
+    "id": "mcp-nutanix",
+    "fullId": "thunderboltsid/mcp-nutanix/mcp-nutanix",
+    "repo": {
+      "provider": "github.com",
+      "owner": "thunderboltsid",
+      "repo": "mcp-nutanix",
+      "branch": "main",
+      "url": "https://github.com/thunderboltsid/mcp-nutanix"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "MCP Nutanix",
+    "description": "A Model Context Protocol (MCP) server for interacting with Nutanix Prism Central APIs through Large Language Models (LLMs)."
+  },
+  "manifestHash": "21db0aad0cd9890ad342fb43e4a2045e",
+  "createdAt": "2026-07-02T07:08:15.287Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CGO_ENABLED": "0",
+          "NIXPACKS_METADATA": "go"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install",
+              "setup"
+            ],
+            "cmds": [
+              "go build -o out"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "go mod download"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/go-build"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "go"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "e89cf1c932006531f454de7d652163a9a5c86668"
+          }
+        },
+        "start": {
+          "cmd": "./out",
+          "runImage": "ubuntu:noble"
+        }
+      }
+    }
+  ]
+}

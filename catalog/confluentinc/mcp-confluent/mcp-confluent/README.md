@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--confluentinc--mcp-confluent--mcp-con
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--confluentinc--mcp-confluent--mcp-confluent  "npm run start"
+ghcr.io/metorial/mcp-container--confluentinc--mcp-confluent--mcp-confluent  "pnpm run start"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -45,7 +45,7 @@ ghcr.io/metorial/mcp-container--confluentinc--mcp-confluent--mcp-confluent  "npm
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--confluentinc--mcp-confluent--mcp-confluent",
-        "npm run start"
+        "pnpm run start"
       ],
       "env": {}
     }

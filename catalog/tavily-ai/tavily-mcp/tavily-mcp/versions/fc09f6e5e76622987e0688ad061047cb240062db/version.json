@@ -1,0 +1,92 @@
+{
+  "serverId": "tavily-ai/tavily-mcp/tavily-mcp",
+  "version": "fc09f6e5e76622987e0688ad061047cb240062db",
+  "manifest": {
+    "id": "tavily-mcp",
+    "fullId": "tavily-ai/tavily-mcp/tavily-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "tavily-ai",
+      "repo": "tavily-mcp",
+      "branch": "main",
+      "url": "https://github.com/tavily-ai/tavily-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "tavily-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "TAVILY_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Tavily MCP Server",
+    "description": "An MCP server for Tavily search."
+  },
+  "manifestHash": "ad100df35e9d3a965a7ff47979ef8cc8",
+  "createdAt": "2026-07-02T07:08:15.460Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node build/index.js"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "serverId": "apeyroux/mcp-xmind/mcp-xmind",
+  "version": "89aaa226efc0f93fea22e672c4a5d612a947ac69",
+  "manifest": {
+    "id": "mcp-xmind",
+    "fullId": "apeyroux/mcp-xmind/mcp-xmind",
+    "repo": {
+      "provider": "github.com",
+      "owner": "apeyroux",
+      "repo": "mcp-xmind",
+      "branch": "main",
+      "url": "https://github.com/apeyroux/mcp-xmind"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "MCP XMind Server",
+    "description": "A Model Context Protocol server for analyzing and querying XMind mind maps. This tool provides powerful capabilities for searching, extracting, and analyzing content from XMind files."
+  },
+  "manifestHash": "41122c788b52b403a644fdc6a9388032",
+  "createdAt": "2026-07-02T07:07:34.365Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        }
+      }
+    }
+  ]
+}

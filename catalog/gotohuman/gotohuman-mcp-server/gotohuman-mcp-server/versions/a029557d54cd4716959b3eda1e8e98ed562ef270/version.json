@@ -1,0 +1,92 @@
+{
+  "serverId": "gotohuman/gotohuman-mcp-server/gotohuman-mcp-server",
+  "version": "a029557d54cd4716959b3eda1e8e98ed562ef270",
+  "manifest": {
+    "id": "gotohuman-mcp-server",
+    "fullId": "gotohuman/gotohuman-mcp-server/gotohuman-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "gotohuman",
+      "repo": "gotohuman-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/gotohuman/gotohuman-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "gotohuman-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GOTOHUMAN_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "gotoHuman MCP Server",
+    "description": "Let your **AI agents ask for human reviews** in gotoHuman via MCP."
+  },
+  "manifestHash": "0c28433d2aed275d8ead5e400de5b527",
+  "createdAt": "2026-07-02T07:07:46.133Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm i"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "node ./build/index.js"
+        }
+      }
+    }
+  ]
+}

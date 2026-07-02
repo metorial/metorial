@@ -1,0 +1,47 @@
+{
+  "serverId": "neondatabase/mcp-server-neon/mcp-server-neon",
+  "version": "dd1b59d0ae1e318a4be4492c566427891169ef06",
+  "manifest": {
+    "id": "mcp-server-neon",
+    "fullId": "neondatabase/mcp-server-neon/mcp-server-neon",
+    "repo": {
+      "provider": "github.com",
+      "owner": "neondatabase",
+      "repo": "mcp-server-neon",
+      "branch": "main",
+      "url": "https://github.com/neondatabase/mcp-server-neon"
+    },
+    "config": {
+      "argumentsTemplate": "{{NEON_API_KEY}}",
+      "configValues": [
+        {
+          "title": "neon-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "{{NEON_API_KEY}}"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Neon MCP Server",
+    "description": "**Neon MCP Server** is an open-source tool that lets you interact with your Neon Postgres databases in **natural language**."
+  },
+  "manifestHash": "36557d97f408e3397f69b5efb033dbdc",
+  "createdAt": "2026-07-02T07:08:06.917Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "phases": {}
+      }
+    }
+  ]
+}

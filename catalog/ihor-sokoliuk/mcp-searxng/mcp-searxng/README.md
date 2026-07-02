@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--ihor-sokoliuk--mcp-searxng--mcp-sear
 ```bash
 docker run -i --rm \ 
 -e SEARXNG_URL=searxng-url \
-ghcr.io/metorial/mcp-container--ihor-sokoliuk--mcp-searxng--mcp-searxng  "node dist/index.js"
+ghcr.io/metorial/mcp-container--ihor-sokoliuk--mcp-searxng--mcp-searxng  "node dist/cli.js"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -59,7 +59,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--ihor-sokoliuk--mcp-searxng--mcp-searxng",
-        "node dist/index.js"
+        "node dist/cli.js"
       ],
       "env": {
         "SEARXNG_URL": "searxng-url"

@@ -1,0 +1,79 @@
+{
+  "serverId": "mcpdotdirect/evm-mcp-server/evm-mcp-server",
+  "version": "128ac3d4b1ea96084d55a9578306d017006e709d",
+  "manifest": {
+    "id": "evm-mcp-server",
+    "fullId": "mcpdotdirect/evm-mcp-server/evm-mcp-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "mcpdotdirect",
+      "repo": "evm-mcp-server",
+      "branch": "main",
+      "url": "https://github.com/mcpdotdirect/evm-mcp-server"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "EVM MCP Server",
+    "description": "A comprehensive Model Context Protocol (MCP) server that provides blockchain services across multiple EVM-compatible networks. This server enables AI agents to interact with Ethereum, Optimism, Arbitrum, Base, Polygon, and many other EVM chains with a unified interface."
+  },
+  "manifestHash": "9a5a79caefffcbc2660a500bbf8b9ad4",
+  "createdAt": "2026-07-02T07:07:57.018Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "bun run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "bun i --no-save"
+            ],
+            "cacheDirectories": [
+              "/root/.bun"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "bun"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "31fb21469e34b6b5c7be77b9a35bae43d0c598e9"
+          }
+        },
+        "start": {
+          "cmd": "bun run start"
+        }
+      }
+    }
+  ]
+}

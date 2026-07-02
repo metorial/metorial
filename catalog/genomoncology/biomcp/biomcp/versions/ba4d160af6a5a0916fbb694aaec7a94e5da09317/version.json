@@ -1,0 +1,75 @@
+{
+  "serverId": "genomoncology/biomcp/biomcp",
+  "version": "ba4d160af6a5a0916fbb694aaec7a94e5da09317",
+  "manifest": {
+    "id": "biomcp",
+    "fullId": "genomoncology/biomcp/biomcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "genomoncology",
+      "repo": "biomcp",
+      "branch": "main",
+      "url": "https://github.com/genomoncology/biomcp"
+    },
+    "config": {
+      "configValues": []
+    },
+    "subdirectory": "/",
+    "title": "BioMCP: Biomedical Model Context Protocol",
+    "description": "BioMCP is an open source (MIT License) toolkit for biomedical research AI"
+  },
+  "manifestHash": "3b7ee24252f21db226c00476030ee0da",
+  "createdAt": "2026-07-02T07:07:50.295Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python3",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "python -m biomcp-cli"
+        }
+      }
+    }
+  ]
+}

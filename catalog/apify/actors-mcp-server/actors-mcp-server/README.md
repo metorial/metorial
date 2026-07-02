@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--apify--actors-mcp-server--actors-mcp
 ```bash
 docker run -i --rm \ 
 -e APIFY_TOKEN=apify-token \
-ghcr.io/metorial/mcp-container--apify--actors-mcp-server--actors-mcp-server  "npm run start"
+ghcr.io/metorial/mcp-container--apify--actors-mcp-server--actors-mcp-server  "pnpm run start"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -59,7 +59,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--apify--actors-mcp-server--actors-mcp-server",
-        "npm run start"
+        "pnpm run start"
       ],
       "env": {
         "APIFY_TOKEN": "apify-token"

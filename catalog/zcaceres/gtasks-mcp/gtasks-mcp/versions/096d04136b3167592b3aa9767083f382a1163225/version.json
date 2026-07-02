@@ -1,0 +1,92 @@
+{
+  "serverId": "zcaceres/gtasks-mcp/gtasks-mcp",
+  "version": "096d04136b3167592b3aa9767083f382a1163225",
+  "manifest": {
+    "id": "gtasks-mcp",
+    "fullId": "zcaceres/gtasks-mcp/gtasks-mcp",
+    "repo": {
+      "provider": "github.com",
+      "owner": "zcaceres",
+      "repo": "gtasks-mcp",
+      "branch": "main",
+      "url": "https://github.com/zcaceres/gtasks-mcp"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "gcp-oauth-keys",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "GCP_OAUTH_KEYS"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Google Tasks MCP Server",
+    "description": "This MCP server integrates with Google Tasks to allow listing, reading, searching, creating, updating, and deleting tasks."
+  },
+  "manifestHash": "fb560777e5032b036f7ca5baa88218ba",
+  "createdAt": "2026-07-02T07:08:17.783Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "bun run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "bun i --no-save"
+            ],
+            "cacheDirectories": [
+              "/root/.bun"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "bun"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "31fb21469e34b6b5c7be77b9a35bae43d0c598e9"
+          }
+        },
+        "start": {
+          "cmd": "bun run start"
+        }
+      }
+    }
+  ]
+}

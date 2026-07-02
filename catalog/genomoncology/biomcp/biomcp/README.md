@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--genomoncology--biomcp--biomcp
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--genomoncology--biomcp--biomcp  "biomcp"
+ghcr.io/metorial/mcp-container--genomoncology--biomcp--biomcp  "python -m biomcp-cli"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -45,7 +45,7 @@ ghcr.io/metorial/mcp-container--genomoncology--biomcp--biomcp  "biomcp"
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--genomoncology--biomcp--biomcp",
-        "biomcp"
+        "python -m biomcp-cli"
       ],
       "env": {}
     }

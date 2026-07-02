@@ -1,0 +1,103 @@
+{
+  "serverId": "ergut/mcp-bigquery-server/mcp-bigquery-server",
+  "version": "a298b53cd21da769985be244a491e1412ea47a44",
+  "manifest": {
+    "id": "mcp-bigquery-server",
+    "fullId": "ergut/mcp-bigquery-server/mcp-bigquery-server",
+    "repo": {
+      "provider": "github.com",
+      "owner": "ergut",
+      "repo": "mcp-bigquery-server",
+      "branch": "main",
+      "url": "https://github.com/ergut/mcp-bigquery-server"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "project-id",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--project-id"
+            }
+          ]
+        },
+        {
+          "title": "location",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "cli",
+              "key": "--location"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "BigQuery MCP Server",
+    "description": "A Model Context Protocol (MCP) server that provides secure, read-only access to BigQuery datasets. Enables Large Language Models (LLMs) to safely query and analyze data through a standardized interface."
+  },
+  "manifestHash": "f785e89d2559cd992b2e6046aec07166",
+  "createdAt": "2026-07-02T07:07:41.375Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_24",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "23f9169c4ccce521379e602cc82ed873a1f1b52b"
+          }
+        },
+        "start": {
+          "cmd": "node dist/index.js"
+        }
+      }
+    }
+  ]
+}
