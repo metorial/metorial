@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/bigcommerce",
+  "description": "Manage online stores on BigCommerce. Create, read, update, and delete products, variants, brands, and categories. Process and manage orders, shipments, refunds, and transactions. Handle customer data, addresses, and segments. Create and modify carts and checkouts, process payments, and manage subscriptions. Configure multi-channel and multi-storefront selling across marketplaces, POS, and headless storefronts. Manage content including pages, blog posts, widgets, and themes. Create and track promotions, coupons, gift certificates, and abandoned cart campaigns. Set up price lists with per-channel and per-customer-group pricing. Manage inventory levels across multiple locations. Configure shipping zones, tax rates, and store settings. Subscribe to webhooks for real-time notifications on orders, products, carts, customers, shipments, and inventory changes.",
+  "categories": [
+    "document-processing",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage product catalog",
+    "process and track orders",
+    "manage customers and segments",
+    "create and modify carts",
+    "process payments and refunds",
+    "configure multi-channel selling",
+    "manage store content",
+    "create promotions and coupons",
+    "manage inventory levels",
+    "configure shipping and tax"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bigcommerce.png"
+}

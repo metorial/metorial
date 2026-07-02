@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/marketstack",
+  "description": "Retrieve real-time, intraday, and historical stock market data for 30,000+ tickers across 70+ global exchanges. Look up end-of-day and intraday prices, live stock quotes, commodity prices, government bond yields, ETF holdings, and stock market indices. Access company information, analyst ratings, stock splits, and dividend history. Search SEC EDGAR filings, company submissions, and XBRL financial data. Query reference data for exchanges, currencies, and timezones.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "retrieve end-of-day prices",
+    "get intraday stock data",
+    "fetch real-time stock quotes",
+    "look up commodity prices",
+    "query government bond yields",
+    "retrieve ETF holdings",
+    "access analyst ratings",
+    "look up stock splits and dividends",
+    "search SEC EDGAR filings",
+    "get company information"
+  ]
+}

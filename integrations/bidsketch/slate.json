@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/bidsketch",
+  "description": "Create, send, and track professional business proposals. Manage clients with contact details and notes. Create and organize reusable fee items (fixed, hourly, monthly, yearly, or custom) and content sections. Build proposals from scratch or templates with configurable taxes, discounts, and approval messages. Receive webhook notifications when proposals are created, sent, viewed, accepted, or declined.",
+  "categories": ["crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "create and manage proposals",
+    "manage client records",
+    "create reusable fee items",
+    "manage content sections",
+    "send proposals to clients",
+    "track proposal status",
+    "create proposals from templates",
+    "configure taxes and discounts",
+    "monitor proposal events via webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bidsketch.png"
+}

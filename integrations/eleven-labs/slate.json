@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/elevenlabs",
+  "description": "Convert text to lifelike speech with customizable voices, intonation, and emotional awareness across 70+ languages. Transcribe speech to text with real-time streaming or batch processing. Clone, generate, and manage voices. Generate music, sound effects, and multi-speaker dialogue from text descriptions. Dub and translate audio/video content into other languages. Deploy and manage conversational voice agents with phone integration, knowledge bases, and analytics. Isolate vocals from background noise, align text to audio timestamps, and remix voice characteristics. Manage pronunciation dictionaries, access generation history, and retrieve usage statistics. Supports webhook notifications for call completions, transcription results, and voice events.",
+  "categories": [
+    "apis-and-http-requests",
+    "language-translation",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "convert text to speech",
+    "transcribe speech to text",
+    "clone and manage voices",
+    "generate music from text",
+    "generate sound effects",
+    "dub and translate audio",
+    "deploy voice agents",
+    "isolate audio vocals",
+    "generate multi-speaker dialogue",
+    "manage pronunciation dictionaries"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/elevenlabs.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/eventbrite",
+  "description": "Create, retrieve, update, publish, and unpublish events within an organization. Manage ticket classes, orders, and attendee registrations. Track attendee check-ins and check-outs. Create and manage venues, organizer profiles, and discount codes. Retrieve authenticated user details and associated organizations. Access structured content for rich event descriptions. Receive real-time webhooks for event lifecycle changes, order placements, and attendee updates.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail", "scheduling-and-calendars"],
+  "skills": [
+    "create and manage events",
+    "manage ticket classes",
+    "track attendee registrations",
+    "process ticket orders",
+    "manage venue information",
+    "create discount codes",
+    "publish and unpublish events",
+    "track attendee check-ins",
+    "manage organizer profiles",
+    "retrieve user organizations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/eventbrite.svg"
+}

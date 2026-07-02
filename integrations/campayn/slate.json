@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/campayn",
+  "description": "Create, send, and track email marketing campaigns and newsletters. Manage contact lists, add and update subscribers with detailed profile information, and unsubscribe contacts. Retrieve email campaign details and access campaign reports filtered by date range. Manage web sign-up forms for contact lists.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage contact lists",
+    "create and update contacts",
+    "retrieve email campaigns",
+    "access campaign reports",
+    "unsubscribe contacts",
+    "filter contacts by keyword",
+    "manage web sign-up forms",
+    "track email performance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/campayn.png"
+}

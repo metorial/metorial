@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/witai",
+  "description": "Extract meaning from text and voice inputs using natural language processing. Detect intents, entities, and traits from text messages with confidence scores. Transcribe and analyze audio files and streams via speech recognition. Synthesize human-like speech from text. Manage multi-turn conversational flows with dialogue state and context. Detect languages from text input. Create, update, and delete entities, intents, and training utterances programmatically. Manage Wit.ai apps, export and import app configurations, and train NLU models with annotated samples.",
+  "categories": [
+    "apis-and-http-requests",
+    "language-translation",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "extract intents from text",
+    "recognize speech from audio",
+    "synthesize speech from text",
+    "detect language",
+    "manage conversational flows",
+    "extract entities and traits",
+    "manage training utterances",
+    "manage NLU apps",
+    "export and import apps",
+    "transcribe audio to text"
+  ]
+}

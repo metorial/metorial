@@ -1,0 +1,18 @@
+{
+  "name": "@google/google-cloud-storage",
+  "description": "Store, retrieve, and manage unstructured data as objects in Google Cloud Storage buckets. Create, configure, list, and delete buckets with geographic location and storage class settings. Upload, download, copy, move, and delete objects with support for resumable and multipart uploads. Control access via IAM roles, ACLs, and signed URLs. Configure object lifecycle rules to automatically transition storage classes or delete objects based on age or access patterns. Enable object versioning, retention policies, and soft delete for data protection. Set up Pub/Sub notifications for object change events (create, update, delete, archive). Manage encryption with Google-managed, customer-managed (CMEK), or customer-supplied (CSEK) keys. Host static websites and interoperate with Amazon S3 via the XML API.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "upload and download objects",
+    "manage storage buckets",
+    "control access permissions",
+    "generate signed URLs",
+    "configure lifecycle rules",
+    "enable object versioning",
+    "set up event notifications",
+    "manage encryption keys",
+    "host static websites",
+    "replicate data cross-region"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

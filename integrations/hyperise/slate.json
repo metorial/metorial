@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/hyperise",
+  "description": "Create and manage dynamically personalized images, videos, and website content tailored to individual recipients. List and manage image templates with dynamic text, image, and QR code layers. Create, read, update, and delete prospect business data records for personalization. Generate personalized short links with Open Graph metadata and dynamic image previews. Enrich contact data from email addresses, resolving profile images, company logos, website screenshots, and business details. Track personalized image impressions and views filtered by template and date range. Manage client sub-accounts for agency-scale operations.",
+  "categories": ["crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "manage image templates",
+    "create personalized short links",
+    "manage prospect business data",
+    "enrich contact data from email",
+    "track image impressions",
+    "generate dynamic personalized images",
+    "manage client sub-accounts",
+    "resolve company logos from domain"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hyperise.png"
+}

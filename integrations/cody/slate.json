@@ -1,0 +1,20 @@
+{
+  "name": "@metorial/cody",
+  "description": "Create and manage custom AI bots trained on your own knowledge base. Upload documents (text, HTML, files, or web URLs), organize them into folders, and build conversations with AI bots that generate responses based on uploaded knowledge. Manage conversations with focus mode to restrict responses to specific documents. Send messages and receive AI-generated answers via standard responses or real-time SSE streaming.",
+  "categories": [
+    "apis-and-http-requests",
+    "crm-and-sales-tools",
+    "note-taking-and-knowledge-bases"
+  ],
+  "skills": [
+    "list AI bots",
+    "upload knowledge base documents",
+    "manage document folders",
+    "create conversations",
+    "send messages to bots",
+    "stream AI responses",
+    "ingest webpage content",
+    "focus on specific documents",
+    "retrieve message history"
+  ]
+}

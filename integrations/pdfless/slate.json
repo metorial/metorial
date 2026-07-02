@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/pdfless",
+  "description": "Generate PDF documents from HTML/CSS templates by passing dynamic JSON data. Supports semantic templating with variable interpolation, conditionals, and array iteration. Add barcodes in multiple formats, set PDF metadata, apply encryption and permission controls, and generate bookmarks from headings. Returns a temporary download URL for the generated PDF.",
+  "categories": ["document-processing"],
+  "skills": [
+    "generate PDF from template",
+    "populate dynamic template data",
+    "encrypt and protect PDFs",
+    "generate barcodes",
+    "set PDF metadata",
+    "create PDF bookmarks",
+    "control page styling"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pdfless.png"
+}

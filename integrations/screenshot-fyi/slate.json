@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/screenshotfyi",
+  "description": "Capture high-quality screenshots of any website via API. Supports full-page captures, custom viewport sizes (mobile to widescreen), dark mode, automatic cookie banner and popup removal, and multiple output formats (PNG, JPG). Returns a URL to the captured screenshot image.",
+  "categories": ["document-processing"],
+  "skills": [
+    "capture website screenshots",
+    "full-page screenshot capture",
+    "set custom viewport size",
+    "enable dark mode capture",
+    "remove cookie banners",
+    "choose output image format"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/screenshot-fyi.png"
+}

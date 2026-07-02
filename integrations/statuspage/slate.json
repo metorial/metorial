@@ -1,0 +1,18 @@
+{
+  "name": "@atlassian/statuspage",
+  "description": "Manage status pages to communicate incidents, outages, and scheduled maintenance to customers. Create, update, and resolve incidents with lifecycle tracking. Manage components representing infrastructure pieces and their statuses (operational, degraded, partial/major outage). Create and publish incident postmortems. Configure scheduled maintenance with subscriber reminders and auto-transitions. Manage subscribers (email, SMS, Slack, webhook, Teams) scoped to pages, components, or incidents. Submit and display custom system performance metrics. Create reusable incident templates for faster response. Control page access with user groups and role-based permissions. Configure embeddable status widgets.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "create and update incidents",
+    "manage component statuses",
+    "schedule planned maintenance",
+    "manage subscriber notifications",
+    "publish incident postmortems",
+    "submit system metrics",
+    "create incident templates",
+    "control page access",
+    "configure webhook notifications",
+    "manage team permissions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/statuspage.png"
+}

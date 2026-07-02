@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/hacker-news",
+  "description": "Read and search Hacker News content including stories, comments, jobs, polls, and user profiles. Retrieve curated story listings such as top, new, best, Ask HN, Show HN, and job stories. Look up user profiles with karma, submission history, and bios. Perform full-text search across all content with filtering by type, author, date range, and point thresholds. Track recently changed items and profiles via the updates feed. Subscribe to real-time changes on items, story rankings, and profiles via Firebase listeners. All access is read-only with no authentication required.",
+  "categories": ["news-and-media", "web-search"],
+  "skills": [
+    "retrieve stories and comments",
+    "search Hacker News content",
+    "list top and trending stories",
+    "fetch user profiles",
+    "filter by content type",
+    "track item and profile changes",
+    "browse Ask HN and Show HN",
+    "retrieve comment trees",
+    "search by date or relevance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hackernews.png"
+}

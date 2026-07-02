@@ -1,0 +1,86 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  addComment,
+  browseRepository,
+  createRelease,
+  deletePipeline,
+  getPipeline,
+  getPipelineJobs,
+  getProject,
+  getTestReport,
+  lintCiConfig,
+  listDeployments,
+  listGroups,
+  listIssues,
+  listJobs,
+  listMergeRequests,
+  listPipelines,
+  listProjects,
+  manageBranch,
+  manageEnvironments,
+  manageFile,
+  manageIssue,
+  manageJob,
+  manageMergeRequest,
+  managePipeline,
+  manageProject,
+  manageRunners,
+  manageSchedules,
+  manageTriggers,
+  manageVariables,
+  runPipeline,
+  search
+} from './tools';
+import {
+  commentEvents,
+  deploymentEvents,
+  issueEvents,
+  mergeRequestEvents,
+  pipelineEvents,
+  pushEvents
+} from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listProjects,
+    getProject,
+    manageProject,
+    listIssues,
+    manageIssue,
+    listMergeRequests,
+    manageMergeRequest,
+    listPipelines,
+    getPipeline,
+    runPipeline,
+    deletePipeline,
+    listJobs,
+    manageJob,
+    managePipeline,
+    getPipelineJobs,
+    manageVariables,
+    manageEnvironments,
+    manageRunners,
+    manageSchedules,
+    manageTriggers,
+    lintCiConfig,
+    listDeployments,
+    getTestReport,
+    browseRepository,
+    manageBranch,
+    manageFile,
+    addComment,
+    search,
+    createRelease,
+    listGroups
+  ],
+  triggers: [
+    pushEvents,
+    mergeRequestEvents,
+    issueEvents,
+    pipelineEvents,
+    commentEvents,
+    deploymentEvents
+  ]
+});

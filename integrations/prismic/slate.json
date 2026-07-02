@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/prismic",
+  "description": "Query, create, and manage structured content in a headless CMS repository. Read published content via REST or GraphQL APIs with filtering, sorting, pagination, and advanced predicates (full-text search, date ranges, geolocation). Manage content types and shared slices programmatically — create, read, update, and delete custom type schemas. Migrate content by creating and updating draft documents in a repository. Upload, update, and delete media assets (images, videos, documents) in the media library. Integrate third-party data sources via integration fields. Receive webhooks for document publish/unpublish events, release changes, and tag changes.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "query structured content",
+    "filter and sort documents",
+    "manage content types",
+    "create and update drafts",
+    "upload and manage assets",
+    "integrate third-party data",
+    "manage shared slices",
+    "receive webhook events",
+    "preview scheduled releases"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/prismic-logo.jpeg"
+}

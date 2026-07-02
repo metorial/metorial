@@ -1,0 +1,22 @@
+{
+  "name": "@shopify/shopify",
+  "description": "Manage e-commerce stores including products, orders, customers, inventory, and fulfillment. Create and update products with variants, images, and metafields. Process and track orders, draft orders, refunds, and transactions. Manage customer records, addresses, and marketing consent. Track and adjust inventory levels across multiple locations. Handle fulfillment workflows including routing to warehouses and third-party logistics. Create and manage discount codes, price rules, and automatic discounts. Configure shipping rates, carrier services, and delivery profiles. Build custom storefronts with cart management and checkout via the Storefront API. Manage content including pages, blogs, articles, and themes. Support B2B commerce with company profiles, catalogs, and custom pricing. Receive webhooks for events across orders, products, customers, inventory, fulfillment, collections, carts, checkouts, disputes, and more.",
+  "categories": [
+    "document-processing",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage products and variants",
+    "process and track orders",
+    "manage customer records",
+    "adjust inventory levels",
+    "handle order fulfillment",
+    "create discount codes",
+    "configure shipping rates",
+    "manage draft orders",
+    "build custom storefronts",
+    "manage collections and catalogs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/shopify.svg"
+}

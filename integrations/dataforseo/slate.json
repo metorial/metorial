@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/dataforseo",
+  "description": "Retrieve practical DataForSEO API v3 data for SEO, SEM, ecommerce, business listings, Google Play apps, content analysis, and AI optimization. Supports Google/Bing/Yahoo/YouTube organic SERP live search, Google Ads keyword metrics, DataForSEO Labs keyword and domain intelligence, backlinks, OnPage audits and results, domain analytics, Google Shopping and Amazon Merchant tasks, Business Listings and Google Reviews, Google Play App Data tasks, and AI keyword, LLM mentions, and live LLM response benchmarking.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "web-search"],
+  "skills": [
+    "retrieve SERP data",
+    "research keyword metrics",
+    "analyze backlink profiles",
+    "audit website technical SEO",
+    "lookup domain analytics",
+    "monitor brand mentions",
+    "track ecommerce pricing",
+    "retrieve Google Play app data",
+    "analyze content sentiment",
+    "benchmark AI LLM responses"
+  ]
+}

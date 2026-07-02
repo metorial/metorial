@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/canny",
+  "description": "Collect, organize, and prioritize user feedback and feature requests. Create, update, and manage feedback posts on boards with voting, comments, and status tracking. Manage users, companies, categories, tags, and changelog entries. Track ideas, insights, and opportunities linked to sales tools. Use AI-powered Autopilot to extract feature requests from text content. Monitor post, comment, and vote events via webhooks.",
+  "categories": [
+    "apis-and-http-requests",
+    "crm-and-sales-tools",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage feedback posts",
+    "track votes on posts",
+    "create and manage comments",
+    "organize feedback boards",
+    "publish changelog entries",
+    "manage categories and tags",
+    "extract feedback with AI",
+    "track post status changes",
+    "manage users and companies",
+    "list synced opportunities"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/canny-logo.png"
+}

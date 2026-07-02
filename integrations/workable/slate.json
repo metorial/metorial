@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/workable",
+  "description": "Manage recruiting, hiring, and HR processes. Create and track job postings, manage candidates through hiring pipelines, and handle employee records. Create, move, disqualify, and comment on candidates. Manage requisitions with approval workflows. Retrieve offers and scheduled events like interviews. Create and manage departments. Handle employee data, documents, and time-off requests. Subscribe to webhooks for candidate, employee, and time-off events. Build custom careers pages with public job listing endpoints.",
+  "categories": ["hr-and-recruiting"],
+  "skills": [
+    "manage job postings",
+    "track candidates through pipeline",
+    "create and update candidates",
+    "manage employee records",
+    "handle time-off requests",
+    "manage requisitions and approvals",
+    "retrieve scheduled interviews",
+    "manage departments",
+    "subscribe to webhook events",
+    "retrieve offer details"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/workable.svg"
+}

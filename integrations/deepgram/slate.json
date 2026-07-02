@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/deepgram",
+  "description": "Transcribe pre-recorded and live streaming audio to text in 45+ languages with speaker diarization, smart formatting, and keyword boosting. Convert text to natural-sounding speech with 40+ voice options. Analyze transcripts for sentiment, topics, summaries, and intents. Build conversational voice agents with integrated STT, LLM reasoning, and TTS in a single session. Manage projects, API keys, members, billing, and usage. Discover available models and their metadata. Supports asynchronous processing via callbacks for both transcription and speech synthesis.",
+  "categories": ["apis-and-http-requests", "speech-recognition-and-synthesis"],
+  "skills": [
+    "transcribe pre-recorded audio",
+    "transcribe live streaming audio",
+    "convert text to speech",
+    "detect speakers in audio",
+    "analyze text sentiment",
+    "detect topics and intents",
+    "summarize transcripts",
+    "build conversational voice agents",
+    "manage projects and keys",
+    "discover available models"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/deepgram-logo.svg"
+}

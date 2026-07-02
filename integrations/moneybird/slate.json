@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/moneybird",
+  "description": "Create, send, and manage sales invoices, recurring invoices, and estimates/quotes. Track expenses with purchase invoices, receipts, and general journal documents. Manage contacts (customers and suppliers) with detailed company information, addresses, and custom fields. Register and reconcile payments against invoices and bank transactions. Import bank statements and link financial mutations to invoices and ledger accounts. Track time entries on projects and convert them into invoices. Manage products, tax rates, ledger accounts (chart of accounts), and subscriptions. Send invoices via email, postal mail, or Peppol electronic invoicing. Create credit notes, send payment reminders, and handle SEPA direct debit transactions. Manage workflows, document styles, and identities for outgoing documents. Synchronize data incrementally across all major resources.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "create and send invoices",
+    "manage contacts and customers",
+    "track expenses and receipts",
+    "reconcile bank transactions",
+    "manage recurring invoices",
+    "create estimates and quotes",
+    "track time on projects",
+    "register payments",
+    "manage products and tax rates",
+    "handle SEPA direct debits"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/moneybird.png"
+}

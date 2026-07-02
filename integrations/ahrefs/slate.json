@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/ahrefs",
+  "description": "Access Ahrefs SEO data including backlink analysis, keyword research, organic traffic estimates, and SERP analysis. Analyze any domain or URL to retrieve Domain Rating, referring domains, organic traffic, top pages, and anchor text distribution. Research keywords with difficulty scores, search volumes, click metrics, and related suggestions. Retrieve current SERP data for competitive analysis. Monitor keyword ranking positions over time and manage Rank Tracker projects. Access Site Audit data including crawl results, detected issues, and health scores. Monitor brand appearances in AI-generated responses across AI platforms via Brand Radar. Manage Keywords Explorer lists and Rank Tracker projects programmatically.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "web-search"],
+  "skills": [
+    "analyze backlink profiles",
+    "research keyword metrics",
+    "retrieve SERP data",
+    "track keyword rankings",
+    "audit site health",
+    "monitor AI brand mentions",
+    "estimate organic traffic",
+    "manage rank tracker projects",
+    "discover keyword ideas",
+    "analyze competitor domains"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ahrefs.png"
+}

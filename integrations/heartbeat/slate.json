@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/heartbeat",
+  "description": "Manage an online community on Heartbeat. Create, retrieve, update, and deactivate members. Manage groups and group membership, including moving users between groups. Create threads and comments in channels with plain text or rich text (HTML) content. Create channels and events, with support for Zoom or built-in voice locations. Send direct messages to community members. Send invitation emails to new users. Configure webhooks to receive notifications for community activity such as new users, threads, events, group joins, course completions, event RSVPs, direct messages, and abandoned invitations.",
+  "categories": ["crm-and-sales-tools", "education-and-learning", "email-and-messaging"],
+  "skills": [
+    "manage community members",
+    "create threads and comments",
+    "send direct messages",
+    "create events",
+    "manage group membership",
+    "create channels",
+    "send user invitations",
+    "configure webhooks",
+    "search users by email"
+  ]
+}

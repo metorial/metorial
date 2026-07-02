@@ -1,0 +1,13 @@
+{
+  "name": "@metorial/crowterminal",
+  "description": "Post and schedule content to social media platforms including TikTok, X (Twitter), and Instagram. Operates as a skill/plugin within the OpenClaw agent framework to automate cross-platform social media publishing.",
+  "categories": ["crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "post to social media",
+    "cross-platform content publishing",
+    "schedule social media posts",
+    "publish to TikTok",
+    "publish to X/Twitter",
+    "publish to Instagram"
+  ]
+}

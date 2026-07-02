@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/mailcheck",
+  "description": "Verify and validate email addresses for deliverability and trustworthiness. Check single emails instantly with a trust score, upload CSV files for bulk email list verification of up to 1,000,000 addresses, and monitor batch operation status. Retrieves validation data from social networks and public sources to score emails beyond simple MX checks.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "verify single email address",
+    "bulk email list validation",
+    "check email trust score",
+    "upload CSV for verification",
+    "monitor batch operation status",
+    "clean email lists",
+    "detect invalid emails"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mailcheck.png"
+}

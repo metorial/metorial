@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/userflow",
+  "description": "Manage users, groups, and events for in-app onboarding experiences. Create, update, retrieve, list, and delete users with custom attributes. Manage groups (companies/accounts) and memberships. Track custom events for segmentation and personalization. Retrieve content objects like flows, checklists, and launchers. Manage webhook subscriptions to receive notifications for user, group, flow, checklist, and launcher events. Administer account settings, team members, and invitations.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "manage user profiles",
+    "manage groups and memberships",
+    "track custom events",
+    "retrieve onboarding content",
+    "manage webhook subscriptions",
+    "manage team members",
+    "list event definitions",
+    "manage account invitations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/userflow.png"
+}

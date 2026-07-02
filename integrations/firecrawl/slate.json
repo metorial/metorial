@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/firecrawl",
+  "description": "Scrape, crawl, search, map, parse, monitor, and extract data from websites and files with Firecrawl v2. Convert pages into markdown, HTML, screenshots, links, summaries, structured JSON, answers, highlights, and media URLs with browser automation, batch jobs, agent jobs, browser sandbox sessions, content monitors, and account usage visibility.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "scrape web pages",
+    "crawl entire websites",
+    "search the internet",
+    "extract structured data",
+    "parse uploaded files",
+    "map site URLs",
+    "convert pages to markdown",
+    "automate browser interactions",
+    "create browser sandbox sessions",
+    "batch scrape multiple URLs",
+    "AI-powered data extraction",
+    "monitor content changes",
+    "inspect credit and token usage"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/firecrawl.jpeg"
+}

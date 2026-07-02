@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/census-bureau",
+  "description": "Query raw statistical data from U.S. Census Bureau programs, including demographic, economic, housing, and geographic datasets. Retrieve population, income, housing characteristics, and other variables filtered by geographic area (state, county, tract, block group, etc.) and vintage year. Discover available datasets, variables, and supported geographies. Geocode addresses to latitude/longitude coordinates and identify Census geographic areas. Access geographic boundary shapes via TIGERweb. Query microdata for individual-level survey responses. Retrieve international demographic indicators for countries worldwide. Access economic time series data covering construction, trade, manufacturing, and more.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "query demographic statistics",
+    "filter data by geography",
+    "geocode addresses",
+    "discover available datasets",
+    "retrieve geographic boundaries",
+    "access microdata responses",
+    "query economic time series",
+    "lookup international demographics",
+    "retrieve population estimates",
+    "explore census variables"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/census-bureau.png"
+}

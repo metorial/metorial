@@ -1,0 +1,19 @@
+{
+  "name": "@adobe/adobe-creative-cloud",
+  "description": "Manage Creative Cloud Libraries, assets, and elements including colors, images, logos, and graphics. Edit PSD files programmatically by manipulating layers, applying smart object edits, removing backgrounds, and using Generative Fill. Generate images from text prompts via Firefly AI, apply Lightroom presets and auto-adjustments, and merge data into InDesign templates to export as PDF, JPEG, or PNG. Search, license, and download Adobe Stock assets. Manage user accounts, product entitlements, and administrative roles. Upload and organize photos and videos in Lightroom cloud catalogs. Receive webhook notifications for file, directory, library, and cloud document changes. Perform generative expand, object compositing, content tagging, and video localization with translate and lip-sync capabilities.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "manage creative cloud libraries",
+    "edit PSD files programmatically",
+    "generate images from text prompts",
+    "remove image backgrounds",
+    "apply Lightroom presets",
+    "search and license stock assets",
+    "merge data into InDesign templates",
+    "manage user accounts and entitlements",
+    "receive asset change webhooks",
+    "generate and expand with Firefly AI"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/adobe.svg",
+  "version": "0.1.3"
+}

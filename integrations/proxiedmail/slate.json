@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/proxiedmail",
+  "description": "Create and manage proxy email aliases that forward incoming messages to real email addresses. List, update, and configure proxy emails with forwarding rules, webhook callbacks, and browsable settings. Browse and read received emails including subject, body, sender, headers, and attachments. Attach custom domains for creating proxy addresses on your own domain. Send messages and initiate conversations from proxy email addresses. Set up webhook receivers to get notified on incoming emails and poll for webhook payloads.",
+  "categories": ["email-and-messaging", "security"],
+  "skills": [
+    "create proxy email aliases",
+    "manage email forwarding rules",
+    "browse received emails",
+    "configure email webhooks",
+    "attach custom domains",
+    "send from proxy addresses",
+    "poll webhook receivers",
+    "list proxy email addresses",
+    "read email attachments and headers"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/proxiedmail.svg"
+}

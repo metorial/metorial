@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/loomio",
+  "description": "Create and manage group discussions, proposals, and polls for collaborative decision-making. Supports multiple voting methods including proposals, score voting, ranked choice, dot voting, and meeting polls. Create discussion threads with Markdown or HTML content and notify recipients. Configure poll options, anonymous voting, result visibility, and closing times. Manage group memberships by inviting users via email and syncing member lists. Retrieve details of discussions and polls. Receive outgoing webhook notifications for events such as new threads, polls, comments, votes, and outcomes.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "create discussion threads",
+    "create polls and proposals",
+    "manage group memberships",
+    "retrieve discussion details",
+    "retrieve poll results",
+    "invite members by email",
+    "sync group membership lists",
+    "configure voting methods",
+    "receive webhook event notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/loomio.svg"
+}

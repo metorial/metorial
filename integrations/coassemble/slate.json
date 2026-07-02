@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/coassemble",
+  "description": "Create, manage, and deliver e-learning courses programmatically. List, duplicate, delete, and restore courses. Generate courses using AI by providing prompts, audience, tone, and screen count. Embed course player and course builder into third-party applications via signed URLs. Publish and revert course versions. Export courses as SCORM 1.2 or 2004 packages. Manage multi-tenant identities including clients (groups/tenants) and users (learners/creators) with custom metadata. Track learner progress and completion status, filtered by course, user, client, date range, or completion. Listen to client-side iframe events for course player interactions (start, progress, completed) and builder actions (created, updated).",
+  "categories": ["apis-and-http-requests", "document-processing", "education-and-learning"],
+  "skills": [
+    "manage e-learning courses",
+    "generate courses with AI",
+    "embed course player",
+    "embed course builder",
+    "track learner progress",
+    "export SCORM packages",
+    "manage users and clients",
+    "publish course versions",
+    "duplicate and restore courses"
+  ]
+}

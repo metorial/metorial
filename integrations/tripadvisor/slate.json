@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/tripadvisor",
+  "description": "Search for hotels, restaurants, and attractions by keyword or geographic coordinates. Retrieve detailed location information including ratings, reviews, photos, addresses, and rankings. Map external property identifiers to Tripadvisor location IDs. Send review collection emails to hotel guests via Review Express. Check hotel opt-in status for review programs. Access TripConnect advertising campaign performance data including click and conversion metrics.",
+  "categories": ["crm-and-sales-tools", "document-processing", "e-commerce-and-retail"],
+  "skills": [
+    "search locations by keyword",
+    "search nearby locations",
+    "retrieve location details",
+    "retrieve location reviews",
+    "retrieve location photos",
+    "map external location IDs",
+    "send review request emails",
+    "check hotel opt-in status",
+    "retrieve campaign performance data"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/reddit-ads",
+  "description": "Create, manage, and optimize advertising campaigns on Reddit. Configure campaign objectives, budgets, bidding strategies, and ad formats (text, image, video, carousel). Target audiences by subreddit, keyword, and interest category. Build and manage custom audiences using customer lists, website retargeting, lookalike audiences, and engagement retargeting. Send server-side conversion events via the Conversions API for offline attribution. Upload product catalogs for dynamic product ads. Retrieve campaign performance reports including impressions, clicks, CTR, CPC, spend, and conversions at account, campaign, ad group, and ad levels.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "create ad campaigns",
+    "manage audience targeting",
+    "send conversion events",
+    "retrieve performance reports",
+    "manage custom audiences",
+    "configure ad group targeting",
+    "upload product catalogs",
+    "manage campaign budgets",
+    "track ad conversions",
+    "manage advertiser accounts"
+  ]
+}

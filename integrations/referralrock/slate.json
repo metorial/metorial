@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/referralrock",
+  "description": "Manage referral marketing programs, members, referrals, rewards, and payouts. Create and update program members (advocates) with unique referral codes and sharing URLs. Track and manage referrals through approval workflows (Pending, Qualified, Approved, Denied). Create, issue, and manage rewards tied to members or referrals. View pending payouts and process payout transactions. Manage email unsubscribe lists. Send contacts to invite feeds for automatic referral campaigns. Generate member access URLs for embedding share widgets and portals. Subscribe to webhooks for program, member, referral, reward, and email events.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "manage referral programs",
+    "create and update members",
+    "track referral status",
+    "issue and manage rewards",
+    "process payout transactions",
+    "generate member share URLs",
+    "manage email unsubscribes",
+    "send invite contacts",
+    "subscribe to webhooks",
+    "filter referrals by status"
+  ]
+}

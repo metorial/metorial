@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/gift-up",
+  "description": "Create, manage, redeem, and track digital and physical gift cards. Create orders with gift cards, manage gift card products and item groups, process redemptions and balance transfers, and top up balances. Configure checkout settings, email templates, artwork, promotions, and shipping options. Retrieve financial transaction reports, manage user access and permissions, register webhooks for order and gift card events, and configure Stripe payment integration.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "manage gift cards",
+    "redeem gift cards",
+    "create gift card orders",
+    "transfer gift card balances",
+    "manage product items",
+    "configure checkout settings",
+    "retrieve transaction reports",
+    "manage promotions",
+    "register webhooks",
+    "manage user access"
+  ]
+}

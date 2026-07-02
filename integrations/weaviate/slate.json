@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/weaviate",
+  "description": "Store, search, and manage data objects with vector embeddings in an AI-native vector database. Create and configure collections with vectorizers and generative modules. Import objects individually or in batches with automatic or custom vector embeddings. Perform semantic (vector) search, hybrid search combining vector and keyword (BM25) matching, and filtered queries. Execute retrieval augmented generation (RAG) using integrated LLMs. Aggregate data across collections for statistical metrics. Manage multi-tenant data isolation, create and restore backups, and administer users and roles with RBAC. Monitor cluster health and node status.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage vector collections",
+    "import and store objects",
+    "semantic vector search",
+    "hybrid search queries",
+    "keyword BM25 search",
+    "retrieval augmented generation",
+    "aggregate data metrics",
+    "manage multi-tenancy",
+    "create and restore backups",
+    "manage users and roles"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/weaviate.png"
+}

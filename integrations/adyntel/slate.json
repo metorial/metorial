@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/adyntel",
+  "description": "Retrieve competitive advertising intelligence across major ad platforms. Look up ads running on Meta (Facebook & Instagram), Google, LinkedIn, and TikTok for any company by domain or page URL. Search Meta and TikTok ad libraries by keyword with optional country filters. Fetch ad creatives, copy, media assets, impressions, and audience estimates. Retrieve Google Shopping ads asynchronously. Analyze paid vs. organic keyword performance for a domain, including estimated budgets, CPC, traffic, and keyword position trends.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "look up Meta ads by company",
+    "search Meta ad library by keyword",
+    "look up LinkedIn ads by company",
+    "look up Google ads by company",
+    "retrieve Google Shopping ads",
+    "search TikTok ads by keyword",
+    "get TikTok ad details",
+    "analyze paid vs organic keywords",
+    "estimate ad budgets and CPC"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/adyntel.png"
+}

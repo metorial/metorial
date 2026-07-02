@@ -1,0 +1,68 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  batchImportContacts,
+  createConversation,
+  createOrUpdateContact,
+  deleteContact,
+  getContact,
+  getConversation,
+  getConversationCounts,
+  listArticles,
+  listCampaigns,
+  listContacts,
+  listEvents,
+  listSegments,
+  listTeams,
+  manageArticle,
+  manageCampaign,
+  manageCart,
+  manageCollection,
+  manageConversation,
+  manageCustomer,
+  manageForm,
+  manageOrder,
+  manageProduct,
+  manageStore,
+  manageSubscriptionType,
+  manageTags,
+  replyToConversation,
+  searchConversations,
+  trackEvent
+} from './tools';
+import { campaignEvents, contactEvents, conversationEvents, meetingEvents } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    getContact,
+    listContacts,
+    createOrUpdateContact,
+    deleteContact,
+    batchImportContacts,
+    getConversation,
+    createConversation,
+    replyToConversation,
+    searchConversations,
+    manageConversation,
+    getConversationCounts,
+    manageTags,
+    trackEvent,
+    listEvents,
+    listCampaigns,
+    manageCampaign,
+    manageArticle,
+    listArticles,
+    manageCollection,
+    listSegments,
+    manageForm,
+    manageSubscriptionType,
+    listTeams,
+    manageStore,
+    manageOrder,
+    manageCart,
+    manageProduct,
+    manageCustomer
+  ],
+  triggers: [contactEvents, conversationEvents, campaignEvents, meetingEvents]
+});

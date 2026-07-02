@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/wordpress",
+  "description": "Create, read, update, and delete posts, pages, and custom post types. Manage media files, comments, categories, tags, and taxonomies. Upload images and documents to the media library. Moderate comments and manage user accounts and roles. Retrieve and update site settings such as title, description, and timezone. View site statistics including page views, visitors, referrers, and traffic trends. Manage navigation menus and menu items. Follow and unfollow blogs via the WordPress.com Reader. Configure social media sharing and Publicize connections for automatic post distribution. Access user notifications for likes, comments, follows, and mentions. Supports both WordPress.com hosted sites and self-hosted WordPress.org sites via REST API.",
+  "categories": ["apis-and-http-requests", "document-processing", "news-and-media"],
+  "skills": [
+    "create and manage posts",
+    "manage pages and content",
+    "upload and organize media",
+    "moderate comments",
+    "manage categories and tags",
+    "manage user accounts",
+    "view site statistics",
+    "configure site settings",
+    "manage navigation menus",
+    "share posts to social media"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/wordpress.png"
+}

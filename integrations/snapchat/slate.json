@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/snapchat",
+  "description": "Manage Snapchat advertising campaigns, creatives, and audiences. Create and update the full ad hierarchy including organizations, ad accounts, campaigns, ad squads, and ads. Upload media assets and build ad creatives across formats like Snap Ads, Story Ads, Collection Ads, and AR Lens ads. Target users by demographics, location, interests, and behaviors. Build custom audiences from customer lists, Snap Pixel events, or lookalike segments. Pull campaign performance reports with metrics such as impressions, swipe-ups, spend, and conversions at hourly, daily, or lifetime granularity. Send web, app, and offline conversion events to Snapchat via the Conversions API. Retrieve creator and business public profile data including Stories, Spotlights, and engagement statistics. Collect and retrieve leads from in-app lead generation forms. Manage organization members, roles, funding sources, billing, and Snap Pixels.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "manage ad campaigns",
+    "create ad creatives",
+    "upload media assets",
+    "build custom audiences",
+    "pull performance reports",
+    "send conversion events",
+    "retrieve public profiles",
+    "collect lead submissions",
+    "manage organization billing",
+    "manage Snap Pixels"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/snapchat.png"
+}

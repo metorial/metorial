@@ -1,0 +1,18 @@
+{
+  "name": "@google/google-tag-manager",
+  "description": "Manage Google Tag Manager accounts, containers, workspaces, tags, triggers, variables, and versions. Create and configure tracking tags for websites and mobile apps. Publish container versions, manage environments for preview and testing, organize entities into folders, and control user permissions at account and container levels. Supports web, AMP, iOS, Android, and server container types.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "manage GTM accounts",
+    "create and configure tags",
+    "manage triggers and variables",
+    "publish container versions",
+    "manage workspaces",
+    "control user permissions",
+    "manage preview environments",
+    "organize tags into folders",
+    "manage custom templates",
+    "retrieve tagging snippets"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

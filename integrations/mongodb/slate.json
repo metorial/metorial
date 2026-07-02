@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mongodb",
+  "description": "Manage MongoDB Atlas cloud database infrastructure programmatically. Create, scale, update, pause, and delete clusters across AWS, Azure, and GCP. Manage organizations, projects, database users, and custom roles. Configure cloud backups, take on-demand snapshots, and initiate restores. Set up network security including IP access lists, VPC peering, and private endpoints. Configure encryption at rest with customer-managed keys. Monitor cluster performance with host metrics, disk measurements, and log downloads. Create and manage alert configurations with webhook notifications. Integrate with third-party services like Datadog, PagerDuty, and Slack. Create and manage Atlas Search indexes and search nodes. Set up data federation, online archives, and stream processing pipelines. Configure federated authentication with SAML and OIDC identity providers. Retrieve invoices, billing details, and cost analysis. Perform live migrations from self-managed MongoDB deployments. Note: manages infrastructure only — does not provide direct access to data stored in clusters.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage database clusters",
+    "configure cloud backups",
+    "manage database users",
+    "set up network peering",
+    "monitor cluster performance",
+    "configure alert notifications",
+    "create search indexes",
+    "manage organizations and projects",
+    "retrieve invoices and billing",
+    "perform live migrations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mongodb.png"
+}

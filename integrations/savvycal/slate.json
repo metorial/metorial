@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/savvycal",
+  "description": "Create, manage, and cancel scheduled events via shareable scheduling links. List and create scheduling links with configurable durations, custom fields, and availability settings. Manage automated workflows with actions and rules attached to scheduling links. Register and manage webhooks for real-time notifications on event lifecycle changes, attendee updates, meeting poll responses, and workflow triggers. Retrieve user information and supported time zones. Supports paid event checkout tracking, meeting polls, and custom event metadata.",
+  "categories": ["scheduling-and-calendars", "task-and-project-management"],
+  "skills": [
+    "create scheduling links",
+    "manage scheduled events",
+    "cancel events",
+    "register webhooks",
+    "manage automated workflows",
+    "track event attendees",
+    "handle paid event checkout",
+    "retrieve user information",
+    "list time zones",
+    "store custom event metadata"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/savvycal.png"
+}

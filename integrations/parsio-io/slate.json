@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/parsioio",
+  "description": "Extract structured data from emails, PDFs, images, and documents (HTML, CSV, DOCX, XLSX, XML, TXT, RTF) using template-based, OCR, and GPT-powered parsing. Manage mailboxes for document ingestion, upload files or submit HTML/text content for parsing, retrieve parsed data as JSON, and configure webhooks for real-time notifications on document events. Create and manage parsing templates, search and filter documents by status and date range, export extracted data, and handle bulk operations like re-parsing or skipping documents.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "extract data from documents",
+    "upload files for parsing",
+    "manage parsing mailboxes",
+    "manage parsing templates",
+    "retrieve parsed data",
+    "configure webhooks",
+    "search and filter documents",
+    "bulk re-parse documents",
+    "collect email addresses",
+    "export data as JSON/CSV"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/brilliant-directories",
+  "description": "Create, read, update, delete, and search members, leads, reviews, and content posts in online membership and business directory websites. Manage member subscriptions, transactions, and credits. Create and manage widgets, post types (categories), and album photos. Track user clicks and verify login credentials for SSO. Unsubscribe members from email campaigns. Receive webhooks for form submissions including member signups, lead submissions, review submissions, newsletter events, and post creation/updates. Supports smart list webhooks on scheduled cron jobs and custom webhook events for any form or smart list.",
+  "categories": ["crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "manage directory members",
+    "manage leads",
+    "manage reviews",
+    "create and manage posts",
+    "track member transactions",
+    "manage member subscriptions",
+    "manage website widgets",
+    "track user clicks",
+    "unsubscribe from emails",
+    "verify user credentials"
+  ]
+}

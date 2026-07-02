@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/breathe-hr",
+  "description": "Manage employee records, absences, sickness, expenses, and organizational structure for small to medium-sized businesses. Create and retrieve employees with personal and employment details. Track and cancel absence and leave requests, manage holiday allowances. Record sickness entries. Create, retrieve, and delete expenses and expense claims. Access compensation data including bonuses and salaries. Retrieve employee benefits, training records, and training types. Manage departments, divisions, and locations. Access working patterns, statutory holidays, and custom field definitions.",
+  "categories": ["hr-and-recruiting"],
+  "skills": [
+    "manage employee records",
+    "track absences and leave",
+    "record sickness entries",
+    "manage expenses and claims",
+    "retrieve salary and bonus data",
+    "manage departments and divisions",
+    "track employee training",
+    "retrieve employee benefits",
+    "manage holiday allowances",
+    "access working patterns"
+  ]
+}

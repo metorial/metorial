@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/perigon",
+  "description": "Search and retrieve real-time and historical news articles from 200,000+ global sources with AI-enriched metadata. Filter articles by keyword, source, country, category, date range, sentiment, and entities. Retrieve story clusters grouping related articles about the same event. Search profiles of people, companies, journalists, and media sources referenced in news coverage. Discover available topics and categories. Access Wikipedia page summaries. Each article includes 25+ metadata points such as sentiment scores, extracted entities, geographic tags, topic classifications, and AI-generated summaries. Supports both keyword and semantic search.",
+  "categories": ["apis-and-http-requests", "news-and-media"],
+  "skills": [
+    "search news articles",
+    "retrieve story clusters",
+    "search people profiles",
+    "search company profiles",
+    "search journalist profiles",
+    "discover media sources",
+    "analyze article sentiment",
+    "search Wikipedia pages",
+    "filter by topic category",
+    "semantic news search"
+  ]
+}

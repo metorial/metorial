@@ -1,0 +1,66 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  createBlock,
+  createContact,
+  createPage,
+  createSite,
+  deleteBlock,
+  deletePage,
+  deleteSite,
+  getBlogPost,
+  getPage,
+  getSite,
+  getSiteAnalytics,
+  listBlocks,
+  listBlogPosts,
+  listBookings,
+  listContacts,
+  listEventTypes,
+  listFormResponses,
+  listFormTemplates,
+  listInvoices,
+  listOrders,
+  listPages,
+  listSites,
+  listWorkspaces,
+  manageBooking,
+  updateBlock,
+  updatePage,
+  updateSite
+} from './tools';
+import { bookingEvents, contactEvents, formResponseEvents, orderEvents } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listSites,
+    getSite,
+    createSite,
+    updateSite,
+    deleteSite,
+    getSiteAnalytics,
+    listPages,
+    getPage,
+    createPage,
+    updatePage,
+    deletePage,
+    listBlocks,
+    createBlock,
+    updateBlock,
+    deleteBlock,
+    listContacts,
+    createContact,
+    listBookings,
+    manageBooking,
+    listEventTypes,
+    listBlogPosts,
+    getBlogPost,
+    listFormTemplates,
+    listFormResponses,
+    listInvoices,
+    listOrders,
+    listWorkspaces
+  ],
+  triggers: [bookingEvents, orderEvents, formResponseEvents, contactEvents]
+});

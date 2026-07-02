@@ -1,0 +1,24 @@
+{
+  "name": "@gitlab/gitlab",
+  "description": "Manage GitLab projects, repositories, issues, merge requests, releases, and CI/CD workflows from one provider. Includes pipeline, job, variable, environment, schedule, trigger, runner, deployment, CI lint, and test report tools.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage repositories and branches",
+    "create and track issues",
+    "review and merge merge requests",
+    "trigger and inspect CI/CD pipelines",
+    "manage pipeline jobs and logs",
+    "manage CI/CD variables",
+    "manage deployment environments",
+    "manage pipeline schedules and triggers",
+    "inspect runners and deployments",
+    "validate CI configuration",
+    "retrieve test reports",
+    "create and manage releases",
+    "list GitLab groups",
+    "search code and issues",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/gitlab.svg",
+  "version": "0.1.2"
+}

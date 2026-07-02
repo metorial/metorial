@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/klipfolio",
+  "description": "Manage business dashboards, data visualizations, and analytics. Create and configure dashboards (tabs), build and update Klip visualizations with custom schemas, and connect to various data sources including REST/URL and service connectors. Manage users, roles, groups, and permissions for access control. Handle client accounts for multi-tenant setups, publish shareable dashboard links, refresh and upload data source instances, and embed PowerMetrics visualizations externally.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage dashboards",
+    "create data visualizations",
+    "configure data sources",
+    "manage users and roles",
+    "publish shareable links",
+    "manage client accounts",
+    "refresh data on demand",
+    "embed analytics externally",
+    "organize users into groups",
+    "control share rights"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/klipfolio.png"
+}

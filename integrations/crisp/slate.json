@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/crisp",
+  "description": "Manage customer conversations, contacts, and support operations across multiple channels. Send and receive messages (text, files, audio, carousels) in conversations, assign conversations to operators, and track conversation states. Create, update, search, and manage contact profiles with custom data, events, and subscription status. Build and manage helpdesk knowledge base articles with multi-language support. Create and manage marketing campaigns including one-shot and automated campaigns. Configure website workspace settings, chatbox appearance, and operator roles. Track visitors in real-time, monitor website availability status, and access analytics for messaging, contacts, ratings, and campaigns. Receive real-time events via webhooks or WebSocket for session changes, messages, campaigns, and more.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "manage conversations and messages",
+    "search and filter conversations",
+    "manage contact profiles",
+    "build helpdesk knowledge base",
+    "create marketing campaigns",
+    "track visitors in real-time",
+    "assign operators to conversations",
+    "configure website settings",
+    "access messaging analytics",
+    "import and export contacts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/crisp.png"
+}

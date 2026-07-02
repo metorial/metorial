@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/addressfinder",
+  "description": "Verify and autocomplete addresses for Australia, New Zealand, and international locations. Search addresses with type-ahead autocomplete, retrieve full address metadata and structured components, verify addresses against standardized records, perform reverse geocoding from GPS coordinates, and search points of interest. Also verify email addresses and phone numbers for validity and connection status. Supports bulk address verification for cleaning existing datasets.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "autocomplete address search",
+    "verify postal addresses",
+    "retrieve address metadata",
+    "reverse geocode coordinates",
+    "search points of interest",
+    "verify email addresses",
+    "verify phone numbers",
+    "bulk address verification",
+    "search locations and suburbs"
+  ]
+}

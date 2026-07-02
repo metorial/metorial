@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/cloudconvert",
+  "description": "Convert, optimize, and process files across 200+ formats including audio, video, documents, images, spreadsheets, and presentations. Create conversion jobs with multi-task pipelines to convert formats, optimize/compress files, add watermarks, generate thumbnails, merge files into PDFs, capture website screenshots, extract and write file metadata, perform PDF operations (OCR, encrypt, decrypt, split, rotate), create archives, and execute custom FFmpeg/ImageMagick commands. Import files from URLs, uploads, S3, Azure Blob, Google Cloud Storage, SFTP and export to temporary URLs or cloud storage. Orchestrate complex workflows with jobs containing multiple interdependent tasks.",
+  "categories": [
+    "apis-and-http-requests",
+    "document-processing",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "convert file formats",
+    "optimize and compress files",
+    "add watermarks to files",
+    "capture website screenshots",
+    "generate file thumbnails",
+    "merge files into PDF",
+    "extract file metadata",
+    "perform PDF OCR",
+    "create archive files",
+    "import and export files"
+  ]
+}

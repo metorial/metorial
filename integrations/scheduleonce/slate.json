@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/scheduleonce",
+  "description": "Retrieve and manage bookings, booking calendars, booking pages, event types, users, and teams for automated appointment scheduling. Filter bookings by status, time range, and other parameters. Access detailed booking data including guest information, form submissions, virtual conferencing details, and cancel/reschedule history. Manage webhook subscriptions to receive real-time notifications for booking lifecycle events such as scheduled, rescheduled, canceled, completed, and no-show.",
+  "categories": ["crm-and-sales-tools", "scheduling-and-calendars"],
+  "skills": [
+    "retrieve booking details",
+    "filter bookings by status",
+    "manage booking calendars",
+    "manage event types",
+    "retrieve users and teams",
+    "manage webhook subscriptions",
+    "track booking lifecycle events",
+    "access guest contact information",
+    "manage booking pages"
+  ]
+}

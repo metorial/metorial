@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/honeybadger",
+  "description": "Track, search, and manage application errors (faults) and their occurrences (notices). Resolve, unresolve, and assign errors to team members, and add comments for collaboration. Monitor uptime by managing site checks and viewing outage history. Create and manage check-ins to monitor cron jobs and scheduled tasks. Record and retrieve deployment information with revision, environment, and repository details. Send custom events and structured logs, then query them using BadgerQL for insights and analytics. Create and manage projects, teams, environments, and public status pages. Report error events, check-in pings, and deployments via the Reporting API. Receive webhooks for error occurrences, uptime changes, missing check-ins, and deployments.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "track and manage errors",
+    "monitor application uptime",
+    "monitor cron jobs",
+    "record deployments",
+    "query logs and events",
+    "manage status pages",
+    "manage projects and teams",
+    "report custom events",
+    "assign and resolve errors",
+    "manage environments"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/honeybadger.png"
+}

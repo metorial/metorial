@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/paypal",
+  "description": "Process payments, manage orders, and handle financial transactions through PayPal. Create and capture checkout orders with immediate or deferred payment flows. Issue full or partial refunds and void authorizations. Create and manage recurring subscriptions with billing plans, pricing tiers, and trial periods. Send and track invoices, record payments and refunds against them. Send batch payouts to multiple recipients via email, phone, or PayPal ID. View and resolve customer disputes by providing evidence or accepting claims. Save payment methods to a vault for returning customers. Search transaction history for reconciliation and reporting. Add shipment tracking to captured payments. Manage catalog products, onboard merchants via partner referrals, and look up currency exchange rates. Receive webhook notifications for payment, order, subscription, payout, invoice, dispute, and merchant onboarding events.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "create and capture orders",
+    "process refunds",
+    "manage subscriptions and billing plans",
+    "send and track invoices",
+    "send batch payouts",
+    "resolve customer disputes",
+    "vault payment methods",
+    "search transaction history",
+    "add shipment tracking",
+    "onboard merchants"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/paypal.png"
+}

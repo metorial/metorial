@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/aivoov",
+  "description": "Convert text to speech audio using 2300+ AI voices from Google, Amazon, IBM, and Microsoft. Generate audio in MP3 and WAV formats across 155+ languages. Combine multiple voices in a single request to create conversational audio. Control pitch, speaking rate, and volume per text segment using SSML. Browse and filter available voices by language.",
+  "categories": ["apis-and-http-requests", "speech-recognition-and-synthesis"],
+  "skills": [
+    "convert text to speech",
+    "generate audio files",
+    "browse available voices",
+    "filter voices by language",
+    "adjust speech pitch",
+    "control speaking rate",
+    "adjust audio volume",
+    "combine multiple voices",
+    "export MP3 and WAV"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/aivoov.png"
+}

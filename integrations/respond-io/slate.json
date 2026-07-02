@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/respondio",
+  "description": "Manage omnichannel customer messaging across WhatsApp, Facebook Messenger, Telegram, Viber, email, and web chat. Create, update, search, merge, and delete contacts with custom fields and tags. Send text, media, attachment, and template messages to contacts through connected channels. Open and close conversations, assign and unassign agents to contacts. List message templates for connected channels. Configure custom channels via webhooks for unsupported messaging providers. Receive real-time webhook notifications for new messages, conversation events, contact changes, and comments.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send omnichannel messages",
+    "manage contacts",
+    "open and close conversations",
+    "assign conversation agents",
+    "tag and filter contacts",
+    "send template messages",
+    "list message templates",
+    "manage custom fields",
+    "sync contact data",
+    "receive webhook notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/respond-io.jpeg"
+}

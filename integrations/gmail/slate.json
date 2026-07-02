@@ -1,0 +1,18 @@
+{
+  "name": "@google/gmail",
+  "description": "Send, read, and search email messages with support for recipients, attachments, and HTML content. Create, update, and send drafts. Manage conversation threads and organize messages with labels. Search mailboxes using Gmail query syntax (from, to, subject, date, attachment filters). Configure mail settings including forwarding rules, filters, vacation responders, signatures, aliases, and delegates. Import and insert messages for migration. Sync mailbox changes incrementally via history API. Subscribe to mailbox change notifications via push notifications.",
+  "categories": ["email-and-messaging"],
+  "skills": [
+    "send email messages",
+    "search and read emails",
+    "manage drafts",
+    "manage conversation threads",
+    "organize with labels",
+    "configure mail filters",
+    "set vacation responder",
+    "manage forwarding rules",
+    "sync mailbox changes",
+    "manage email signatures"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/gmail.svg"
+}

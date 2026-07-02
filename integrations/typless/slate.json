@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/typless",
+  "description": "Extract structured data from documents such as invoices, receipts, and purchase orders using AI-powered OCR. Upload PDF, JPG, PNG, TIFF, or BMP files and receive extracted field values with confidence scores. Manage document types to configure which fields to extract, build training datasets by adding validated documents, and provide feedback on extraction results to continuously improve model accuracy. Supports 170+ languages and normalizes dates and numbers automatically.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "extract data from documents",
+    "manage document types",
+    "build training datasets",
+    "provide extraction feedback",
+    "retrieve confidence scores",
+    "manage supplier models",
+    "retrieve user profile",
+    "train extraction models"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/typless.svg"
+}

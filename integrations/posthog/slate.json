@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/posthog",
+  "description": "Capture and analyze product usage events, manage feature flags, run A/B test experiments, and create user surveys. Track persons and groups, evaluate feature flags for specific users, query analytics data using HogQL, and manage cohorts. Retrieve session recording metadata, create and manage insights and dashboards (trends, funnels, retention, paths), and configure data pipeline destinations and sources. Manage projects, organizations, annotations, actions, and event/property definitions.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "capture user events",
+    "evaluate feature flags",
+    "manage A/B experiments",
+    "create and manage surveys",
+    "query analytics with HogQL",
+    "manage cohorts and persons",
+    "retrieve session recordings",
+    "create insights and dashboards",
+    "configure data pipelines",
+    "manage annotations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/posthog.svg"
+}

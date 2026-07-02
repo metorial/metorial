@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/shotstack",
+  "description": "Programmatically edit and generate videos, images, and audio using a JSON-based timeline model. Arrange clips with transitions, effects, filters, and overlays. Create reusable templates with merge fields for mass video personalization. Ingest and transform source assets (resize, convert formats, adjust frame rates). Host and distribute rendered assets via CDN or to AWS S3, Google Cloud Storage, Google Drive, Mux, and Vimeo. Generate AI-powered assets including text-to-image, text-to-speech, image-to-video, text generation, talking avatars (D-ID), realistic voice synthesis (ElevenLabs), and Stable Diffusion image generation. Inspect media file metadata such as format, duration, and codecs. Receive webhook callbacks for render, hosting, and ingestion completion events.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "render videos from JSON",
+    "generate AI images and speech",
+    "apply transitions and effects",
+    "create reusable video templates",
+    "ingest and transform assets",
+    "host and distribute media",
+    "personalize videos with merge fields",
+    "inspect media metadata",
+    "generate talking avatars",
+    "distribute to external storage"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/shotstack.png"
+}

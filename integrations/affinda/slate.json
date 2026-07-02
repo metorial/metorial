@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/affinda",
+  "description": "Extract structured data from documents using AI-powered parsing. Upload resumes, invoices, bank statements, passports, job descriptions, and other documents (PDF, DOCX, JPG, PNG, etc.) to receive clean structured JSON output. Classify documents automatically by type, validate extracted data with configurable rules, and redact sensitive information from resumes. Match resumes against job descriptions to rank candidates or jobs. Manage workspaces, collections, organizations, and document annotations. Receive webhook notifications when documents are parsed or validated.",
+  "categories": ["apis-and-http-requests", "document-processing", "hr-and-recruiting"],
+  "skills": [
+    "extract data from documents",
+    "parse resumes and invoices",
+    "classify document types",
+    "validate extracted data",
+    "redact resume information",
+    "match resumes to jobs",
+    "manage workspaces and collections",
+    "upload documents for processing",
+    "batch update annotations",
+    "configure webhook notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/affinda.png"
+}

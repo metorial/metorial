@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/radar",
+  "description": "Track user locations and manage geofences, trips, and location-based events. Create circle, polygon, or isochrone geofences with tags, metadata, and operating hours. Track trips from origin to destination with live ETAs, approaching/arrived status updates, and delay detection. Detect user visits to known places and chain locations. Detect region crossings for countries, states, DMAs, and postal codes. Identify location fraud including GPS spoofing, proxy/VPN usage, and device tampering. Perform forward, reverse, and IP geocoding. Search for places, addresses, and geofences near a location with autocomplete support. Calculate routing distances and travel durations by car, truck, foot, or bike. Validate and standardize postal addresses. Render interactive and static maps. Create location-based campaigns and audience segments. Receive webhook events for geofence entries/exits, place visits, trip lifecycle changes, region crossings, and beacon proximity.",
+  "categories": ["apis-and-http-requests", "iot-and-device-control", "security"],
+  "skills": [
+    "create and manage geofences",
+    "track user locations",
+    "track trips with live ETAs",
+    "detect location fraud",
+    "geocode addresses and coordinates",
+    "search nearby places",
+    "calculate routes and distances",
+    "validate postal addresses",
+    "manage location-based events",
+    "render maps"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/radar.svg"
+}

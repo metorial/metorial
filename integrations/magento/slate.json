@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/magento",
+  "description": "Manage online stores on the Magento/Adobe Commerce eCommerce platform. Create, update, and delete products across multiple types (simple, configurable, bundle, grouped, virtual). Manage product catalogs, categories, attributes, images, and pricing. Process the full order lifecycle: create carts, add items, set shipping and billing addresses, estimate shipping costs, place orders, create invoices, generate shipments, and issue credit memo refunds. Manage customer accounts, profiles, addresses, and customer groups. Handle multi-source inventory across warehouses, check stock salability, and assign products to sources. Support the complete shopping cart and checkout flow for both logged-in customers and guests, including coupon codes, shipping estimation, and payment method selection. Manage CMS pages and content blocks. Configure store settings, tax rules, tax rates, and tier pricing. Search and filter across collections using complex criteria with pagination and sorting. Subscribe to webhook events for products, orders, customers, carts, and inventory changes (Adobe Commerce edition). B2B features include company accounts, shared catalogs, negotiable quotes, and purchase orders.",
+  "categories": [
+    "document-processing",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage product catalog",
+    "process orders and refunds",
+    "manage customer accounts",
+    "track multi-source inventory",
+    "handle shopping cart checkout",
+    "manage CMS content",
+    "configure tax and pricing",
+    "manage categories and attributes",
+    "subscribe to webhook events",
+    "search and filter entities"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/magento.png"
+}

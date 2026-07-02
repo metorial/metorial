@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/college-football-data",
+  "description": "Retrieve college football data including game results, scores, schedules, and play-by-play details. Access team and player statistics, both basic and advanced (SP+, Elo, SRS, FPI, EPA). Look up recruiting rankings, player ratings, and transfer portal entries. Query betting lines (spreads, over/unders, moneylines) from various sportsbooks. Retrieve weekly AP/Coaches poll rankings, win probabilities, predicted points, and adjusted metrics. Search player profiles, coaching records, NFL Draft picks, conference listings, and venue information. Access drive-level data, team rosters, talent composites, and historical matchup records.",
+  "categories": ["apis-and-http-requests", "news-and-media"],
+  "skills": [
+    "retrieve game scores and schedules",
+    "access play-by-play data",
+    "query team and player statistics",
+    "look up recruiting rankings",
+    "retrieve betting lines",
+    "access poll rankings and ratings",
+    "search player profiles",
+    "query win probabilities",
+    "look up coaching records",
+    "retrieve NFL Draft data"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/scrapingbee",
+  "description": "Scrape web pages and extract structured data using headless browsers, proxy rotation, and CAPTCHA solving. Render JavaScript-heavy pages, capture screenshots, and extract data using CSS selectors, XPath, or AI-powered natural language queries. Search and retrieve structured JSON results from Google (search, news, maps, images, shopping), Amazon (product search and lookup), Walmart (product search and details), and YouTube (search, metadata, transcripts). Execute JavaScript scenarios on pages (click, scroll, wait) and check account usage.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail", "web-search"],
+  "skills": [
+    "scrape web page HTML",
+    "extract data with AI queries",
+    "capture website screenshots",
+    "search Google results",
+    "search Amazon products",
+    "search Walmart products",
+    "search YouTube videos",
+    "extract YouTube transcripts",
+    "execute JavaScript scenarios",
+    "check account usage"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/scrapingbee.svg"
+}

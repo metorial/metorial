@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/tpscheck",
+  "description": "Verify UK phone numbers against the Telephone Preference Service (TPS) and Corporate Telephone Preference Service (CTPS) registers. Check single or bulk batches of up to 100 numbers for TPS/CTPS registration status, line type, carrier, location, and reachability. Retrieve compliance risk scores (0–100) for each number. Monitor numbers with automated 28-day re-checks to maintain ICO compliance. Access audit logs and exportable compliance reports. Check API credit usage and remaining allowances. Receive webhook notifications for bulk job completion, TPS status changes, low credits, and usage limits.",
+  "categories": ["crm-and-sales-tools", "legal-and-compliance"],
+  "skills": [
+    "verify TPS registration status",
+    "bulk phone number checking",
+    "retrieve phone intelligence data",
+    "calculate compliance risk scores",
+    "automate 28-day re-checks",
+    "export audit logs and reports",
+    "check API credit usage",
+    "monitor TPS status changes",
+    "detect line type and carrier"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tpscheck.png"
+}

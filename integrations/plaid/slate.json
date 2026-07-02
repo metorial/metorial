@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/plaid",
+  "description": "Connect to users' bank accounts at thousands of financial institutions to access financial data and enable money movement. Retrieve account details, balances, and transactions (with merchant info, categories, and location data). Get account and routing numbers for ACH/wire transfers. Verify identity by comparing user-provided data against bank-held records. View investment holdings, securities, and investment transactions. Access loan and liability data including balances, interest rates, and payment schedules. Initiate ACH transfers and manage money movement with built-in risk assessment. Assess ACH return risk with signal scoring. Generate verifiable asset reports summarizing financial history. Verify income and employment through payroll connections or document uploads. Retrieve bank statements as PDFs. Enrich transaction data with merchant names, categories, and logos. Generate consumer credit reports with income insights and cashflow analysis. Search and retrieve metadata about supported financial institutions. Receive webhooks for item status changes, new transactions, auth updates, identity changes, transfer events, and more.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "retrieve account balances",
+    "fetch transaction history",
+    "get account routing numbers",
+    "verify user identity",
+    "view investment holdings",
+    "initiate ACH transfers",
+    "assess ACH return risk",
+    "generate asset reports",
+    "verify income and employment",
+    "enrich transaction data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/plaid.png"
+}

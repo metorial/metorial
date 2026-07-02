@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/renderform",
+  "description": "Generate images and PDFs from templates with dynamic text, images, QR codes, and custom properties. Manage and list templates with placeholder definitions. Take website screenshots with configurable dimensions and wait times. Browse previously rendered results and their CDN-hosted URLs. Receive webhook notifications for render completion and template lifecycle events.",
+  "categories": ["document-processing"],
+  "skills": [
+    "render images from templates",
+    "generate PDF documents",
+    "take website screenshots",
+    "manage image templates",
+    "list rendered results",
+    "customize dynamic content",
+    "host assets on CDN",
+    "configure render webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/renderform.svg"
+}

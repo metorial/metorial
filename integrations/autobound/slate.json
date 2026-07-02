@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/autobound",
+  "description": "Generate AI-powered personalized sales outreach content including emails, email sequences, call scripts, LinkedIn connection requests, and SMS messages. Enrich prospects with ranked buying signal insights covering job changes, funding, news, SEC filings, hiring trends, tech stack changes, and more. Import contacts into campaigns, subscribe to real-time signal webhooks for company and contact events, and access a B2B database of 270M+ contacts and 11M+ companies. Configure writing style, AI model, word count, insight filters, and sales asset references for content generation.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "generate personalized sales emails",
+    "create multi-step email sequences",
+    "generate call scripts",
+    "enrich prospect insights",
+    "detect buying signals",
+    "import campaign contacts",
+    "subscribe to signal webhooks",
+    "generate LinkedIn messages",
+    "rewrite email templates",
+    "filter signal categories"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/autobound.png"
+}

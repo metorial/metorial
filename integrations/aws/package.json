@@ -1,0 +1,29 @@
+{
+  "name": "@slates-integrations/amazon-web-services",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.1043.0",
+    "@aws-sdk/client-dynamodb": "^3.1043.0",
+    "@aws-sdk/client-ec2": "^3.1043.0",
+    "@aws-sdk/client-iam": "^3.1043.0",
+    "@aws-sdk/client-lambda": "^3.1043.0",
+    "@aws-sdk/client-s3": "^3.1043.0",
+    "@aws-sdk/client-sns": "^3.1043.0",
+    "@aws-sdk/client-sqs": "^3.1043.0",
+    "@aws-sdk/client-sts": "^3.1043.0",
+    "@lowerdeck/error": "^1.1.0",
+    "@slates/aws-sdk-http-handler": "1.0.0-rc.4",
+    "@types/node": "^20",
+    "slates": "1.0.0-rc.14",
+    "zod": "^4.2"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  },
+  "version": "0.2.0-rc.9"
+}

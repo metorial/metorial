@@ -1,0 +1,23 @@
+{
+  "name": "@microsoft/microsoft-outlook",
+  "description": "Send, read, reply to, forward, and manage email messages in user mailboxes. Organize messages into folders, apply categories, flags, and importance levels. Manage file and item attachments. Create, update, delete, and respond to calendar events and meetings. Find available meeting times, manage attendees, handle recurrence, and work with shared or delegated calendars. Create, read, update, and delete contacts, organize them into contact folders, and manage contact photos. Manage tasks and task lists via Microsoft To Do, including due dates, reminders, recurrence, and checklist items. Subscribe to webhook notifications for changes to messages, calendar events, and contacts. Support for Focused Inbox, @-mentions, mail tips, send-on-behalf, and send-as capabilities.",
+  "categories": [
+    "email-and-messaging",
+    "scheduling-and-calendars",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "send and manage emails",
+    "organize mail folders",
+    "manage email attachments",
+    "create calendar events",
+    "schedule and find meeting times",
+    "manage shared calendars",
+    "create and manage contacts",
+    "manage tasks and to-do lists",
+    "subscribe to change notifications",
+    "send on behalf of users"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/Outlook%20SVG%20Icon.svg",
+  "version": "0.1.2"
+}

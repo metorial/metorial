@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/blackbaud",
+  "description": "Manage nonprofit and educational institution data through Blackbaud's SKY API. Create, read, update, and delete constituent records (donors, prospects, volunteers) with addresses, emails, phone numbers, relationships, and custom fields. Track gifts and donations including pledges, recurring gifts, acknowledgements, and soft credits. Manage fundraising opportunities, campaigns, funds, and appeals. Track prospect assignments and cultivation activities. Access financial management data including general ledger accounts, journal entries, invoices, and vendors. Manage education data for K-12 schools including students, academics, admissions, and schedules. Run custom lists and queries against Raiser's Edge NXT and Financial Edge NXT. Subscribe to webhook events for constituent changes, gift activity, and action updates.",
+  "categories": [
+    "crm-and-sales-tools",
+    "education-and-learning",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage constituent records",
+    "track gifts and donations",
+    "manage fundraising campaigns",
+    "track prospect assignments",
+    "manage general ledger accounts",
+    "process journal entries",
+    "manage student records",
+    "run custom queries",
+    "subscribe to webhook events",
+    "manage accounts payable"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/blackbaud.svg"
+}

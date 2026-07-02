@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/draftable",
+  "description": "Compare two documents to detect differences in text, formatting, and layout. Supports Word, PowerPoint, Excel, PDF, RTF, and text files, including cross-format comparisons (e.g., Word to PDF). Create comparisons by uploading files or providing URLs, retrieve structured change details as JSON, view comparisons in interactive side-by-side or redline viewers, and export comparison results to PDF. Manage comparisons by listing, retrieving, or deleting them.",
+  "categories": ["document-processing"],
+  "skills": [
+    "compare documents cross-format",
+    "detect text changes",
+    "export comparison to PDF",
+    "retrieve structured change details",
+    "generate signed viewer URLs",
+    "manage document comparisons",
+    "upload documents for comparison",
+    "embed comparison viewer"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/draftable.svg"
+}

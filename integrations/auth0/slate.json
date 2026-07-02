@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/auth0",
+  "description": "Manage users, roles, permissions, and identity provider connections for authentication and authorization. Create, read, update, and delete users across identity connections. Configure social, enterprise, and passwordless authentication methods. Assign roles and permissions using role-based access control (RBAC). Register and manage applications and API resource servers. Set up multi-factor authentication (MFA) including SMS, email, TOTP, and WebAuthn. Create organizations for multi-tenant B2B scenarios and invite members. Build custom serverless Actions for login, registration, and password change flows. Configure custom domains, email templates, branding, and attack protection. Import and export users in bulk. Retrieve authentication logs and audit events. Manage client grants and log streams for event delivery.",
+  "categories": ["security"],
+  "skills": [
+    "manage users and profiles",
+    "assign roles and permissions",
+    "configure identity connections",
+    "register applications",
+    "set up multi-factor authentication",
+    "manage organizations and members",
+    "create custom actions",
+    "retrieve authentication logs",
+    "bulk import export users",
+    "configure attack protection"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/Auth0.png"
+}

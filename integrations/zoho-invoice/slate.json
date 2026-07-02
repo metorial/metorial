@@ -1,0 +1,19 @@
+{
+  "name": "@metorial/zoho-invoice",
+  "description": "Create, send, and manage invoices, estimates, credit notes, and recurring invoices for customers. Record customer payments, apply credits, and process refunds. Track expenses (billable and non-billable) and manage expense categories. Create and manage projects with tasks, user assignments, and time tracking with start/stop timers. Manage a catalog of items, price lists, tax rates, and multi-currency exchange rates. Handle customer and contact management with billing/shipping addresses and portal access. Send invoices and estimates via email individually or in bulk. Supports GST, VAT, and regional tax treatments across multiple Zoho data center regions.",
+  "categories": ["financial-data-and-stock-market", "task-and-project-management"],
+  "skills": [
+    "create and send invoices",
+    "manage recurring invoices",
+    "create and send estimates",
+    "record customer payments",
+    "track expenses",
+    "manage credit notes",
+    "track project time entries",
+    "manage contacts and customers",
+    "configure taxes and currencies",
+    "manage items and price lists"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zoho-invoice.svg",
+  "version": "0.1.2"
+}

@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/ko-fi",
+  "description": "Receive webhook notifications for payment events on Ko-fi, including donations, subscription payments, shop orders, and commissions. Each webhook payload includes supporter details, payment amount, currency, transaction type, and order-specific information such as shop items and shipping details. Verify webhook authenticity using a verification token. Note: Ko-fi is webhook-only (outbound) with no queryable API — you cannot read, create, or manage Ko-fi data directly.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "receive donation notifications",
+    "track subscription payments",
+    "receive shop order details",
+    "receive commission payments",
+    "verify webhook authenticity",
+    "identify first vs recurring subscriptions",
+    "retrieve shipping information"
+  ]
+}

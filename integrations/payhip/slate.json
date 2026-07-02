@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/payhip",
+  "description": "Manage coupons and software license keys for a Payhip e-commerce store. Create, list, and retrieve discount coupons with configurable options like percentage or fixed-amount discounts, usage limits, and date ranges. Verify, enable, disable, and track usage of software license keys tied to digital products. Receive webhook notifications for completed payments, refunds, subscription creations, and subscription cancellations.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "create discount coupons",
+    "list and retrieve coupons",
+    "verify license keys",
+    "enable or disable licenses",
+    "track license key usage",
+    "monitor payment events",
+    "track subscription lifecycle",
+    "handle refund notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/payhip.jpeg"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/parsehub",
+  "description": "Manage web scraping projects, start and monitor scraping runs, and retrieve extracted data. List projects, launch scraping jobs with custom start URLs and parameters, cancel or delete runs, and download structured data in JSON format. Receive webhook notifications when run statuses change or extracted data becomes available.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "list scraping projects",
+    "start scraping runs",
+    "retrieve extracted data",
+    "cancel scraping runs",
+    "delete scraping runs",
+    "monitor run status",
+    "override start URL",
+    "receive webhook notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/parsehub.png"
+}

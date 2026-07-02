@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/pipeline-crm",
+  "description": "Manage sales deals, contacts, companies, and activities in Pipeline CRM. Create, update, and search deals with associated values, stages, and currencies. Add and manage person and company records with duplicate detection and automatic company linking. Create calendar events and tasks associated with deals, people, or companies. Add categorized notes to CRM records. Read and write custom fields for companies, deals, and people. Capture leads from website forms via Web-to-Leads. Retrieve user information and assign owners to records.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "manage sales deals",
+    "create and search contacts",
+    "manage company records",
+    "create calendar events",
+    "add notes to records",
+    "configure custom fields",
+    "capture web-to-leads",
+    "search and filter records",
+    "assign deal owners"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pipeline-crm.png"
+}

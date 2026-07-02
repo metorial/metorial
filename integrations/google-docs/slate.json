@@ -1,0 +1,18 @@
+{
+  "name": "@google/google-docs",
+  "description": "Create, read, edit, and format Google Docs documents. Insert and style text, manage tables, add images, create bulleted and numbered lists, and apply paragraph formatting. Use named ranges for template merging and dynamic content generation. Access document structure including headers, footers, and multiple tabs.",
+  "categories": ["document-processing"],
+  "skills": [
+    "create documents",
+    "read document content",
+    "edit document text",
+    "format text styles",
+    "insert and manage tables",
+    "add images to documents",
+    "create lists and bullets",
+    "merge templates with data",
+    "manage named ranges",
+    "access headers and footers"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google-docs.svg"
+}

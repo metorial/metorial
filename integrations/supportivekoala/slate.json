@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/supportivekoala",
+  "description": "Generate images programmatically from customizable templates. Create and manage reusable image templates with configurable dimensions and dynamic parameters. Populate templates with text, images, and other content to produce images in PNG, JPEG, or WebP formats. Retrieve and list previously generated images hosted on the cloud.",
+  "categories": ["document-processing"],
+  "skills": [
+    "generate images from templates",
+    "create image templates",
+    "update image templates",
+    "list available templates",
+    "retrieve generated images",
+    "export in multiple formats",
+    "populate dynamic template parameters",
+    "browse public templates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/supportivekoala.png"
+}

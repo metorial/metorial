@@ -1,0 +1,18 @@
+{
+  "name": "@microsoft/power-bi",
+  "description": "Manage Power BI workspaces, datasets, reports, dashboards, and dataflows. Create and refresh datasets, trigger data refreshes, execute DAX queries, and push real-time data into tables. Import PBIX and Excel files into workspaces. Generate embed tokens for embedding reports and dashboards in custom applications. Clone, rebind, and export reports to PDF, PPTX, or PNG. Manage workspace membership and user roles. Administer deployment pipelines to promote content across development, test, and production stages. Perform tenant-wide admin operations including scanning workspaces, listing all content, and managing capacities. Manage on-premises data gateways and their data sources. Retrieve published apps and template apps.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage workspaces and roles",
+    "refresh datasets",
+    "execute DAX queries",
+    "push real-time data",
+    "export reports to file",
+    "generate embed tokens",
+    "import PBIX files",
+    "manage deployment pipelines",
+    "administer tenant content",
+    "manage data gateways"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/power-bi.png"
+}

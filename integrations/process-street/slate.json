@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/process-street",
+  "description": "Create, manage, and run structured workflow runs (checklists) from templates. Complete, assign, and track tasks within workflows. Read and update form field values across workflow runs. Manage structured data set records (create, update, delete, list). Handle approval tasks (approve/reject). Set due dates, change workflow run status (active, complete, archived), and manage subtasks. Configure outgoing webhooks for workflow, form, and data set events. Trigger new workflow runs via incoming webhooks.",
+  "categories": ["task-and-project-management"],
+  "skills": [
+    "create workflow runs",
+    "manage tasks and assignments",
+    "update form field values",
+    "manage data set records",
+    "handle approval tasks",
+    "configure webhooks",
+    "track task due dates",
+    "complete and archive workflows",
+    "trigger workflows via webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/process-street.png"
+}

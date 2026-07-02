@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/ynab",
+  "description": "Manage personal budgets, accounts, transactions, and financial categories. Create, read, update, and delete transactions including split transactions and scheduled recurring transactions. Track account balances across checking, savings, credit cards, and loans. Manage budget categories with goal tracking, view monthly budget summaries including income, activity, and \"Ready to Assign\" amounts. Import bank transactions with automatic deduplication and matching. Retrieve payee information and locations. Export full budget data and efficiently sync changes using delta requests.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "manage budget categories",
+    "create and update transactions",
+    "track account balances",
+    "schedule recurring transactions",
+    "import bank transactions",
+    "view monthly budget summaries",
+    "manage financial accounts",
+    "manage payees",
+    "sync budget data changes",
+    "set category goals"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ynab.svg"
+}

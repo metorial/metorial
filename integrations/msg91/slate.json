@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/msg91",
+  "description": "Send and manage multi-channel communications across SMS, Email, WhatsApp, Voice, and RCS. Generate, send, resend, and verify OTPs. Create and manage message templates with variable substitution. Launch multi-channel campaigns with scheduling, retry logic, and segment-based targeting. Manage contacts, phonebook fields, segments, and user events. Send WhatsApp interactive messages with buttons, lists, and product catalogs. Execute voice calls including text-to-speech, IVR flows, and click-to-call sessions. Send rich RCS messages with cards, carousels, suggested replies, and actions. Validate email addresses, verify domains, and track delivery reports. Manage subaccounts and retrieve messaging logs and analytics.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send SMS messages",
+    "verify OTP codes",
+    "send transactional emails",
+    "send WhatsApp messages",
+    "make voice calls",
+    "send RCS messages",
+    "launch multi-channel campaigns",
+    "manage contacts and segments",
+    "track delivery reports",
+    "manage message templates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/msg91.svg"
+}

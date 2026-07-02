@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/imagior",
+  "description": "Generate and customize images from design templates via API. Retrieve and inspect template structures to discover customizable elements (text, colors, images, positioning). List and sort user templates, generate images with element overrides, and check account credit balance. Suited for bulk image generation including social media graphics, certificates, product images, badges, and marketing materials.",
+  "categories": ["crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "generate images from templates",
+    "customize template elements",
+    "list user templates",
+    "inspect template structure",
+    "check account credits",
+    "bulk image generation",
+    "override text and colors"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/imagior.png"
+}

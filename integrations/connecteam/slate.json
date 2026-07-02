@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/connecteam",
+  "description": "Manage workforce operations for deskless employees across operations, communications, and HR hubs. Create, update, archive, and sync employee/user profiles with custom fields and Smart Groups. Track employee time clock activities including clock-in/out, breaks, geofence-based tracking, and timesheet totals. Manage time-off policies, balances, and requests. Create and manage shift schedules with auto-assign, shift layers, and employee unavailability. Create and organize jobs and sub-jobs for scheduling and time tracking. Retrieve forms and form submissions for data collection workflows. Manage Quick Tasks with boards, labels, sub-tasks, and user assignments. Send private chat messages via custom publishers. Manage onboarding packs and assignments. Upload file attachments for use across platform features. Receive real-time webhook notifications for user changes, time activities, form submissions, scheduler events, and task completions.",
+  "categories": [
+    "hr-and-recruiting",
+    "scheduling-and-calendars",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage employee profiles",
+    "track time clock activities",
+    "manage shift scheduling",
+    "handle time-off requests",
+    "create and assign tasks",
+    "retrieve form submissions",
+    "send chat messages",
+    "manage onboarding packs",
+    "organize jobs and sub-jobs",
+    "upload file attachments"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/connecteam.jpeg"
+}

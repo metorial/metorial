@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/customgpt",
+  "description": "Create and manage custom AI chatbot agents powered by your own content. Ingest data from websites, documents, PDFs, audio, video, and 1400+ file formats to build RAG-powered knowledge bases. Send messages to agents and manage conversations with session tracking. Retrieve citations, trust scores, and claim verification for responses. Configure agent personas, settings, and behavior rules. Organize documents with labels and control user access. View analytics including customer intelligence, traffic, query, and conversation metrics. Export leads and conversation data. Manage agent licenses, data source syncing, and document reindexing.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "create custom AI agents",
+    "ingest multi-format content",
+    "manage conversations and messages",
+    "retrieve response citations",
+    "verify response accuracy",
+    "configure agent personas",
+    "manage data sources",
+    "view usage analytics",
+    "organize documents with labels",
+    "export leads and conversations"
+  ]
+}

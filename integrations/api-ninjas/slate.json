@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/api-ninjas",
+  "description": "Retrieve data from 100+ REST APIs spanning finance, technology, AI, geography, health, and entertainment. Look up stock prices, cryptocurrency rates, exchange rates, and financial instruments. Perform AI-powered text sentiment analysis, image OCR, face detection, and object detection. Access geographic data including geocoding, weather, air quality, and country statistics. Process text with dictionary lookups, spell checking, language detection, and profanity filtering. Retrieve nutrition data, exercise info, quotes, jokes, trivia, and historical facts. Look up vehicle specs, airport data, domain availability, WHOIS records, IP geolocation, and validate emails, phone numbers, and IBANs. Generate barcodes, QR codes, and passwords. Calculate taxes, mortgage payments, and currency conversions.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
+  "skills": [
+    "retrieve financial market data",
+    "analyze text sentiment",
+    "detect objects in images",
+    "look up geographic data",
+    "validate emails and phones",
+    "generate barcodes and QR codes",
+    "calculate taxes and mortgages",
+    "search nutrition information",
+    "retrieve quotes and trivia",
+    "look up domain and IP data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/api-ninjas.png"
+}

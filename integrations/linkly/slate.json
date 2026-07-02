@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/linkly",
+  "description": "Create, update, and delete branded short links with custom domains, slugs, and UTM parameters. Configure smart redirect rules based on geography, device, or traffic rotation. Generate styled QR codes for short links. Export click analytics including geolocation, device, browser, referrer, and OS data. Set up link-level and workspace-level webhooks for real-time click notifications. Manage Open Graph metadata for social previews, attach retargeting pixels (Meta Pixel, GA4, GTM), and configure link expiry, password protection, and parameter forwarding. Bulk create up to 1000 links per request.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "shorten and brand URLs",
+    "configure smart redirects",
+    "generate styled QR codes",
+    "export click analytics",
+    "manage webhooks",
+    "set UTM parameters",
+    "bulk create links",
+    "configure retargeting pixels",
+    "set link expiry rules",
+    "manage custom domains"
+  ]
+}

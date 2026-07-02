@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/signpath",
+  "description": "Submit, manage, and track code signing requests for software artifacts (e.g., Authenticode, Java, macOS, Docker, Office macros). Approve or deny signing requests, resubmit requests with different signing policies, and retrieve signed artifacts. Manage projects, signing policies, artifact configurations, and certificates. Download X.509 certificates and GPG public keys. Query audit logs for signing and administrative changes. Receive webhook notifications on signing request status changes (completed, failed, denied, canceled).",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "submit signing requests",
+    "retrieve signed artifacts",
+    "approve or deny signing",
+    "resubmit signing requests",
+    "manage signing policies",
+    "manage certificates",
+    "query audit logs",
+    "list and manage projects",
+    "track signing request status"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/signpath.svg"
+}

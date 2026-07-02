@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/fireflies",
+  "description": "Record, transcribe, and analyze meeting conversations from platforms like Zoom, Google Meet, and Webex. Retrieve, search, and manage meeting transcripts with AI-generated summaries, action items, sentiment analysis, and keywords. Upload audio files for transcription. Ask questions about meetings using the AskFred AI assistant. Add a bot to live meetings for automatic recording, pause and resume recordings, and create live action items or soundbites. Manage users and teams, organize meetings into channels, query contacts, and receive webhook notifications when transcriptions complete.",
+  "categories": [
+    "note-taking-and-knowledge-bases",
+    "scheduling-and-calendars",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "transcribe meeting audio",
+    "retrieve meeting transcripts",
+    "generate AI meeting summaries",
+    "upload audio for transcription",
+    "ask questions about meetings",
+    "manage live meeting recording",
+    "create meeting soundbites",
+    "search transcripts by keyword",
+    "manage users and teams",
+    "organize meetings into channels"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/fireflies.jpg"
+}

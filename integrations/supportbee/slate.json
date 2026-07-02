@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/supportbee",
+  "description": "Create, retrieve, search, and manage customer support tickets. Assign tickets to users or teams, add labels, archive, trash, star, and delete tickets. Post replies to customers and add internal comments for agents. Manage saved response snippets for common replies. Set up automation filters with rules and consequences to auto-label, assign, archive, or spam tickets. Retrieve agents, teams, and groups. Upload attachments to tickets. Manage forwarding email addresses. Access support performance reports. Receive webhook notifications for ticket lifecycle events, replies, comments, and assignment changes.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage support tickets",
+    "assign tickets to agents",
+    "post replies and comments",
+    "manage ticket labels",
+    "create automation filters",
+    "manage response snippets",
+    "upload ticket attachments",
+    "manage teams and groups",
+    "search and filter tickets",
+    "track ticket events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/supportbee.svg"
+}

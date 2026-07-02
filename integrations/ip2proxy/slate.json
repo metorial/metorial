@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/ip2proxy",
+  "description": "Detect whether an IP address is associated with a proxy, VPN, TOR exit node, data center, search engine robot, or residential proxy. Query IPv4 or IPv6 addresses to retrieve proxy type, geolocation data (country, region, city), network metadata (ISP, domain, ASN), threat classifications (spam, scanner, botnet), and VPN provider identification. Check remaining API credit balance. Supports multiple response packages (PX1–PX11) with varying levels of detail.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "detect proxy and VPN usage",
+    "identify TOR exit nodes",
+    "geolocate IP addresses",
+    "retrieve ISP and ASN details",
+    "classify IP security threats",
+    "identify VPN provider names",
+    "detect search engine robots",
+    "check API credit balance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ip2proxy.png"
+}

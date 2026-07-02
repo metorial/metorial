@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/supadata",
+  "description": "Extract video transcripts, media metadata, and web page content as structured text and data. Transcribe videos from YouTube, TikTok, Instagram, Facebook, and X (Twitter) with language preferences and timestamped or plain text output. Fetch unified media metadata including engagement stats, author info, and platform-specific details. Use AI to extract structured data from video content via natural language prompts and JSON schemas. Scrape any web page into clean markdown, map website URLs, and crawl entire websites with configurable page limits. Search YouTube for videos, channels, and playlists, retrieve channel and playlist metadata, list channel or playlist video IDs, and translate YouTube transcripts into target languages.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "extract video transcripts",
+    "fetch media metadata",
+    "AI structured data extraction",
+    "scrape web pages",
+    "crawl entire websites",
+    "map website URLs",
+    "search YouTube content",
+    "retrieve channel metadata",
+    "translate video transcripts",
+    "list playlist videos"
+  ]
+}

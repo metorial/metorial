@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/ragie",
+  "description": "Ingest, process, and semantically retrieve documents using RAG (Retrieval Augmented Generation). Upload files, URLs, or raw text for indexing across multimodal content including PDFs, images, audio, and video. Perform semantic search with metadata filtering, reranking, and chunk diversity controls. Extract structured entities from unstructured documents using natural language instructions. Manage data source connections to services like Google Drive, Notion, Confluence, and Salesforce for automatic document synchronization. Organize documents into partitions for multi-tenant isolation. Monitor document processing status and connection sync events via webhooks.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "ingest and index documents",
+    "semantic document retrieval",
+    "extract entities from documents",
+    "filter by metadata",
+    "manage data source connections",
+    "partition multi-tenant data",
+    "upload multimodal content",
+    "monitor document processing status",
+    "synchronize external data sources",
+    "retrieve document content"
+  ]
+}

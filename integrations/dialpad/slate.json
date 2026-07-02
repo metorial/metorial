@@ -1,0 +1,19 @@
+{
+  "name": "@metorial/dialpad",
+  "description": "Manage business communications including voice calls, SMS messaging, video meetings, and contact center operations. Initiate and control calls, send SMS messages, manage users and contacts, configure call centers with agent duty status and skill levels, set up call routing with IVR menus, retrieve AI-generated call transcripts and recaps, send faxes, manage phone number assignments, subscribe to real-time webhook events for calls and messages, run analytics reports, and administer company settings including access control policies and blocked numbers.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "initiate and manage calls",
+    "send SMS messages",
+    "manage call center agents",
+    "configure call routing",
+    "retrieve call transcripts",
+    "manage contacts",
+    "subscribe to call events",
+    "send faxes",
+    "manage phone numbers",
+    "run analytics reports"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/dialpad.png",
+  "version": "0.1.2"
+}

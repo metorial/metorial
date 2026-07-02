@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/pulumi",
+  "description": "Manage cloud infrastructure-as-code through Pulumi Cloud. Create, list, and delete stacks and projects. Trigger and monitor deployments including updates, previews, destroys, and refreshes. Manage secrets, configuration, and environments (Pulumi ESC) with versioning and composability. Search and audit cloud resources across organizations. Enforce compliance with policy packs and policy groups. Configure scheduled operations like drift detection and TTL stack destruction. Manage organization membership, teams, and access tokens. Export audit logs and data for external analysis. Configure webhooks for stack, deployment, drift, policy, and environment events.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "manage stacks and projects",
+    "trigger cloud deployments",
+    "manage secrets and configuration",
+    "search cloud resources",
+    "enforce compliance policies",
+    "schedule drift detection",
+    "manage environments (ESC)",
+    "export audit logs",
+    "configure webhooks",
+    "manage access tokens"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pulumi.png"
+}

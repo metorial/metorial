@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/freshbooks",
+  "description": "Create and manage invoices, estimates, expenses, and payments for small business accounting. Track time entries against projects, manage clients and vendors, record bill payments, and generate financial reports including profit & loss, balance sheet, and cash flow. Create credit notes, configure taxes, manage billable items and services, and send invoices and estimates via email. Supports webhooks for real-time notifications on changes to invoices, clients, expenses, payments, projects, and more.",
+  "categories": ["financial-data-and-stock-market", "task-and-project-management"],
+  "skills": [
+    "create and manage invoices",
+    "track expenses and receipts",
+    "record and manage payments",
+    "log time entries",
+    "manage clients and contacts",
+    "create and send estimates",
+    "generate financial reports",
+    "manage projects and services",
+    "create credit notes",
+    "configure taxes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/freshbooks.svg"
+}

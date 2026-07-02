@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/woocommerce",
+  "description": "Manage an online store's products, orders, customers, coupons, and shipping configuration. Create, read, update, and delete products with support for variations, inventory tracking, pricing, images, categories, tags, and attributes. Process and manage orders including line items, refunds, order notes, and status updates. Manage customer records with billing and shipping addresses. Configure discount coupons with usage limits, product restrictions, and expiration dates. Set up tax rates, shipping zones, and payment gateways. Access sales reports, top sellers, and store-wide totals. Read and update store settings, manage webhooks, and monitor system status.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "manage products and inventory",
+    "process and track orders",
+    "manage customer records",
+    "create discount coupons",
+    "issue order refunds",
+    "configure shipping zones",
+    "configure tax rates",
+    "access sales reports",
+    "manage payment gateways",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/woocommerce.png"
+}

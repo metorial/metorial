@@ -1,0 +1,82 @@
+name: Validate changed integrations
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  validate-changed-integrations:
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build shared packages
+        run: bun run packages:build
+
+      - name: Detect, build, and validate changed integrations
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_COMMENT_PATH: ${{ runner.temp }}/changed-integrations-comment.md
+        run: bun run integrations:validate-pr -- --base "$PR_BASE_SHA" --head "$PR_HEAD_SHA"
+
+      - name: Update PR comment
+        uses: actions/github-script@v7
+        env:
+          PR_COMMENT_PATH: ${{ runner.temp }}/changed-integrations-comment.md
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- changed-integrations-report -->';
+            const body = fs.readFileSync(process.env.PR_COMMENT_PATH, 'utf8');
+            const issue_number = context.payload.pull_request.number;
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              per_page: 100
+            });
+
+            const existing = comments.find(comment =>
+              comment.user?.type === 'Bot' && typeof comment.body === 'string' && comment.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+              core.info(`Updated comment ${existing.id}`);
+            } else {
+              const created = await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number,
+                body
+              });
+              core.info(`Created comment ${created.data.id}`);
+            }

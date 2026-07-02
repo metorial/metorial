@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/squarespace",
+  "description": "Manage e-commerce operations for Squarespace merchant sites. Retrieve, create, update, and fulfill orders, including importing orders from third-party channels. Manage products (physical, service, gift card, and download types) with variants, images, and pricing. Track and adjust inventory stock levels across product variants. Access customer profiles, mailing list subscribers, and donors. Retrieve financial transaction data across Squarespace, Stripe, PayPal, and Square payment gateways. Get site information such as name, URL, currency, and time zone. Subscribe to webhooks for order creation and update events. Access form submission data for workflow automation.",
+  "categories": [
+    "document-processing",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage products and variants",
+    "fulfill and create orders",
+    "adjust inventory levels",
+    "retrieve customer profiles",
+    "access financial transactions",
+    "subscribe to order webhooks",
+    "retrieve site information",
+    "filter orders by status",
+    "manage product images",
+    "retrieve form submissions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/squarespace.png"
+}

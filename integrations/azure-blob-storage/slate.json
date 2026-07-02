@@ -1,0 +1,19 @@
+{
+  "name": "@microsoft/azure-blob-storage",
+  "description": "Upload, download, copy, and delete blobs (block, append, page) in Azure cloud storage. Create and manage containers, set blob metadata and properties, and configure access tiers (Hot, Cool, Cold, Archive). Manage blob snapshots and versioning for point-in-time recovery. Apply lifecycle management policies to automatically transition blobs between tiers or expire data. Acquire and manage leases for concurrency control. Configure immutable storage with WORM policies for compliance. Subscribe to blob events (created, deleted, tier changed, renamed) via Azure Event Grid webhooks for event-driven workflows.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "upload and download blobs",
+    "manage storage containers",
+    "copy blobs across accounts",
+    "set blob access tiers",
+    "configure lifecycle policies",
+    "manage blob snapshots and versions",
+    "set blob metadata and properties",
+    "acquire and manage leases",
+    "configure immutable storage",
+    "subscribe to blob events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/azure-blob-storage.png",
+  "version": "0.1.2"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/api-labz",
+  "description": "Access a marketplace of AI-powered API modules for document processing, data extraction, and content generation. Convert documents between formats (e.g., PDF to JSON), extract structured data from ID cards for KYC, track and analyze expenses, generate AI-driven business reports, and create social media content from product descriptions. Convert text to diagrams or images, perform AI-powered deep research and search queries, and extract organized JSON from PDFs and images using custom schemas. Manage OAuth integrations for 100+ third-party applications without maintaining your own OAuth infrastructure.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "convert document formats",
+    "extract ID card data",
+    "generate business reports",
+    "track and analyze expenses",
+    "generate social media content",
+    "convert text to diagrams",
+    "generate images from text",
+    "extract PDF to JSON",
+    "perform AI-powered search",
+    "manage OAuth integrations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/api-labz.svg"
+}

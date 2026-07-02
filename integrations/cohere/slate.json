@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/cohere",
+  "description": "Generate text and chat completions using Cohere's Command family of large language models, with support for multi-turn conversations, retrieval augmented generation (RAG), tool use, reasoning, vision, and translation. Create text and image embeddings for semantic search, classification, and clustering. Rerank search results by semantic relevance. Manage batch embedding jobs and datasets for large-scale document processing. Tokenize and detokenize text for cost estimation. List available models and their capabilities.",
+  "categories": ["apis-and-http-requests", "language-translation"],
+  "skills": [
+    "generate text completions",
+    "multi-turn chat conversations",
+    "create text embeddings",
+    "rerank search results",
+    "retrieval augmented generation",
+    "translate text across languages",
+    "process images with vision",
+    "manage batch embedding jobs",
+    "manage datasets",
+    "tokenize and detokenize text"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cohere.png"
+}

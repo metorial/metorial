@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/freeagent",
+  "description": "Create, manage, and track invoices, expenses, and bank transactions for UK-focused small business accounting. Manage contacts, projects, and timeslips for time tracking and billing. Run payroll, generate financial reports (Profit & Loss, Balance Sheet, Trial Balance, Cashflow), and handle UK tax compliance including VAT returns, Self Assessment, and Corporation Tax. Track capital assets, stock items, and hire purchases. Create recurring invoices, reconcile bank transactions, manage journal entries, and administer company users and permissions.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "create and manage invoices",
+    "track expenses",
+    "reconcile bank transactions",
+    "manage contacts",
+    "track project time",
+    "generate financial reports",
+    "manage UK tax returns",
+    "run payroll",
+    "track capital assets",
+    "manage stock items"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/soundcloud",
+  "description": "Upload, stream, search, and manage audio tracks on SoundCloud. Create and manage playlists (sets), follow users, like and repost tracks, and post timed comments. Retrieve user profiles, activity feeds, and public content. Search for tracks, playlists, and users. Resolve SoundCloud URLs to API resources and generate oEmbed player widgets for external embedding.",
+  "categories": ["document-processing", "news-and-media"],
+  "skills": [
+    "upload audio tracks",
+    "stream audio content",
+    "manage playlists",
+    "search tracks and users",
+    "like and repost tracks",
+    "post timed comments",
+    "retrieve user profiles",
+    "resolve SoundCloud URLs",
+    "embed audio players",
+    "follow and unfollow users"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/soundcloud.png"
+}

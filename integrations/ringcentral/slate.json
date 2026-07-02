@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/ringcentral",
+  "description": "Send and receive SMS, MMS, and fax messages from RingCentral phone numbers. Place and manage voice calls with controls like hold, transfer, park, and conference. Create and schedule video meetings and webinars, manage meeting recordings and registrations. Post messages, adaptive cards, tasks, and files into team messaging chats and channels. Access call logs and analytics with aggregate and timeline-based reporting. Manage account users, extensions, devices, phone numbers, and presence status. Connect with customers across social channels including Facebook, WhatsApp, Instagram, and X (Twitter). Leverage AI-powered speech-to-text transcription, conversation summaries, and interaction analytics. Subscribe to real-time event notifications via webhooks or WebSockets for calls, messages, presence changes, and more.",
+  "categories": ["email-and-messaging", "scheduling-and-calendars"],
+  "skills": [
+    "send SMS and MMS messages",
+    "manage voice calls",
+    "schedule video meetings",
+    "send and receive faxes",
+    "post team messages",
+    "access call logs and analytics",
+    "manage account users and devices",
+    "transcribe speech to text",
+    "create webinars",
+    "subscribe to event notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ring-central.svg"
+}

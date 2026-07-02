@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/emelia",
+  "description": "Create and manage multi-channel B2B prospecting campaigns combining cold email and LinkedIn outreach. Add, remove, and manage contacts and contact lists across email, LinkedIn, and advanced campaigns. Configure multi-step email sequences, start/pause campaigns, send test emails, and reply to prospects via a merged inbox. Retrieve campaign statistics including opens, clicks, and replies, and view activity logs. Find and verify professional email addresses and phone numbers using asynchronous job-based lookups. Manage email sending providers (mailboxes), enable or disable email warmup for sender reputation. Create and manage LinkedIn Sales Navigator scrapers to extract contact data at scale — start, pause, resume, rename, split, delete scrapers, enrich scraped data, and download results. Manage LinkedIn authentication credentials. Set up webhooks to monitor campaign events (opens, clicks, replies) and scraper completion. Blacklist contacts and set custom fields on individual contacts.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage email campaigns",
+    "manage LinkedIn campaigns",
+    "find professional emails",
+    "verify email addresses",
+    "find phone numbers",
+    "manage email warmup",
+    "scrape LinkedIn Sales Navigator",
+    "configure campaign webhooks",
+    "retrieve campaign statistics",
+    "manage contact lists"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/emelia.jpeg"
+}

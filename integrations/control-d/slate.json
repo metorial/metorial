@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/control-d",
+  "description": "Manage DNS filtering profiles, custom rules, and traffic redirection. Create and configure profiles with filters (ads, trackers, adult content, etc.), block or redirect 400+ specific services, and define custom domain-level rules including blocking, allowing, spoofing, and proxying. Manage devices/endpoints and assign profiles with scheduled swapping. Control IP-based access authorization, configure analytics logging, browse proxy locations for traffic redirection, and manage organizations and sub-organizations. Retrieve account, billing, and subscription information.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "manage DNS filtering profiles",
+    "block or redirect services",
+    "create custom domain rules",
+    "manage device endpoints",
+    "authorize IP addresses",
+    "configure traffic redirection proxies",
+    "manage organizations",
+    "configure analytics logging",
+    "retrieve billing information",
+    "toggle content filters"
+  ]
+}

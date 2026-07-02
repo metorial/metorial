@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/beamer",
+  "description": "Create, read, update, delete, and search changelog posts and announcements. Schedule and target posts to specific user segments with categories, translations, and rich media. Collect and manage feature requests and ideas from users. Add comments to posts and feature requests. Check NPS survey eligibility for users and retrieve NPS prompt URLs. Retrieve unread post counts and feed URLs. Receive webhooks for new posts, comments, reactions, and NPS scores.",
+  "categories": ["crm-and-sales-tools", "document-processing", "email-and-messaging"],
+  "skills": [
+    "create changelog posts",
+    "manage feature requests",
+    "collect NPS scores",
+    "target user segments",
+    "schedule post publication",
+    "add comments to posts",
+    "retrieve unread post count",
+    "track user reactions",
+    "send in-app notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/beamer.png"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@metorial/lever",
+  "description": "Manage candidates, opportunities, and hiring pipelines in Lever's applicant tracking system (ATS) and CRM. Create, update, and list job postings with descriptions, requirements, and categories. Track candidates through pipeline stages, archive or hire them, and manage their contact information, resumes, files, and tags. Schedule and manage interview panels, assign interviewers, and collect structured feedback via customizable forms and templates. View offers including compensation, status, and signature tracking. Create and manage hiring requisitions with headcount tracking, compensation bands, and approval workflows. Manage users with access roles and external directory mappings. Retrieve EEO responses, diversity surveys, audit events, referrals, sources, and archive reasons. Upload files and submit applications on behalf of candidates. Listen for webhooks on candidate stage changes, hires, interview events, contact updates, and application creation.",
+  "categories": ["hr-and-recruiting"],
+  "skills": [
+    "manage candidate opportunities",
+    "create job postings",
+    "schedule interviews",
+    "collect interview feedback",
+    "track pipeline stages",
+    "manage hiring requisitions",
+    "upload resumes and files",
+    "view offers and compensation",
+    "manage users and roles",
+    "monitor candidate webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/lever.png",
+  "version": "0.1.2"
+}

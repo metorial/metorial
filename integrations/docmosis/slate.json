@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/docmosis",
+  "description": "Generate documents by merging data with pre-uploaded templates (DOCX or ODT) to produce output in PDF, DOCX, ODT, TXT, HTML, and other formats. Upload, download, list, and delete document templates. Analyze template structure to retrieve expected field names. Deliver generated documents via direct response, email, AWS S3, or webhook. Track document generation usage with tags for reporting. Check service health and account usage quotas.",
+  "categories": ["document-processing"],
+  "skills": [
+    "generate documents from templates",
+    "merge data into templates",
+    "upload and manage templates",
+    "convert document formats",
+    "deliver documents via email",
+    "store documents to S3",
+    "analyze template fields",
+    "track document usage",
+    "check service status"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/docmosis.jpeg"
+}

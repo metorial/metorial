@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/metabase",
+  "description": "Create, manage, and execute queries against connected databases. Build and organize questions (saved queries) using SQL or MBQL, and export results in JSON, CSV, or XLSX formats. Create, update, and share dashboards with configurable parameters and filters. Organize items into collections, manage database connections and metadata, and control user permissions and group access. Set up scheduled alerts on question results with delivery to email, Slack, or webhooks. Search across all Metabase objects, upload CSV data, configure instance settings, and manage embedding with public links or signed tokens.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "execute database queries",
+    "create and manage dashboards",
+    "manage saved questions",
+    "organize items into collections",
+    "export query results",
+    "manage user permissions",
+    "set up alerts and notifications",
+    "search Metabase objects",
+    "upload CSV data",
+    "manage database connections"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/metabase.png"
+}

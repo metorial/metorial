@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/cats",
+  "description": "Manage the full recruitment lifecycle with an applicant tracking system. Create, update, search, and delete candidate records with resume uploads and parsing. Manage job orders with workflows, statuses, and career portal publishing. Track companies and contacts as a recruiting CRM. Build and manage candidate pipelines through configurable hiring workflow stages. Log activities (calls, emails, meetings) and create tasks against candidates, contacts, or jobs. Organize records with tags, lists, and custom fields. Perform advanced filtered searches with boolean logic and geo-distance queries. Subscribe to webhooks or poll events for changes to candidates, jobs, contacts, companies, pipelines, activities, and users. Initiate and retrieve full data backups.",
+  "categories": ["crm-and-sales-tools", "hr-and-recruiting", "task-and-project-management"],
+  "skills": [
+    "manage candidate records",
+    "parse and upload resumes",
+    "manage job orders",
+    "track hiring pipelines",
+    "manage companies and contacts",
+    "log recruiting activities",
+    "create and assign tasks",
+    "publish to career portals",
+    "search and filter records",
+    "manage tags and lists"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cats.png"
+}

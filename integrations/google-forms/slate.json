@@ -1,0 +1,16 @@
+{
+  "name": "@google/google-forms",
+  "description": "Create, retrieve, and update Google Forms, surveys, and quizzes. Configure quiz answer keys with point values and automatic feedback. Retrieve form responses and quiz grades, with filtering by timestamp. Set up push notification watches for form schema changes and new response submissions. Supports various question types including short answer, paragraph, multiple choice, checkboxes, dropdowns, linear scales, date, time, and grid questions. Add images and videos to forms.",
+  "categories": ["document-processing", "education-and-learning"],
+  "skills": [
+    "create and edit forms",
+    "configure quizzes and grading",
+    "retrieve form responses",
+    "set up answer keys",
+    "manage push notification watches",
+    "add form questions",
+    "filter responses by timestamp",
+    "set form settings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

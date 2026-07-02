@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/stitch",
+  "description": "Manage data pipelines that replicate data from SaaS applications, databases, and other sources into data warehouses like Redshift, BigQuery, Snowflake, and PostgreSQL. Create and configure data sources (integrations), set up destination warehouses, select streams and fields for replication, and schedule extraction frequency. Push arbitrary data via the Import API using JSON payloads with schema validation. Monitor extraction and load job status, manage post-load webhook notifications that trigger when data loading completes, and configure custom email notifications. Supports partner account provisioning, OAuth source configuration, and upsert or append-only loading behavior.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage data source integrations",
+    "configure destination warehouses",
+    "select streams and fields",
+    "schedule data replication",
+    "push data via Import API",
+    "monitor extraction and load jobs",
+    "manage post-load webhook notifications",
+    "provision Stitch accounts",
+    "configure OAuth for sources",
+    "manage email notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/stitch.png"
+}

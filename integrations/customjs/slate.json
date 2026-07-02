@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/customjs",
+  "description": "Execute custom JavaScript and Python code via API. Generate PDFs from HTML, merge, split, compress, and extract text from PDFs. Convert HTML to PNG images and capture website screenshots. Scrape web content and automate browser interactions with Puppeteer. Host static HTML pages and forms. Create mail hooks that forward incoming emails to webhooks. Process data with JSON Path selectors and Regex operations. Run stored reusable functions and check SSL certificates.",
+  "categories": ["code-execution", "document-processing", "task-and-project-management"],
+  "skills": [
+    "execute custom JavaScript code",
+    "execute custom Python code",
+    "generate PDFs from HTML",
+    "merge and split PDFs",
+    "capture website screenshots",
+    "scrape web content",
+    "convert HTML to images",
+    "host static HTML pages",
+    "forward emails to webhooks",
+    "extract and transform data"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/productlane",
+  "description": "Manage customer feedback, support insights, and public roadmaps. Create and list companies, contacts, and segments. Create, retrieve, and update feedback threads/insights. Access portal projects and issues, manage upvotes, and submit feedback. Retrieve changelogs and workspace information. Useful for consolidating customer feedback into actionable product work.",
+  "categories": ["crm-and-sales-tools", "task-and-project-management"],
+  "skills": [
+    "manage companies",
+    "create and list contacts",
+    "manage contact segments",
+    "create feedback insights",
+    "list portal projects",
+    "manage project upvotes",
+    "retrieve changelogs",
+    "fetch workspace details",
+    "update feedback threads"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/productlane.svg"
+}

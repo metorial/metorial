@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/proabono",
+  "description": "Manage subscriptions, recurring billing, and customer lifecycles for SaaS businesses. Create, update, suspend, upgrade, and terminate subscriptions tied to pricing offers. Track feature usage (toggles, limits, consumption quotas) per customer. Generate and retrieve invoices, process one-time charges and credits, and compute pricing quotes with taxes. Manage customers with billing addresses, payment methods, and GDPR anonymization. Retrieve and filter offers with multi-language and multi-currency support. Access hosted customer portal links for self-service subscription management, payment, and invoice downloads. Receive webhook notifications for customer, subscription, invoice, and payment method events.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "manage subscriptions",
+    "track feature usage",
+    "generate invoices",
+    "manage customers",
+    "compute pricing quotes",
+    "process one-time charges",
+    "retrieve pricing offers",
+    "host customer portal",
+    "handle payment methods",
+    "upgrade subscriptions"
+  ]
+}

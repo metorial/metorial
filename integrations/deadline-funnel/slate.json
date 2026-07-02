@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/deadline-funnel",
+  "description": "Start personalized deadline countdowns and countdown timers for individual subscribers in evergreen and launch campaigns. Track sales via webhooks with email, purchase date, amount, and currency. Integrate with email service providers to automatically trigger deadlines from automation rules. Create custom events for social proof displays and analytics. Manage ConvertHub portals with opt-in forms, microsurveys, and social proof widgets. Monitor new portal creations, custom events, and opt-in form submissions.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "start subscriber deadline tracking",
+    "track sales via webhooks",
+    "create custom events",
+    "manage countdown campaigns",
+    "capture opt-in form submissions",
+    "create ConvertHub portals",
+    "display social proof widgets",
+    "integrate email platforms"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/deadline-funnel.png"
+}

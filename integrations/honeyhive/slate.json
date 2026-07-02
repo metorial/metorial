@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/honeyhive",
+  "description": "Trace, monitor, and evaluate LLM applications and AI agents. Create and manage projects, log distributed traces of AI application execution including model calls, tool invocations, and chain events. Run offline experiments against curated datasets with custom evaluators. Create, version, and manage datasets and prompts. Post user feedback and custom metrics against sessions or events. Query and analyze production traces with aggregated cost, latency, token usage, and quality metrics. Manage annotation queues for human feedback collection. Configure prompt deployments across environments.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "trace LLM application execution",
+    "run evaluation experiments",
+    "manage prompts and versions",
+    "create and manage datasets",
+    "post feedback and metrics",
+    "query production traces",
+    "manage annotation queues",
+    "manage AI projects",
+    "batch log events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/honeyhive.png"
+}

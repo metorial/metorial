@@ -1,0 +1,16 @@
+{
+  "name": "@google/google-photos",
+  "description": "Upload, manage, and organize photos and videos in users' Google Photos libraries. Create and manage albums, add enrichments (text, location, map markers), and change album titles and cover photos. Upload media items, edit descriptions, and search app-created content with filters including date ranges, content categories, and favorites. Create picker sessions that let users securely select photos and videos from their library to share with your application. Access media metadata including camera information, creation time, dimensions, and exposure details.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "upload photos and videos",
+    "create and manage albums",
+    "search media items",
+    "create picker sessions",
+    "edit media descriptions",
+    "add album enrichments",
+    "retrieve media metadata",
+    "organize album content"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/Google_Photos.svg"
+}

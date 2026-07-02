@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/humanitix",
+  "description": "Retrieve event, order, and ticket information from the Humanitix not-for-profit ticketing platform. Fetch details about events owned by or shared with your account, query orders associated with specific events, inspect individual ticket details, and manage tags for categorizing events. A beta capability for creating and updating events is available by request. The API is primarily read-only with no webhook support.",
+  "categories": ["e-commerce-and-retail", "scheduling-and-calendars"],
+  "skills": [
+    "retrieve event details",
+    "fetch order information",
+    "retrieve ticket details",
+    "manage event tags",
+    "list account events",
+    "create events (beta)",
+    "update events (beta)"
+  ]
+}

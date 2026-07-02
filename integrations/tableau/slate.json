@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/tableau",
+  "description": "Manage Tableau Cloud and Tableau Server resources through the Tableau REST API. Query and manage workbooks, data sources, views, custom views, flows, users, groups, projects, permissions, favorites, collections, jobs, and data-driven alerts. Export views as CSV, PNG, or PDF.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "query and manage workbooks",
+    "export views as CSV, PNG, or PDF",
+    "manage data source extracts",
+    "administer users and groups",
+    "configure permissions",
+    "monitor background jobs",
+    "manage flows and runs",
+    "manage data-driven alerts",
+    "manage collections and favorites",
+    "manage custom views"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tableau.png"
+}

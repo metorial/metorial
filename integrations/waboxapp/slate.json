@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/waboxapp",
+  "description": "Send WhatsApp messages, images, links, and files programmatically through a linked WhatsApp account. Track message delivery and read status via acknowledgement events. Receive inbound messages and media (text, image, video, audio, documents, vcards, locations) through webhooks. Check linked account status including connectivity and device information.",
+  "categories": ["email-and-messaging"],
+  "skills": [
+    "send text messages",
+    "send images with captions",
+    "send link previews",
+    "send media files",
+    "track message delivery status",
+    "receive inbound messages",
+    "receive media content",
+    "check account status",
+    "handle group messages",
+    "monitor read receipts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/waboxapp.png"
+}

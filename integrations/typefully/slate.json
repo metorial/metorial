@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/typefully",
+  "description": "Create, schedule, and publish social media content across X (Twitter), LinkedIn, Threads, Bluesky, and Mastodon. Manage multi-platform drafts with per-platform tailored content, schedule posts for specific times or queue them into available slots, and publish immediately. Upload and attach media (images, videos, GIFs, PDFs) to posts. Organize content with tags, manage social sets (groups of connected platform accounts), and filter drafts by status. Receive webhook notifications for draft lifecycle events including creation, scheduling, publishing, status changes, tag changes, and deletion.",
+  "categories": ["crm-and-sales-tools", "document-processing", "news-and-media"],
+  "skills": [
+    "create multi-platform drafts",
+    "schedule social media posts",
+    "publish posts immediately",
+    "upload media attachments",
+    "manage content tags",
+    "list and filter drafts",
+    "manage social sets",
+    "queue posts for publishing",
+    "track draft status changes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/typefully.png"
+}

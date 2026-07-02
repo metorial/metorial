@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/uptimerobot",
+  "description": "Monitor website, server, and service uptime, downtime, and response times. Create and manage monitors (HTTP, keyword, ping, port, heartbeat, DNS) to track availability. Configure alert contacts and notification integrations (Slack, PagerDuty, Teams, webhooks, etc.) for up/down, SSL, and domain expiry events. Create and customize public status pages to display service health. Define maintenance windows to suppress alerts during scheduled downtime. Retrieve account information, subscription details, and monitor limits.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "create uptime monitors",
+    "manage alert contacts",
+    "configure webhook notifications",
+    "create public status pages",
+    "define maintenance windows",
+    "track response times",
+    "monitor SSL expiry",
+    "manage notification integrations",
+    "retrieve account information"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/uptimerobot.svg"
+}

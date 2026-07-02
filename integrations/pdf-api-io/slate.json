@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/pdf-apiio",
+  "description": "Generate PDF documents dynamically from pre-defined templates. List and retrieve template metadata including variable definitions and data types. Populate templates with dynamic data including text, images, tables, barcodes, QR codes, and charts. Merge multiple templates into a single PDF document. Output PDFs as binary data, base64-encoded strings, or temporary download URLs. Receive webhook notifications when PDFs are created.",
+  "categories": ["document-processing"],
+  "skills": [
+    "generate PDF from template",
+    "list available templates",
+    "retrieve template metadata",
+    "merge multiple templates",
+    "populate dynamic data fields",
+    "render tables with dynamic rows",
+    "generate QR codes and barcodes",
+    "receive PDF creation webhooks",
+    "export PDF as base64 or URL"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pdf-api-io.png"
+}

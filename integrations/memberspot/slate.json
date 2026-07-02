@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/memberspot",
+  "description": "Manage members, course access, and progress on the Memberspot e-learning platform. List, look up, and delete users. Grant, revoke, or delete course access for members (auto-creating members when granting access). Retrieve available offers/courses, track course progress, and fetch exam results. Control chapter-level access for fine-grained content delivery. Set and list custom user properties for personalization and segmentation. Generate single sign-on login tokens for passwordless user access.",
+  "categories": ["document-processing", "education-and-learning"],
+  "skills": [
+    "manage members",
+    "grant course access",
+    "revoke course access",
+    "track course progress",
+    "retrieve exam results",
+    "list available courses",
+    "manage chapter access",
+    "generate login tokens",
+    "set custom user properties"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/memberspot.png"
+}

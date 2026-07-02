@@ -1,0 +1,13 @@
+{
+  "name": "@metorial/norges-bank",
+  "description": "Retrieve raw Norges Bank exchange-rate and government generic-rate SDMX JSON from the public API.",
+  "categories": ["finance-and-accounting", "data-and-analytics"],
+  "skills": [
+    "get Norwegian exchange rates",
+    "retrieve currency rates against NOK",
+    "get Norwegian government generic rates",
+    "fetch treasury bill rates",
+    "fetch government bond rates",
+    "analyze historical Norges Bank data"
+  ]
+}

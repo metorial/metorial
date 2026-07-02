@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/ip2whois",
+  "description": "Look up domain WHOIS records to retrieve registration and ownership information including creation date, expiration date, domain age, registrant contact details, nameservers, and more. Find hosted domains by IP address (IPv4 and IPv6). Convert internationalized domain names to/from punycode, extract domain names from URLs, and identify gTLD or ccTLD extensions. Supports 1221 TLDs and 634 ccTLDs.",
+  "categories": ["security", "web-search"],
+  "skills": [
+    "lookup domain WHOIS records",
+    "retrieve domain registration details",
+    "find hosted domains by IP",
+    "convert punycode domain names",
+    "extract domain from URL",
+    "identify domain TLD extension",
+    "check domain expiration date",
+    "lookup registrant contact info"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ip2whois.png"
+}

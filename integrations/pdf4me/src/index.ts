@@ -1,0 +1,71 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  addBarcodeToPdf,
+  addHeaderFooter,
+  addPageNumbers,
+  addWatermark,
+  classifyDocument,
+  compressPdf,
+  convertFromPdf,
+  convertToPdf,
+  createBarcodeImage,
+  createImagesFromPdf,
+  createPdfA,
+  deletePages,
+  extractContent,
+  extractPages,
+  fillPdfForm,
+  findAndReplaceText,
+  flattenPdf,
+  generateDocument,
+  getPdfMetadata,
+  linearizePdf,
+  mergePdfs,
+  ocrPdf,
+  protectPdf,
+  readBarcodeFromPdf,
+  repairPdf,
+  rotatePdf,
+  runWorkflow,
+  splitPdf,
+  unlockPdf
+} from './tools';
+
+import { inboundWebhook } from './triggers/inbound-webhook';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    convertToPdf,
+    convertFromPdf,
+    mergePdfs,
+    splitPdf,
+    compressPdf,
+    extractContent,
+    addWatermark,
+    addBarcodeToPdf,
+    createBarcodeImage,
+    readBarcodeFromPdf,
+    protectPdf,
+    unlockPdf,
+    ocrPdf,
+    getPdfMetadata,
+    createPdfA,
+    extractPages,
+    deletePages,
+    rotatePdf,
+    addPageNumbers,
+    findAndReplaceText,
+    flattenPdf,
+    repairPdf,
+    linearizePdf,
+    fillPdfForm,
+    generateDocument,
+    addHeaderFooter,
+    createImagesFromPdf,
+    classifyDocument,
+    runWorkflow
+  ],
+  triggers: [inboundWebhook]
+});

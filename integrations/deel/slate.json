@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/deel",
+  "description": "Manage global payroll, contracts, and compliance for international employees and contractors. Create, amend, sign, and terminate contracts across multiple types (fixed rate, pay-as-you-go, milestone, EOR). Run payroll in 120+ countries, process payments and invoices, and handle off-cycle payments. Manage timesheets, time off requests, and worker profiles. Track immigration cases, provision users via SCIM, perform background checks, and access accounting data. Manage IT assets and device lifecycle through Deel IT. Subscribe to webhooks for real-time notifications on contract changes, payments, onboarding, and other platform events.",
+  "categories": ["financial-data-and-stock-market", "hr-and-recruiting"],
+  "skills": [
+    "manage international contracts",
+    "run global payroll",
+    "process payments and invoices",
+    "manage timesheets and time off",
+    "hire via employer of record",
+    "provision users via SCIM",
+    "track immigration cases",
+    "manage worker profiles",
+    "run background checks",
+    "manage IT assets"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/deel.svg"
+}

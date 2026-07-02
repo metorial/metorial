@@ -1,0 +1,18 @@
+{
+  "name": "@discord/discord",
+  "description": "Send, edit, and delete messages in channels. Manage servers (guilds), channels, roles, members, invites, webhooks, threads, scheduled events, auto moderation rules, audit logs, application commands, and custom guild emojis. Add or remove users, assign roles, kick or ban members, and receive supported message, guild, channel, member, and inbound webhook triggers.",
+  "categories": ["email-and-messaging", "news-and-media"],
+  "skills": [
+    "send and manage messages",
+    "manage servers and channels",
+    "create slash commands",
+    "execute webhooks",
+    "manage roles and members",
+    "moderate content automatically",
+    "schedule guild events",
+    "manage threads",
+    "manage custom guild emojis",
+    "track audit logs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/discord.svg"
+}

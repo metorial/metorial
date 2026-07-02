@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/budibase",
+  "description": "Manage low-code internal business applications, tables, rows, users, and queries. Create, retrieve, update, delete, and search applications, with the ability to publish and unpublish them. Perform full CRUD operations on tables and rows (data records) within applications, including filtered and sorted search. Manage users and their role-based access. Execute pre-configured queries (SQL, REST, etc.) with dynamic parameters. Trigger automations via inbound webhooks by sending JSON payloads to auto-generated URLs.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage applications",
+    "create and manage tables",
+    "create and search rows",
+    "manage users and roles",
+    "execute saved queries",
+    "publish applications",
+    "trigger automations via webhooks",
+    "filter and sort data",
+    "search across resources"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/budibase.png"
+}

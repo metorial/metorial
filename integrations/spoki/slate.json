@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/spoki",
+  "description": "Send and manage WhatsApp messages through the WhatsApp Business API. Create, update, and delete contacts with tags, custom fields, and list segmentation. Trigger automation workflows for multi-step messaging sequences. Send bulk campaigns to contact lists using approved template messages. Manage sales deals and pipelines. Receive webhook notifications for message, chat, contact, and deal events. Start AI-powered chatbot interactions. Embed WhatsApp inbox and chat interfaces into third-party applications.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send WhatsApp messages",
+    "manage contacts and tags",
+    "trigger automation workflows",
+    "send bulk campaigns",
+    "manage sales deals",
+    "segment contacts into lists",
+    "receive webhook notifications",
+    "update custom contact fields",
+    "embed WhatsApp inbox",
+    "AI-powered chatbot responses"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/spoki.png"
+}

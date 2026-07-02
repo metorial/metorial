@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/simplesat",
+  "description": "Collect, manage, and analyze customer satisfaction feedback through CSAT, NPS, and CES surveys. Retrieve surveys, questions, and response data with date filtering. Create and update customers via upsert using email as key. Send event-based email surveys triggered by customer interactions (e.g., purchases, ticket resolutions). Look up team members to associate feedback with agents. Receive real-time webhook notifications when new feedback is submitted. Integrates with helpdesks and CRMs to embed surveys in ticket emails and sync feedback data.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "retrieve survey responses",
+    "send event-based email surveys",
+    "create or update customers",
+    "retrieve feedback answers",
+    "list surveys and questions",
+    "look up team members",
+    "filter responses by date",
+    "receive new feedback webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/simplesat.jpeg"
+}

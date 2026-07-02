@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/newsdata-io",
+  "description": "Search and retrieve current and historic news articles from over 150,000 worldwide sources. Perform keyword searches across hundreds of millions of articles with advanced filtering by source, domain, date range, language, and country. Get live top and breaking headlines by country, category (business, entertainment, general, health, science, sports, technology), or specific sources. Discover and list available news publishers and their metadata. Sort results by relevancy, popularity, or publication date. Supports 14 languages and 55 countries.",
+  "categories": ["news-and-media", "web-search"],
+  "skills": [
+    "search news articles",
+    "get top headlines",
+    "filter by country and language",
+    "discover news sources",
+    "filter by date range",
+    "filter by category",
+    "sort search results",
+    "filter by domain"
+  ]
+}

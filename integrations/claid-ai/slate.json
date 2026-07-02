@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/claidai",
+  "description": "Enhance, edit, and generate images using AI-powered processing. Upscale and restore photos, remove or replace backgrounds, resize and reformat images, blur license plates for privacy, and apply style transfers. Generate product backgrounds from text prompts or templates, create AI fashion model photoshoots from garment photos, generate images from text descriptions, and convert static images to video animations. Manage cloud storage connectors for input/output, process images in batch or asynchronously, and receive webhook notifications on job completion.",
+  "categories": ["apis-and-http-requests", "document-processing", "e-commerce-and-retail"],
+  "skills": [
+    "enhance and upscale images",
+    "remove or replace backgrounds",
+    "generate AI product backgrounds",
+    "create AI fashion photoshoots",
+    "generate images from text",
+    "convert images to video",
+    "resize and reformat images",
+    "blur license plates",
+    "apply style transfer",
+    "batch process images"
+  ]
+}

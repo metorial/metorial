@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/rocketlane",
+  "description": "Manage customer onboarding and implementation projects. Create, update, archive, and delete projects with phases, tasks, and custom fields. Track time entries, manage resource allocations, and handle financial data like invoices. Create and manage collaborative spaces and documents for sharing with customers. Manage companies (customers), users, conversations, and comments. Configure project templates, custom fields for projects/tasks/companies, and receive webhook notifications for task events.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "create and manage projects",
+    "track and assign tasks",
+    "manage project phases",
+    "log and search time entries",
+    "manage customer companies",
+    "create collaborative spaces and documents",
+    "manage conversations and comments",
+    "configure custom fields",
+    "search invoices and financials",
+    "retrieve resource allocations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/rocketlane.png"
+}

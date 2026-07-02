@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/parsera",
+  "description": "Extract structured data from web pages using AI-powered natural-language descriptions. Scrape any URL by specifying desired attributes with names, descriptions, and types. Parse raw HTML or text content directly. Convert web pages to markdown. Create reusable scrapers that can be run across multiple URLs at once. Generate deterministic Python scraping code for faster, cost-effective extraction. Supports proxy configuration for geo-specific access, precision mode for hidden HTML data, and custom cookies for authenticated pages.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "extract structured web data",
+    "parse raw HTML content",
+    "convert pages to markdown",
+    "create reusable scrapers",
+    "generate scraping code",
+    "run scrapers on multiple URLs",
+    "configure proxy locations",
+    "manage custom scrapers",
+    "extract data with attributes"
+  ]
+}

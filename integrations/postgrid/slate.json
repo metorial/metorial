@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/postgrid",
+  "description": "Send physical mail programmatically including letters, postcards, cheques, and self-mailers. Manage contacts and reusable templates with merge variables for personalized mailings. Verify, standardize, and autocomplete postal addresses across the US, Canada, and 245+ countries. Track mail order status through printing, delivery, and completion stages. Run bulk mail campaigns to contact lists. Process PDFs with OCR address extraction and HTML-to-PDF rendering. Add QR codes and personalized URLs to track mailpiece engagement. Manage return envelopes and detect recipient address changes via NCOA. Receive webhook notifications for mail order lifecycle events.",
+  "categories": ["crm-and-sales-tools", "document-processing", "email-and-messaging"],
+  "skills": [
+    "send physical letters",
+    "send postcards",
+    "send cheques",
+    "verify postal addresses",
+    "autocomplete addresses",
+    "manage mail contacts",
+    "create mail templates",
+    "track mail orders",
+    "run bulk mail campaigns",
+    "process and render PDFs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/postgrid.jpeg"
+}

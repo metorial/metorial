@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/bouncer",
+  "description": "Verify and validate email addresses for deliverability, toxicity, and domain health. Perform real-time single email verification or batch verify up to 500,000 emails asynchronously. Check if emails are deliverable, undeliverable, risky, or unknown, and detect disposable, role-based, or catch-all addresses. Run toxicity checks to identify breached, spam-trap, or complainer emails on a 1-5 scale. Verify domain MX records and catch-all behavior. Monitor account credit balance for usage tracking.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging", "security"],
+  "skills": [
+    "verify single email address",
+    "batch verify email lists",
+    "detect disposable emails",
+    "check email toxicity",
+    "verify domain MX records",
+    "detect catch-all domains",
+    "check credit balance",
+    "identify role-based addresses",
+    "get deliverability score"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bouncer.png"
+}

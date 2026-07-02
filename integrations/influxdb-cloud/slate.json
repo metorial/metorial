@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/influxdb-cloud",
+  "description": "Write, query, and manage time-series data in InfluxDB Cloud buckets using line protocol and Flux or InfluxQL query languages. Create and manage buckets with configurable retention periods. Schedule and manage tasks (Flux scripts) for data downsampling, aggregation, and transformation. Set up monitoring checks, notification rules, and notification endpoints (Slack, PagerDuty, HTTP) to alert on data conditions. Create and manage dashboards for data visualization. Manage organizations, users, API tokens, secrets, labels, Telegraf configurations, and DBRP mappings for v1 compatibility.",
+  "categories": ["apis-and-http-requests", "iot-and-device-control"],
+  "skills": [
+    "write time-series data",
+    "query data with Flux",
+    "manage storage buckets",
+    "schedule automated tasks",
+    "configure monitoring alerts",
+    "manage dashboards",
+    "manage API tokens",
+    "manage secrets",
+    "manage Telegraf configurations",
+    "organize labels and resources"
+  ]
+}

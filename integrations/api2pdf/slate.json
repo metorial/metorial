@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/api2pdf",
+  "description": "Generate PDFs from HTML, URLs, and Markdown. Convert Microsoft Office documents, images, and email files to PDF. Capture screenshots of websites and HTML content. Merge multiple PDFs, extract specific page ranges, and reorder pages. Password-protect PDFs for secure delivery. Generate barcodes and QR codes. Create thumbnail previews for PDFs, Office documents, and email files. Extract structured data from PDFs. Convert HTML to Word (DOCX) and Excel (XLSX). Compress files into ZIP archives. Delete generated files on demand.",
+  "categories": ["document-processing"],
+  "skills": [
+    "generate PDF from HTML/URL",
+    "convert Office documents to PDF",
+    "capture website screenshots",
+    "merge multiple PDFs",
+    "extract PDF pages",
+    "password-protect PDFs",
+    "generate barcodes and QR codes",
+    "create document thumbnails",
+    "extract structured PDF data",
+    "compress files into ZIP"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/api2pdf.png"
+}

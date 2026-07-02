@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mongodb-atlas",
+  "description": "Manage MongoDB Atlas cloud database infrastructure programmatically. Provision, scale, pause, and delete database clusters across AWS, Azure, and GCP. Create and manage database users with role-based access control and multiple authentication methods (SCRAM, X.509, IAM, LDAP, OIDC). Configure network security including IP access lists, VPC peering, and private endpoints. Manage cloud backups, on-demand snapshots, scheduled backup policies, and point-in-time restores. Monitor cluster performance metrics, retrieve slow query logs, and get index recommendations from the Performance Advisor. Configure alerts for metric thresholds and operational events with notifications to webhooks, Slack, PagerDuty, Datadog, and other services. Create and manage Atlas Search indexes for full-text search. Set up database triggers that forward change events to AWS EventBridge. Configure online archiving rules to move data to cheaper storage. Manage organizations, projects, teams, invoices, federated authentication, and push-based log exports. Note: this API manages infrastructure only — it does not read or write application data stored in databases.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "provision database clusters",
+    "manage database users",
+    "configure network security",
+    "manage cloud backups",
+    "monitor cluster metrics",
+    "configure alert notifications",
+    "create search indexes",
+    "set up database triggers",
+    "manage organizations and projects",
+    "retrieve performance recommendations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mongodb-atlas.png"
+}

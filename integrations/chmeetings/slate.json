@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/chmeetings",
+  "description": "Manage church members, families, groups, contributions, and organizational structures in ChMeetings. Retrieve and delete people records and profile notes. Create and manage family structures including adding, updating, and removing family members. Pull groups and ministries data within the church hierarchy. Record and retrieve contributions (donations), and track pledges and campaigns. Receive real-time webhook notifications when people are created, updated, or deleted, and when contributions are created.",
+  "categories": [
+    "crm-and-sales-tools",
+    "email-and-messaging",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "retrieve people profiles",
+    "manage family structures",
+    "record contributions",
+    "track pledges and campaigns",
+    "retrieve groups data",
+    "manage profile notes",
+    "list organizations and ministries",
+    "delete people records",
+    "receive people change notifications",
+    "receive contribution notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/chmeetings.svg"
+}

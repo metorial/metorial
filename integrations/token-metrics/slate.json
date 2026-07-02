@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/token-metrics",
+  "description": "Retrieve AI-powered cryptocurrency analytics, market data, and trading insights. Get real-time and historical token prices (OHLCV), AI-generated trader and investor grades, trading signals for long/short positions, market sentiment analysis from Twitter/Reddit/Telegram, AI model portfolio indices with holdings and performance, support/resistance levels, correlation analysis, quantitative metrics, scenario-based price predictions, AI-generated research reports, crypto investor scores, and top tokens by market cap. Query a conversational AI agent for on-demand market insights in plain English.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
+  "skills": [
+    "retrieve token market data",
+    "fetch historical OHLCV prices",
+    "get AI trading signals",
+    "access trader and investor grades",
+    "analyze crypto sentiment",
+    "browse AI model portfolios",
+    "get support and resistance levels",
+    "generate AI research reports",
+    "predict token prices",
+    "query conversational AI agent"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/token-metrics.png"
+}

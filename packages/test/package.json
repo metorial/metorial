@@ -1,0 +1,53 @@
+{
+  "name": "@slates/test",
+  "version": "1.0.0-rc.9",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src/**",
+    "dist/**",
+    "README.md",
+    "package.json"
+  ],
+  "author": "Tobias Herber",
+  "license": "FSL 1.1",
+  "type": "module",
+  "source": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.module.js",
+      "default": "./dist/index.module.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "require": "./dist/config.cjs",
+      "import": "./dist/config.module.js",
+      "default": "./dist/config.module.js"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.module.js",
+  "types": "dist/index.d.ts",
+  "unpkg": "./dist/index.module.js",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "build": "tsup --config tsup.config.ts",
+    "typecheck": "tsc --noEmit",
+    "biome:check": "biome check --write src"
+  },
+  "dependencies": {
+    "@lowerdeck/testing-tools": "latest",
+    "@slates/client": "1.0.0-rc.12",
+    "@slates/profiles": "1.0.0-rc.10"
+  },
+  "devDependencies": {
+    "@slates/provider": "1.0.0-rc.15",
+    "@slates/tsconfig": "1.0.0-rc.1",
+    "typescript": "5.8.2",
+    "vitest": "^3.1.2",
+    "zod": "^4.2"
+  }
+}

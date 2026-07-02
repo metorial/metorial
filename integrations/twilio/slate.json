@@ -1,0 +1,18 @@
+{
+  "name": "@twilio/twilio",
+  "description": "Send and receive SMS, MMS, WhatsApp, and RCS messages. Make, receive, and monitor phone calls with programmable call control. Verify user identities via OTP, TOTP, and silent network authentication. Look up phone number intelligence including carrier, line type, caller name, and SIM swap detection. Manage multi-channel conversations across chat, SMS, and WhatsApp. Search for and purchase phone numbers, configure voice and messaging endpoints, schedule messages for future delivery, and inspect call recording metadata.",
+  "categories": ["email-and-messaging", "security"],
+  "skills": [
+    "send SMS and MMS messages",
+    "make and receive phone calls",
+    "verify user identity",
+    "lookup phone number intelligence",
+    "manage multi-channel conversations",
+    "schedule future messages",
+    "record and monitor calls",
+    "purchase and manage phone numbers",
+    "manage messaging services",
+    "send WhatsApp messages"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/twilio.svg"
+}

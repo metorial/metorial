@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/owl-protocol",
+  "description": "Deploy and manage smart contracts (ERC20, ERC721, ERC1155) across EVM-compatible blockchains without private keys or cryptocurrency. Create and manage NFT and fungible token collections, mint and transfer tokens individually or in batches, and configure token metadata and templates. Manage developer and user wallets with gasless sponsored transactions via ERC4337 smart wallets. Create project users with universal wallets, deploy cross-chain token bridges, add custom EVM chain configurations, and integrate on-chain events with Web2 platforms through Zapier. All gas fees are handled automatically via API key authentication.",
+  "categories": [
+    "apis-and-http-requests",
+    "financial-data-and-stock-market",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "deploy smart contracts",
+    "mint and transfer tokens",
+    "manage token metadata",
+    "create user wallets",
+    "manage NFT collections",
+    "create token templates",
+    "bridge tokens cross-chain",
+    "configure custom EVM chains",
+    "batch mint tokens",
+    "manage contract royalties"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/owl-protocol.png"
+}

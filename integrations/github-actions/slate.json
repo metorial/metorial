@@ -1,0 +1,18 @@
+{
+  "name": "@github/github-actions",
+  "description": "Manage GitHub Actions CI/CD workflows, runs, and jobs programmatically. Trigger, cancel, and re-run workflow runs, including re-running only failed jobs. List and download workflow artifacts and job logs. Create, update, and delete encrypted secrets and plaintext variables at repository, organization, and environment levels. Manage self-hosted and GitHub-hosted runners, including registration tokens, labels, and runner groups. Configure Actions permissions and policies, such as allowed actions, default GITHUB_TOKEN permissions, and fork pull request approval settings. Inspect and delete workflow caches. Retrieve workflow and run usage/billing statistics. Customize OIDC subject claim templates for cloud provider federation. Subscribe to webhook events for workflow runs, jobs, check runs, check suites, and deployments.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "trigger workflow runs",
+    "manage workflow secrets",
+    "manage workflow variables",
+    "download workflow artifacts",
+    "manage self-hosted runners",
+    "configure actions permissions",
+    "re-run failed jobs",
+    "manage workflow caches",
+    "download job logs",
+    "customize OIDC claims"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/github.png"
+}

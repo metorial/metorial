@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/removebg",
+  "description": "Remove image backgrounds automatically using AI. Detect foreground subjects (people, products, animals, cars) and remove or replace backgrounds with solid colors or custom images. Configure output size, format, cropping, scaling, positioning, and shadow effects. Define regions of interest for selective background removal. Retrieve foreground position metadata and account credit balance information. Submit feedback to improve result quality.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "remove image backgrounds",
+    "replace image backgrounds",
+    "add shadow effects",
+    "crop and scale images",
+    "detect foreground subjects",
+    "generate alpha masks",
+    "set region of interest",
+    "check account credits",
+    "submit quality feedback"
+  ]
+}

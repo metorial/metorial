@@ -1,0 +1,19 @@
+{
+  "name": "@microsoft/azure-functions",
+  "description": "Manage and invoke Azure Functions serverless compute resources. Create, update, delete, and list function apps and their individual functions. Invoke HTTP-triggered functions directly via URL endpoints. Manage function-level, host-level, and system access keys for authentication. Configure application settings, connection strings, CORS policies, and custom domain bindings. Create, swap, and manage deployment slots for staged rollouts. Deploy function code via ZIP packages, external URLs, or source control integration. Retrieve function execution logs, host status, and runtime health. Monitor resource lifecycle events via Azure Event Grid integration.",
+  "categories": ["apis-and-http-requests", "code-execution"],
+  "skills": [
+    "manage function apps",
+    "invoke HTTP-triggered functions",
+    "manage access keys",
+    "configure app settings",
+    "manage deployment slots",
+    "deploy function code",
+    "monitor function health",
+    "list and get functions",
+    "swap deployment slots",
+    "manage CORS and auth settings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/azure-functions.png",
+  "version": "0.1.2"
+}

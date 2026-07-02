@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/countdown-api",
+  "description": "Search and retrieve real-time eBay product data across 20 global eBay domains. Search product listings with filters for condition, sorting, and pagination. Retrieve detailed product information by eBay Product ID, GTIN, ISBN, UPC, or EAN. Fetch customer reviews and rating breakdowns for products. Look up seller profiles and seller feedback. Get autocomplete suggestions for eBay search terms. Schedule bulk data collection jobs of up to 15,000 requests with automatic delivery to Amazon S3 or Google Cloud Storage. Monitor account usage and review error logs for failed requests. Receive webhook notifications when bulk collection jobs complete.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail"],
+  "skills": [
+    "search eBay product listings",
+    "retrieve product details",
+    "fetch customer reviews",
+    "look up seller profiles",
+    "get seller feedback",
+    "get autocomplete suggestions",
+    "schedule bulk data collections",
+    "lookup products by GTIN/UPC/EAN",
+    "export results to cloud storage",
+    "monitor account usage"
+  ]
+}

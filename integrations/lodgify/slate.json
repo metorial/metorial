@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/lodgify",
+  "description": "Manage vacation rental properties, reservations, and guest communication. Create, edit, and remove property listings. Create and update bookings with status tracking (open, booked, tentative, declined). Query and update availability calendars across connected channels. Set rates, seasonal pricing, and discounts. Generate quotes and payment links for bookings. Send and receive guest messages. Subscribe to webhooks for booking changes, availability updates, rate changes, and new guest messages.",
+  "categories": [
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market",
+    "scheduling-and-calendars"
+  ],
+  "skills": [
+    "manage property listings",
+    "create and update bookings",
+    "manage availability calendars",
+    "set rates and pricing",
+    "generate quotes and payment links",
+    "automate guest communication",
+    "manage webhook subscriptions",
+    "sync multi-channel listings",
+    "track reservation status",
+    "retrieve guest information"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/lodgify.svg"
+}

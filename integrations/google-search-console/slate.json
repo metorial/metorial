@@ -1,0 +1,16 @@
+{
+  "name": "@google/google-search-console",
+  "description": "Query search traffic analytics including clicks, impressions, CTR, and average position, with filtering by query, page, country, device, search type, and date. Manage Search Console site properties by adding, removing, and listing sites. Submit, list, retrieve, and delete sitemaps. Inspect URLs to check indexing status, AMP results, rich results, and mobile usability. Run mobile-friendly tests on URLs to check Google's mobile-friendliness standards.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "query search traffic analytics",
+    "inspect URL indexing status",
+    "manage site properties",
+    "submit and manage sitemaps",
+    "run mobile-friendly tests",
+    "filter by device and country",
+    "retrieve click and impression data",
+    "check rich results status"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google_search_console-logo.svg"
+}

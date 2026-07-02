@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/bart",
+  "description": "Retrieve real-time BART (Bay Area Rapid Transit) train departure estimates, plan trips between stations, and access schedule, fare, route, and station information. Look up service advisories, elevator outage status, and active train counts. Get fare costs between stations, station access details including parking and bike facilities, and holiday or special schedules. All data is read-only.",
+  "categories": ["apis-and-http-requests", "scheduling-and-calendars"],
+  "skills": [
+    "get real-time departure estimates",
+    "plan trips between stations",
+    "retrieve fare information",
+    "look up station details",
+    "check service advisories",
+    "check elevator status",
+    "get active train count",
+    "retrieve schedule information",
+    "get route information"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bart.jpeg"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/shipengine",
+  "description": "Create shipping labels, compare carrier rates, validate addresses, and track packages across multiple carriers including FedEx, UPS, USPS, and DHL. Manage shipments with customs documentation, insurance, and multi-package support. Parse addresses from unstructured text. Schedule carrier pickups, create manifests, and handle LTL freight quotes and bills of lading. Connect and manage carrier accounts, organize warehouses, import sales orders from marketplaces, and find carrier pick-up/drop-off service points. Subscribe to real-time tracking updates and batch completion events via webhooks.",
+  "categories": ["e-commerce-and-retail", "task-and-project-management"],
+  "skills": [
+    "create shipping labels",
+    "compare carrier rates",
+    "validate addresses",
+    "track packages",
+    "parse unstructured addresses",
+    "manage shipments",
+    "schedule carrier pickups",
+    "request LTL freight quotes",
+    "manage warehouse locations",
+    "import sales orders"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/shipengine.svg"
+}

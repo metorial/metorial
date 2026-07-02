@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/prisma",
+  "description": "Provision and manage PostgreSQL databases, projects, and workspaces on the Prisma Data Platform. Create and delete Prisma Postgres databases in specified regions, retrieve connection details (pooled, direct, and Accelerate endpoints), manage database backups, and monitor usage statistics. Organize resources through workspaces and projects, transfer database ownership to other users, and manage OAuth integrations. Stream real-time database change events (create, update, delete) via Prisma Pulse for building reactive applications.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "provision PostgreSQL databases",
+    "manage database connections",
+    "list and retrieve workspaces",
+    "create and manage projects",
+    "retrieve database backups",
+    "monitor database usage",
+    "transfer database ownership",
+    "manage OAuth integrations",
+    "stream database change events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/prisma.png"
+}

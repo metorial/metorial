@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/jigsawstack",
+  "description": "Scrape websites using natural language prompts to extract structured data. Perform AI-powered web search and deep research on topics. Analyze text sentiment, summarize content, translate text across 160+ languages, and check spelling. Convert natural language to SQL queries. Extract structured data from images using vision OCR (e.g., receipts, documents). Transcribe audio and video files to text with speaker diarization and language detection. Generate images from text prompts using multiple model backends. Convert HTML to PDF or images. Detect NSFW content, profanity, and spam. Classify text into custom categories. Upload, retrieve, and delete files in cloud storage. Search for addresses and places with geocoding. Generate text embeddings for semantic search. Receive webhook callbacks for long-running task results.",
+  "categories": ["apis-and-http-requests", "speech-recognition-and-synthesis", "web-search"],
+  "skills": [
+    "scrape websites with prompts",
+    "AI web search and research",
+    "analyze text sentiment",
+    "translate text multi-language",
+    "extract data from images",
+    "transcribe audio to text",
+    "generate images from text",
+    "convert HTML to PDF",
+    "detect NSFW and spam",
+    "classify text into categories"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/jigsawstack.png"
+}

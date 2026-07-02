@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/appsmith",
+  "description": "Manage and interact with Appsmith, an open-source low-code platform for building internal tools and dashboards. Trigger workflow automations via webhook URLs, monitor instance health, and manage applications and workspaces. Import and export applications as JSON, connect to datasources, embed apps in external sites, and retrieve audit logs. Note: most management operations rely on internal session-based APIs rather than a formally documented public API, so programmatic capabilities are limited. Key actions include triggering workflows with HTTP POST requests, checking instance health status, exporting and importing applications, managing workspace users and roles, and querying audit logs for user and application events.",
+  "categories": ["apis-and-http-requests", "code-execution", "task-and-project-management"],
+  "skills": [
+    "trigger workflows via webhook",
+    "check instance health",
+    "export and import applications",
+    "manage workspace users",
+    "query audit logs",
+    "connect to datasources",
+    "embed applications in iframes",
+    "manage Git version control",
+    "schedule cron-based workflows"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/appsmith.png"
+}

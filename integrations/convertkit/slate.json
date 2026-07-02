@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/convertkit",
+  "description": "Manage email subscribers, tags, forms, sequences, and broadcasts for creator-focused email marketing. Create and send broadcast emails, enroll subscribers in automated drip sequences, organize subscribers with tags and custom fields, import purchase data, and build subscriber segments. Supports webhooks for subscriber events including activations, unsubscribes, bounces, form subscriptions, tag changes, link clicks, and product purchases.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage email subscribers",
+    "send broadcast emails",
+    "create and manage tags",
+    "manage email sequences",
+    "add subscribers to forms",
+    "create custom fields",
+    "import purchase data",
+    "configure webhooks",
+    "segment subscribers",
+    "list email templates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/convertkit.png"
+}

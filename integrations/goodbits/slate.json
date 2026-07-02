@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/goodbits",
+  "description": "Manage email newsletters and subscribers for roundup-style newsletters. Add and update subscribers, create content links in the content library, retrieve sent email details, and access email analytics including open rates, click counts, and engagement metrics. Retrieve newsletter information and subscriber counts by status.",
+  "categories": ["crm-and-sales-tools", "document-processing", "email-and-messaging"],
+  "skills": [
+    "manage newsletter subscribers",
+    "add content to library",
+    "retrieve email analytics",
+    "track click engagement rates",
+    "retrieve sent emails",
+    "get subscriber counts",
+    "create content links",
+    "view newsletter information"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/goodbits.png"
+}

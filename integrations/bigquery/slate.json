@@ -1,0 +1,18 @@
+{
+  "name": "@google/bigquery",
+  "description": "Execute SQL queries against BigQuery datasets, including DML and DDL statements. Create, update, list, and delete datasets and tables with support for partitioning, clustering, and nested fields. Load data from local files or Cloud Storage in formats like CSV, JSON, Avro, and Parquet, and stream data in real time. Export table data to Cloud Storage. Manage asynchronous jobs for queries, loads, exports, and copies. Query external data sources including Cloud Storage, Bigtable, Spanner, and Google Sheets via federated queries. Create and manage machine learning models using BigQuery ML with SQL. Define and manage scheduled queries and data transfer pipelines. Share datasets across organizations via Analytics Hub. Manage IAM permissions and data policies for column-level security. Create user-defined functions and stored procedures. Monitor BigQuery activity through audit log events routed to Pub/Sub.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "execute SQL queries",
+    "manage datasets and tables",
+    "load and export data",
+    "stream real-time data",
+    "query external data sources",
+    "manage async jobs",
+    "train ML models with SQL",
+    "schedule data transfers",
+    "manage IAM permissions",
+    "create user-defined functions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bigquery.svg"
+}

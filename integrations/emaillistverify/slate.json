@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/emaillistverify",
+  "description": "Verify and validate email addresses for deliverability, safety, and accuracy. Perform single or bulk email verification to detect invalid addresses, spam traps, disposable emails, catch-all domains, and syntax errors. Find business email addresses by name and domain, search domains for associated email addresses, and enrich email data with profile details such as full name, gender, and email service provider. Upload CSV or text files for bulk verification, poll job status, and download verified results.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "verify single email address",
+    "bulk email list verification",
+    "detect spam traps",
+    "find email by name and domain",
+    "search domain for emails",
+    "enrich email with profile data",
+    "detect disposable emails",
+    "check email deliverability",
+    "upload and process email files"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/calendarhero",
+  "description": "Schedule and manage meetings with automated booking for 1:1 and group meetings. Retrieve and manage meeting types, query scheduled meetings by date range, and create meeting requests that find optimal times based on availability. Create and search contacts with detailed insights including job history, personality, and social media profiles. Subscribe to webhooks for meeting lifecycle events such as scheduled, created, expired, and cancelled meeting requests, as well as new contacts added via scheduling links.",
+  "categories": ["crm-and-sales-tools", "scheduling-and-calendars"],
+  "skills": [
+    "retrieve meeting types",
+    "query scheduled meetings",
+    "create meeting requests",
+    "create contacts",
+    "search contacts",
+    "get contact insights",
+    "manage webhook subscriptions",
+    "retrieve user profile"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/calendarhero.png"
+}

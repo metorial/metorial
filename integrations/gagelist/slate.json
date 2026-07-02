@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/gagelist",
+  "description": "Manage gages (measurement equipment), calibration records, and compliance tracking for quality standards such as ISO 9001, ISO 17025, AS 9100, and 21 CFR Parts 11/820. Create, read, update, and delete gage records and calibration records. Upload and manage file attachments on gages and calibrations. Generate calibration certificates. Manage manufacturer entries. Read and update custom field values for organization-specific data. Retrieve and update account settings. Export data for business intelligence and reporting purposes.",
+  "categories": [
+    "apis-and-http-requests",
+    "legal-and-compliance",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage gage records",
+    "manage calibration records",
+    "generate calibration certificates",
+    "upload file attachments",
+    "manage manufacturer entries",
+    "read custom field values",
+    "update custom field values",
+    "export BI data",
+    "manage account settings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/gagelist.jpeg"
+}

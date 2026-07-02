@@ -1,0 +1,20 @@
+{
+  "name": "@slates-integrations/test-public-apis",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@types/node": "^20",
+    "slates": "1.0.0-rc.14",
+    "zod": "^4.2"
+  },
+  "devDependencies": {
+    "typescript": "^5",
+    "vitest": "^3.1.2"
+  },
+  "version": "0.1.0-rc.6"
+}

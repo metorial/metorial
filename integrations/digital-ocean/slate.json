@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/digitalocean",
+  "description": "Manage cloud infrastructure on DigitalOcean. Create, resize, rebuild, and destroy Droplets (virtual machines). Provision and manage managed Kubernetes clusters, managed databases (MySQL, PostgreSQL, MongoDB, Valkey, OpenSearch, Kafka), and App Platform deployments. Create and manage block storage volumes, Spaces object storage buckets, container registries, and serverless functions. Configure networking resources including domains, DNS records, load balancers, VPCs, firewalls, and reserved IPs. Set up monitoring alert policies and uptime checks for Droplets and URLs. Manage SSH keys, images, snapshots, projects, tags, and billing information. Access generative AI inference endpoints via the Gradient AI Platform.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage virtual machines",
+    "provision managed databases",
+    "manage Kubernetes clusters",
+    "deploy applications via App Platform",
+    "manage object storage",
+    "configure DNS and domains",
+    "create load balancers",
+    "set up firewalls and VPCs",
+    "monitor uptime and alerts",
+    "manage container registry"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/digital_ocean-logo.svg"
+}

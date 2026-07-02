@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/drip",
+  "description": "Manage ecommerce-focused email marketing and CRM. Create, update, list, and delete subscribers with custom fields, tags, and lead scores. Run email series campaigns (drip sequences) and one-time broadcasts. Build and manage automation workflows, including starting or removing subscribers. Track shopper activity by creating and updating orders, carts, and products. Record custom events and conversions for subscribers. Manage tags for segmentation and automation triggers. Configure webhooks to receive real-time notifications on subscriber lifecycle changes, email engagement, lead scoring, and behavioral events. List forms, custom fields, and account information.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail"],
+  "skills": [
+    "manage subscriber records",
+    "send email campaigns",
+    "automate drip workflows",
+    "track orders and carts",
+    "apply and remove tags",
+    "record custom events",
+    "manage product catalog",
+    "configure webhooks",
+    "track lead scores",
+    "manage broadcast emails"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/getdrip.svg"
+}

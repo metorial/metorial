@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/imagekit",
+  "description": "Upload, manage, transform, and deliver images and videos via a cloud-based media platform with integrated Digital Asset Management. Upload files from streams, URLs, or Base64 data with options for AI tagging, background removal, and pre/post transformations. Manage assets in folders and collections with search, copy, move, rename, delete, and version control. Retrieve file metadata including EXIF data and dimensions. Create and manage custom metadata fields. Purge CDN cache and check purge status. Receive webhook notifications for video transformation and upload transformation events. Supports AI-powered auto-tagging, background removal, visual search, and image generation from text prompts.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "upload media files",
+    "manage digital assets",
+    "search and filter assets",
+    "retrieve file metadata",
+    "manage custom metadata fields",
+    "purge CDN cache",
+    "AI auto-tag assets",
+    "AI background removal",
+    "bulk tag operations",
+    "manage file versions"
+  ]
+}

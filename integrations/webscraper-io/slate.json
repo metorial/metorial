@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/webscraper-io",
+  "description": "Create, manage, and execute web scraping jobs to extract structured data from websites. Define sitemaps with CSS selectors and start URLs, run scraping jobs with configurable drivers (fast or full JavaScript), proxies, and timing controls. Monitor job status and data quality, download scraped data in JSON or CSV format, and schedule recurring scraping jobs using cron expressions. Receive webhook notifications when scraping jobs complete. Retrieve account information and remaining page credits.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "create and manage sitemaps",
+    "execute scraping jobs",
+    "download scraped data",
+    "schedule recurring scrapes",
+    "monitor job status",
+    "assess data quality",
+    "configure proxy settings",
+    "receive completion webhooks",
+    "retrieve account information"
+  ]
+}

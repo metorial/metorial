@@ -1,0 +1,66 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  addCommunicationWay,
+  bookInvoice,
+  bookVoucher,
+  cancelInvoice,
+  createContact,
+  createCreditNote,
+  createInvoice,
+  createInvoiceFromOrder,
+  createOrder,
+  createPart,
+  createVoucher,
+  deleteContact,
+  exportDatev,
+  getContact,
+  getInvoice,
+  getInvoicePdf,
+  getReceiptGuidance,
+  listCheckAccounts,
+  manageAccountingContact,
+  searchContacts,
+  searchCreditNotes,
+  searchInvoices,
+  searchOrders,
+  searchParts,
+  searchVouchers,
+  sendInvoice,
+  updateContact
+} from './tools';
+import { inboundWebhook, newContact, newInvoice, newVoucher } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    createContact,
+    getContact,
+    searchContacts,
+    updateContact,
+    deleteContact,
+    createInvoice,
+    getInvoice,
+    searchInvoices,
+    sendInvoice,
+    bookInvoice,
+    cancelInvoice,
+    getInvoicePdf,
+    createInvoiceFromOrder,
+    createVoucher,
+    searchVouchers,
+    bookVoucher,
+    createOrder,
+    searchOrders,
+    createPart,
+    searchParts,
+    createCreditNote,
+    searchCreditNotes,
+    exportDatev,
+    getReceiptGuidance,
+    listCheckAccounts,
+    addCommunicationWay,
+    manageAccountingContact
+  ],
+  triggers: [inboundWebhook, newContact, newInvoice, newVoucher]
+});

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/aha",
+  "description": "Manage product development records in Aha! including features, epics, releases, goals, initiatives, and ideas. Create and update roadmap items, track strategy with goals and OKRs, manage releases and milestones, and organize features by product or epic. Submit and manage ideas through idea portals, including voting, commenting, and promoting ideas to features or epics. Add comments and attachments to records, create to-dos and tasks, track time, manage capacity planning, and link records together. Manage users, teams, custom fields, custom tables, competitors, personas, notes, and knowledge base documents. Configure integrations, retrieve custom reports, and receive webhooks for record activity, audit events, and security events.",
+  "categories": ["note-taking-and-knowledge-bases", "task-and-project-management"],
+  "skills": [
+    "manage features and epics",
+    "create and track releases",
+    "submit and manage ideas",
+    "define goals and initiatives",
+    "manage to-dos and tasks",
+    "add comments and attachments",
+    "publish knowledge base notes",
+    "track time and capacity",
+    "manage users and teams",
+    "configure integrations and webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/aha.png"
+}

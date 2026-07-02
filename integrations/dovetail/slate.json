@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/dovetail",
+  "description": "Manage user research projects, notes, and qualitative data in Dovetail. Create and organize research projects, notes, insights, highlights, and documents. Tag and code qualitative data for thematic analysis. Manage research contacts and feedback channels with topics and data points. Import and export files across entities. Search across workspace data using AI-powered semantic search and generate AI summaries of research findings. Navigate workspace folders and retrieve attached files.",
+  "categories": [
+    "apis-and-http-requests",
+    "note-taking-and-knowledge-bases",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage research projects",
+    "create and edit notes",
+    "organize insights and highlights",
+    "tag qualitative data",
+    "manage research contacts",
+    "create feedback channels",
+    "AI-powered semantic search",
+    "generate AI summaries",
+    "import and export files",
+    "manage documents"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/twitch",
+  "description": "Manage Twitch live-streaming channels, streams, and viewer engagement. Retrieve and update channel information (title, game, language). Monitor live streams with viewer counts and metadata. Manage subscriptions, followers, and chat (send messages, announcements, whispers, configure chat settings). Moderate channels by banning/unbanning users, managing timeouts, configuring AutoMod, and managing blocked terms. Create and manage clips and videos. Create and manage custom channel points rewards and track redemptions. Run polls and predictions with Channel Points wagering. Monitor Hype Trains, initiate raids, and manage broadcast schedules. Access analytics for extensions and games. Manage charity campaigns, ads, Drops entitlements, and extensions. Subscribe to real-time events via EventSub (webhooks or WebSocket) for stream status, chat messages, subscriptions, moderation actions, channel point redemptions, and more.",
+  "categories": ["document-processing", "email-and-messaging", "news-and-media"],
+  "skills": [
+    "manage channel information",
+    "monitor live streams",
+    "send chat messages",
+    "moderate users and chat",
+    "manage subscriptions and followers",
+    "create and manage clips",
+    "manage channel points rewards",
+    "run polls and predictions",
+    "manage broadcast schedules",
+    "subscribe to real-time events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/twitch-logo.jpeg"
+}

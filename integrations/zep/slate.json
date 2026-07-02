@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/zep",
+  "description": "Manage persistent memory and knowledge graphs for AI agents. Create and manage users, conversation threads, and chat message history. Build and query temporal knowledge graphs from chat data, business data, and documents. Add structured and unstructured data to user-specific or shared group graphs. Retrieve assembled context using semantic, full-text, and graph-based search with configurable reranking and filtering. Search across graph nodes, edges, and episodes. Configure custom context templates, user summary instructions, and entity types. Receive webhook notifications for graph processing and batch ingestion events.",
+  "categories": ["apis-and-http-requests", "note-taking-and-knowledge-bases"],
+  "skills": [
+    "manage user profiles",
+    "manage conversation threads",
+    "add chat messages",
+    "build knowledge graphs",
+    "ingest business data",
+    "search graph nodes and edges",
+    "retrieve assembled context",
+    "configure custom entity types",
+    "manage group graphs",
+    "receive webhook notifications"
+  ]
+}

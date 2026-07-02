@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/paradym",
+  "description": "Issue, verify, and revoke verifiable credentials using SD-JWT VC, mDOC, and AnonCreds formats over OpenID4VC and DIDComm protocols. Create and manage credential templates with typed attributes, branding, and revocability settings. Define presentation templates to request and verify credentials from holders. Manage trusted entities (X.509 certificates and DIDs) to restrict accepted issuers during verification. Configure attribute providers to dynamically populate credentials from external systems. Establish and manage DIDComm connections for secure messaging and credential exchange. Manage projects and team members for multi-tenant environments. Receive webhook notifications for issuance and verification session events.",
+  "categories": ["security"],
+  "skills": [
+    "create credential templates",
+    "issue verifiable credentials",
+    "verify presented credentials",
+    "revoke issued credentials",
+    "manage DIDComm connections",
+    "configure presentation templates",
+    "manage trusted entities",
+    "manage projects and members",
+    "configure attribute providers",
+    "receive webhook events"
+  ]
+}

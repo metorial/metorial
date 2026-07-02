@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/waiverfile",
+  "description": "Manage online waiver forms, signed waivers, and events. Retrieve signed waivers by ID or search by reference IDs to link with external booking/reservation systems. Access waiver details including signer info, participants, custom fields, and signatures. Create and update events (parties, classes, tournaments) with categories, date ranges, and participant limits. Retrieve waiver form definitions and site configuration. Subscribe to webhooks for new waivers, edited waivers, new events, and edited events.",
+  "categories": ["document-processing", "legal-and-compliance", "scheduling-and-calendars"],
+  "skills": [
+    "retrieve signed waivers",
+    "search waivers by reference ID",
+    "create and manage events",
+    "manage event categories",
+    "retrieve waiver form definitions",
+    "get site details",
+    "subscribe to waiver webhooks",
+    "track waiver signing status",
+    "link waivers to bookings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/waiverfile.png"
+}

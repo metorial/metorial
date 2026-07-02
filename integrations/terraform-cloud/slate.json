@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/terraform-cloud",
+  "description": "Manage infrastructure-as-code workflows on Terraform Cloud (HCP Terraform). Create, update, delete, lock, and unlock workspaces. Trigger and manage Terraform runs including plan, apply, and destroy operations. Approve, cancel, discard, or force-execute runs. Create and manage Terraform variables and environment variables at the workspace or variable set level, including sensitive values. Organize workspaces into projects. Manage organizations, teams, team memberships, and granular workspace permissions. Enforce policies using Sentinel and OPA policy-as-code frameworks. View and manage Terraform state versions and outputs. Connect workspaces to VCS repositories (GitHub, GitLab, Bitbucket, Azure DevOps) for automatic run triggers. Configure run tasks to integrate external services during plan and apply stages. Set up run triggers for workspace dependency chains. Enable health assessments including drift detection and continuous validation. Publish and manage private Terraform modules and providers in a private registry. Manage agent pools for private infrastructure execution. Access audit trail logs. Configure webhook notifications for run progress, workspace health, and auto-destroy events to Slack, Microsoft Teams, email, or custom endpoints.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "manage workspaces and projects",
+    "trigger and manage runs",
+    "manage variables and secrets",
+    "enforce policies on runs",
+    "manage state versions",
+    "configure VCS integrations",
+    "manage teams and permissions",
+    "configure run task integrations",
+    "detect infrastructure drift",
+    "manage private registry modules"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/terraform-cloud.png"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@meta/instagram",
+  "description": "Publish photos, videos, Reels, Stories, and carousels to Instagram. Retrieve and manage media with metadata such as captions, timestamps, and permalinks. Moderate comments by creating, replying, deleting, hiding, or disabling them. Inspect current API content publishing quota usage. Access account and media-level insights including reach, views, saves, likes, comments, shares, and audience demographics. Search public posts by hashtag. Discover and retrieve mentions of your brand and other business/creator account profiles. Send and receive direct messages including text, media, and story replies within the 24-hour messaging window. Tag products on media for commerce. Receive real-time webhook notifications for new comments, mentions, story insights, and incoming messages.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "publish media content",
+    "inspect publishing limits",
+    "manage comments",
+    "retrieve account insights",
+    "search hashtags",
+    "send direct messages",
+    "moderate user comments",
+    "discover business profiles",
+    "track brand mentions",
+    "tag products on media",
+    "receive webhook notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/instagram.svg"
+}

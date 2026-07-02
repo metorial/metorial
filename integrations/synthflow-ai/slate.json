@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/synthflow-ai",
+  "description": "Create, configure, and manage AI-powered voice agents for automating inbound and outbound phone calls. Initiate live calls, monitor active conversations, and retrieve call history with transcripts and recordings. Upload domain knowledge bases, browse and assign voices, and provision phone numbers. Run simulations and test cases before deploying agents. Register custom actions to integrate external APIs during calls. Manage contacts, subaccounts, webhook logs, and export analytics. Supports post-call and inbound call webhooks for real-time notifications and dynamic call routing.",
+  "categories": [
+    "apis-and-http-requests",
+    "email-and-messaging",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "create and manage voice agents",
+    "initiate outbound phone calls",
+    "retrieve call transcripts and recordings",
+    "manage knowledge bases",
+    "provision phone numbers",
+    "run call simulations and tests",
+    "register custom actions",
+    "manage contacts and phonebooks",
+    "export call analytics",
+    "configure call webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/synthflow-ai.jpeg"
+}

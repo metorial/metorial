@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/pagerduty",
+  "description": "Manage incidents, services, and on-call schedules for infrastructure and application incident response. Create, acknowledge, escalate, and resolve incidents. Configure escalation policies, on-call rotations, and event orchestration rules. Ingest alerts and change events from monitoring tools via the Events API. Manage users, teams, contact methods, and notification rules. Access incident analytics and audit trails. Configure maintenance windows, business services, custom fields, and incident workflows. Subscribe to webhooks for incident and service lifecycle events.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage incidents",
+    "configure escalation policies",
+    "manage on-call schedules",
+    "ingest monitoring events",
+    "manage services and integrations",
+    "access incident analytics",
+    "manage users and teams",
+    "configure event orchestration",
+    "set maintenance windows",
+    "subscribe to webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pagerduty.png"
+}

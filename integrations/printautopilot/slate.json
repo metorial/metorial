@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/printautopilot",
+  "description": "Submit PDF documents to remote print queues for automated physical printing. Add PDF files to designated print queues, route documents to specific printers, and retrieve print job statuses. Supports multiple print queues for organizing different document types such as packing slips, shipping labels, and invoices across different printers.",
+  "categories": [
+    "document-processing",
+    "e-commerce-and-retail",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "submit PDF to print queue",
+    "retrieve print job status",
+    "manage multiple print queues",
+    "automate document printing",
+    "route documents to printers"
+  ]
+}

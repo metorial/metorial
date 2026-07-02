@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/make",
+  "description": "Manage no-code automation workflows (scenarios) on the Make platform. Create, run, activate, deactivate, clone, and delete scenarios. Manage scenario blueprints, execution logs, and consumption statistics. Create and verify app connections. Manage data stores and their records, define data structures, and handle webhooks. Organize teams, users, and organizations with role-based access. Build and manage custom app integrations via the SDK. Access analytics, audit logs, and incomplete executions for debugging. Manage AI agents, encryption keys, devices, and notification preferences.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage automation scenarios",
+    "run and monitor executions",
+    "manage app connections",
+    "manage data stores and records",
+    "configure webhooks",
+    "manage organizations and teams",
+    "build custom app integrations",
+    "access analytics and audit logs",
+    "manage scenario blueprints",
+    "handle incomplete executions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/make.png"
+}

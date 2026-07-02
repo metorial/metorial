@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/epic-games",
+  "description": "Authenticate players via Epic Games accounts or external identity providers (Steam, PlayStation, Xbox, Nintendo) using OAuth 2.0. Manage cross-platform player identities, friends lists, and presence status. Track and record player stats, unlock achievements, and manage leaderboards. Create and manage game lobbies, sessions, and matchmaking. Store and retrieve player-specific cloud save data and game-level title storage. Verify game and DLC ownership, enumerate entitlements, and validate ownership tokens. Submit and query player reports, define and manage player sanctions (bans/suspensions). Access game analytics including player retention and online player counts.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail", "security"],
+  "skills": [
+    "authenticate players cross-platform",
+    "manage friends and presence",
+    "track player stats",
+    "unlock player achievements",
+    "manage leaderboards",
+    "create and manage lobbies",
+    "verify game ownership",
+    "manage player sanctions",
+    "store player cloud data",
+    "query game analytics"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/epic-games.svg"
+}

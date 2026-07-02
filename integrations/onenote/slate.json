@@ -1,0 +1,19 @@
+{
+  "name": "@microsoft/onenote",
+  "description": "Create, read, update, and organize OneNote notebooks, sections, section groups, and pages. Create pages with rich HTML content including images, video, audio, and embedded files. Update page content using targeted patch operations. Copy notebooks, sections, and pages across user, group, and SharePoint site locations. Search notes with full-text search and OCR on images. Retrieve page previews and structured notebook hierarchies. Access personal, shared, group, and SharePoint site-hosted notebooks.",
+  "categories": ["note-taking-and-knowledge-bases"],
+  "skills": [
+    "create notebooks",
+    "manage sections and section groups",
+    "create rich content pages",
+    "update page content",
+    "copy notebooks and sections",
+    "search notes full-text",
+    "retrieve page previews",
+    "access shared notebooks",
+    "access group notebooks",
+    "organize notebook hierarchy"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/one-drive.svg",
+  "version": "0.1.2"
+}

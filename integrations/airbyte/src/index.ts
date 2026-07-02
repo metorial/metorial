@@ -1,0 +1,76 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+
+import {
+  cancelJobTool,
+  createConnectionTool,
+  createDestinationTool,
+  createPermissionTool,
+  createSourceTool,
+  createTagTool,
+  createWorkspaceTool,
+  deleteConnectionTool,
+  deleteDestinationTool,
+  deletePermissionTool,
+  deleteSourceTool,
+  deleteTagTool,
+  deleteWorkspaceTool,
+  getConnectionTool,
+  getDestinationTool,
+  getJobTool,
+  getSourceTool,
+  getStreamPropertiesTool,
+  listConnectionsTool,
+  listDestinationsTool,
+  listJobsTool,
+  listPermissionsTool,
+  listSourcesTool,
+  listTagsTool,
+  listWorkspacesTool,
+  triggerSyncTool,
+  updateConnectionTool,
+  updateDestinationTool,
+  updateSourceTool,
+  updateTagTool,
+  updateWorkspaceTool
+} from './tools';
+
+import { jobCompletedTrigger, syncNotificationTrigger } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listSourcesTool,
+    getSourceTool,
+    createSourceTool,
+    updateSourceTool,
+    deleteSourceTool,
+    listDestinationsTool,
+    getDestinationTool,
+    createDestinationTool,
+    updateDestinationTool,
+    deleteDestinationTool,
+    listConnectionsTool,
+    getConnectionTool,
+    createConnectionTool,
+    updateConnectionTool,
+    deleteConnectionTool,
+    triggerSyncTool,
+    getJobTool,
+    listJobsTool,
+    cancelJobTool,
+    listWorkspacesTool,
+    createWorkspaceTool,
+    updateWorkspaceTool,
+    deleteWorkspaceTool,
+    getStreamPropertiesTool,
+    listPermissionsTool,
+    createPermissionTool,
+    deletePermissionTool,
+    listTagsTool,
+    createTagTool,
+    updateTagTool,
+    deleteTagTool
+  ],
+  triggers: [syncNotificationTrigger, jobCompletedTrigger]
+});

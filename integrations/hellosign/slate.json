@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/hellosign",
+  "description": "Send documents for electronic signature via email or embedded signing flows. Create and manage reusable signature templates with merge fields and signer roles. Embed signing experiences directly into applications via iframes. Track signature request status through lifecycle events (sent, viewed, signed, declined, expired). Bulk send template-based requests to multiple signers. Manage teams, accounts, and API apps. Create unclaimed drafts for embedded requesting workflows. Configure webhooks for real-time signature event notifications. Send faxes and manage fax lines. Generate reports on signature request activity. Supports signer authentication via access codes and SMS PIN, document form fields, CC recipients, and white-label branding.",
+  "categories": ["document-processing", "legal-and-compliance", "task-and-project-management"],
+  "skills": [
+    "send signature requests",
+    "embed signing experience",
+    "create signature templates",
+    "bulk send documents",
+    "track signature status",
+    "manage teams and members",
+    "create unclaimed drafts",
+    "configure webhook events",
+    "send faxes",
+    "generate usage reports"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hellosign-logo.png"
+}

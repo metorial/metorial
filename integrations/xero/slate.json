@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/xero",
+  "description": "Manage accounting, invoicing, and financial operations for small and medium-sized businesses. Create, send, and track invoices, credit notes, quotes, and purchase orders. Process payments and batch payments. Manage contacts (customers and suppliers) and organize them into groups. Reconcile bank transactions and push bank statement data via bank feeds. Generate financial reports including Balance Sheet, Profit and Loss, Trial Balance, Aged Payables/Receivables, and tax reports. Manage the chart of accounts, tax rates, currencies, and tracking categories. Track fixed assets with depreciation settings and lifecycle management. Create and manage projects, assign tasks, and log time entries for billable hours. Run region-specific payroll (AU, UK, NZ) including employees, pay runs, leave, and timesheets. Upload and organize files associated with accounting objects. Receive webhook notifications for contact, invoice, and credit note changes.",
+  "categories": ["financial-data-and-stock-market", "task-and-project-management"],
+  "skills": [
+    "create and send invoices",
+    "process payments",
+    "manage contacts",
+    "reconcile bank transactions",
+    "generate financial reports",
+    "manage chart of accounts",
+    "track fixed assets",
+    "manage projects and time tracking",
+    "run payroll",
+    "upload and organize files"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/xero.svg"
+}

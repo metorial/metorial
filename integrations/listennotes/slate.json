@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/listen-notes",
+  "description": "Search, browse, and retrieve metadata for millions of podcasts and episodes. Perform full-text search across episode titles, descriptions, and podcast metadata with filters for language, genre, region, and publish date. Fetch detailed podcast and episode information including titles, descriptions, audio URLs, images, and cross-platform links (Spotify, Apple Podcasts, YouTube). Discover trending and recommended podcasts, browse curated \"best podcasts\" lists by genre, and find similar shows. Retrieve episode transcripts where available. Manage playlists of podcasts and episodes. Submit new podcast RSS feeds to the database. Look up podcasts by Apple Podcasts/iTunes IDs for cross-platform matching. Browse the full taxonomy of podcast genres and supported languages.",
+  "categories": ["document-processing", "news-and-media", "web-search"],
+  "skills": [
+    "search podcasts and episodes",
+    "fetch podcast metadata",
+    "discover trending podcasts",
+    "get podcast recommendations",
+    "retrieve episode transcripts",
+    "manage podcast playlists",
+    "submit podcast RSS feeds",
+    "cross-platform podcast lookup",
+    "browse podcast genres",
+    "typeahead search suggestions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/listennotes.png"
+}

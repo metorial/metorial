@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/chatfai",
+  "description": "Search and discover AI-powered characters from a catalog spanning movies, TV shows, books, history, anime, games, and more. Generate AI message replies in a character's unique style by sending conversation context to a chosen character. Supports multi-turn conversations, custom character name and bio overrides, and internal response optimizations.",
+  "categories": ["apis-and-http-requests", "email-and-messaging"],
+  "skills": [
+    "search public characters",
+    "get character by ID",
+    "generate character message reply",
+    "send multi-turn conversations",
+    "customize character personality",
+    "browse character catalog"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/chatfai.png"
+}

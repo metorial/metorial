@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/bestbuy",
+  "description": "Search Best Buy's product catalog for consumer electronics with pricing, specifications, descriptions, and images. Browse product categories, find store locations with hours and services, and check in-store product availability by store or postal code. Retrieve product recommendations including trending, most viewed, also viewed, and also bought products. Access open box deals with condition ratings and discounted pricing. Partner commerce features support order creation, modification, and cancellation.",
+  "categories": ["e-commerce-and-retail"],
+  "skills": [
+    "search product catalog",
+    "check product availability",
+    "browse product categories",
+    "find store locations",
+    "retrieve product recommendations",
+    "query open box deals",
+    "check in-store availability",
+    "lookup product pricing",
+    "search stores by location"
+  ]
+}

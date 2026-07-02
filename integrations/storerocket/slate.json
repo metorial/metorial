@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/storerocket",
+  "description": "Retrieve store locator account information, manage users, and access physical store location data. Get authenticated account details and plan information, list users with roles and permissions, and query store locations including addresses, phone numbers, operating hours, and custom fields. Supports filtering locations by geographic proximity to match customers with nearby stores. Provides a health check endpoint to verify API connectivity.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail"],
+  "skills": [
+    "retrieve account information",
+    "list users and roles",
+    "query store locations",
+    "filter locations by proximity",
+    "access store operating hours",
+    "check API health status",
+    "read location custom fields"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/storerocket.svg"
+}

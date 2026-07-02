@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/conveyor",
+  "description": "Manage security reviews and automate responses to security questionnaires and RFPs. Upload and organize Trust Center documents (e.g., SOC 2 reports), manage customer access authorizations, and approve or deny access requests. Ask AI-powered security questions and receive answers from your knowledge library. Submit questionnaires for automated AI answering. Retrieve analytics on Trust Center connections, interactions, and knowledge base questions. Create and manage folders, documents, and access groups within the Trust Center portal. Listen for webhook events when users request Trust Center access.",
+  "categories": ["apis-and-http-requests", "document-processing", "security"],
+  "skills": [
+    "automate questionnaire responses",
+    "manage Trust Center documents",
+    "approve access requests",
+    "ask AI security questions",
+    "retrieve connection analytics",
+    "upload security documents",
+    "manage access authorizations",
+    "organize document folders",
+    "submit questionnaires for processing",
+    "track visitor interactions"
+  ]
+}

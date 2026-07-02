@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/helloleads",
+  "description": "Create and retrieve leads in a sales CRM designed for small and medium-sized businesses. Manage lead contact details, addresses, qualifiers (potential, customer group, product group, lead stage, deal size, tags), notes, and activities. Organize leads into lists categorized by source, geography, or timeline. Supports web form integration to automatically capture leads from website enquiry forms.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "create new leads",
+    "retrieve lead information",
+    "manage lead lists",
+    "track lead qualifiers",
+    "capture web form leads",
+    "organize leads by category",
+    "export lead data"
+  ]
+}

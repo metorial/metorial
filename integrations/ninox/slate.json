@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/ninox",
+  "description": "Manage workspaces, databases, tables, and records in Ninox's low-code database platform. Create, read, update, and delete records with filtering and upsert support. Execute Ninox query expressions and scripts to retrieve computed data and trigger custom logic. Upload, download, and delete file attachments on records. Retrieve and share views in PDF, HTML, CSV, XLSX, and JSON formats. Track changes across databases, tables, and records using sequence-based polling for synchronization workflows. Manage file and view sharing links.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage database records",
+    "execute Ninox scripts",
+    "query and filter data",
+    "upload and download files",
+    "track database changes",
+    "export views to formats",
+    "manage workspaces and teams",
+    "introspect table schemas",
+    "share files and views",
+    "upsert multiple records"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ninox.png"
+}

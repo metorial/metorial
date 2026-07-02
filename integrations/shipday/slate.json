@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/shipday",
+  "description": "Create, retrieve, edit, and delete delivery and pickup orders for local businesses. Manage carrier/driver fleets by adding, removing, and assigning drivers to orders. Track delivery progress with real-time ETA, distance, and driver location. Connect to third-party on-demand delivery services (DoorDash, Uber) to check availability, get cost estimates, assign deliveries, and cancel assignments. Receive webhook notifications for order status changes and driver location updates. Access partner-level APIs to query merchant members and their completed orders.",
+  "categories": ["e-commerce-and-retail", "task-and-project-management"],
+  "skills": [
+    "manage delivery orders",
+    "manage pickup orders",
+    "manage carrier drivers",
+    "track delivery progress",
+    "estimate delivery costs",
+    "assign on-demand delivery services",
+    "receive order status webhooks",
+    "track driver location",
+    "query partner member orders"
+  ]
+}

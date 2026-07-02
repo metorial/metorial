@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mysql",
+  "description": "Execute SQL queries to read, insert, update, and delete data in MySQL databases. Create and manage databases, tables, indexes, views, and other schema objects. Inspect schema metadata including columns, constraints, and indexes via INFORMATION_SCHEMA. Run stored procedures and user-defined functions. Manage user accounts and privileges. Execute transactions with ACID compliance. Bulk import and export data in CSV and delimited formats. Stream real-time data change events (inserts, updates, deletes, schema changes) via binary log (binlog) replication for change data capture (CDC).",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "execute SQL queries",
+    "manage database schemas",
+    "insert and update data",
+    "inspect schema metadata",
+    "execute stored procedures",
+    "manage user permissions",
+    "handle transactions",
+    "bulk import and export data",
+    "stream change data capture events",
+    "create and drop tables"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mysql.png"
+}

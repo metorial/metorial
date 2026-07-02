@@ -1,0 +1,18 @@
+{
+  "name": "@google/youtube-analytics",
+  "description": "Retrieve and analyze YouTube channel and video performance data. Query custom analytics reports with dimensions like date, country, traffic source, and device type, and metrics like views, watch time, likes, subscribers, and estimated revenue. Generate channel reports, content owner reports, and ad performance reports. Create and manage analytics groups of videos, playlists, channels, or assets to retrieve aggregated data. Schedule and download bulk reporting jobs containing comprehensive daily YouTube Analytics data. Access system-managed reports for ad revenue and YouTube Premium subscription revenue. Filter and sort data by geographic, demographic, content, and playback dimensions.",
+  "categories": ["apis-and-http-requests", "document-processing", "news-and-media"],
+  "skills": [
+    "query custom analytics reports",
+    "retrieve video performance metrics",
+    "generate channel reports",
+    "manage analytics groups",
+    "schedule bulk report jobs",
+    "download bulk data reports",
+    "access ad revenue data",
+    "filter by dimensions and metrics",
+    "retrieve content owner reports",
+    "analyze traffic sources"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/youtube.svg"
+}

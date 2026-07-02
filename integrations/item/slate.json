@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/item",
+  "description": "Manage people, companies, and custom objects in item. Query shared views, inspect schema, batch upsert records, list users, and trigger webhook-based skills.",
+  "categories": [
+    "apis-and-http-requests",
+    "crm-and-sales-tools",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "list records",
+    "get record",
+    "create record",
+    "update record",
+    "delete record",
+    "batch upsert records",
+    "inspect schema",
+    "list views",
+    "run views",
+    "trigger skills"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/item.png"
+}

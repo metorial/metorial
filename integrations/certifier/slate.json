@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/certifier",
+  "description": "Create, issue, send, and manage digital credentials such as certificates and badges. Organize credentials into groups by course, program, or event. Issue credentials to recipients via email, track credential interactions (views, downloads, shares), and manage credential lifecycles (draft, scheduled, issued, expired). Retrieve certificate and badge design templates, set custom attributes, and create-issue-send credentials in a single automated step. Supports webhook events for credential lifecycle changes including creation, updates, deletion, and issuance.",
+  "categories": [
+    "document-processing",
+    "education-and-learning",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create digital credentials",
+    "issue credentials to recipients",
+    "send credentials via email",
+    "manage credential groups",
+    "track credential interactions",
+    "retrieve design templates",
+    "search and filter credentials",
+    "bulk credential generation",
+    "set custom attributes",
+    "monitor credential lifecycle events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/certifier.jpeg"
+}

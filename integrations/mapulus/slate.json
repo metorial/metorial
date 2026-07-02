@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/mapulus",
+  "description": "Plot and manage locations on maps with geographic coordinates, addresses, and custom attributes. Create and organize maps and layers, search for nearby locations by address or coordinates, and define travel boundaries (isochrones) around locations. Look up territories and boundaries to identify which locations fall within specific regions, including Australian suburbs, postcodes, and LGAs. Visualize data through heat maps, clustering, and demographic overlays. Collect and enrich location data from end users via an embeddable widget with demographic, travel, and competitive insights delivered in real-time via webhooks. Bulk import large datasets and trigger workflows when new locations or maps are created.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "create and manage map locations",
+    "search nearby locations",
+    "define travel boundaries",
+    "look up territory boundaries",
+    "manage map layers",
+    "collect enriched location data",
+    "bulk import location data",
+    "visualize demographic overlays",
+    "trigger on new locations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mapulus.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/kubernetes",
+  "description": "Manage and orchestrate containerized applications on Kubernetes clusters. Create, update, scale, and delete workloads including Pods, Deployments, StatefulSets, DaemonSets, Jobs, and CronJobs. Configure service discovery and load balancing through Services, Ingress, and Endpoints. Manage configuration and storage with ConfigMaps, Secrets, PersistentVolumes, and StorageClasses. Control access with Namespaces, RBAC roles and bindings, ServiceAccounts, and NetworkPolicies. Administer cluster infrastructure including Nodes, ResourceQuotas, LimitRanges, and PriorityClasses. Autoscale workloads with HorizontalPodAutoscaler and VerticalPodAutoscaler. Define and manage Custom Resource Definitions (CRDs) to extend cluster functionality. Watch resources in real time for create, modify, and delete events. Configure admission webhooks to validate or mutate resources before persistence.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "manage container workloads",
+    "scale deployments and replicas",
+    "configure services and ingress",
+    "manage secrets and configmaps",
+    "control RBAC access policies",
+    "administer cluster nodes",
+    "watch resources in real time",
+    "manage persistent storage",
+    "configure autoscaling policies",
+    "define custom resources"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/kubernetes.png"
+}

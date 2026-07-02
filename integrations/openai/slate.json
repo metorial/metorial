@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/openai",
+  "description": "Generate text, images, audio, and video using large language models and multimodal AI. Create chat completions, generate and edit images from text prompts, convert text to speech, transcribe and translate audio, generate video, and create text embeddings for search and retrieval. Fine-tune models on custom training data, run evaluations to measure model performance, and moderate content against policy categories. Manage vector stores for semantic file search, upload and organize files, and submit batch processing jobs for asynchronous bulk requests. Conduct real-time speech-to-speech conversations via WebRTC or SIP. Administer organizations, projects, users, API keys, and audit logs programmatically. Receive webhook notifications for background responses, batch jobs, fine-tuning jobs, eval runs, and incoming realtime calls.",
+  "categories": [
+    "apis-and-http-requests",
+    "document-processing",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "generate text completions",
+    "generate images from text",
+    "transcribe and translate audio",
+    "text-to-speech synthesis",
+    "generate video content",
+    "create text embeddings",
+    "fine-tune custom models",
+    "moderate content safety",
+    "manage vector stores",
+    "batch process API requests"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/openai-logo.svg"
+}

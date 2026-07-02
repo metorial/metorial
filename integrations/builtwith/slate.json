@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/builtwith",
+  "description": "Profile and detect the technology stacks used by any website, including frameworks, analytics, CMS platforms, widgets, and more. Look up current and historical technology usage for domains, perform live technology detection, and retrieve lists of websites using specific technologies for lead generation. Analyze website relationships and shared ownership, track technology adoption trends over time, resolve company names to domains, and assess domain trustworthiness with fraud detection scoring. Stream real-time technology detections via WebSocket, search for ecommerce product sellers, access financial data for websites, get technology recommendations based on similar site profiles, and retrieve keywords, redirects, and related domains.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "e-commerce-and-retail"],
+  "skills": [
+    "profile website technology stack",
+    "detect technologies live",
+    "list sites by technology",
+    "track technology trends",
+    "resolve company to domain",
+    "assess domain trustworthiness",
+    "analyze website relationships",
+    "stream real-time detections",
+    "search ecommerce product sellers",
+    "access website financial data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/builtwith.png"
+}

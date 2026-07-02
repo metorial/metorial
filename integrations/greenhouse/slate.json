@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/greenhouse",
+  "description": "Manage recruiting workflows in the Greenhouse applicant tracking system (ATS). Create, read, update, and delete candidates, applications, jobs, and offers. Track candidates through hiring stages, manage interview schedules and scorecards, and handle offer approval workflows. Ingest candidates from external sources such as agencies and job portals. Build custom career sites and job boards. Manage organizational data including departments, offices, users, custom fields, and rejection reasons. Handle employee onboarding profiles and tasks. Receive real-time webhook notifications for candidate, application, job, interview, and organization events. Supports prospect management, candidate merging, GDPR anonymization, and assessment integrations.",
+  "categories": ["hr-and-recruiting"],
+  "skills": [
+    "manage candidate records",
+    "track application stages",
+    "create and manage jobs",
+    "manage offers and approvals",
+    "schedule interviews and scorecards",
+    "ingest candidates from sources",
+    "manage employee onboarding",
+    "configure custom fields",
+    "manage departments and offices",
+    "monitor recruiting webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/greenhouse.png"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/pexels",
+  "description": "Search and retrieve free, royalty-free stock photos and videos from the Pexels library. Search photos and videos by keyword with filters for orientation, size, color, and locale across 28 languages. Browse curated and trending photos, popular videos, and featured collections. Retrieve specific photos or videos by ID with full metadata including dimensions, photographer/videographer info, and multiple resolution variants. List and browse collections of curated media content.",
+  "categories": ["document-processing"],
+  "skills": [
+    "search stock photos",
+    "search stock videos",
+    "browse curated photos",
+    "retrieve popular videos",
+    "get photo by ID",
+    "get video by ID",
+    "browse featured collections",
+    "filter by orientation and size",
+    "retrieve collection media"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pexels.svg"
+}

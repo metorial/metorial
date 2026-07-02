@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/stormglass-io",
+  "description": "Retrieve global weather, marine, tide, astronomy, solar, and elevation data for any coordinate. Fetch weather forecasts and historical data including temperature, wind, precipitation, humidity, and cloud cover. Access marine parameters such as wave height, swell, currents, and water temperature. Get tide sea-level predictions and high/low tide extremes. Retrieve sunrise, sunset, moonrise, moonset, and moon phase information. Fetch solar radiation and UV index data. Look up elevation for any point. Supports multiple meteorological data sources with configurable date ranges and parameter selection.",
+  "categories": ["apis-and-http-requests", "iot-and-device-control"],
+  "skills": [
+    "retrieve weather forecasts",
+    "fetch historical weather data",
+    "get marine and ocean data",
+    "retrieve tide predictions",
+    "list tide stations",
+    "fetch astronomy data",
+    "get solar radiation data",
+    "retrieve elevation data",
+    "select meteorological data sources"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/stormglass-io.svg"
+}

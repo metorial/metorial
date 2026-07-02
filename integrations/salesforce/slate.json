@@ -1,0 +1,19 @@
+{
+  "name": "@salesforce/salesforce",
+  "description": "Manage CRM data including Accounts, Contacts, Leads, Opportunities, Cases, and custom objects. Create, read, update, and delete records. Query data using SOQL and search across objects using SOSL. Perform bulk data operations for large-scale imports, exports, and migrations. Execute composite requests to batch multiple operations in a single API call. Access analytics, reports, and dashboards. Manage files and attachments associated with records. Interact with Chatter feeds, posts, and groups for social collaboration. Subscribe to real-time change events via Change Data Capture and Platform Events. Manage org metadata including custom objects, fields, layouts, and workflows. Query data using GraphQL for precise data retrieval across related objects.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "manage CRM records",
+    "query data with SOQL",
+    "bulk data operations",
+    "execute composite requests",
+    "run reports and dashboards",
+    "manage files and attachments",
+    "subscribe to change events",
+    "publish platform events",
+    "search across objects",
+    "manage org metadata"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/salesforce.svg",
+  "version": "0.1.2"
+}

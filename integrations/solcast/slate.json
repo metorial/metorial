@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/solcast",
+  "description": "Retrieve global solar irradiance, weather, and PV power data for any location. Access live estimated actuals, forecasts up to 14 days ahead, and historical time series from 2007. Query 20+ weather parameters including GHI, DNI, DHI, GTI, air temperature, wind speed, humidity, cloud opacity, and precipitation. Estimate rooftop PV power output based on system capacity, tilt, and azimuth. Configure advanced PV power sites with detailed specifications including tracking type, bifacial settings, and derating factors. Retrieve Typical Meteorological Year (TMY) datasets for long-term resource assessment. Access grid aggregation data for PV fleets in total power or performance units. Supports probabilistic forecasting (P10/P50/P90), terrain shading, and 5- to 60-minute time resolution. Output available in JSON and CSV formats.",
+  "categories": ["apis-and-http-requests", "iot-and-device-control"],
+  "skills": [
+    "retrieve solar irradiance data",
+    "forecast PV power output",
+    "query historical weather data",
+    "estimate rooftop PV production",
+    "configure advanced PV sites",
+    "retrieve TMY datasets",
+    "access grid aggregation data",
+    "get probabilistic forecasts",
+    "retrieve live weather estimates",
+    "manage PV power sites"
+  ]
+}

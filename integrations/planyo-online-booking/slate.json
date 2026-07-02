@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/planyo-online-booking",
+  "description": "Create, modify, cancel, and search reservations for bookable resources such as vacation properties, car rentals, hotels, equipment, and event spaces. Manage resource availability, vacations, and weekly schedules. Configure pricing rules, calculate rental prices, and handle seasonal pricing. Record and track payments against reservations. Create and manage customers, assign roles, and search users by custom properties. Define additional products, coupons, and vouchers for reservations. Generate invoices, send customer emails, and sync availability via iCal feeds. Manage site and meta-site settings, notification templates, and webhook callbacks for reservation lifecycle, payment, check-in/check-out, and scheduling events.",
+  "categories": [
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market",
+    "scheduling-and-calendars"
+  ],
+  "skills": [
+    "create and manage reservations",
+    "check resource availability",
+    "configure pricing rules",
+    "record and track payments",
+    "manage customers and users",
+    "create coupons and vouchers",
+    "generate invoices",
+    "manage vacations and schedules",
+    "send customer notifications",
+    "manage additional products"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/planyo-online-booking.png"
+}

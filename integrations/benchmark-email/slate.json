@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/benchmark-email",
+  "description": "Create, schedule, and send email marketing campaigns. Manage contact lists by adding, updating, and removing subscribers in bulk or individually. Track campaign performance metrics including opens, clicks, bounces, and unsubscribes. Upload and manage images for use in campaigns. Create and configure signup forms, surveys, and autoresponders. Set up webhooks on contact lists to receive real-time notifications for subscribes, unsubscribes, profile updates, and cleaned addresses.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send email campaigns",
+    "schedule campaign delivery",
+    "manage contact lists",
+    "track campaign metrics",
+    "upload gallery images",
+    "create signup forms",
+    "manage surveys",
+    "configure autoresponders",
+    "set up webhooks",
+    "batch add contacts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/benchmark-email.jpeg"
+}

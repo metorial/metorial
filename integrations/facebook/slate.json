@@ -1,0 +1,19 @@
+{
+  "name": "@meta/facebook",
+  "description": "Manage Facebook Pages, publish posts, photos, videos, and links to Pages. Access user profile data including name, email, and birthday. Read ad accounts, list campaigns, track ad performance, and retrieve marketing insights. Read and manage comments, list reactions, and inspect shares on posts. Retrieve Page and post analytics including reach, engagement, and demographics. Subscribe to and retrieve leads from Lead Ads. Send and receive messages via Page Messenger. Search for places, pages, and public objects. Subscribe to real-time webhooks for page feed changes, new messages, lead generation events, and permission changes.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "publish posts and media",
+    "manage Facebook Pages",
+    "read ad accounts and campaign insights",
+    "retrieve analytics and insights",
+    "read and manage comments",
+    "list reactions",
+    "retrieve lead ad submissions",
+    "send and receive messages",
+    "access user profile data",
+    "search public objects",
+    "subscribe to webhook events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/facebook.svg"
+}

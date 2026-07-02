@@ -1,0 +1,20 @@
+{
+  "name": "@metorial/givebutter",
+  "description": "Manage nonprofit fundraising campaigns, donor contacts, and transactions. Create and update campaigns (donation forms, fundraising pages, events), manage donor/supporter contacts with custom fields and tags, retrieve and create transactions, track recurring giving plans, manage funds for donation categorization, retrieve event tickets and attendee details, and access payout records. Supports webhooks for real-time notifications on campaigns, transactions, contacts, tickets, and recurring plans.",
+  "categories": [
+    "crm-and-sales-tools",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage fundraising campaigns",
+    "manage donor contacts",
+    "retrieve transactions",
+    "create manual transactions",
+    "manage funds",
+    "track recurring plans",
+    "retrieve event tickets",
+    "retrieve payout records",
+    "manage campaign teams"
+  ]
+}

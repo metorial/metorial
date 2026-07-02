@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/formdesk",
+  "description": "Manage online forms, submissions, and visitors on Formdesk. Retrieve form lists, query and filter form results by date, status, or sync state, and export submissions to Excel, CSV, XML, or PDF. Add, update, and remove form result entries programmatically, including file uploads. Manage form visitors (list, add, update, remove, authenticate) and retrieve visitor-associated results. Pre-fill forms using data parking with ticketed URLs. Mark results as processed for incremental sync workflows. Supports single sign-on for users and visitors, and retrieves uploaded files and pre-defined filters.",
+  "categories": [
+    "apis-and-http-requests",
+    "document-processing",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "retrieve form submissions",
+    "add form results",
+    "update form results",
+    "export results to PDF",
+    "manage form visitors",
+    "upload files to forms",
+    "pre-fill forms via parking",
+    "filter results by status",
+    "authenticate visitors via SSO",
+    "export results to Excel/CSV"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/formdesk.svg"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/affinity",
+  "description": "Manage contacts, organizations, and deal pipelines in a relationship intelligence CRM. Create, search, update, and delete people, organizations, and opportunities. Track interactions including emails, meetings, and calls. Manage custom lists with configurable fields and field values. Query relationship strength scores between team members and external contacts. Create and manage notes, file attachments, and reminders on any entity. Access enrichment data from Affinity's proprietary database. Subscribe to webhooks for real-time notifications on record changes, list updates, and field value modifications.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage contact records",
+    "track deal pipelines",
+    "manage organizations",
+    "query relationship strengths",
+    "track interactions and emails",
+    "manage custom list fields",
+    "create and manage notes",
+    "upload and retrieve files",
+    "set reminders",
+    "subscribe to webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/affinity.jpeg"
+}

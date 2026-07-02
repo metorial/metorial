@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/kaleido",
+  "description": "Create, manage, and operate enterprise blockchain networks on the Kaleido blockchain-as-a-service platform. Provision consortia, environments, and blockchain nodes across multiple protocols (Ethereum, Quorum, Hyperledger Besu, Corda, Hyperledger Fabric) and consensus algorithms (Raft, PoA, IBFT). Deploy and compile Solidity smart contracts with auto-generated REST APIs and OpenAPI documentation. Manage tokens (ERC20, ERC721) via the Token Factory, including minting, burning, and transfers. Handle wallet and key management, including HD wallets and Cloud HSM signing. Exchange documents securely with on-chain hash references and off-chain encrypted messaging. Configure event streams via webhooks or WebSockets to deliver smart contract events to external applications. Tether permissioned chains to public Ethereum for enhanced security. Perform zero-knowledge token transfers for confidential and anonymous transactions. Manage application credentials, JWT/OAuth authentication, and blockchain application firewall rules for fine-grained access control. Access audit logs for organizational and consortium-level activity tracking.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "manage blockchain networks",
+    "deploy smart contracts",
+    "provision blockchain nodes",
+    "manage token contracts",
+    "exchange documents securely",
+    "configure event streams",
+    "manage wallets and keys",
+    "send off-chain messages",
+    "manage access control rules",
+    "query audit logs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/kaleido.svg"
+}

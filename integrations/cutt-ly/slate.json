@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/cuttly",
+  "description": "Shorten URLs, manage shortened links, and retrieve click analytics. Create short links with custom aliases, branded domains, and UTM parameters. Edit link properties including destination URL, title, tags, password protection, expiration rules, mobile redirects, deep links, and AB/C split testing. Retrieve detailed click statistics with breakdowns by referrer, geography, device, browser, OS, and language. Supports team-based link management.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "shorten URLs",
+    "create custom link aliases",
+    "edit link properties",
+    "retrieve click analytics",
+    "set link expiration",
+    "configure mobile redirects",
+    "set up AB testing",
+    "password protect links",
+    "delete shortened links",
+    "filter analytics by date"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cutt-ly.png"
+}

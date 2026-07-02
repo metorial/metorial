@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/rootly",
+  "description": "Manage the full incident lifecycle including creating, updating, triaging, mitigating, and resolving incidents. Ingest and route alerts from monitoring tools, configure alert sources, and attach alerts to incidents. Manage on-call schedules, rotations, override shifts, and escalation policies with multi-level routing. Create automated workflows triggered by incident or alert events. Track post-incident retrospectives and action items. Maintain a service catalog with custom properties, functionalities, and environments. Configure status pages to communicate outage information. Define playbooks with ordered tasks for standardized incident response. Manage teams, users, notification rules, and role assignments. Create dashboards with panels for incident metrics. Monitor system health via heartbeats, configure live call routing to on-call responders, and manage outbound webhooks for real-time event notifications.",
+  "categories": [
+    "apis-and-http-requests",
+    "email-and-messaging",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage incident lifecycle",
+    "route and ingest alerts",
+    "manage on-call schedules",
+    "configure escalation policies",
+    "automate incident workflows",
+    "track retrospectives and action items",
+    "maintain service catalog",
+    "manage status pages",
+    "define response playbooks",
+    "monitor heartbeats"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/rootly.jpeg"
+}

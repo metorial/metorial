@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/calcom",
+  "description": "Create, manage, and cancel bookings, including recurring and seated events. Define event types with custom durations, locations, and scheduling rules for individuals and teams. Manage availability schedules and query available time slots. Connect external calendars (Google, Outlook, Apple) for conflict checking. Handle team and organization management with role-based access control. Set up routing forms to direct bookings to appropriate team members. Connect conferencing apps (Zoom, Google Meet) and Stripe for paid bookings. Register webhooks for real-time notifications on booking lifecycle events, payments, meeting activity, recording readiness, no-show detection, and form submissions. Manage out-of-office entries and automated workflows for reminders and notifications.",
+  "categories": ["scheduling-and-calendars", "task-and-project-management"],
+  "skills": [
+    "create and manage bookings",
+    "define event types",
+    "manage availability schedules",
+    "query available time slots",
+    "connect external calendars",
+    "manage teams and organizations",
+    "configure routing forms",
+    "register booking webhooks",
+    "manage out-of-office entries",
+    "process booking payments"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cal-logo.png"
+}

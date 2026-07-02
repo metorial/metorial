@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/ambient-weather",
+  "description": "Retrieve real-time and historical weather station data from Ambient Weather personal weather stations. List user devices, fetch sensor readings (temperature, humidity, wind speed, barometric pressure, rain, UV, solar radiation), query historical data in 5 or 30 minute increments, and stream live weather data via real-time WebSocket events.",
+  "categories": ["apis-and-http-requests", "iot-and-device-control"],
+  "skills": [
+    "list weather station devices",
+    "fetch historical weather data",
+    "stream real-time sensor data",
+    "read temperature and humidity",
+    "read wind speed and direction",
+    "read barometric pressure",
+    "read rain and UV levels",
+    "subscribe to device updates"
+  ]
+}

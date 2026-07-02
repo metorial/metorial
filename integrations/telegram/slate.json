@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/telegram",
+  "description": "Send, edit, delete, forward, and pin messages in private chats, groups, supergroups, and channels. Support text, photo, video, audio, document, and sticker messages with rich formatting (HTML, Markdown) and interactive keyboards. Handle inline queries to provide rich search results directly in any chat. Manage chat members (kick, ban, unban), edit chat settings and permissions, create and manage invite links, and handle join requests. Process payments and invoices using Telegram Stars or third-party payment providers. Create, edit, and delete sticker and custom emoji packs. Serve HTML5 games with score tracking. Launch interactive Mini Apps (Web Apps) within chats. Integrate with business accounts to manage and reply to messages on behalf of businesses. Create and manage polls and quizzes. Upload and download files. Receive real-time webhook events for messages, reactions, chat membership changes, payment queries, poll updates, inline queries, business account events, and chat boosts.",
+  "categories": ["email-and-messaging", "financial-data-and-stock-market"],
+  "skills": [
+    "send and receive messages",
+    "manage chat members",
+    "process payments and invoices",
+    "handle inline queries",
+    "create and manage stickers",
+    "send and receive files",
+    "create polls and quizzes",
+    "manage chat permissions",
+    "receive webhook events",
+    "launch mini web apps"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/telegram-logo.svg"
+}

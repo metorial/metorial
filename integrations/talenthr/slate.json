@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/talenthr",
+  "description": "Manage employee records, organizational structure, and time-off tracking in a cloud-based HRIS for small to medium businesses. Hire new employees, create departments, divisions, job titles, and locations. List absent employees, view upcoming absences, and approve or reject time-off requests. Manage job openings for applicant tracking and careers pages.",
+  "categories": ["hr-and-recruiting"],
+  "skills": [
+    "hire new employees",
+    "create departments",
+    "create divisions",
+    "create job titles",
+    "create locations",
+    "list absent employees",
+    "approve time-off requests",
+    "reject time-off requests",
+    "manage job openings"
+  ]
+}

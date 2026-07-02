@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/appointo",
+  "description": "Manage appointment bookings and scheduling for Shopify stores. Create, fetch, reschedule, cancel, and update bookings with support for group and multi-day reservations. Retrieve and configure appointment types, check calendar availability for specific date ranges and team members, and manage appointment settings including duration, capacity, buffer times, reminders, and weekly availability slots. Retrieve bookable products/services and subscription contracts. Receive event notifications when bookings are created, rescheduled, or canceled.",
+  "categories": ["e-commerce-and-retail", "scheduling-and-calendars"],
+  "skills": [
+    "create and manage bookings",
+    "reschedule or cancel bookings",
+    "check calendar availability",
+    "configure appointment settings",
+    "retrieve bookable products",
+    "search bookings by customer",
+    "manage group bookings",
+    "retrieve subscription contracts",
+    "set reminders and notifications",
+    "manage weekly availability slots"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/appointo.png"
+}

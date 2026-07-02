@@ -1,0 +1,19 @@
+{
+  "name": "@microsoft/excel-online",
+  "description": "Read and write Excel workbook data stored in OneDrive for Business and SharePoint. Manage worksheets, cell ranges, tables, charts, and named items. Read and write cell values, formulas, and number formats across arbitrary ranges. Create and manage structured tables with sorting and filtering. Generate and retrieve chart images. Invoke Excel's built-in calculation functions (e.g., SUM, VLOOKUP, PMT) remotely without modifying cells. Use persistent or non-persistent sessions for efficient multi-step operations. Subscribe to file-level change notifications for Excel workbooks.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "read and write cell ranges",
+    "manage worksheets",
+    "create and manage tables",
+    "sort and filter table data",
+    "create and update charts",
+    "invoke calculation functions",
+    "retrieve chart images",
+    "manage named items",
+    "manage workbook sessions",
+    "subscribe to file changes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/Excel.png",
+  "version": "0.1.2"
+}

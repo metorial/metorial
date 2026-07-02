@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/census",
+  "description": "Manage reverse ETL syncs that move data from cloud data warehouses (Snowflake, BigQuery, Redshift, Databricks) into 200+ business applications like Salesforce, HubSpot, and Google Ads. Create, configure, trigger, and monitor data syncs with support for upsert, update-only, create-only, mirror, append, and delete behaviors. View sync run statuses and detailed record counts. List and manage source and destination connections. Retrieve dataset records via the Dataset API. Manage organization workspaces, users, and invitations. Configure webhooks for sync alert events. Build embedded reverse ETL experiences with Connect Links and Sync Management Links.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "create and trigger syncs",
+    "monitor sync run status",
+    "manage source connections",
+    "manage destination connections",
+    "retrieve dataset records",
+    "manage webhooks",
+    "manage organization users",
+    "configure sync schedules",
+    "embed reverse ETL flows"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/census.png"
+}

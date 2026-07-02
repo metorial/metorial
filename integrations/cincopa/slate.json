@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/cincopa",
+  "description": "Manage multimedia galleries, assets, portals, and live streams. Upload, organize, search, and retrieve video, audio, and image assets. Create and customize media galleries with metadata, tags, and featured items. Set up portals as customizable landing pages or video hubs. Start, stop, and manage live video streams. Collect user-generated content via uploads and recordings. Track video analytics including viewer engagement heatmaps. Capture leads from video forms. Configure webhooks for real-time notifications on asset, gallery, account, lead, and analytics events.",
+  "categories": ["apis-and-http-requests", "document-processing", "scheduling-and-calendars"],
+  "skills": [
+    "manage media galleries",
+    "upload and organize assets",
+    "search and filter media",
+    "manage live streams",
+    "create portal landing pages",
+    "track video analytics",
+    "capture lead generation events",
+    "configure event webhooks",
+    "collect user-generated content",
+    "set asset metadata and tags"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cincopa.svg"
+}

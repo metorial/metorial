@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/northflank",
+  "description": "Build, deploy, and scale applications, jobs, and databases on Northflank's cloud or your own AWS, GCP, and Azure infrastructure. Create and manage projects, build services from Git repositories, deploy containers, run scheduled or manual jobs, and provision database addons (PostgreSQL, MongoDB, MySQL, Redis, MinIO, RabbitMQ). Manage secrets, environment variables, domains, TLS certificates, and container registries. Orchestrate release pipelines with staged promotions, preview environments, and infrastructure-as-code templates. Scale services with autoscaling policies, monitor logs and metrics, configure log sinks, manage BYOC clusters and nodes, and handle webhook notification integrations for build, job, backup, billing, autoscaling, and infrastructure alert events. Organize resources with tags, manage billing invoices, and administer team VCS integrations.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "deploy container services",
+    "manage database addons",
+    "trigger builds from repositories",
+    "run scheduled jobs",
+    "manage secrets and variables",
+    "orchestrate release pipelines",
+    "configure autoscaling policies",
+    "manage domains and certificates",
+    "monitor logs and metrics",
+    "manage BYOC clusters"
+  ]
+}

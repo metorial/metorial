@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/heyzine",
+  "description": "Convert PDF, DOCX, and PPTX files into interactive digital flipbooks with page-turning effects. Create flipbooks programmatically from document URLs with customizable styling, titles, logos, and UI controls. List, retrieve details, and delete flipbooks. Organize flipbooks into bookshelves by adding, removing, and reordering them. Configure social media metadata (title, description, thumbnail) for flipbooks and bookshelves. Protect flipbooks with password-based access control including per-user credentials, single passwords, Google Sign-In, OTP, and email-based access. Retrieve oEmbed data for embedding flipbooks in third-party platforms. Collect leads via webhook when users submit forms embedded in flipbooks.",
+  "categories": ["crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "convert documents to flipbooks",
+    "manage flipbook collections",
+    "organize bookshelves",
+    "set social media metadata",
+    "password-protect flipbooks",
+    "manage user access control",
+    "retrieve oEmbed data",
+    "collect leads via webhook",
+    "delete flipbooks",
+    "customize flipbook styling"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/heyzine.png"
+}

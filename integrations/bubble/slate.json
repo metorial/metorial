@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/bubble",
+  "description": "Perform CRUD operations on Bubble application databases and trigger server-side workflows. Create, read, update, and delete records across exposed data types. Search and filter records by field values, geographic coordinates, and date ranges. Trigger custom API workflows that can create data, sign up or log in users, send emails, and return data. Manage user authentication by signing up and logging in users to obtain session tokens.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "create database records",
+    "search and filter records",
+    "update and delete records",
+    "trigger server-side workflows",
+    "sign up and log in users",
+    "retrieve user auth tokens",
+    "execute custom business logic",
+    "receive incoming webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bubble.jpg"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/worksnaps",
+  "description": "Track time and monitor remote team activity through automated screenshots, keyboard/mouse activity, and application usage captured at 10-minute intervals. Create, update, and manage projects and tasks. Assign users to projects and tasks with role-based access. Retrieve time entries filtered by user and date range, including full-resolution screenshot URLs. Generate project-level time tracking reports for billing, payroll, and productivity analysis. Manage user accounts and user assignments across projects.",
+  "categories": ["apis-and-http-requests", "hr-and-recruiting", "task-and-project-management"],
+  "skills": [
+    "manage projects",
+    "create and manage tasks",
+    "retrieve time entries",
+    "generate time tracking reports",
+    "manage user assignments",
+    "retrieve task assignments",
+    "track screenshot activity",
+    "manage user accounts"
+  ]
+}

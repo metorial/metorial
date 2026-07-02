@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/later",
+  "description": "Retrieve influencer campaign performance data from Later Influence (formerly Mavrck). List campaigns and reporting groups, pull detailed analytics including impressions, engagements, clicks, conversions, and conversion values broken down by social network (Facebook, Instagram, TikTok, Pinterest) and content type (posts, stories, reels, lives). Filter reports by date range and group data by day, week, month, quarter, or year. Retrieve instance metadata to confirm community credentials. Designed for integration with external reporting dashboards and BI tools. Note: this API covers only Later Influence reporting — Later's core social media scheduling product does not have a public API.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "list influencer campaigns",
+    "retrieve campaign performance metrics",
+    "manage reporting groups",
+    "filter reports by date range",
+    "retrieve instance metadata",
+    "aggregate metrics by time period",
+    "view engagement by social network"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/later.png"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/hystruct",
+  "description": "Extract structured data from websites using AI-powered web scraping. Create and trigger scraping jobs for existing workflows, retrieve extracted data shaped by user-defined schemas, and manage webhook subscriptions for real-time event notifications. Supports multi-page scraping (loops) for listing pages, schema-based extraction with field types like String, Number, Boolean, Date, and Array, and asynchronous job processing for crawling sub-pages.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "retrieve scraped workflow data",
+    "trigger scraping jobs",
+    "extract structured web data",
+    "define data extraction schemas",
+    "scrape multiple pages",
+    "manage webhook subscriptions",
+    "receive job completion events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hystruct.png"
+}

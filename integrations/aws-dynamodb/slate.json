@@ -1,0 +1,18 @@
+{
+  "name": "@amazon/aws-dynamodb",
+  "description": "Create, manage, and delete DynamoDB tables with configurable capacity modes and key schemas. Perform CRUD operations on items using primary keys, including conditional writes and attribute-level updates. Query items by partition and sort key conditions, or scan entire tables with filter and projection expressions. Support PartiQL (SQL-compatible) syntax for data operations. Manage secondary indexes (GSI and LSI) for alternative query patterns. Execute multi-item transactions with all-or-nothing guarantees across tables. Configure global tables for multi-region active-active replication. Create and restore on-demand backups, enable point-in-time recovery, and set TTL for automatic item expiration. Import and export data between S3 and DynamoDB. Monitor table changes via DynamoDB Streams for near-real-time change data capture with configurable stream view types.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "create and manage tables",
+    "read and write items",
+    "query and scan data",
+    "execute transactions",
+    "manage secondary indexes",
+    "backup and restore tables",
+    "import and export data",
+    "configure global tables",
+    "set item TTL expiration",
+    "stream change data capture"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/amazon.svg"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/deepseek",
+  "description": "Generate chat completions, chain-of-thought reasoning responses, and code completions using DeepSeek large language models. Supports streaming and non-streaming chat, structured JSON output, function calling with up to 128 parallel tool invocations, fill-in-the-middle (FIM) code completion, and chat prefix completion. List available models and check account balance. Compatible with OpenAI API format.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "generate chat completions",
+    "chain-of-thought reasoning",
+    "call external functions",
+    "fill-in-the-middle completion",
+    "stream model responses",
+    "generate structured JSON output",
+    "list available models",
+    "check account balance",
+    "complete chat prefixes"
+  ]
+}

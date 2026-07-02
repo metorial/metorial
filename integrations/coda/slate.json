@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/coda",
+  "description": "Create, read, update, and delete docs, pages, tables, and rows in Coda's collaborative document platform. Manage folders, sharing permissions, and doc publishing. Insert, upsert, and query table rows with sync token support for incremental updates. Trigger button actions and webhook-invoked automations programmatically. Read formula values and control states. Export page content to HTML or Markdown. Track doc and Pack usage analytics. Register webhooks for row change events. Resolve browser URLs to API resources and monitor asynchronous mutation status.",
+  "categories": ["document-processing", "task-and-project-management"],
+  "skills": [
+    "manage docs and folders",
+    "read and write table rows",
+    "manage page content",
+    "share and set permissions",
+    "trigger automations via webhooks",
+    "push button columns",
+    "read formulas and controls",
+    "publish and unpublish docs",
+    "retrieve usage analytics",
+    "export pages to Markdown"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/coda.svg"
+}

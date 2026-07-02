@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/jotform",
+  "description": "Create, manage, and collect data through online forms. Build forms programmatically by defining questions, properties, and email notifications. Retrieve, create, update, and delete form submissions with filtering by date, status, or custom fields. Manage form fields/questions, configure form properties, and set up webhooks for submission notifications. List form folders, generate reports (Excel, CSV, charts), and list uploaded file metadata and download URLs from forms. Access user account details and usage statistics.",
+  "categories": [
+    "apis-and-http-requests",
+    "document-processing",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and manage forms",
+    "retrieve form submissions",
+    "create submissions programmatically",
+    "manage form questions",
+    "configure form webhooks",
+    "generate submission reports",
+    "list form folders",
+    "list uploaded files",
+    "update form properties"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/jotform-logo.png"
+}

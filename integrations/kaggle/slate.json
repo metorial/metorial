@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/kaggle",
+  "description": "Search, download, create, and manage data science and machine learning resources on Kaggle. List and filter competitions, download competition data, submit predictions, and view leaderboards. Search, create, update, and download datasets by keyword, file type, tags, and license. Push, pull, run, and manage kernels (notebooks), retrieve execution output, and check run status. Create, update, download, and delete models with support for multiple framework variations and versions. Configure API client defaults.",
+  "categories": ["apis-and-http-requests", "code-execution"],
+  "skills": [
+    "search and list competitions",
+    "download competition data",
+    "submit competition predictions",
+    "search and download datasets",
+    "create and update datasets",
+    "push and run notebooks",
+    "retrieve kernel output",
+    "manage ML models",
+    "view competition leaderboards",
+    "configure API settings"
+  ]
+}

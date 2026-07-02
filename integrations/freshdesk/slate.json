@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/freshdesk",
+  "description": "Manage customer support tickets, contacts, companies, and agents. Create, update, filter, merge, and delete support tickets with custom fields, tags, priorities, and assignments. Add replies, notes, and forward emails on ticket conversations. Manage contacts and companies with search, filter, import, and export capabilities. Maintain a knowledge base of articles organized in categories and folders. Run community discussion forums with topics and comments. Track time entries on tickets, configure SLA policies, and set up automation rules with webhook triggers. Manage canned response templates, custom objects, email mailboxes, collaboration threads, and agent groups with auto-assignment. Send outbound WhatsApp messages and handle satisfaction surveys and ratings. Support field service management with service tasks and technician scheduling.",
+  "categories": [
+    "crm-and-sales-tools",
+    "email-and-messaging",
+    "note-taking-and-knowledge-bases"
+  ],
+  "skills": [
+    "manage support tickets",
+    "manage contacts and companies",
+    "add ticket replies and notes",
+    "manage knowledge base articles",
+    "track time entries",
+    "configure automation rules",
+    "manage canned responses",
+    "manage agent groups",
+    "handle satisfaction surveys",
+    "send WhatsApp messages"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/freshdesk.svg"
+}

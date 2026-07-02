@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/smartsheet",
+  "description": "Create, read, update, and delete sheets, rows, columns, and cells in a spreadsheet-like work management platform. Organize work into workspaces and folders with granular sharing permissions. Manage attachments, discussions, and comments on sheets and rows. Build and access dashboards and reports that aggregate data across sheets. Search across sheets, send sheets or rows via email, and create update requests for collaborators. Manage users, groups, contacts, and favorites. Set up webhooks for real-time change notifications on sheets and account-level events. Support cross-sheet references, automation rules, proofing workflows, templates, and event reporting for auditing actions.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "manage sheets and rows",
+    "organize workspaces and folders",
+    "share sheets and dashboards",
+    "upload file attachments",
+    "create discussions and comments",
+    "search across sheets",
+    "send sheets via email",
+    "manage users and groups",
+    "configure webhooks",
+    "create update requests"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/smartsheet.png"
+}

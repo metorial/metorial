@@ -1,0 +1,13 @@
+{
+  "name": "@metorial/genderize",
+  "description": "Predict the gender associated with a given name using statistical data. Returns a gender prediction (male or female) with a probability score and data count. Supports country-specific localization using ISO 3166-1 alpha-2 codes for higher accuracy, and batch prediction of up to ten names per request.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "predict gender from name",
+    "batch name gender prediction",
+    "country-specific gender lookup",
+    "retrieve prediction probability score",
+    "parse full names"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/genderize.svg"
+}

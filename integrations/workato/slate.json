@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/workato",
+  "description": "Manage automation recipes, connections, and deployments on the Workato iPaaS platform. Create, start, stop, and copy recipes. Create and manage connections to third-party applications. View job execution history and error details. Organize assets into projects and folders. Build and deploy projects across environments with review workflows. Export and import recipe packages for CI/CD migrations. Manage the API Platform including API collections, endpoints, and client access profiles. Perform CRUD operations on data tables and lookup tables. Publish and consume messages via event stream topics for pub/sub messaging. Manage AI agents with skills and knowledge bases. Invite and manage workspace collaborators with role-based access control. Configure environment properties, tags, audit logs, and secrets. Run test cases for recipes and retrieve results. Generate connector schemas from JSON/CSV samples.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage automation recipes",
+    "manage app connections",
+    "view job execution history",
+    "deploy projects across environments",
+    "export and import packages",
+    "manage API endpoints and clients",
+    "manage data tables and records",
+    "publish and consume event messages",
+    "manage workspace collaborators",
+    "run recipe test cases"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/workato.png"
+}

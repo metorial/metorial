@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/gtmetrix",
+  "description": "Run web page speed tests and retrieve detailed performance reports. Analyze any URL using Lighthouse or legacy PageSpeed/YSlow engines from multiple global server locations and browsers. Configure tests with connection throttling, ad blocking, custom cookies, HTTP authentication, and simulated devices. Retrieve Core Web Vitals, timing metrics, GTmetrix grades, and optimization recommendations. Download report artifacts including HAR files, screenshots, filmstrips, videos, PDF reports, and Lighthouse JSON. Manage pages, view historical reports, retest pages, and query available test locations, browsers, and simulated devices. Check API credit balance and account status.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "run page speed tests",
+    "retrieve performance metrics",
+    "analyze Core Web Vitals",
+    "download HAR files",
+    "capture page screenshots",
+    "generate PDF reports",
+    "manage test pages",
+    "query test locations",
+    "check account status",
+    "configure network throttling"
+  ]
+}

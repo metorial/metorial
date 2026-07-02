@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/genderapiio",
+  "description": "Predict a person's gender from their first name, full name, email address, or social media username. Supports multilingual names across many scripts including Chinese, Hindi, and Arabic, with optional country-based tuning for region-specific names. Uses AI fallback for uncommon or fantasy names. Validate and format international phone numbers from 242 countries, returning E.164 format, number type, geographic location, and country metadata. Monitor API usage and remaining credits.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "detect gender from name",
+    "detect gender from email",
+    "detect gender from username",
+    "bulk gender prediction",
+    "validate phone numbers",
+    "format phone to E.164",
+    "identify phone number type",
+    "check API usage quota",
+    "AI-assisted gender prediction"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/genderapi-io.png"
+}

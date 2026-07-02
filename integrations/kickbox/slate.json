@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/kickbox",
+  "description": "Verify email addresses for deliverability, detect disposable, role-based, and free email domains, and identify typos in email addresses. Supports single real-time email verification and batch verification of up to 1 million addresses. Returns deliverability status (deliverable, undeliverable, risky, unknown), a Sendex quality score, and suggested corrections for misspelled domains. Useful for cleaning email lists, reducing bounce rates, and validating user-submitted emails.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "verify single email address",
+    "batch verify email lists",
+    "detect disposable emails",
+    "detect role-based addresses",
+    "detect free email providers",
+    "suggest email typo corrections",
+    "score email quality",
+    "detect accept-all domains"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/kickbox.svg"
+}

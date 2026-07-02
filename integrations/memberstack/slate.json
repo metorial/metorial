@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/memberstack",
+  "description": "Manage members, authentication, and membership plans for websites and web applications. Create, read, update, and delete members with custom fields, metadata, and JSON data. Assign or remove free plans from members. Verify JWT authentication tokens server-side. Track member and plan events via webhooks including member creation, updates, deletions, and plan connection changes. Integrates with Stripe for subscription payment processing.",
+  "categories": ["financial-data-and-stock-market", "security"],
+  "skills": [
+    "create and manage members",
+    "assign membership plans",
+    "verify authentication tokens",
+    "manage custom fields and metadata",
+    "delete members and subscriptions",
+    "retrieve members by email",
+    "track member events via webhooks",
+    "manage plan connections"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/memberstack.jpeg"
+}

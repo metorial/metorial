@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/detrack",
+  "description": "Create, manage, and track delivery and collection jobs for logistics operations. Assign drivers and vehicles to jobs, optimize delivery routes, and monitor real-time job statuses including dispatched, in-transit, arrived, completed, and failed. Capture electronic proof of delivery including signatures, photos, and timestamps. Download POD documents and signature images. Search jobs by driver, status, customer, or time period. Manage vehicle and driver records with GPS location tracking. Receive webhook notifications on job status updates and driver assignment changes.",
+  "categories": ["e-commerce-and-retail", "task-and-project-management"],
+  "skills": [
+    "create and manage delivery jobs",
+    "track job status updates",
+    "capture proof of delivery",
+    "optimize delivery routes",
+    "manage vehicles and drivers",
+    "download signatures and photos",
+    "search jobs by criteria",
+    "receive webhook notifications",
+    "assign drivers to jobs",
+    "track real-time GPS location"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/detrack.svg"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/l2s",
+  "description": "Create, manage, and track shortened URLs. Shorten long URLs with custom aliases, UTM parameters, tags, and titles. Retrieve and update existing shortened links. Generate QR codes for short URLs. Access click analytics including geolocation, device, browser, and referrer data. Manage custom domains and team members. Retrieve user account settings.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "shorten URLs",
+    "generate QR codes",
+    "track click analytics",
+    "manage UTM parameters",
+    "tag and organize links",
+    "update shortened URLs",
+    "use custom domains",
+    "manage team members",
+    "retrieve user settings"
+  ]
+}

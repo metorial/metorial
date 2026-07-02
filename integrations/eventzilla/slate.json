@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/eventzilla",
+  "description": "Manage events, tickets, registrations, and attendees on the Eventzilla event ticketing platform. Retrieve event details, ticket configurations, and categories. Process end-to-end registrations through a multi-step checkout flow including preparing, creating, filling, and confirming orders. Manage attendees by retrieving details and checking in or reverting check-ins via barcode. Look up transactions by checkout ID or order reference. Confirm or cancel existing orders. Retrieve organizer and sub-organizer account details. Publish or unpublish event sale pages.",
+  "categories": [
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market",
+    "scheduling-and-calendars"
+  ],
+  "skills": [
+    "retrieve event details",
+    "process event registrations",
+    "manage ticket configurations",
+    "check in attendees",
+    "confirm or cancel orders",
+    "retrieve transaction details",
+    "manage checkout flow",
+    "publish event sale pages",
+    "retrieve attendee details",
+    "retrieve event categories"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/eventzilla.svg"
+}

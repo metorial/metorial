@@ -1,0 +1,13 @@
+{
+  "name": "@metorial/stern-financial-data",
+  "description": "Query public NYU Stern financial datasets including country equity risk premiums and industry betas.",
+  "categories": ["finance-and-accounting", "data-and-analytics"],
+  "skills": [
+    "list NYU Stern financial datasets",
+    "query country equity risk premiums",
+    "filter country risk premium data",
+    "query US industry betas",
+    "query global industry betas",
+    "filter industry beta datasets"
+  ]
+}

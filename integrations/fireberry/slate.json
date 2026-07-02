@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/fireberry",
+  "description": "Manage a full CRM platform covering sales, marketing, and service. Create, read, update, and delete accounts, contacts, opportunities, orders, invoices, tickets, activities, campaigns, products, projects, contracts, and assets. Query and search records across any object type with advanced filtering. Manage custom objects and custom fields to extend the data model. Handle invoicing with multiple document types (invoices, credit invoices, receipts, drafts) and line items. Schedule and track activities including tasks, meetings, phone calls, and notes. Retrieve object metadata and field schemas. Upload files and associate them with records.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "manage accounts and contacts",
+    "track sales opportunities",
+    "create and manage invoices",
+    "manage support tickets",
+    "schedule tasks and meetings",
+    "run marketing campaigns",
+    "query and search records",
+    "manage custom objects and fields",
+    "track projects and contracts",
+    "upload files to records"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/fireberry.png"
+}

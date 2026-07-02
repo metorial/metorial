@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/retently",
+  "description": "Manage customer experience surveys including NPS, CSAT, CES, and 5-Star metrics. Create, update, and delete customers with custom properties and tags. Send transactional surveys via email or in-app channels with optional delivery delays. Retrieve and annotate survey responses with topics, sentiments, and tags. Access campaign reports, score trends, and delivery statistics. Manage survey suppression lists and customer unsubscriptions. Monitor webhook events for new responses, score updates, bounces, and unsubscribes.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "manage customer records",
+    "send transactional surveys",
+    "retrieve survey responses",
+    "annotate feedback with topics",
+    "retrieve NPS/CSAT/CES scores",
+    "generate campaign reports",
+    "manage suppression lists",
+    "unsubscribe customers",
+    "retrieve score trends",
+    "manage survey campaigns"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/retently.png"
+}

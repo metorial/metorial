@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/semantic-scholar",
+  "description": "Search and retrieve academic paper metadata from over 200 million scientific publications. Find papers by keyword queries with filters for year, venue, fields of study, and citation count. Look up detailed paper metadata including titles, abstracts, authors, citation counts, TLDR summaries, and SPECTER2 embeddings using various identifiers (DOI, ArXiv ID, PMID, etc.). Explore citation and reference graphs to trace connections between papers. Look up author profiles with publication history, affiliations, h-index, and citation metrics. Get paper autocomplete suggestions and paper recommendations based on positive and negative examples. Download full dataset releases or incremental diffs for large-scale offline research.",
+  "categories": ["apis-and-http-requests", "education-and-learning", "web-search"],
+  "skills": [
+    "search academic papers",
+    "retrieve paper metadata",
+    "explore citation graphs",
+    "look up author profiles",
+    "get paper recommendations",
+    "autocomplete paper queries",
+    "download dataset releases",
+    "retrieve paper references",
+    "batch lookup papers",
+    "filter by publication fields"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/semanticscholar.png"
+}

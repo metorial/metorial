@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/rudderstack",
+  "description": "Collect, route, and process customer event data across websites, apps, and servers. Send identify, track, page, screen, group, and alias events via HTTP API. Manage event transformations with custom JavaScript or Python functions. Create and enforce tracking plans to validate incoming event data. Access event audit data for data governance and schema inspection. Suppress users and delete collected data for GDPR/CCPA compliance. Run Reverse ETL syncs to route warehouse data back to business tools. Fetch enriched user profiles for real-time personalization via the Activation API. Test event transformation and delivery for source-destination setups. Manage data catalog events and properties. Access audit logs for security monitoring.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "send event tracking data",
+    "manage event transformations",
+    "enforce tracking plans",
+    "suppress and delete user data",
+    "run reverse ETL syncs",
+    "fetch enriched user profiles",
+    "test event delivery pipelines",
+    "audit event data governance",
+    "batch import historical events",
+    "manage data catalog"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/rudderstack.png"
+}

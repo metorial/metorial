@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/heygen",
+  "description": "Generate AI avatar videos from text or audio scripts, with customizable avatars, voices, backgrounds, and multi-scene layouts. Translate videos into multiple languages with lip-sync. Create personalized video campaigns at scale using templates with dynamic variables. Stream real-time interactive avatar sessions for conversational AI experiences. Generate text-to-speech audio. Create photo avatar videos from uploaded photos. Upload and manage image, video, and audio assets. Monitor video generation status via webhooks and check account credit balances.",
+  "categories": [
+    "apis-and-http-requests",
+    "document-processing",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "generate AI avatar videos",
+    "translate videos with lip-sync",
+    "stream interactive avatars",
+    "generate text-to-speech audio",
+    "create personalized video campaigns",
+    "manage video templates",
+    "upload and manage assets",
+    "create photo avatar videos",
+    "monitor generation via webhooks",
+    "check account credit balance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/heygen.jpg"
+}

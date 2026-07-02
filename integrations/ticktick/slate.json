@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/ticktick",
+  "description": "Create, read, update, complete, and delete tasks and subtasks. Manage projects (task lists) and organize tasks with due dates, priorities, tags, reminders, and recurrence rules. Perform batch operations to add, update, or delete multiple tasks at once. Retrieve project details with associated tasks and access user profile information.",
+  "categories": ["task-and-project-management"],
+  "skills": [
+    "create and update tasks",
+    "complete and delete tasks",
+    "manage projects and lists",
+    "set task priorities",
+    "add subtasks and reminders",
+    "batch task operations",
+    "set due dates and recurrence",
+    "organize tasks with tags",
+    "retrieve user profile"
+  ]
+}

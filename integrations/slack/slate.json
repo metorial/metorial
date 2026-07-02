@@ -1,0 +1,19 @@
+{
+  "name": "@metorial/slack",
+  "description": "Slack: connect with bot OAuth or user OAuth. Send, update, delete, and schedule messages; list and cancel scheduled messages; open DMs and group DMs; manage conversations, members, files, reactions, pins, bookmarks, reminders, user groups, and user status; search messages and files with user scopes; and retrieve user, conversation, and workspace info.",
+  "categories": ["email-and-messaging"],
+  "skills": [
+    "send and schedule messages as a bot or user",
+    "list and cancel scheduled messages",
+    "manage channels and conversations",
+    "open DMs and group DMs",
+    "search messages and files",
+    "manage reminders and user status",
+    "upload and share files",
+    "manage emoji reactions",
+    "retrieve user profiles",
+    "manage user groups",
+    "pin and bookmark messages"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/slack.svg"
+}

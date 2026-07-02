@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/intercom",
+  "description": "Manage customer support conversations, tickets, and contacts on the Intercom platform. Create, update, search, and archive contacts (users and leads) and companies. Send and reply to conversations as admins or on behalf of contacts, assign conversations to teammates or teams, snooze, close, and tag conversations. Create and manage support tickets with configurable types and state transitions. Build and maintain help center articles and collections for self-service knowledge bases. Submit and retrieve custom data events for contact activity tracking. Manage tags, segments, custom data attributes, and custom objects. Send outbound messages via in-app and email channels. Manage AI content sources for the Fin AI agent. Retrieve call data with transcriptions and recordings. Create and manage news items and newsfeeds. Export workspace data and reporting datasets. Manage admin away status and access activity logs. Subscribe to webhooks for real-time notifications on conversation, contact, company, ticket, and content engagement events.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage customer conversations",
+    "create and update contacts",
+    "create and manage tickets",
+    "manage help center articles",
+    "send outbound messages",
+    "search and filter contacts",
+    "tag contacts and conversations",
+    "track custom data events",
+    "manage companies and segments",
+    "export workspace data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/intercom.svg"
+}

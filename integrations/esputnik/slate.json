@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/esputnik",
+  "description": "Manage contacts, segments, and omnichannel marketing campaigns across Email, SMS, Viber, Web Push, Mobile Push, App Inbox, Telegram, and In-App channels. Add, update, delete, and search contacts with custom fields and subscription management. Create and manage dynamic and static audience segments. Send bulk broadcasts or individual triggered messages with dynamic content. Generate custom events to trigger automated workflows for abandoned carts, transactional emails, and post-purchase follow-ups. Manage orders, upload promotional codes, configure product feeds, and retrieve personalized product recommendations. Track message delivery statuses and contact activity via webhooks. Retrieve account information, billing history, and organization balance.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail", "email-and-messaging"],
+  "skills": [
+    "send omnichannel messages",
+    "manage contacts and segments",
+    "trigger automated workflows",
+    "track message delivery status",
+    "manage broadcast campaigns",
+    "generate custom events",
+    "upload promotional codes",
+    "configure product recommendations",
+    "manage orders",
+    "retrieve account and billing info"
+  ]
+}

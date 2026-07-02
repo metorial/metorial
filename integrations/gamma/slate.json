@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/gamma",
+  "description": "Generate AI-powered presentations, documents, social media posts, and webpages from text prompts or existing templates. Control text handling modes (generate, condense, preserve), configure image sourcing (AI-generated, stock photos, GIFs, web images), and apply visual themes for colors and fonts. Export generated content as PDF or PPTX files. Share content with configurable access permissions and organize it into folders. Supports 60+ languages, customizable tone, audience targeting, card dimensions, and header/footer configuration.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "generate presentations from prompts",
+    "create documents and webpages",
+    "generate social media posts",
+    "export to PDF or PPTX",
+    "apply visual themes",
+    "configure AI image generation",
+    "share content with permissions",
+    "organize content into folders",
+    "generate from templates",
+    "customize headers and footers"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/gamma.svg"
+}

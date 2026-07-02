@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/contentful",
+  "description": "Manage structured content in a headless CMS. Create, update, publish, unpublish, archive, and delete entries and assets. Define content types and content models with field validations. Retrieve published content via the Content Delivery API or preview unpublished content via the Content Preview API. Manage spaces, environments, and environment aliases. Configure locales for multilingual content. Apply image transformations including resizing, cropping, and format conversion. Sync content incrementally using sync tokens. Organize content with tags. Group and bulk-publish content using releases. Schedule future publish and unpublish actions. Manage users, organizations, teams, and space memberships. Configure webhooks for content change notifications on entries, assets, content types, releases, and scheduled actions.",
+  "categories": ["document-processing"],
+  "skills": [
+    "create and update entries",
+    "publish and unpublish content",
+    "manage content types",
+    "upload and manage assets",
+    "transform and resize images",
+    "manage spaces and environments",
+    "configure localization and locales",
+    "sync content incrementally",
+    "schedule publish actions",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/contentful-logo.png"
+}

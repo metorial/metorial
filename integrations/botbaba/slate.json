@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/botbaba",
+  "description": "Manage and deploy no-code chatbots for WhatsApp and web channels. Retrieve bot listings, send WhatsApp template messages via 360Dialog or Gupshup, and handle e-commerce workflows including ordering, payments, and cart abandonment. React to event triggers such as payment success/failure, chat completion, and cart abandonment by sending outbound HTTP requests, WhatsApp messages, Telegram messages, or emails. Supports lead generation, SMS campaigns, and integration with e-commerce platforms like Shopify and WooCommerce.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail"],
+  "skills": [
+    "list and manage chatbots",
+    "send WhatsApp template messages",
+    "track cart abandonment events",
+    "process payment events",
+    "launch SMS campaigns",
+    "handle chat completion triggers",
+    "send outbound webhook requests",
+    "manage e-commerce orders",
+    "track chatbot analytics"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/botbaba.png"
+}

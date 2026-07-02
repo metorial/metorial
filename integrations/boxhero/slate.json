@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/boxhero",
+  "description": "Manage inventory items, track stock levels, and process inventory transactions. Retrieve items with details like SKU, barcode, cost, price, and custom attributes. Record stock in, stock out, adjust stock, and move stock transactions. Look up warehouse locations and partner (supplier/customer) information. Receive real-time webhook notifications for transaction and item changes.",
+  "categories": ["e-commerce-and-retail"],
+  "skills": [
+    "retrieve inventory items",
+    "record stock transactions",
+    "track stock levels",
+    "manage warehouse locations",
+    "look up partners",
+    "monitor item changes",
+    "filter items by location",
+    "process stock adjustments",
+    "transfer stock between locations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/boxhero.png"
+}

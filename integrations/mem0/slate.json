@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mem0",
+  "description": "Store, retrieve, search, and manage persistent memories for AI applications across users, agents, and sessions. Add memories from conversations with automatic fact extraction or direct storage. Search memories using natural language with semantic similarity and advanced filtering. Manage graph-based memories with entity relationships and multi-hop reasoning. Organize memories with custom categories and instructions. Support multimodal content including images, PDFs, and markdown. Manage entities (users, agents, apps, runs), export memory data, and configure webhooks for memory event notifications.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "store and retrieve memories",
+    "semantic memory search",
+    "manage graph relationships",
+    "filter and query memories",
+    "manage user entities",
+    "configure custom instructions",
+    "export memory data",
+    "manage webhook events",
+    "multimodal memory storage",
+    "organize memory categories"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mem0.png"
+}

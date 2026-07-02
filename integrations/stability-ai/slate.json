@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/stability-ai",
+  "description": "Generate images from text prompts using Stable Diffusion models, edit images with tools like inpainting, outpainting, erase, search-and-replace, search-and-recolor, and background removal. Upscale images to 4K resolution with conservative, creative, or fast modes. Apply style transfer between images and generate images guided by structural inputs like sketches. Replace backgrounds and adjust lighting on subject images. Generate audio from text prompts or transform existing audio with style control. Create 3D assets from single images. Check account credit balance and usage.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "generate images from text",
+    "edit and inpaint images",
+    "upscale image resolution",
+    "remove image backgrounds",
+    "apply style transfer",
+    "generate audio from text",
+    "transform audio styles",
+    "generate 3D assets",
+    "replace image backgrounds",
+    "check account credits"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/stability-ai.png"
+}

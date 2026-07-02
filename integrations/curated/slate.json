@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/curated",
+  "description": "Manage curated email newsletters, including collecting and organizing links, creating draft issues, managing subscribers, and retrieving publication data. List and retrieve publications, create and delete draft issues with categorized content, collect and update links with metadata, subscribe and unsubscribe emails, and retrieve category configurations. Note: issues cannot be published via the API and no webhook events are available.",
+  "categories": ["crm-and-sales-tools", "document-processing", "email-and-messaging"],
+  "skills": [
+    "list and retrieve publications",
+    "create draft newsletter issues",
+    "collect and manage links",
+    "subscribe and unsubscribe emails",
+    "list subscriber details",
+    "retrieve issue statistics",
+    "manage publication categories",
+    "organize links into issues"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/curated.png"
+}

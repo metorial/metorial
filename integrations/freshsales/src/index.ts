@@ -1,0 +1,78 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  convertLead,
+  deleteAccount,
+  deleteAppointment,
+  deleteContact,
+  deleteDeal,
+  deleteLead,
+  deleteNote,
+  deleteTask,
+  getAccount,
+  getContact,
+  getDeal,
+  getFields,
+  getLead,
+  listAccounts,
+  listAppointments,
+  listContacts,
+  listDeals,
+  listFilters,
+  listLeads,
+  listSelectors,
+  listTasks,
+  manageAccount,
+  manageAppointment,
+  manageContact,
+  manageDeal,
+  manageLead,
+  manageNote,
+  manageSalesActivity,
+  manageTask,
+  searchRecords
+} from './tools';
+import {
+  accountChanges,
+  contactChanges,
+  dealChanges,
+  inboundWebhook,
+  leadChanges
+} from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    manageLead,
+    getLead,
+    listLeads,
+    deleteLead,
+    convertLead,
+    manageContact,
+    getContact,
+    listContacts,
+    deleteContact,
+    manageAccount,
+    getAccount,
+    listAccounts,
+    deleteAccount,
+    manageDeal,
+    getDeal,
+    listDeals,
+    deleteDeal,
+    manageTask,
+    listTasks,
+    deleteTask,
+    manageAppointment,
+    listAppointments,
+    deleteAppointment,
+    manageNote,
+    deleteNote,
+    manageSalesActivity,
+    searchRecords,
+    listFilters,
+    listSelectors,
+    getFields
+  ],
+  triggers: [inboundWebhook, contactChanges, leadChanges, dealChanges, accountChanges]
+});

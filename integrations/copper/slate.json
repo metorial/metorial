@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/copper",
+  "description": "Manage contacts, companies, leads, opportunities, projects, tasks, and activities in Copper CRM. Create, read, update, and delete person and company records with support for bulk operations. Track sales opportunities through configurable pipelines with stages, customer sources, and loss reasons. Convert leads into people, companies, or opportunities. Log activities like calls, meetings, and notes against CRM records. Define custom fields to extend the data model and create relationships between entities. Upload and manage file attachments, organize records with tags, and manage users and account details. Subscribe to webhooks for real-time notifications on record creation, updates, and deletions.",
+  "categories": ["crm-and-sales-tools", "task-and-project-management"],
+  "skills": [
+    "manage contacts and companies",
+    "track sales opportunities",
+    "manage leads and conversions",
+    "log activities and interactions",
+    "manage tasks and projects",
+    "configure custom fields",
+    "link related entities",
+    "upload file attachments",
+    "subscribe to webhooks",
+    "bulk create and update records"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/copper.png"
+}

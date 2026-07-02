@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/close",
+  "description": "Manage leads, contacts, opportunities, and sales pipeline in Close CRM. Create, read, update, and delete leads and contacts with custom fields. Track and log activities including emails, calls, SMS, meetings, notes, and WhatsApp messages. Send emails and manage email threads and templates. Create and manage tasks, opportunities with configurable statuses and pipelines, and email sequences for automated outreach. Search and filter leads with advanced queries and Smart Views. Generate sales reports and exports. Manage custom fields, custom activities, custom objects, scheduling links, connected email accounts, users, roles, and organization settings. Perform bulk operations on leads and other objects. Subscribe to webhooks for real-time event notifications on CRM data changes.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "manage leads and contacts",
+    "track sales opportunities",
+    "send and log emails",
+    "log calls and SMS",
+    "create and assign tasks",
+    "automate email sequences",
+    "generate sales reports",
+    "search and filter leads",
+    "manage custom fields",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/close.svg"
+}

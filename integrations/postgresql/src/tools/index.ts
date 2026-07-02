@@ -1,0 +1,12 @@
+export { deleteRows } from './delete-rows';
+export { describeTable } from './describe-table';
+export { executeQuery } from './execute-query';
+export { insertRows } from './insert-rows';
+export { listSchemas } from './list-schemas';
+export { listTables } from './list-tables';
+export { manageIndexes } from './manage-indexes';
+export { manageRoles } from './manage-roles';
+export { manageSchemas } from './manage-schemas';
+export { manageTable } from './manage-table';
+export { manageViews } from './manage-views';
+export { updateRows } from './update-rows';

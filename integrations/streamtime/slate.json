@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/streamtime",
+  "description": "Manage jobs (projects), time tracking, quoting, invoicing, and expenses for creative businesses and agencies. Create, update, and search jobs with phases, line items, team assignments, estimated hours, and deadlines. Track time through to-do lists auto-populated from job plans. Generate quotes and invoices from job plans or logged time and expenses. Manage contacts and companies linked to jobs. Search across all data types using advanced filtering with combinable AND/OR logic. Retrieve reporting statistics including column series and time series aggregations across logged hours, invoice totals, and quote totals. Manage expenses linked to jobs and supplier contacts. Retrieve user and team member information.",
+  "categories": [
+    "apis-and-http-requests",
+    "financial-data-and-stock-market",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and manage jobs",
+    "track time via to-dos",
+    "create quotes and invoices",
+    "manage contacts and companies",
+    "advanced search and filtering",
+    "manage job expenses",
+    "generate profitability reports",
+    "assign team members",
+    "manage job phases and milestones",
+    "aggregate reporting statistics"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/streamtime.svg"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/cloudcart",
+  "description": "Manage an online e-commerce store on the CloudCart platform. Create, read, update, and delete products including variants, pricing, images, and stock quantities. Access and manage orders with statuses, payment details, shipping information, and fulfilment tracking. Manage customer records and contact information. Organize products into categories and manage category hierarchies. Sync inventory levels between CloudCart and external systems. Configure webhooks to receive notifications on order, product, and customer events.",
+  "categories": ["e-commerce-and-retail"],
+  "skills": [
+    "manage products and variants",
+    "manage orders and statuses",
+    "manage customer records",
+    "organize product categories",
+    "sync inventory levels",
+    "configure webhooks",
+    "track order fulfilment",
+    "bulk edit products",
+    "import and export categories"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cloudcart.svg"
+}

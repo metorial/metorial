@@ -1,0 +1,19 @@
+{
+  "name": "@google/google-drive",
+  "description": "Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Apply and read custom labels on files. Monitor file and folder changes via push notifications or webhook subscriptions. Store app-specific data in a hidden per-user folder.",
+  "categories": ["apis-and-http-requests", "document-processing", "email-and-messaging"],
+  "skills": [
+    "upload and download files",
+    "search files and folders",
+    "share files and manage permissions",
+    "manage shared drives",
+    "export files to standard formats",
+    "track file revisions",
+    "manage comments and replies",
+    "apply labels to files",
+    "monitor file changes",
+    "create and organize folders"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google-drive.svg",
+  "version": "0.1.6"
+}

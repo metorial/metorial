@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/unisender",
+  "description": "Manage email and SMS marketing campaigns. Create, update, and delete contact lists, subscribe and unsubscribe contacts, and import/export contacts in bulk. Design email messages and reusable templates, launch email campaigns with scheduling and A/B testing, and send SMS messages to lists or individual numbers. Manage custom contact fields, tags, and subscriber notes. Retrieve campaign statistics including opens, clicks, bounces, and delivery status. Configure webhooks for real-time notifications on email delivery, subscribes, unsubscribes, and campaign status changes. Manage sender domain verification and account settings.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage contact lists",
+    "send email campaigns",
+    "send SMS messages",
+    "create email templates",
+    "import and export contacts",
+    "retrieve campaign statistics",
+    "manage custom fields and tags",
+    "configure webhooks",
+    "schedule campaign delivery",
+    "manage subscriber notes"
+  ]
+}

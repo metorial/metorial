@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/mocean",
+  "description": "Send and receive SMS, WhatsApp, and voice messages globally across 190+ countries. Perform phone number verification (OTP/2FA) via SMS or Telegram. Look up mobile number details including carrier, porting status, and reachability. Make programmable voice calls with text-to-speech, DTMF input collection, and call recording. Manage WhatsApp message templates and send rich media, interactive messages, and template-based notifications. Query account balance and messaging pricing. Receive delivery reports, inbound messages, and call events via webhooks.",
+  "categories": ["email-and-messaging", "security"],
+  "skills": [
+    "send SMS messages",
+    "send WhatsApp messages",
+    "make programmable voice calls",
+    "verify phone numbers via OTP",
+    "look up mobile number details",
+    "receive inbound messages",
+    "manage WhatsApp templates",
+    "record voice calls",
+    "schedule SMS delivery",
+    "query account balance"
+  ]
+}

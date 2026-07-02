@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/e2b",
+  "description": "Create, manage, and terminate secure cloud sandbox environments (lightweight Linux VMs) for executing AI-generated code. Run Python, JavaScript, and other code in isolated Jupyter-based interpreters with stateful sessions. Execute shell commands, install packages, and manage processes. Perform filesystem operations including creating, reading, writing, deleting, uploading, and downloading files. Pause and resume sandboxes to preserve full state including memory and running processes. Create snapshots of running sandboxes to rapidly spin up new instances from a known state. Build custom sandbox templates from Dockerfiles with configurable CPU, memory, and dependencies. Control desktop GUI environments with programmatic mouse, keyboard, screenshot, and streaming capabilities. Configure port forwarding for network access, connect external storage buckets, and manage MCP server integrations. Register webhooks for sandbox lifecycle events (created, updated, killed).",
+  "categories": ["apis-and-http-requests", "code-execution"],
+  "skills": [
+    "execute code in sandboxes",
+    "run shell commands",
+    "manage sandbox lifecycle",
+    "read and write files",
+    "pause and resume sandboxes",
+    "create sandbox snapshots",
+    "build custom templates",
+    "control desktop GUI",
+    "capture screenshots",
+    "manage lifecycle webhooks"
+  ]
+}

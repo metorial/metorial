@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/missive",
+  "description": "Manage collaborative team conversations across email, SMS, WhatsApp, Facebook Messenger, Instagram, live chat, and custom channels in a shared inbox. Browse, filter, and retrieve conversations by mailbox, team, label, or contact. Send messages and drafts with attachments across all supported channels, including scheduled sends and WhatsApp templates. Inject rich posts with Markdown and structured attachments into conversations to surface external system data. Manage conversation state by closing, reopening, assigning, labeling, and merging conversations. Create, update, search, and sync contacts with rich profile data including custom fields and organization memberships. Manage shared labels with hierarchy, color coding, and visibility controls. Create and manage tasks with states, due dates, assignees, and subtasks. Manage teams, canned response templates, and contact books. Generate asynchronous analytics reports filtered by team, users, labels, and account types. Receive real-time webhook notifications for incoming emails, SMS, WhatsApp, Messenger, and chat messages, as well as new comments.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "send multichannel messages",
+    "manage shared inbox conversations",
+    "create and manage tasks",
+    "manage contacts and contact books",
+    "organize with shared labels",
+    "inject rich posts",
+    "create canned response templates",
+    "generate analytics reports",
+    "configure webhooks",
+    "manage teams and users"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/missive-logo.png"
+}

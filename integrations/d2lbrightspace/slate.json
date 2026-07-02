@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/d2l-brightspace",
+  "description": "Manage a Brightspace Learning Management System (LMS) for K–12, higher education, and corporate training. Create and manage users, courses, enrollments, and organizational structures. Handle grades, assignments, quizzes, and discussion forums. Create and organize course content modules and topics. Manage calendar events, announcements, awards, groups, sections, and learning outcomes. Submit and retrieve assignment submissions with feedback. Configure LTI tool integrations and SIS connections. Access bulk data exports for reporting and analytics. Manage ePortfolios, release conditions, checklists, notifications, and role-based permissions. Receive real-time webhook events for user activity, content interactions, grade changes, quiz submissions, enrollments, and session events.",
+  "categories": ["apis-and-http-requests", "document-processing", "education-and-learning"],
+  "skills": [
+    "manage user accounts and roles",
+    "create and manage courses",
+    "enroll users in courses",
+    "manage grades and assessments",
+    "create and grade assignments",
+    "manage quizzes and surveys",
+    "manage discussion forums",
+    "organize course content",
+    "export bulk data reports",
+    "issue awards and badges"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/d2lbrightspace.png"
+}

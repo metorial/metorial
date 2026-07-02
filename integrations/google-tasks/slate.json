@@ -1,0 +1,17 @@
+{
+  "name": "@google/google-tasks",
+  "description": "Create, read, update, and delete task lists and individual tasks. Manage task properties including titles, notes, due dates, and completion status. Organize tasks with subtask hierarchies and reorder tasks within or across lists. Clear completed tasks in bulk and filter tasks by completion status or modification time for incremental sync.",
+  "categories": ["task-and-project-management"],
+  "skills": [
+    "create and manage task lists",
+    "create and update tasks",
+    "set task due dates",
+    "mark tasks complete",
+    "organize subtask hierarchies",
+    "reorder and move tasks",
+    "clear completed tasks",
+    "filter tasks by status",
+    "incremental task sync"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google-tasks.png"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/pointagram",
+  "description": "Manage gamification for teams and individuals by tracking points, running competitions, and awarding achievements. Create and manage players and teams, add points to score series with tags and deduplication, list competitions and leaderboards, and query score history with filters. Supports auto-creating players when submitting scores, configuring point types, backdating transactions, and embedding gamification widgets (profiles, competitions, reward stores) into external sites via HMAC-secured iframes.",
+  "categories": ["apis-and-http-requests", "hr-and-recruiting", "task-and-project-management"],
+  "skills": [
+    "manage players and teams",
+    "add points to score series",
+    "list competitions and leaderboards",
+    "query score history",
+    "create and assign teams",
+    "embed gamification widgets",
+    "configure point types and tags",
+    "deduplicate score transactions",
+    "auto-create players on scoring"
+  ]
+}

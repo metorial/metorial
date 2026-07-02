@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/superchat",
+  "description": "Send and receive messages across WhatsApp, Instagram, Facebook Messenger, Telegram, Email, and SMS from a unified inbox. Manage contacts with custom attributes and organize them into lists. Create, update, and track conversations across channels. Use pre-approved WhatsApp message templates with variable placeholders. Upload and manage file attachments. Add internal notes to conversations for team collaboration. Manage labels, inboxes, and channel configurations. Track message and template engagement analytics. Subscribe to webhooks for inbound/outbound message events, contact changes, conversation status updates, and note creation.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send multi-channel messages",
+    "manage contacts and lists",
+    "manage conversations",
+    "create message templates",
+    "upload file attachments",
+    "add internal notes",
+    "track message analytics",
+    "manage webhook subscriptions",
+    "export conversation history",
+    "search contacts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/superchat.jpeg"
+}

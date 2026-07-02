@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/zerobounce",
+  "description": "Validate email addresses for deliverability, detecting invalid, catch-all, spam trap, abuse, and disposable emails. Score email quality using AI to assess subscriber engagement likelihood. Find business email addresses by name and domain. Search domains for email format patterns. Check email activity data (opens, clicks, forwards, unsubscribes) to identify active inboxes. Upload and process bulk email lists for validation and scoring. Evaluate email list health with estimated bounce rates. Retrieve WHOIS and website availability information for domains. Manage allowlists and blocklists for custom validation filtering. Check account credit balance and API usage statistics.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "validate email addresses",
+    "score email quality with AI",
+    "find business email addresses",
+    "search domain email patterns",
+    "check email activity data",
+    "bulk validate email lists",
+    "evaluate email list health",
+    "retrieve domain WHOIS info",
+    "manage allowlists and blocklists",
+    "check account credit balance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zerobounce.jpeg"
+}

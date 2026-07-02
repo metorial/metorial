@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/swaggerhub",
+  "description": "Create, retrieve, update, and delete API definitions (OpenAPI and AsyncAPI) and reusable domains in SwaggerHub's centralized registry. Manage API versions, visibility, and publishing status. Search the public and private API catalog for APIs and domains. Retrieve collaboration comments and replies on API specifications. Configure and trigger integrations with external tools like GitHub, GitLab, AWS API Gateway, and CI/CD systems. Organize APIs and domains into projects with team-level access control. Generate client SDKs and server stubs in 30+ languages. Manage organization members, roles, and permissions. Run standardization scans to validate API definitions against style guides and governance rules. Configure webhooks to receive notifications when API versions are saved or published.",
+  "categories": ["apis-and-http-requests", "email-and-messaging"],
+  "skills": [
+    "manage API definitions",
+    "manage reusable domains",
+    "search API catalog",
+    "retrieve collaboration comments",
+    "configure external integrations",
+    "organize APIs into projects",
+    "generate client SDKs",
+    "manage organization members",
+    "run standardization scans",
+    "configure webhooks"
+  ]
+}

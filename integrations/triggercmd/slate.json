@@ -1,0 +1,20 @@
+{
+  "name": "@metorial/triggercmd",
+  "description": "Remotely execute commands on registered computers via REST API. Trigger pre-configured scripts, programs, or system commands on any computer running the TRIGGERcmd agent. List registered computers and their available commands, pass parameters to triggered commands, query command run history, and create shareable bookmark URLs for command execution. Supports managing multiple computers and sharing computer access with other accounts.",
+  "categories": [
+    "apis-and-http-requests",
+    "iot-and-device-control",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "trigger remote commands",
+    "list registered computers",
+    "list available commands",
+    "pass command parameters",
+    "query command run history",
+    "create command bookmarks",
+    "share computer access",
+    "manage computer commands"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/triggercmd.svg"
+}

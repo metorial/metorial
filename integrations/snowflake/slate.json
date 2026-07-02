@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/snowflake",
+  "description": "Execute SQL statements and manage cloud data warehouse resources on Snowflake. Run queries synchronously or asynchronously, manage databases, schemas, tables, warehouses, users, roles, grants, tasks, stages, streams, and pipes. Ingest data via Snowpipe batch loading or Snowpipe Streaming for low-latency continuous ingestion. Access Cortex AI services for search, inference, and embeddings. Configure outbound notifications to Slack, Microsoft Teams, PagerDuty, email, or cloud queues (SNS, PubSub, Event Grid). Supports multi-statement transactions, resource creation and alteration without SQL, and dynamic tables.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "execute SQL statements",
+    "manage databases and schemas",
+    "manage tables and views",
+    "manage warehouses",
+    "ingest streaming data",
+    "batch load files via Snowpipe",
+    "manage users and roles",
+    "configure outbound notifications",
+    "access Cortex AI services",
+    "manage tasks and pipelines"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/snowflake.svg"
+}

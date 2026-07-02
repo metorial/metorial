@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/addresszen",
+  "description": "Verify and standardize postal addresses, validate email addresses, and validate phone numbers. Autocomplete and search addresses in real-time with suggestions from authoritative postal datasets for US and international locations. Cleanse and verify full addresses against trusted sources to return standardized, deliverable address components. Manage API keys, retrieve usage statistics, and export lookup logs.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "e-commerce-and-retail"],
+  "skills": [
+    "autocomplete address search",
+    "verify postal addresses",
+    "validate email addresses",
+    "validate phone numbers",
+    "standardize address components",
+    "manage API keys",
+    "retrieve usage statistics",
+    "export lookup logs",
+    "tag requests with metadata"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/addresszen.png"
+}

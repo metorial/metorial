@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/apipie-ai",
+  "description": "Access hundreds of AI models from multiple providers (OpenAI, Anthropic, Google, Meta, etc.) through a unified OpenAI-compatible API. Send chat completions to language models with streaming, function calling, and structured output. Generate images, convert text to speech, analyze images with vision models, and create text embeddings. Augment responses with real-time web search grounding, upload documents for RAG-based retrieval, and reduce hallucinations via integrity checking. Discover and filter available models by type, provider, pricing, and performance. Manage routing preferences (cost or performance optimized), configure model pooling for redundancy, enable persistent conversational memory, and track API usage with detailed cost and token analytics.",
+  "categories": ["apis-and-http-requests", "speech-recognition-and-synthesis", "web-search"],
+  "skills": [
+    "chat with AI models",
+    "generate images",
+    "synthesize speech from text",
+    "analyze images with vision",
+    "generate text embeddings",
+    "search and scrape web content",
+    "upload documents for RAG",
+    "discover and filter models",
+    "track API usage and costs",
+    "manage routing and state"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/apipie-ai.png"
+}

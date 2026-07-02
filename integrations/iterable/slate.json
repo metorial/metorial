@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/iterable",
+  "description": "Manage cross-channel marketing automation across email, push notifications, SMS, in-app messages, web push, and WhatsApp. Create, update, and delete user profiles, track custom and commerce events, and manage subscription preferences. Create and manage campaigns (blast or triggered) and message templates with Handlebars personalization. Organize users into lists for audience targeting. Send transactional messages to individual users via API-triggered campaigns with dynamic data fields. Create and manage catalogs of items for template personalization. Create, update, and delete reusable content snippets for embedding in templates. Export user data, event data, and campaign metrics as CSV. Manage messaging channels and message types. Receive real-time webhook notifications for email, push, SMS, in-app, web push, WhatsApp, subscription, journey, and embedded messaging events.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage user profiles",
+    "track custom events",
+    "send triggered campaigns",
+    "manage mailing lists",
+    "create message templates",
+    "track commerce events",
+    "export campaign metrics",
+    "manage product catalogs",
+    "send transactional messages",
+    "manage content snippets"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/iterable.png"
+}

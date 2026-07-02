@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/1password",
+  "description": "Manage passwords, secrets, and sensitive credentials stored in encrypted vaults. Retrieve secrets using reference URIs, create/read/update/delete vault items including API keys, passwords, SSH keys, and file attachments. Generate passwords with configurable recipes. Share items securely with expiration and recipient controls. Manage vaults, users, and groups with permissions. Monitor account activity through audit events, item usage events, and sign-in attempt events for SIEM integration.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "resolve secrets by reference",
+    "manage vault items",
+    "generate passwords",
+    "share items securely",
+    "manage vaults and permissions",
+    "manage users and groups",
+    "store and retrieve files",
+    "monitor audit events",
+    "track sign-in attempts",
+    "track item usage events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/1password.png"
+}

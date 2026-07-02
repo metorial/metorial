@@ -1,0 +1,23 @@
+{
+  "name": "@metorial/zoho-mail",
+  "description": "Send, receive, search, and manage email messages, threads, folders, labels, and signatures. Schedule emails, manage drafts, flag and archive messages, and apply labels. Create and manage tasks with priorities, due dates, reminders, subtasks, and recurring schedules. Create and organize notes into books with attachments. Manage bookmarks in collections. Administer organizations, domains, users, groups, mail policies, and anti-spam settings. Configure email forwarding, vacation replies, domain DNS records (MX, SPF, DKIM), and user protocol access (IMAP, POP, ActiveSync). Retrieve audit logs, login history, and SMTP logs. Receive webhooks for incoming emails, new tasks, and Streams posts.",
+  "categories": [
+    "email-and-messaging",
+    "note-taking-and-knowledge-bases",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "send and receive emails",
+    "manage email folders and labels",
+    "search and filter messages",
+    "create and manage tasks",
+    "create and organize notes",
+    "manage bookmarks and collections",
+    "administer users and groups",
+    "configure domain DNS records",
+    "manage mail policies and anti-spam",
+    "retrieve audit and SMTP logs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zoho-mail.svg",
+  "version": "0.1.2"
+}

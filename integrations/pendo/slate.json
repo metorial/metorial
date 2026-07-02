@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/pendo",
+  "description": "Manage product analytics data, in-app guidance, and user feedback. Retrieve, create, and update visitor and account records with custom metadata. Create and manage in-app guides (tooltips, modals, walkthroughs) and segments for targeting users. Query aggregated product usage data including page events, feature events, guide interactions, poll responses, and track events using a flexible aggregation pipeline. Send custom track events from client-side and server-side sources. Manage legacy feedback requests and product roadmap data. Receive real-time webhook notifications for events like guide displays, NPS surveys, poll submissions, visitor creation, and account creation.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "manage visitor records",
+    "manage account records",
+    "query product usage data",
+    "create and manage guides",
+    "manage user segments",
+    "send custom track events",
+    "retrieve poll and NPS responses",
+    "manage user metadata",
+    "manage feedback requests",
+    "aggregate analytics data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pendo.png"
+}

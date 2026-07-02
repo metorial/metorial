@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mural",
+  "description": "Create, manage, and collaborate on visual murals with shared canvases. Add and update canvas widgets including sticky notes, shapes, text boxes, images, arrows, areas, tables, and comments. Organize content with tags, run voting sessions, control timers, and manage private mode for facilitated workshops. Create and manage rooms, workspaces, and templates. Invite users and manage permissions at workspace, room, and mural levels. Search across murals, rooms, and templates. Export murals and duplicate content. Enterprise features include audit logs, eDiscovery, content ownership transfer, SCIM user provisioning, and reporting.",
+  "categories": ["document-processing", "email-and-messaging"],
+  "skills": [
+    "create and manage murals",
+    "add sticky notes and shapes",
+    "manage canvas widgets",
+    "run voting sessions",
+    "control session timers",
+    "manage rooms and workspaces",
+    "invite and manage users",
+    "create templates from murals",
+    "search murals and rooms",
+    "export and duplicate murals"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mural.svg"
+}

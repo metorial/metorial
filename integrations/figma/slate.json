@@ -1,0 +1,18 @@
+{
+  "name": "@figma/figma",
+  "description": "Access and inspect Figma design files, including full node trees, layers, properties, and metadata. Export file nodes as PNG, SVG, JPG, or PDF images. Read, create, and delete comments and reactions on files. Manage file version history. List team projects and project files. Retrieve published components, component sets, and styles from team libraries. Create, update, and delete variables and variable collections (Enterprise). Manage dev resources attached to file nodes. Retrieve library analytics and design system usage data (Enterprise). Read organization activity logs and discovery text events (Enterprise). Configure webhooks to receive notifications for file updates, deletions, version changes, comments, library publishes, and dev mode status changes.",
+  "categories": ["document-processing", "email-and-messaging"],
+  "skills": [
+    "read file contents and nodes",
+    "export images from designs",
+    "manage file comments",
+    "browse projects and teams",
+    "retrieve components and styles",
+    "manage design variables",
+    "manage dev resources",
+    "read version history",
+    "configure webhooks",
+    "retrieve library analytics"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/figma.svg"
+}

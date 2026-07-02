@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/anthropic",
+  "description": "Generate text and analyze images using Claude language models. Send conversational messages with configurable parameters (model, temperature, system prompt) and receive AI-generated responses, with optional streaming. Execute Python code in a sandboxed environment for data analysis and visualizations. Perform web searches for up-to-date information with cited sources. Use tool calling (function calling) to let Claude invoke structured tools during conversations. Enable extended thinking for complex reasoning tasks. Process and analyze images via vision capabilities. Upload and manage files for multi-session analysis. Connect to remote MCP servers for external system integration. Use agent skills for working with PowerPoint, Excel, Word, and PDF files. Count tokens, cache prompts for reduced latency and cost, create message batches for async processing, and enable citations for source attribution. Administer organizations by managing members, workspaces, invites, API keys, and retrieving usage and cost reports.",
+  "categories": ["apis-and-http-requests", "code-execution", "web-search"],
+  "skills": [
+    "generate conversational responses",
+    "execute Python code",
+    "search the web",
+    "analyze images",
+    "manage file uploads",
+    "use tool calling",
+    "batch process messages",
+    "count tokens",
+    "administer organization members",
+    "manage workspaces and API keys"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/anthropic.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/graphhopper",
+  "description": "Calculate optimal routes between multiple points with support for various vehicle profiles (car, bike, foot, truck). Solve vehicle routing and traveling salesman problems with real-world constraints like time windows, capacities, and driver skills. Compute distance and time matrices between origin and destination sets. Geocode addresses to coordinates and reverse geocode coordinates to place names. Generate isochrones and isodistances for reachability analysis. Snap GPS points to road networks via map matching. Cluster customers into groups for territory planning. Create and manage custom routing profiles to avoid, prefer, or exclude specific road types and areas.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "calculate routes between points",
+    "optimize vehicle routing",
+    "compute distance time matrices",
+    "geocode addresses to coordinates",
+    "reverse geocode coordinates",
+    "generate isochrone areas",
+    "snap GPS to road network",
+    "cluster locations into groups",
+    "create custom routing profiles",
+    "calculate alternative routes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/graphhopper.png"
+}

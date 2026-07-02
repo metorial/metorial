@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/sms-alert",
+  "description": "Send individual and bulk SMS messages via transactional and promotional routes. Schedule SMS for future delivery, modify or cancel scheduled messages. Generate and validate OTPs for mobile number verification. Manage contacts and contact groups for bulk campaigns. Create and manage reusable SMS templates and sender IDs. Track delivery status via pull reports or push callbacks. Create shortened URLs for SMS links. Check account credit balance and manage profile settings.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send bulk SMS",
+    "schedule SMS delivery",
+    "generate and verify OTP",
+    "manage contact groups",
+    "manage SMS templates",
+    "track delivery status",
+    "create short URLs",
+    "check credit balance",
+    "import contacts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sms-alert.png"
+}

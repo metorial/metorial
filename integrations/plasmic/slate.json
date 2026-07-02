@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/plasmic",
+  "description": "Render Plasmic-designed pages and components as HTML, access project models, and manage CMS content. Render components in preview, published, or versioned modes with customizable props and variants. Retrieve full project structures including components, pages, design tokens, and metadata. Programmatically create and update components, pages, and design tokens. Perform full CRUD operations on headless CMS content: query, count, create, update, delete, and publish items with filtering and localization support. Configure webhooks for project and CMS publish events.",
+  "categories": ["document-processing"],
+  "skills": [
+    "render components as HTML",
+    "retrieve project models",
+    "create components and pages",
+    "update design tokens",
+    "query CMS content",
+    "create CMS entries",
+    "update CMS entries",
+    "delete CMS entries",
+    "publish CMS items",
+    "configure publish webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/plasmic.svg"
+}

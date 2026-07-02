@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/duo-security",
+  "description": "Manage multi-factor authentication, users, devices, and access security. Create, read, update, and delete users, groups, phones, hardware tokens, and administrators. Perform two-factor authentication via Duo Push, phone call, SMS, hardware tokens, and WebAuthn/FIDO2. Manage Duo-protected applications and configure access policies by user group or application. Retrieve authentication logs, administrator action logs, and telephony logs. Read and update account settings, trigger directory syncs, and manage trusted endpoints. Supports MSP partner account management for creating and managing child Duo accounts.",
+  "categories": ["security"],
+  "skills": [
+    "manage users and groups",
+    "perform two-factor authentication",
+    "manage phones and devices",
+    "manage administrators and roles",
+    "retrieve authentication logs",
+    "manage access policies",
+    "manage protected applications",
+    "trigger directory sync",
+    "manage MSP child accounts",
+    "read and update account settings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/duo-security.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/algolia",
+  "description": "Search, index, and manage records and indices using Algolia's hosted search platform. Perform full-text search with typo tolerance, faceting, filtering, geo-search, and multi-language support. Configure index settings, searchable attributes, custom ranking, synonyms, and query rules. Track user events (clicks, conversions, views, purchases) to power analytics, personalization, and recommendations. Run A/B tests on index configurations. Generate product recommendations including related products, frequently bought together, and trending items. Manage API keys with fine-grained permissions and restrictions. Set up automated data ingestion pipelines from external sources. Crawl websites to extract and index content. Monitor infrastructure status, latency, and indexing performance.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "full-text search queries",
+    "manage indices and records",
+    "configure search relevance",
+    "track user events",
+    "generate product recommendations",
+    "run A/B tests",
+    "manage API keys",
+    "crawl and index websites",
+    "analyze search analytics",
+    "personalize search results"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/algolia-logo.jpeg"
+}

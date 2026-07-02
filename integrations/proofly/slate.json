@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/proofly",
+  "description": "Manage social proof notification campaigns and retrieve lead and conversion data. List, inspect, and toggle campaigns. Retrieve notification performance statistics including impressions, clicks, and leads. Access collected lead data with visitor details and geolocation. Add external conversions to notifications from third-party systems. View account activity logs and user information. Receive webhook events when new leads are collected.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "e-commerce-and-retail"],
+  "skills": [
+    "list campaigns",
+    "toggle campaign status",
+    "retrieve notification data",
+    "collect lead data",
+    "add external conversions",
+    "view activity logs",
+    "get user account info",
+    "track notification performance",
+    "receive lead webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/proofly.svg"
+}

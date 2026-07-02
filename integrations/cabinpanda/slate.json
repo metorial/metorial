@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/cabinpanda",
+  "description": "Create, manage, and retrieve online forms and their submissions. List and delete form integrations, retrieve user profiles, and manage team members. Supports standard, conversational, pop-up, and scheduling form types with 30+ field types for data collection.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "create and manage forms",
+    "retrieve form submissions",
+    "manage form integrations",
+    "retrieve user profile",
+    "list account users",
+    "delete forms",
+    "delete integrations",
+    "list all forms"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cabinpanda.png"
+}

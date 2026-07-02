@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/onedesk",
+  "description": "Create, update, and search for tickets, tasks, and other work items with custom fields, priorities, and assignments. Manage projects and portfolios hierarchically. Track time with timesheets and work logs. Create and manage invoices and quotes. Handle customer and organization records. Add internal comments and public-facing messages to work items. Search and filter across items, projects, and entities using property-based conditions.",
+  "categories": ["crm-and-sales-tools", "task-and-project-management"],
+  "skills": [
+    "create and manage tickets",
+    "create and manage tasks",
+    "manage projects and portfolios",
+    "track time with timesheets",
+    "create invoices and quotes",
+    "manage customers and organizations",
+    "add comments and messages",
+    "search and filter work items",
+    "manage user assignments"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/onedesk.svg"
+}

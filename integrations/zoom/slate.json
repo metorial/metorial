@@ -1,0 +1,18 @@
+{
+  "name": "@zoom/zoom",
+  "description": "Create, schedule, and manage video meetings and webinars. Manage users, roles, and account settings. Access and download cloud recordings and transcripts. Send and manage chat messages and channels. Handle Zoom Phone call logs, voicemails, and SMS. Manage meeting registrants, polls, and breakout rooms. Retrieve usage reports, meeting participant reports, and dashboard analytics. Configure Zoom Rooms and contact center settings. Receive real-time webhook notifications for meeting, webinar, recording, user, phone, and chat events.",
+  "categories": ["email-and-messaging", "scheduling-and-calendars"],
+  "skills": [
+    "schedule and manage meetings",
+    "manage webinars and registrants",
+    "access cloud recordings",
+    "send chat messages",
+    "manage users and roles",
+    "retrieve usage reports",
+    "manage Zoom Phone calls",
+    "configure Zoom Rooms",
+    "manage meeting polls",
+    "handle webhook events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zoom.svg"
+}

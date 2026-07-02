@@ -1,0 +1,21 @@
+{
+  "name": "@notion/notion",
+  "description": "Create, read, update, and archive pages and databases in a Notion workspace. Manage blocks (paragraphs, lists, headings, embeds, etc.) within pages. Query databases with filters and sorts across rich property types including text, numbers, dates, selects, relations, and formulas. Search across pages and databases by title. Add and read comments on pages and blocks. Upload files to pages. Manage workspace users and retrieve user profiles. Receive real-time webhook notifications for page changes, new pages, comments, and database schema updates.",
+  "categories": [
+    "document-processing",
+    "note-taking-and-knowledge-bases",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and update pages",
+    "manage page blocks",
+    "query and filter databases",
+    "search pages by title",
+    "add and read comments",
+    "upload files",
+    "manage database schemas",
+    "retrieve workspace users",
+    "receive webhook notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/notion.svg"
+}

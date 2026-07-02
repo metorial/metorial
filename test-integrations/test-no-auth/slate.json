@@ -1,0 +1,11 @@
+{
+  "name": "@__test__/no-auth",
+  "description": "Internal test slate with no authentication. Provides simple calculator utilities for exercising Metorial flows without credentials.",
+  "categories": ["utilities"],
+  "skills": [
+    "perform basic arithmetic on two numbers",
+    "sum a list of numbers",
+    "divide multiply add and subtract",
+    "run no-auth integration tests"
+  ]
+}

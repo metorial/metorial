@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/evenium",
+  "description": "Create and manage professional events with details like title, dates, location, and description. Add and track participants with registration status, contact details, and CRM mapping. Retrieve event lists and participant rosters. Manage contacts database. Monitor ticket orders and updates. Track participant status changes including invited, registered, confirmed, cancelled, and attended. Supports external ID fields for CRM integration with Salesforce and Veeva.",
+  "categories": ["crm-and-sales-tools", "scheduling-and-calendars"],
+  "skills": [
+    "create and manage events",
+    "add event participants",
+    "track registration status",
+    "manage contacts database",
+    "monitor ticket orders",
+    "retrieve participant lists",
+    "map participants to CRM",
+    "track attendee status"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/evenium.svg"
+}

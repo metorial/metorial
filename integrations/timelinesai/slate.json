@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/timelinesai",
+  "description": "Send and receive WhatsApp messages across multiple accounts. Manage chats, groups, and contacts programmatically. Create WhatsApp groups, add or remove members, and send group messages. Upload and attach files (images, videos, voice records, documents) to messages. Retrieve chat history, filter conversations by assignee, label, read status, or search terms. List and monitor connected WhatsApp accounts and their statuses. Configure webhooks for real-time notifications on new messages, new chats, chat renames, and new account events.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "send WhatsApp messages",
+    "manage WhatsApp chats",
+    "create WhatsApp groups",
+    "upload and attach files",
+    "retrieve chat history",
+    "manage group members",
+    "list WhatsApp accounts",
+    "configure webhooks",
+    "filter and search chats",
+    "send group messages"
+  ]
+}

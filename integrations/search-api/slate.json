@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/search-api",
+  "description": "Perform real-time web searches across multiple search engines (Google, Bing, Baidu, Yahoo, Yandex, DuckDuckGo, Naver) and retrieve structured JSON results. Search Google verticals including Images, Videos, News, Shopping, Maps, Scholar, Trends, Flights, Hotels, Jobs, Finance, Patents, and Autocomplete. Scrape results from YouTube, Amazon, Walmart, eBay, Airbnb, Tripadvisor, and app stores. Access ad transparency libraries for Meta, LinkedIn, Reddit, and TikTok. Track keyword rankings for SEO, look up geo-targeting locations, retrieve search history, and check account usage. Supports localization by language, country, and device targeting.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail", "web-search"],
+  "skills": [
+    "search multiple engines",
+    "scrape Google verticals",
+    "track keyword rankings",
+    "search e-commerce products",
+    "retrieve news articles",
+    "search Google Shopping",
+    "look up local businesses",
+    "query Google Trends",
+    "search travel listings",
+    "retrieve ad transparency data"
+  ]
+}

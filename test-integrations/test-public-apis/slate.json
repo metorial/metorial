@@ -1,0 +1,14 @@
+{
+  "name": "@__test__/public-apis",
+  "description": "Internal test slate that exercises a handful of free public APIs (PokéAPI, REST Countries, Open-Meteo, Dog CEO, Cat Facts, Chuck Norris, JSONPlaceholder). Useful for smoke testing tool dispatch and HTTP tracing.",
+  "categories": ["utilities", "fun"],
+  "skills": [
+    "look up pokemon by name or id",
+    "get a random dog image",
+    "get a random cat fact",
+    "get information about a country",
+    "get a random chuck norris joke",
+    "get current weather for coordinates",
+    "fetch a sample todo from jsonplaceholder"
+  ]
+}

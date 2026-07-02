@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/wave",
+  "description": "Manage small business accounting, invoicing, and financial data. Create and send invoices with line items, taxes, and payment options. Manage customers, vendors, and product/service catalogs. Create and organize chart of accounts. Record financial transactions as deposits and withdrawals. Create and manage estimates for customers. Configure sales taxes with rate changes and effective dates. Query business information and user profiles.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "create and send invoices",
+    "manage customers and vendors",
+    "record financial transactions",
+    "manage chart of accounts",
+    "create estimates",
+    "manage product catalog",
+    "configure sales taxes",
+    "query business information"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/wave-accounting.svg"
+}

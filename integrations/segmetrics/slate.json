@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/segmetrics",
+  "description": "Import and retrieve marketing attribution and analytics data. Create, update, and delete contacts with UTM parameters, tags, and custom fields. Manage orders/invoices with line items and refund status. Create and manage subscriptions with billing cycle configuration. Track ad performance including spend, clicks, and impressions across campaigns, ad sets, and ads. Retrieve saved reports for leads, revenue, ads, and subscriptions with KPIs, time series graphs, and tabular breakdowns. Access full customer journey data including page views, tags, orders, and attribution touchpoints. Identify website visitors and link them to CRM contacts.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "manage contacts and tags",
+    "import orders and invoices",
+    "manage subscriptions",
+    "track ad performance",
+    "retrieve attribution reports",
+    "view customer journeys",
+    "manage products",
+    "identify website visitors",
+    "filter reports by date range"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/segmetrics.png"
+}

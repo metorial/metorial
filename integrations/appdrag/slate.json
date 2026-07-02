@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/appdrag",
+  "description": "Execute SQL queries on cloud databases, manage cloud functions, and build serverless backends. Create and manage database tables, run SELECT/INSERT/UPDATE/DELETE queries, upload and manage files in cloud storage, send transactional emails, manage newsletter contacts, post blog articles, and handle e-commerce orders. Supports cloud function execution on AWS Lambda in multiple languages (Node.js, Python, C#, GO, Java, Ruby, SQL). Triggers available for new form submissions, new orders, and order status updates.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail"],
+  "skills": [
+    "execute SQL queries",
+    "manage cloud functions",
+    "upload and manage files",
+    "send transactional emails",
+    "manage newsletter contacts",
+    "post blog articles",
+    "manage e-commerce orders",
+    "create database tables",
+    "run serverless code",
+    "import export CSV data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/appdrag.svg"
+}

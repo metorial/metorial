@@ -1,0 +1,86 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  createBrand,
+  createLocation,
+  createOffer,
+  createProgram,
+  createTestTransaction,
+  createWebhook,
+  deleteBrand,
+  deleteCard,
+  deleteLocation,
+  deleteWebhook,
+  enrollCard,
+  getBrand,
+  getCard,
+  getLocation,
+  getOffer,
+  getProgram,
+  getTransaction,
+  listBrands,
+  listCards,
+  listLocations,
+  listOffers,
+  listPrograms,
+  listTransactions,
+  listWebhooks,
+  manageOfferCard,
+  manageOfferLocations,
+  updateBrand,
+  updateOffer,
+  updateProgram,
+  updateWebhook
+} from './tools';
+import {
+  brandConsentEvents,
+  cardEvents,
+  locationStatusEvents,
+  marketplaceOfferEvents,
+  programStatusEvents,
+  transactionEvents
+} from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    createProgram,
+    getProgram,
+    listPrograms,
+    updateProgram,
+    createBrand,
+    getBrand,
+    listBrands,
+    updateBrand,
+    deleteBrand,
+    createLocation,
+    getLocation,
+    listLocations,
+    deleteLocation,
+    enrollCard,
+    getCard,
+    listCards,
+    deleteCard,
+    getTransaction,
+    listTransactions,
+    createTestTransaction,
+    createOffer,
+    getOffer,
+    listOffers,
+    updateOffer,
+    manageOfferLocations,
+    manageOfferCard,
+    createWebhook,
+    listWebhooks,
+    deleteWebhook,
+    updateWebhook
+  ],
+  triggers: [
+    transactionEvents,
+    cardEvents,
+    brandConsentEvents,
+    locationStatusEvents,
+    programStatusEvents,
+    marketplaceOfferEvents
+  ]
+});

@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/square",
+  "description": "Process payments, manage orders, and handle invoices for online, in-app, and in-person commerce. Create and manage customer profiles, catalog items, inventory counts, and locations. Issue refunds, manage disputes, and track payouts. Create bookings and appointments, manage team members and timecards, handle gift cards and loyalty programs, and manage subscriptions. Save cards on file, generate checkout links, connect and control Square Terminal devices, and manage vendor/supplier information. Extend Square objects with custom attributes. Receive webhook notifications for payments, orders, customers, inventory, invoices, bookings, disputes, team changes, and more.",
+  "categories": [
+    "crm-and-sales-tools",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "process payments",
+    "manage orders",
+    "create invoices",
+    "manage customer profiles",
+    "track inventory",
+    "issue refunds",
+    "manage catalog items",
+    "create bookings",
+    "manage team members",
+    "handle gift cards and loyalty"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/squareup.svg"
+}

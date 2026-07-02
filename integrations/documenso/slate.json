@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/documenso",
+  "description": "Create, send, and manage electronic signature documents and multi-document envelopes. Upload PDF documents, add recipients with roles (signer, viewer, approver, CC), and configure signature fields (signature, text, date, checkbox, etc.) with precise positioning. Create reusable templates with direct signing links. Organize documents into folders. Manage teams and organizations. Embed signing and document authoring experiences into external applications. Receive webhook notifications for document lifecycle events including creation, sending, opening, signing, completion, rejection, and cancellation.",
+  "categories": ["document-processing", "legal-and-compliance"],
+  "skills": [
+    "send documents for signing",
+    "manage document recipients",
+    "configure signature fields",
+    "create reusable templates",
+    "organize documents in folders",
+    "manage teams and members",
+    "embed signing experience",
+    "create multi-document envelopes",
+    "track document lifecycle events",
+    "generate documents from templates"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@__test__/triggers",
+  "description": "Internal test slate for exercising polling and webhook trigger flows.",
+  "categories": ["utilities"],
+  "skills": [
+    "receive webhook payloads and emit processed trigger events",
+    "emit the current time during polling runs",
+    "test callback trigger delivery",
+    "run trigger integration smoke tests"
+  ]
+}

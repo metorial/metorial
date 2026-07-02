@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/people-data-labs",
+  "description": "Enrich, search, and identify person and company records using attributes like name, email, phone, employment, education, and social profiles. Enrich IP addresses to retrieve associated company and location data. Search and filter person and company datasets using SQL or Elasticsearch queries. Identify and rank matching person profiles from partial or ambiguous inputs. Retrieve specific records by unique PDL ID. Standardize and clean company, location, and school data strings. Enrich job titles and skills with standardized information. Autocomplete search query values with record counts.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "enrich person profiles",
+    "enrich company profiles",
+    "search person dataset",
+    "search company dataset",
+    "identify matching persons",
+    "enrich IP addresses",
+    "clean and standardize data",
+    "enrich job titles",
+    "enrich skills data",
+    "autocomplete search queries"
+  ]
+}

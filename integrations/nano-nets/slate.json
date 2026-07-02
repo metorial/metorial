@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/nanonets",
+  "description": "Extract structured data from unstructured documents using AI-powered OCR and deep learning. Create and manage document processing workflows to extract fields and tables from invoices, receipts, forms, purchase orders, bank statements, and other document types. Upload documents as files or URLs for synchronous or asynchronous processing, receiving extracted data with confidence scores and bounding boxes. Train custom image classification and object detection models with labeled data. Manage human-in-the-loop review processes including approving, rejecting, and moderating extracted predictions. Apply post-processing transformations such as date formatting, currency detection, regex matching, lookup enrichment, and custom Python scripts. Import documents from email, Dropbox, Google Drive, OneDrive, and SharePoint. Export processed data to Google Sheets, QuickBooks, Xero, Salesforce, databases (PostgreSQL, MySQL, MSSQL), and other platforms. Receive webhook notifications on document processing, approval, rejection, and assignment events.",
+  "categories": [
+    "apis-and-http-requests",
+    "document-processing",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "extract document data",
+    "train custom ML models",
+    "classify images",
+    "detect objects in images",
+    "review and approve extractions",
+    "import documents from sources",
+    "export data to platforms",
+    "configure processing workflows",
+    "apply data transformations",
+    "process invoices and receipts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/nano-nets.png"
+}

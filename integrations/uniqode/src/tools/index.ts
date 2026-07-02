@@ -1,0 +1,15 @@
+export { createQrCode } from './create-qr-code';
+export { deleteQrCode } from './delete-qr-code';
+export { getAnalytics } from './get-analytics';
+export { getFormResponses } from './get-form-responses';
+export { getQrCode } from './get-qr-code';
+export { listBeacons } from './list-beacons';
+export { listGeofences } from './list-geofences';
+export { listNfcTags } from './list-nfc-tags';
+export { listPlaces } from './list-places';
+export { listQrCodes } from './list-qr-codes';
+export { manageGeofence } from './manage-geofence';
+export { manageLandingPage } from './manage-landing-page';
+export { updateBeacon } from './update-beacon';
+export { updateNfcTag } from './update-nfc-tag';
+export { updateQrCode } from './update-qr-code';

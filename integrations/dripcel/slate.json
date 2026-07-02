@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/dripcel",
+  "description": "Send SMS and bulk email campaigns with ML-optimized delivery timing and targeting. Manage contacts with tags, custom fields, and bulk upload (up to 100K per request). Track message deliveries, view send logs, and search contact replies classified as opt-in, opt-out, or unknown. Upload sale conversions and postbacks tied to campaigns. Check compliance of cell numbers against campaign targeting rules before sending. Manage campaign exchange transactions as a buyer. List and manage email templates, tags, and campaigns. Check organization credit balance. Receive webhook notifications when contacts reply to campaign sends.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send SMS messages",
+    "send bulk emails",
+    "manage contacts and tags",
+    "track message deliveries",
+    "search contact replies",
+    "upload sale conversions",
+    "check compliance status",
+    "manage email templates",
+    "manage exchange transactions",
+    "check credit balance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/dripcel.png"
+}

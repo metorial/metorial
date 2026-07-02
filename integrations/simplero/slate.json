@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/simplero",
+  "description": "Manage contacts, mailing lists, products, purchases, invoices, and account administrators for an all-in-one online course and membership platform. Create and update contacts with custom fields, tags, GDPR consent, and affiliate attribution. Subscribe and unsubscribe contacts to mailing lists individually or in bulk. List products, look up purchases, and add people to products via webhooks. Retrieve invoices filtered by date or number range. Manage account administrators with role assignments. Receive webhooks for events including list subscriptions, purchases, tag changes, course completions, membership joins, form submissions, event registrations, pipeline updates, email clicks, and affiliate activity.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail", "education-and-learning"],
+  "skills": [
+    "manage contacts and tags",
+    "subscribe to mailing lists",
+    "bulk subscribe contacts",
+    "list and retrieve products",
+    "look up purchases",
+    "retrieve and filter invoices",
+    "manage account administrators",
+    "track course completion",
+    "handle webhook events",
+    "manage GDPR consent"
+  ]
+}

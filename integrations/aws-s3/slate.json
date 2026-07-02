@@ -1,0 +1,17 @@
+{
+  "name": "@amazon/aws-s3",
+  "description": "Store, retrieve, and manage objects in Amazon S3 buckets. Upload and download text objects, create and delete buckets, generate presigned URLs for temporary access, manage object versions, configure bucket policies and lifecycle rules, and tag objects and buckets.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "upload and download objects",
+    "create and delete buckets",
+    "generate presigned URLs",
+    "manage object versions",
+    "configure bucket policies",
+    "set lifecycle rules",
+    "tag objects and buckets",
+    "copy objects",
+    "poll for object changes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/amazon.svg"
+}

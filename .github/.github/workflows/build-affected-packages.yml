@@ -1,0 +1,194 @@
+name: Build affected packages
+
+on:
+  push:
+    branches:
+      - '**'
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'Optional base ref or SHA for the build diff'
+        required: false
+        type: string
+      head:
+        description: 'Optional head ref or SHA for the build diff'
+        required: false
+        type: string
+
+jobs:
+  build-affected-packages:
+    name: Build affected packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build affected packages
+        shell: bash
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+          PUSH_BASE_EXPLICIT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.base != '' }}
+          PUSH_BASE_SHA: ${{ github.event.inputs.base || github.event.before || '' }}
+          PUSH_HEAD_SHA: ${{ github.event.inputs.head || github.sha }}
+        run: |
+          set -eo pipefail
+
+          head_sha="$(git rev-parse "${PUSH_HEAD_SHA:-HEAD}")"
+          base_ref="${PUSH_BASE_SHA:-}"
+          branch_name="${BRANCH_NAME:-$(git rev-parse --abbrev-ref HEAD)}"
+          explicit_base="${PUSH_BASE_EXPLICIT:-false}"
+          branch_diff_used=false
+          fallback_used=false
+
+          if [[ "$explicit_base" == true && -n "$base_ref" && ! "$base_ref" =~ ^0{40}$ ]] && git cat-file -e "${base_ref}^{commit}" 2>/dev/null; then
+            base_sha="$(git rev-parse "$base_ref")"
+          elif [[ "$explicit_base" != true && "$branch_name" != "main" ]]; then
+            base_sha="$(git merge-base origin/main "$head_sha")"
+            branch_diff_used=true
+          elif [[ -n "$base_ref" && ! "$base_ref" =~ ^0{40}$ ]] && git cat-file -e "${base_ref}^{commit}" 2>/dev/null; then
+            base_sha="$(git rev-parse "$base_ref")"
+          else
+            base_sha="$(git merge-base origin/main "$head_sha")"
+            fallback_used=true
+          fi
+
+          changed_files=()
+          diff_output="$(git diff --name-only --diff-filter=ACMR "$base_sha..$head_sha" | sort)"
+          while IFS= read -r file; do
+            if [[ -n "$file" ]]; then
+              changed_files+=("$file")
+            fi
+          done <<< "$diff_output"
+
+          echo "Base SHA: $base_sha"
+          echo "Head SHA: $head_sha"
+          echo "Branch: $branch_name"
+          if [[ "$branch_diff_used" == true ]]; then
+            echo "Branch diff: used merge-base origin/main HEAD for non-main branch."
+          fi
+          if [[ "$fallback_used" == true ]]; then
+            echo "Base fallback: used merge-base origin/main HEAD."
+          fi
+          echo "Changed files: ${#changed_files[@]}"
+          if [[ "${#changed_files[@]}" -gt 0 ]]; then
+            printf -- '- %s\n' "${changed_files[@]}"
+          fi
+
+          full_build=false
+          lockfile_changed=false
+          filters=()
+          typecheck_dirs=()
+          full_build_reasons=()
+
+          for file in "${changed_files[@]}"; do
+            case "$file" in
+              bun.lock)
+                lockfile_changed=true
+                ;;
+              package.json|tsup.packages.config.ts|turbo.json)
+                full_build=true
+                full_build_reasons+=("$file")
+                ;;
+              integrations/*/*)
+                package="${file#integrations/}"
+                package="${package%%/*}"
+                if [[ -n "$package" ]]; then
+                  filters+=("--filter=./integrations/$package")
+                  typecheck_dirs+=("integrations/$package")
+                fi
+                ;;
+              test-integrations/*/*)
+                package="${file#test-integrations/}"
+                package="${package%%/*}"
+                if [[ -n "$package" ]]; then
+                  filters+=("--filter=./test-integrations/$package")
+                  typecheck_dirs+=("test-integrations/$package")
+                fi
+                ;;
+              packages/*/*)
+                package="${file#packages/}"
+                package="${package%%/*}"
+                if [[ -n "$package" ]]; then
+                  filters+=("--filter=..../packages/$package")
+                  typecheck_dirs+=("packages/$package")
+                fi
+                ;;
+            esac
+          done
+
+          command=(bunx turbo run build --ui=stream)
+
+          if [[ "$full_build" == true ]]; then
+            printf 'Build scope: full workspace'
+            printf ' (%s)' "${full_build_reasons[@]}"
+            printf '\n'
+          elif [[ "${#filters[@]}" -gt 0 ]]; then
+            sorted_filters=()
+            while IFS= read -r filter; do
+              if [[ -n "$filter" ]]; then
+                sorted_filters+=("$filter")
+              fi
+            done < <(printf '%s\n' "${filters[@]}" | sort -u)
+
+            echo "Build scope: ${#sorted_filters[@]} affected filter(s)"
+            if [[ "$lockfile_changed" == true ]]; then
+              echo "Lockfile changed; using affected package filters from changed workspace paths."
+            fi
+            printf -- '- %s\n' "${sorted_filters[@]}"
+            command+=("${sorted_filters[@]}")
+          elif [[ "$lockfile_changed" == true ]]; then
+            echo "Build scope: full workspace (bun.lock with no package-scoped changes)"
+          else
+            echo "No build-relevant workspace changes detected; skipping Turbo build."
+            exit 0
+          fi
+
+          printf 'Build command:'
+          printf ' %q' "${command[@]}"
+          printf '\n'
+          "${command[@]}"
+
+          if [[ "${#typecheck_dirs[@]}" -eq 0 ]]; then
+            echo "No package-scoped TypeScript check targets detected."
+            exit 0
+          fi
+
+          sorted_typecheck_dirs=()
+          while IFS= read -r package_dir; do
+            if [[ -n "$package_dir" ]]; then
+              sorted_typecheck_dirs+=("$package_dir")
+            fi
+          done < <(printf '%s\n' "${typecheck_dirs[@]}" | sort -u)
+
+          echo "TypeScript 5.9.3 check scope: ${#sorted_typecheck_dirs[@]} package directories"
+          printf -- '- %s\n' "${sorted_typecheck_dirs[@]}"
+
+          for package_dir in "${sorted_typecheck_dirs[@]}"; do
+            if [[ ! -f "$package_dir/tsconfig.json" ]]; then
+              echo "Skipping TypeScript check for $package_dir: no tsconfig.json."
+              continue
+            fi
+
+            echo "TypeScript check: $package_dir"
+            (
+              cd "$package_dir"
+              npm exec --yes --package typescript@5.9.3 -- tsc --noEmit
+            )
+          done

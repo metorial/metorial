@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/acculynx",
+  "description": "Manage roofing contractor business operations including jobs, contacts, estimates, invoices, and payments. Create and search jobs with milestone tracking, assign representatives, and monitor job lifecycle events. Create and retrieve contacts with communication logging. Access estimates, supplements, and financial worksheets. Create and manage invoices, payments, and expenses. Schedule and update appointments via calendars. Upload documents, photos, and videos to jobs. Retrieve company settings such as insurance companies, lead sources, milestones, and trade types. Access reports and manage webhook subscriptions for real-time event notifications on job, contact, and financial changes.",
+  "categories": [
+    "crm-and-sales-tools",
+    "financial-data-and-stock-market",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and manage jobs",
+    "manage contacts and logging",
+    "create and retrieve estimates",
+    "process invoices and payments",
+    "schedule appointments",
+    "upload documents and media",
+    "track job milestones",
+    "manage financial worksheets",
+    "retrieve company settings",
+    "subscribe to webhook events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/acculynx.jpeg"
+}

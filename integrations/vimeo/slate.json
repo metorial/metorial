@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/vimeo",
+  "description": "Upload, manage, and stream videos on Vimeo. Edit video metadata including titles, descriptions, tags, and privacy settings. Organize videos into showcases, folders, channels, and groups. Search for videos by keywords, category, or tags. Manage user profiles, followers, likes, and watch history. Create and control live streaming events with RTMP configuration. Retrieve embed codes and customize player settings. Manage thumbnails and text tracks (subtitles/captions). Subscribe to webhooks for real-time notifications on video uploads, plays, and status changes.",
+  "categories": ["document-processing", "scheduling-and-calendars"],
+  "skills": [
+    "upload videos",
+    "edit video metadata",
+    "manage showcases and folders",
+    "search videos",
+    "create live streaming events",
+    "manage channels and groups",
+    "configure video embedding",
+    "manage text tracks and subtitles",
+    "subscribe to webhooks",
+    "manage user profiles"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/vimeo.png"
+}

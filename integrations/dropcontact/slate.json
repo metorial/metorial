@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/dropcontact",
+  "description": "Find, verify, and enrich B2B contact and company data. Look up professional email addresses from name and company combinations, LinkedIn URLs, or existing emails. Qualify email addresses by type (nominative, catch-all, generic) and domain (professional, personal). Enrich contacts with job title, phone number, LinkedIn profile, company details, SIREN/SIRET registration data, employee count, and turnover. Check remaining API credits and configure webhooks for enrichment result notifications.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "find professional email addresses",
+    "verify and qualify emails",
+    "enrich B2B contact data",
+    "enrich company information",
+    "lookup SIREN/SIRET data",
+    "check remaining credits",
+    "configure enrichment webhooks",
+    "resolve LinkedIn profiles"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/dropcontact.png"
+}

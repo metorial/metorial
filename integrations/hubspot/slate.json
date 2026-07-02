@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/hubspot",
+  "description": "Create, read, update, and delete CRM objects including contacts, companies, deals, tickets, and custom objects. Manage associations between CRM records. Track engagements such as calls, emails, meetings, notes, and tasks. Send transactional and marketing emails, manage campaigns, and handle subscription preferences. Build and manage marketing workflows, sequences, and automation actions. Manage CMS content including blog posts, landing pages, and HubDB tables. Handle commerce data including products, orders, invoices, quotes, and payments. Create and manage contact lists for segmentation. Configure deal, ticket, and order pipelines with custom stages. Search and filter CRM records. Bulk import and export CRM data. Manage users, teams, and account settings. Subscribe to webhooks for real-time notifications on object creation, deletion, property changes, merges, and association changes.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "manage CRM contacts and companies",
+    "track deals and pipelines",
+    "send marketing emails",
+    "manage workflow automation",
+    "handle commerce and payments",
+    "create and manage tickets",
+    "search and filter records",
+    "manage CMS content",
+    "bulk import export data",
+    "subscribe to webhook events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hubspot.webp"
+}

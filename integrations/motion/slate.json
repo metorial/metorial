@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/motion",
+  "description": "Create, update, delete, and list tasks with AI-powered auto-scheduling, priorities, deadlines, and assignees. Manage projects within workspaces, create recurring tasks with configurable frequency, and add comments to tasks for collaboration. Define and manage custom fields (text, number, date, select, checkbox, etc.) on tasks and projects. Retrieve user schedules that control when tasks can be auto-scheduled. List workspaces, workspace statuses, and users.",
+  "categories": ["scheduling-and-calendars", "task-and-project-management"],
+  "skills": [
+    "create and manage tasks",
+    "manage projects in workspaces",
+    "create recurring tasks",
+    "add comments to tasks",
+    "manage custom fields",
+    "retrieve user schedules",
+    "list workspaces and statuses",
+    "move tasks between workspaces",
+    "manage task priorities and deadlines",
+    "list workspace users"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/backendless",
+  "description": "Manage backend services for mobile and web applications. Create, read, update, and delete database records with SQL-driven queries and relational data linking. Register, authenticate, and manage users with role-based permissions. Upload, download, list, and delete files in scalable cloud storage. Send emails using templates with dynamic placeholders. Publish and subscribe to real-time messaging channels. Send push notifications to specific users or devices. Manage geolocation data with radius and area searches. Cache data in server-side in-memory storage. Use atomic counters for thread-safe sequential values. Store and retrieve key-value data via Hive. Deploy custom business logic with Cloud Code services, event handlers, and scheduled timers.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage database records",
+    "authenticate and manage users",
+    "upload and download files",
+    "send template emails",
+    "publish real-time messages",
+    "send push notifications",
+    "query geolocation data",
+    "cache server-side data",
+    "manage atomic counters",
+    "execute custom cloud code"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/backendless.png"
+}

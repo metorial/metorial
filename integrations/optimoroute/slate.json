@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/optimoroute",
+  "description": "Create, update, search, and delete delivery and field service orders. Optimize multi-stop routes for drivers across configurable date ranges with options for route balancing, clustering, and depot trips. Retrieve planned routes with stop sequences, scheduled times, travel distances, and polylines. Manage driver parameters including working hours, vehicles, load capacities, and start/end locations. Track driver GPS positions and monitor order completion status. Access proof of delivery data including signatures, photos, barcode scans, and notes. Poll real-time mobile events such as route starts, order completions, and driver duty changes. Send customer notifications via email or SMS with order tracking URLs.",
+  "categories": ["scheduling-and-calendars", "task-and-project-management"],
+  "skills": [
+    "create and manage orders",
+    "optimize delivery routes",
+    "retrieve planned routes",
+    "manage driver parameters",
+    "track driver GPS positions",
+    "retrieve proof of delivery",
+    "search orders by status",
+    "poll mobile driver events",
+    "send customer notifications",
+    "bulk order operations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/optimoroute.svg"
+}

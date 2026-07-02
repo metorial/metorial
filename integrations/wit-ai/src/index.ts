@@ -1,0 +1,73 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  analyzeText,
+  createApp,
+  createAppTag,
+  createEntity,
+  createIntent,
+  createTrait,
+  deleteApp,
+  deleteAppTag,
+  deleteEntity,
+  deleteIntent,
+  deleteTrait,
+  deleteUtterances,
+  detectLanguage,
+  exportApp,
+  getApp,
+  getEntity,
+  getIntent,
+  getTrait,
+  listApps,
+  listAppTags,
+  listEntities,
+  listIntents,
+  listTraits,
+  listUtterances,
+  listVoices,
+  manageEntityKeywords,
+  manageTraitValues,
+  trainUtterances,
+  updateApp,
+  updateEntity
+} from './tools';
+
+import { inboundWebhook } from './triggers/inbound-webhook';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    analyzeText,
+    detectLanguage,
+    listApps,
+    getApp,
+    createApp,
+    updateApp,
+    deleteApp,
+    listAppTags,
+    createAppTag,
+    deleteAppTag,
+    listIntents,
+    getIntent,
+    createIntent,
+    deleteIntent,
+    listEntities,
+    getEntity,
+    createEntity,
+    updateEntity,
+    deleteEntity,
+    manageEntityKeywords,
+    listTraits,
+    getTrait,
+    createTrait,
+    deleteTrait,
+    manageTraitValues,
+    listUtterances,
+    trainUtterances,
+    deleteUtterances,
+    exportApp,
+    listVoices
+  ],
+  triggers: [inboundWebhook]
+});

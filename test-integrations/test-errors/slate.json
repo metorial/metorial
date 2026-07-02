@@ -1,0 +1,12 @@
+{
+  "name": "@__test__/errors",
+  "description": "Internal test slate for exercising error paths. Exposes tools that deliberately throw various error types on demand.",
+  "categories": ["utilities"],
+  "skills": [
+    "throw a requested error",
+    "simulate tool failures",
+    "reject promises for testing",
+    "raise validation and type errors on demand",
+    "run error-handling integration tests"
+  ]
+}

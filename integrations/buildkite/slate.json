@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/buildkite",
+  "description": "Manage CI/CD pipelines, builds, and agents on the Buildkite platform. Create, update, archive, and delete pipelines. Trigger, list, cancel, and rebuild builds with filtering by state, branch, commit, and creator. Inspect and retry individual jobs within builds, and retrieve job logs. List, stop, pause, and resume connected agents. Manage clusters, agent queues, and agent tokens for infrastructure isolation. Organize teams with configurable roles and pipeline access. List and download build artifacts, and create build annotations. Manage test suites, identify flaky tests, and quarantine problematic tests. Create and manage package registries supporting npm, Maven, Docker, Python, Ruby, Helm, and more. Receive webhook notifications for build, job, agent, and package events.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage CI/CD pipelines",
+    "trigger and cancel builds",
+    "retry and inspect jobs",
+    "manage build agents",
+    "manage clusters and queues",
+    "download build artifacts",
+    "create build annotations",
+    "manage test suites",
+    "manage package registries",
+    "monitor build and agent events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/buildkite-logo.png"
+}

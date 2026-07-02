@@ -1,0 +1,68 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  attachDomain,
+  createDeployment,
+  createRoute,
+  createTail,
+  deleteRoute,
+  deleteScript,
+  deleteSecret,
+  deleteTail,
+  detachDomain,
+  getSchedules,
+  getScript,
+  getSubdomain,
+  getVersion,
+  getWorkerSettings,
+  listDeployments,
+  listDomains,
+  listRoutes,
+  listScripts,
+  listSecrets,
+  listTails,
+  listTelemetryKeys,
+  listVersions,
+  putSecret,
+  queryTelemetry,
+  setScriptSubdomain,
+  updateRoute,
+  updateSchedules,
+  updateScriptSettings
+} from './tools';
+import { deploymentChanges, inboundWebhook, scriptChanges } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listScripts,
+    getScript,
+    deleteScript,
+    listVersions,
+    getVersion,
+    listDeployments,
+    createDeployment,
+    listSecrets,
+    putSecret,
+    deleteSecret,
+    getWorkerSettings,
+    updateScriptSettings,
+    getSchedules,
+    updateSchedules,
+    listDomains,
+    attachDomain,
+    detachDomain,
+    listRoutes,
+    createRoute,
+    updateRoute,
+    deleteRoute,
+    getSubdomain,
+    setScriptSubdomain,
+    createTail,
+    listTails,
+    deleteTail,
+    queryTelemetry,
+    listTelemetryKeys
+  ],
+  triggers: [inboundWebhook, scriptChanges, deploymentChanges]
+});

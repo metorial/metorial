@@ -1,0 +1,17 @@
+{
+  "name": "@google/google-contacts",
+  "description": "Create, read, update, and delete contacts with rich data fields including names, emails, phone numbers, addresses, organizations, birthdays, and notes. Search contacts by name, email, or phone number. Manage contact groups (labels) by creating, updating, and listing groups and their members. Access \"Other contacts\" automatically saved by Google. Browse Google Workspace directory profiles. Retrieve authenticated user profile information and public Google profile data. Manage contact photos.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "create and update contacts",
+    "delete contacts",
+    "search contacts",
+    "manage contact groups",
+    "list contacts",
+    "access directory profiles",
+    "retrieve profile information",
+    "manage contact photos",
+    "copy other contacts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

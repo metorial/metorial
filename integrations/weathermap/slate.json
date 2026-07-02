@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/openweathermap",
+  "description": "Retrieve current weather conditions, forecasts, and historical weather data for any location worldwide. Access air quality indices and pollutant concentrations. Convert location names to coordinates and vice versa via geocoding. Get solar irradiance data and energy production estimates. Retrieve weather map tile layers for visual representation. Monitor road weather risk conditions. Receive severe weather alerts and push notifications. Access fire danger assessments and agricultural monitoring data. Supports queries by geographic coordinates, with configurable units, languages, and response formats.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "retrieve current weather data",
+    "get weather forecasts",
+    "query historical weather archives",
+    "check air quality index",
+    "geocode location names",
+    "get solar irradiance data",
+    "retrieve weather map tiles",
+    "assess road weather risk",
+    "receive severe weather alerts",
+    "monitor agricultural field data"
+  ]
+}

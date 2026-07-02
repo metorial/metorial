@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/tapfiliate",
+  "description": "Manage affiliate marketing programs, track conversions, and handle affiliate payments. Create and organize affiliates into groups, track clicks and conversions attributed via referral codes or coupons, manage commissions with approval workflows, and process affiliate payouts. Supports customer lifecycle tracking for recurring commissions, multi-level marketing (MLM) structures, and attaching custom meta data to affiliates, customers, and conversions.",
+  "categories": [
+    "crm-and-sales-tools",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage affiliates and groups",
+    "track conversions and sales",
+    "approve or disapprove commissions",
+    "process affiliate payments",
+    "track referred customers",
+    "manage affiliate programs",
+    "create and track clicks",
+    "configure MLM relationships",
+    "manage affiliate prospects",
+    "attach custom meta data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tapfiliate.jpeg"
+}

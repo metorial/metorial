@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/mailsso",
+  "description": "Validate and verify email addresses for deliverability and quality. Check individual emails or bulk-validate lists for format validity, domain and MX record status, catch-all policies, disposable address detection, and blocklist presence. Returns deliverability scores and classifications to help maintain clean email lists.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "validate single email address",
+    "bulk validate email lists",
+    "check email deliverability",
+    "detect disposable emails",
+    "verify domain MX records",
+    "detect catch-all domains",
+    "check email blocklist status",
+    "poll bulk validation results"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mails-so.png"
+}

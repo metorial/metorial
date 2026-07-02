@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/databricks",
+  "description": "Manage Databricks workspaces, clusters, jobs, and data assets. Create, start, stop, and configure Apache Spark clusters. Orchestrate multi-task workflows and data pipelines with scheduled or triggered jobs. Execute SQL statements on SQL warehouses. Manage Unity Catalog resources including catalogs, schemas, tables, and volumes for data governance. Track ML experiments, manage model registry, and deploy model serving endpoints. Create and manage vector search indexes. Import, export, and organize notebooks and workspace files. Upload and download files via DBFS and Unity Catalog Volumes. Manage users, groups, service principals, and permissions. Create and publish Lakeview dashboards. Share data across organizations with Delta Sharing. Store and manage secrets for secure credential access. Receive webhook notifications for model registry events and job lifecycle events.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage Spark clusters",
+    "orchestrate data pipelines",
+    "execute SQL queries",
+    "govern data with Unity Catalog",
+    "track ML experiments",
+    "deploy model serving endpoints",
+    "manage notebooks and workspaces",
+    "manage vector search indexes",
+    "share data across organizations",
+    "manage users and permissions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/databricks.png"
+}

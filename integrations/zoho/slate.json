@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/zoho",
+  "description": "Manage core Zoho workflows across CRM, Desk, Books, People, and Projects. Retrieve, search, create, update, delete, and inspect related CRM records. Manage Desk tickets and contacts. Work with Books organizations, invoices, contacts, and expenses. List People forms and manage form/employee, leave, and attendance data. Discover Projects portals and manage projects, tasks, and milestones.",
+  "categories": ["crm-and-sales-tools", "financial-data-and-stock-market"],
+  "skills": [
+    "manage CRM records",
+    "create and track invoices",
+    "manage support tickets",
+    "manage employee HR records",
+    "organize projects and tasks",
+    "discover Zoho organization and portal IDs",
+    "query CRM data using COQL",
+    "subscribe to CRM and Desk event webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zoho.png",
+  "version": "0.1.2"
+}

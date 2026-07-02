@@ -1,0 +1,18 @@
+{
+  "name": "@amazon/aws-ses",
+  "description": "Send formatted, raw, and bulk templated emails to recipients. Create and manage reusable email templates with personalization variables. Manage contact lists and topic-based subscription preferences. Verify and configure sending identities (email addresses and domains) with DKIM authentication. Create configuration sets to control delivery options, reputation monitoring, and event tracking. Manage account-level suppression lists for bounces and complaints. Organize dedicated IP addresses into pools for reputation isolation. Monitor deliverability with Virtual Deliverability Manager dashboard and sending statistics. Track email events including sends, deliveries, bounces, complaints, opens, and clicks. Process inbound emails with receipt rules and filters (v1 API).",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send emails",
+    "manage email templates",
+    "manage contact lists",
+    "manage subscription preferences",
+    "verify sending identities",
+    "configure DKIM authentication",
+    "manage suppression lists",
+    "track email sending events",
+    "monitor deliverability metrics",
+    "manage dedicated IP pools"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/amazon.svg"
+}

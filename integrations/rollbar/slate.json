@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/rollbar",
+  "description": "Track, manage, and resolve application errors and exceptions in real time. Report and list occurrences, group items by status (active, resolved, muted, archived), and filter by environment or severity level. Track deployments with revision and environment details to identify suspect deploys. Run custom RQL queries against occurrence data. Manage projects, teams, users, and access tokens. Configure webhook, Slack, PagerDuty, and email notification rules. Upload source maps and debug symbol files for stack trace de-obfuscation. Retrieve metrics and reports on top active items, occurrence rates, and resolution times. Manage service links, environments, code versions, and session replay data. Handle PII deletion requests for data privacy compliance. Receive webhook events for new items, occurrences, high occurrence rates, item resolution/reactivation, and deployments.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "track and manage errors",
+    "report deployments",
+    "query occurrence data",
+    "manage projects and teams",
+    "configure notification rules",
+    "upload source maps",
+    "retrieve error metrics",
+    "manage access tokens",
+    "delete PII data",
+    "monitor occurrence rates"
+  ]
+}

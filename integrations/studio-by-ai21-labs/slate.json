@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/studio-by-ai21-labs",
+  "description": "Access AI21 Labs' Jamba and Jurassic-2 large language models for chat completions, text generation, and specialized language processing tasks. Generate conversational responses with long-context support (256K tokens), orchestrate AI agents via Maestro for RAG and enterprise automation, and upload/manage documents for conversational retrieval-augmented generation. Task-specific APIs enable text summarization, paraphrasing, text segmentation, grammatical error correction, text improvement suggestions, and contextual question answering. Supports streaming, function calling, JSON mode, and configurable generation parameters.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "generate chat completions",
+    "orchestrate AI agents",
+    "summarize text",
+    "paraphrase text",
+    "correct grammatical errors",
+    "segment text by topic",
+    "suggest text improvements",
+    "answer contextual questions",
+    "manage document library",
+    "conversational RAG retrieval"
+  ]
+}

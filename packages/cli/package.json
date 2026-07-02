@@ -1,0 +1,38 @@
+{
+  "name": "@slates/cli",
+  "version": "1.0.0-rc.10",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src/**",
+    "dist/**",
+    "README.md",
+    "package.json"
+  ],
+  "author": "Tobias Herber",
+  "license": "FSL 1.1",
+  "type": "module",
+  "source": "src/cli.ts",
+  "bin": "./src/cli.ts",
+  "exports": {
+    "default": "./src/cli.ts"
+  },
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit",
+    "biome:check": "biome check --write src"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.4.0",
+    "@slates/client": "1.0.0-rc.12",
+    "@slates/oauth-microsoft": "1.0.0-rc.5",
+    "@slates/profiles": "1.0.0-rc.10",
+    "sade": "^1.8.1"
+  },
+  "devDependencies": {
+    "@slates/tsconfig": "1.0.0-rc.1",
+    "typescript": "5.8.2",
+    "vitest": "^3.1.2"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/ambee",
+  "description": "Retrieve hyperlocal environmental and climate data across 37 endpoints. Query real-time, historical, and forecast air quality (AQI, pollutant concentrations), weather conditions (temperature, humidity, wind, pressure), pollen counts (tree, grass, weed), wildfire activity and fire-risk forecasts, natural disaster data (earthquakes, floods, droughts, cyclones, volcanic eruptions), soil moisture and temperature, water vapor levels, NDVI/EVI vegetation indices, and elevation data. Data can be queried by latitude/longitude, postal code, city name, or country code. Access map tile layers for air quality and pollen visualization. Configure webhook-based environmental alerts for pollen, air quality, weather, and wildfires with custom conditions and frequency. Supports multi-language responses and cloud data dumps to S3, GCP, Azure, or FTP.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "retrieve air quality data",
+    "query weather conditions",
+    "get pollen count data",
+    "track wildfire activity",
+    "monitor natural disasters",
+    "retrieve soil moisture data",
+    "access vegetation index data",
+    "get elevation data",
+    "configure environmental alerts",
+    "render map tile layers"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ambee.png"
+}

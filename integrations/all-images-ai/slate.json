@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/all-images-ai",
+  "description": "Generate AI images from text prompts using Midjourney AI, producing 4 image proposals per generation. Supports simple mode with configurable parameters (aspect ratio, weather, time of day, camera model, chaos, stylization, exclusions) and advanced mode for raw Midjourney prompts. Search and download AI-generated stock images by keyword, purchase images with credits, and retrieve multiple resolution versions (preview, full, upscale, UHD). Track asynchronous generation status, retry failed generations, manage API keys, and configure webhooks for generation lifecycle events (created, active, progress, completed, failed).",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "generate images from text",
+    "search stock images",
+    "download purchased images",
+    "configure image parameters",
+    "track generation status",
+    "manage webhook subscriptions",
+    "retry failed generations",
+    "filter download history",
+    "manage API keys"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/all-images-ai.png"
+}

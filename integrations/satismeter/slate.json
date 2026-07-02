@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/satismeter",
+  "description": "Collect and manage customer feedback through NPS, CSAT, CES, and custom surveys. Export survey responses in CSV or JSON format, filtered by date range. Retrieve aggregated survey response statistics. Create, update, list, and delete users with custom traits for survey targeting and segmentation. Track events to trigger live surveys for users. Insert survey responses programmatically with support for in-app, mobile, and email delivery methods. Manage email unsubscribe lists. Receive real-time webhook notifications when surveys are answered, completed, or dismissed.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "export survey responses",
+    "retrieve response statistics",
+    "manage survey users",
+    "track user events",
+    "insert survey responses",
+    "manage email unsubscriptions",
+    "receive survey webhooks",
+    "filter responses by date",
+    "manage user traits"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/satismeter.svg"
+}

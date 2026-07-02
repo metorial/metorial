@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/outline",
+  "description": "Create, read, edit, search, and organize documents and knowledge base content in Outline. Manage collections, create and update documents with Markdown content, search across the knowledge base, manage users and groups, handle document permissions and sharing, organize content with stars and pins, upload attachments, and configure webhooks for event-driven workflows. Supports document archiving, publishing, unpublishing, moving, importing, and export operations.",
+  "categories": [
+    "document-processing",
+    "email-and-messaging",
+    "note-taking-and-knowledge-bases"
+  ],
+  "skills": [
+    "create and edit documents",
+    "search knowledge base",
+    "manage collections",
+    "organize with stars and pins",
+    "manage users and groups",
+    "share documents",
+    "upload file attachments",
+    "archive and delete documents",
+    "import and export content",
+    "configure webhooks"
+  ]
+}

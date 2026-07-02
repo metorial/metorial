@@ -1,0 +1,12 @@
+{
+  "name": "@__test__/oauth",
+  "description": "Internal test slate for exercising OAuth flows against the Metorial mock OAuth provider. Provides one auth method for the happy path and one per failure stage supported by mock-oauth.",
+  "categories": ["utilities"],
+  "skills": [
+    "sign in against the mock oauth provider",
+    "exercise the oauth authorization code flow",
+    "trigger specific oauth failure stages on demand",
+    "simulate invalid_grant and invalid_client errors",
+    "run oauth integration tests"
+  ]
+}

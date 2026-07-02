@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/ollama",
+  "description": "Run and manage large language models locally or via Ollama cloud. Generate text completions, conduct chat conversations, and create vector embeddings. Support tool calling (function calling) and structured JSON outputs. Manage models by pulling, pushing, creating, copying, deleting, and listing them. Generate images using experimental image generation models. Provides OpenAI-compatible API endpoints for drop-in integration with existing applications.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "generate text completions",
+    "chat with language models",
+    "generate vector embeddings",
+    "call tools and functions",
+    "generate structured outputs",
+    "pull and push models",
+    "create and delete models",
+    "list available models",
+    "generate images"
+  ]
+}

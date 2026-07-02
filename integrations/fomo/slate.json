@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/fomo",
+  "description": "Manage social proof notifications that display real-time customer activity (purchases, signups, reviews) on websites. Create, retrieve, search, update, and delete notification events with details like customer name, location, and custom attributes. Manage notification templates that define display formats using variable placeholders. Retrieve application statistics and update display settings for how notifications appear to site visitors. Search events by specific fields and values. Access Fomo's public marketing metrics including signup counts, customer counts, and integrations.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "e-commerce-and-retail"],
+  "skills": [
+    "create notification events",
+    "search and filter events",
+    "update and delete events",
+    "manage notification templates",
+    "retrieve application statistics",
+    "update display settings",
+    "access public marketing metrics",
+    "configure event geolocation"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/fomo.png"
+}

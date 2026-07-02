@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/piloterr",
+  "description": "Scrape and extract structured data from websites using 50+ pre-built endpoints. Crawl any webpage with anti-bot bypass, rotating proxies, and rendered HTML extraction. Extract LinkedIn profiles, companies, jobs, and posts. Search Google, Bing, and Brave and retrieve structured results. Scrape e-commerce product data from Amazon, Walmart, Best Buy, and other retailers. Enrich company data from a 60M+ company database. Detect website technology stacks. Look up domain WHOIS information, validate emails, and find email addresses. Retrieve Crunchbase funding and company data. Capture webpage screenshots. Extract data from real estate, automotive, and prediction market platforms. Monitor API usage and remaining credits.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail", "web-search"],
+  "skills": [
+    "scrape website HTML content",
+    "extract LinkedIn profile data",
+    "search engine result scraping",
+    "scrape e-commerce product data",
+    "enrich company information",
+    "detect website technologies",
+    "validate and find emails",
+    "capture webpage screenshots",
+    "lookup domain WHOIS data",
+    "retrieve Crunchbase company data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/piloterr.svg"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/v0",
+  "description": "Generate, refine, and deploy web application code using natural language prompts through AI-powered chat sessions. Create and manage projects programmatically, upload and manage files, import codebases from GitHub repositories, and deploy applications to hosting with custom domains. Supports multi-turn conversational code generation, iterative development workflows, and autonomous AI agent integration for building and deploying web applications.",
+  "categories": ["apis-and-http-requests", "code-execution"],
+  "skills": [
+    "generate code from prompts",
+    "manage web projects",
+    "deploy applications",
+    "import GitHub repositories",
+    "iterate code via chat",
+    "manage project files",
+    "initialize from templates",
+    "integrate AI agent tools",
+    "configure custom domains"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/v0.png"
+}

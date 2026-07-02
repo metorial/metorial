@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/modelry",
+  "description": "Manage 3D product visualizations for eCommerce. Create, retrieve, and delete products with SKUs, dimensions, tags, and external URLs. Submit and track modeling requests for 3D model creation. Manage embeddable 3D and AR viewers for product pages. Handle product assets across multiple 3D file formats (glTF, GLB, USDZ, and more). Organize work across workspaces.",
+  "categories": ["document-processing", "e-commerce-and-retail"],
+  "skills": [
+    "create and manage products",
+    "track modeling requests",
+    "manage 3D embeds",
+    "manage product assets",
+    "list workspaces",
+    "assign product SKUs and tags",
+    "delete products"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/modelry.png"
+}

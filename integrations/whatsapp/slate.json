@@ -1,0 +1,18 @@
+{
+  "name": "@meta/whatsapp-business",
+  "description": "Send and receive WhatsApp messages at scale, including text, images, audio, video, documents, locations, contacts, and interactive elements (buttons, lists). Manage and send pre-approved message templates for marketing, utility, and authentication purposes. Upload and download media files for use in messages. Retrieve and update WhatsApp Business profile information. Register and manage business phone numbers. Create interactive WhatsApp Flows for sign-ups, surveys, and lead capture. Monitor inbound messages, outbound message statuses, and account events via webhooks.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send WhatsApp messages",
+    "receive inbound messages",
+    "manage message templates",
+    "send interactive messages",
+    "upload and download media",
+    "manage business profile",
+    "manage phone numbers",
+    "track message delivery status",
+    "create WhatsApp Flows",
+    "manage two-step verification"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/whatsapp-logo.svg"
+}

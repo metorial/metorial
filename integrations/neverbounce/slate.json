@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/neverbounce",
+  "description": "Verify individual email addresses in real time and validate bulk email lists. Returns verification results including valid, invalid, disposable, catchall, or unknown statuses along with DNS flags and suggested corrections. Create and manage bulk verification jobs from direct input or remote CSV files, monitor job progress, download results, and receive webhook callbacks on job status changes. Perform free list analysis to estimate bounce rates, check account credit balances, and confirm proof-of-entry verification from the JavaScript widget.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "verify single email address",
+    "bulk email list verification",
+    "check email validity status",
+    "analyze list bounce rate",
+    "manage verification jobs",
+    "download verification results",
+    "monitor job progress",
+    "check account credit balance",
+    "confirm proof of entry"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/neverbounce.png"
+}

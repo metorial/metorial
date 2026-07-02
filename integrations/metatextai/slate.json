@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/metatextai",
+  "description": "Classify, extract, and generate text using custom and pre-built NLP models. Perform sentiment analysis, keyword extraction, named entity recognition, and text generation via API. Train and deploy custom text classification, extraction, and generation models using labeled data. Access pre-built hub models for common tasks like sentiment analysis, keyword extraction, blog post generation, and news headline summarization without training.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "classify text into categories",
+    "analyze text sentiment",
+    "extract keywords from text",
+    "recognize named entities",
+    "generate text content",
+    "summarize news headlines",
+    "train custom NLP models",
+    "deploy custom models",
+    "evaluate model performance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/metatextai.jpeg"
+}

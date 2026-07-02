@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/nango",
+  "description": "Manage product integrations with 700+ APIs through a unified platform. Create and manage OAuth connections, API key auth, and credential storage for end users. Proxy authenticated API requests to external services on behalf of users. Deploy sync functions that continuously pull data from external APIs on a schedule, and action functions that perform on-demand operations. List, create, update, and delete integrations and connections. Create connect sessions for frontend auth flows. Receive and forward webhooks from external APIs attributed to specific user connections. Monitor integration execution with real-time logs and metrics. Manage isolated environments for development and production.",
+  "categories": ["apis-and-http-requests", "security", "task-and-project-management"],
+  "skills": [
+    "manage OAuth connections",
+    "proxy authenticated API requests",
+    "sync external API data",
+    "execute integration functions",
+    "manage integrations and providers",
+    "create connect sessions",
+    "forward external webhooks",
+    "manage environment settings",
+    "monitor integration logs",
+    "handle credential refresh"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/nango.svg"
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@metorial/tldv",
+  "description": "Retrieve recorded meeting data, transcripts, and AI-generated highlights from Zoom, Google Meet, and Microsoft Teams calls. Download meeting recordings via signed URLs, access structured transcripts with speaker identification and timestamps, and retrieve AI-generated notes organized by topic. Import external recordings for transcription and analysis. Receive webhook notifications when meetings finish processing or transcripts become available.",
+  "categories": [
+    "apis-and-http-requests",
+    "note-taking-and-knowledge-bases",
+    "scheduling-and-calendars"
+  ],
+  "skills": [
+    "retrieve meeting metadata",
+    "download meeting recordings",
+    "get meeting transcripts",
+    "retrieve AI-generated highlights",
+    "import external recordings",
+    "filter and search meetings",
+    "receive meeting-ready webhooks",
+    "receive transcript-ready webhooks"
+  ]
+}

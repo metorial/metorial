@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/needle",
+  "description": "Manage document collections, perform AI-powered semantic search, and build automated workflows. Create, list, update, and delete collections that index documents for retrieval-augmented generation (RAG). Add files to collections via URL or signed upload, supporting PDFs, Word, Excel, CSV, Markdown, and more with OCR capabilities. Search across indexed documents using semantic search with automatic chunking, embedding, and reranking. Connect 25+ external data sources (Google Drive, SharePoint, Notion, Slack, GitHub, Salesforce, Gmail) that automatically sync and reindex content. Build visual AI-powered workflows with agent nodes, conditional logic, loops, and integrations to external services.",
+  "categories": [
+    "apis-and-http-requests",
+    "note-taking-and-knowledge-bases",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage document collections",
+    "semantic search documents",
+    "upload and index files",
+    "sync external data sources",
+    "build AI workflows",
+    "retrieve collection statistics",
+    "generate file upload URLs",
+    "download collection files",
+    "OCR document extraction",
+    "connect third-party sources"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/needle.png"
+}

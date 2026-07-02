@@ -1,0 +1,22 @@
+{
+  "name": "@microsoft/azure-speech",
+  "description": "Transcribe audio to text using real-time, fast, or batch transcription modes with speaker diarization and language identification. Convert text to synthesized speech using neural, custom, or personal voices with SSML control over pronunciation and prosody. Generate photorealistic avatar videos from text. Translate speech across multiple languages. Verify and identify speakers by voice characteristics. Assess pronunciation accuracy, fluency, completeness, and prosody for language learning. Supports custom speech models trained on domain-specific data and LLM-enhanced transcription for captions, meeting summaries, and call center assistance.",
+  "categories": [
+    "apis-and-http-requests",
+    "language-translation",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "transcribe audio to text",
+    "synthesize speech from text",
+    "batch transcribe audio files",
+    "identify and diarize speakers",
+    "translate speech across languages",
+    "verify speaker identity",
+    "assess pronunciation quality",
+    "generate avatar video",
+    "create custom voice models",
+    "identify spoken language"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/azure-speech.png"
+}

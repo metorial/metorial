@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/nozbe-teams",
+  "description": "Create, read, update, and delete tasks and projects for team collaboration. Manage task attributes including assignments, due dates, recurrence, priority, tags, and time tracking. Add comments with Markdown text and file attachments to tasks. Organize projects with sections, member access controls, and color coding. Manage tags to categorize tasks across projects. Retrieve team member information and roles. Filter, sort, and select specific fields in query results.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "create and manage projects",
+    "create and manage tasks",
+    "assign tasks to members",
+    "add comments and attachments",
+    "manage tags and categories",
+    "set due dates and recurrence",
+    "track time on tasks",
+    "organize project sections",
+    "retrieve team member info",
+    "filter and sort results"
+  ]
+}

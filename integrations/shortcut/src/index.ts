@@ -1,0 +1,66 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  createDocument,
+  createEpic,
+  createIteration,
+  createObjective,
+  createStory,
+  deleteEpic,
+  deleteStory,
+  getDocument,
+  getEpic,
+  getStory,
+  listCustomFields,
+  listEpics,
+  listIterations,
+  listLabels,
+  listMembers,
+  listObjectives,
+  listTeams,
+  listWorkflows,
+  manageLabels,
+  manageStoryComments,
+  manageStoryTasks,
+  searchStories,
+  updateDocument,
+  updateEpic,
+  updateIteration,
+  updateObjective,
+  updateStory
+} from './tools';
+import { workspaceEvents } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    createStory,
+    getStory,
+    updateStory,
+    deleteStory,
+    searchStories,
+    manageStoryComments,
+    manageStoryTasks,
+    createEpic,
+    getEpic,
+    updateEpic,
+    deleteEpic,
+    listEpics,
+    createIteration,
+    updateIteration,
+    listIterations,
+    createObjective,
+    updateObjective,
+    listObjectives,
+    listWorkflows,
+    listMembers,
+    listTeams,
+    listLabels,
+    listCustomFields,
+    manageLabels,
+    createDocument,
+    getDocument,
+    updateDocument
+  ],
+  triggers: [workspaceEvents]
+});

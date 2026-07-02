@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/docugenerate",
+  "description": "Generate documents from reusable Word templates by merging them with dynamic JSON or spreadsheet data. Create and manage templates (DOCX, DOC, ODT, TXT), generate documents in multiple output formats (PDF, DOCX, DOC, ODT, TXT, HTML, PNG), and manage generated documents. Supports PDF attachments, PDF merging, template versioning, configurable tag delimiters, enhanced syntax for complex expressions, and multi-region processing for data compliance.",
+  "categories": ["document-processing"],
+  "skills": [
+    "create document templates",
+    "generate documents from templates",
+    "merge data into templates",
+    "export documents to PDF",
+    "attach files to PDFs",
+    "merge multiple PDFs",
+    "manage template versions",
+    "list generated documents",
+    "delete templates and documents",
+    "configure output formats"
+  ]
+}

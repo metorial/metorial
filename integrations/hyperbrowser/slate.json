@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/hyperbrowser",
+  "description": "Manage cloud-based headless browser sessions for AI agents and web automation. Create, configure, and stop browser sessions with built-in stealth mode, proxy rotation, CAPTCHA solving, and anti-bot detection. Scrape web pages in markdown or HTML, crawl entire websites, and extract structured data using AI-powered schema-based extraction. Run autonomous AI browser agents (Browser Use, Claude Computer Use, OpenAI CUA, Gemini) that accept natural language tasks and operate a browser to complete them. Manage persistent browser profiles to maintain login state and cookies across sessions. Upload and attach Chrome extensions, retrieve downloaded files, perform web searches via Bing, capture session recordings, and observe live browser sessions in real-time.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "manage browser sessions",
+    "scrape web pages",
+    "crawl websites",
+    "extract structured data",
+    "run AI browser agents",
+    "solve CAPTCHAs automatically",
+    "manage browser profiles",
+    "configure proxy settings",
+    "search the web",
+    "record browser sessions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hyperbrowser.svg"
+}

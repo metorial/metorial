@@ -1,0 +1,20 @@
+{
+  "name": "@metorial/mailchimp",
+  "description": "Manage email marketing audiences, campaigns, and automations. Create, send, schedule, and track email campaigns with detailed reporting on opens, clicks, and bounces. Add, update, and organize audience contacts with tags, segments, and interest groups. Set up and manage automation workflows triggered by subscriber activity or events. Connect e-commerce stores to manage customers, products, orders, and carts. Create and manage reusable email templates and landing pages. Upload and organize files for use in campaigns. Send transactional emails via the Mandrill API. Post custom events to trigger targeted automations. Configure webhooks to track subscribe, unsubscribe, profile updates, and email delivery events.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail", "email-and-messaging"],
+  "skills": [
+    "send email campaigns",
+    "manage audience contacts",
+    "create automation workflows",
+    "track campaign analytics",
+    "manage e-commerce stores",
+    "manage audience fields",
+    "create email templates",
+    "upload campaign files",
+    "schedule campaigns",
+    "manage landing pages",
+    "send transactional emails",
+    "segment and tag contacts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mailchimp.svg"
+}

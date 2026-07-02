@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/veo",
+  "description": "Upload, manage, and analyze videos for educational observation and professional development. Tag key moments in videos with predefined performance markers, retrieve AI-powered analysis and transcripts, and collaborate through comments and threaded notes. Manage users and organisations, including inviting, creating, and deactivating users with role-based access. Create and manage groups (collaboration spaces, video banks, communities, and cohorts) and their memberships. Organise content into portfolios. Download transcoded videos in various resolutions via time-limited URLs.",
+  "categories": [
+    "apis-and-http-requests",
+    "education-and-learning",
+    "scheduling-and-calendars"
+  ],
+  "skills": [
+    "upload and manage videos",
+    "tag video moments",
+    "AI video analysis",
+    "manage users and roles",
+    "create and manage groups",
+    "add comments and notes",
+    "retrieve video transcripts",
+    "manage portfolios",
+    "invite users to organisations",
+    "download transcoded videos"
+  ]
+}

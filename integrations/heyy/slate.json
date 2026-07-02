@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/heyy",
+  "description": "Send messages to contacts across WhatsApp, Instagram, Facebook Messenger, and website live chat from a unified inbox. Create and update contacts, upload files for conversations, retrieve business account information, and run marketing campaigns. Receive webhook notifications for incoming messages across all connected channels. Supports AI-powered customer support, lead qualification, and automated conversation workflows.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send WhatsApp messages",
+    "manage contacts",
+    "upload conversation files",
+    "retrieve business information",
+    "run marketing campaigns",
+    "receive incoming message webhooks",
+    "multi-channel messaging",
+    "AI-powered customer support"
+  ]
+}

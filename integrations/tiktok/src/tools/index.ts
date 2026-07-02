@@ -1,0 +1,14 @@
+export { createAdGroup } from './create-ad-group';
+export { getAdGroups } from './get-ad-groups';
+export { getAdReport } from './get-ad-report';
+export { getAds } from './get-ads';
+export { getCampaigns } from './get-campaigns';
+export { getCreatorInfo } from './get-creator-info';
+export { getPublishStatus } from './get-publish-status';
+export { getUserProfile } from './get-user-profile';
+export { listAdvertisers } from './list-advertisers';
+export { listVideos } from './list-videos';
+export { manageCampaign } from './manage-campaign';
+export { postPhoto } from './post-photo';
+export { postVideo } from './post-video';
+export { queryVideos } from './query-videos';

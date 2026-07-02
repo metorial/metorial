@@ -1,0 +1,16 @@
+{
+  "name": "@slates/tsconfig",
+  "version": "1.0.0-rc.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\""
+  },
+  "files": [
+    "base.json"
+  ],
+  "dependencies": {
+    "@types/node": "^22.15.3"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/bugbug",
+  "description": "Run and manage automated end-to-end web application tests in the cloud. List and retrieve tests and suites within a project, trigger individual test runs or suite runs with custom variables and profile configurations, and retrieve test run results including pass/fail status. Export test reports in JUnit XML, JSON, and CSV formats. Useful for CI/CD pipelines and automated quality assurance workflows.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "run cloud test executions",
+    "trigger suite runs",
+    "list tests and suites",
+    "retrieve test run results",
+    "export JUnit XML reports",
+    "configure test variables",
+    "access project data",
+    "export results as CSV/JSON"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bugbug.svg"
+}

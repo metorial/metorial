@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/boloforms",
+  "description": "Send documents for electronic signature, manage PDF and form templates, and collect form responses. Retrieve documents filtered by type (PDFs, forms, templates), send templates to multiple recipients for signing, download signed documents, and fetch template respondent details. Track signing events via webhooks including document viewed, individual signed, and signature completed notifications.",
+  "categories": ["document-processing", "legal-and-compliance", "task-and-project-management"],
+  "skills": [
+    "send documents for signing",
+    "manage document templates",
+    "retrieve form responses",
+    "download signed documents",
+    "list and filter documents",
+    "batch send to recipients",
+    "track signature events",
+    "retrieve template respondents",
+    "embed signing workflows"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/boloforms.png"
+}

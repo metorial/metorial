@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/replicate",
+  "description": "Run, fine-tune, and deploy machine learning models via API. Create predictions on public or private AI models with synchronous or streaming output. Fine-tune existing models with custom training data. Manage model versions, deployments, and scaling configurations. Upload and manage files for model inputs. Browse curated model collections, search for public models, and discover available hardware options. Configure webhooks for prediction and training lifecycle events.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "run model predictions",
+    "stream model output",
+    "fine-tune models",
+    "manage model deployments",
+    "upload and manage files",
+    "search public models",
+    "browse model collections",
+    "configure prediction webhooks",
+    "manage model versions",
+    "discover available hardware"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/replicate-logo.png"
+}

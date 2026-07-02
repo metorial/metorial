@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/formsite",
+  "description": "Retrieve form definitions, field structures, and submission results from Formsite online forms and surveys. List all forms and their status, get item/field definitions for labeling, and search, filter, sort, and paginate through form submission data. Manage webhooks for real-time notifications when results are completed. Read-only access to form data — cannot create, edit, or delete submissions.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "list forms and details",
+    "retrieve field definitions",
+    "get form submission results",
+    "filter results by date or ID",
+    "search submission data",
+    "sort and paginate results",
+    "manage webhooks",
+    "receive result completed events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/formsite.png"
+}

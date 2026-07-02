@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/retool",
+  "description": "Programmatically manage a Retool organization's users, groups, apps, permissions, and infrastructure. Create, list, update, and delete users and permission groups. Manage app lifecycle including creating, organizing, and deleting apps and folders. Configure SSO, data source resources, environments, and source control settings. Control access permissions for apps and folders. Monitor workflow executions and retrieve run details. Manage Spaces for multi-tenant setups, custom component libraries, app themes, observability providers, API access tokens, and usage analytics.",
+  "categories": ["apis-and-http-requests", "security", "task-and-project-management"],
+  "skills": [
+    "manage users and groups",
+    "control app permissions",
+    "configure SSO settings",
+    "manage data source resources",
+    "organize apps in folders",
+    "monitor workflow executions",
+    "manage Spaces environments",
+    "configure source control",
+    "manage custom component libraries",
+    "access usage analytics"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/retool.png"
+}

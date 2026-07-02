@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/shortenrest",
+  "description": "Create, retrieve, update, and delete shortened URLs (aliases) that redirect to destination URLs. Configure vanity or random short URL paths, set up geo and OS-based redirect targeting to route users to different destinations by country and device, and attach custom branded domains with free SSL. Track click analytics including referrer, browser, OS, and country data. Customize meta tags for social media previews, add UTM parameters for campaign tracking, and embed retargeting/tracking pixels (snippets) from Facebook, Google Analytics, Pinterest, and more.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "create short URLs",
+    "manage vanity aliases",
+    "configure geo-based redirects",
+    "configure OS-based redirects",
+    "track click analytics",
+    "attach custom branded domains",
+    "customize meta tags",
+    "add UTM parameters",
+    "embed tracking pixels",
+    "export click data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/shorten-rest.png"
+}

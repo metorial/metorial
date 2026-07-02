@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/buffer",
+  "description": "Schedule, publish, and manage social media posts across multiple networks (Twitter/X, Facebook, Instagram, LinkedIn, Pinterest). Create and edit updates with text, media, and link attachments. Manage posting queues by reordering, shuffling, or prioritizing updates. Retrieve pending and sent posts with engagement statistics (reach, clicks, retweets, favorites, mentions). Manage connected social media profiles and their posting schedules. Retrieve social media interactions such as mentions, retweets, likes, and comments on sent updates. Get link sharing statistics and service configuration details including character limits and supported features per network.",
+  "categories": ["crm-and-sales-tools", "news-and-media", "scheduling-and-calendars"],
+  "skills": [
+    "schedule social media posts",
+    "publish updates immediately",
+    "manage posting queues",
+    "retrieve engagement statistics",
+    "manage social media profiles",
+    "set posting schedules",
+    "retrieve social interactions",
+    "get link sharing stats",
+    "create media attachments",
+    "delete social media updates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/buffer.png"
+}

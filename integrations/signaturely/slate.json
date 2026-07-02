@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/signaturely",
+  "description": "Send, manage, and track electronic signature requests for documents. Upload documents and send them to one or multiple signers for legally binding e-signatures. Create and use reusable document templates with configurable roles and field placements (signatures, initials, dates, textboxes, checkboxes). Embed signing and requesting experiences directly within external applications. Track document signing status (sent, viewed, signed, pending), download completed signed documents with audit trails, and manage document workflows. Monitor events when documents are sent, viewed, or completed.",
+  "categories": ["document-processing", "legal-and-compliance"],
+  "skills": [
+    "send signature requests",
+    "manage document templates",
+    "track signing status",
+    "download signed documents",
+    "embed signing experience",
+    "configure signer roles",
+    "customize signing branding",
+    "retrieve audit trails",
+    "monitor document events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/signaturely.svg"
+}

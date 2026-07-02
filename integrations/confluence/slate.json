@@ -1,0 +1,23 @@
+{
+  "name": "@atlassian/confluence",
+  "description": "Create, read, update, and delete pages, blog posts, comments, and attachments in Confluence spaces. Manage spaces, permissions, labels, and content restrictions. Search content using Confluence Query Language (CQL). Upload and download file attachments with versioning. Manage users, groups, and group memberships. Create and manage whiteboards, databases, folders, and templates. View and update inline tasks. Access audit logs. Listen for webhooks on page, blog, comment, attachment, space, label, and user events.",
+  "categories": [
+    "document-processing",
+    "email-and-messaging",
+    "note-taking-and-knowledge-bases"
+  ],
+  "skills": [
+    "create and edit pages",
+    "manage blog posts",
+    "search content with CQL",
+    "manage spaces and permissions",
+    "upload and download attachments",
+    "add and remove labels",
+    "manage comments",
+    "manage users and groups",
+    "manage content restrictions",
+    "track page version history"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/confluence-logo.png",
+  "version": "0.1.3"
+}

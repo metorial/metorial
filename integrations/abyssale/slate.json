@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/abyssale",
+  "description": "Programmatically generate visual content (images, videos, PDFs, GIFs, and HTML5 banners) from pre-designed templates. Retrieve and manage design templates, generate single images synchronously or multiple formats asynchronously, create dynamic image URLs for real-time personalization, export generated visuals as ZIP files, customize element properties (text, colors, images, shapes), manage fonts and projects, and leverage AI features for image generation, background removal, and content translation. Supports webhooks for tracking generation, export, and design approval events.",
+  "categories": ["crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "generate images from templates",
+    "generate videos and GIFs",
+    "generate PDFs for printing",
+    "create dynamic image URLs",
+    "manage design templates",
+    "export visuals as ZIP",
+    "customize template elements",
+    "generate HTML5 banners",
+    "AI background removal",
+    "multi-format batch generation"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/abyssale.png"
+}

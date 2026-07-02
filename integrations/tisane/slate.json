@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/tisane",
+  "description": "Analyze text to detect abusive content (hate speech, cyberbullying, sexual harassment, criminal activity), extract sentiment, named entities, and topics across 30+ languages. Detect languages in text fragments, calculate semantic similarity between texts, compare named entities cross-linguistically, translate text between supported languages, and clean up markup from text. Provides low-level NLP capabilities including tokenization, part-of-speech tagging, and morphological analysis. Supports configurable content moderation with severity scoring and explanations, document-level and expression-level sentiment analysis, and direct access to underlying language model entries.",
+  "categories": ["apis-and-http-requests", "document-processing", "language-translation"],
+  "skills": [
+    "detect abusive content",
+    "analyze text sentiment",
+    "extract named entities",
+    "detect text topics",
+    "detect languages",
+    "calculate semantic similarity",
+    "compare named entities",
+    "translate text",
+    "clean up markup text",
+    "inspect language model entries"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tisane.jpeg"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/dailybot",
+  "description": "Manage async check-ins (stand-ups), forms, peer recognition (kudos), teams, and messaging for team productivity. Create, update, delete, and list check-ins with configurable schedules, reminders, and anonymity settings. Retrieve check-in and form responses filtered by date range. Send messages, images, and interactive buttons to users, teams, or channels across Slack, Microsoft Teams, Google Chat, and Discord. Give kudos to users with company values and optional anonymity. Manage users (update profiles, timezones, work days, time-off) and teams (add/remove members). Ingest external activity into check-in reports. Configure webhooks for check-in responses, form responses, kudos, and organization membership change events.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "manage async check-ins",
+    "retrieve check-in responses",
+    "send team messages",
+    "give peer recognition kudos",
+    "manage users and teams",
+    "list and monitor forms",
+    "ingest external activity",
+    "configure webhook events",
+    "send emails to users",
+    "manage check-in reminders"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/dailybot.jpg"
+}

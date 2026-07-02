@@ -1,0 +1,66 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  addChannelDataPoint,
+  browseFolders,
+  createProject,
+  getDoc,
+  getFile,
+  getInsight,
+  getNote,
+  getProject,
+  importFile,
+  listChannels,
+  listContacts,
+  listData,
+  listDocs,
+  listHighlights,
+  listInsights,
+  listNotes,
+  listProjects,
+  listTags,
+  manageChannel,
+  manageContact,
+  manageData,
+  manageDoc,
+  manageInsight,
+  manageNote,
+  manageTopic,
+  search,
+  summarize
+} from './tools';
+import { inboundWebhook, newInsights, newNotes, newProjects } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listProjects,
+    createProject,
+    getProject,
+    listNotes,
+    getNote,
+    manageNote,
+    listData,
+    manageData,
+    listInsights,
+    getInsight,
+    manageInsight,
+    listHighlights,
+    listTags,
+    listContacts,
+    manageContact,
+    listDocs,
+    getDoc,
+    manageDoc,
+    listChannels,
+    manageChannel,
+    manageTopic,
+    addChannelDataPoint,
+    browseFolders,
+    search,
+    summarize,
+    importFile,
+    getFile
+  ],
+  triggers: [inboundWebhook, newNotes, newInsights, newProjects]
+});

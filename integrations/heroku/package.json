@@ -1,0 +1,19 @@
+{
+  "name": "@slates-integrations/heroku",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lowerdeck/error": "^1.1.0",
+    "@slates/provider": "1.0.0-rc.15",
+    "@types/node": "^20",
+    "zod": "^4.2"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  },
+  "version": "0.2.0-rc.9"
+}

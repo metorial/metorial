@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/codereadr",
+  "description": "Manage barcode scanning workflows, validation databases, and scan records. Create and configure scanning services (record scans, validate scans, check in/out). Manage app users and their service access. Build and populate validation databases with barcode values and response text. Retrieve and filter scan records by service, user, date, or barcode value. Create data collection questions (text, dropdowns, photos, signatures, GPS) attached to scans. Generate QR codes and PDF417 barcodes from database values. Configure postback URLs for real-time scan forwarding and validation. Manage devices and kiosk mode settings.",
+  "categories": [
+    "apis-and-http-requests",
+    "iot-and-device-control",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage scanning services",
+    "create and manage app users",
+    "populate validation databases",
+    "retrieve scan records",
+    "generate barcodes",
+    "configure scan postback webhooks",
+    "create data collection questions",
+    "manage device kiosk mode",
+    "upload CSV database files",
+    "validate barcode scans"
+  ]
+}

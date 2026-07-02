@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/abstract",
+  "description": "Validate, enrich, and look up data through a suite of utility APIs. Validate email addresses for deliverability, format, and risk (disposable, spam trap, role-based detection). Validate and identify phone numbers with carrier, line type, and location details. Geolocate IP addresses and detect VPNs, proxies, and TOR usage. Enrich company data from domains or emails. Retrieve live and historical currency exchange rates and perform conversions. Look up public holidays by country and date. Get current time and convert between timezones. Scrape web page content from URLs. Capture website screenshots. Compress and optimize images. Generate user avatars. Validate VAT numbers and retrieve VAT rates. Validate IBAN bank account numbers.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market", "security"],
+  "skills": [
+    "validate email addresses",
+    "validate phone numbers",
+    "geolocate IP addresses",
+    "enrich company data",
+    "convert currency exchange rates",
+    "look up public holidays",
+    "scrape web page content",
+    "capture website screenshots",
+    "validate VAT numbers",
+    "validate IBAN numbers"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/abstract.svg"
+}

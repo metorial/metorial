@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/sympla",
+  "description": "Read event, order, participant, and affiliate data from the Sympla event management and ticketing platform. Retrieve and filter events by date range or specific fields, list orders and order details for events, access participant and attendee information including check-in status, and look up affiliates associated with events. The API is read-only and does not support creating or modifying events.",
+  "categories": ["e-commerce-and-retail", "scheduling-and-calendars"],
+  "skills": [
+    "retrieve event details",
+    "filter events by date",
+    "list event orders",
+    "get order details",
+    "list event participants",
+    "get participant by ticket",
+    "check participant check-in status",
+    "retrieve event affiliates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sympla.png"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@google/youtube",
+  "description": "Search and manage YouTube videos, channels, playlists, comments, captions, ratings, subscriptions, and related metadata through the YouTube Data API.",
+  "categories": ["document-processing", "news-and-media", "scheduling-and-calendars"],
+  "skills": [
+    "search videos and channels",
+    "list and manage videos",
+    "manage playlists and items",
+    "post and moderate comments",
+    "manage captions and subtitles",
+    "manage subscriptions",
+    "rate videos",
+    "list video categories and regions",
+    "receive channel notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/youtube.svg"
+}

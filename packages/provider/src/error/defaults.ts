@@ -1,0 +1,50 @@
+export let DEFAULT_CODE = 'internal.unexpected';
+
+export let DEFAULT_MESSAGES: Record<string, string> = {
+  'declaration.invalid_definition': 'The slate definition is invalid.',
+  'context.missing': 'No Slate context is available.',
+  'input.invalid': 'The provided input is invalid.',
+  'request.bad': 'The request is invalid.',
+  'request.invalid_version': 'The requested version is invalid.',
+  'request.precondition_failed': 'The request precondition failed.',
+  'request.not_acceptable': 'The request is not acceptable.',
+  'request.rate_limited': 'Too many requests were made in a short period of time.',
+  'config.invalid': 'The provided configuration is invalid.',
+  'auth.required': 'Authentication is required.',
+  'auth.invalid': 'Authentication failed.',
+  'auth.expired': 'Authentication has expired.',
+  'permission.denied': 'Permission was denied.',
+  'resource.not_found': 'The requested resource was not found.',
+  'resource.conflict': 'The requested resource is in conflict.',
+  'resource.gone': 'The requested resource is no longer available.',
+  'payment.required': 'Payment is required to continue.',
+  'operation.not_implemented': 'The requested operation is not implemented.',
+  'upstream.invalid_request': 'The upstream service rejected the request.',
+  'upstream.rate_limited': 'The upstream service rate limited the request.',
+  'upstream.timeout': 'The upstream service timed out.',
+  'upstream.network_error': 'A network error occurred while contacting the upstream service.',
+  'upstream.unavailable': 'The upstream service is unavailable.',
+  'upstream.invalid_response': 'The upstream service returned an invalid response.',
+  'upstream.error': 'The upstream service returned an error.',
+  'transport.invoke_failed': 'The provider transport failed.',
+  'internal.timeout': 'The operation timed out.',
+  'internal.unexpected': 'An unexpected internal error occurred.'
+};
+
+export let SERVICE_ERROR_CODE_MAP: Record<string, string> = {
+  invalid_data: 'input.invalid',
+  bad_request: 'request.bad',
+  not_found: 'resource.not_found',
+  unauthorized: 'auth.required',
+  forbidden: 'permission.denied',
+  invalid_version: 'request.invalid_version',
+  conflict: 'resource.conflict',
+  gone: 'resource.gone',
+  payment_required: 'payment.required',
+  precondition_failed: 'request.precondition_failed',
+  not_acceptable: 'request.not_acceptable',
+  not_implemented: 'operation.not_implemented',
+  too_many_requests: 'request.rate_limited',
+  timeout: 'internal.timeout',
+  internal_server_error: 'internal.unexpected'
+};

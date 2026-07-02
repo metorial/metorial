@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mistral-ai",
+  "description": "Generate chat completions, embeddings, and structured outputs using Mistral AI's language models. Process documents with OCR to extract text, tables, and images from PDFs. Transcribe audio with speaker diarization. Generate code with specialized coding models. Create and manage AI agents with built-in connectors for code execution, web search, image generation, and document retrieval. Moderate content for safety across multiple languages. Fine-tune models by uploading training data and managing fine-tuning jobs. Generate text embeddings for semantic search and RAG. Perform batch inference for async bulk processing. Manage files and list available models.",
+  "categories": ["apis-and-http-requests", "code-execution", "document-processing"],
+  "skills": [
+    "generate chat completions",
+    "extract text via OCR",
+    "generate text embeddings",
+    "transcribe audio",
+    "moderate content safety",
+    "generate code",
+    "create AI agents",
+    "fine-tune models",
+    "produce structured JSON outputs",
+    "batch inference processing"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mistral-ai.png"
+}

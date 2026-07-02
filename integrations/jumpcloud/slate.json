@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/jumpcloud",
+  "description": "Manage users, devices, and access across a cloud directory platform. Create, update, and delete user accounts and groups. Bind users and groups to systems, SSO applications, RADIUS servers, and LDAP directories via graph associations. Manage device policies for security enforcement (disk encryption, password complexity, screen lock). Execute remote commands and scripts on managed Windows, Mac, and Linux systems. Configure SAML/OIDC SSO application connectors. Provision and deprovision application users via SCIM. Manage RADIUS server configurations for WiFi and VPN authentication. Integrate with external directories like Google Workspace, Microsoft 365, and Active Directory. Query audit logs and directory event data for compliance. Retrieve device telemetry including installed software, hardware details, and OS configuration. Manage organization settings and administrator roles. Receive webhook notifications for directory changes, authentication events, device monitoring, and policy/command execution results.",
+  "categories": ["apis-and-http-requests", "iot-and-device-control", "security"],
+  "skills": [
+    "manage user accounts",
+    "manage user and device groups",
+    "bind resources via associations",
+    "enforce device security policies",
+    "execute remote commands",
+    "configure SSO applications",
+    "manage RADIUS servers",
+    "query audit event logs",
+    "retrieve device telemetry",
+    "provision users via SCIM"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/jumpcloud.png"
+}

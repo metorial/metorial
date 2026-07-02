@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/eodhd-apis",
+  "description": "Retrieve historical end-of-day, intraday, and real-time market data for stocks, ETFs, mutual funds, forex, cryptocurrencies, bonds, and indices across 70+ global exchanges. Access fundamental data including financial statements, company profiles, and valuation metrics. Stream real-time US stock trades, quotes, forex, and crypto prices via WebSockets. Look up corporate actions (splits, dividends), insider transactions, financial calendars (earnings, IPOs), and financial news with sentiment analysis. Screen stocks by financial criteria, compute technical indicators (SMA, EMA, RSI, MACD, Bollinger Bands), and retrieve options chain data with Greeks. Access macroeconomic indicators, ESG scores, index constituents, historical market capitalization, and company logos. Map identifiers across CUSIP, ISIN, FIGI, LEI, and CIK. Search for tickers by name or code and query exchange metadata, trading hours, and holidays.",
+  "categories": [
+    "apis-and-http-requests",
+    "financial-data-and-stock-market",
+    "news-and-media"
+  ],
+  "skills": [
+    "retrieve historical price data",
+    "stream real-time market data",
+    "access fundamental financial data",
+    "screen stocks by criteria",
+    "compute technical indicators",
+    "fetch financial news sentiment",
+    "retrieve options chain data",
+    "look up corporate actions",
+    "access macroeconomic indicators",
+    "map financial identifiers"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/eodhd-apis.svg"
+}

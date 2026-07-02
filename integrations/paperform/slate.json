@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/paperform",
+  "description": "Manage online forms, submissions, and eSignature documents. Retrieve and update forms, fields, and submissions. Create and manage products, coupons, and translations for forms. Organize forms into spaces. Access partial (incomplete) submissions. Send documents for eSignature via Papersign, track signing progress, copy and cancel documents, and organize them into folders. Receive webhooks for new submissions, partial submissions, and Papersign document events such as sent, completed, signed, rejected, and expired.",
+  "categories": [
+    "document-processing",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage forms and fields",
+    "retrieve form submissions",
+    "manage partial submissions",
+    "create and manage products",
+    "manage discount coupons",
+    "send documents for eSignature",
+    "track document signing progress",
+    "organize forms into spaces",
+    "manage form translations",
+    "manage Papersign folders"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/amcards",
+  "description": "Send personalized physical greeting cards and gifts to clients, employees, and partners. Create and schedule individual cards using pre-configured Quicksend templates with custom messages and recipient details. Launch drip campaigns to send a series of cards over time for birthdays, anniversaries, holidays, and referrals. Cancel pending cards by contact ID. Search and manage contacts by email or name. Retrieve complete card history including queued, printed, mailed, and delivered statuses. Link cards to external CRM records via third-party contact IDs.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "send physical greeting cards",
+    "schedule drip campaigns",
+    "cancel pending cards",
+    "search contacts",
+    "retrieve card history",
+    "schedule future card sends",
+    "link cards to CRM contacts",
+    "get user account information"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/amcards.svg"
+}

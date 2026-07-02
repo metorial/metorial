@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/erpnext",
+  "description": "Manage enterprise business processes across ERPNext's integrated ERP platform. Create, read, update, and delete any business document (DocType) including Sales Invoices, Purchase Orders, Customers, Employees, and Items. Manage accounting and finance with Sales Invoices, Purchase Invoices, Payment Entries, Journal Entries, and chart of accounts. Track inventory and stock levels with Stock Entries, Warehouses, Material Requests, and Delivery Notes. Handle the full sales and CRM pipeline including Leads, Opportunities, Quotations, Sales Orders, and customer interactions. Manage purchasing with Suppliers, Purchase Orders, and Requests for Quotation. Administer human resources including Employees, Attendance, Leave Applications, Payroll, and Expense Claims. Support manufacturing with Bills of Materials, Work Orders, and Production Plans. Create and track Projects, Tasks, and Timesheets. Upload files, call custom server-side methods, extract reporting data, and receive webhooks on document lifecycle events such as creation, update, submission, cancellation, and deletion.",
+  "categories": [
+    "crm-and-sales-tools",
+    "financial-data-and-stock-market",
+    "hr-and-recruiting"
+  ],
+  "skills": [
+    "manage sales invoices and payments",
+    "track inventory and stock levels",
+    "manage CRM leads and opportunities",
+    "create purchase orders",
+    "administer employee records",
+    "process payroll and expenses",
+    "manage manufacturing work orders",
+    "track projects and tasks",
+    "upload and attach files",
+    "extract reporting data"
+  ]
+}

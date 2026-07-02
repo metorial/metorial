@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/plausible-analytics",
+  "description": "Query privacy-friendly website analytics data including visitors, pageviews, bounce rate, visit duration, and revenue metrics. Break down data by dimensions such as page, traffic source, country, device, browser, UTM parameters, and custom properties. Send pageviews and custom events programmatically for server-side or app tracking. Manage sites, goals (conversion tracking), custom properties, shared dashboard links, and guest user access. Filter analytics with operators like is, contains, and session-level filters. Supports configurable date ranges and time-series output.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "query website analytics",
+    "track pageviews and events",
+    "manage analytics sites",
+    "create conversion goals",
+    "manage custom properties",
+    "generate shared dashboard links",
+    "manage guest user access",
+    "filter and segment data",
+    "send custom events",
+    "list teams"
+  ]
+}

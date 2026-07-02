@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/hiver",
+  "description": "Manage shared email inboxes and customer support conversations within Gmail and Outlook. List and browse shared inboxes, retrieve and update conversations (status, assignee, tags), search users and tags per inbox, and track email activity. Receive real-time webhooks for conversation updates, new inbound/outbound conversations, sent/received emails, internal notes, and CSAT ratings.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "list shared inboxes",
+    "retrieve conversations by inbox",
+    "update conversation properties",
+    "search inbox users",
+    "search inbox tags",
+    "track conversation updates",
+    "monitor inbound emails",
+    "monitor outbound emails",
+    "receive CSAT ratings",
+    "track internal notes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hiver.png"
+}

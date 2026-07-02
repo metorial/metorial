@@ -1,0 +1,11 @@
+export { controlPlayback } from './control-playback';
+export { getAlbum } from './get-album';
+export { getArtist } from './get-artist';
+export { getRecentlyPlayed } from './get-recently-played';
+export { getTopItems } from './get-top-items';
+export { getTrack } from './get-track';
+export { getUserProfile } from './get-user-profile';
+export { manageFollowing } from './manage-following';
+export { manageLibrary } from './manage-library';
+export { managePlaylist } from './manage-playlist';
+export { searchCatalog } from './search';

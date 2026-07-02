@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/hashnode",
+  "description": "Manage blog posts, drafts, publications, and static pages on Hashnode's developer blogging platform. Create and publish posts with Markdown content, tags, and SEO metadata. Query user profiles, publication details, series, and comments. Subscribe to newsletters, manage publication members, and access analytics data grouped by country, device, or region. Use as a headless CMS to power custom blog frontends. Receive webhooks for post and static page publish, update, and delete events.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "publish blog posts",
+    "manage drafts",
+    "query publication details",
+    "manage post series",
+    "create static pages",
+    "add comments and replies",
+    "query user profiles",
+    "subscribe to newsletters",
+    "access blog analytics",
+    "manage publication members"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hashnode.svg"
+}

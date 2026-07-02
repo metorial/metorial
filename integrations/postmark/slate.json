@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/postmark",
+  "description": "Send transactional and broadcast emails via API with support for HTML, plain text, attachments, and batch sending. Create and manage reusable email templates with dynamic variables. Track email delivery, opens, link clicks, bounces, and spam complaints. Manage message streams to separate transactional and broadcast emails. Search and retrieve sent and received message details. Handle bounce management and reactivate bounced addresses. Manage suppression lists for inactive recipients. Process inbound emails with parsing and routing rules. Configure webhooks for delivery events, bounces, opens, clicks, and spam complaints. Manage sending domains, sender signatures, DNS verification, and DKIM keys. Retrieve aggregate sending statistics filtered by date and tag. Manage servers and account-level settings.",
+  "categories": ["email-and-messaging"],
+  "skills": [
+    "send transactional emails",
+    "send batch emails",
+    "manage email templates",
+    "track opens and clicks",
+    "manage bounces and suppressions",
+    "process inbound emails",
+    "search sent messages",
+    "manage message streams",
+    "configure webhooks",
+    "manage domains and signatures"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/postmark-logo.svg"
+}

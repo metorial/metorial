@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/ipinfoio",
+  "description": "Look up detailed information for any IPv4 or IPv6 address. Retrieve IP geolocation data (city, region, country, coordinates, timezone, postal code), ASN and network details, privacy/anonymity detection (VPN, proxy, Tor, relay, hosting), mobile carrier identification, company data, abuse contact information, and WHOIS records. Perform reverse IP lookups to find hosted domains, query IP ranges by domain, detect residential proxies, and execute bulk/batch lookups across multiple IPs in a single request.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "look up IP geolocation",
+    "detect VPN and proxy usage",
+    "retrieve ASN network details",
+    "identify mobile carrier",
+    "look up company data",
+    "find abuse contact info",
+    "bulk IP address lookup",
+    "query IP ranges by domain",
+    "reverse IP domain lookup",
+    "detect residential proxies"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ipinfo-io.png"
+}

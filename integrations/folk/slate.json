@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/folk",
+  "description": "Manage contacts, companies, deals, and pipelines in a relationship-focused CRM. Create, read, update, and delete people and companies with custom fields. Track deals and opportunities within groups. Organize contacts into customizable groups for different workflows. Attach notes and reminders to contacts. Monitor interaction metadata including interaction counts and last interaction times. Subscribe to webhooks for real-time notifications on changes to people, companies, deals, notes, and reminders.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "manage contacts and people",
+    "manage companies",
+    "track deals and pipelines",
+    "organize contacts into groups",
+    "manage custom fields",
+    "create and manage notes",
+    "set and track reminders",
+    "monitor interaction metadata",
+    "subscribe to webhook events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/folk.png"
+}

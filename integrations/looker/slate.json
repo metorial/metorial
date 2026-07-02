@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/looker",
+  "description": "Run queries against LookML models and retrieve results in multiple formats (JSON, CSV, PDF, XLSX). Create, manage, and organize dashboards, Looks, and folders. Schedule recurring data deliveries via email, webhook, S3, and SFTP. Administer users, groups, roles, and permissions. Configure database connections and inspect database metadata (schemas, tables, columns). Manage LookML projects with Git branch operations, deployments, and validation. Generate embed URLs and cookieless sessions for embedding analytics in external applications. Create and manage data-driven alerts on dashboard tiles. Render dashboards and queries as images or PDFs. Configure instance settings, authentication (LDAP, SAML, OIDC), themes, and integrations with external action hubs.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "run queries and retrieve data",
+    "manage dashboards and Looks",
+    "schedule data deliveries",
+    "administer users and roles",
+    "configure database connections",
+    "manage LookML projects",
+    "generate embed URLs",
+    "render content as images",
+    "create data-driven alerts",
+    "manage folders and content"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/looker.png"
+}

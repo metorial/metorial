@@ -1,0 +1,18 @@
+{
+  "name": "@stripe/stripe",
+  "description": "Process payments, manage subscriptions, and handle invoices. Create and manage customers, payment methods, and product catalogs. Issue refunds, handle disputes, and submit chargeback evidence. Create checkout sessions and payment links. Manage connected accounts and platform fund flows via Stripe Connect. Configure payouts to bank accounts and debit cards. Apply coupons and promotion codes to subscriptions and invoices. Calculate and collect taxes automatically. Access balance information and transaction history. Upload files for dispute evidence and identity verification. Create and manage virtual and physical payment cards via Issuing. Receive real-time webhook notifications for payment, subscription, invoice, and account events.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "process payments",
+    "manage subscriptions",
+    "create and send invoices",
+    "manage customers",
+    "issue refunds",
+    "handle disputes",
+    "create checkout sessions",
+    "manage payouts",
+    "manage connected accounts",
+    "apply coupons and discounts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/stripe.svg"
+}

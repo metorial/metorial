@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/airbyte",
+  "description": "Manage data integration pipelines that sync data from sources (APIs, databases, files) to destinations (data warehouses, lakes, databases). Create, update, and delete source and destination connectors. Configure connections linking sources to destinations with stream selection, sync modes, and schedules. Trigger sync jobs, monitor job status, and cancel running jobs. Manage workspaces, user permissions, and role-based access control. Retrieve stream properties and schemas for sources. Organize resources with tags. Set up embedded connection and source templates for third-party integrations. Receive webhook notifications for sync success, sync failure, schema changes, and sync disabled events.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage source connectors",
+    "manage destination connectors",
+    "configure sync connections",
+    "trigger and monitor sync jobs",
+    "manage workspaces",
+    "manage user permissions",
+    "retrieve stream properties",
+    "organize resources with tags",
+    "configure webhook notifications",
+    "create embedded templates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/airbyte.png"
+}

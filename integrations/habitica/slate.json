@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/habitica",
+  "description": "Manage gamified tasks, habits, and productivity goals in Habitica's RPG-style task manager. Create, update, delete, and score tasks across four types: Habits, Dailies, To-Dos, and Rewards. Retrieve and update user profiles, character stats (HP, XP, Gold, Mana), class, equipment, and appearance. Manage inventory including pets, mounts, eggs, hatching potions, food, and quest scrolls. Cast class-specific skills and spells. Manage social groups (parties and guilds), send chat messages, and handle private messaging. Create, join, and manage challenges. Invite to, accept, start, and cancel quests. Create and organize tags for task filtering. Retrieve game content data for gear, quests, pets, and mounts. Configure webhooks for task activity, group chat, user activity, and quest events.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "create and score tasks",
+    "manage habits and dailies",
+    "retrieve user stats",
+    "manage inventory and equipment",
+    "cast class skills",
+    "send chat messages",
+    "manage quests",
+    "create and join challenges",
+    "organize tasks with tags",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/habitica.png"
+}

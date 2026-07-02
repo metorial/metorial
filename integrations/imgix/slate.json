@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/imgix",
+  "description": "Process, transform, and optimize images and videos in real time via URL-based parameters. Manage image sources backed by S3, GCS, Azure, and other storage providers. Upload, browse, search, and edit assets and their metadata. Apply transformations including resize, crop, format conversion, compression, watermarks, text overlays, background removal, and AI-powered background replacement. Generate video thumbnails, convert video to GIF, and optimize video playback. Purge cached assets from the CDN. Generate signed/secure URLs with expiration. Retrieve image and source analytics reports.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "transform and optimize images",
+    "manage image sources",
+    "upload and browse assets",
+    "purge CDN cache",
+    "resize and crop images",
+    "apply watermarks and overlays",
+    "AI background removal",
+    "process and optimize video",
+    "generate secure signed URLs",
+    "retrieve analytics reports"
+  ]
+}

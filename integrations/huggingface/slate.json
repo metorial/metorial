@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/hugging-face",
+  "description": "Manage machine learning model, dataset, and Spaces repositories on Hugging Face Hub. Create, update, delete, and configure Git-based repositories with version control, branching, tagging, and pull requests. Upload and download model files and datasets. Run model inference for tasks like text generation, image generation, summarization, embeddings, and classification via serverless or dedicated endpoints. Search and discover models, datasets, and Spaces by author, task, language, or tags. Create and manage Spaces for hosting ML-powered application demos. Participate in community discussions, open pull requests, and post comments on repositories. Organize related items into collections. Manage organizations and access control. Listen for repository, discussion, and comment events via webhooks.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage model repositories",
+    "upload and download files",
+    "run model inference",
+    "search models and datasets",
+    "create and manage Spaces",
+    "manage discussions and pull requests",
+    "host and browse datasets",
+    "curate collections",
+    "manage organizations",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/huggingface.png"
+}

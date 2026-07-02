@@ -1,0 +1,68 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  createArtwork,
+  createContact,
+  createContactList,
+  createWebhook,
+  deleteArtwork,
+  deleteContact,
+  deleteContactList,
+  deleteWebhook,
+  editArtwork,
+  editContact,
+  findContact,
+  generatePreview,
+  getAccountBalance,
+  getOrder,
+  listArtwork,
+  listContactLists,
+  listContacts,
+  listOrders,
+  listResources,
+  listTemplates,
+  listUsers,
+  listWebhooks,
+  manageInvitation,
+  placeOrder,
+  removeUser,
+  sendInvitation,
+  syncContact,
+  updateWebhook
+} from './tools';
+import { cardlyEvents } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    placeOrder,
+    generatePreview,
+    listArtwork,
+    createArtwork,
+    editArtwork,
+    deleteArtwork,
+    listContacts,
+    findContact,
+    createContact,
+    editContact,
+    syncContact,
+    deleteContact,
+    listContactLists,
+    createContactList,
+    deleteContactList,
+    listTemplates,
+    listOrders,
+    getOrder,
+    getAccountBalance,
+    listResources,
+    listWebhooks,
+    createWebhook,
+    updateWebhook,
+    deleteWebhook,
+    listUsers,
+    removeUser,
+    sendInvitation,
+    manageInvitation
+  ],
+  triggers: [cardlyEvents]
+});

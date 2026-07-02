@@ -1,0 +1,86 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  completeTask,
+  createComment,
+  createFilter,
+  createLabel,
+  createProject,
+  createSection,
+  createTask,
+  deleteComment,
+  deleteFilter,
+  deleteLabel,
+  deleteProject,
+  deleteSection,
+  deleteTask,
+  getCollaborators,
+  getComments,
+  getFilters,
+  getLabels,
+  getProductivityStats,
+  getProjects,
+  getSections,
+  getTasks,
+  moveTask,
+  quickAddTask,
+  updateComment,
+  updateFilter,
+  updateLabel,
+  updateProject,
+  updateSection,
+  updateTask
+} from './tools';
+import {
+  commentEvents,
+  filterEvents,
+  labelEvents,
+  projectEvents,
+  reminderEvents,
+  sectionEvents,
+  taskEvents
+} from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    createTask,
+    getTasks,
+    updateTask,
+    completeTask,
+    deleteTask,
+    moveTask,
+    quickAddTask,
+    createProject,
+    updateProject,
+    deleteProject,
+    getProjects,
+    getSections,
+    createSection,
+    updateSection,
+    deleteSection,
+    getLabels,
+    createLabel,
+    updateLabel,
+    deleteLabel,
+    getComments,
+    createComment,
+    updateComment,
+    deleteComment,
+    getFilters,
+    createFilter,
+    updateFilter,
+    deleteFilter,
+    getCollaborators,
+    getProductivityStats
+  ] as any[],
+  triggers: [
+    taskEvents,
+    projectEvents,
+    commentEvents,
+    sectionEvents,
+    labelEvents,
+    filterEvents,
+    reminderEvents
+  ] as any[]
+});

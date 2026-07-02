@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/docsbot-ai",
+  "description": "Create and manage custom AI chatbots trained on your own documentation, websites, and content sources. Manage teams, bots, and training sources programmatically. Chat with AI agents via multi-turn conversations with streaming responses, multimodal inputs, and support escalation. Upload documents and files as training sources. Rate answers, track question and conversation history, and retrieve full conversation sessions with metadata and user feedback. Configure bot settings including AI model, language, custom prompts, and branding.",
+  "categories": [
+    "apis-and-http-requests",
+    "crm-and-sales-tools",
+    "note-taking-and-knowledge-bases"
+  ],
+  "skills": [
+    "create and manage chatbots",
+    "chat with AI agents",
+    "upload training sources",
+    "stream AI responses",
+    "rate bot answers",
+    "track conversation history",
+    "manage teams and bots",
+    "escalate to human support",
+    "retrieve question logs",
+    "configure bot settings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/docsbot-ai.svg"
+}

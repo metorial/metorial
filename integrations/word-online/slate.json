@@ -1,0 +1,19 @@
+{
+  "name": "@microsoft/word-online",
+  "description": "Manage Word documents stored in OneDrive and SharePoint via Microsoft Graph. Upload, download, create, copy, move, rename, and delete Word documents. Convert documents to PDF. Share documents with view or edit permissions via links or user invitations. Retrieve version history and restore previous versions. Check in and check out documents to control editing access. Search for documents by name, content, or metadata. Generate document previews and thumbnails. Subscribe to webhook-based change notifications for file updates in drive folders.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "upload and create documents",
+    "download Word documents",
+    "convert documents to PDF",
+    "move copy and delete files",
+    "share documents with permissions",
+    "retrieve version history",
+    "check in and check out documents",
+    "search documents",
+    "generate document previews",
+    "subscribe to change notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/workspace.png",
+  "version": "0.1.2"
+}

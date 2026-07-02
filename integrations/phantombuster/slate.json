@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/phantombuster",
+  "description": "Manage and run cloud-based automation Phantoms for data extraction, lead generation, and social media automation across LinkedIn, Instagram, Facebook, Twitter, and other platforms. Create, launch, update, and delete Phantoms (automation agents). Monitor execution status, retrieve console logs, and download results in CSV or JSON format. Manage a LinkedIn Leads database including fetching, deleting, and organizing leads by list. Upload and manage custom JavaScript automation scripts. Persist state between runs using agent and global JSON objects. Configure webhooks to receive notifications when Phantom executions complete.",
+  "categories": ["crm-and-sales-tools", "news-and-media", "task-and-project-management"],
+  "skills": [
+    "launch automation phantoms",
+    "extract lead data",
+    "monitor execution status",
+    "retrieve result files",
+    "manage LinkedIn leads database",
+    "manage automation scripts",
+    "configure execution webhooks",
+    "abort running phantoms",
+    "persist agent state"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/phantombuster.png"
+}

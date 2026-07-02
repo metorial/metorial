@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/teamcamp",
+  "description": "Manage projects, tasks, and team collaboration in Teamcamp. Create, read, update, and delete projects, including creating projects from templates. Create and update tasks with assignments, priorities, due dates, estimated time, milestones, statuses, and file attachments. Post comments on tasks. Retrieve workspace users, customers with contact details, and project groups. Projects can be associated with customers and configured with start and due dates.",
+  "categories": ["task-and-project-management"],
+  "skills": [
+    "create and manage projects",
+    "create and update tasks",
+    "assign tasks to users",
+    "post task comments",
+    "retrieve workspace users",
+    "retrieve customer details",
+    "manage project groups",
+    "attach files to tasks",
+    "set task priorities",
+    "create projects from templates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/teamcamp.png"
+}

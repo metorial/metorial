@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/finmei",
+  "description": "Create, list, and delete invoices with customizable templates, multi-currency support, and recurring billing. Manage customers by listing, updating, and deleting customer records. Maintain a product catalog by creating, retrieving, updating, and deleting products. Record, list, retrieve, and delete payments associated with invoices. Track expenses with receipt uploads. List supported currencies (180+) and retrieve authenticated user profile information.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "create and manage invoices",
+    "manage customer records",
+    "track payments",
+    "record expenses",
+    "manage product catalog",
+    "list supported currencies",
+    "configure recurring invoices",
+    "retrieve user profile",
+    "delete payments"
+  ]
+}

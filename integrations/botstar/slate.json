@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/botstar",
+  "description": "Manage chatbots, broadcast messages, and handle CMS content on the BotStar platform. List and retrieve bots, send messages to specific chatbot users, manage CMS entities and items for product catalogs and digital content, access and update audience/user data with custom fields and tags, and control a livechat website widget programmatically. Supports webhook events for new subscribers, user attribute updates, human takeover requests, new tags, CMS item creation, and checkpoint records.",
+  "categories": ["crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "list and retrieve bots",
+    "broadcast messages to users",
+    "manage CMS entities and items",
+    "manage user tags and attributes",
+    "control livechat widget",
+    "subscribe to webhook events",
+    "retrieve audience data",
+    "send text messages",
+    "update user details"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/botstar.png"
+}

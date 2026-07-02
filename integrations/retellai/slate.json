@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/retell-ai",
+  "description": "Build, deploy, and manage AI phone and chat agents. Create and configure voice agents with customizable voices, conversation flows, and knowledge bases. Initiate outbound phone calls, manage inbound calls, and run batch calling campaigns. Purchase and manage phone numbers with separate inbound/outbound agent assignments. Create web-based voice calls via WebRTC. Send SMS messages and manage chat sessions. Define and run batch simulation tests against agents. Monitor call concurrency, retrieve call transcripts, recordings, cost breakdowns, and post-call analysis including sentiment, summaries, and custom insights. Manage Retell LLM configurations, conversation flows, and reusable flow components. Clone and browse voices filtered by provider, gender, accent, and age. Receive real-time webhooks for call lifecycle, transcript updates, and transfer events.",
+  "categories": [
+    "apis-and-http-requests",
+    "email-and-messaging",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "create and manage voice agents",
+    "initiate outbound phone calls",
+    "run batch calling campaigns",
+    "manage phone numbers",
+    "create web calls via WebRTC",
+    "send SMS messages",
+    "manage knowledge bases",
+    "retrieve call transcripts and recordings",
+    "run agent simulation tests",
+    "perform post-call analysis"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/retellai.jpeg"
+}

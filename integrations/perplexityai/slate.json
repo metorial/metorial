@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/perplexity-ai",
+  "description": "Perform AI-powered web searches and generate grounded answers with citations. Access multiple LLM providers (OpenAI, Anthropic, Google, xAI, Sonar) through a unified chat completions interface. Retrieve raw ranked web search results for RAG pipelines. Generate text embeddings for semantic search and retrieval. Supports streaming responses, structured JSON output, search recency and domain filtering, multi-step reasoning, deep research reports, model fallback, and configurable presets for common workflows. Manage API keys and groups programmatically.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "search the web",
+    "generate cited answers",
+    "retrieve raw search results",
+    "generate text embeddings",
+    "stream chat completions",
+    "conduct deep research",
+    "filter search by domain",
+    "perform multi-step reasoning",
+    "generate structured JSON output",
+    "manage API keys"
+  ]
+}

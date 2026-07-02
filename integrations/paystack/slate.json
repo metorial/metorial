@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/paystack",
+  "description": "Process payments and manage transactions for African businesses. Initialize and verify transactions across multiple payment channels including cards, bank transfers, USSD, mobile money, and QR codes. Create and manage customers, subscriptions, and recurring billing plans. Issue refunds, handle disputes, and track settlements. Transfer funds to bank accounts and mobile money recipients individually or in bulk. Split transaction settlements across multiple subaccounts. Create dedicated virtual accounts for customers, generate payment pages and invoices, and manage products, storefronts, and orders. Verify bank accounts, cards, and customer identities. Receive real-time webhook notifications for transaction, transfer, subscription, invoice, refund, and dispute events.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "process payments",
+    "manage subscriptions and plans",
+    "initiate fund transfers",
+    "create and manage customers",
+    "issue refunds",
+    "manage transaction splits",
+    "create dedicated virtual accounts",
+    "generate payment pages",
+    "verify bank accounts and cards",
+    "manage products and orders"
+  ]
+}

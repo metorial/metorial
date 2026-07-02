@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/docsumo",
+  "description": "Upload, process, and extract structured data from documents using AI-powered models. Supports invoices, bank statements, tax forms, insurance documents, and more. Retrieve extracted key-value pairs and table data, manage document review and approval workflows, classify documents automatically, split multi-document files, and organize documents into folders. Manage cases grouping related documents, create and maintain database lookup tables, and receive webhook notifications on document status changes. Provides specialized analytics for bank statements and MCA analysis.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "upload and process documents",
+    "extract structured document data",
+    "auto-classify document types",
+    "review and validate extractions",
+    "manage document folders",
+    "split multi-document files",
+    "manage cases and workflows",
+    "create database lookup tables",
+    "retrieve bank statement analytics",
+    "track document status changes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/docsumo.svg"
+}

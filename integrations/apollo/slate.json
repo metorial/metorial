@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/apolloio",
+  "description": "Search and prospect B2B contacts and companies from a database of over 275 million people and 70 million organizations. Enrich people and company data with emails, phone numbers, and firmographic details. Create and manage contacts, accounts, deals, and tasks. Add contacts to email sequences and manage sequence statuses. Log and search call records. Perform bulk operations for contact creation, account creation, task creation, and data enrichment.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "search prospect contacts",
+    "search organizations",
+    "enrich people data",
+    "enrich company data",
+    "manage contacts and accounts",
+    "create and update deals",
+    "manage email sequences",
+    "create and manage tasks",
+    "log call records",
+    "bulk data enrichment"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/apollo.jpg"
+}

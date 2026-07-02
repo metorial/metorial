@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/resend",
+  "description": "Send, receive, and manage emails programmatically. Send transactional and marketing emails with HTML, plain text, or React content, including attachments, scheduling, and batch sending. Manage sending domains with DNS verification (DKIM, SPF, DMARC) and open/click tracking. Create and organize contacts into audiences with custom properties, segments, and topic-based subscription preferences. Send broadcast campaigns immediately or on a schedule with automatic unsubscribe handling. Create and manage reusable email templates. Set up automated email workflows triggered by custom events. Manage API keys and webhook endpoints for real-time email, contact, and domain event notifications.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send transactional emails",
+    "send batch emails",
+    "receive inbound emails",
+    "manage sending domains",
+    "manage contacts and audiences",
+    "send broadcast campaigns",
+    "manage email templates",
+    "schedule email delivery",
+    "create automated workflows",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/resend.png"
+}

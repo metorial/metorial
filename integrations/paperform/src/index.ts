@@ -1,0 +1,66 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  cancelPapersignDocument,
+  copyPapersignDocument,
+  createCoupon,
+  createPapersignFolder,
+  createProduct,
+  createSpace,
+  deleteCoupon,
+  deleteProduct,
+  deleteSubmission,
+  getForm,
+  getPapersignDocument,
+  getSubmission,
+  listCoupons,
+  listFormFields,
+  listForms,
+  listPapersignDocuments,
+  listPapersignFolders,
+  listPartialSubmissions,
+  listProducts,
+  listSpaceForms,
+  listSpaces,
+  listSubmissions,
+  movePapersignDocument,
+  sendPapersignDocument,
+  updateCoupon,
+  updateForm,
+  updateProduct
+} from './tools';
+import { formSubmissionTrigger, papersignEventTrigger } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listForms,
+    getForm,
+    updateForm,
+    listFormFields,
+    listSubmissions,
+    getSubmission,
+    deleteSubmission,
+    listPartialSubmissions,
+    listProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct,
+    listCoupons,
+    createCoupon,
+    updateCoupon,
+    deleteCoupon,
+    listSpaces,
+    createSpace,
+    listSpaceForms,
+    listPapersignDocuments,
+    getPapersignDocument,
+    sendPapersignDocument,
+    copyPapersignDocument,
+    movePapersignDocument,
+    cancelPapersignDocument,
+    listPapersignFolders,
+    createPapersignFolder
+  ],
+  triggers: [formSubmissionTrigger, papersignEventTrigger]
+});

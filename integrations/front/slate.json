@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/front",
+  "description": "Manage shared inboxes and team-based communication across email, SMS, chat, and social media. Create, reply to, and manage conversations including assignment, tagging, archiving, and moving between inboxes. Send messages, create drafts, and import historical messages. Manage contacts, accounts, and contact groups with custom fields and handles. Add internal comments and mentions for team collaboration. Create and organize tags with hierarchical structures. Configure and manage channels connecting external messaging platforms. Create and manage knowledge base articles and categories. Export analytics data on team performance and response times. Manage message templates, teammate shifts, email signatures, and automation rules. Listen for real-time webhook events on conversation assignments, inbound/outbound messages, tagging changes, and conversation lifecycle updates.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage shared inboxes",
+    "send and reply messages",
+    "assign conversations to teammates",
+    "manage contacts and accounts",
+    "tag and organize conversations",
+    "add internal comments",
+    "create message templates",
+    "export analytics reports",
+    "manage knowledge base articles",
+    "receive webhook event notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/front.svg"
+}

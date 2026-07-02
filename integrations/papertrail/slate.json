@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/papertrail",
+  "description": "Search, manage, and archive centralized logs from applications, servers, and cloud platforms. Search log events with Boolean queries and attribute filters, live-tail logs in real time, manage systems (log senders) and groups, create and manage saved searches with alerting, download hourly log archives, manage log destinations, invite and manage team members, and retrieve account usage information. Receive webhook notifications when saved search alerts are triggered by matching or missing log events.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "search log events",
+    "live tail logs",
+    "manage log systems",
+    "manage system groups",
+    "create saved searches",
+    "configure log alerts",
+    "download log archives",
+    "manage log destinations",
+    "invite team members",
+    "retrieve account usage"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/papertrail.png"
+}

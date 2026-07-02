@@ -1,0 +1,47 @@
+{
+  "name": "@slates/aws-sdk-http-handler",
+  "version": "1.0.0-rc.4",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src/**",
+    "dist/**",
+    "README.md",
+    "package.json"
+  ],
+  "author": "Tobias Herber",
+  "license": "FSL 1.1",
+  "type": "module",
+  "source": "src/index.ts",
+  "exports": {
+    "bun": "./src/index.ts",
+    "types": "./dist/index.d.ts",
+    "require": "./dist/index.cjs",
+    "import": "./dist/index.module.js",
+    "default": "./dist/index.module.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.module.js",
+  "types": "dist/index.d.ts",
+  "unpkg": "./dist/index.module.js",
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts --passWithNoTests",
+    "build": "tsup --config ../../tsup.packages.config.ts",
+    "typecheck": "tsc --noEmit",
+    "biome:check": "biome check --write src"
+  },
+  "dependencies": {
+    "@smithy/protocol-http": "^5.3.14",
+    "@smithy/querystring-builder": "^4.2.14",
+    "@smithy/types": "^4.14.1",
+    "axios": "^1.13.2",
+    "slates": "1.0.0-rc.14"
+  },
+  "devDependencies": {
+    "@slates/tsconfig": "1.0.0-rc.1",
+    "@types/node": "^20",
+    "typescript": "5.8.2",
+    "vitest": "^3.1.2"
+  }
+}

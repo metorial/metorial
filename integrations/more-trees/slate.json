@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/more-trees",
+  "description": "Plant trees and purchase carbon credits through global reforestation projects. Retrieve account details, credit balances, and forest statistics including trees planted and CO2 captured. Browse active projects and available tree types, plant trees for yourself or gift them to others by email or account code, and track cumulative carbon offset figures.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail"],
+  "skills": [
+    "plant trees",
+    "gift trees to others",
+    "view credit balance",
+    "retrieve forest statistics",
+    "browse reforestation projects",
+    "get carbon offset totals",
+    "retrieve account information",
+    "list available tree types"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/more-trees.jpg"
+}

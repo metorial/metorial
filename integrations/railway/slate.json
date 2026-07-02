@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/railway",
+  "description": "Deploy and manage web applications, databases, and infrastructure on Railway's cloud platform. Create and configure projects, services, environments, and deployments. Manage environment variables, custom domains, persistent storage volumes, and database services (PostgreSQL, MySQL, MongoDB, Redis). Trigger deployments from GitHub repos or Docker images, monitor deployment status, roll back services, and receive webhook notifications for deployment changes, volume usage, and resource alerts.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage projects and services",
+    "trigger and monitor deployments",
+    "manage environment variables",
+    "configure custom domains",
+    "provision managed databases",
+    "create persistent volumes",
+    "manage deployment environments",
+    "rollback deployments",
+    "receive deployment webhooks",
+    "monitor resource usage"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/railway.png"
+}

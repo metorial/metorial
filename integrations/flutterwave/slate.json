@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/flutterwave",
+  "description": "Process payments across multiple African and global markets using cards, bank transfers, mobile money, USSD, and digital wallets. Send payouts to bank accounts, mobile money wallets, and Flutterwave wallets in multiple currencies. Create and manage subscription billing with payment plans. Generate virtual accounts (dynamic or static) for receiving bank transfer payments. Create and manage payout subaccounts (wallets) with wallet-to-wallet transfers. Pay bills including airtime, data, cable, power, and tolls. Manage transaction disputes, refunds, and settlements. Verify identity via bank account and BVN resolution. Receive webhook notifications for charge, transfer, and subscription events.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "process card payments",
+    "send payouts and transfers",
+    "manage subscriptions and billing",
+    "generate virtual accounts",
+    "collect mobile money payments",
+    "pay bills and airtime",
+    "manage refunds and disputes",
+    "verify bank account identity",
+    "create payout wallets",
+    "track settlements and reports"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/flutterwave.png"
+}

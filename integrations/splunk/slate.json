@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/splunk",
+  "description": "Search, monitor, and analyze machine-generated data such as logs, metrics, and events. Execute searches using Splunk Processing Language (SPL), create and manage search jobs, and retrieve results in JSON, XML, or CSV. Ingest data via the HTTP Event Collector (HEC) in JSON or raw text format. Create and manage saved searches, alerts, and webhook-based alert actions. Manage indexes, data inputs, and knowledge objects such as event types, field extractions, lookups, tags, and macros. Store and query application state using the KV Store with MongoDB-like queries. Manage dashboards, views, users, roles, apps, and server configuration.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "execute SPL search queries",
+    "ingest events via HEC",
+    "manage saved searches and alerts",
+    "create and manage indexes",
+    "configure alert webhooks",
+    "manage KV Store collections",
+    "manage knowledge objects",
+    "manage dashboards and views",
+    "manage users and roles",
+    "manage data inputs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/splunk.png"
+}

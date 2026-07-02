@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/gong",
+  "description": "Access and analyze sales call recordings, transcripts, and conversation intelligence data. Retrieve call details including participants, topics, trackers, scorecards, and full transcripts with speaker labels. Upload and manage call recordings from external systems. Retrieve user activity statistics such as talk ratios and interaction metrics. Manage CRM data by uploading accounts, contacts, deals, and leads. List and manage Engage outreach automation flows, assign or unassign prospects, and override flow content for campaigns. Browse and manage the call library and folders. Push digital interaction events like content shares and views. Create, validate, and delete meetings. Handle data privacy operations including GDPR-compliant erasure of user data. Retrieve audit logs, tracker configurations, workspace details, and permission profiles. Receive webhook notifications when calls match configured automation rules.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "retrieve call recordings and transcripts",
+    "create call records",
+    "upload call media",
+    "analyze user activity statistics",
+    "retrieve CRM data and metadata",
+    "manage outreach automation flows",
+    "assign prospects to flows",
+    "retrieve scorecard answers",
+    "retrieve tracker and scorecard definitions",
+    "browse call library folders",
+    "push digital interaction events",
+    "create update and delete meetings",
+    "manage individual call user access",
+    "handle data privacy erasure"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/gong.png"
+}

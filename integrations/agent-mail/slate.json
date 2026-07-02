@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/agent-mail",
+  "description": "Create and manage email inboxes for AI agents to send, receive, and reply to emails programmatically. Organize conversations with threads, labels, and drafts. Search emails semantically across inboxes. Extract structured data from unstructured emails and auto-categorize messages with custom prompts. Manage custom domains, contact/mailing lists, and multi-tenant pods. Subscribe to webhook and WebSocket events for message delivery, bounces, complaints, and domain verification. Supports IMAP and SMTP access alongside the REST API.",
+  "categories": [
+    "apis-and-http-requests",
+    "email-and-messaging",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and manage inboxes",
+    "send and receive emails",
+    "manage email threads",
+    "semantic email search",
+    "extract structured data from emails",
+    "manage labels and drafts",
+    "configure webhooks for events",
+    "manage custom domains",
+    "manage multi-tenant pods",
+    "manage contact lists"
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/alpha-vantage",
+  "description": "Retrieve global financial market data including stock prices, forex rates, cryptocurrency prices, commodities, and economic indicators. Access real-time and historical OHLCV time series data at intraday, daily, weekly, and monthly intervals across 20+ global exchanges. Look up ticker symbols, get quote snapshots, and fetch options chain data. Retrieve company fundamentals including income statements, balance sheets, cash flow statements, earnings reports, dividend history, and stock splits. Compute 50+ technical indicators such as SMA, EMA, RSI, MACD, and Bollinger Bands. Access AI-powered market news sentiment, insider transactions, and earnings call transcripts. Query macroeconomic indicators like GDP, CPI, inflation, treasury yields, and unemployment rates.",
+  "categories": [
+    "apis-and-http-requests",
+    "financial-data-and-stock-market",
+    "news-and-media"
+  ],
+  "skills": [
+    "retrieve stock price data",
+    "search ticker symbols",
+    "fetch company fundamentals",
+    "compute technical indicators",
+    "retrieve forex exchange rates",
+    "get cryptocurrency prices",
+    "access commodity prices",
+    "query economic indicators",
+    "fetch options chain data",
+    "get market news sentiment"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/alpha-vantage.png"
+}

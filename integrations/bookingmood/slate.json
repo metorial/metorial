@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/bookingmood",
+  "description": "Manage vacation rental bookings, calendar events, and guest communication for property management. Create and update bookings with line items, taxes, and deposits. Check availability and search for bookable rental units across date ranges. Manage contacts (guests/customers), invoices, and payments including refunds. Create and manage calendar events for reservations and blocked periods, with iCal synchronization to platforms like Airbnb and Booking.com. Configure products (rental units) with pricing, seasonal rates, capacity, and custom attributes. Create discount coupons, manage tasks for cleaning and maintenance, collect guest reviews, and configure embeddable booking widgets. Supports webhooks for real-time notifications on bookings, payments, calendar events, and more.",
+  "categories": [
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market",
+    "scheduling-and-calendars"
+  ],
+  "skills": [
+    "manage rental bookings",
+    "check availability",
+    "process payments and refunds",
+    "manage calendar events",
+    "manage guest contacts",
+    "create and track invoices",
+    "configure rental unit pricing",
+    "manage discount coupons",
+    "assign and track tasks",
+    "send guest messages"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bookingmood.png"
+}

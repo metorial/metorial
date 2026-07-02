@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/google-address-validation",
+  "description": "Validate, standardize, and geocode postal addresses worldwide. Identify and correct individual address components, assess deliverability, and return formatted addresses with latitude/longitude coordinates and Google Place IDs. Determine whether an address is residential, commercial, or a PO Box. Enable USPS CASS™ processing for US and Puerto Rico addresses to obtain ZIP+4 codes, delivery point codes, and carrier route information. Provide validation feedback to improve future results.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail"],
+  "skills": [
+    "validate postal addresses",
+    "standardize address formatting",
+    "geocode addresses",
+    "correct address components",
+    "assess address deliverability",
+    "classify residential or commercial",
+    "retrieve USPS CASS data",
+    "provide validation feedback"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google-address-validation.svg"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/eversign",
+  "description": "Create, send, sign, and manage legally binding electronic signature documents. Send documents to signers with configurable signing order, create reusable templates, and generate documents from templates. Support embedded signing and document preparation within your own application via iFrame. Upload files, download completed PDFs with audit trails, and bulk send documents from CSV data. Manage signers by sending reminders, reassigning signing responsibility, and authenticating via SMS. Track document lifecycle events through webhooks including creation, viewing, signing, completion, decline, and expiration. Operate in sandbox mode for testing.",
+  "categories": ["document-processing", "legal-and-compliance", "task-and-project-management"],
+  "skills": [
+    "send documents for signature",
+    "create signature templates",
+    "embed signing experience",
+    "bulk send documents",
+    "download signed PDFs",
+    "manage document signers",
+    "track document lifecycle events",
+    "upload document files",
+    "access audit trails",
+    "create documents from templates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/eversign.png"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/leadfeeder",
+  "description": "Identify and retrieve B2B website visitor data at the company level. Access leads with company details including industry, employee count, revenue, location, and social profiles. Track detailed visit behavior such as traffic source, page routes, visit duration, and device type. Manage custom feeds (filtered lead views), request bulk lead exports, and retrieve website tracking scripts. Enrich IP addresses to resolve company information including name, domain, industry, and confidence score.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "retrieve website visitor leads",
+    "track company visit behavior",
+    "enrich IP to company data",
+    "manage custom lead feeds",
+    "export lead reports",
+    "retrieve account details",
+    "filter leads by date range",
+    "access visit traffic sources",
+    "get tracking script"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/leadfeeder.jpeg"
+}

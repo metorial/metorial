@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/bugherd",
+  "description": "Track bugs and manage visual website feedback. Create, update, and organize tasks on Kanban-style project boards with custom columns. Manage projects linked to website URLs, add team members and guest clients, and configure project settings. Create and filter tasks by status, priority, tags, assignee, and date ranges. Add comments to tasks (public or private), upload and manage file attachments, and move tasks between projects. List users, view their assigned tasks, and manage organization details. Receive real-time webhook notifications for project creation, task creation, task updates, task deletion, and new comments.",
+  "categories": ["crm-and-sales-tools", "task-and-project-management"],
+  "skills": [
+    "create and manage projects",
+    "create and update tasks",
+    "filter and search tasks",
+    "manage Kanban board columns",
+    "add comments to tasks",
+    "upload file attachments",
+    "manage users and guests",
+    "move tasks between projects",
+    "configure webhook notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bugherd.png"
+}

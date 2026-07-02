@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/castingwords",
+  "description": "Order human-powered transcriptions of audio and video files across multiple tiers (Budget, 7 Day, 1 Day) with add-ons like timestamps, captions, and verbatim transcription. Track audiofile status, retrieve completed transcripts in multiple formats (TXT, DOC, RTF, HTML), upgrade or cancel orders, view invoices, and check prepay balance. Receive webhook notifications for transcript completion, duplicate files, refunds, and difficult audio detection.",
+  "categories": ["document-processing", "speech-recognition-and-synthesis"],
+  "skills": [
+    "order audio transcription",
+    "retrieve completed transcripts",
+    "track transcription status",
+    "upgrade transcription orders",
+    "cancel and refund orders",
+    "view invoice details",
+    "check prepay balance",
+    "receive transcription webhooks"
+  ]
+}

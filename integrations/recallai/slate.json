@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/recallai",
+  "description": "Create and manage meeting bots that join video conferences on Zoom, Google Meet, Microsoft Teams, Webex, Slack Huddles, and GoTo Meeting to capture recordings, transcripts, and metadata. Schedule bots to join meetings automatically via Google Calendar and Outlook integrations. Capture meeting recordings in multiple formats (MP4, MP3, per-participant audio/video). Generate real-time and async transcripts using multiple providers (Deepgram, AssemblyAI, AWS Transcribe, Rev, Speechmatics, or platform captions). Stream real-time audio (PCM), video (PNG/H264), and RTMP. Send and read chat messages through bots. Build interactive AI agents that output speech and video into meetings. Access participant information including names, emails, join/leave events, and host status. Monitor bot status and recording lifecycle via webhooks. Support botless recording via Desktop SDK and native platform integrations (Zoom RTMS, Google Meet Media API).",
+  "categories": ["scheduling-and-calendars", "speech-recognition-and-synthesis"],
+  "skills": [
+    "create meeting recording bots",
+    "capture meeting transcripts",
+    "stream real-time audio and video",
+    "schedule bots via calendars",
+    "send meeting chat messages",
+    "retrieve participant metadata",
+    "generate multi-provider transcriptions",
+    "build interactive AI agents",
+    "capture per-participant media",
+    "monitor bot status webhooks"
+  ]
+}

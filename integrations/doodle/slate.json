@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/doodle",
+  "description": "Create and manage group scheduling polls where participants vote on preferred meeting times. Set up booking pages for direct appointment scheduling, and create sign-up sheets for events and workshops. Integrate with Google Calendar, Outlook, and iCloud to sync availability. Automatically attach video conferencing links from Zoom, Google Meet, or Webex to scheduled meetings. Configure poll voting modes (YES/NO or YES/NO/MAYBE), add participant comments, and collect payments via Stripe for bookings. Note: Doodle's API has been officially deprecated; these capabilities may only be available for legacy Enterprise integrations.",
+  "categories": ["scheduling-and-calendars"],
+  "skills": [
+    "create scheduling polls",
+    "manage group voting",
+    "set up booking pages",
+    "create sign-up sheets",
+    "sync calendar availability",
+    "attach video conferencing links",
+    "collect booking payments",
+    "configure poll options",
+    "manage participant responses"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/doodle.png"
+}

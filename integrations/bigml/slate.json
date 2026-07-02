@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/bigml",
+  "description": "Build, manage, and deploy machine learning models via BigML's cloud platform. Create data sources from files, URLs, or external databases. Process datasets with transformations, sampling, filtering, and aggregation. Train supervised models (decision trees, ensembles, deepnets, logistic/linear regressions, time series) and unsupervised models (clusters, anomaly detectors, topic models, associations, PCA). Generate single or batch predictions including classifications, regressions, forecasts, anomaly scores, and centroids. Evaluate model performance with accuracy and precision metrics. Automate model selection with OptiML. Combine heterogeneous models using fusions. Script and automate ML workflows with WhizzML. Export models for local use. Manage organizations, projects, and external database connectors. Receive webhook notifications when resources are created or completed.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "create ML data sources",
+    "train predictive models",
+    "generate batch predictions",
+    "evaluate model performance",
+    "detect anomalies in data",
+    "automate model selection",
+    "script ML workflows",
+    "manage datasets and transformations",
+    "connect external databases",
+    "forecast time series"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bigml.jpeg"
+}

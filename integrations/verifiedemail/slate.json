@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/verifiedemail",
+  "description": "Verify email addresses in real time and clean bulk email lists. Perform single email verification with domain health checks, mail server validation, misspelled domain detection, role/alias identification, and deliverability scoring. Upload and process bulk email lists to eliminate undeliverable addresses with 99% precision. Set up continuous list maintenance to automatically re-verify and sync email lists with CRMs and email providers. Manage webhooks to receive notifications on verification job completion. Check credit balance and configure auto-refill settings. Manage API keys with granular permissions for different verification functions.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "verify single email address",
+    "bulk email list cleaning",
+    "continuous list maintenance",
+    "check deliverability score",
+    "detect misspelled domains",
+    "identify role-based emails",
+    "manage verification webhooks",
+    "check credit balance",
+    "sync lists with CRMs",
+    "embed verification widget"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/verifiedemail.svg"
+}

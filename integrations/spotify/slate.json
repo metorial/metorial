@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/spotify",
+  "description": "Search and browse Spotify's music catalog for tracks, artists, albums, playlists, podcasts, and episodes. Create, edit, and manage playlists including adding, removing, and reordering items. Control playback across devices: play, pause, skip, seek, set volume, toggle shuffle and repeat, and transfer playback. Save and remove items from the user's library. Retrieve user profiles, top artists and tracks, and recently played history. Follow and unfollow artists, users, and playlists. Access audio features and analysis data for tracks. Upload custom playlist cover images.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "search music catalog",
+    "manage playlists",
+    "control playback",
+    "manage user library",
+    "retrieve user profile",
+    "get top artists and tracks",
+    "follow artists and users",
+    "browse new releases",
+    "get recently played tracks",
+    "retrieve audio features"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/spotify.svg"
+}

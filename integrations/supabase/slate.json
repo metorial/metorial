@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/supabase",
+  "description": "Manage PostgreSQL databases, authenticate users, store files, and run edge functions on Supabase. Perform CRUD operations on database tables via auto-generated REST and GraphQL APIs with row-level security. Create and manage user accounts with password, magic link, OTP, social login, and SSO authentication. Upload, download, list, and delete files organized in storage buckets. Deploy and invoke server-side TypeScript edge functions. Listen to realtime database changes, broadcast messages, and track user presence. Configure database webhooks for INSERT, UPDATE, and DELETE events. Programmatically manage Supabase organizations and projects, including creating/deleting projects, managing API keys, configuring auth settings, custom domains, network restrictions, and Edge Function secrets.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "query and modify database rows",
+    "manage user authentication",
+    "upload and manage files",
+    "deploy edge functions",
+    "listen to realtime changes",
+    "configure database webhooks",
+    "manage projects and organizations",
+    "manage row-level security",
+    "broadcast realtime messages",
+    "retrieve API keys and secrets"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/supabase.jpeg"
+}

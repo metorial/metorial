@@ -1,0 +1,68 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  addUsersToAudience,
+  createAd,
+  createAdCreative,
+  createAdSet,
+  createCampaign,
+  createCustomAudience,
+  deleteAd,
+  deleteAdSet,
+  deleteCampaign,
+  deleteCustomAudience,
+  getAd,
+  getAdCreative,
+  getAdSet,
+  getCampaign,
+  getCustomAudience,
+  getInsights,
+  getLeads,
+  listAdCreatives,
+  listAdSets,
+  listAds,
+  listCampaigns,
+  listCustomAudiences,
+  listLeadForms,
+  searchAdLibrary,
+  sendConversionEvents,
+  updateAd,
+  updateAdSet,
+  updateCampaign
+} from './tools';
+import { adAccountChanges, leadSubmitted } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listCampaigns,
+    getCampaign,
+    createCampaign,
+    updateCampaign,
+    deleteCampaign,
+    listAdSets,
+    getAdSet,
+    createAdSet,
+    updateAdSet,
+    deleteAdSet,
+    listAds,
+    getAd,
+    createAd,
+    updateAd,
+    deleteAd,
+    listAdCreatives,
+    getAdCreative,
+    createAdCreative,
+    getInsights,
+    listCustomAudiences,
+    getCustomAudience,
+    createCustomAudience,
+    addUsersToAudience,
+    deleteCustomAudience,
+    sendConversionEvents,
+    searchAdLibrary,
+    listLeadForms,
+    getLeads
+  ],
+  triggers: [adAccountChanges, leadSubmitted]
+});

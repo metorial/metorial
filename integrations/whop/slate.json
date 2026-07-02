@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/whop",
+  "description": "Sell digital products, memberships, and subscriptions on the Whop platform. Create and manage products and pricing plans, accept payments via checkout links or embedded checkouts, and issue refunds. Manage memberships including canceling, pausing, resuming, and attaching metadata or software license keys. Create and manage promo codes with percentage or fixed-amount discounts. Automate payouts to users from ledger accounts. Handle payment disputes and resolution cases. Manage chat channels, DMs, forums, and notifications for community engagement. Create and manage courses, chapters, and lessons with student tracking. Manage leads, waitlist entries, and shipments. Access customer reviews. Build and distribute Whop apps across companies. Receive webhooks for payment, membership, entry, and setup intent events.",
+  "categories": [
+    "document-processing",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "manage products and plans",
+    "accept and process payments",
+    "manage memberships",
+    "issue refunds and disputes",
+    "create promo codes",
+    "automate payouts",
+    "manage chat and forums",
+    "create courses and lessons",
+    "manage checkout sessions",
+    "handle webhook events"
+  ]
+}

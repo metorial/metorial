@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/timelink",
+  "description": "Track and manage time entries for individuals and teams. Create, update, search, and delete time entries with start/end times, descriptions, and billable status. Manage clients, projects, and services (activity types) associated with time tracking. Retrieve user information. Filter time entries by date range, client, project, or service. Receive instant webhook notifications when time entries are created, updated, or deleted.",
+  "categories": ["financial-data-and-stock-market", "task-and-project-management"],
+  "skills": [
+    "create time entries",
+    "search and filter time entries",
+    "manage clients",
+    "manage projects",
+    "manage services",
+    "retrieve user information",
+    "track billable hours",
+    "receive time entry webhooks",
+    "link projects to clients"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/timelink.svg"
+}

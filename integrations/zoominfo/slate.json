@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/zoominfo",
+  "description": "Search and enrich B2B contact and company data from ZoomInfo's database of over 200 million business profiles. Look up contacts by title, company, location, and other filters. Enrich records with direct dials, email addresses, job titles, firmographics, technographics, corporate hierarchy, and funding details. Access intent data to identify accounts actively researching relevant topics. Retrieve actionable scoops and news about companies. Resolve anonymous website visitors to company-level data via WebSights. Manage data privacy compliance for GDPR and CCPA. Perform bulk search and enrichment operations at scale. Track credit and API usage. Receive real-time webhook notifications when previously enriched contact or company records change.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "search contacts and companies",
+    "enrich contact profiles",
+    "enrich company firmographics",
+    "retrieve intent data",
+    "access scoops and news",
+    "identify website visitors",
+    "manage compliance opt-outs",
+    "bulk search and enrich",
+    "track credit usage",
+    "receive record update webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zoominfo.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/vercel",
+  "description": "Manage web application deployments, projects, and infrastructure on Vercel's cloud platform. Create and configure projects with build settings, framework presets, and Git repository connections. Deploy applications programmatically, promote deployments to production, and manage rolling releases. Register, transfer, and configure domains with DNS records and SSL certificates. Create and manage environment variables scoped to production, preview, or development environments. Manage team members, roles, and access groups for fine-grained RBAC. Configure Edge Config stores for ultra-low-latency key-value data at the edge. Set up log drains to forward logs to external services. Register deployment checks for custom validation before promotion. Create deploy hooks to trigger builds from external systems. Upload and manage files with Vercel Blob storage. Configure Web Application Firewall rules, rate limiting, and IP blocking. Schedule cron jobs and retrieve billing and usage information. Receive webhooks for deployment lifecycle, domain changes, project events, rolling releases, and marketplace billing activity.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "deploy web applications",
+    "manage projects and settings",
+    "configure custom domains",
+    "manage DNS records",
+    "manage environment variables",
+    "manage team access and roles",
+    "configure edge config stores",
+    "set up log drains",
+    "configure firewall rules",
+    "trigger deploy hooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/vercel-logo.png"
+}

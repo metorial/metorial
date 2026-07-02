@@ -1,0 +1,19 @@
+{
+  "name": "@github/github",
+  "description": "Manage repositories, issues, and pull requests. Create and configure branches, star repositories, review code, and merge changes. Automate CI/CD workflows with GitHub Actions, manage workflow runs, secrets, and artifacts. Track issues with labels, milestones, and assignees. Search across code, repositories, issues, and users. Manage organizations, teams, and memberships. Create and manage projects, gists, packages, deployments, and environments. Access security alerts including code scanning, secret scanning, and Dependabot alerts. Read and write file contents in repositories. Manage webhooks, notifications, and codespaces.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage repositories",
+    "star repositories",
+    "create pull requests",
+    "track issues",
+    "review and merge code",
+    "automate CI/CD workflows",
+    "search code and repositories",
+    "manage organizations and teams",
+    "read and write file contents",
+    "manage security alerts",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/github.png"
+}

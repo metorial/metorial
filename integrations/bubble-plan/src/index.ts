@@ -1,0 +1,76 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  createComment,
+  createContact,
+  createEvent,
+  createProject,
+  createSubtask,
+  createTask,
+  createTimeEntry,
+  deleteComment,
+  deleteContact,
+  deleteEvent,
+  deleteProject,
+  deleteSubtask,
+  deleteTask,
+  getProject,
+  listClients,
+  listComments,
+  listContacts,
+  listEvents,
+  listFiles,
+  listProjects,
+  listSubtasks,
+  listTasks,
+  listTimeEntries,
+  listUsers,
+  updateContact,
+  updateEvent,
+  updateProject,
+  updateSubtask,
+  updateTask
+} from './tools';
+import {
+  clientTrigger,
+  eventTrigger,
+  projectTrigger,
+  subtaskTrigger,
+  taskTrigger
+} from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listProjects,
+    getProject,
+    createProject,
+    updateProject,
+    deleteProject,
+    listTasks,
+    createTask,
+    updateTask,
+    deleteTask,
+    listSubtasks,
+    createSubtask,
+    updateSubtask,
+    deleteSubtask,
+    listComments,
+    createComment,
+    deleteComment,
+    listFiles,
+    listEvents,
+    createEvent,
+    updateEvent,
+    deleteEvent,
+    listTimeEntries,
+    createTimeEntry,
+    listUsers,
+    listContacts,
+    createContact,
+    updateContact,
+    deleteContact,
+    listClients
+  ],
+  triggers: [projectTrigger, taskTrigger, subtaskTrigger, eventTrigger, clientTrigger]
+});

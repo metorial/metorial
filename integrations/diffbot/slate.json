@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/diffbot",
+  "description": "Extract structured data from web pages using AI-powered computer vision and NLP. Automatically classify and parse articles, products, events, jobs, discussions, images, and videos into clean JSON. Search a knowledge graph of 10+ billion entities (organizations, people, articles, products) using Diffbot Query Language (DQL). Enrich person and organization records from minimal identifiers. Analyze natural language text to extract entities, facts, sentiment, and relationships. Crawl entire websites or process bulk URL lists through extraction APIs. Define custom extraction rules with CSS selectors for specific domains. Receive webhook notifications when crawl or bulk jobs complete.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "extract web page data",
+    "search knowledge graph entities",
+    "enrich organization records",
+    "enrich person records",
+    "analyze text for entities",
+    "extract sentiment from text",
+    "crawl websites at scale",
+    "bulk process URL lists",
+    "extract product pricing details",
+    "classify web page types"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/diffbot.svg"
+}

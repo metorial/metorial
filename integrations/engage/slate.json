@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/engage",
+  "description": "Manage customers, track events, and send transactional messages across multiple channels. Create, update, archive, and merge user profiles with custom attributes. Organize customers into accounts and subscription lists with double opt-in support. Track custom events for segmentation and automation. Send transactional emails using HTML, text, or templates with tracking options. Send transactional SMS via integrated providers like Twilio and Termii. Manage device tokens for push notifications. Perform batch operations for bulk user and event processing.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage customer profiles",
+    "track custom events",
+    "send transactional email",
+    "send transactional SMS",
+    "manage subscription lists",
+    "batch user operations",
+    "segment customers",
+    "manage accounts and roles",
+    "merge user profiles",
+    "manage device tokens"
+  ]
+}

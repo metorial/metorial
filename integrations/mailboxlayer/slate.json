@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mailboxlayer",
+  "description": "Validate and verify email addresses in real time. Check email syntax against RFC standards, verify existence via MX record lookup and SMTP checks, detect disposable and free email providers, identify role-based addresses, and receive a deliverability quality score. Supports single and bulk email validation, typo detection with \"did you mean\" suggestions, and catch-all detection.",
+  "categories": ["apis-and-http-requests", "email-and-messaging"],
+  "skills": [
+    "validate email address",
+    "verify email existence",
+    "detect disposable emails",
+    "detect free email providers",
+    "identify role-based addresses",
+    "check email syntax",
+    "bulk email validation",
+    "detect email typos",
+    "score email deliverability",
+    "detect catch-all addresses"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mailboxlayer.png"
+}

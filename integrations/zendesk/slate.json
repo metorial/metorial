@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/zendesk",
+  "description": "Manage Zendesk Support tickets, ticket comments, users, organizations, Help Center articles, ticket views, groups, ticket fields, and macros. Create, update, resolve, and delete support tickets with assignments, priorities, tags, comments, and custom fields. Search across tickets, users, groups, and organizations, and inspect Help Center categories and sections before managing articles.",
+  "categories": ["crm-and-sales-tools", "note-taking-and-knowledge-bases"],
+  "skills": [
+    "manage support tickets",
+    "search tickets and users",
+    "manage knowledge base articles",
+    "create and manage users",
+    "manage organizations",
+    "list ticket comments",
+    "inspect ticket fields",
+    "list agent macros",
+    "list ticket views and groups"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zendesk.svg"
+}

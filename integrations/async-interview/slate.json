@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/async-interview",
+  "description": "Manage asynchronous video interviews for hiring workflows. List and retrieve interview jobs (positions), access candidate interview responses (video, audio, or text), and invite candidates to participate in interviews. Monitor for new interview response submissions to trigger follow-up workflows such as notifying hiring managers or pushing data to an ATS. Supports AI-powered transcription of candidate responses and file attachment collection.",
+  "categories": ["hr-and-recruiting", "scheduling-and-calendars"],
+  "skills": [
+    "list interview jobs",
+    "retrieve interview responses",
+    "invite candidates to interviews",
+    "monitor new response submissions",
+    "access AI transcriptions",
+    "manage interview campaigns",
+    "collect candidate file attachments"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/async-interview.png"
+}

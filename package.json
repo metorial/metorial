@@ -1,16 +1,32 @@
 {
-  "name": "@metorial-mcp-containers/root",
-  "private": true,
+  "name": "@metorial/integrations-root",
   "scripts": {
-    "add-server": "bun ./scripts/add-server/src/index.ts",
-    "check-versions": "bun ./scripts/check-versions/src/index.ts",
-    "build": "bun ./scripts/build/src/index.ts"
+    "biome:check": "biome check --write .",
+    "integrations:cli": "bun packages/cli/src/cli.ts",
+    "integrations:validate-pr": "bun scripts/validate-pr-integrations.ts",
+    "package-local": "bun scripts/package-local.ts",
+    "packages:sync-versions": "bun scripts/update-integration-package-versions.ts",
+    "packages:build": "turbo run build --filter=./packages/*",
+    "integrations:build:inner": "turbo run build --concurrency=1 --ui=stream --filter=./integrations/* --filter=./test-integrations/*",
+    "build:integrations": "bun run packages:build && bun run integrations:build:inner"
   },
-  "devDependencies": {},
-  "packageManager": "yarn@1.22.19",
+  "devDependencies": {
+    "@biomejs/biome": "2.4.15",
+    "tsup": "^8.5.1",
+    "turbo": "^2.5.5",
+    "typescript": "5.8.2"
+  },
+  "engines": {
+    "node": ">=18",
+    "bun": ">=1.2.15"
+  },
+  "packageManager": "bun@1.2.15",
   "workspaces": [
-    "servers/*",
-    "scripts/*",
-    "packages/*"
-  ]
+    "packages/*",
+    "integrations/*",
+    "test-integrations/*"
+  ],
+  "dependencies": {
+    "@types/bun": "^1.3.12"
+  }
 }

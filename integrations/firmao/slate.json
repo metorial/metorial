@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/firmao",
+  "description": "Manage CRM and ERP operations for small and medium businesses. Create, read, update, and delete customers, contact persons, projects, tasks, and sales opportunities. Generate and manage invoices, pro forma invoices, receipts, correction invoices, offers, orders, and contracts with line items and pricing. Track products and services with stock levels, manage warehouse documents (GRN/GIN), and monitor sales pipelines. Record employee work time entries, create sales notes linked to customers and projects, and query emails stored in Firmao's mail system. Upload and download file attachments on tasks, projects, products, customers, and other objects. Retrieve PDF versions of invoices and offers using configured templates. Supports filtering with comparison operators, sorting, and custom fields across all object types.",
+  "categories": [
+    "crm-and-sales-tools",
+    "financial-data-and-stock-market",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage customer records",
+    "create and manage invoices",
+    "track projects and tasks",
+    "manage sales opportunities",
+    "handle offers and orders",
+    "track employee work time",
+    "manage warehouse stock",
+    "upload and download files",
+    "manage products and services",
+    "query stored emails"
+  ]
+}

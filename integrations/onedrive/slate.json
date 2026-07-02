@@ -1,0 +1,19 @@
+{
+  "name": "@microsoft/onedrive",
+  "description": "Upload, download, create, copy, move, rename, and delete files and folders in OneDrive and SharePoint document libraries. Share files and folders via sharing links or permission grants. Search for files by name, content, or metadata. Manage drives and access storage quota information. Track file and folder changes over time using delta queries. Subscribe to webhooks for drive change notifications. Access file previews, thumbnails, and rich metadata for photos, audio, and video. Supports resumable uploads for large files up to 250 GB and PDF conversion on download.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "upload and download files",
+    "create and delete folders",
+    "copy and move files",
+    "share files and folders",
+    "manage file permissions",
+    "search files by content",
+    "track file changes",
+    "subscribe to change webhooks",
+    "access file previews and thumbnails",
+    "manage drive storage quota"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/one-drive.svg",
+  "version": "0.1.2"
+}

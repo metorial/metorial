@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/pushbullet",
+  "description": "Send push notifications, links, and files across devices. Send and receive SMS/MMS messages through connected Android phones. Mirror phone notifications to other devices, sync clipboard content across devices, and manage device registrations. Create and subscribe to channels for broadcasting pushes to multiple users. Manage chats with other Pushbullet users, upload files, and receive real-time events via WebSocket stream.",
+  "categories": ["email-and-messaging", "iot-and-device-control"],
+  "skills": [
+    "send push notifications",
+    "send SMS/MMS messages",
+    "mirror phone notifications",
+    "sync clipboard across devices",
+    "share files across devices",
+    "manage connected devices",
+    "subscribe to channels",
+    "manage chats",
+    "upload files",
+    "receive real-time events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pushbullet.png"
+}

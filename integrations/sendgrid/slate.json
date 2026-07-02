@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/sendgrid",
+  "description": "Send transactional and marketing emails at scale. Create and manage dynamic email templates with Handlebars substitution. Manage contact lists, segments, and custom fields for marketing campaigns. Schedule and automate email sequences. Track email delivery and engagement statistics including opens, clicks, bounces, and spam reports. Manage suppression groups, global unsubscribes, bounces, blocks, and invalid emails. Validate email addresses in real-time. Configure sender authentication (SPF, DKIM, DMARC), branded links, and verified sender identities. Manage dedicated IP addresses and IP pools. Parse inbound emails via webhooks. Receive real-time event notifications for delivery and engagement events.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send transactional emails",
+    "manage marketing campaigns",
+    "create dynamic templates",
+    "manage contact lists",
+    "track email analytics",
+    "manage suppression groups",
+    "validate email addresses",
+    "configure sender authentication",
+    "parse inbound emails",
+    "schedule email delivery"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sendgrid.png"
+}

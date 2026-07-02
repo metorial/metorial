@@ -1,0 +1,12 @@
+{
+  "name": "@metorial/statbank-norway-ssb",
+  "description": "Search Statbank Norway – SSB tables and query PxWebApi v2 table data.",
+  "categories": ["data-and-analytics", "government"],
+  "skills": [
+    "search Statbank Norway SSB tables",
+    "find Statbank Norway SSB datasets",
+    "inspect PxWeb table metadata",
+    "query Norwegian statistics tables",
+    "download Statbank Norway SSB CSV or Excel data"
+  ]
+}

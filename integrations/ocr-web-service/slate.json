@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/ocr-web-service",
+  "description": "Extract text from scanned documents and images using optical character recognition (OCR). Convert scanned PDFs and images into editable Word, Excel, PDF, RTF, and plain text formats. Supports 46 recognition languages, zonal OCR for extracting text from specific rectangular regions, multi-page document processing with page range selection, and word coordinate extraction. Accepts PDF, TIFF, JPEG, BMP, PNG, GIF, and ZIP inputs up to 100 MB. Retrieve account information including page balance and subscription details.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "extract text from images",
+    "convert scanned documents",
+    "zonal OCR recognition",
+    "multi-language text recognition",
+    "export to Word and Excel",
+    "process multi-page PDFs",
+    "get word coordinates",
+    "retrieve account information"
+  ]
+}

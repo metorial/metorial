@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/optimizely",
+  "description": "Manage A/B testing experiments, feature flags, and content across Optimizely's digital experience platform. Create and configure web experiments, feature rollouts, and flag rulesets with traffic allocation. Manage content marketing workflows including tasks, campaigns, assets, briefs, and publishing events. Upload and organize digital assets in folders with permissions. Send and track email marketing campaigns with recipient lists, target groups, and opt-in processes. Access real-time email engagement events including opens, clicks, bounces, and unsubscribes. Manage CMS content items, content types, and site definitions. Query indexed content via GraphQL with filtering, sorting, and faceting. Integrate customer data through ODP including profiles, events, segments, and real-time audience segmentation. Export raw experimentation event data for analysis. Receive webhook notifications for datafile updates, content workflow changes, email engagement events, and content synchronization.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "manage A/B test experiments",
+    "configure feature flags",
+    "manage content workflows",
+    "upload and organize assets",
+    "send email campaigns",
+    "track email engagement events",
+    "manage CMS content",
+    "query content via GraphQL",
+    "manage customer data profiles",
+    "export experimentation events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/optimizely.png"
+}

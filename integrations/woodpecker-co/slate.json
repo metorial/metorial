@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/woodpecker-co",
+  "description": "Create, manage, and automate B2B cold email and LinkedIn outreach campaigns. Build multi-step sequences with configurable delays, A/B testing, and delivery time windows. Add, update, search, and manage prospects with custom fields, statuses, and interest levels. Track engagement including opens, clicks, and replies. Manage connected email mailboxes and LinkedIn accounts. Maintain domain and email blacklists. Generate asynchronous campaign performance reports. Handle manual tasks for prospects. Subscribe to webhooks for prospect status changes, engagement events, campaign events, LinkedIn events, and task events. Supports agency-level management of multiple client accounts.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "create outreach campaigns",
+    "manage prospect database",
+    "send cold emails",
+    "automate LinkedIn outreach",
+    "track email engagement",
+    "manage email blacklists",
+    "generate campaign reports",
+    "configure webhook subscriptions",
+    "manage agency client accounts",
+    "handle manual tasks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/woodpecker-co.png"
+}

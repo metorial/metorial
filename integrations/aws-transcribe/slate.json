@@ -1,0 +1,22 @@
+{
+  "name": "@amazon/aws-transcribe",
+  "description": "Transcribe speech to text from audio and video files or real-time audio streams. Perform batch transcription of media files stored in S3 and streaming transcription of live audio. Automatically identify languages, apply custom vocabularies and language models, filter unwanted words, identify speakers (diarization), and transcribe multi-channel audio. Redact personally identifiable information (PII) from transcripts. Generate subtitles in WebVTT and SRT formats. Detect toxic speech content. Analyze call center audio to extract sentiment, call categories, and AI-powered summaries. Transcribe medical dictation and patient-clinician conversations. Generate clinical notes from healthcare conversations using AWS HealthScribe. Monitor transcription job state changes, language identification events, and vocabulary updates via EventBridge.",
+  "categories": [
+    "apis-and-http-requests",
+    "healthcare-and-medical",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "batch speech-to-text transcription",
+    "real-time streaming transcription",
+    "automatic language identification",
+    "manage custom vocabularies",
+    "redact PII from transcripts",
+    "generate subtitles",
+    "speaker diarization",
+    "call analytics and summarization",
+    "medical speech transcription",
+    "detect toxic speech"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/amazon.svg"
+}

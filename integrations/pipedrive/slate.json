@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/pipedrive",
+  "description": "Manage sales pipelines, deals, leads, contacts, activities, and products in Pipedrive CRM. Create, read, update, delete, and merge deals across configurable pipeline stages. Manage leads in the Leads Inbox and convert them to deals. Create and organize contacts (persons and organizations) with custom fields, followers, and notes. Schedule and track activities like calls, meetings, and tasks linked to deals or contacts. Maintain a product catalog with pricing and attach products to deals. Manage projects with boards, phases, and tasks. Define and track sales goals by user or team. Search across deals, leads, persons, organizations, files, and products. Attach notes, files, and mail threads to entities. Log calls and manage subscriptions. Configure webhooks to receive notifications on deal, lead, contact, activity, product, pipeline, stage, and user events.",
+  "categories": ["crm-and-sales-tools", "task-and-project-management"],
+  "skills": [
+    "manage deals and pipelines",
+    "manage leads",
+    "manage contacts and organizations",
+    "schedule and track activities",
+    "manage product catalog",
+    "manage projects and tasks",
+    "track sales goals",
+    "search across entities",
+    "attach notes and files",
+    "log calls"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pipedrive.svg"
+}

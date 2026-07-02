@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/commcare",
+  "description": "Manage cases, forms, and users on CommCare, a mobile data collection and case management platform for frontline workers. Create, update, close, and query cases that track longitudinal records such as patients or households. Retrieve submitted form data and attachments, and submit new forms via the OpenRosa standard. Manage mobile workers, web users, and user groups. Access application structure and lookup table reference data. Send and receive SMS messages. Integrate with FHIR services for healthcare data interoperability. Configure webhooks for form submissions, case changes, and application updates.",
+  "categories": [
+    "apis-and-http-requests",
+    "healthcare-and-medical",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and update cases",
+    "bulk case operations",
+    "retrieve form submissions",
+    "manage mobile workers",
+    "manage web users and groups",
+    "send SMS messages",
+    "access lookup tables",
+    "FHIR data integration",
+    "submit XForms data",
+    "configure data forwarding webhooks"
+  ]
+}

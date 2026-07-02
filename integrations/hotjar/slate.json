@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/hotjar",
+  "description": "Export survey response data and manage user data for privacy compliance. List surveys for a site, retrieve survey responses, perform user lookups by email or user ID, and submit deletion requests for GDPR compliance. Receive real-time webhook notifications when new survey responses are created or new recordings matching a segment are captured.",
+  "categories": ["apis-and-http-requests", "legal-and-compliance"],
+  "skills": [
+    "export survey responses",
+    "list site surveys",
+    "lookup user data",
+    "delete user data",
+    "receive survey response webhooks",
+    "receive recording webhooks",
+    "automate GDPR compliance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hotjar.png"
+}

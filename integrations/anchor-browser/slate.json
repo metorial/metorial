@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/anchor-browser",
+  "description": "Automate web-based workflows using cloud-hosted browser sessions. Create, configure, and manage Chromium browser instances with proxy support, CAPTCHA solving, stealth mode, and ad blocking. Execute AI-powered web tasks by submitting natural language prompts to autonomous agents (browser-use, OpenAI, Gemini, Anthropic). Manage browser profiles to persist cookies and authenticated states across sessions. Perform OS-level controls including mouse clicks, keyboard input, scrolling, drag-and-drop, and clipboard operations. Fetch web content as text, screenshots, or PDFs without persistent sessions. Upload and manage Chrome extensions. Create and manage batch browser sessions. Define applications with authentication flows and manage identity credentials for automated logins. Record, pause, and resume browser sessions for review. Coordinate real-time events between external systems and active sessions (e.g., injecting MFA codes). Upload resources for AI agent access and manage third-party integrations.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage browser sessions",
+    "execute AI web tasks",
+    "persist browser profiles",
+    "solve CAPTCHAs automatically",
+    "capture screenshots and PDFs",
+    "control mouse and keyboard",
+    "manage browser extensions",
+    "batch session operations",
+    "coordinate real-time events",
+    "automate web authentication"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/anchor-browser.png"
+}

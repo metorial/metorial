@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/apilio",
+  "description": "Manage smart home automation logic by creating and updating variables (boolean, string, numeric), evaluating conditions, and triggering logicblocks. Set, toggle, or clear variable values to reflect device states or contextual information. Retrieve and evaluate conditions that compare variables against expected states using AND/OR/NOT logic. Trigger, activate, or deactivate logicblocks that execute action chains — including delayed actions, cross-brand device commands, and outgoing webhooks — based on positive or negative evaluation results. Coordinate devices across brands like Tuya, Philips Hue, Sonoff, and Tado through complex multi-condition automation.",
+  "categories": ["iot-and-device-control", "task-and-project-management"],
+  "skills": [
+    "manage boolean variables",
+    "manage string variables",
+    "manage numeric variables",
+    "evaluate conditions",
+    "trigger logicblock evaluation",
+    "activate or deactivate logicblocks",
+    "execute delayed action chains",
+    "send outgoing webhooks",
+    "cross-brand device coordination"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/apilio.png"
+}

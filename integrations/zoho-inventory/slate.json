@@ -1,0 +1,19 @@
+{
+  "name": "@metorial/zoho-inventory",
+  "description": "Manage inventory, orders, and invoicing across multiple warehouses. Create and track items, item groups, and composite items with SKU, pricing, and reorder levels. Create and manage sales orders, purchase orders, invoices, bills, and credit notes with full lifecycle support. Record inventory adjustments, transfer stock between warehouses, and manage packaging and shipments with tracking. Handle customer payments, sales returns, vendor credits, and refunds. Manage contacts, price lists, taxes, currencies, and users. Supports multi-warehouse operations, drop shipment workflows, and workflow-based webhook notifications.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "manage inventory items",
+    "create sales orders",
+    "create purchase orders",
+    "generate invoices",
+    "track shipments and packages",
+    "record inventory adjustments",
+    "transfer stock between warehouses",
+    "manage contacts and vendors",
+    "process customer payments",
+    "handle credit notes and refunds"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zoho-inventory.svg",
+  "version": "0.1.2"
+}

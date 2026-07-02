@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/promptmateio",
+  "description": "Build and execute multi-step AI workflows combining multiple AI systems (ChatGPT, Claude, Gemini, Mistral, Stability AI). Create and manage apps, run batch processing jobs with CSV-style row data, and retrieve results. List and use pre-built templates for content generation, SEO optimization, and prospecting. Configure jobs with language and country localization. Register webhooks for job-level or row-level completion notifications. Retrieve available languages, countries, projects, and user account information.",
+  "categories": [
+    "apis-and-http-requests",
+    "crm-and-sales-tools",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "run AI workflow jobs",
+    "manage AI apps",
+    "retrieve job results",
+    "use pre-built templates",
+    "configure webhooks",
+    "bulk data processing",
+    "list available languages",
+    "manage projects",
+    "verify user credentials"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/promptmate-io.png"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/codemagic",
+  "description": "Manage CI/CD pipelines for mobile applications. Add and list applications, trigger and cancel builds, retrieve build status, and download build artifacts. Manage build caches, environment variables, and secrets. Supports Flutter, React Native, native iOS/Android, Unity, and other mobile frameworks. Configure builds with custom environment variables, software version overrides, labels, and machine types.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "trigger builds",
+    "cancel running builds",
+    "retrieve build status",
+    "manage applications",
+    "download build artifacts",
+    "manage environment variables",
+    "manage secrets",
+    "manage build caches",
+    "configure build parameters"
+  ]
+}

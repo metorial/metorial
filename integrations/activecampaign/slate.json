@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/activecampaign",
+  "description": "Manage contacts, deals, and marketing automation for customer experience. Create, update, search, and sync contacts with tags, lists, custom fields, and notes. Build and manage sales pipelines with deals, stages, tasks, and custom fields. Create and send email campaigns with templates and personalization. Subscribe and unsubscribe contacts from lists. Add or remove contacts from automations. Track custom events and site visitor behavior. Manage e-commerce data including orders, customers, and abandoned carts. Send SMS broadcasts and WhatsApp template messages. Define custom object schemas and manage records. Create and manage segments with flexible conditions. Configure webhooks for real-time updates on contact, campaign, deal, and SMS activity.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage contacts and tags",
+    "create email campaigns",
+    "manage deals and pipelines",
+    "automate marketing workflows",
+    "subscribe contacts to lists",
+    "track custom events",
+    "send SMS broadcasts",
+    "manage e-commerce orders",
+    "create contact segments",
+    "configure webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/activecampaign.png"
+}

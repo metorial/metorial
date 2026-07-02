@@ -1,0 +1,18 @@
+{
+  "name": "@amazon/aws-cognito",
+  "description": "Manage user authentication and authorization for web and mobile apps. Create and configure user pools as user directories with password policies, MFA, and account recovery. Create, update, disable, and delete users and their attributes. Manage groups for role-based access control. Configure federated sign-in with SAML 2.0, OIDC, and social identity providers (Google, Facebook, Apple, Amazon). Set up app clients with OAuth scopes, callback URLs, and token settings. Create identity pools to issue temporary AWS credentials for authenticated or anonymous users. Migrate users via batch CSV import or just-in-time Lambda triggers. Customize ID and access tokens with pre-token generation triggers. Configure machine-to-machine authorization using OAuth client credentials flow with resource servers and custom scopes. Enable advanced security features for risk-based adaptive authentication. Respond to authentication lifecycle events including sign-up, authentication, token generation, and user migration via Lambda triggers.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "manage user pools",
+    "create and manage users",
+    "configure identity federation",
+    "manage user groups",
+    "set up app clients",
+    "configure identity pools",
+    "customize authentication tokens",
+    "migrate users",
+    "manage MFA settings",
+    "configure OAuth scopes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/amazon.svg"
+}

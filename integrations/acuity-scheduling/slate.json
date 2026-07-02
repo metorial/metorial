@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/acuity-scheduling",
+  "description": "Create, retrieve, update, cancel, and reschedule appointments. Manage availability by querying open dates and time slots for appointment types and calendars. Block time slots to prevent bookings. Manage client records including creation, retrieval, updates, and deletion. List appointment types, add-ons, calendars, and intake forms. Create and validate gift certificates, packages, and coupons. Retrieve orders and product listings. Subscribe to webhooks for appointment and order events.",
+  "categories": [
+    "crm-and-sales-tools",
+    "financial-data-and-stock-market",
+    "scheduling-and-calendars"
+  ],
+  "skills": [
+    "schedule and manage appointments",
+    "check available time slots",
+    "block calendar time slots",
+    "manage client records",
+    "list appointment types",
+    "validate certificates and coupons",
+    "manage gift certificates",
+    "retrieve intake forms",
+    "process appointment payments",
+    "subscribe to appointment webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/acuity-scheduling.png"
+}

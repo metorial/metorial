@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/blazemeter",
+  "description": "Create, configure, and run performance and API monitoring tests. Manage test results, schedule test runs, and simulate virtual users for load testing websites and APIs. Create and deploy mock/virtual services from transactions, HAR files, or Swagger/WSDL definitions. Generate and manage dynamic test data models for parameterized testing. Monitor API performance from global locations with webhook notifications on test completion. Organize tests across accounts, workspaces, and projects. Upload and manage shared test artifacts such as JMX scripts and CSV data files. Configure usage alerts for test events including start, end, pass, and fail.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "run performance tests",
+    "monitor API endpoints",
+    "create virtual services",
+    "manage test data models",
+    "schedule test runs",
+    "retrieve test results",
+    "manage shared test files",
+    "configure test webhooks",
+    "administer workspaces and users",
+    "deploy mock services"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/blazemeter.png"
+}

@@ -1,0 +1,95 @@
+# Slates Specification for Yelp
+
+## Overview
+
+Yelp is a platform that provides local business information, user reviews, and ratings for millions of businesses across 32 countries. The Yelp Places API allows you to get the best local content and user reviews from millions of businesses around the world. Yelp offers both a publicly accessible Places API for consumer-facing products and Partner APIs for advertising, listing management, leads, and analytics use cases.
+
+## Authentication
+
+### Yelp Places API (Public API) — API Key
+
+Yelp Places API uses private API Keys to authenticate requests. Starting March 1, 2018, the API moved over to only API Keys and no longer uses OAuth 2.0 for the queries.
+
+To authenticate:
+
+1. Create a Yelp user account.
+2. Register an app on the Yelp Developer portal to obtain your API key.
+3. Your private API Key will be automatically generated after you create your app.
+4. Include the API key as a Bearer token in the `Authorization` header of every request: `Authorization: Bearer <YOUR_API_KEY>`.
+5. Your API Key does not expire.
+
+All Yelp Places API endpoints are under `https://api.yelp.com/v3`.
+
+### Yelp Partner APIs — Basic HTTP Authentication
+
+Most APIs using the `https://partner-api.yelp.com` subdomain use basic HTTP Authentication over SSL (excluding Respond to Reviews API). Each API (such as Data Ingestion API, Ads API, etc.) requires a separate set of credentials. These credentials are provided separately through your company's business development/partnership team, delivered through GPG encrypted files.
+
+### Respond to Reviews / Leads API — OAuth 2.0
+
+Based on the OAuth 2.0 Authorization Framework, Yelp grants an access token following a user's successful login into the site, and uses that token to authorize the user's review response to be submitted. This is used specifically for actions that require business owner authorization (e.g., responding to reviews, managing leads). Redirect URIs must be whitelisted by Yelp in advance.
+
+## Features
+
+### Business Search
+
+Search for businesses by keyword, category, location (address or coordinates), price level, and open hours. Search for businesses by keyword, category, location, price level, etc. Search for businesses by phone number. Search for businesses which support certain transactions, such as food delivery and pickup. Results include name, address, phone number, photos, rating, price level, review counts, and coordinates. Search results are limited to 240 businesses per query.
+
+### Business Details
+
+Get rich business data, such as name, address, phone number, photos, Yelp rating, price levels and hours of operation. Each business has a unique ID and alias that can be used to retrieve detailed information. A Business Match endpoint allows matching a business by name, address, and other attributes to obtain its Yelp Business ID.
+
+### Reviews
+
+The Yelp Places API does not return full review text. Three review excerpts from individual businesses of approximately 160 characters each are returned by default. Higher-tier plans provide up to 7 review excerpts and review highlights. The Partner-level Private Reviews API provides access to the 200 most recent full-text reviews for subscribed businesses.
+
+### Autocomplete
+
+Provide real-time autocomplete suggestions as users type. The response returns suggestions for terms, businesses, and categories. Location parameters improve suggestion relevance.
+
+### AI Chat (Conversational Search)
+
+The Yelp AI API enables developers to build conversational experiences for local business discovery. Whether you're developing a chatbot, integrating into voice assistants or enhancing your app with smart local business recommendations, Yelp AI API provides flexible capabilities. The API takes in natural language inquiries and provides natural language responses along with structured data for additional context. Session state is managed via a `chat_id` returned in responses for multi-turn conversations.
+
+### GraphQL Access
+
+GraphQL is a query language for APIs that places emphasis on being able to query for exactly the data you want. GraphQL gives you the ultimate flexibility in being able to specify in your API requests specifically what data you need, and get back exactly that. Available through the Yelp Developer Beta program.
+
+### Listing Management (Partner Only)
+
+Subscribed businesses' listings can be managed. Partners can publish and update business information on Yelp for their clients via the Business Subscriptions API.
+
+### Respond to Reviews (Partner Only)
+
+Partners can enable business owners to view and respond to their Yelp reviews without logging into Yelp directly. R2R is available for mutual enterprise customers and customers who have purchased Yelp + Listing Management. Requires OAuth 2.0 authentication.
+
+### Leads Management (Partner Only)
+
+The Yelp Leads API provides a means for Yelp partners to get notified, read and respond to Leads generated by Yelp users, such as conversations. Partners can retrieve lead interactions, mark leads as read, and reply to leads.
+
+### Reservations (Partner Only)
+
+The Yelp Reservations API exposes functionality for Yelp Reservations search and native booking flows into partner applications. This will allow users to book reservations through Yelp without ever having to leave the 3rd party application.
+
+### Advertising Management (Partner Only)
+
+Ability to customize advertising programs like: manage negative keywords, modify ad copy, target specific locations, etc. Reporting APIs allow retrieval of business advertising metrics.
+
+### Engagement Metrics (Partner Only)
+
+The Engagement Metrics API returns a business's consumer engagement score, by week, relative to all other North America-based businesses on Yelp.
+
+### Yelp Insights (Partner Only)
+
+Yelp Insights API serves business-to-business (B2B) use cases, providing location data and web traffic analytics for internal, non-public/back-end purposes such as internal analysis.
+
+## Events
+
+Webhooks are reserved for use only by official Yelp advertising, listing management, and Yelp Insights partners. You can use the Business Subscriptions API with the subscription type WEBHOOK to subscribe or unsubscribe from getting webhook notifications for specific businesses. Webhook URLs must be verified by Yelp before events are delivered.
+
+### Review Events
+
+Notifications when reviews are created, edited, or removed for subscribed businesses. Event types include `NEW_REVIEW_EVENT`, `REVIEW_REMOVED_EVENT`, and `REVIEW_EDITED_EVENT`. Payloads include the review ID, rating, language, and user ID, but do not include full review text.
+
+### Lead Events
+
+Notifications are sent when a new lead is created, or a new interaction is done in an existing lead. This includes new messages from consumers, as well as phone number opt-in/opt-out events for leads. Partners must subscribe to specific business IDs to receive lead webhooks.

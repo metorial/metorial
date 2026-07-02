@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/onelogin",
+  "description": "Manage identity and access management (IAM) for organizations. Create, read, update, and delete users, roles, and groups. Configure and manage SSO-connected applications. Enroll and verify multi-factor authentication (MFA) factors including SMS, email, and authenticator apps. Authenticate users programmatically and generate session tokens. Set up authorization servers with custom scopes and claims. Configure Smart Hooks for custom pre-authentication and user migration logic. Query historical events for audit logging and compliance. Automate user provisioning via SCIM to third-party applications. Sync users from external directories like Active Directory and LDAP. Receive near real-time event webhooks for authentication, user lifecycle, app access, MFA, and provisioning activities.",
+  "categories": ["security"],
+  "skills": [
+    "manage users and roles",
+    "configure single sign-on apps",
+    "enroll and verify MFA factors",
+    "authenticate users programmatically",
+    "query audit events",
+    "automate user provisioning",
+    "manage groups and policies",
+    "configure smart hooks",
+    "sync external directories",
+    "manage API authorization servers"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/onelogin.png"
+}

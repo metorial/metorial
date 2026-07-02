@@ -1,0 +1,19 @@
+{
+  "name": "@adobe/adobe-sign",
+  "description": "Send, sign, track, and manage electronic signature agreements. Upload documents as transient files, create agreements with sequential or parallel signing workflows, and configure recipient roles (signer, approver, acceptor, form filler, delegator). Create reusable library templates with pre-configured form fields. Build embeddable web forms that generate unique signing URLs. Send agreements in bulk (MegaSign) for mass signing scenarios. Manage form fields including signatures, initials, text, dates, checkboxes, and dropdowns. Send reminders to pending participants, download audit trails, and export completed form field data. Generate embedded signing URLs for in-app signing experiences. Manage users, group memberships, and perform actions on behalf of other users. Receive real-time webhook notifications for agreement lifecycle events, web form activity, bulk send operations, and library template changes.",
+  "categories": ["document-processing", "legal-and-compliance", "task-and-project-management"],
+  "skills": [
+    "send signature agreements",
+    "upload documents",
+    "track agreement status",
+    "create web forms",
+    "bulk send agreements",
+    "manage library templates",
+    "send signing reminders",
+    "download audit trails",
+    "export form field data",
+    "manage users and groups"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/docusign.svg",
+  "version": "0.1.3"
+}

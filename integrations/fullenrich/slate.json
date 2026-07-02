@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/fullenrich",
+  "description": "Enrich B2B contact data by finding verified work emails, personal emails, and mobile phone numbers using a waterfall approach across 20+ data vendors. Perform reverse email lookups to identify people and companies behind email addresses. Search for people by job title, location, industry, company, and education filters. Search for companies by various filters. Supports bulk enrichment of up to 100 contacts per request with asynchronous processing via webhooks or polling. Check credit balance and verify API key status.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "enrich contact information",
+    "find work emails",
+    "find mobile phone numbers",
+    "reverse email lookup",
+    "search people by filters",
+    "search companies by filters",
+    "bulk contact enrichment",
+    "check credit balance",
+    "verify API key"
+  ]
+}

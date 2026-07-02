@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/docupilot",
+  "description": "Automate document generation from templates by merging dynamic data into merge fields. Create, list, update, and delete document templates in formats like DOCX, PPTX, XLSX, and fillable PDF. Generate documents (PDF, DOCX, HTML, PNG) by submitting JSON data matching template tokens, with support for nested data and arrays. Organize templates into folders. Configure automatic document deliveries to destinations including Email, Google Drive, OneDrive, Dropbox, Amazon S3, Azure Blob, SFTP, and webhooks. Send generated documents for eSignature with built-in AES-compliant signing, signer field placement, reminders, and audit trails. Supports bulk document creation, content library for reusable snippets, password-protected PDFs, and auto-numbering across generated documents.",
+  "categories": ["document-processing", "task-and-project-management"],
+  "skills": [
+    "manage document templates",
+    "generate documents from templates",
+    "merge dynamic data into documents",
+    "organize templates in folders",
+    "configure document deliveries",
+    "send documents for eSignature",
+    "bulk create documents",
+    "manage content library",
+    "deliver documents via webhook",
+    "password-protect PDF output"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/docupilot.png"
+}

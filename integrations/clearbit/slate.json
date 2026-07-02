@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/clearbit",
+  "description": "Enrich person and company data using email addresses and domain names. Look up detailed contact information, firmographic data, technographics, and social profiles. Identify anonymous website visitors by IP address to reveal associated companies. Prospect for leads by searching contacts by role, seniority, title, and location. Discover companies matching specific criteria like size, industry, and technology usage. Convert company names to domains, retrieve company logos, and score signups for fraud risk. Receive webhook notifications for enrichment results and audience segment matches.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "enrich person by email",
+    "enrich company by domain",
+    "reveal company from IP",
+    "prospect contacts by role",
+    "discover companies by criteria",
+    "convert name to domain",
+    "retrieve company logos",
+    "score signup risk",
+    "autocomplete company names",
+    "receive enrichment webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/clearbit.png"
+}

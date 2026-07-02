@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/split",
+  "description": "Manage feature flags, segments, and experimentation for software releases. Create, update, kill, restore, and delete feature flags with targeting rules, percentage-based rollouts, and multiple treatments. Organize flags into flag sets and manage user segments for targeting. Run A/B experiments and measure feature impact on metrics via events. Manage environments, projects, traffic types, and change request approval workflows. Administer users, groups, and permissions. Receive webhooks for audit logs, impressions, and metric alerts.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage feature flags",
+    "configure targeting rules",
+    "create user segments",
+    "track experiment metrics",
+    "manage environments",
+    "submit change requests",
+    "manage users and groups",
+    "organize flag sets",
+    "send events for analytics",
+    "manage projects and workspaces"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/split.png"
+}

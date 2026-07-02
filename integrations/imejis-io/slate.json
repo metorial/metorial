@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/imejisio",
+  "description": "Generate custom images from pre-designed templates using dynamic data via API. Create social media graphics, e-commerce banners, and marketing visuals by customizing text, colors, images, QR codes, and other components. List and search design templates with pagination. Use an AI design assistant to create or update designs from natural language prompts. Supports text patterns for rich inline formatting, auto-resize text, and public shareable design pages.",
+  "categories": ["crm-and-sales-tools", "document-processing"],
+  "skills": [
+    "generate images from templates",
+    "customize text and colors",
+    "list and search designs",
+    "generate dynamic QR codes",
+    "AI-assisted design creation",
+    "create marketing graphics",
+    "override template components",
+    "share public design pages"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/imejis-io.jpeg"
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@__test__/http",
+  "description": "Internal test slate for sending arbitrary HTTP requests using the built-in slates axios client. Useful for exercising network traces, retries, and error mapping.",
+  "categories": ["utilities"],
+  "skills": [
+    "send arbitrary http requests",
+    "make GET POST PUT PATCH DELETE requests",
+    "inspect response status and headers",
+    "probe a URL",
+    "exercise the built-in slates axios client"
+  ]
+}

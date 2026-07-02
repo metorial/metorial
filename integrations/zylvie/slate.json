@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/zylvie",
+  "description": "Manage digital product sales, checkout flows, and subscriptions for creators and small businesses. Create, update, and delete products with configurable pricing models (one-time, subscription, delayed payments). Manage discount coupons with percentage or fixed-amount types, usage limits, and product scoping. Verify, redeem, and refund software license keys. Verify subscription status by subscriber email. Track sales events, new leads, affiliate sign-ups, and subscription lifecycle changes via webhooks.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "manage digital products",
+    "create discount coupons",
+    "verify license keys",
+    "redeem license keys",
+    "refund license keys",
+    "verify subscription status",
+    "track new sales",
+    "track new leads",
+    "monitor affiliate sign-ups",
+    "manage subscription lifecycle"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zylvie.svg"
+}

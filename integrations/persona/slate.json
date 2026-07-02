@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/persona",
+  "description": "Verify identities and manage compliance workflows for individuals and businesses. Create and manage inquiries for end-to-end identity verification flows using government IDs, selfies, and documents. Run database verifications, generate risk reports (watchlist, adverse media, PEP, address, email, phone), and screen against sanctions lists. Manage accounts representing verified individuals, consolidate or redact personal data for GDPR/CCPA compliance. Create and manage cases for manual review workflows. Maintain screening lists (blocklists/allowlists) with custom list items. Trigger automated workflows based on verification results. Analyze relationships between accounts via graph connections. Monitor events via webhooks for inquiries, verifications, reports, transactions, and cases.",
+  "categories": ["legal-and-compliance", "security", "task-and-project-management"],
+  "skills": [
+    "verify government IDs",
+    "run identity verifications",
+    "generate risk reports",
+    "screen sanctions watchlists",
+    "manage compliance cases",
+    "redact personal data",
+    "manage screening lists",
+    "create inquiry flows",
+    "analyze account relationships",
+    "manage verified accounts"
+  ]
+}

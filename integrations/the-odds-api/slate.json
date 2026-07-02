@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/the-odds-api",
+  "description": "Retrieve real-time and historical sports betting odds aggregated from 40+ bookmakers across 70+ sports and leagues. Fetch live and pre-match odds for markets including moneyline, spreads, totals, and futures. Access player props and alternate lines for individual events. Discover available sports, leagues, and market keys per bookmaker. Get live game scores and results with ~30-second update intervals. Look up historical odds snapshots (back to 2020) and iterate through timestamps. List participants (teams/players) for reference data. Filter odds by region (US, UK, AU, EU), odds format (decimal/American), specific bookmakers, event IDs, and time ranges.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
+  "skills": [
+    "retrieve live betting odds",
+    "fetch pre-match odds",
+    "get game scores and results",
+    "query historical odds snapshots",
+    "discover sports and leagues",
+    "access player prop markets",
+    "discover event market keys",
+    "list sport participants",
+    "filter odds by bookmaker region",
+    "retrieve historical events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/the-odds-api.png"
+}

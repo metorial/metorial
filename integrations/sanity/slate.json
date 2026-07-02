@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/sanity",
+  "description": "Query, create, update, and delete structured content documents in Sanity's Content Lake using GROQ or GraphQL. Manage digital assets including images and files with on-the-fly transformations. Perform document mutations (create, patch, delete) individually or in atomic transactions. Search content using vector embeddings for semantic similarity. Access document history and revisions at any point in time. Listen for real-time document changes. Manage datasets, projects, CORS origins, and API tokens. Control access with roles, permissions, and user membership. Export and import dataset content. Configure webhooks that fire on document or transaction changes with GROQ filtering and custom projections.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "query content with GROQ",
+    "create and mutate documents",
+    "manage digital assets",
+    "search vector embeddings",
+    "retrieve document history",
+    "manage datasets and projects",
+    "control access and roles",
+    "listen for real-time changes",
+    "transform and resize images",
+    "export and import content"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sanity.png"
+}

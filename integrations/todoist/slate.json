@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/todoist",
+  "description": "Create, read, update, delete, complete, and reopen tasks with due dates, priorities, labels, recurring schedules, and natural language parsing. Organize tasks into projects and sections, manage sub-tasks, and assign tasks to collaborators. Create and manage projects with nesting, archiving, sharing, and multiple view styles. Add comments with file attachments and emoji reactions to tasks and projects. Create saved filters using query language, set reminders (relative, absolute, or location-based), and manage personal and shared labels. Collaborate via shared projects and workspaces with granular role-based access. Track productivity stats, karma scores, and streaks. View activity logs of all changes. Upload files, retrieve backups, and generate email-to-task addresses. Receive real-time webhook notifications for changes to tasks, projects, sections, comments, labels, filters, and reminders.",
+  "categories": [
+    "email-and-messaging",
+    "scheduling-and-calendars",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and manage tasks",
+    "organize projects and sections",
+    "set due dates and reminders",
+    "add comments and attachments",
+    "share and collaborate on projects",
+    "filter and search tasks",
+    "track productivity statistics",
+    "manage labels and priorities",
+    "complete and reopen tasks",
+    "manage workspace members"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/todoist.svg"
+}

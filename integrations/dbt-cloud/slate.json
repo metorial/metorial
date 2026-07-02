@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/dbt-cloud",
+  "description": "Manage dbt Cloud account operations for accounts, projects, environments, jobs, runs, artifacts, users, and webhook subscriptions. Discover accessible accounts, projects, and environments, inspect jobs, trigger or retry job runs, monitor run status, cancel queued or running jobs, list and download run artifacts as attachments, audit account users, and create, update, test, or delete webhook subscriptions for job run events.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "trigger dbt jobs",
+    "retry failed runs",
+    "monitor job run status",
+    "fetch run artifacts",
+    "discover accessible accounts",
+    "inspect projects and environments",
+    "list account users",
+    "configure webhook subscriptions",
+    "inspect webhook delivery events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/dbt-cloud.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/callpage",
+  "description": "Manage callback automation for website visitors. Initiate immediate or scheduled phone calls through embeddable widgets, retrieve and filter call history with detailed metadata (duration, recording, geo-location, UTM data, tags, notes). Create and configure widgets with call algorithms, caller ID modes, recording settings, language, and after-hours behavior. Manage users (agents) and managers with configurable business hours and department assignments. Customize SMS templates and voice greetings per widget. Receive webhooks for call events including scheduled, new, missed, completed calls, and visitor messages.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "initiate callback calls",
+    "schedule phone callbacks",
+    "retrieve call history",
+    "configure callback widgets",
+    "manage agents and managers",
+    "customize SMS templates",
+    "customize voice greetings",
+    "track call events via webhooks",
+    "filter calls by status",
+    "assign manager business hours"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/callpage.png"
+}

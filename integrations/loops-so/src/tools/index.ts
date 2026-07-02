@@ -1,0 +1,9 @@
+export { createContact } from './create-contact';
+export { deleteContact } from './delete-contact';
+export { findContact } from './find-contact';
+export { listContactProperties } from './list-contact-properties';
+export { listMailingLists } from './list-mailing-lists';
+export { listTransactionalEmails } from './list-transactional-emails';
+export { sendEvent } from './send-event';
+export { sendTransactionalEmail } from './send-transactional-email';
+export { updateContact } from './update-contact';

@@ -1,0 +1,68 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  approveInvoice,
+  archiveAccount,
+  archiveProduct,
+  archiveSalesTax,
+  cloneInvoice,
+  createAccount,
+  createCustomer,
+  createInvoice,
+  createProduct,
+  createSalesTax,
+  createTransaction,
+  deleteCustomer,
+  deleteInvoice,
+  getUser,
+  listAccounts,
+  listBusinesses,
+  listCustomers,
+  listInvoices,
+  listProducts,
+  listSalesTaxes,
+  listVendors,
+  markInvoiceSent,
+  sendInvoice,
+  updateAccount,
+  updateCustomer,
+  updateInvoice,
+  updateProduct,
+  updateSalesTax
+} from './tools';
+import { customerChanges, inboundWebhook, invoiceChanges } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listBusinesses,
+    listCustomers,
+    createCustomer,
+    updateCustomer,
+    deleteCustomer,
+    listInvoices,
+    createInvoice,
+    updateInvoice,
+    deleteInvoice,
+    sendInvoice,
+    approveInvoice,
+    cloneInvoice,
+    markInvoiceSent,
+    listAccounts,
+    createAccount,
+    updateAccount,
+    archiveAccount,
+    listProducts,
+    createProduct,
+    updateProduct,
+    archiveProduct,
+    listSalesTaxes,
+    createSalesTax,
+    updateSalesTax,
+    archiveSalesTax,
+    createTransaction,
+    listVendors,
+    getUser
+  ],
+  triggers: [inboundWebhook, invoiceChanges, customerChanges]
+});

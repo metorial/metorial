@@ -1,0 +1,18 @@
+{
+  "name": "@google/google-ads",
+  "description": "Create, manage, and optimize advertising campaigns across Google Search, Display Network, YouTube, and Shopping. Configure ad groups, keywords, bidding strategies, audience targeting, and geographic targeting. Track and import conversions including offline and enhanced conversions. Generate reporting and analytics using Google Ads Query Language (GAQL). Plan keywords with historical metrics and forecasts. Manage account hierarchies and multi-account operations. Receive lead form webhook data from campaigns.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "manage ad campaigns",
+    "configure keyword targeting",
+    "set bidding strategies",
+    "track conversions",
+    "generate ad reports",
+    "manage audience targeting",
+    "plan keyword forecasts",
+    "manage ad groups and ads",
+    "import offline conversions",
+    "manage account hierarchies"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/googleads.png"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/chatwork",
+  "description": "Send, read, edit, and delete messages in chat rooms. Create and manage group chat rooms with configurable members and roles. Assign and track tasks within rooms with due dates and completion status. Upload and retrieve files in chat rooms. Manage contacts and handle contact requests. Retrieve user profile information, unread counts, and mention counts. Receive real-time webhooks for new messages, edited messages, and mentions.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "send and edit messages",
+    "create chat rooms",
+    "manage room members",
+    "assign tasks in rooms",
+    "upload files to rooms",
+    "manage contacts",
+    "retrieve user profile",
+    "mark messages read or unread",
+    "receive message webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/chatwork.jpg"
+}

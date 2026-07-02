@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/carbone",
+  "description": "Generate documents by merging JSON data into templates (DOCX, XLSX, PPTX, ODT, ODS, HTML, XML, and more). Upload, list, update, and delete reusable document templates with Carbone tags. Render documents in various output formats including PDF, DOCX, XLSX, CSV, and XML. Convert between document formats using LibreOffice, OnlyOffice, or Chromium engines. Generate batch documents as ZIP or merged PDF files. Support asynchronous rendering with webhook notifications. Manage template versioning, metadata, categories, and tags. Download generated documents via unique render IDs.",
+  "categories": ["document-processing"],
+  "skills": [
+    "generate documents from templates",
+    "upload and manage templates",
+    "convert document formats",
+    "merge JSON data into documents",
+    "batch document generation",
+    "download generated documents",
+    "manage template versions",
+    "asynchronous rendering with webhooks",
+    "generate PDF reports"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/carbone.png"
+}

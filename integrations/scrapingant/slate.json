@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/scrapingant",
+  "description": "Scrape web pages and extract data from websites using headless Chrome browsers with automatic proxy rotation, CAPTCHA bypass, and Cloudflare handling. Render JavaScript-heavy pages, execute custom JS snippets, and wait for specific page elements. Convert scraped HTML to Markdown for LLM/RAG use cases. Extract structured data using AI-powered extraction with free-form field descriptions. Configure proxy geo-targeting, block specific resource types, pass custom cookies and headers, and retrieve extended response data including cookies, headers, and XHR details. Check API credit usage and subscription status.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "scrape web pages",
+    "bypass CAPTCHAs and anti-bot",
+    "render JavaScript content",
+    "convert HTML to Markdown",
+    "AI-powered data extraction",
+    "rotate proxies with geo-targeting",
+    "execute custom JavaScript snippets",
+    "block page resource types",
+    "retrieve extended response data",
+    "check subscription status"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/scrapingant.jpeg"
+}

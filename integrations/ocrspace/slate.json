@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/ocrspace",
+  "description": "Extract text from images and PDF documents using optical character recognition (OCR). Supports multiple file formats (JPG, PNG, GIF, BMP, TIFF, PDF) via file upload, URL, or Base64 input. Choose from three OCR engines optimized for speed, complex backgrounds, or high-quality recognition including handwriting and tables. Generate searchable PDFs from scanned documents. Retrieve word-level bounding box coordinates for text overlay. Supports 200+ languages with automatic language detection, image auto-rotation, upscaling, and table-mode preprocessing for receipts and invoices.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "extract text from images",
+    "extract text from PDFs",
+    "generate searchable PDFs",
+    "recognize handwritten text",
+    "detect word coordinates",
+    "recognize table layouts",
+    "auto-rotate images",
+    "detect document language",
+    "process multi-page documents"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ocrspace.png"
+}

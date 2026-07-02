@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/dotsimple",
+  "description": "Create, schedule, publish, and manage social media posts across multiple platforms including Facebook, Instagram, LinkedIn, X/Twitter, TikTok, Pinterest, YouTube, and Mastodon. Manage connected social accounts, browse and delete media files, create and organize tags with custom colors, and retrieve account-level analytics reports. Supports platform-specific post options (e.g., TikTok privacy, YouTube visibility, Instagram post type), bulk post deletion, publishing queues, and autoresponder management.",
+  "categories": ["crm-and-sales-tools", "document-processing", "news-and-media"],
+  "skills": [
+    "schedule social media posts",
+    "publish to multiple platforms",
+    "manage connected social accounts",
+    "browse media files",
+    "create and manage tags",
+    "retrieve analytics reports",
+    "bulk delete posts",
+    "queue posts for publishing",
+    "list autoresponders",
+    "configure platform-specific options"
+  ]
+}

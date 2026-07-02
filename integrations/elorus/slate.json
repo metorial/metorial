@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/elorus",
+  "description": "Create, manage, and send invoices, credit notes, estimates, and recurring billing documents. Track expenses, record payments, and manage contacts representing clients and suppliers. Monitor project finances with time tracking and task management. Manage products and services inventory, apply tax configurations, and export documents as PDFs. Upload and manage attachments on records. Organize data with custom tracking categories for segmented reporting. Supports multi-currency invoicing, payment receipt generation, client portal discussions, and Greek tax compliance (myDATA/AADE) integration.",
+  "categories": ["financial-data-and-stock-market", "task-and-project-management"],
+  "skills": [
+    "create and send invoices",
+    "track expenses",
+    "record payments",
+    "manage contacts",
+    "track project time",
+    "manage products and services",
+    "export documents as PDF",
+    "manage recurring billing",
+    "create estimates and credit notes",
+    "upload attachments"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/elorus.png"
+}

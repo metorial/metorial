@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/labs64-netlicensing",
+  "description": "Manage software licensing for products using a Licensing-as-a-Service platform. Create and configure products, product modules, and license templates with various licensing models (subscription, try-and-buy, pay-per-use, node-locked, floating, quota, and more). Create and manage licensees (customers) and their licenses. Validate licenses with a single API call to retrieve the complete licensing state for a customer across all product modules. Transfer licenses between licensees, create license bundles, and generate shop tokens for integrated online purchasing via PayPal or Stripe. Track transactions, manage API keys with role-based access control, and receive webhook notifications for events such as customer creation, license issuance, payment processing, and warning level changes. Export product configurations for backup and generate usage reports in CSV format.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market", "security"],
+  "skills": [
+    "create and manage products",
+    "configure licensing models",
+    "validate customer licenses",
+    "manage licensees and licenses",
+    "generate shop tokens",
+    "process license purchases",
+    "track license transactions",
+    "transfer licenses between customers",
+    "create license bundles",
+    "configure webhook notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/labs64-netlicensing.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/salesloft",
+  "description": "Manage sales engagement workflows including people (contacts), accounts, cadences, calls, emails, and tasks. Create, update, and delete people and accounts. Add people to multi-step cadences for automated outreach sequences. Track email activities including sends, opens, clicks, replies, and bounces. Log and retrieve call data. Create and manage tasks and actions. List and manage email templates. Send buyer signals to trigger AI-powered Rhythm workflows. Export and import cadences across instances. Subscribe to webhooks for real-time notifications on person, account, cadence, meeting, call, note, and task events. Map external IDs for syncing records with external systems.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage people and contacts",
+    "manage accounts and companies",
+    "create and run cadences",
+    "track email activities",
+    "log and retrieve calls",
+    "create and manage tasks",
+    "manage email templates",
+    "send buyer signals",
+    "subscribe to webhooks",
+    "import and export cadences"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/salesloft.png"
+}

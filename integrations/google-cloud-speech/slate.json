@@ -1,0 +1,18 @@
+{
+  "name": "@google/google-cloud-speech",
+  "description": "Convert audio to text transcriptions and synthesize natural-sounding speech from text using Google's neural network models. Perform synchronous, asynchronous, and streaming speech-to-text recognition across 125+ languages. Create and manage recognizer configurations for reusable transcription settings. Adapt speech models with custom phrase sets, custom classes, and boost values to improve accuracy for domain-specific vocabulary. Identify distinct speakers via speaker diarization and recognize multi-channel audio. Generate subtitle/caption output in SRT format. Synthesize text or SSML into audio using Standard, WaveNet, Neural2, Studio, and Chirp voice types with configurable pitch, speaking rate, volume, and encoding. Produce long-form audio content asynchronously.",
+  "categories": ["apis-and-http-requests", "speech-recognition-and-synthesis"],
+  "skills": [
+    "transcribe audio to text",
+    "synthesize speech from text",
+    "stream real-time transcription",
+    "identify speakers via diarization",
+    "adapt models with phrases",
+    "generate subtitle captions",
+    "manage recognizer configurations",
+    "select synthesis voice types",
+    "recognize multi-channel audio",
+    "synthesize long-form audio"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

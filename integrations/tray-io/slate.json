@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/trayio",
+  "description": "Automate workflows and integrate across hundreds of third-party services using pre-built connectors. Execute connector operations to call external service APIs (e.g., Salesforce, Slack, Trello) with dynamic input/output schemas. Create, manage, and delete service authentications including OAuth2 flows. Manage external end users, generate user tokens, and perform actions on their behalf. List, create, enable, disable, and delete solution instances for embedded integrations. Export and import projects and workflows for promotion across environments. Expose workflows as REST API endpoints with configurable access control, roles, and throttling policies. Receive real-time events via webhook triggers, scheduled triggers, callable triggers, email triggers, and service-specific event subscriptions. Retrieve dynamic dropdown data (DDL) from connected services for building configuration forms.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "execute connector operations",
+    "manage service authentications",
+    "create and manage users",
+    "manage solution instances",
+    "export and import projects",
+    "expose workflows as APIs",
+    "configure webhook triggers",
+    "retrieve operation schemas",
+    "dynamic data lookups",
+    "manage access control policies"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tray-io.png"
+}

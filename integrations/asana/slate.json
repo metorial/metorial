@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/asana",
+  "description": "Create, read, update, and delete tasks, projects, portfolios, and goals in Asana workspaces. Manage task assignments, due dates, subtasks, dependencies, tags, custom fields, attachments, and comments. Organize work with sections, project templates, and portfolios. Search tasks across workspaces, track time entries, manage team memberships, and subscribe to webhooks for real-time change notifications on resources.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "create and manage tasks",
+    "manage projects and sections",
+    "track goals and portfolios",
+    "manage custom fields",
+    "add comments and stories",
+    "upload file attachments",
+    "search tasks in workspace",
+    "manage webhooks and events",
+    "track time entries",
+    "manage tags and team memberships"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/asana.png"
+}

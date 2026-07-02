@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/gemini",
+  "description": "Generate text, chat responses, and structured outputs using Google's multimodal Gemini AI models. Process and understand mixed inputs including text, images, audio, video, and PDF documents. Generate images via Imagen and native models, generate videos via Veo, and create music with granular creative controls. Execute Python code within the model environment. Produce text, image, video, and audio embeddings for semantic search and classification. Upload and manage files for use in prompts. Fine-tune models with custom training data. Use built-in tools including Google Search grounding, URL context fetching, and computer use automation. Cache context for repeated use across requests. Count tokens before sending requests. Stream real-time voice and video interactions via the Live API over WebSockets. Call external functions and chain multiple tool invocations to fulfill complex requests.",
+  "categories": ["apis-and-http-requests", "code-execution", "document-processing"],
+  "skills": [
+    "generate text and chat responses",
+    "process multimodal inputs",
+    "generate and edit images",
+    "generate videos",
+    "generate music",
+    "execute Python code",
+    "generate embeddings",
+    "upload and manage files",
+    "fine-tune models",
+    "real-time voice and video streaming"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/gemini.svg"
+}

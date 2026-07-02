@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/godial",
+  "description": "Manage outbound calling operations, contacts, and leads through a mobile-first auto dialer and CRM platform. Create and organize contacts into calling lists, manage teams and agents, and trigger automated call workflows. Supports webhook events for call completion and contact updates to sync with external systems. Integrates with WhatsApp Business API for messaging follow-ups.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "create and manage contacts",
+    "manage calling lists",
+    "manage teams and agents",
+    "retrieve account information",
+    "track call events via webhooks",
+    "sync contact updates externally",
+    "assign contacts to agents",
+    "automate outbound calling"
+  ]
+}

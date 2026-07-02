@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mailerlite",
+  "description": "Manage email marketing subscribers, campaigns, automations, and signup forms. Create, update, and segment subscribers into groups with custom fields. Build and send email campaigns (regular, A/B split, resend) with scheduling and activity reporting. List and monitor marketing automations and their subscriber activity. Manage signup forms and track form submissions. Connect external e-commerce shops to manage products, orders, carts, and customers for abandoned cart automations, post-purchase emails, and sales tracking. Configure webhooks to receive real-time notifications on subscriber events (created, unsubscribed, bounced, spam reported) and campaign events (sent, opened, clicked).",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail", "email-and-messaging"],
+  "skills": [
+    "manage email subscribers",
+    "send email campaigns",
+    "create subscriber groups",
+    "manage subscriber segments",
+    "configure custom fields",
+    "schedule campaign delivery",
+    "track campaign activity",
+    "manage e-commerce shops and orders",
+    "handle abandoned cart tracking",
+    "manage webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mailerlite.jpeg"
+}

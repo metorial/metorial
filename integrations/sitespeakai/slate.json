@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/sitespeakai",
+  "description": "Query custom-trained AI chatbots and manage their configurations, conversations, and training data. Send questions to chatbots and receive AI-generated answers with source citations. Retrieve and manage conversation history, captured leads, suggested messages, and training sources. Create, retrieve, and delete fine-tuned question-answer pairs to override or improve chatbot responses. Access chatbot settings including appearance, behavior, AI model configuration, and escalation rules. List all chatbots and retrieve account details.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "query AI chatbot",
+    "retrieve conversation history",
+    "manage fine-tuned answers",
+    "retrieve captured leads",
+    "get chatbot configuration",
+    "list training sources",
+    "manage suggested messages",
+    "list chatbots"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sitespeakai.svg"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/docuseal",
+  "description": "Create, manage, and send electronic documents for signature. Build reusable document templates from PDF, DOCX, or HTML with fillable fields (signature, text, date, initials, checkboxes, etc.). Send signing requests to one or multiple parties via email or SMS with options for sequential or parallel signing order, field pre-filling, expiration dates, two-factor authentication, and custom messaging. Retrieve submitter details, track signing progress, and download completed signed documents as PDFs. Clone, merge, and archive templates and submissions. Receive webhook notifications for form events (viewed, started, completed, declined), submission lifecycle events (created, completed, expired, archived), and template changes (created, updated).",
+  "categories": ["document-processing", "legal-and-compliance"],
+  "skills": [
+    "create document templates",
+    "send signature requests",
+    "track signing progress",
+    "download signed documents",
+    "pre-fill form fields",
+    "manage submitters",
+    "clone and merge templates",
+    "archive submissions",
+    "configure signing webhooks",
+    "send signing notifications"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/beaconchain",
+  "description": "Query Ethereum blockchain data across consensus and execution layers. Retrieve validator performance metrics, staking rewards breakdowns, attestation efficiency, and duty assignments. Manage validator dashboards and groups to monitor up to 100,000 validators. Access execution layer data including wallet balances, token holdings, transaction tracking, and gas fees. Look up staking entities and benchmark their performance. Monitor beacon and validator node health. Receive webhook notifications for validator events such as missed attestations, block proposals, slashings, sync committee assignments, and status changes.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
+  "skills": [
+    "query validator performance metrics",
+    "retrieve staking rewards",
+    "manage validator dashboards",
+    "track wallet balances",
+    "monitor validator duties",
+    "benchmark staking entities",
+    "receive validator event webhooks",
+    "query Ethereum network state",
+    "monitor node health",
+    "track gas fees"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/beaconchain.png"
+}

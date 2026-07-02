@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/fixer",
+  "description": "Retrieve real-time and historical foreign exchange rate data for 170+ world currencies. Convert amounts between currencies, query historical rates back to 1999, fetch time-series data for date ranges up to 365 days, and get fluctuation data showing day-to-day currency changes. List all supported currencies including Bitcoin, Gold, and Silver.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "get latest exchange rates",
+    "convert currency amounts",
+    "query historical rates",
+    "retrieve time-series data",
+    "get fluctuation data",
+    "list supported currencies",
+    "set base currency",
+    "filter currency symbols"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/fixer.png"
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/openperplex",
+  "description": "Perform AI-powered web searches with LLM-generated answers, sources, and citations. Search the web with customizable models, locations, languages, and recency filters. Execute custom searches with tailored system prompts for summarization, analysis, or structured extraction. Stream search results incrementally in real time. Query URL content by asking questions about a specific web page. Extract web page content as plain text or Markdown. Capture live screenshots of any web page.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "AI-powered web search",
+    "stream search results",
+    "custom prompt search",
+    "query URL content",
+    "extract web page content",
+    "capture website screenshots",
+    "filter results by recency",
+    "localized search results",
+    "multi-language responses"
+  ]
+}

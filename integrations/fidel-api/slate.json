@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/fidel-api",
+  "description": "Link payment cards to programs and monitor transactions in real-time across Visa, Mastercard, and American Express networks. Manage programs, brands, and locations for card-linked loyalty and rewards schemes. Enroll cards via API or SDKs, track authorization, clearing, and refund transaction events via webhooks. Create and manage card-linked offers with configurable cashback or discount rewards. Reimburse cash directly onto linked cards. Configure webhooks for transaction, card, brand, location, and program status events.",
+  "categories": ["e-commerce-and-retail", "financial-data-and-stock-market"],
+  "skills": [
+    "link payment cards",
+    "monitor real-time transactions",
+    "manage programs and brands",
+    "create card-linked offers",
+    "configure transaction webhooks",
+    "reimburse to linked cards",
+    "manage merchant locations",
+    "track transaction clearing",
+    "enroll cards via API",
+    "manage offer marketplace"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/fidel-api.png"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/botsonic",
+  "description": "Build and manage custom AI chatbots trained on your own data. Generate AI-powered responses from bots, create and delete bots, and upload training data in PDF, DOC, DOCX, URL, sitemap, or text formats. Manage FAQs for precise answers to common questions, configure starter questions to guide user interactions, and retrieve conversation history for analytics and quality assurance. Supports both synchronous and streaming response modes.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "generate chatbot responses",
+    "create and manage bots",
+    "upload training data",
+    "manage FAQ entries",
+    "manage starter questions",
+    "retrieve conversation history",
+    "bulk upload training URLs",
+    "check data processing status",
+    "end chat sessions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/botsonic.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/tiktok",
+  "description": "Interact with TikTok's consumer and business API ecosystems. Authenticate users via TikTok Login Kit, retrieve user profile information (display name, avatar, bio, follower counts), and query video metadata (views, likes, comments, shares). Post videos and photos to TikTok, manage content publishing workflows, and embed TikTok videos on websites. Create and manage advertising campaigns, ad groups, and ads through TikTok Ads Manager. Build and manage audiences for ad targeting, run ad performance reports, and manage creative assets and product catalogs. Access the Creator Marketplace API for influencer marketing and boosted content. Query public video and comment data for research purposes using filters like hashtag, keyword, region, and date range. Track conversions via the Events API by sharing marketing data from servers, websites, or CRMs. Receive webhook notifications for video publish events, authorization changes, lead generation, ad review status, and creator marketplace order updates. Manage business messaging for real-time user engagement and transfer user data via the Data Portability API.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "post videos and photos",
+    "retrieve user profiles",
+    "query video metadata",
+    "manage ad campaigns",
+    "build target audiences",
+    "run ad performance reports",
+    "query public research data",
+    "track conversions",
+    "manage product catalogs",
+    "send business messages"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tiktok.svg"
+}

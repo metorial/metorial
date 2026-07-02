@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mailgun",
+  "description": "Send, receive, and track transactional and marketing emails via API or SMTP. Manage sending domains, DNS verification, and DKIM keys. Route and parse inbound emails with custom rules. Validate email addresses in real-time or in bulk. Manage suppressions (bounces, complaints, unsubscribes), mailing lists, and reusable email templates. Query detailed email analytics, event logs, and deliverability metrics. Monitor IP blocklists, manage dedicated IPs and IP pools, and configure webhook notifications for email events like delivery, opens, clicks, bounces, and complaints.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send transactional emails",
+    "track email opens and clicks",
+    "manage sending domains",
+    "route inbound emails",
+    "validate email addresses",
+    "manage suppressions lists",
+    "manage mailing lists",
+    "manage email templates",
+    "query email analytics",
+    "manage dedicated IPs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mailgun.png"
+}

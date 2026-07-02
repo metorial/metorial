@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/timecamp",
+  "description": "Track and manage time entries for tasks and projects. Start, stop, and check real-time timers. Create and organize projects and tasks in hierarchical structures. Manage users, groups, and team membership. Retrieve attendance and away time records for workforce management. Create and send invoices from billable time entries. Set billing rates for users, groups, and projects. Approve employee timesheets. Track project budgets against actual time spent. Assign tags to categorize time entries. Monitor computer activity and application usage. Manage client records associated with projects and invoices.",
+  "categories": [
+    "apis-and-http-requests",
+    "financial-data-and-stock-market",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "track time entries",
+    "manage projects and tasks",
+    "control real-time timer",
+    "manage users and groups",
+    "retrieve attendance records",
+    "create and send invoices",
+    "set billing rates",
+    "approve timesheets",
+    "track project budgets",
+    "monitor computer activities"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/timecamp.png"
+}

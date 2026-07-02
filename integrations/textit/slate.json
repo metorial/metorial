@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/textit",
+  "description": "Build and manage interactive messaging workflows across SMS, WhatsApp, voice, Facebook Messenger, Telegram, and other channels. Send broadcasts to contacts, groups, or URNs with media attachments. Create, update, and organize contacts with custom fields and groups. Start contacts in automated conversational flows, passing extra variables, and retrieve collected run data and responses. Manage campaigns with scheduled events tied to contact date fields. Organize incoming messages with labels and perform bulk message actions. Create and manage support tickets organized by topics. List connected NLP classifiers, messaging channels, global variables, and workspace users. Subscribe to flow-triggered webhook events via resthooks for real-time notifications. Access historical archives of messages and flow runs for data export.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "send broadcast messages",
+    "manage contacts and groups",
+    "start automated flows",
+    "create campaign events",
+    "label and archive messages",
+    "manage support tickets",
+    "subscribe to webhook events",
+    "list messaging channels",
+    "retrieve flow run data",
+    "export message archives"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/textit.png"
+}

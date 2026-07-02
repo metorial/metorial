@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/neon",
+  "description": "Manage serverless PostgreSQL databases on Neon. Create, update, and delete projects, branches, databases, compute endpoints, and roles. Configure autoscaling limits, suspend timeouts, and read replicas. Create branches from any point in time for development, testing, or backups. Compare schemas between branches and create anonymized data copies. Track consumption metrics including compute time, storage, and data transfer, and set quota limits. Manage organization members, permissions, and API keys. Monitor asynchronous operation status and query databases over HTTP via the Data API.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage database projects",
+    "create and restore branches",
+    "configure compute endpoints",
+    "manage database roles",
+    "track consumption metrics",
+    "set resource quotas",
+    "compare branch schemas",
+    "manage organization members",
+    "create database snapshots",
+    "query databases over HTTP"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/neon.png"
+}

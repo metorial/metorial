@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/assemblyai",
+  "description": "Transcribe pre-recorded and live audio/video to text with support for 99+ languages, speaker diarization, and multichannel audio. Apply audio intelligence models to extract summaries, sentiment analysis, entity detection, topic detection, key phrases, and content moderation from transcripts. Redact personally identifiable information from text and audio. Generate SRT/VTT subtitles and segment transcripts into paragraphs, sentences, or auto-chapters. Stream real-time speech-to-text via WebSocket connections. Upload audio/video files for processing. Manage and delete transcripts. Access an LLM gateway to apply large language models (Claude, GPT, Gemini) to transcribed speech data for summarization, Q&A, and custom analysis. Translate transcripts across 99+ languages. Receive webhook notifications when transcriptions complete or fail.",
+  "categories": [
+    "apis-and-http-requests",
+    "language-translation",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "transcribe audio to text",
+    "real-time speech streaming",
+    "detect speaker identity",
+    "analyze transcript sentiment",
+    "extract named entities",
+    "redact personal information",
+    "generate subtitles and captions",
+    "summarize audio content",
+    "translate transcripts",
+    "apply LLMs to speech data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/assembly-ai.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/stannp",
+  "description": "Send physical postcards, letters, greetings cards, and self-mailers programmatically. Manage recipients and groups, create and track bulk mail campaigns, validate addresses, send SMS messages, and generate QR codes. Upload design templates and artwork, check account balance, and monitor mailpiece delivery status. Supports US, UK, Canada, and worldwide destinations.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send postcards and letters",
+    "manage recipient lists",
+    "create mail campaigns",
+    "validate postal addresses",
+    "send SMS messages",
+    "track mailpiece delivery status",
+    "generate QR codes",
+    "upload design templates",
+    "manage recipient groups",
+    "check account balance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/stannp.svg"
+}

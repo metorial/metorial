@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/krakenio",
+  "description": "Optimize and compress images in JPG, PNG, WebP, GIF, SVG, AVIF, HEIC, and PDF formats. Perform lossy or lossless compression with custom quality settings. Resize images using multiple strategies (exact, portrait, landscape, auto, crop, square, fit) and generate responsive image sets. Convert images between formats (JPEG, PNG, GIF, WebP, AVIF). Preserve or strip image metadata (EXIF, XMP, IPTC). Auto-correct image orientation. Store optimized images to external cloud providers (S3, Azure, Google Cloud Storage, SoftLayer). Compress PDF files. Query account status for quota and plan details. Receive webhook notifications when optimization completes.",
+  "categories": ["document-processing"],
+  "skills": [
+    "optimize and compress images",
+    "resize images",
+    "convert image formats",
+    "generate responsive image sets",
+    "compress PDF files",
+    "preserve image metadata",
+    "store to cloud storage",
+    "check account status",
+    "receive optimization webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/kraken-io.png"
+}

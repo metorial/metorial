@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/linkup",
+  "description": "Search the web using natural language queries and retrieve real-time content for AI grounding. Perform standard fast searches or deep iterative searches for comprehensive results. Get sourced answers with citations, raw search result chunks, or structured data extraction following a custom JSON schema. Filter results by date range, specific domains, and result count. Fetch and extract clean markdown content from individual web pages, optionally rendering JavaScript for dynamic sites. Check account credit balance.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "search web content",
+    "deep iterative search",
+    "fetch webpage content",
+    "extract structured data",
+    "filter by date range",
+    "filter by domain",
+    "generate sourced answers",
+    "extract images from pages",
+    "check credit balance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/linkup.jpeg"
+}

@@ -1,0 +1,13 @@
+export { getAdInsights } from './get-ad-insights';
+export { getLeads } from './get-leads';
+export { getPageInsights } from './get-page-insights';
+export { getPostInsights } from './get-post-insights';
+export { getPosts } from './get-posts';
+export { getReactions } from './get-reactions';
+export { getUserProfile } from './get-user-profile';
+export { listPages } from './list-pages';
+export { manageComments } from './manage-comments';
+export { managePost } from './manage-post';
+export { publishContent } from './publish-content';
+export { searchFacebook } from './search-facebook';
+export { sendPageMessage } from './send-page-message';

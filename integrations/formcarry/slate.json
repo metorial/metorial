@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/formcarry",
+  "description": "Manage form backends and collect form submissions without server-side code. Create, update, and delete forms programmatically. Retrieve and filter submissions by date range, spam status, attachments, and custom field values with sorting and pagination. Export submissions in CSV or JSON format. Configure email notifications, auto-responses, and webhooks for new submissions. Supports file uploads, spam protection, field validations, Stripe payment collection, and integrations with 1500+ apps via Zapier.",
+  "categories": [
+    "apis-and-http-requests",
+    "crm-and-sales-tools",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and manage forms",
+    "collect form submissions",
+    "retrieve and filter submissions",
+    "export submissions to CSV/JSON",
+    "configure email notifications",
+    "handle file uploads",
+    "set up submission webhooks",
+    "validate form fields",
+    "collect Stripe payments",
+    "manage team collaboration"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/formcarry.png"
+}

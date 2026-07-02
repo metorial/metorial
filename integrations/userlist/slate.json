@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/userlist",
+  "description": "Manage users, companies, and their relationships for SaaS email marketing automation. Create, update, and delete user and company records with custom properties. Track behavioral events performed by users or companies. Send transactional emails and in-app messages using templates or custom content. Manage user subscription preferences for messaging topics. Receive webhook notifications for user, company, relationship, message, and form events.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage user records",
+    "manage company records",
+    "track behavioral events",
+    "send transactional messages",
+    "manage user-company relationships",
+    "manage subscription preferences",
+    "send in-app messages",
+    "receive webhook notifications"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/userlist.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/datagma",
+  "description": "Enrich B2B contact and company profiles with 75+ real-time data points. Find verified work emails and mobile phone numbers from names, LinkedIn URLs, or company details. Detect job changes for contacts, perform reverse lookups by phone number or email, identify people at companies by job title, and enrich Twitter/X profiles. Check account credit balance.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "enrich person profiles",
+    "enrich company profiles",
+    "find verified work emails",
+    "find mobile phone numbers",
+    "detect job changes",
+    "reverse lookup by phone",
+    "reverse lookup by email",
+    "find people at companies",
+    "enrich Twitter profiles",
+    "check credit balance"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/datagma.jpeg"
+}

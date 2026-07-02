@@ -1,0 +1,12 @@
+{
+  "name": "@metorial/linkedin",
+  "description": "Authenticate LinkedIn members with OpenID Connect, fetch the authenticated member profile, and create self-serve LinkedIn shares with text, article links, and uploaded images. Organization and Community Management workflows should move to a separate slate because LinkedIn restricts combining those products in one app.",
+  "categories": ["crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "post and share content",
+    "retrieve member profiles",
+    "upload images for shares",
+    "authenticate with OpenID Connect"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/linkedin.svg"
+}

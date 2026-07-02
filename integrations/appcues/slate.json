@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/appcues",
+  "description": "Manage in-app product adoption experiences including onboarding flows, tooltips, banners, checklists, and NPS surveys. Create, publish, and unpublish web flows, pins, banners, launchpads, checklists, and mobile experiences. Read, update, and delete end-user profiles and group profiles for targeting and personalization. Track custom user events and retrieve event history. Create, update, and manage user segments with bulk user ID uploads. Import user profiles, group profiles, and events in bulk via CSV or JSON. Export event data with flexible filtering by flow, checklist, NPS, segment, or custom attributes. Configure ingestion filtering rules to control which attributes and events are stored. Manage SDK authentication keys for identity verification. Receive real-time webhook events for NPS interactions, flow completions, checklist progress, banner dismissals, email delivery, and push notifications.",
+  "categories": [
+    "apis-and-http-requests",
+    "crm-and-sales-tools",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "manage in-app experiences",
+    "publish and unpublish flows",
+    "manage user profiles",
+    "track custom user events",
+    "create and manage segments",
+    "bulk import user data",
+    "export event data",
+    "manage group profiles",
+    "configure ingestion rules",
+    "manage SDK authentication keys"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/appcues.png"
+}

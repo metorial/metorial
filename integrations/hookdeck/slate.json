@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/hookdeck",
+  "description": "Manage webhook and asynchronous event infrastructure. Create and configure sources (inbound endpoints), destinations (outbound targets), and connections (routing rules) to receive, transform, filter, and deliver HTTP events. Publish outbound webhooks via the Publish API. Apply JavaScript transformations to modify event payloads in transit. Filter events based on headers, body, query, or path using conditional operators. Configure automatic retries with customizable intervals and attempt limits. Monitor event delivery with detailed logs of requests, events, and attempts. Track and manage issues for delivery failures, transformation errors, and backpressure. Query metrics on event delivery, queue depth, and transformation performance. Store and replay requests using bookmarks. Configure webhook notifications for issue and event delivery status changes.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage webhook sources",
+    "configure event destinations",
+    "route events via connections",
+    "filter events conditionally",
+    "transform event payloads",
+    "retry failed deliveries",
+    "publish outbound webhooks",
+    "track delivery issues",
+    "query event metrics",
+    "store and replay requests"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/hookdeck.svg"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/tomtom",
+  "description": "Access TomTom's location technology services for maps, search, routing, traffic, geofencing, and tracking. Retrieve map tiles in raster and vector formats, including satellite imagery and custom styles. Search and geocode addresses, points of interest, and geographic features with fuzzy search, autocomplete, reverse geocoding, and batch search. Plan optimized routes with real-time and historical traffic consideration, supporting waypoints, toll/ferry avoidance, eco routing, reachable range calculations, and matrix routing. Retrieve real-time traffic flow and incident data. Create and manage geofences (circles, polygons, corridors) organized into projects, track object transitions across fence borders, and configure alerts. Store and query location history for fleet tracking. Snap GPS points to road networks with speed limit and road detail enrichment. Manage notification contacts and delivery via webhooks and email for geofence transition alerts.",
+  "categories": ["apis-and-http-requests", "iot-and-device-control"],
+  "skills": [
+    "search and geocode addresses",
+    "plan optimized routes",
+    "retrieve real-time traffic data",
+    "display map tiles",
+    "create and manage geofences",
+    "track object locations",
+    "snap GPS points to roads",
+    "configure geofence alerts",
+    "calculate route matrices",
+    "manage notification contacts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tomtom.svg"
+}

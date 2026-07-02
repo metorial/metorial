@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/passslot",
+  "description": "Create, manage, and distribute mobile wallet passes (coupons, loyalty cards, event tickets, boarding passes, membership cards) for Apple Wallet, Android Pay, and HTML5. Design pass templates with custom styles, colors, images, barcodes, and placeholder fields. Generate personalized passes from templates, download as .pkpass files, and distribute via short URLs or email. Update pass values and images after generation, with automatic push notifications to Apple Wallet. Scan, validate, and redeem passes using scanner configurations. Configure payment integration with PayPal, Stripe, or PAYMILL. Manage Apple Wallet pass type identifiers. Receive webhook events for pass creation, updates, downloads, device registrations, and scan/redemption actions.",
+  "categories": [
+    "crm-and-sales-tools",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "create pass templates",
+    "generate mobile wallet passes",
+    "distribute passes via email",
+    "update pass placeholder values",
+    "scan and redeem passes",
+    "manage scanner configurations",
+    "configure payment integration",
+    "download pkpass files",
+    "track pass lifecycle events",
+    "manage pass type identifiers"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/passslot.png"
+}

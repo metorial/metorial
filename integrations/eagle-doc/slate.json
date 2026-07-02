@@ -1,0 +1,20 @@
+{
+  "name": "@metorial/eagle-doc",
+  "description": "Extract structured data from documents using AI-powered OCR. Process invoices, receipts, bank statements, passports, ID cards, resumes, business cards, and more in 40+ languages. Automatically classify document types and return structured JSON with extracted fields including line items, tax details, addresses, and payment information. Split multi-page documents, extract signatures, submit batch processing jobs, provide human feedback to improve extractions, and monitor API usage quota.",
+  "categories": [
+    "apis-and-http-requests",
+    "document-processing",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "extract invoice data",
+    "extract receipt data",
+    "process any document type",
+    "split multi-page documents",
+    "extract signatures from documents",
+    "batch process documents",
+    "auto-classify document types",
+    "provide extraction feedback",
+    "monitor API usage quota"
+  ]
+}

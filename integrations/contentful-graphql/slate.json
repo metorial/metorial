@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/contentful-graphql",
+  "description": "Query and retrieve structured content from Contentful spaces using GraphQL. Fetch published and draft/preview entries and assets with flexible filtering, sorting, and localization. Traverse linked entry relationships, resolve rich text with embedded references, and query collections by content type. Supports reverse lookups via linkedFrom fields, multi-locale content retrieval, and schema introspection. Configure webhooks to monitor content lifecycle events including entry, asset, release, and scheduled action changes.",
+  "categories": ["document-processing"],
+  "skills": [
+    "query entries by content type",
+    "filter and sort collections",
+    "traverse linked entries",
+    "preview draft content",
+    "retrieve localized content",
+    "query assets and media",
+    "resolve rich text references",
+    "introspect GraphQL schema",
+    "configure content webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/contentful-graphql.svg"
+}

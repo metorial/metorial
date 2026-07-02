@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/calendly",
+  "description": "List, retrieve, and cancel scheduled events. Book meetings programmatically on behalf of invitees using available time slots. Retrieve event types and their configurations. Query user availability, available time slots, busy times, and availability schedules. Create single-use scheduling links with optional overrides. List and manage invitees, mark no-shows, and access custom question responses and UTM tracking data. Manage organization memberships, invite or remove users. Retrieve routing form configurations and submissions. Subscribe to webhooks for new bookings, cancellations, and routing form submissions.",
+  "categories": ["crm-and-sales-tools", "scheduling-and-calendars"],
+  "skills": [
+    "list scheduled events",
+    "book meetings programmatically",
+    "cancel scheduled events",
+    "query available time slots",
+    "check user busy times",
+    "create scheduling links",
+    "manage invitee no-shows",
+    "retrieve routing form submissions",
+    "manage organization memberships",
+    "subscribe to booking webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/calendly.svg"
+}

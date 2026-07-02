@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/convolo-ai",
+  "description": "Trigger phone calls to leads and connect them with available sales agents using Speed To Lead™. Retrieve call reports and statistics for both inbound (Speed To Lead) and outbound (Power Dialer) sales campaigns. Filter call data by date range, status, agents, teams, and projects. Receive webhook events for call lifecycle stages including call started, ringing, answered, ended, and post-call summaries with AI-generated transcripts. Dynamically assign agents to calls and pass lead details such as phone number, name, and email. Access aggregated call metrics including total calls, answered calls, missed calls, talk times, and AI talk time breakdowns.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "trigger calls to leads",
+    "retrieve call reports",
+    "filter calls by status",
+    "retrieve dialer statistics",
+    "receive call lifecycle webhooks",
+    "assign agents to calls",
+    "access AI call summaries",
+    "track lead call details",
+    "monitor call performance metrics"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/convolo-ai.svg"
+}

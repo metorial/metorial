@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/follow-up-boss",
+  "description": "Manage contacts, leads, deals, and communications in a real estate CRM. Create, update, and search contacts with automatic deduplication. Ingest leads and events from IDX websites and lead sources. Track calls, emails, and text messages associated with contacts. Manage deals and pipelines with customizable stages. Create and assign tasks and appointments for follow-up. Enroll contacts in action plans and automations. Add notes with reactions and threaded replies for team collaboration. Manage email and text message templates. Handle team, user, and group management including round-robin lead distribution and shared lead pools. Configure custom fields, stages, and pipelines. Build custom inbox app integrations. Subscribe to webhooks for real-time notifications on contacts, deals, tasks, appointments, communications, and configuration changes.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage contacts and leads",
+    "track deals and pipelines",
+    "log calls and text messages",
+    "create tasks and appointments",
+    "enroll in action plans",
+    "ingest lead events",
+    "manage email templates",
+    "configure custom fields",
+    "manage team and groups",
+    "subscribe to webhooks"
+  ]
+}

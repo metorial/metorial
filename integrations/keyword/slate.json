@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/keyword",
+  "description": "Track keyword rankings across Google SERP and AI search platforms. Create and manage tracking projects, monitor keyword positions by location and device type, and retrieve historical SERP data. Analyze share of voice, competitor visibility, search volume, and search intent. Track brand visibility across AI platforms including ChatGPT, Perplexity, AI Mode, and Gemini. Export ranking data and generate shareable performance reports.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "web-search"],
+  "skills": [
+    "track keyword rankings",
+    "manage tracking projects",
+    "retrieve SERP history",
+    "analyze share of voice",
+    "monitor competitor rankings",
+    "track AI search visibility",
+    "export ranking reports",
+    "classify search intent",
+    "track local keyword positions"
+  ]
+}

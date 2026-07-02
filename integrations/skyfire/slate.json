@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/skyfire",
+  "description": "Enable autonomous AI agent payments and identity verification through Skyfire's token-based protocol. Create PAY tokens to authorize payments to seller services, generate KYA (Know Your Agent) tokens for identity verification, and combine both in KYA+PAY tokens. Browse and search a marketplace of agent-consumable services, filter by tags and categories, and retrieve seller service IDs. Manage agent wallets including checking balances, funding via cards or ACH, and withdrawing earnings. Charge buyer tokens as a seller to collect payments. Register and manage seller services for discovery by buyer agents. Audit transactions by listing tokens with date and status filters, and reconcile authorized versus charged amounts.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market", "security"],
+  "skills": [
+    "create payment tokens",
+    "verify agent identity",
+    "browse service marketplace",
+    "manage agent wallets",
+    "charge buyer tokens",
+    "register seller services",
+    "audit transactions",
+    "search services by tags",
+    "check wallet balance",
+    "introspect token validity"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/skyfire.png"
+}

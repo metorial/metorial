@@ -1,0 +1,158 @@
+name: Publish packages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/**/package.json'
+      - 'scripts/get-updated-packages.ts'
+      - '.github/workflows/publish-packages.yml'
+  workflow_dispatch:
+    inputs:
+      filter:
+        description: 'Optional package filter, for example "@slates/*"'
+        required: false
+        type: string
+
+jobs:
+  detect-unpublished-packages:
+    name: Detect unpublished packages
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.discover.outputs.matrix }}
+      count: ${{ steps.discover.outputs.count }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Discover unpublished package versions
+        id: discover
+        shell: bash
+        env:
+          FILTER: ${{ github.event.inputs.filter || '' }}
+        run: |
+          cmd=(bun scripts/get-updated-packages.ts)
+          if [[ -n "$FILTER" ]]; then
+            cmd+=(--filter "$FILTER")
+          fi
+
+          matrix="$("${cmd[@]}")"
+          count="$(printf '%s' "$matrix" | bun -e 'const input = await Bun.stdin.text(); const data = JSON.parse(input); console.log(data.include.length);')"
+
+          {
+            echo 'matrix<<EOF'
+            echo "$matrix"
+            echo 'EOF'
+            echo "count=$count"
+          } >> "$GITHUB_OUTPUT"
+
+  test-packages:
+    name: Test packages
+    needs: detect-unpublished-packages
+    if: ${{ needs.detect-unpublished-packages.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run package builds
+        run: bunx turbo run build --filter="./packages/*"
+
+      - name: Run package tests
+        run: bunx turbo run test --filter="./packages/*"
+
+  publish-package:
+    name: Publish ${{ matrix.name }}
+    needs:
+      - detect-unpublished-packages
+      - test-packages
+    if: ${{ needs.detect-unpublished-packages.outputs.count != '0' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix: ${{ fromJSON(needs.detect-unpublished-packages.outputs.matrix) }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.15
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build package
+        if: ${{ matrix.hasBuildScript }}
+        run: bunx turbo run build --filter="${{ matrix.name }}"
+
+      - name: Publish package to npm
+        working-directory: ${{ matrix.directory }}
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          max_attempts=5
+          base_delay_seconds=2
+
+          for attempt in $(seq 1 "$max_attempts"); do
+            log_file="$(mktemp)"
+
+            if npm publish --access public > >(tee "$log_file") 2> >(tee -a "$log_file" >&2); then
+              rm -f "$log_file"
+              exit 0
+            fi
+
+            if ! grep -Eq 'E429|429 Too Many Requests' "$log_file"; then
+              rm -f "$log_file"
+              exit 1
+            fi
+
+            if [[ "$attempt" -eq "$max_attempts" ]]; then
+              echo "npm publish hit the rate limit too many times." >&2
+              rm -f "$log_file"
+              exit 1
+            fi
+
+            delay_seconds=$((base_delay_seconds * (2 ** (attempt - 1))))
+            echo "npm publish rate limited. Retrying in ${delay_seconds}s (${attempt}/${max_attempts})..." >&2
+            rm -f "$log_file"
+            sleep "$delay_seconds"
+          done

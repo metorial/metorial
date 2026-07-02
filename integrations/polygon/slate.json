@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/polygon",
+  "description": "Retrieve real-time and historical financial market data across stocks, options, forex, crypto, and indices. Access trades, quotes, OHLCV aggregate bars, and snapshots at configurable time intervals. Look up technical indicators (SMA, EMA, RSI, MACD) for stocks and indices. Query reference data including ticker details, company information, stock splits, dividends, SEC filings, exchanges, and market status. Retrieve market news articles with sentiment analysis. Stream real-time trades, quotes, and aggregate bars via WebSocket for stocks, options, forex, crypto, and indices. Query options chains by underlying ticker, expiration, strike price, and contract type with Greeks and implied volatility. Perform currency conversions for forex pairs. Access Level 2 order book data for cryptocurrencies. This integration is read-only and does not support placing trades.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "retrieve stock market data",
+    "stream real-time trades and quotes",
+    "query options chain data",
+    "access forex and crypto data",
+    "compute technical indicators",
+    "look up ticker details",
+    "retrieve market news",
+    "get market indices snapshots",
+    "query dividends and splits",
+    "check market status"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/polygon.svg"
+}

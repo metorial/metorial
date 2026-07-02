@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/npm",
+  "description": "Query and manage JavaScript packages on the npm registry. Retrieve package metadata (full or abbreviated), search packages by text query with quality/popularity/maintenance weightings, and get download statistics by package, version, and time range. Publish and unpublish packages, deprecate versions, and manage distribution tags. Create, list, and delete access tokens with granular permissions, CIDR restrictions, and expiration settings. Configure trusted publishers for CI/CD platforms (GitHub Actions, GitLab CI, CircleCI) to enable OIDC-based publishing without long-lived tokens. Bulk query download counts for up to 128 packages at a time.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "retrieve package metadata",
+    "search packages",
+    "get download statistics",
+    "publish packages",
+    "unpublish package versions",
+    "deprecate package versions",
+    "manage distribution tags",
+    "manage access tokens",
+    "configure trusted publishers",
+    "bulk query download counts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/npm.svg"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@amazon/amazon-web-services",
+  "description": "Manage AWS cloud infrastructure and services. Launch, configure, and terminate EC2 instances. Deploy and invoke Lambda functions. Create and manage S3 buckets and objects with upload, download, versioning, and lifecycle policies. Provision and manage RDS relational databases and DynamoDB NoSQL tables. Configure VPCs, subnets, security groups, and load balancers. Manage IAM users, roles, and permission policies. Set up CloudWatch alarms, metrics, and dashboards for monitoring. Create SNS topics and SQS queues for messaging. Define CloudFormation stacks for infrastructure as code. Configure EventBridge rules to route events across services. Manage encryption keys with KMS and secrets with Secrets Manager. Access AI/ML services including Bedrock foundation models, SageMaker, Rekognition, Comprehend, Translate, Polly, and Transcribe. Set up CI/CD pipelines with CodePipeline, CodeBuild, and CodeDeploy. Manage container orchestration with ECS and EKS. Configure Route 53 DNS, CloudFront CDN, and API Gateway endpoints.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage EC2 instances",
+    "deploy Lambda functions",
+    "manage S3 objects",
+    "provision databases",
+    "configure IAM policies",
+    "monitor with CloudWatch",
+    "send SNS notifications",
+    "manage SQS queues",
+    "deploy CloudFormation stacks",
+    "invoke AI/ML services"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/amazon.svg"
+}

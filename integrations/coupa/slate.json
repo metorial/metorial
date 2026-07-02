@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/coupa",
+  "description": "Create, update, and query procurement data including purchase requisitions, purchase orders, invoices, expense reports, and contracts. Manage suppliers, accounts, budgets, users, and approvals across the spend management lifecycle. Track inventory, receipts, advance ship notices, and payments. Run sourcing events and access risk assessments. Receive real-time event notifications when documents change status, such as invoice approvals, PO creation, expense report submissions, and contract lifecycle events.",
+  "categories": ["financial-data-and-stock-market", "task-and-project-management"],
+  "skills": [
+    "manage purchase orders",
+    "create and query invoices",
+    "manage expense reports",
+    "manage suppliers",
+    "track approvals",
+    "manage contracts",
+    "manage accounts and budgets",
+    "process payments",
+    "manage purchase requisitions",
+    "track inventory and receipts"
+  ]
+}

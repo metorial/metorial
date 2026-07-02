@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/blocknative",
+  "description": "Estimate blockchain gas fees, monitor mempool transactions, decode L2 batches, and retrieve archived blob data. Get gas price predictions across 40+ chains (Ethereum, Bitcoin, Polygon, Arbitrum, Base, Optimism, etc.) with configurable confidence levels. Predict base fees and blob fees for upcoming Ethereum blocks. Retrieve gas price distribution data from the current mempool. Discover supported chains and on-chain gas oracle metadata. Decode L2 batch transactions (Optimism, Base, zkSync, Arbitrum, and others) from calldata or blobdata into human-readable format. Retrieve archived Ethereum blob data by versioned hash, including commitment, proof, and byte counts. Subscribe to real-time mempool transaction lifecycle events (pending, confirmed, speed-ups, cancellations) via WebSockets or webhooks for specific addresses or transaction hashes, with optional filters and custom ABI decoding.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
+  "skills": [
+    "estimate gas fees",
+    "predict base and blob fees",
+    "retrieve gas distribution data",
+    "discover supported chains",
+    "decode L2 batch transactions",
+    "retrieve archived blob data",
+    "monitor mempool transactions",
+    "subscribe to transaction events",
+    "configure transaction webhooks",
+    "lookup gas oracle metadata"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/blocknative.png"
+}

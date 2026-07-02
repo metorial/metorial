@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/kit",
+  "description": "Manage email subscribers, send broadcast emails, and automate marketing workflows for creators. Create, update, tag, and segment subscribers. Build and schedule broadcast campaigns with HTML support and audience targeting. Manage email sequences (drip campaigns), sign-up forms, and landing pages. Create and list custom fields for subscriber profiles. Import purchase data and track e-commerce activity. Retrieve email templates and account information. Set up webhooks to receive notifications for subscriber events such as activations, unsubscribes, bounces, form subscriptions, tag changes, link clicks, sequence completions, and product purchases.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage email subscribers",
+    "send broadcast emails",
+    "tag and segment subscribers",
+    "manage email sequences",
+    "create custom fields",
+    "schedule email campaigns",
+    "manage sign-up forms",
+    "track purchase data",
+    "configure webhooks",
+    "retrieve account information"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/kit.jpeg"
+}

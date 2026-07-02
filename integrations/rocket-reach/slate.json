@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/rocketreach",
+  "description": "Search and look up contact data for over 700 million professionals and 60 million companies. Retrieve verified email addresses, phone numbers, and social media links for people by name, company, LinkedIn URL, or other identifiers. Search and enrich company records with firmographic data including industry, size, revenue, technographics, and funding history. Perform bulk lookups for up to 100 profiles per request. Combine people and company lookups in a single request. Track API credit usage and manage account settings.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "search people by name or company",
+    "look up contact information",
+    "bulk contact lookup",
+    "search company records",
+    "enrich company firmographic data",
+    "retrieve email addresses",
+    "retrieve phone numbers",
+    "combined people and company lookup",
+    "track API credit usage"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/rocket-reach.png"
+}

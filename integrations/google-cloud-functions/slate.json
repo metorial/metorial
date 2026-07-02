@@ -1,0 +1,18 @@
+{
+  "name": "@google/google-cloud-functions",
+  "description": "Manage serverless cloud functions on Google Cloud. Create, update, deploy, list, and delete functions triggered by HTTP requests or cloud events. Configure runtimes (Node.js, Python, Go, Java, .NET, Ruby), event triggers (Cloud Storage, Pub/Sub, Firestore), memory, timeouts, and environment variables. Upload and download function source code via signed URLs. Invoke deployed HTTP functions. Manage function upgrades from 1st gen to 2nd gen. List available runtimes and monitor long-running deployment operations. Configure ingress/egress networking, secret environment variables, and authentication settings for function invocation.",
+  "categories": ["apis-and-http-requests", "code-execution"],
+  "skills": [
+    "create and deploy functions",
+    "delete and update functions",
+    "list and get function details",
+    "configure event triggers",
+    "invoke HTTP functions",
+    "upload and download source code",
+    "manage function runtimes",
+    "migrate functions between generations",
+    "monitor deployment operations",
+    "configure function networking"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

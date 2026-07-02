@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/sentry",
+  "description": "Track, manage, and resolve application errors and performance issues. List, query, and bulk-update issues and error events with filters like status, assignment, and tags. Create and manage releases, associate commits, and upload source maps. Configure issue alert rules and metric alert rules with notification actions. Set up cron monitors to detect missed or failed scheduled jobs. Build custom dashboards with configurable widgets. Run ad-hoc Discover queries across errors and transactions for performance analysis. Manage organizations, teams, projects, and members. Provision users via SCIM. Access session replay data. Receive webhooks for issues, errors, alerts, comments, and installation events.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "track and manage errors",
+    "query issues and events",
+    "create alert rules",
+    "manage releases and deploys",
+    "monitor cron jobs",
+    "build custom dashboards",
+    "run discover queries",
+    "manage projects and teams",
+    "provision users via SCIM",
+    "access session replays"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sentry.svg"
+}

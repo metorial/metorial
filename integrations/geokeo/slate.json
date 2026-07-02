@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/geokeo",
+  "description": "Convert addresses and place names into geographic coordinates (forward geocoding) and convert latitude/longitude coordinates into human-readable addresses (reverse geocoding). Filter results by country using ISO country codes. Retrieve bounding box coordinates, formatted postal addresses, and distance calculations. Supports JSON and XML response formats with built-in spell check for improved accuracy.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "forward geocode addresses",
+    "reverse geocode coordinates",
+    "filter results by country",
+    "retrieve bounding box coordinates",
+    "convert place names to coordinates",
+    "convert coordinates to addresses",
+    "spell-check address queries"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/geokeo.svg"
+}

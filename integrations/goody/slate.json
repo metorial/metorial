@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/goody",
+  "description": "Send corporate gifts and physical products programmatically without needing recipient addresses. Browse a curated product catalog, create gift orders for one or many recipients, generate shareable gift links, and track orders through their full lifecycle (created, opened, accepted, shipped, delivered). Manage order batches, schedule future deliveries, calculate pricing, handle payments, and receive real-time webhook notifications on gift and order events. Supports address-free gifting where recipients choose their own options and enter their address, as well as direct shipping to known addresses.",
+  "categories": [
+    "crm-and-sales-tools",
+    "e-commerce-and-retail",
+    "financial-data-and-stock-market"
+  ],
+  "skills": [
+    "browse product catalog",
+    "send gifts without address",
+    "create order batches",
+    "track order lifecycle",
+    "generate gift links",
+    "manage payment methods",
+    "schedule future deliveries",
+    "calculate batch pricing",
+    "cancel and refund orders",
+    "list workspaces"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/hypeauditor",
+  "description": "Search and discover influencers across Instagram, YouTube, TikTok, Twitter/X, Twitch, and Snapchat using extensive filters like audience demographics, engagement rates, and niche keywords. Generate detailed influencer reports including audience quality scores, follower authenticity analysis, engagement metrics, brand mentions, and cross-platform linked accounts. Export reports as PDFs. Search posts by keywords across social networks. Conduct Instagram competitor analysis to monitor share of voice and brand mentions. Create and manage influencer marketing campaigns, track posts and hashtags, and review campaign content. Set up influencer recruitment campaigns with landing pages. Organize influencers into lists for campaign planning. Track API usage and remaining credits.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "discover influencers by filters",
+    "generate influencer analytics reports",
+    "detect fake followers",
+    "search posts by keywords",
+    "analyze competitor share of voice",
+    "manage influencer campaigns",
+    "recruit influencers",
+    "organize influencer lists",
+    "export reports as PDF",
+    "find similar influencers"
+  ]
+}

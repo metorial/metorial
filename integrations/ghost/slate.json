@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/ghost",
+  "description": "Manage a Ghost publishing platform including posts, pages, tags, members, newsletters, tiers, and site settings. Create, read, update, and delete posts and pages with support for draft, published, and scheduled states. Organize content with tags. Browse, add, and edit members and their subscriptions. Manage membership tiers and promotional offers. Configure and manage multiple newsletters. Upload images and themes. Read site settings and staff/user data. Access published content via a read-only Content API for headless CMS use cases. Register and manage webhooks for events such as post publishing, member changes, and tag updates.",
+  "categories": ["crm-and-sales-tools", "document-processing", "email-and-messaging"],
+  "skills": [
+    "create and manage posts",
+    "create and manage pages",
+    "manage tags and categories",
+    "manage members and subscriptions",
+    "manage newsletters",
+    "manage tiers and offers",
+    "upload images",
+    "upload and activate themes",
+    "read site settings",
+    "manage webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/ghost.png"
+}

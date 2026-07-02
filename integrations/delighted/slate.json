@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/delighted",
+  "description": "Send customer experience surveys (NPS, CSAT, CES) via email or SMS and collect feedback programmatically. Create and manage survey recipients with custom properties, retrieve survey responses with scores, comments, and tags, and access aggregated metrics like NPS scores. Manage Autopilot recurring survey automation, handle pending survey requests, unsubscribe people, and receive webhooks for survey response and unsubscribe events.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "send customer surveys",
+    "retrieve survey responses",
+    "access aggregated NPS metrics",
+    "manage survey recipients",
+    "configure Autopilot automation",
+    "add custom person properties",
+    "cancel pending survey requests",
+    "unsubscribe people from surveys",
+    "receive feedback webhooks",
+    "delete people and data"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/fullstory",
+  "description": "Manage user profiles, capture custom events, and retrieve session replay data for digital experience analytics. Create and update users, send server-side events, look up session replay URLs, export behavioral data, retrieve segment information, add session annotations, audit privacy and recording settings, and manage webhook endpoints for real-time event delivery.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "create and update users",
+    "capture custom events",
+    "retrieve session replays",
+    "export behavioral data",
+    "retrieve user segments",
+    "annotate sessions",
+    "manage webhook endpoints",
+    "audit privacy settings",
+    "batch import users"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/fullstory.png"
+}

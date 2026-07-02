@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/enigma",
+  "description": "Search, match, and enrich U.S. business data using Enigma's comprehensive database. Look up businesses by name, address, website, or person information and retrieve unified profiles with identity, financial health, and market rank attributes. Perform Know Your Business (KYB) verification including name, address, Secretary of State, TIN, and OFAC watchlist screening. Screen businesses and persons against government sanctions and compliance watchlists. Enrich CRM and prospect databases with revenue, growth signals, industry classification, and contact information. Query business relationships, brands, and operating locations via a flexible GraphQL API.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "legal-and-compliance"],
+  "skills": [
+    "search and match businesses",
+    "enrich business profiles",
+    "verify business identity (KYB)",
+    "screen against OFAC watchlists",
+    "retrieve financial health data",
+    "look up business locations",
+    "classify business industry",
+    "generate lead lists",
+    "batch enrich business data",
+    "query business relationships"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/enigma.jpeg"
+}

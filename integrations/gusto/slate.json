@@ -1,0 +1,19 @@
+{
+  "name": "@metorial/gusto",
+  "description": "Manage payroll, employees, contractors, benefits, and HR operations for U.S. businesses. Create and onboard companies, employees, and contractors. Run regular, off-cycle, and termination payrolls, including calculating wages, submitting payrolls for processing, and retrieving pay stubs. Manage employee compensation, jobs, addresses, tax information, and payment methods. Process contractor payments individually or in groups. Administer company benefits (health insurance, 401(k), HSA) and enroll employees. Configure pay schedules, earning types, garnishments, and time off policies. Handle tax forms (W-2, W-4, 1099, I-9) including generation, signing, and retrieval. Generate custom and general ledger reports. Receive webhook notifications for payroll, employee, contractor, benefit, and company lifecycle events.",
+  "categories": ["financial-data-and-stock-market", "hr-and-recruiting"],
+  "skills": [
+    "run and process payrolls",
+    "manage employees and contractors",
+    "administer employee benefits",
+    "process contractor payments",
+    "manage tax forms",
+    "configure pay schedules",
+    "track time off balances",
+    "manage company onboarding",
+    "handle wage garnishments",
+    "generate payroll reports"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/gusto.svg",
+  "version": "0.1.2"
+}

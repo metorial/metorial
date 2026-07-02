@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/similarweb-digital-rank-api",
+  "description": "Retrieve website ranking data powered by SimilarWeb's SimilarRank algorithm. Look up a domain's global rank, country-specific rank, and category rank. List top-ranked websites globally (up to 5,000 results). Filter rankings by date range, country, and subdomain inclusion. Check remaining API credits and subscription status.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "web-search"],
+  "skills": [
+    "lookup website global rank",
+    "retrieve country-specific rank",
+    "get website category rank",
+    "list top-ranked websites",
+    "check remaining API credits",
+    "filter rankings by date range",
+    "filter rankings by country"
+  ]
+}

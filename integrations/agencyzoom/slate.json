@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/agencyzoom",
+  "description": "Manage insurance agency sales automation and CRM operations. Create, search, update, and delete leads (personal and commercial) with pipeline stage tracking and status management. Manage customers, policies, and opportunities with carrier and product line associations. Create and track insurance quotes, service tickets, and tasks (to-dos, calls, emails, meetings). Handle policy lifecycle events including endorsements, renewals, and cancellations. Manage opportunity details like drivers and vehicles. Search and manage email and SMS threads. Retrieve reference data including carriers, product lines, employees, lead sources, pipelines, and custom field definitions. Supports life and health lead management and batch contact creation.",
+  "categories": ["crm-and-sales-tools", "task-and-project-management"],
+  "skills": [
+    "manage insurance leads",
+    "track policy lifecycle",
+    "create service tickets",
+    "manage tasks and to-dos",
+    "search and filter customers",
+    "manage insurance quotes",
+    "track opportunity pipelines",
+    "manage drivers and vehicles",
+    "retrieve carrier and product data",
+    "manage email and SMS threads"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/agencyzoom.jpeg"
+}

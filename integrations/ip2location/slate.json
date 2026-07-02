@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/ip2location",
+  "description": "Look up IP address geolocation, detect proxies and VPNs, perform domain WHOIS lookups, and retrieve hosted domains by IP. Supports single and bulk IP geolocation queries returning country, region, city, coordinates, timezone, ASN, ISP, and more. Detects anonymous proxies, VPNs, TOR exit nodes, data center IPs, and residential proxies with fraud scoring. Retrieves WHOIS records for domain names including registration dates, registrant info, and nameservers. Performs reverse IP lookups to discover domains hosted on a given IP address. Supports both IPv4 and IPv6.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "look up IP geolocation",
+    "detect proxy and VPN",
+    "bulk IP geolocation lookup",
+    "domain WHOIS lookup",
+    "reverse IP domain lookup",
+    "assess proxy fraud score",
+    "detect TOR exit nodes",
+    "retrieve ASN and ISP info"
+  ]
+}

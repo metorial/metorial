@@ -1,0 +1,18 @@
+{
+  "name": "@twilio/twilio-sendgrid",
+  "description": "Send transactional and marketing emails at scale. Create and manage dynamic email templates with Handlebars syntax. Manage contacts, lists, and segments for targeted campaigns. Validate email addresses in real-time or bulk. Monitor email delivery with detailed statistics on opens, clicks, bounces, and more. Manage suppressions including bounces, blocks, spam reports, and unsubscribes. Configure inbound email parsing to receive and process incoming emails. Authenticate sender domains (DKIM, SPF) and manage dedicated IP addresses and IP pools. Create and automate marketing campaigns with A/B testing. Manage subusers, teammates, and API keys with granular permissions. Receive real-time webhook events for delivery status, engagement tracking, and account changes.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send transactional emails",
+    "create marketing campaigns",
+    "manage contact lists",
+    "validate email addresses",
+    "monitor email statistics",
+    "manage email suppressions",
+    "create dynamic templates",
+    "parse inbound emails",
+    "authenticate sender domains",
+    "manage IP addresses"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sendgrid.png"
+}

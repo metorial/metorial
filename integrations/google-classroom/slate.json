@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/google-classroom",
+  "description": "Manage courses, rosters, and assignments in Google Classroom. Create, update, and delete courses with metadata like name, section, and description. Add and remove students and teachers from courses, and manage course invitations. Create, retrieve, and grade assignments, quizzes, and homework with support for materials like Drive files, YouTube videos, and URLs. Post and manage announcements, organize content with topics, and configure rubrics for assignments. Manage guardian relationships for students. Read and manage grading periods, and subscribe to push notifications for roster changes, coursework updates, and submission events.",
+  "categories": ["education-and-learning", "task-and-project-management"],
+  "skills": [
+    "create and manage courses",
+    "manage class rosters",
+    "create and grade assignments",
+    "post announcements",
+    "manage course topics",
+    "configure assignment rubrics",
+    "manage guardian relationships",
+    "handle course invitations",
+    "subscribe to change notifications",
+    "manage grading periods"
+  ]
+}

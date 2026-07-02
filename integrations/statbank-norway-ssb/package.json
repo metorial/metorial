@@ -1,0 +1,20 @@
+{
+  "name": "@slates-integrations/statbank-norway-ssb",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lowerdeck/error": "^1.1.0",
+    "@types/node": "^20",
+    "slates": "1.0.0-rc.14",
+    "zod": "^4.2"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  },
+  "version": "0.1.0-rc.8"
+}

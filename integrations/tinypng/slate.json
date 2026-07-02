@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/tinypng",
+  "description": "Compress AVIF, WebP, JPEG, and PNG images using lossy compression while preserving visual quality. Resize images using scale, fit, cover, and thumb methods. Convert images between AVIF, WebP, JPEG, and PNG formats. Preserve image metadata such as copyright, creation date, and GPS location. Save optimized images directly to Amazon S3 or Google Cloud Storage buckets. Track monthly compression usage.",
+  "categories": ["document-processing"],
+  "skills": [
+    "compress images",
+    "resize images",
+    "convert image formats",
+    "preserve image metadata",
+    "upload to cloud storage",
+    "track compression usage",
+    "optimize for web"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tinypng.png"
+}

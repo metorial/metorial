@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/postgresql",
+  "description": "Query, insert, update, and delete data in PostgreSQL relational databases. Explore schemas and tables, manage schemas, tables, indexes, views, materialized views, and database roles, and poll tables for row changes using timestamp or incrementing columns.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "execute SQL queries",
+    "manage database schemas",
+    "insert and update data",
+    "delete table rows",
+    "describe tables",
+    "create and alter tables",
+    "manage indexes",
+    "create and refresh views and materialized views",
+    "manage database roles",
+    "poll tables for row changes"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/postgresql.png"
+}

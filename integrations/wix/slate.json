@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/wix",
+  "description": "Manage Wix-hosted websites and business solutions programmatically. Create and manage eCommerce products, inventory, carts, orders, and fulfillment. Handle bookings for appointments, classes, and courses with scheduling and availability. Create and manage events with RSVP and ticketing. Manage blog posts, forum categories, and CMS data collections. Access and update CRM contacts and site members, including roles and authentication. Configure loyalty programs, pricing plans, and subscription management. Manage restaurant menus, orders, and table reservations. Upload and organize media files. Run marketing campaigns and SEO settings. Set up automated workflows triggered by site events. Access site analytics, manage payments, and handle notifications. Account-level operations include managing sites, domains, and team members. Webhooks provide real-time events for orders, bookings, content changes, member activity, and more.",
+  "categories": ["crm-and-sales-tools", "document-processing", "e-commerce-and-retail"],
+  "skills": [
+    "manage products and inventory",
+    "process orders and fulfillment",
+    "manage bookings and schedules",
+    "create and manage events",
+    "manage blog posts",
+    "manage CRM contacts and members",
+    "handle carts and checkouts",
+    "manage CMS data collections",
+    "upload and organize media",
+    "configure pricing plans"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/wix.png"
+}

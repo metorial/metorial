@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/quickbooks",
+  "description": "Manage business finances and accounting in QuickBooks Online. Create, send, and track invoices. Manage bills and accounts payable, record bill payments. Create and update customer and vendor records with contact details and hierarchies. Record payments against invoices and credit memos. Create estimates, sales receipts, and journal entries. Track expenses and categorize against the chart of accounts. Manage items, products, services, and inventory levels. Query entities using SQL-like syntax and sync incremental changes via Change Data Capture. Generate financial reports including profit and loss, balance sheet, and cash flow. Process credit card and bank account (ACH) payments via the Payments API. Manage the chart of accounts for tracking income, expenses, assets, and liabilities.",
+  "categories": ["financial-data-and-stock-market"],
+  "skills": [
+    "create and send invoices",
+    "manage bills and payments",
+    "manage customers and vendors",
+    "track expenses",
+    "manage inventory and items",
+    "generate financial reports",
+    "create journal entries",
+    "process credit card payments",
+    "create estimates and quotes",
+    "query and sync data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/quickbooks.jpg"
+}

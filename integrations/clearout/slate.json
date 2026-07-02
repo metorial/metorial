@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/clearout",
+  "description": "Verify email addresses instantly or in bulk to determine deliverability status (valid, invalid, unknown, catch-all). Find email addresses from names and company domains. Perform reverse lookups using LinkedIn URLs, email addresses, or domains to retrieve person and company information. Look up MX records and Whois data for domains. Resolve company names to website domains. Upload CSV/XLSX files for bulk email verification and bulk email finding. Track bulk job progress and download results. Check remaining credit balance. Receive webhook notifications for completed verification, finder, and form guard operations.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "verify email addresses",
+    "bulk email verification",
+    "find emails by name and domain",
+    "reverse lookup by LinkedIn URL",
+    "domain MX and Whois lookup",
+    "company to domain resolution",
+    "detect disposable emails",
+    "bulk email finding",
+    "check credit balance",
+    "download bulk results"
+  ]
+}

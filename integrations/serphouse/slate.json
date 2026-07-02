@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/serphouse",
+  "description": "Extract structured search engine results from Google, Bing, and Yahoo. Perform real-time SERP queries across web, image, news, video, jobs, and shopping verticals. Submit batch searches of up to 100 keywords for asynchronous processing. Retrieve parsed result types including organic results, knowledge graphs, People Also Ask, AI overviews, ads, map packs, and more. Query Google Trends data for keyword interest over time with geographic and category targeting. Look up supported locations, languages, and search engine domains for query targeting. Receive webhook notifications when batch search tasks complete. Check account credit usage and plan details.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "web-search"],
+  "skills": [
+    "search engine results extraction",
+    "batch SERP queries",
+    "Google Trends analysis",
+    "image and video search",
+    "news search results",
+    "job listing search",
+    "location and language lookup",
+    "webhook task notifications",
+    "multi-engine SERP comparison",
+    "account credit management"
+  ]
+}

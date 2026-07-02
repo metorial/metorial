@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/wrike",
+  "description": "Create, read, update, and delete tasks, folders, and projects in Wrike's hierarchical work management structure. Manage task properties including titles, descriptions, statuses, dates, assignees, custom fields, and dependencies. Organize work using spaces, folders, and projects with support for workflows, approvals, and blueprints. Track time with timelogs and timesheets. Upload and manage file attachments and comments on tasks and folders. Administer users, groups, invitations, access roles, and work schedules. Define custom fields, custom item types, and workflows with configurable statuses. Manage resource bookings, hourly rates, and job roles. Export data for BI analytics. Access audit logs for compliance. Receive real-time webhook notifications for changes to tasks, folders, projects, approvals, comments, attachments, and time entries.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "create and manage tasks",
+    "manage folders and projects",
+    "track time with timelogs",
+    "manage approvals and workflows",
+    "upload and manage attachments",
+    "add and delete comments",
+    "manage task dependencies",
+    "configure custom fields",
+    "manage users and groups",
+    "export data for analytics"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/wrike.png"
+}

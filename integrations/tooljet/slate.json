@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/tooljet",
+  "description": "Manage users, workspaces, and applications on a ToolJet low-code platform instance. List, create, and update users with workspace assignments and group memberships. Retrieve workspace information and manage user-workspace relationships. Export and import applications between workspaces or instances, including pages, queries, data sources, and ToolJet Database data. Trigger workflow automations via webhooks with custom parameters.",
+  "categories": ["apis-and-http-requests", "security", "task-and-project-management"],
+  "skills": [
+    "list and filter users",
+    "create and update users",
+    "manage workspace assignments",
+    "export applications",
+    "import applications",
+    "trigger workflows via webhooks",
+    "manage user roles",
+    "retrieve workspace information"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/tooljet.png"
+}

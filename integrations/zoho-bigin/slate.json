@@ -1,0 +1,19 @@
+{
+  "name": "@metorial/zoho-bigin",
+  "description": "Manage contacts, companies, deals, products, and activities in a lightweight CRM for small businesses. Create, read, update, delete, and search records across all modules. Manage related records, notes, and file attachments. Tag records, perform bulk read/write operations, and retrieve CRM metadata including fields, layouts, and custom views. Manage users, roles, and organization details. Subscribe to webhook notifications for real-time updates on record changes.",
+  "categories": ["crm-and-sales-tools"],
+  "skills": [
+    "manage contacts and companies",
+    "manage deals and pipelines",
+    "search CRM records",
+    "manage notes and attachments",
+    "tag and categorize records",
+    "bulk read and write records",
+    "retrieve CRM metadata",
+    "manage users and roles",
+    "subscribe to record notifications",
+    "upsert records"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/zoho-bigin.svg",
+  "version": "0.1.2"
+}

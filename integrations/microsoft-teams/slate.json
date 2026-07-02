@@ -1,0 +1,19 @@
+{
+  "name": "@microsoft/microsoft-teams",
+  "description": "Send, read, update, and delete messages in channels and chats. Create and manage teams, channels, and memberships. Schedule and manage online meetings, access call recordings and transcripts. Monitor user presence status in real time. Manage shifts, schedules, and time-off requests for frontline workers. Install and configure apps and tabs within teams. Send activity feed notifications to users. Subscribe to change notifications (webhooks) for messages, chats, teams, channels, memberships, presence, and meeting events. Create and manage tags for @mentioning user groups. Generate usage reports and import historical message data from other platforms.",
+  "categories": ["email-and-messaging", "scheduling-and-calendars"],
+  "skills": [
+    "send and manage messages",
+    "create and manage teams",
+    "manage channels and members",
+    "schedule online meetings",
+    "read user presence status",
+    "manage shifts and schedules",
+    "subscribe to change notifications",
+    "install apps and tabs",
+    "send activity feed notifications",
+    "access call recordings and transcripts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/microsoft-teams.svg",
+  "version": "0.1.2"
+}

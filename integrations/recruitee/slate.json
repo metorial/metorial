@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/recruitee",
+  "description": "Manage the full recruitment pipeline including candidates, job offers, talent pools, and careers site content. Create, search, update, and delete candidates with profile data, CVs, and custom fields. Create and manage job offers with details like title, description, department, and status. Assign candidates to jobs or talent pools, move them through pipeline stages, disqualify or requalify them. Upload file attachments such as resumes and cover letters. Retrieve office locations and departments. Access published job listings via a public careers site API and submit candidate applications programmatically. Access audit logs to track account changes. Receive webhooks for candidate creation, assignment, pipeline changes, deletion, and job publish/unpublish/update events.",
+  "categories": ["hr-and-recruiting"],
+  "skills": [
+    "manage candidates",
+    "create job offers",
+    "move pipeline stages",
+    "search candidates",
+    "upload resumes and attachments",
+    "manage talent pools",
+    "submit candidate applications",
+    "manage custom fields",
+    "retrieve locations and departments",
+    "access audit logs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/recruitee.png"
+}

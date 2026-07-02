@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/textrazor",
+  "description": "Analyze text to extract entities, topics, categories, relations, and linguistic structures using natural language processing. Extract named entities (people, organizations, locations, products) linked to knowledge bases like Wikipedia and Wikidata. Classify documents against IPTC and IAB taxonomies or custom classifiers. Extract grammatical relations, dependency trees, word senses, phrases, and spelling corrections. Create and manage custom entity dictionaries for domain-specific entity recognition. Create and manage custom classifiers with concept-based category queries. Supports 142 languages with automatic language detection. Retrieve account usage and subscription information.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "extract named entities",
+    "classify document topics",
+    "analyze grammatical relations",
+    "manage custom entity dictionaries",
+    "create custom classifiers",
+    "extract dependency trees",
+    "detect text language",
+    "disambiguate word senses",
+    "correct spelling errors",
+    "retrieve account usage"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/textrazor.svg"
+}

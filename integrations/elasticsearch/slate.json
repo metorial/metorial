@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/elasticsearch",
+  "description": "Index, search, and analyze documents in Elasticsearch clusters. Create and manage indices with custom mappings and settings. Perform full-text search, structured queries, aggregations, and async search using Query DSL and ES|QL. Manage ingest pipelines to transform data before indexing. Run machine learning inference tasks including text embedding, reranking, completion, and anomaly detection. Monitor cluster health, node stats, and manage snapshots for backups. Configure cross-cluster replication and index lifecycle policies. Manage security including users, roles, API keys, and privileges. Explore graph relationships between terms. Set up Watcher alerts that poll data and trigger actions like emails or webhooks based on conditions.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "search and query documents",
+    "manage indices and mappings",
+    "index and update documents",
+    "run aggregations and analytics",
+    "configure ingest pipelines",
+    "run ML inference tasks",
+    "monitor cluster health",
+    "manage snapshots and backups",
+    "manage users and roles",
+    "configure watcher alerts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/elasticsearch.svg"
+}

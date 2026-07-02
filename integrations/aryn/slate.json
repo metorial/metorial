@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/aryn",
+  "description": "Parse, segment, and extract structured data from 30+ document types including PDFs and Office files. Convert complex documents into structured JSON, Markdown, or HTML with labeled bounding boxes for titles, tables, images, and text. Extract tables with cell-level content, run OCR in multiple languages, and summarize images. Store parsed documents in DocSets, extract metadata properties as key-value pairs using GenAI, and search across documents and metadata with vector and keyword search. Analyze document collections using natural language queries in deep analytics workspaces. Supports chunking strategies, asynchronous processing for large collections, and property-based filtering.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "parse and segment documents",
+    "extract tables from documents",
+    "perform OCR on documents",
+    "extract metadata properties",
+    "search documents and metadata",
+    "store documents in DocSets",
+    "convert documents to structured JSON",
+    "analyze document collections",
+    "extract images from documents",
+    "chunk documents for RAG"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/aryn.png"
+}

@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/prerender",
+  "description": "Manage pre-rendered HTML cache for JavaScript-heavy websites to improve SEO. Recache single or multiple URLs on demand, search cached URLs by query or exact match, clear cache using wildcard patterns, submit and manage XML sitemaps for automated crawling, control recache speed, manage connected domains, and render pages through a headless browser. Supports desktop and mobile adaptive rendering.",
+  "categories": ["crm-and-sales-tools", "document-processing", "web-search"],
+  "skills": [
+    "recache single or multiple URLs",
+    "search cached URLs",
+    "clear cache with wildcards",
+    "submit XML sitemaps",
+    "configure recrawl intervals",
+    "control recache speed",
+    "manage connected domains",
+    "render pages via headless browser",
+    "filter by desktop or mobile"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/prerender.svg"
+}

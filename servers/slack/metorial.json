@@ -1,4 +1,0 @@
-{
-  "name": "Slack MCP Server",
-  "runtime": "typescript.deno"
-}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/clickmeeting",
+  "description": "Create, manage, and delete virtual conference rooms (webinars and meetings) with configurable access types, registration, and advanced settings. Send email invitations to participants and generate auto-login URLs for direct room access. Manage attendee registrations, retrieve session history and attendee data, and generate PDF session reports. Create and manage access tokens for token-protected events. Upload, download, list, and delete files in the file library, and manage session recordings. Retrieve chat logs, manage contacts in the address book, and access utility data like timezones and phone gateways.",
+  "categories": ["email-and-messaging", "scheduling-and-calendars"],
+  "skills": [
+    "create conference rooms",
+    "manage attendee registrations",
+    "send email invitations",
+    "generate auto-login URLs",
+    "manage access tokens",
+    "retrieve session history",
+    "manage file library",
+    "manage session recordings",
+    "retrieve chat logs",
+    "manage contacts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/clickmeeting.svg"
+}

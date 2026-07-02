@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/braze",
+  "description": "Track and manage user profiles with attributes, custom events, and purchases. Send personalized messages across email, push notifications, in-app messages, SMS, Content Cards, and webhooks. Trigger and schedule campaigns and multi-step Canvas journeys programmatically. Export campaign and Canvas analytics, KPIs, and user data. Manage audience segments, subscription groups, catalogs, email templates, content blocks, and preference centers. Handle email blocklists, hard bounces, and invalid phone numbers. Upload media assets and provision dashboard users via SCIM. Stream real-time message engagement and customer behavior events through Currents.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send multi-channel messages",
+    "track user events",
+    "manage user profiles",
+    "trigger campaigns and canvases",
+    "export analytics data",
+    "manage audience segments",
+    "manage subscription groups",
+    "manage catalogs",
+    "create email templates",
+    "schedule message delivery"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/braze.png"
+}

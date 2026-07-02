@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/llmwhisperer",
+  "description": "Extract and convert complex documents — PDFs, scanned images, Office documents, and spreadsheets — into LLM-optimized text. Submit documents via file upload or URL with multiple extraction modes: native text, low-cost OCR, high-quality OCR, form extraction, and table extraction. Preserve document layout or extract plain text. Configure image preprocessing (median filter, Gaussian blur) to improve OCR quality. Select specific pages for extraction. Check extraction status for async processing and retrieve results when ready. Get line-level bounding box metadata for text highlighting and search. Register webhooks for extraction completion notifications. Track API usage metrics by processing mode and tag.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "extract text from documents",
+    "convert scanned images to text",
+    "preserve document layout",
+    "extract table data",
+    "extract form data",
+    "check extraction status",
+    "retrieve line metadata",
+    "highlight text with bounding boxes",
+    "register extraction webhooks",
+    "track usage metrics"
+  ]
+}

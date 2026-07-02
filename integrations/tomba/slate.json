@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/tomba",
+  "description": "Find, verify, and enrich professional email addresses across a database of over 430 million contacts. Search for emails by domain or company name, find specific people's emails by name and domain, verify email deliverability, and discover emails from LinkedIn profiles or article URLs. Enrich emails with person and company data including name, position, social profiles, and location. Find phone numbers linked to domains or emails. Retrieve domain intelligence including email counts by department and seniority, email format patterns, technologies used, and domain status. Manage leads with full CRUD operations, organize leads into lists for campaign targeting, and receive webhook notifications when leads are saved. Track API usage, view activity logs, and manage account settings.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "find professional emails",
+    "verify email deliverability",
+    "enrich email and domain data",
+    "find phone numbers",
+    "search emails by domain",
+    "find email from LinkedIn",
+    "manage lead lists",
+    "retrieve domain intelligence",
+    "find article author email",
+    "track API usage"
+  ]
+}

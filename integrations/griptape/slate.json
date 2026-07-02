@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/griptape",
+  "description": "Build, deploy, and operate AI-powered applications on Griptape Cloud. Create and run Assistants for chat applications, deploy custom Structures (agents, pipelines, workflows) from Python code, and manage Knowledge Bases for RAG retrieval. Ingest data from web pages, S3, Google Drive, Confluence, and Data Lakes. Query across Knowledge Bases with reranking via Retrievers. Configure Rules and Rulesets to steer LLM behavior. Manage conversation state through Threads. Run Griptape Tools as cloud-hosted endpoints for third-party integrations. Monitor performance and spending with observability traces and events.",
+  "categories": [
+    "apis-and-http-requests",
+    "note-taking-and-knowledge-bases",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and run AI assistants",
+    "deploy custom AI structures",
+    "manage knowledge bases",
+    "ingest and sync data sources",
+    "query with RAG retrieval",
+    "manage conversation threads",
+    "configure LLM rules and rulesets",
+    "run cloud-hosted tools",
+    "monitor AI observability",
+    "store files in data lakes"
+  ]
+}

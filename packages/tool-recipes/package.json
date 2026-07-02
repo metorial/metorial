@@ -1,0 +1,43 @@
+{
+  "name": "@slates/tool-recipes",
+  "version": "1.0.0-rc.4",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Ivan Siianytsia",
+  "license": "FSL 1.1",
+  "type": "module",
+  "source": "src/index.ts",
+  "files": [
+    "src/**",
+    "dist/**",
+    "README.md",
+    "package.json"
+  ],
+  "exports": {
+    "bun": "./src/index.ts",
+    "types": "./dist/index.d.ts",
+    "require": "./dist/index.cjs",
+    "import": "./dist/index.module.js",
+    "default": "./dist/index.module.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.module.js",
+  "types": "dist/index.d.ts",
+  "unpkg": "./dist/index.module.js",
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts --passWithNoTests",
+    "build": "tsup --config ../../tsup.packages.config.ts",
+    "typecheck": "tsc --noEmit",
+    "biome:check": "biome check --write src"
+  },
+  "dependencies": {
+    "slates": "1.0.0-rc.14",
+    "zod": "^4.2"
+  },
+  "devDependencies": {
+    "@slates/tsconfig": "1.0.0-rc.1",
+    "typescript": "5.8.2",
+    "vitest": "^3.1.2"
+  }
+}

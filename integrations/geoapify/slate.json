@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/geoapify",
+  "description": "Geocode addresses to coordinates and reverse geocode coordinates to addresses. Calculate routes between waypoints for multiple travel modes (drive, truck, bike, walk, transit). Generate isochrones and isodistances for reachability analysis. Search for places and points of interest by category, location, and filters. Compute route matrices and optimize multi-vehicle route plans (VRP). Look up postcodes, administrative boundaries, and IP geolocation. Perform geometry operations on GeoJSON data. Generate static map images and retrieve map tiles. Batch process up to 1000 geocoding requests. Supports address autocomplete, map matching, and place detail lookups.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "geocode addresses",
+    "reverse geocode coordinates",
+    "calculate routes",
+    "search places and POIs",
+    "generate isochrones",
+    "optimize route plans",
+    "compute route matrices",
+    "look up administrative boundaries",
+    "batch geocode addresses",
+    "generate static maps"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/geoapify.png"
+}

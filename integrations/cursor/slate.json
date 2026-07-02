@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/cursor",
+  "description": "Launch and manage AI coding agents that operate on GitHub repositories. Create agents with natural language prompts, monitor their status, send follow-up instructions, and retrieve conversation histories. Agents can automatically create pull requests with their changes. List accessible GitHub repositories and available AI models. Manage team members, track per-member usage and spend, and configure repository blocklists. Receive webhook notifications on agent status changes.",
+  "categories": ["apis-and-http-requests", "code-execution"],
+  "skills": [
+    "launch AI coding agents",
+    "monitor agent status",
+    "send follow-up instructions",
+    "retrieve conversation history",
+    "list GitHub repositories",
+    "query available AI models",
+    "track team usage and spend",
+    "manage team members",
+    "configure repository blocklists",
+    "receive agent webhooks"
+  ]
+}

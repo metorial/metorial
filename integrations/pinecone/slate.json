@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/pinecone",
+  "description": "Manage vector database indexes and perform vector operations for AI applications. Create, configure, and delete serverless or pod-based indexes. Upsert, query, fetch, update, and delete vector embeddings with metadata filtering and namespace partitioning. Generate embeddings and rerank results using hosted inference models. Upload documents and chat with an AI assistant for RAG-based Q&A with citations. Bulk import data from cloud storage, create backups and collections, and manage organizational resources like projects, API keys, and service accounts.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage vector indexes",
+    "upsert vector embeddings",
+    "query similar vectors",
+    "filter by metadata",
+    "generate embeddings via inference",
+    "rerank search results",
+    "upload and chat with documents",
+    "bulk import from cloud storage",
+    "create backups and collections",
+    "manage projects and API keys"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/pinecone-logo.svg"
+}

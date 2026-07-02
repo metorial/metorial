@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/apiverve",
+  "description": "Access 300+ utility, data, and AI-powered APIs through a single unified interface. Validate emails, phone numbers, BIN numbers, and SSL certificates. Analyze text with sentiment analysis, grammar checking, and hashtag generation. Generate QR codes, barcodes, captchas, and test data. Look up currency exchange rates, gold prices, stock data, and CPI inflation data. Retrieve weather conditions, air quality, earthquake data, and IP geolocation. Perform WHOIS lookups, SSL certificate checks, Gravatar lookups, and web scraping. Convert between data formats and look up reference data such as car models, historical events, and Bible verses. Detect gender from names and process images with AI. Supports JSON, XML, YAML, and CSV response formats, plus GraphQL for combining multiple API calls in a single request.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
+  "skills": [
+    "validate emails and phone numbers",
+    "analyze text sentiment",
+    "generate QR codes and barcodes",
+    "look up currency exchange rates",
+    "retrieve weather and air quality",
+    "perform domain WHOIS lookups",
+    "generate synthetic test data",
+    "convert data formats",
+    "scrape web data",
+    "geolocate IP addresses"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/apiverve.png"
+}

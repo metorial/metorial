@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/bigmailer",
+  "description": "Manage multi-brand email marketing and transactional email sending. Create and manage brands, contacts, lists, suppression lists, custom fields, and senders. Send transactional emails with merge tags and field values. Create and list bulk marketing campaigns with A/B testing support. Upsert contacts with email validation, manage contact subscriptions across lists, and track bounces and complaints. Receive webhook events for bounces, clicks, opens, unsubscribes, and spam complaints.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send transactional emails",
+    "manage contact lists",
+    "create bulk campaigns",
+    "manage brands and senders",
+    "upsert contacts with validation",
+    "manage suppression lists",
+    "create custom fields",
+    "track bounces and complaints",
+    "receive webhook events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bigmailer.jpeg"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/box",
+  "description": "Upload, download, copy, move, rename, lock, and delete files and folders in Box. Manage file versions, shared links, and collaborations with configurable roles. Search content by full text, metadata, file type, and date ranges. Create and manage e-signature requests via Box Sign. Apply custom metadata templates to files and folders. Add comments and task assignments to files. Generate documents from templates with merged data. Use Box AI to ask questions about file content, generate text, and extract structured data. Manage enterprise users, groups, retention policies, legal holds, and security classifications. Monitor file, folder, collaboration, comment, shared link, metadata, task, sign request, and document generation events via webhooks.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "upload and download files",
+    "manage folders and permissions",
+    "share files via links",
+    "search file content",
+    "manage collaborations",
+    "create e-signature requests",
+    "apply metadata to files",
+    "generate documents from templates",
+    "AI-powered content analysis",
+    "manage users and groups"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/box.svg"
+}

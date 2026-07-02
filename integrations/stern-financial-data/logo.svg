@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" role="img" aria-label="Stern Financial Data">
+  <rect width="40" height="40" rx="7" fill="#4f46e5"/>
+  <path d="M9 29h22v3H9v-3Zm2-5h4V13h-4v11Zm7 0h4V8h-4v16Zm7 0h4V16h-4v8Z" fill="#fff"/>
+  <path d="M8 26h24" stroke="#c7d2fe" stroke-width="2" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/cloudlayer",
+  "description": "Generate PDF and image documents from HTML content, URLs, or templates. Convert web pages and HTML into PDFs with configurable paper formats, margins, headers/footers, and orientation. Generate images (PNG, JPG, WebP) from HTML or URLs with configurable viewports and transparency. Use predefined or custom Nunjucks templates with dynamic data for document generation. Batch-convert multiple URLs into a single combined PDF. Store generated assets in cloud storage with CDN access or custom S3-compatible storage. Generate image previews and thumbnails of documents. Manage jobs, check account status and credits, and receive webhook notifications on job completion.",
+  "categories": ["document-processing"],
+  "skills": [
+    "generate PDF from HTML",
+    "generate PDF from URL",
+    "generate image from HTML",
+    "generate image from URL",
+    "template-based document generation",
+    "batch URL to PDF conversion",
+    "manage generated asset storage",
+    "generate document previews",
+    "manage jobs",
+    "check account status"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cloudlayer.svg"
+}

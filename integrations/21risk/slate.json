@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/21risk",
+  "description": "Retrieve compliance, audit, and risk management data from 21RISK. Access organizations, sites, audits, risk models, corrective actions, compliance status, COPE (Construction, Occupancy, Protection, and Exposure) insurance data, and user information. Query data using OData protocol with filtering, sorting, and expansion options. Primarily a read-only API designed for data extraction, reporting, and integration with analytics tools like Power BI. Supports polling-based detection of new audits, corrective actions, and users.",
+  "categories": ["apis-and-http-requests", "legal-and-compliance"],
+  "skills": [
+    "retrieve audit and report data",
+    "access corrective actions",
+    "query compliance status",
+    "retrieve site information",
+    "access risk model definitions",
+    "export COPE insurance data",
+    "list organization members",
+    "filter and query OData endpoints",
+    "retrieve property insurance items"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/21risk.png"
+}

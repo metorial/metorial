@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/reddit",
+  "description": "Browse, search, and interact with Reddit communities (subreddits). Submit text, link, or image posts to subreddits. Comment on posts and reply to comments. Upvote and downvote content. Edit and delete your own posts and comments. Save and unsave content. Search Reddit for posts matching keywords. Fetch subreddit information, rules, and posts sorted by hot, new, top, or controversial. Access user profiles, post/comment history, and karma data. Send and receive private messages. Subscribe and unsubscribe from subreddits. Manage subreddit moderation tasks including approving or removing posts and comments, accessing mod logs, configuring subreddit settings, and managing bans. Set and manage user and post flairs. Read and edit subreddit wiki pages. Give awards to posts and comments.",
+  "categories": ["document-processing", "email-and-messaging", "news-and-media"],
+  "skills": [
+    "submit posts to subreddits",
+    "comment and reply to posts",
+    "upvote and downvote content",
+    "search Reddit posts",
+    "browse subreddit content",
+    "send private messages",
+    "manage subreddit moderation",
+    "manage user and post flairs",
+    "edit subreddit wiki pages",
+    "subscribe to subreddits"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/reddit.svg"
+}

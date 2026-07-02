@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/polygonio",
+  "description": "Access real-time, delayed, and historical financial market data across stocks, options, forex, cryptocurrencies, and indices. Retrieve trades, quotes, OHLCV aggregate bars, daily open/close prices, and snapshots. Compute technical indicators including SMA, EMA, MACD, and RSI. Look up reference data such as ticker details, stock financials, dividends, stock splits, market status, and market holidays. Stream real-time market data via WebSocket for stocks, options, forex, crypto, and indices. Search financial news articles with sentiment analysis.",
+  "categories": [
+    "apis-and-http-requests",
+    "financial-data-and-stock-market",
+    "news-and-media"
+  ],
+  "skills": [
+    "retrieve stock market data",
+    "stream real-time prices",
+    "query options contracts",
+    "fetch forex quotes",
+    "get cryptocurrency trades",
+    "compute technical indicators",
+    "lookup ticker details",
+    "retrieve stock financials",
+    "search financial news",
+    "check market status"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/polygon-io.svg"
+}

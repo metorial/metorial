@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/bigpictureio",
+  "description": "Enrich and look up B2B company data from a database of 20M+ company profiles. Convert domain names into detailed company profiles including firmographics, industry classification, technology stack, financials, employee count, social profiles, and location data. Resolve IP addresses to identify the company behind website traffic, with confidence scores and geolocation. Retrieve company logos by domain. Track website visitors and associate them with company and user traits using a JavaScript SDK. Supports asynchronous webhook delivery for enrichment results.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "enrich company by domain",
+    "resolve IP to company",
+    "retrieve company logos",
+    "get firmographic data",
+    "detect technology stack",
+    "identify website visitors",
+    "get financial metrics",
+    "track custom events",
+    "lookup industry classification"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/bigpicture-io.png"
+}

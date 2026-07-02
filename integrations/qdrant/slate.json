@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/qdrant",
+  "description": "Store, search, and manage vectors with JSON payloads in a vector database. Create and configure collections with custom vector parameters, distance metrics, and multiple named vector spaces. Upsert, retrieve, and delete points (vectors) individually or in batches. Perform similarity search, filtered search, hybrid search, and multi-stage queries using dense or sparse vectors. Build recommendation systems using positive/negative examples with configurable scoring strategies. Run discovery searches constrained by context pairs. Filter results by payload fields including keyword matching, full-text search, numerical ranges, and geo-locations. Group search results by payload field. Create, list, download, and delete collection snapshots for backup and recovery. Manage cloud clusters, API keys, backup schedules, and hybrid cloud environments. Generate vector embeddings via built-in inference for text and other data types.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage vector collections",
+    "upsert and retrieve points",
+    "perform similarity search",
+    "filter by payload fields",
+    "build recommendations",
+    "run discovery search",
+    "create and restore snapshots",
+    "manage cloud clusters",
+    "generate vector embeddings",
+    "group search results"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/qdrant-logo.svg"
+}

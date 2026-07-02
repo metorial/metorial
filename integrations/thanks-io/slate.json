@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/thanksio",
+  "description": "Send personalized handwritten postcards, letters, notecards, and gift cards as physical direct mail at scale. Manage recipients and mailing lists, track order delivery status, and monitor QR code engagement. Supports dynamic image personalization, radius-based lead generation, multiple handwriting styles, gift card catalogs, sub-account management, and webhooks for delivery and scan events. Preview mail pieces before sending, use message and image templates, and personalize content with recipient-specific data tags.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail"],
+  "skills": [
+    "send direct mail pieces",
+    "manage recipients and mailing lists",
+    "track order delivery status",
+    "search recipients by radius",
+    "build dynamic personalized images",
+    "browse gift card catalog",
+    "manage sub-accounts",
+    "preview mail before sending",
+    "manage webhook subscriptions",
+    "use message and image templates"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/thanks-io.png"
+}

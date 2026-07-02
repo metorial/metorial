@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/placekey",
+  "description": "Look up universal unique identifiers (Placekeys) for physical places worldwide using addresses or geographic coordinates. Match, deduplicate, and merge location data across datasets. Retrieve single or bulk Placekeys with optional response fields including confidence scores, normalized addresses, geocodes, parcel identifiers, and census geoids. Geocode addresses into latitude/longitude coordinates.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "look up Placekey for location",
+    "bulk Placekey lookup",
+    "geocode address to coordinates",
+    "match and deduplicate places",
+    "retrieve normalized addresses",
+    "get confidence scores",
+    "look up parcel identifiers",
+    "retrieve census geoids"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/placekey.png"
+}

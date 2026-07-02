@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/algodocs",
+  "description": "Extract structured data from PDFs, images, Word, and Excel documents using AI-powered OCR and custom extractors. Upload documents via local file, URL, or base64 encoding. Manage extractors and folders. Retrieve extracted fields and table data by document or extractor ID, with filtering by folder, date, and limit. Export extracted data in Excel, JSON, XML, or custom Excel templates. Supports over 200 languages.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "upload documents for extraction",
+    "extract data from PDFs",
+    "extract data from images",
+    "manage extractors",
+    "manage folders",
+    "retrieve extracted data",
+    "export data to Excel",
+    "export data to JSON/XML",
+    "filter extracted results"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/algodocs.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@cloudflare/cloudflare-workers",
+  "description": "Manage Cloudflare Workers serverless scripts, versions, and deployments on Cloudflare's global edge network. Create, list, update, download, and delete Worker scripts. Manage versions and deployments independently, supporting gradual rollouts. Configure bindings to external resources like KV, D1, R2, Durable Objects, Queues, and environment variables. Add, list, and delete encrypted secrets. Set up and update cron triggers for scheduled execution. Manage custom domains, routes, and workers.dev subdomains. Stream real-time logs via Tail, configure Logpush for log forwarding, and query observability telemetry data. Supports Workers for Platforms (dispatch namespaces) for multi-tenant use cases.",
+  "categories": ["apis-and-http-requests", "code-execution"],
+  "skills": [
+    "manage Worker scripts",
+    "deploy Worker versions",
+    "configure bindings and settings",
+    "manage secrets",
+    "schedule cron triggers",
+    "manage custom domains and routes",
+    "stream real-time logs",
+    "query observability telemetry",
+    "configure Logpush pipelines",
+    "manage dispatch namespaces"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/cloudflare.png"
+}

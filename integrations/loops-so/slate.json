@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/loopsso",
+  "description": "Manage contacts, send emails, and track engagement for SaaS email marketing. Create, update, find, and delete contacts with custom properties. Send transactional emails using templates with dynamic data variables and attachments. Trigger automated email workflows (loops) by sending events. Manage mailing list subscriptions. List contact properties and transactional email templates. Receive webhooks for contact changes, email sends, deliveries, opens, clicks, bounces, and unsubscribes.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage contacts",
+    "send transactional emails",
+    "trigger automated workflows",
+    "manage mailing lists",
+    "track email engagement",
+    "list contact properties",
+    "send events for contacts",
+    "list email templates",
+    "subscribe and unsubscribe contacts"
+  ]
+}

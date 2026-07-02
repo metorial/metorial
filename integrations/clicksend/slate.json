@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/clicksend",
+  "description": "Send and receive SMS, MMS, voice (text-to-speech), transactional email, fax, and physical post (letters and postcards) worldwide. Manage contacts and contact lists, purchase dedicated phone numbers, register sender IDs, and create inbound automation rules for auto-replies and webhook forwarding. Schedule messages for future delivery, run bulk SMS and MMS campaigns, upload files for fax and post operations, and track delivery receipts and messaging statistics. Manage subaccounts, check account balance, and export message history for reporting.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send SMS messages",
+    "send MMS messages",
+    "send voice calls",
+    "send transactional email",
+    "send physical letters and postcards",
+    "manage contacts and lists",
+    "purchase dedicated numbers",
+    "configure inbound automation rules",
+    "schedule bulk campaigns",
+    "track delivery receipts"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/launchdarkly",
+  "description": "Manage feature flags, experiments, and progressive rollouts across projects and environments. Create, update, toggle, and delete feature flags with targeting rules, percentage rollouts, and prerequisites. Define user segments for bulk targeting. Run experiments to measure the impact of flag variations using custom metrics. Manage projects, environments, account members, teams, and role-based access. Query the audit log for change history. Configure webhooks, release pipelines, relay proxy settings, and data export destinations. Set up scheduled flag changes, approval workflows, and integration audit log subscriptions.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "manage feature flags",
+    "configure targeting rules",
+    "run experiments",
+    "manage user segments",
+    "manage projects and environments",
+    "query audit log",
+    "configure webhooks",
+    "manage release pipelines",
+    "schedule flag changes",
+    "manage account members and teams"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/launch-darkly-logo.png"
+}

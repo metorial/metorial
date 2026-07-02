@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/simlacom",
+  "description": "Manage customers, orders, and product catalogs for eCommerce CRM. Create, edit, retrieve, and merge customer profiles (individual and corporate) with segmentation, notes, and file attachments. Create, edit, upload, and combine orders with line items, delivery info, discounts, payments, and custom fields. Retrieve product listings with SKUs, inventory, and product groups. Calculate delivery costs, manage delivery orders, and generate shipping documents. Integrate telephony with call event notifications. Track incremental change history for orders and customers to sync with external systems. Manage custom fields, dictionaries, reference data (statuses, payment types, delivery types, stores), and integration modules.",
+  "categories": ["crm-and-sales-tools", "e-commerce-and-retail"],
+  "skills": [
+    "manage customer profiles",
+    "create and edit orders",
+    "merge customer records",
+    "track order change history",
+    "manage product catalog",
+    "calculate delivery costs",
+    "manage custom fields",
+    "segment customers",
+    "integrate telephony events",
+    "manage reference data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/simla-com.svg"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/mixpanel",
+  "description": "Track, import, and query product analytics data. Send events and manage user and group profiles. Query analytics reports including funnels, retention, segmentation, and cohorts. Export raw event data and configure data pipelines to external warehouses. Import data from warehouses into Mixpanel. Manage lookup tables, data schemas, and annotations. Submit GDPR data retrieval and deletion requests. Evaluate feature flags for users. Sync cohort membership changes via webhooks.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "track and import events",
+    "manage user profiles",
+    "query funnel reports",
+    "query retention and segmentation",
+    "export raw event data",
+    "configure data pipelines",
+    "manage lookup tables",
+    "submit GDPR requests",
+    "evaluate feature flags",
+    "sync cohort webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/mixpanel.svg"
+}

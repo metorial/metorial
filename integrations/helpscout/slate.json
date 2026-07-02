@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/help-scout",
+  "description": "Manage customer support conversations, customers, and knowledge base content. Create, update, assign, and close conversations across shared mailboxes. Add replies, notes, and attachments to conversation threads. Create and manage customer profiles with contact details and custom properties. Organize customers into companies/organizations. Manage tags, teams, users, and automated workflows. Create and update knowledge base articles, collections, and categories via the Docs API. Access support reporting including conversation volume, response times, user productivity, and customer satisfaction ratings. Configure webhooks to receive real-time notifications on conversation, customer, and organization changes.",
+  "categories": [
+    "crm-and-sales-tools",
+    "email-and-messaging",
+    "note-taking-and-knowledge-bases"
+  ],
+  "skills": [
+    "manage support conversations",
+    "send agent replies",
+    "create internal notes",
+    "manage customer profiles",
+    "manage knowledge base articles",
+    "organize tags and workflows",
+    "access support reports",
+    "manage mailboxes and teams",
+    "configure webhooks",
+    "track satisfaction ratings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/helpscout.png"
+}

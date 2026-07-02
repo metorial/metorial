@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/clickup",
+  "description": "Create, update, delete, and search tasks across a hierarchical workspace structure of Spaces, Folders, and Lists. Manage task details including assignees, statuses, priorities, due dates, tags, dependencies, and custom fields. Track time on tasks with timers and time entries. Add comments and attachments to tasks. Create and manage Docs, Views (List, Board, Calendar, Gantt), Goals, and Targets for progress tracking. Organize workspaces by creating and managing Spaces, Folders, and Lists. Retrieve workspace members and team information. Subscribe to webhooks for real-time notifications on task, list, folder, space, and goal events.",
+  "categories": ["email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "create and manage tasks",
+    "track time on tasks",
+    "manage custom fields",
+    "add comments and attachments",
+    "create goals and targets",
+    "organize spaces and folders",
+    "filter and search tasks",
+    "manage views and workflows",
+    "subscribe to webhook events",
+    "manage tags and priorities"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/clickup.png"
+}

@@ -1,4 +1,0 @@
-{
-  "name": "Stripe MCP Server",
-  "runtime": "typescript.deno"
-}

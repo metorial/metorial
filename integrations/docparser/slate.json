@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/docparser",
+  "description": "Extract structured data from PDFs, Word documents, and image-based documents using OCR and pattern recognition. Import documents via file upload, base64 content, or URL fetch. Manage document parsers and model layouts, track document processing status, and retrieve parsed data as JSON or flat key/value pairs. Re-parse documents after rule changes and re-integrate results through webhooks. Filter and sort parsed results by date, processing status, or remote ID.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "extract data from documents",
+    "import documents for parsing",
+    "manage document parsers",
+    "track document processing status",
+    "retrieve parsed data",
+    "re-parse documents",
+    "fetch documents from URL",
+    "filter and sort results",
+    "configure webhook integrations"
+  ]
+}

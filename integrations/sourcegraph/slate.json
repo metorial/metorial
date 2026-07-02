@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/sourcegraph",
+  "description": "Search code across all repositories, branches, and code hosts using literal, regex, structural, and natural language queries. Perform AI-powered deep search to ask natural language questions and get detailed answers with code citations. Stream search results in real-time via Server-Sent Events. Manage batch changes to create, update, and track pull requests across many repositories and code hosts at scale. Create and manage code insights to track code patterns over time with line charts and dashboards. Set up code monitors to get notified about changes like potential secrets, anti-patterns, or typos via email, Slack, or webhooks. Query and manage repositories, branches, commit history, users, organizations, and permissions. Connect AI agents to Sourcegraph's code intelligence via the MCP Server for natural language search, file reading, and repository listing.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "search code across repositories",
+    "AI-powered deep search",
+    "stream search results",
+    "manage batch changes",
+    "track code insights",
+    "monitor code changes",
+    "manage repositories and branches",
+    "manage users and permissions",
+    "create large-scale changesets",
+    "read files and commits"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sourcegraph.jpeg"
+}

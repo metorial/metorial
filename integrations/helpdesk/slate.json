@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/helpdesk",
+  "description": "Manage customer support tickets including creating, updating, assigning, and filtering tickets by status, priority, tags, teams, and custom fields. Add public or private messages and attachments to ticket conversations. Import historical tickets from other systems. Manage agents with roles, team membership, and autoassignment settings. Organize agents into teams with configurable email templates and reply addresses. Create automation rules with triggers and actions to automatically process tickets. Define reusable macros and canned response templates. Configure custom email domains and mailboxes for inbound routing. Create saved ticket filter views. Access reports on ticket volume, ratings, response times, and resolution times. Query audit logs of system changes. Manage webhooks for ticket lifecycle events including creation, updates, status changes, assignment changes, new messages, and tag changes.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging", "task-and-project-management"],
+  "skills": [
+    "manage support tickets",
+    "send ticket messages",
+    "assign tickets to agents",
+    "create automation rules",
+    "manage agent teams",
+    "configure custom fields",
+    "generate support reports",
+    "import historical tickets",
+    "manage canned responses",
+    "configure webhook events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/helpdesk.jpeg"
+}

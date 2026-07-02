@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/resistant-ai",
+  "description": "Verify individual identities using government-issued documents and biometric selfies across 200+ countries. Run KYC identity checks, AML screening (PEP, sanctions, adverse media), proof of address verification, US background checks, and credit reports. Perform Know Your Business (KYB) verification including UBO and ASIC director reports. Send branded ID check request emails to contacts, receive verification outcomes via webhooks, and write results back to connected CRMs. Supports custom onboarding forms and Bring Your Own Key (BYOK) provider configuration.",
+  "categories": ["crm-and-sales-tools", "legal-and-compliance", "security"],
+  "skills": [
+    "verify identity documents",
+    "biometric selfie verification",
+    "AML and PEP screening",
+    "sanctions and adverse media screening",
+    "proof of address verification",
+    "US criminal background checks",
+    "credit reports and scoring",
+    "KYB business verification",
+    "send ID check requests",
+    "CRM verification writeback"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/identitycheck.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/canva",
+  "description": "Create, manage, and export graphic designs programmatically. Upload and manage assets (images), organize designs and assets into folders, and retrieve design metadata. Import external files as Canva designs and export designs in various formats (PDF, PNG, JPG). Autofill brand templates with dynamic data to generate designs at scale. Read and create comments and replies on designs. Resize designs to different dimensions. Manage folder permissions and retrieve user profile information. Receive webhook notifications for comments, design sharing, approval requests, access requests, and suggestions.",
+  "categories": ["document-processing"],
+  "skills": [
+    "create and manage designs",
+    "upload and manage assets",
+    "export designs to PDF/PNG/JPG",
+    "autofill brand templates",
+    "import external files as designs",
+    "manage folders and permissions",
+    "read and create comments",
+    "resize designs",
+    "retrieve user profile",
+    "receive design event webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/canva.jpeg"
+}

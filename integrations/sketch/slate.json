@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/sketch",
+  "description": "Manipulate Sketch design documents programmatically via a local JavaScript Plugin API, CLI tool (sketchtool), and open JSON-based file format. Create, read, and modify documents including layers, symbols, colors, and styles. Export artboards, layers, slices, and pages in multiple formats (PNG, JPG, SVG, PDF). Inspect document metadata and dump full document structure as JSON. Import symbols and styles from shared libraries. Generate or process Sketch files server-side without the app by reading/writing the open ZIP/JSON file format. Supply custom data (images, text) to Sketch via Data Suppliers. Note: all APIs are local to macOS or file-based — there is no public remote/cloud API, no webhooks, and no OAuth or API key authentication.",
+  "categories": ["document-processing"],
+  "skills": [
+    "export design assets",
+    "inspect document structure",
+    "manipulate layers and symbols",
+    "import shared library styles",
+    "generate Sketch files programmatically",
+    "read and modify documents",
+    "export in multiple formats",
+    "supply custom data to designs",
+    "run plugins via CLI"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/sketch.png"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/maintainx",
+  "description": "Create, update, and track work orders for reactive and preventive maintenance. Manage assets, locations, parts inventory, meters, and readings. Create and process purchase orders, manage vendors, and organize users into teams. Send messages in work order conversations, create work requests, assign categories and priorities, and export maintenance data as CSV for reporting. Supports custom fields, asset hierarchies, QR/barcode tracking, and low-stock alerts for parts inventory.",
+  "categories": ["iot-and-device-control", "task-and-project-management"],
+  "skills": [
+    "manage work orders",
+    "track asset maintenance",
+    "monitor parts inventory",
+    "record meter readings",
+    "create purchase orders",
+    "manage vendors",
+    "send conversation messages",
+    "create work requests",
+    "export data as CSV",
+    "manage teams and users"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/maintainx.svg"
+}

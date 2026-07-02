@@ -1,0 +1,21 @@
+{
+  "name": "@metorial/fillout-forms",
+  "description": "Manage online forms, surveys, and quizzes. List and retrieve form definitions with question metadata, calculations, and quiz configuration. Create, retrieve, filter, and delete form submissions programmatically. Access submission data including responses, scheduling details, payment information, and quiz scores. Subscribe to webhooks for real-time new submission notifications.",
+  "categories": [
+    "apis-and-http-requests",
+    "crm-and-sales-tools",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "list and retrieve forms",
+    "get form question definitions",
+    "create form submissions",
+    "retrieve form submissions",
+    "delete form submissions",
+    "filter submissions by date",
+    "manage submission webhooks",
+    "access quiz scores",
+    "access payment data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/fillout-forms.png"
+}

@@ -1,0 +1,68 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  addSubscriber,
+  bulkSyncSubscribers,
+  createCampaign,
+  createField,
+  createList,
+  createSegment,
+  createWebhook,
+  deleteCampaign,
+  deleteField,
+  deleteList,
+  deleteSegment,
+  deleteSubscriber,
+  deleteWebhook,
+  getCampaigns,
+  getFields,
+  getList,
+  getReport,
+  getSegments,
+  getSubscribers,
+  getWebhooks,
+  sendCampaign,
+  setCampaignContent,
+  updateCampaign,
+  updateField,
+  updateList,
+  updateSegment,
+  updateSubscriber,
+  updateWebhook
+} from './tools';
+import { subscriberEvent } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    createList,
+    getList,
+    updateList,
+    deleteList,
+    getSubscribers,
+    addSubscriber,
+    updateSubscriber,
+    deleteSubscriber,
+    bulkSyncSubscribers,
+    getFields,
+    createField,
+    updateField,
+    deleteField,
+    getSegments,
+    createSegment,
+    updateSegment,
+    deleteSegment,
+    getCampaigns,
+    createCampaign,
+    updateCampaign,
+    deleteCampaign,
+    setCampaignContent,
+    sendCampaign,
+    getReport,
+    getWebhooks,
+    createWebhook,
+    updateWebhook,
+    deleteWebhook
+  ],
+  triggers: [subscriberEvent]
+});

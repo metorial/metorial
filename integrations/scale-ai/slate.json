@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/scale-ai",
+  "description": "Create and manage data labeling and annotation projects for AI/ML training data. Submit tasks for image annotation (bounding boxes, polygons, segmentation), video annotation with tracking, 3D LiDAR/sensor fusion annotation, document transcription, and text annotation. Manage projects, batches, and taxonomies/ontologies for structured labeling workflows. Support pre-labeling with model-generated hypotheses, quality auditing, evaluation tasks, and team management for annotation teams. Receive task and batch completion notifications via webhooks.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "create annotation tasks",
+    "manage labeling projects",
+    "annotate images and video",
+    "manage batches and priorities",
+    "configure labeling ontologies",
+    "audit task quality",
+    "create evaluation tasks",
+    "manage annotation teams",
+    "receive completion webhooks",
+    "annotate 3D point clouds"
+  ]
+}

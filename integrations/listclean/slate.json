@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/listclean",
+  "description": "Verify and validate email addresses in real time or in bulk. Check email syntax, DNS/MX records, SMTP responses, and risk signals to classify emails as valid, invalid, catch-all, disposable, or role-based. Upload CSV or TXT files for batch list cleaning with duplicate removal. Find business email addresses by name and domain. Retrieve account profile and credit balance. Receive webhook notifications for email delivery events including opens, clicks, bounces, and unsubscribes.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "verify single email address",
+    "bulk email list verification",
+    "detect disposable emails",
+    "find business email addresses",
+    "check account credit balance",
+    "upload CSV email lists",
+    "download cleaned results",
+    "track email delivery events"
+  ]
+}

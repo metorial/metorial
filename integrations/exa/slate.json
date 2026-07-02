@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/exa",
+  "description": "Search the web using AI-native neural and keyword search methods. Extract full text, highlights, and summaries from web pages. Find similar pages based on a given URL. Get AI-generated answers to questions with citations. Automate in-depth web research and receive structured results with citations. Build and manage Websets—structured collections of web entities found, verified, and enriched by search agents. Import data into Websets, enrich items with additional structured data, schedule monitors for continuous updates, and export results to CSV, JSON, or XLSX. Configure webhooks for Webset lifecycle events.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "search the web",
+    "extract web page content",
+    "find similar pages",
+    "answer questions with citations",
+    "automate web research",
+    "build structured websets",
+    "enrich webset items",
+    "import and export data",
+    "monitor for new results",
+    "manage webhooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/exa.svg"
+}

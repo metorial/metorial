@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/outreach",
+  "description": "Manage sales engagement data and automation in Outreach. Create, read, update, and delete prospects (contacts/leads) and accounts (companies). Build and manage sequences — automated multi-step outreach campaigns — including adding/removing prospects and tracking their progress through sequence states. Send and track emails with delivery, open, bounce, and reply metrics. Log and manage phone calls with dispositions and purposes. Create and manage tasks, opportunities, templates, snippets, and custom objects. Invite and manage users, roles, and teams. Perform bulk operations and data imports. Access audit logs, compliance requests, and Kaia conversation intelligence recordings. Subscribe to webhooks for real-time notifications on changes to accounts, prospects, mailings, sequences, tasks, opportunities, and more.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage prospects and accounts",
+    "create and run sequences",
+    "send and track emails",
+    "log and manage calls",
+    "manage sales tasks",
+    "track opportunities and pipeline",
+    "manage email templates and snippets",
+    "bulk import and update records",
+    "subscribe to event webhooks",
+    "access audit logs"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/outreach.png"
+}

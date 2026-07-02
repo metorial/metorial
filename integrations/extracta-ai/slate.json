@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/extractaai",
+  "description": "Extract structured data from unstructured documents including PDFs, Word files, text files, and scanned images (PNG, JPG) using AI and OCR. Create and manage extraction templates with custom fields (string, object, array types) to define what data to extract. Upload files for batch processing with options for table extraction, visual/chart detection, handwritten text recognition, checkbox detection, long document handling, PDF page splitting, and specific page range processing. Classify documents into predefined categories with optional automatic extraction. Use pre-built templates for common document types like invoices, receipts, contracts, resumes, bank statements, business cards, and emails. Monitor extraction results via webhooks for processed and edited events. Check remaining account credits for usage tracking. Supports up to 27 languages.",
+  "categories": ["apis-and-http-requests", "document-processing"],
+  "skills": [
+    "extract data from documents",
+    "classify documents by type",
+    "create extraction templates",
+    "process scanned images with OCR",
+    "extract tables and visuals",
+    "recognize handwritten text",
+    "detect checkbox states",
+    "upload files for batch processing",
+    "retrieve extraction results",
+    "check account credits"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/extracta-ai.svg"
+}

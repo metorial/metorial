@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/strapi",
+  "description": "Create, read, update, and delete entries for custom content types via REST and GraphQL APIs. Manage media assets including images, videos, and documents. Publish and unpublish content with draft/publish workflows. Create and manage localized content for multiple locales using internationalization. Manage end users with registration, login, and role-based access control. Filter, sort, and populate nested relations and components in API queries. Configure webhooks to receive notifications on content, media, and release events.",
+  "categories": ["document-processing"],
+  "skills": [
+    "create content entries",
+    "manage media assets",
+    "publish and unpublish content",
+    "manage localized content",
+    "manage users and roles",
+    "filter and sort queries",
+    "configure webhooks",
+    "upload files",
+    "manage content relations",
+    "authenticate via JWT"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/strapi.png"
+}

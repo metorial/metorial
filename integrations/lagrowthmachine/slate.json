@@ -1,0 +1,17 @@
+{
+  "name": "@metorial/la-growth-machine",
+  "description": "Automate multichannel sales outreach across LinkedIn, email, and Twitter/X. Search, create, and update leads with enrichment data. Manage audiences by importing or removing leads from segmented lists. Retrieve campaign information, change lead statuses within campaigns, and access campaign performance stats. Send LinkedIn messages to leads by ID or profile URL. Import leads from LinkedIn search results, Sales Navigator URLs, or LinkedIn post URLs. List workspace members and connected identities. Configure inbox webhooks for real-time notifications on email events (sent, opened, clicked, replied), LinkedIn events (connection requests, messages, profile visits), Twitter/X events (tweets, DMs, follows), and lead lifecycle events (enriched, converted, unsubscribed, status changed).",
+  "categories": ["crm-and-sales-tools", "news-and-media"],
+  "skills": [
+    "search and manage leads",
+    "manage lead audiences",
+    "send LinkedIn messages",
+    "import leads from LinkedIn",
+    "retrieve campaign stats",
+    "update lead campaign status",
+    "track email engagement events",
+    "monitor LinkedIn interactions",
+    "configure inbox webhooks",
+    "enrich lead data"
+  ]
+}

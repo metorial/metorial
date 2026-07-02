@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/knack",
+  "description": "Create, read, update, and delete records in custom online database applications. Manage data across user-defined objects and views with filtering and sorting. Upload files and images to records. Retrieve application metadata including objects, fields, views, and scenes. Authenticate users remotely to obtain tokens for view-based access. React to record creation, update, deletion, and form submission events.",
+  "categories": ["apis-and-http-requests", "task-and-project-management"],
+  "skills": [
+    "create database records",
+    "read and filter records",
+    "update existing records",
+    "delete records",
+    "upload files and images",
+    "retrieve application metadata",
+    "sort and filter data",
+    "authenticate users remotely",
+    "monitor record changes"
+  ]
+}

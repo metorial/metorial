@@ -1,0 +1,20 @@
+{
+  "name": "@metorial/getform",
+  "description": "Collect, store, and manage form submissions via a headless form backend API. Submit form data with structured blocks or standard form-encoded data, upload files up to 25MB, and retrieve or search submissions with filtering and pagination. Configure spam protection with reCAPTCHA, hCaptcha, or honeypot fields. Set up webhooks to forward new submissions to external endpoints. Restrict submissions to authorized domains and organize forms into collaborative workspaces. Integrates with Zapier, Make, Slack, and Discord for notifications and automation.",
+  "categories": [
+    "apis-and-http-requests",
+    "document-processing",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "collect form submissions",
+    "upload and store files",
+    "retrieve and search submissions",
+    "configure spam protection",
+    "forward submissions via webhooks",
+    "restrict authorized domains",
+    "manage form workspaces",
+    "set custom redirects"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/getform.png"
+}

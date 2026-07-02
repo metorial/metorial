@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/serpdog",
+  "description": "Scrape search engine results and extract web data from multiple platforms. Search and extract Google results including web search, maps, news, shopping, images, videos, finance, jobs, scholar, and autocomplete. Scrape Bing search results, Amazon and Walmart product data, Yelp business listings, YouTube search results, and LinkedIn job postings. Perform general-purpose web scraping with JavaScript rendering, premium proxies, and CAPTCHA handling. Returns data in JSON or HTML format with geo-targeting and language configuration.",
+  "categories": ["apis-and-http-requests", "e-commerce-and-retail", "web-search"],
+  "skills": [
+    "scrape Google search results",
+    "extract Google Maps data",
+    "scrape Google Shopping prices",
+    "extract Amazon product data",
+    "scrape Walmart products",
+    "search Google News",
+    "extract LinkedIn job listings",
+    "scrape any website",
+    "retrieve Google Scholar results",
+    "extract YouTube search data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/serpdog.png"
+}

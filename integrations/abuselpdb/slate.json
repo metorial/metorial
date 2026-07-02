@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/abuseipdb",
+  "description": "Check IP address reputation and abuse confidence scores. Report malicious IP addresses with categorized abuse types. Retrieve detailed abuse reports for IPs and subnets. Download blacklists of known malicious IPs for firewall import. Bulk-report abusive IPs via CSV upload. Clear your own submitted reports for an IP address.",
+  "categories": ["apis-and-http-requests", "security"],
+  "skills": [
+    "check IP reputation",
+    "report abusive IP addresses",
+    "retrieve IP abuse reports",
+    "check subnet for abuse",
+    "download IP blacklists",
+    "bulk report via CSV",
+    "clear submitted IP reports",
+    "filter blacklist by country"
+  ]
+}

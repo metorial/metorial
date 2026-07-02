@@ -1,0 +1,66 @@
+import { Slate } from 'slates';
+import { spec } from './spec';
+import {
+  createCheck,
+  createContact,
+  createMaintenance,
+  createTeam,
+  deleteCheck,
+  deleteContact,
+  deleteMaintenance,
+  deleteTeam,
+  deleteTmsCheck,
+  getAccountInfo,
+  getActions,
+  getAnalysis,
+  getCheck,
+  getCheckResults,
+  getProbes,
+  getSummary,
+  getTmsCheck,
+  listChecks,
+  listContacts,
+  listMaintenance,
+  listTeams,
+  listTmsChecks,
+  performSingleCheck,
+  updateCheck,
+  updateContact,
+  updateMaintenance,
+  updateTeam
+} from './tools';
+import { stateChange } from './triggers';
+
+export let provider = Slate.create({
+  spec,
+  tools: [
+    listChecks,
+    getCheck,
+    createCheck,
+    updateCheck,
+    deleteCheck,
+    getCheckResults,
+    getSummary,
+    listContacts,
+    createContact,
+    updateContact,
+    deleteContact,
+    listTeams,
+    createTeam,
+    updateTeam,
+    deleteTeam,
+    listMaintenance,
+    createMaintenance,
+    updateMaintenance,
+    deleteMaintenance,
+    listTmsChecks,
+    getTmsCheck,
+    deleteTmsCheck,
+    performSingleCheck,
+    getProbes,
+    getAccountInfo,
+    getActions,
+    getAnalysis
+  ],
+  triggers: [stateChange]
+});

@@ -1,0 +1,16 @@
+{
+  "name": "@metorial/leadboxer",
+  "description": "Identify website visitors and enrich lead data with firmographic and behavioral intelligence. Retrieve and filter lists of identified leads, look up company information by IP address or domain, track server-side behavioral events, and enrich lead profiles with custom properties. Supports company identification from IP addresses (returning company name, industry, employee count, revenue, and location), domain-based data enrichment (returning technology stack, company size, and more), detailed session and event history retrieval for leads, and lead assignment to sales team members.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "retrieve and filter leads",
+    "look up company by IP",
+    "enrich data by domain",
+    "track server-side events",
+    "enrich lead profiles",
+    "retrieve session history",
+    "assign leads to team",
+    "identify website visitors",
+    "score and qualify leads"
+  ]
+}

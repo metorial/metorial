@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/chameleon",
+  "description": "Manage in-app product adoption experiences for SaaS applications. Create and manage product tours, microsurveys, tooltips, launchers (checklists), embeddables, and HelpBar content. Send and update user profiles and company data, track tour interactions and microsurvey responses, manage audience segments for targeting experiences, and configure webhooks for real-time data exchange. Import user data in bulk, manage approved domains and environments, and access delivery and interaction analytics for tours and surveys.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "manage product tours",
+    "collect microsurvey responses",
+    "manage user profiles",
+    "configure audience segments",
+    "manage in-app tooltips",
+    "track tour interactions",
+    "import bulk user data",
+    "configure webhooks",
+    "manage HelpBar content",
+    "update company data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/chameleon.png"
+}

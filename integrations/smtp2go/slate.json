@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/smtp2go",
+  "description": "Send emails and SMS messages programmatically with reliable delivery. Manage email templates, sender domains, and SMTP users. Track delivery statistics including bounces, opens, clicks, spam complaints, and unsubscribes. Manage suppressions, allowed senders, and single sender verification. Configure webhooks for email and SMS events. Archive sent emails and manage subaccounts for isolated settings and reporting. Restrict API access via IP allowlists.",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "send emails",
+    "send SMS messages",
+    "manage email templates",
+    "track delivery statistics",
+    "manage sender domains",
+    "manage suppressions",
+    "configure webhooks",
+    "manage SMTP users",
+    "search email events",
+    "manage subaccounts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/smtp2go.jpeg"
+}

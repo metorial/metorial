@@ -1,0 +1,19 @@
+{
+  "name": "@microsoft/azure-repos",
+  "description": "Manage Git repositories, branches, and pull requests in Azure DevOps. Create, list, update, and delete repositories and forks. Create and manage branches, configure branch policies (minimum reviewers, build validation, merge strategies). Create, review, comment on, and complete pull requests with support for draft PRs, auto-completion, and merge strategies. Browse commit history, view pushes, and retrieve file contents at specific versions. Search code across repositories by text, path, and file extension. Receive webhooks for code pushes, pull request lifecycle events, repository creation/deletion/renaming, and TFVC check-ins.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage Git repositories",
+    "create and review pull requests",
+    "manage branches and refs",
+    "configure branch policies",
+    "browse commit history",
+    "retrieve file contents",
+    "search code across repos",
+    "create repository forks",
+    "manage PR comments and votes",
+    "receive repo webhook events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/azure-repos.png",
+  "version": "0.1.2"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/2chat",
+  "description": "Send and receive WhatsApp messages (text, images, audio, video, PDFs) to individuals and groups. Manage WhatsApp contacts, groups, catalogs, and connected numbers. Verify WhatsApp phone numbers, set profile status and pictures, and generate QR codes for white-label WhatsApp connections. Manage virtual phone numbers and voice calls across 90+ countries. Subscribe to webhooks for real-time events including message delivery receipts, group membership changes, call status updates, and order notifications.",
+  "categories": ["email-and-messaging"],
+  "skills": [
+    "send WhatsApp messages",
+    "manage WhatsApp groups",
+    "verify WhatsApp numbers",
+    "manage contacts directory",
+    "send multimedia attachments",
+    "manage virtual phone numbers",
+    "handle voice calls",
+    "subscribe to webhooks",
+    "manage WhatsApp catalogs",
+    "generate QR code connections"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/2chat.png"
+}

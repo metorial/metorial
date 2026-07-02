@@ -1,0 +1,22 @@
+{
+  "name": "@metorial/evernote",
+  "description": "Create, read, update, and delete notes, notebooks, and tags in Evernote. Manage note content written in ENML markup, attach files and resources to notes, and share notes or notebooks with other users. Search notes by full text, title, tags, date, location, or notebook. Organize notes with tags and saved searches. Access shared and linked notebooks from other users. Set reminders on notes and store custom application-specific data. Receive webhook notifications when notes are created or updated. Supports both personal and Evernote Business accounts, including business notebooks and business-specific data.",
+  "categories": [
+    "apis-and-http-requests",
+    "note-taking-and-knowledge-bases",
+    "task-and-project-management"
+  ],
+  "skills": [
+    "create and manage notes",
+    "organize notebooks",
+    "manage tags",
+    "search notes",
+    "attach files to notes",
+    "share notes and notebooks",
+    "manage saved searches",
+    "receive change notifications",
+    "sync account data",
+    "manage business notebooks"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/evernote.png"
+}

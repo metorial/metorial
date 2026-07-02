@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/replyio",
+  "description": "Manage multichannel sales outreach sequences across email, LinkedIn, calls, SMS, and WhatsApp. Create and configure campaigns with multi-step sequences, add and update contacts, track engagement metrics (opens, clicks, replies, bounces), and manage email templates. Organize contacts into lists, manage blacklists, handle tasks (calls, meetings, to-dos), retrieve email account statuses, and access campaign performance statistics. Receive real-time webhook notifications for email events (sent, replied, opened, clicked, bounced) and contact lifecycle events (added, opted out, finished).",
+  "categories": ["crm-and-sales-tools", "email-and-messaging"],
+  "skills": [
+    "manage outreach sequences",
+    "add and update contacts",
+    "track email engagement",
+    "manage email templates",
+    "create and assign tasks",
+    "manage contact blacklists",
+    "retrieve campaign statistics",
+    "organize contact lists",
+    "monitor email account status",
+    "configure webhook subscriptions"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/reply-io.svg"
+}
