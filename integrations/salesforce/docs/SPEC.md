@@ -37,18 +37,13 @@ Salesforce uses OAuth 2.0 exclusively for API authentication. Salesforce uses th
 
 **OAuth Scopes:**
 
-Key scopes include:
+The integration requests the least-privilege scope set needed for its current
+tool surface and auth profile lookup:
 
-- `api` — Access to REST API, Bulk API, and other data APIs
-- `refresh_token` / `offline_access` — Allows obtaining a refresh token
-- `full` — Full access to all data accessible by the user (does not include refresh token; must request separately)
-- `chatter_api` — Access to Connect REST API resources
-- `wave_api` — Access to Analytics REST API
-- `openid` — OpenID Connect identifier
-- `web` — Access via web browser, includes Visualforce
-- `cdp_api` — Access to all Data Cloud API resources
-- `pardot_api` — Access to Marketing Cloud Account Engagement (Pardot)
-- `custom_permissions` — Access to custom permissions in the org
+- `api` — Access to REST API, Bulk API, Composite API, SOQL/SOSL, reports, limits, and other Salesforce data APIs
+- `refresh_token` / `offline_access` — Allows obtaining a refresh token for persistent access
+- `openid` — OpenID Connect identifier for user profile lookup
+- `profile` — Access to user profile information returned by `/services/oauth2/userinfo`
 
 **Important Details:**
 
@@ -56,6 +51,10 @@ Key scopes include:
 - Access tokens expire and should be refreshed using the refresh token (where available) or by re-authenticating.
 
 ## Features
+
+### Current User Identity
+
+Retrieve the authenticated Salesforce user's identity from `/services/oauth2/userinfo`, including the Salesforce user ID that can be used as `OwnerId` when assigning records, tasks, or activities to the current user.
 
 ### CRM Record Management
 

@@ -57,3 +57,19 @@ export let salesforceOAuthError = (operation: string, error: unknown) => {
 
   return serviceError;
 };
+
+export let salesforceApiError = (operation: string, error: unknown) => {
+  if (error instanceof ServiceError) {
+    return error;
+  }
+
+  let serviceError = salesforceServiceError(
+    `Salesforce API ${operation} failed: ${extractSalesforceMessage(error)}`
+  );
+
+  if (error instanceof Error) {
+    serviceError.setParent(error);
+  }
+
+  return serviceError;
+};

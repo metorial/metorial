@@ -1,4 +1,5 @@
 import { createAxios } from 'slates';
+import { salesforceApiError } from './errors';
 
 export interface SalesforceClientConfig {
   instanceUrl: string;
@@ -24,6 +25,17 @@ export let createSalesforceClient = (config: SalesforceClientConfig) => {
   });
 
   return {
+    // --- Identity ---
+
+    getUserInfo: async () => {
+      try {
+        let response = await rawHttp.get('/services/oauth2/userinfo');
+        return response.data as Record<string, any>;
+      } catch (error) {
+        throw salesforceApiError('get user info', error);
+      }
+    },
+
     // --- sObject CRUD ---
 
     getRecord: async (objectType: string, recordId: string, fields?: string[]) => {

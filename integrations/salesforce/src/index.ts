@@ -7,6 +7,7 @@ import {
   describeObject,
   getOrgLimits,
   getRecord,
+  getUserInfo,
   manageBulkJob,
   manageChatter,
   queryRecords,
@@ -32,6 +33,7 @@ export let provider = Slate.create({
     compositeRequest,
     runReport,
     getOrgLimits,
+    getUserInfo,
     manageChatter
   ],
   triggers: [inboundWebhook, recordChanges, newRecord]

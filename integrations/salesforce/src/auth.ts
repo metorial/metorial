@@ -73,18 +73,6 @@ export let auth = SlateAuth.create()
         scope: 'refresh_token'
       },
       {
-        title: 'Full Access',
-        description: 'Full access to all data accessible by the logged-in user',
-        scope: 'full',
-        defaultChecked: false
-      },
-      {
-        title: 'Chatter API',
-        description: 'Access to Connect REST API (Chatter) resources',
-        scope: 'chatter_api',
-        defaultChecked: false
-      },
-      {
         title: 'OpenID',
         description: 'OpenID Connect identifier for user profile information',
         scope: 'openid'
@@ -93,30 +81,6 @@ export let auth = SlateAuth.create()
         title: 'Profile',
         description: 'Access to user profile information',
         scope: 'profile'
-      },
-      {
-        title: 'Analytics API',
-        description: 'Access to Analytics REST API resources',
-        scope: 'wave_api',
-        defaultChecked: false
-      },
-      {
-        title: 'CDP API',
-        description: 'Access to all Data Cloud API resources',
-        scope: 'cdp_api',
-        defaultChecked: false
-      },
-      {
-        title: 'Pardot API',
-        description: 'Access to Marketing Cloud Account Engagement (Pardot)',
-        scope: 'pardot_api',
-        defaultChecked: false
-      },
-      {
-        title: 'Custom Permissions',
-        description: 'Access to custom permissions in the org',
-        scope: 'custom_permissions',
-        defaultChecked: false
       }
     ],
 

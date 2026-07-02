@@ -28,6 +28,10 @@ Retrieve the current API usage limits and remaining allocations for the Salesfor
 
 Retrieve a single Salesforce record by its ID and object type. Supports fetching specific fields to reduce payload size. Works with any standard or custom sObject (Account, Contact, Lead, Opportunity, Case, custom objects, etc.).
 
+### Get User Info
+
+Retrieve information about the authenticated Salesforce user from the OAuth userinfo endpoint. Use the returned user ID as OwnerId when assigning records, tasks, or activities to the current user.
+
 ### Manage Bulk Job
 
 Create, monitor, and manage Salesforce Bulk API 2.0 jobs for processing large data volumes. Supports creating ingest jobs (insert, update, upsert, delete), uploading CSV data, closing/aborting jobs, checking status, and retrieving results. Also supports bulk query jobs.

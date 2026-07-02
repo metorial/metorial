@@ -4,6 +4,7 @@ export * from './delete-record';
 export * from './describe-object';
 export * from './get-org-limits';
 export * from './get-record';
+export * from './get-user-info';
 export * from './manage-bulk-job';
 export * from './manage-chatter';
 export * from './query-records';
