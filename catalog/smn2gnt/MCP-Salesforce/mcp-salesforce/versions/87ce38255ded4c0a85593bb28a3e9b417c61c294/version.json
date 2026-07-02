@@ -1,0 +1,113 @@
+{
+  "serverId": "smn2gnt/MCP-Salesforce/mcp-salesforce",
+  "version": "87ce38255ded4c0a85593bb28a3e9b417c61c294",
+  "manifest": {
+    "id": "mcp-salesforce",
+    "fullId": "smn2gnt/MCP-Salesforce/mcp-salesforce",
+    "repo": {
+      "provider": "github.com",
+      "owner": "smn2gnt",
+      "repo": "MCP-Salesforce",
+      "branch": "master",
+      "url": "https://github.com/smn2gnt/MCP-Salesforce"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "salesforce-username",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SALESFORCE_USERNAME"
+            }
+          ]
+        },
+        {
+          "title": "salesforce-password",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SALESFORCE_PASSWORD"
+            }
+          ]
+        },
+        {
+          "title": "salesforce-security-token",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SALESFORCE_SECURITY_TOKEN"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "MCP Salesforce Connector",
+    "description": "A Model Context Protocol (MCP) server implementation for Salesforce integration, allowing LLMs to interact with Salesforce data through SOQL queries and SOSL searches."
+  },
+  "manifestHash": "182c0aaa43176b8169e33f8091689ee3",
+  "createdAt": "2026-07-02T07:08:12.074Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python311",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "salesforce"
+        }
+      }
+    }
+  ]
+}

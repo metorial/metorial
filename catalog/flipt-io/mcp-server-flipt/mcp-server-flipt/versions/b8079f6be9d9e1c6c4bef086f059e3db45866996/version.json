@@ -1,0 +1,104 @@
+{
+  "serverId": "flipt-io/mcp-server-flipt/mcp-server-flipt",
+  "version": "b8079f6be9d9e1c6c4bef086f059e3db45866996",
+  "manifest": {
+    "id": "mcp-server-flipt",
+    "fullId": "flipt-io/mcp-server-flipt/mcp-server-flipt",
+    "repo": {
+      "provider": "github.com",
+      "owner": "flipt-io",
+      "repo": "mcp-server-flipt",
+      "branch": "main",
+      "url": "https://github.com/flipt-io/mcp-server-flipt"
+    },
+    "config": {
+      "argumentsTemplate": null,
+      "configValues": [
+        {
+          "title": "flipt-api-url",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "FLIPT_API_URL"
+            }
+          ]
+        },
+        {
+          "title": "flipt-api-key",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "FLIPT_API_KEY"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "Flipt MCP Server",
+    "description": "A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for [Flipt](https://flipt.io), allowing AI assistants to interact with feature flags."
+  },
+  "manifestHash": "2f3137fa7f4eba56d16403ef36c7a392",
+  "createdAt": "2026-07-02T07:07:43.668Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "CI": "true",
+          "NIXPACKS_METADATA": "node",
+          "NODE_ENV": "production",
+          "NPM_CONFIG_PRODUCTION": "false"
+        },
+        "phases": {
+          "build": {
+            "dependsOn": [
+              "install"
+            ],
+            "cmds": [
+              "npm run build"
+            ],
+            "cacheDirectories": [
+              "node_modules/.cache"
+            ]
+          },
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "npm ci"
+            ],
+            "cacheDirectories": [
+              "/root/.npm"
+            ],
+            "paths": [
+              "/app/node_modules/.bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "nodejs_18",
+              "npm-9_x"
+            ],
+            "nixOverlays": [
+              "https://github.com/railwayapp/nix-npm-overlay/archive/main.tar.gz"
+            ],
+            "nixpkgsArchive": "ffeebf0acf3ae8b29f8c7049cd911b9636efd7e7"
+          }
+        },
+        "start": {
+          "cmd": "npm run start"
+        }
+      }
+    }
+  ]
+}

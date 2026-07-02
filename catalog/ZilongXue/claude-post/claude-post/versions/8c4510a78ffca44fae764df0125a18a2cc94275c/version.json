@@ -1,0 +1,136 @@
+{
+  "serverId": "ZilongXue/claude-post/claude-post",
+  "version": "8c4510a78ffca44fae764df0125a18a2cc94275c",
+  "manifest": {
+    "id": "claude-post",
+    "fullId": "ZilongXue/claude-post/claude-post",
+    "repo": {
+      "provider": "github.com",
+      "owner": "ZilongXue",
+      "repo": "claude-post",
+      "branch": "main",
+      "url": "https://github.com/ZilongXue/claude-post"
+    },
+    "config": {
+      "configValues": [
+        {
+          "title": "email-address",
+          "description": "Your email address",
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "EMAIL_ADDRESS"
+            }
+          ]
+        },
+        {
+          "title": "email-password",
+          "description": "Your app-specific password",
+          "default": null,
+          "required": true,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "EMAIL_PASSWORD"
+            }
+          ]
+        },
+        {
+          "title": "imap-server",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "IMAP_SERVER"
+            }
+          ]
+        },
+        {
+          "title": "smtp-server",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SMTP_SERVER"
+            }
+          ]
+        },
+        {
+          "title": "smtp-port",
+          "description": null,
+          "default": null,
+          "required": false,
+          "fields": [
+            {
+              "type": "environment",
+              "key": "SMTP_PORT"
+            }
+          ]
+        }
+      ]
+    },
+    "subdirectory": "/",
+    "title": "ClaudePost",
+    "description": "A Model Context Protocol (MCP) server that provides a seamless email management interface through Claude. This integration allows you to handle emails directly through natural language conversations with Claude, supporting features like searching, reading, and sending emails securely."
+  },
+  "manifestHash": "a8e9f3dcbcd7597611ef0afa2777ce02",
+  "createdAt": "2026-07-02T07:08:22.930Z",
+  "builder": [
+    {
+      "type": "nixpacks",
+      "plan": {
+        "providers": [],
+        "buildImage": "ghcr.io/railwayapp/nixpacks:ubuntu-1745885067",
+        "variables": {
+          "NIXPACKS_METADATA": "python",
+          "NIXPACKS_UV_VERSION": "0.4.30",
+          "PIP_DEFAULT_TIMEOUT": "100",
+          "PIP_DISABLE_PIP_VERSION_CHECK": "1",
+          "PIP_NO_CACHE_DIR": "1",
+          "PYTHONDONTWRITEBYTECODE": "1",
+          "PYTHONFAULTHANDLER": "1",
+          "PYTHONHASHSEED": "random",
+          "PYTHONUNBUFFERED": "1",
+          "UV_PROJECT_ENVIRONMENT": "/opt/venv"
+        },
+        "phases": {
+          "install": {
+            "dependsOn": [
+              "setup"
+            ],
+            "cmds": [
+              "python -m venv --copies /opt/venv && . /opt/venv/bin/activate && pip install uv==$NIXPACKS_UV_VERSION && uv sync --no-dev --frozen"
+            ],
+            "cacheDirectories": [
+              "/root/.cache/uv"
+            ],
+            "paths": [
+              "/opt/venv/bin"
+            ]
+          },
+          "setup": {
+            "nixPkgs": [
+              "python312",
+              "gcc"
+            ],
+            "nixLibs": [
+              "zlib",
+              "stdenv.cc.cc.lib"
+            ],
+            "nixOverlays": [],
+            "nixpkgsArchive": "bc8f8d1be58e8c8383e683a06e1e1e57893fff87"
+          }
+        },
+        "start": {
+          "cmd": "email-client"
+        }
+      }
+    }
+  ]
+}

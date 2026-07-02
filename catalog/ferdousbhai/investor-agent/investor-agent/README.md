@@ -24,7 +24,7 @@ docker pull ghcr.io/metorial/mcp-container--ferdousbhai--investor-agent--investo
 
 ```bash
 docker run -i --rm \ 
-ghcr.io/metorial/mcp-container--ferdousbhai--investor-agent--investor-agent  "investor-agent"
+ghcr.io/metorial/mcp-container--ferdousbhai--investor-agent--investor-agent  "node dist/index.js"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -45,7 +45,7 @@ ghcr.io/metorial/mcp-container--ferdousbhai--investor-agent--investor-agent  "in
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--ferdousbhai--investor-agent--investor-agent",
-        "investor-agent"
+        "node dist/index.js"
       ],
       "env": {}
     }

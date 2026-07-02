@@ -25,7 +25,7 @@ docker pull ghcr.io/metorial/mcp-container--zcaceres--gtasks-mcp--gtasks-mcp
 ```bash
 docker run -i --rm \ 
 -e GCP_OAUTH_KEYS=gcp-oauth-keys \
-ghcr.io/metorial/mcp-container--zcaceres--gtasks-mcp--gtasks-mcp  "npm run start"
+ghcr.io/metorial/mcp-container--zcaceres--gtasks-mcp--gtasks-mcp  "bun run start"
 ```
 
 - `--rm` removes the container after it exits, so you don't have to clean up manually.
@@ -59,7 +59,7 @@ The container supports the following configuration options:
         "-i",
         "--rm",
         "ghcr.io/metorial/mcp-container--zcaceres--gtasks-mcp--gtasks-mcp",
-        "npm run start"
+        "bun run start"
       ],
       "env": {
         "GCP_OAUTH_KEYS": "gcp-oauth-keys"
