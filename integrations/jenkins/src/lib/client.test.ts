@@ -6,6 +6,7 @@ import {
   extractReplayScriptsFromHtml,
   gitScmMatchTargetMatches,
   gitScmUrlsLooselyMatch,
+  JenkinsClient,
   summarizeBuildChangesets
 } from './client';
 
@@ -44,6 +45,43 @@ describe('extractReplayScriptsFromHtml', () => {
     `;
 
     expect(extractReplayScriptsFromHtml(html)).toBeUndefined();
+  });
+});
+
+describe('JenkinsClient replay status handling', () => {
+  it('treats SlateError data.status 404 as Pipeline Replay unavailable', async () => {
+    let client = new JenkinsClient({
+      auth: {
+        baseUrl: 'http://jenkins.example',
+        username: 'user',
+        apiToken: 'token'
+      }
+    });
+    let getCalls = 0;
+    (
+      client as unknown as {
+        axios: {
+          get: (path: string) => Promise<{ data: unknown }>;
+        };
+      }
+    ).axios = {
+      get: async () => {
+        getCalls += 1;
+        if (getCalls === 1) {
+          return { data: { number: 7 } };
+        }
+
+        let error = new Error('Request failed with status code 404') as Error & {
+          data: { status: number };
+        };
+        error.data = { status: 404 };
+        throw error;
+      }
+    };
+
+    await expect(client.getReplayScripts('folder/job', 7)).rejects.toThrow(
+      'Pipeline Replay is not available for this build'
+    );
   });
 });
 

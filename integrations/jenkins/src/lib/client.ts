@@ -155,7 +155,8 @@ export let jenkinsApiError = (error: unknown, operation = 'request') =>
       if (responseText) return responseText.slice(0, 500);
       if (input instanceof Error && input.message) return input.message;
       return undefined;
-    }
+    },
+    extractStatus: input => getJenkinsErrorStatus(input)
   });
 
 export let normalizeBaseUrl = (baseUrl: string) => {
@@ -308,16 +309,28 @@ let maybeNumberFromHeader = (value: string | undefined) => {
 };
 
 let getJenkinsErrorStatus = (error: unknown) => {
-  let normalizeStatus = (status: unknown) =>
-    typeof status === 'string' && /^\d+$/.test(status) ? Number(status) : status;
+  let normalizeStatus = (status: unknown): number | string | undefined => {
+    if (typeof status === 'number') return status;
+    if (typeof status === 'string') {
+      return /^\d+$/.test(status) ? Number(status) : status;
+    }
+    return undefined;
+  };
 
   let status = normalizeStatus(getApiErrorStatus(error));
   if (status !== undefined) return status;
 
   let serviceErrorData = asRecord(asRecord(error).data);
-  let upstreamStatus = normalizeStatus(serviceErrorData.upstreamStatus);
-  return typeof upstreamStatus === 'number' || typeof upstreamStatus === 'string'
-    ? upstreamStatus
+  for (let candidate of [serviceErrorData.upstreamStatus, serviceErrorData.status]) {
+    let serviceStatus = normalizeStatus(candidate);
+    if (typeof serviceStatus === 'number' || typeof serviceStatus === 'string') {
+      return serviceStatus;
+    }
+  }
+
+  let directStatus = normalizeStatus(asRecord(error).status);
+  return typeof directStatus === 'number' || typeof directStatus === 'string'
+    ? directStatus
     : undefined;
 };
 

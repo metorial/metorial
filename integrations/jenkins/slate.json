@@ -13,5 +13,5 @@
     "summarize build changesets",
     "check Jenkins controller status"
   ],
-  "logoUrl": "logo.png"
+  "logoUrl": "https://provider-logos.metorial-cdn.com/jenkins.svg"
 }

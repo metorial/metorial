@@ -1,4 +1,4 @@
-# <img src="logo.png" height="20"> Jenkins
+# <img src="https://provider-logos.metorial-cdn.com/jenkins.svg" height="20"> Jenkins
 
 Use Jenkins Remote Access API endpoints to inspect CI jobs and builds, trigger and replay builds, read queues and logs, summarize tests and SCM metadata, and check controller status.
 
