@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { validateManageHotspotInput } from './hotspots';
+import { validateManageHotspotInput, validateSearchHotspotsInput } from './hotspots';
 import { validateManageIssueInput } from './issues';
+import { mapHotspot, mapIssue } from './shared';
 import { sourceAttachmentMetadata, sourceTextFromShowResponse } from './source';
 
 describe('SonarQube workflow tool helpers', () => {
@@ -44,6 +45,25 @@ describe('SonarQube workflow tool helpers', () => {
     ).not.toThrow();
   });
 
+  it('allows an empty issue tag list to clear tags explicitly', () => {
+    expect(() =>
+      validateManageIssueInput({
+        issueKey: 'ISSUE-1',
+        action: 'set_tags',
+        tags: [],
+        confirmWrite: true
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      validateManageIssueInput({
+        issueKey: 'ISSUE-1',
+        action: 'set_tags',
+        confirmWrite: true
+      })
+    ).toThrow(/tags/);
+  });
+
   it('validates hotspot review status combinations', () => {
     expect(() =>
       validateManageHotspotInput({
@@ -70,6 +90,63 @@ describe('SonarQube workflow tool helpers', () => {
         confirmWrite: true
       })
     ).not.toThrow();
+  });
+
+  it('validates deployment-specific hotspot resolutions', () => {
+    expect(() =>
+      validateManageHotspotInput(
+        {
+          hotspotKey: 'HOTSPOT-1',
+          status: 'REVIEWED',
+          resolution: 'ACKNOWLEDGED',
+          confirmWrite: true
+        },
+        { deployment: 'server' }
+      )
+    ).not.toThrow();
+
+    expect(() =>
+      validateSearchHotspotsInput(
+        {
+          resolution: 'ACKNOWLEDGED'
+        },
+        { deployment: 'cloud' }
+      )
+    ).toThrow(/SonarQube Cloud/);
+  });
+
+  it('maps current issueStatus ahead of legacy issue status', () => {
+    expect(
+      mapIssue({
+        key: 'ISSUE-1',
+        issueStatus: 'ACCEPTED',
+        status: 'RESOLVED'
+      })
+    ).toMatchObject({
+      key: 'ISSUE-1',
+      status: 'ACCEPTED'
+    });
+  });
+
+  it('maps hotspot show responses with nested component, project, and rule objects', () => {
+    expect(
+      mapHotspot({
+        key: 'HOTSPOT-1',
+        component: { key: 'project:src/main/java/App.java' },
+        project: { key: 'project' },
+        rule: {
+          key: 'java:S4787',
+          vulnerabilityProbability: 'LOW'
+        },
+        status: 'TO_REVIEW'
+      })
+    ).toMatchObject({
+      key: 'HOTSPOT-1',
+      component: 'project:src/main/java/App.java',
+      project: 'project',
+      ruleKey: 'java:S4787',
+      vulnerabilityProbability: 'LOW'
+    });
   });
 
   it('builds source attachment content and metadata without inline file output fields', () => {

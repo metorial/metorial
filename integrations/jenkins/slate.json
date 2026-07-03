@@ -1,18 +1,17 @@
 {
   "name": "@metorial/jenkins",
-  "description": "Manage CI/CD pipelines and automation on a Jenkins server. Create, configure, enable, disable, and delete jobs (freestyle, pipeline, multibranch). Trigger builds with or without parameters, stop running builds, and retrieve build status, console output, artifacts, and test results. Manage build queues, views, folders, nodes (agents), plugins, and credentials. Retrieve system information and execute Groovy scripts. Configure webhooks to trigger builds from external systems or send build event notifications to external endpoints.",
+  "description": "Inspect Jenkins CI jobs and builds, trigger and replay builds, read queues and logs, summarize test and SCM metadata, and check controller status through Jenkins Remote Access API endpoints.",
   "categories": ["apis-and-http-requests", "task-and-project-management"],
   "skills": [
-    "create and configure jobs",
-    "trigger and stop builds",
+    "list Jenkins jobs",
+    "trigger Jenkins builds",
+    "inspect build queue items",
     "retrieve build status and logs",
-    "manage build queue",
-    "manage nodes and agents",
-    "manage plugins",
-    "manage credentials",
-    "organize jobs in views and folders",
-    "execute Groovy scripts",
-    "configure webhook triggers"
+    "search failed build logs",
+    "read Jenkins test reports",
+    "find jobs by SCM repository URL",
+    "summarize build changesets",
+    "check Jenkins controller status"
   ],
-  "logoUrl": "https://provider-logos.metorial-cdn.com/jenkins.png"
+  "logoUrl": "logo.png"
 }

@@ -1,5 +1,37 @@
 import { buildApiServiceError, createApiServiceError } from 'slates';
 
+let PROJECT_LOOKUP_HINT =
+  'Verify the project key with search_projects or get_component, check the SonarQube Cloud cloudRegion and organization config, confirm the token has Browse permission on the project, and make sure any branch or pullRequest value exists for that project.';
+
+let PROJECT_SCOPED_OPERATIONS = new Set([
+  'get component',
+  'list component tree',
+  'list project branches',
+  'list project pull requests',
+  'get project analysis status',
+  'get project measures',
+  'search measure history',
+  'get quality gate status',
+  'search issues',
+  'search security hotspots',
+  'get raw source',
+  'show source',
+  'get source SCM info',
+  'get duplications'
+]);
+
+export let hasProjectLookupFailureMessage = (message: string) =>
+  /project doesn't exist/i.test(message) ||
+  /component key '[^']+' not found/i.test(message) ||
+  /component .* not found/i.test(message) ||
+  /requested resource was not found/i.test(message);
+
+export let withProjectLookupHint = (message: string) =>
+  hasProjectLookupFailureMessage(message) ? `${message} ${PROJECT_LOOKUP_HINT}` : message;
+
+let maybeWithProjectLookupHint = (operation: string, message: string) =>
+  PROJECT_SCOPED_OPERATIONS.has(operation) ? withProjectLookupHint(message) : message;
+
 export let sonarqubeValidationError = (message: string) =>
   createApiServiceError(message, { reason: 'sonarqube_validation_error' });
 
@@ -18,11 +50,15 @@ export let sonarqubeApiError = (error: unknown, operation = 'request') =>
         nestedKeys: ['errors', 'error', 'details']
       });
 
-      if (details.length > 0) return details.join(' - ');
+      if (details.length > 0) {
+        return maybeWithProjectLookupHint(operation, details.join(' - '));
+      }
       if (response?.status === 429) {
         return 'Rate limit reached. Wait a few minutes before retrying the operation.';
       }
-      if (input instanceof Error && input.message) return input.message;
+      if (input instanceof Error && input.message) {
+        return maybeWithProjectLookupHint(operation, input.message);
+      }
       return undefined;
     },
     formatMessage: ({ providerLabel, operation, statusLabel, message, status }) => {

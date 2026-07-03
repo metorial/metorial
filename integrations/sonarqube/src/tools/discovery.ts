@@ -20,8 +20,10 @@ export let searchProjectsTool = readOnlyTool({
   name: 'Search Projects',
   key: 'search_projects',
   description:
-    'Search SonarQube projects by text query or project keys. Returns project keys, names, qualifiers, visibility, and latest analysis metadata.',
+    'Search SonarQube projects by text query or exact project keys. Use this before project-scoped tools when the project key is unknown or may be stale.',
   instructions: [
+    'If the user names a project without saying it is an exact project key, search by query first instead of inventing a projectKey for project-scoped tools.',
+    'Use the returned project key exactly in follow-up tools such as get_component, get_project_measures, search_issues, and list_component_tree.',
     'For SonarQube Cloud, provide organization input or configure a default organization.'
   ]
 })
@@ -31,15 +33,22 @@ export let searchProjectsTool = readOnlyTool({
         .string()
         .optional()
         .describe('SonarQube Cloud organization key. Defaults to config.organization.'),
-      query: z.string().optional().describe('Search text for project name or key.'),
+      query: z
+        .string()
+        .optional()
+        .describe(
+          'Search text for project name or key. Use this when the exact key is unknown.'
+        ),
       projectKeys: z
         .array(z.string())
         .optional()
-        .describe('Specific project keys to include. Sent as SonarQube projects.'),
+        .describe(
+          'Specific project keys to include. Sent as SonarQube Cloud projects or SonarQube Server projectKeys.'
+        ),
       qualifiers: z
         .array(z.string())
         .optional()
-        .describe('Optional component qualifiers such as TRK, APP, or VW.'),
+        .describe('Optional SonarQube Server component qualifiers such as TRK, APP, or VW.'),
       ...paginationInputs(50, 500)
     })
   )
@@ -68,11 +77,15 @@ export let getComponentTool = readOnlyTool({
   name: 'Get Component',
   key: 'get_component',
   description:
-    'Get a SonarQube component, file, directory, project, or portfolio by component key, including ancestor metadata when returned.'
+    'Get metadata for one exact SonarQube component key, such as a project, directory, or file. Use search_projects for project names and list_component_tree for file or directory names when the exact component key is unknown.'
 })
   .input(
     z.object({
-      component: z.string().describe('Component key to retrieve.'),
+      component: z
+        .string()
+        .describe(
+          'Exact component key to retrieve. For a project, use the project key returned by search_projects.'
+        ),
       ...branchPullRequestInputs
     })
   )
@@ -114,16 +127,22 @@ export let listComponentTreeTool = readOnlyTool({
   name: 'List Component Tree',
   key: 'list_component_tree',
   description:
-    'List child components under a SonarQube project, directory, or file, optionally filtered by branch, pull request, query text, and qualifiers.'
+    'List child components under an exact SonarQube project, directory, or file component key. Use search_projects first when the project was described by name or partial key; use this to discover file component keys before get_source, get_scm_info, or get_duplications.'
 })
   .input(
     z.object({
-      component: z.string().describe('Root component key to browse.'),
+      component: z
+        .string()
+        .describe(
+          'Exact root component key to browse, usually a project key from search_projects.'
+        ),
       query: z.string().optional().describe('Search text for child components.'),
       qualifiers: z
         .array(z.string())
         .optional()
-        .describe('Component qualifiers such as DIR, FIL, UTS, or TRK.'),
+        .describe(
+          'Component qualifiers to include, such as DIR for directories, FIL for source files, or UTS for tests. Omit for general browsing.'
+        ),
       ...branchPullRequestInputs,
       ...paginationInputs(100, 500)
     })
@@ -153,7 +172,7 @@ export let listProjectBranchesTool = readOnlyTool({
   name: 'List Project Branches',
   key: 'list_project_branches',
   description:
-    'List branches analyzed for a SonarQube project, including main branch and branch analysis status metadata when available.'
+    'List analyzed branches for a SonarQube project. Use this when the branch name is unknown before branch-scoped project, issue, measure, quality-gate, or component calls.'
 })
   .input(z.object(projectInput))
   .output(
@@ -182,7 +201,7 @@ export let listProjectPullRequestsTool = readOnlyTool({
   name: 'List Project Pull Requests',
   key: 'list_project_pull_requests',
   description:
-    'List pull request analyses for a SonarQube project, including source branch, target branch, and status metadata when available.'
+    'List pull request analyses for a SonarQube project. Use this when the pull request id or key is unknown before pull-request-scoped project, issue, measure, quality-gate, or component calls.'
 })
   .input(z.object(projectInput))
   .output(

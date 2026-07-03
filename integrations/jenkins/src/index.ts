@@ -1,44 +1,49 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
-  executeScript,
+  findJobsWithScmUrl,
   getBuild,
+  getBuildChangesets,
+  getBuildLog,
+  getBuildScm,
+  getFlakyFailures,
   getJob,
-  getJobConfig,
-  getSystemInfo,
-  listBuilds,
+  getJobScm,
+  getQueueItem,
+  getReplayScripts,
+  getStatus,
+  getTestResults,
   listJobs,
-  manageCredentials,
-  manageFolder,
-  manageJob,
-  manageNode,
-  managePlugins,
-  manageQueue,
-  manageView,
-  stopBuild,
-  triggerBuild
+  rebuildBuild,
+  replayBuild,
+  searchBuildLog,
+  triggerBuild,
+  updateBuild,
+  whoAmI
 } from './tools';
-import { buildEvent, inboundWebhook, jobStatusChange } from './triggers';
 
-export let jenkins = Slate.create({
+export let provider = Slate.create({
   spec,
   tools: [
-    listJobs,
     getJob,
-    getJobConfig,
-    manageJob,
+    listJobs,
     triggerBuild,
+    getQueueItem,
     getBuild,
-    listBuilds,
-    stopBuild,
-    manageQueue,
-    manageView,
-    manageNode,
-    managePlugins,
-    manageCredentials,
-    manageFolder,
-    executeScript,
-    getSystemInfo
+    updateBuild,
+    getBuildLog,
+    searchBuildLog,
+    rebuildBuild,
+    getReplayScripts,
+    replayBuild,
+    getTestResults,
+    getFlakyFailures,
+    getJobScm,
+    getBuildScm,
+    getBuildChangesets,
+    findJobsWithScmUrl,
+    whoAmI,
+    getStatus
   ],
-  triggers: [inboundWebhook, buildEvent, jobStatusChange]
+  triggers: []
 });

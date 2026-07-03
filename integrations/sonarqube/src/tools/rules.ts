@@ -13,14 +13,14 @@ export let searchRulesTool = readOnlyTool({
   name: 'Search Rules',
   key: 'search_rules',
   description:
-    'Search SonarQube rules by text query, language, repository, tags, severity, type, and status.'
+    'Search SonarQube rules by text query, language, repository, tags, severity, type, and status. Use this before get_rule when the exact rule key is unknown.'
 })
   .input(
     z.object({
       organization: z
         .string()
         .optional()
-        .describe('SonarQube Cloud organization key. Defaults to config.organization.'),
+        .describe('Optional SonarQube Cloud organization key. Ignored for SonarQube Server.'),
       query: z.string().optional().describe('Search text for rule key, name, or description.'),
       languages: z.array(z.string()).optional().describe('Language keys to filter rules.'),
       repositories: z.array(z.string()).optional().describe('Rule repositories to filter.'),
@@ -65,14 +65,16 @@ export let getRuleTool = readOnlyTool({
   name: 'Get Rule',
   key: 'get_rule',
   description:
-    'Get one SonarQube rule by rule key, including rule metadata and raw remediation details returned by SonarQube.'
+    'Get one SonarQube rule by exact rule key, including rule metadata and raw remediation details returned by SonarQube.'
 })
   .input(
     z.object({
       organization: z
         .string()
         .optional()
-        .describe('SonarQube Cloud organization key. Defaults to config.organization.'),
+        .describe(
+          'SonarQube Cloud organization key. Required on Cloud through input or config; ignored for Server.'
+        ),
       ruleKey: z.string().describe('SonarQube rule key, for example java:S1135.')
     })
   )

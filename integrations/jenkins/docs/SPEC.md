@@ -1,112 +1,62 @@
-# Slates Specification for Jenkins
+# Jenkins Integration Specification
 
 ## Overview
 
-Jenkins is an open-source automation server used for building, testing, and deploying software through continuous integration and continuous delivery (CI/CD) pipelines. It provides machine-consumable remote access API to its functionalities, currently offering data in three flavors: JSON, XML, and Python. Jenkins is self-hosted, meaning each instance runs at a user-specified URL.
+The Jenkins integration exposes a REST-only CI tool surface backed by Jenkins Remote Access API and documented Jenkins HTTP endpoints. It mirrors the Jenkins MCP Server plugin's high-value CI inspection and build operation tools without requiring the MCP plugin.
+
+Out of scope: Jenkins script console, Jenkins CLI, repo-local MCP runner wrappers, credentials administration, plugin administration, node administration, and any Jenkins MCP endpoint dependency.
 
 ## Authentication
 
-Jenkins supports two primary authentication methods for API access:
+Authentication uses Jenkins HTTP Basic authentication with:
 
-### HTTP Basic Authentication with API Token (Recommended)
+- `baseUrl`: Jenkins controller base URL.
+- `username`: Jenkins username.
+- `apiToken`: Jenkins API token from the user's Jenkins profile.
 
-To make scripted clients invoke operations that require authorization, use HTTP BASIC authentication to specify the user name and the API token.
+The auth output stores the normalized base URL, username, API token, and detected Jenkins version when available. Profile validation calls `/me/api/json`.
 
-- **Required credentials**: Jenkins instance URL, username, and API token.
-- Jenkins API tokens are an authentication mechanism that allows a tool to impersonate a user without providing the actual password for use with the Jenkins API or CLI.
-- The API token is available in your personal configuration page. Click your name on the top right corner on every page, then click "Configure" to see your API token. The URL `$root/me/configure` is a good shortcut.
-- The token is sent via the `Authorization` header using Basic auth: `Basic base64(username:apiToken)`.
-- Since you can have multiple API tokens, this allows fine-grained control over which scripts, hosts, or applications are allowed to use Jenkins.
-- Example: `curl -X GET http://JENKINS_URL/api/json --user username:apiToken`
+POST tools use the API token credentials directly and retry with a CSRF crumb from `/crumbIssuer/api/json` when Jenkins rejects a POST for crumb-related reasons.
 
-### HTTP Basic Authentication with Password
+## Configuration
 
-Specifying the real password is still supported, but it is not recommended because the risk of revealing password, and the human tendency to reuse the same password in different places.
+Optional configuration:
 
-### CSRF Protection (Crumb)
+- `defaultFolderFullName`: folder full name used by listing/search tools when `folderFullName` is omitted.
+- `defaultJobFullName`: job full name used by job/build tools when `jobFullName` is omitted.
+- `maxLogLines`: default cap for log reads and searches, defaulting to `10000`.
 
-If your Jenkins is configured with "Prevent Cross Site Request Forgery exploits" security option, then you have to send a CSRF protection token as an HTTP request header. A crumb can be obtained from the `/crumbIssuer/api/json` endpoint and must be included as a header in subsequent write requests. API tokens are preferred instead of crumbs for CSRF protection.
+## Tool Surface
 
-**Note**: Jenkins does not do any authorization negotiation, i.e. it immediately returns a 403 (Forbidden) response instead of a 401 (Unauthorized) response, so make sure to send the authentication information from the first request (preemptive authentication).
+| Tool | Purpose |
+| --- | --- |
+| `get_job` | Read job metadata, health, status, and recent builds. |
+| `list_jobs` | List jobs from root or a folder, sorted by name, with `skip`/`limit` pagination and optional recursion. |
+| `trigger_build` | Trigger `/build` or `/buildWithParameters` with scalar or scalar-array non-file parameters and parse the queue id from `Location`. |
+| `get_queue_item` | Read `/queue/item/{id}/api/json`. |
+| `get_build` | Read build metadata by number, default last build, or last-build selector. |
+| `update_build` | Update build display name and/or description through stock build HTTP endpoints. |
+| `get_build_log` | Read build log line windows with forward, end-relative, and opaque cursor pagination over `logText/progressiveText`, with `consoleText` fallback. |
+| `search_build_log` | Search bounded console log text. |
+| `rebuild_build` | Re-run a build, defaulting to the last build; use Pipeline Replay when available, otherwise trigger the job with parameters copied from the previous build. |
+| `get_replay_scripts` | Read Pipeline Replay scripts when the Replay HTTP page is available. |
+| `replay_build` | POST Pipeline Replay with a replacement main script and optional loaded script replacements, defaulting to the last build when `buildNumber` is omitted. |
+| `get_test_results` | Read `/testReport/api/json`. |
+| `get_flaky_failures` | Extract likely flaky JUnit failures from test metadata. |
+| `get_job_scm` | Parse `config.xml` with `fast-xml-parser`, summarize SCM, and expose Git SCM configs with Jenkins MCP plugin-compatible `uris`, `branches`, `commit`, and `name` fields. |
+| `get_build_scm` | Return build Git SCM configs from Jenkins BuildData with MCP plugin-compatible `uris`, `branches`, `commit`, and `name` fields, plus a summary. |
+| `get_build_changesets` | Return Jenkins build change log sets plus flattened change entries, defaulting to the last build when `buildNumber` is omitted. |
+| `find_jobs_with_scm_url` | Recursively inspect jobs and match Git SCM repository URLs with Jenkins Git loose URL matching, optional branch filtering, and `skip`/`limit` pagination over matches. |
+| `who_am_i` | Read `/me/api/json`. |
+| `get_status` | Read controller health/readiness, root URL status, queue sizes, and computer executor status. |
 
-## Features
+## Output Policy
 
-### Job Management
+Tool outputs expose stable fields such as ids, names, URLs, status/result, timestamps, queue ids, build numbers, log cursors, counts, SCM summaries, and test summaries. Raw Jenkins response objects are optional and only returned when the relevant `includeRaw` input is true.
 
-Create, configure, copy, enable, disable, delete, and list jobs. Creating jobs by sending XML file or by specifying params as options with more customization options including source control, notifications, etc. Job configuration is managed via XML (`config.xml`). Listing jobs available in Jenkins with job name filter, job status filter.
+## REST Gaps
 
-- Supports Freestyle jobs, Pipeline jobs, Multibranch Pipelines, and Organization Folders.
-- Adding/removing downstream projects. Chaining jobs, i.e., given a list of projects each project is added as a downstream project to the previous one.
+Some Jenkins plugin capabilities do not have a stable stock REST endpoint. These tools throw clear `ServiceError` failures instead of falling back to unsafe mechanisms:
 
-### Build Management
-
-Building jobs (with params), stopping builds, querying details of recent builds, obtaining build params, etc.
-
-- Trigger builds with or without parameters, including file parameters.
-- Obtaining progressive console output.
-- Access build information including status, duration, artifacts, and test results.
-- Stop, terminate, or kill running builds.
-
-### View Management
-
-Creating, listing views. Adding jobs to views and removing jobs from views.
-
-- Get and update view XML configuration.
-- Views allow organizing jobs into tabbed categories on the dashboard.
-
-### Node (Agent) Management
-
-Adding/removing Jenkins agents, querying details of agents.
-
-- Create, configure, enable, disable, disconnect, and delete nodes.
-- Nodes are the "machines" on which build agents run. Jenkins monitors each attached node for disk space, free temp space, free swap, clock time/sync, and response time.
-
-### Build Queue Management
-
-Obtaining the tasks in build queue, and their age, cause, reason.
-
-- List queued items, query individual queue items, and cancel queued builds.
-
-### Plugin Management
-
-Plugin manager API supports installing necessary plugins and listing current plugins.
-
-### Credential Management
-
-Credentials: create, exists, get config, set config, destroy, list.
-
-- Manage credentials stored in Jenkins for use in jobs and pipelines.
-
-### System Information
-
-- Retrieve Jenkins server version, system information, and overall server status.
-- Execute a Groovy script on the Jenkins master or on a node if specified.
-
-### Folder Management
-
-- Jenkins supports organizing jobs into folders. Folders can be created, configured, and deleted like other job types through the same API patterns.
-
-## Events
-
-Jenkins does not have a built-in, native webhook/event system out of the box. However, event functionality is available through widely-used plugins:
-
-### Outbound Webhook for Build Events (via Notification/Outbound Webhook Plugin)
-
-Sends HTTP POST callbacks to a configured URL when build events occur. Event has four possible values: start, success, failure, unstable.
-
-- Configured as a post-build action on individual jobs.
-- Payload includes build name, build URL, event type, project name, and build variables.
-
-### Generic Webhook Trigger (Inbound)
-
-By default, when enabling the webhook trigger for a job, it can be triggered by sending an event to `http://JENKINS_URL/generic-webhook-trigger/invoke`.
-
-- Allows external systems (e.g., GitHub, GitLab, Bitbucket) to trigger Jenkins builds via HTTP POST.
-- Supports token-based authentication, IP whitelisting, and HMAC validation.
-- Incoming webhook payloads can be parsed using JSONPath or XPath to extract variables for the build.
-
-### Generic Event Plugin (Outbound)
-
-Allows users to receive events fired by the system via webhook. By using the plugin, the third-party system can receive the events it is interested in more quickly and respond quickly.
-
-- Configure an event receiver URL in system management, and Jenkins will forward system-level events to that endpoint.
+- Pipeline Replay tools when the Replay HTTP endpoints are unavailable.
+- Exact in-process Jenkins status or SCM fields that Jenkins does not expose remotely.

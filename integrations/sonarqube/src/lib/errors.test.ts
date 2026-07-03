@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { sonarqubeApiError, sonarqubeValidationError } from './errors';
 
-describe('SonarQube errors', () => {
+let upstreamError = (message: string) => ({
+  response: {
+    status: 400,
+    data: {
+      errors: [{ msg: message }]
+    }
+  }
+});
+
+describe('SonarQube API error normalization', () => {
   it('creates validation ServiceErrors with SonarQube reason metadata', () => {
     let error = sonarqubeValidationError('projectKey is required.');
 
@@ -45,5 +54,44 @@ describe('SonarQube errors', () => {
     expect(error.message).toContain('HTTP 429 Too Many Requests');
     expect(error.message).toContain('rate-limit');
     expect(error.data.upstreamStatus).toBe(429);
+  });
+
+  it('adds project lookup diagnostics to missing project responses', () => {
+    let error = sonarqubeApiError(
+      upstreamError("Project doesn't exist"),
+      'get project measures'
+    );
+
+    expect(error.data.message).toContain("Project doesn't exist");
+    expect(error.data.message).toContain('search_projects');
+    expect(error.data.message).toContain('cloudRegion');
+    expect(error.data.message).toContain('Browse permission');
+  });
+
+  it('adds project lookup diagnostics to missing component-key responses', () => {
+    let error = sonarqubeApiError(
+      upstreamError("Component key 'tractivecloud_tracker-application' not found"),
+      'get project analysis status'
+    );
+
+    expect(error.data.message).toContain(
+      "Component key 'tractivecloud_tracker-application' not found"
+    );
+    expect(error.data.message).toContain('get_component');
+    expect(error.data.message).toContain('branch or pullRequest');
+  });
+
+  it('keeps generic not-found diagnostics scoped to project-aware operations', () => {
+    let projectError = sonarqubeApiError(
+      upstreamError('The requested resource was not found.'),
+      'search security hotspots'
+    );
+    let issueError = sonarqubeApiError(
+      upstreamError('The requested resource was not found.'),
+      'get issue changelog'
+    );
+
+    expect(projectError.data.message).toContain('search_projects');
+    expect(issueError.data.message).not.toContain('search_projects');
   });
 });

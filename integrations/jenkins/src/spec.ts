@@ -5,7 +5,8 @@ import { config } from './config';
 export let spec = SlateSpecification.create({
   key: 'jenkins',
   name: 'Jenkins',
-  description: undefined,
+  description:
+    'Inspect Jenkins CI jobs, trigger builds, read queues, logs, test results, SCM metadata, and controller status through Jenkins Remote Access API endpoints.',
   metadata: {},
   config,
   auth

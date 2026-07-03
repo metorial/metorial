@@ -32,6 +32,50 @@ export type SonarListResult<T> = {
   page?: SonarPage;
 };
 
+export type SonarComputeTaskAdditionalField = 'scannerContext' | 'warnings' | 'stacktrace';
+
+export type SonarIssueSearchParams = {
+  organization?: string;
+  issueKeys?: string[];
+  projectKeys?: string[];
+  componentKeys?: string[];
+  branch?: string;
+  pullRequest?: string;
+  resolved?: boolean;
+  severities?: string[];
+  statuses?: string[];
+  issueStatuses?: string[];
+  impactSoftwareQualities?: string[];
+  impactSeverities?: string[];
+  types?: string[];
+  tags?: string[];
+  query?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type SonarRuleSearchParams = {
+  organization?: string;
+  query?: string;
+  languages?: string[];
+  repositories?: string[];
+  tags?: string[];
+  severities?: string[];
+  types?: string[];
+  statuses?: string[];
+  page?: number;
+  pageSize?: number;
+};
+
+export type SonarProjectSearchParams = {
+  organization?: string;
+  query?: string;
+  projectKeys?: string[];
+  qualifiers?: string[];
+  page?: number;
+  pageSize?: number;
+};
+
 export type SonarAuthenticationValidation = {
   valid?: boolean;
 };
@@ -105,6 +149,14 @@ export let pageSize = (value: number | undefined, defaultValue: number, max: num
   return Math.min(Math.floor(value), max);
 };
 
+export let optionalPageSizeIncludingAll = (value: number | undefined) => {
+  if (value === undefined) return undefined;
+  if (!Number.isFinite(value) || value < 0) {
+    throw sonarqubeValidationError('pageSize must be a non-negative number.');
+  }
+  return Math.floor(value);
+};
+
 export let pageNumber = (value: number | undefined) => {
   if (value === undefined) return 1;
   if (!Number.isFinite(value) || value < 1) {
@@ -117,13 +169,23 @@ export let requireCloudOrganization = (
   config: SonarConfig,
   organization: string | undefined
 ) => {
+  if ((config.deployment ?? 'server') !== 'cloud') return undefined;
+
   let value = organization?.trim() || config.organization?.trim();
-  if ((config.deployment ?? 'server') === 'cloud' && !value) {
+  if (!value) {
     throw sonarqubeValidationError(
       'organization is required for this SonarQube Cloud operation. Provide organization input or config.'
     );
   }
   return value || undefined;
+};
+
+export let optionalCloudOrganization = (
+  config: SonarConfig,
+  organization: string | undefined
+) => {
+  if ((config.deployment ?? 'server') !== 'cloud') return undefined;
+  return organization?.trim() || config.organization?.trim() || undefined;
 };
 
 export let projectKeyFor = (config: SonarConfig, projectKey: string | undefined) => {
@@ -151,6 +213,53 @@ export let requireOneProjectStatusIdentifier = (input: {
   }
 };
 
+export let validateQualityGateStatusParams = (input: {
+  analysisId?: string;
+  projectId?: string;
+  projectKey?: string;
+  branch?: string;
+  pullRequest?: string;
+}) => {
+  requireOneProjectStatusIdentifier(input);
+
+  if (input.branch && input.pullRequest) {
+    throw sonarqubeValidationError('Provide either branch or pullRequest, not both.');
+  }
+
+  if ((input.analysisId || input.projectId) && (input.branch || input.pullRequest)) {
+    throw sonarqubeValidationError(
+      'branch and pullRequest can only be used with projectKey quality gate status requests.'
+    );
+  }
+};
+
+let computeTaskAdditionalFields = new Set<string>([
+  'scannerContext',
+  'warnings',
+  'stacktrace'
+]);
+
+export let validateComputeTaskAdditionalFields = (
+  config: SonarConfig,
+  additionalFields: string[] | undefined
+) => {
+  let invalidField = additionalFields?.find(field => !computeTaskAdditionalFields.has(field));
+  if (invalidField) {
+    throw sonarqubeValidationError(
+      `Unsupported compute task additional field: ${invalidField}.`
+    );
+  }
+
+  if (
+    (config.deployment ?? 'server') === 'cloud' &&
+    additionalFields?.includes('stacktrace')
+  ) {
+    throw sonarqubeValidationError(
+      'Compute task additional field stacktrace is only available for SonarQube Server.'
+    );
+  }
+};
+
 export let requireServerDeployment = (config: SonarConfig, operation: string) => {
   if ((config.deployment ?? 'server') === 'cloud') {
     throw sonarqubeValidationError(`${operation} is only available for SonarQube Server.`);
@@ -163,9 +272,187 @@ export let metricsSearchParams = (params: {
   pageSize?: number;
 }) => ({
   p: pageNumber(params.page),
-  ps: pageSize(params.pageSize, 100, 500),
-  f: 'name,description,domain',
-  q: params.query
+  ps: pageSize(params.pageSize, 100, 500)
+});
+
+let metricSearchFields = ['key', 'name'] as const;
+
+let matchesMetricQuery = (metric: Record<string, unknown>, query: string) =>
+  metricSearchFields.some(field => {
+    let value = metric[field];
+    return typeof value === 'string' && value.toLowerCase().includes(query);
+  });
+
+export let projectMeasuresParams = (
+  config: SonarConfig,
+  params: {
+    projectKey: string;
+    metricKeys: string[];
+    branch?: string;
+    pullRequest?: string;
+  }
+) => ({
+  component: params.projectKey,
+  metricKeys: params.metricKeys,
+  branch: params.branch,
+  pullRequest: params.pullRequest,
+  additionalFields: (config.deployment ?? 'server') === 'cloud' ? 'periods' : 'period'
+});
+
+export let hotspotProjectSearchParams = (config: SonarConfig, projectKey: string) =>
+  (config.deployment ?? 'server') === 'cloud' ? { projectKey } : { project: projectKey };
+
+let validateBranchPullRequestChoice = (params: { branch?: string; pullRequest?: string }) => {
+  if (params.branch && params.pullRequest) {
+    throw sonarqubeValidationError('Provide either branch or pullRequest, not both.');
+  }
+};
+
+let cloudBranchPullRequestParams = (
+  config: SonarConfig,
+  params: {
+    branch?: string;
+    pullRequest?: string;
+  },
+  operation: string
+) => {
+  validateBranchPullRequestChoice(params);
+
+  if ((config.deployment ?? 'server') !== 'cloud') {
+    if (params.branch || params.pullRequest) {
+      throw sonarqubeValidationError(
+        `${operation} branch and pullRequest parameters are only documented for SonarQube Cloud.`
+      );
+    }
+
+    return {};
+  }
+
+  return {
+    branch: params.branch,
+    pullRequest: params.pullRequest
+  };
+};
+
+export let sourceRawParams = (
+  config: SonarConfig,
+  params: {
+    component: string;
+    branch?: string;
+    pullRequest?: string;
+  }
+) => ({
+  key: params.component,
+  ...cloudBranchPullRequestParams(config, params, 'sources/raw')
+});
+
+export let sourceShowParams = (params: {
+  component: string;
+  fromLine?: number;
+  toLine?: number;
+}) => ({
+  key: params.component,
+  from: params.fromLine,
+  to: params.toLine
+});
+
+export let sourceScmParams = (params: {
+  component: string;
+  fromLine?: number;
+  toLine?: number;
+  commitsByLine?: boolean;
+}) => ({
+  key: params.component,
+  from: params.fromLine,
+  to: params.toLine,
+  commits_by_line: params.commitsByLine
+});
+
+export let duplicationShowParams = (
+  config: SonarConfig,
+  params: {
+    component: string;
+    branch?: string;
+    pullRequest?: string;
+  }
+) => ({
+  key: params.component,
+  ...cloudBranchPullRequestParams(config, params, 'duplications/show')
+});
+
+let issueComponentFilter = (params: SonarIssueSearchParams) => {
+  let values = [...(params.projectKeys ?? []), ...(params.componentKeys ?? [])].filter(
+    value => typeof value === 'string' && value.length > 0
+  );
+  if (values.length === 0) return undefined;
+  return [...new Set(values)];
+};
+
+export let projectSearchParams = (config: SonarConfig, params: SonarProjectSearchParams) => {
+  let isCloud = (config.deployment ?? 'server') === 'cloud';
+
+  return {
+    organization: requireCloudOrganization(config, params.organization),
+    q: params.query,
+    ...(isCloud
+      ? { projects: params.projectKeys }
+      : {
+          projectKeys: params.projectKeys,
+          qualifiers: params.qualifiers
+        }),
+    p: pageNumber(params.page),
+    ps: pageSize(params.pageSize, 50, 500)
+  };
+};
+
+export let issueSearchParams = (config: SonarConfig, params: SonarIssueSearchParams) => {
+  let isCloud = (config.deployment ?? 'server') === 'cloud';
+  let components = issueComponentFilter(params);
+
+  return {
+    organization: requireCloudOrganization(config, params.organization),
+    issues: params.issueKeys,
+    ...(isCloud ? { componentKeys: components } : { components }),
+    branch: params.branch,
+    pullRequest: params.pullRequest,
+    resolved: params.resolved,
+    severities: params.severities,
+    statuses: params.statuses,
+    issueStatuses: params.issueStatuses,
+    impactSoftwareQualities: params.impactSoftwareQualities,
+    impactSeverities: params.impactSeverities,
+    types: params.types,
+    tags: params.tags,
+    q: params.query,
+    p: pageNumber(params.page),
+    ps: pageSize(params.pageSize, 100, 500)
+  };
+};
+
+export let ruleSearchParams = (config: SonarConfig, params: SonarRuleSearchParams) => ({
+  organization: optionalCloudOrganization(config, params.organization),
+  q: params.query,
+  languages: params.languages,
+  repositories: params.repositories,
+  tags: params.tags,
+  severities: params.severities,
+  types: params.types,
+  statuses: params.statuses,
+  f: 'name,repo,lang,langName,severity,status,tags,sysTags',
+  p: pageNumber(params.page),
+  ps: pageSize(params.pageSize, 100, 500)
+});
+
+export let ruleShowParams = (
+  config: SonarConfig,
+  ruleKey: string,
+  organization: string | undefined
+) => ({
+  organization:
+    (config.deployment ?? 'server') === 'cloud'
+      ? requireCloudOrganization(config, organization)
+      : undefined,
+  key: ruleKey
 });
 
 export let validateAuthenticationResponse = (data: unknown) => {
@@ -174,16 +461,23 @@ export let validateAuthenticationResponse = (data: unknown) => {
   }
 };
 
-let normalizePage = (data: unknown): SonarPage | undefined => {
+let optionalRecordNumber = (record: Record<string, unknown>, key: string) =>
+  typeof record[key] === 'number' ? record[key] : undefined;
+
+export let normalizePage = (data: unknown): SonarPage | undefined => {
   if (!isRecord(data)) return undefined;
   let paging = isRecord(data.paging) ? data.paging : undefined;
-  if (!paging) return undefined;
+  let source = paging ?? data;
+  let page = optionalRecordNumber(source, 'pageIndex') ?? optionalRecordNumber(source, 'p');
+  let normalizedPageSize =
+    optionalRecordNumber(source, 'pageSize') ?? optionalRecordNumber(source, 'ps');
+  let total = optionalRecordNumber(source, 'total');
 
-  return {
-    page: typeof paging.pageIndex === 'number' ? paging.pageIndex : undefined,
-    pageSize: typeof paging.pageSize === 'number' ? paging.pageSize : undefined,
-    total: typeof paging.total === 'number' ? paging.total : undefined
-  };
+  if (page === undefined && normalizedPageSize === undefined && total === undefined) {
+    return undefined;
+  }
+
+  return { page, pageSize: normalizedPageSize, total };
 };
 
 let normalizeArray = <T>(data: unknown, key: string): SonarListResult<T> => {
@@ -286,23 +580,12 @@ export class SonarQubeClient {
     );
   }
 
-  async searchProjects(params: {
-    organization?: string;
-    query?: string;
-    projectKeys?: string[];
-    qualifiers?: string[];
-    page?: number;
-    pageSize?: number;
-  }) {
-    let organization = requireCloudOrganization(this.config, params.organization);
-    let data = await this.get<unknown>('search projects', '/projects/search', {
-      organization,
-      q: params.query,
-      projects: params.projectKeys,
-      qualifiers: params.qualifiers,
-      p: pageNumber(params.page),
-      ps: pageSize(params.pageSize, 50, 500)
-    });
+  async searchProjects(params: SonarProjectSearchParams) {
+    let data = await this.get<unknown>(
+      'search projects',
+      '/projects/search',
+      projectSearchParams(this.config, params)
+    );
     return normalizeArray<Record<string, unknown>>(data, 'components');
   }
 
@@ -353,9 +636,14 @@ export class SonarQubeClient {
     return normalizeArray<Record<string, unknown>>(data, 'pullRequests');
   }
 
-  async getComputeTask(taskId: string) {
+  async getComputeTask(params: {
+    taskId: string;
+    additionalFields?: SonarComputeTaskAdditionalField[];
+  }) {
+    validateComputeTaskAdditionalFields(this.config, params.additionalFields);
     return await this.get<Record<string, unknown>>('get compute task', '/ce/task', {
-      id: taskId
+      id: params.taskId,
+      additionalFields: params.additionalFields
     });
   }
 
@@ -370,6 +658,42 @@ export class SonarQubeClient {
   }
 
   async listMetrics(params: { query?: string; page?: number; pageSize?: number }) {
+    let query = params.query?.trim().toLowerCase();
+    if (query) {
+      let requestedPage = pageNumber(params.page);
+      let requestedPageSize = pageSize(params.pageSize, 100, 500);
+      let firstPage = await this.get<unknown>(
+        'list metrics',
+        '/metrics/search',
+        metricsSearchParams({ page: 1, pageSize: 500 })
+      );
+      let firstResult = normalizeArray<Record<string, unknown>>(firstPage, 'metrics');
+      let allMetrics = [...firstResult.items];
+      let total = firstResult.page?.total ?? allMetrics.length;
+      let pageCount = Math.ceil(total / 500);
+
+      for (let page = 2; page <= pageCount; page++) {
+        let data = await this.get<unknown>(
+          'list metrics',
+          '/metrics/search',
+          metricsSearchParams({ page, pageSize: 500 })
+        );
+        allMetrics.push(...normalizeArray<Record<string, unknown>>(data, 'metrics').items);
+      }
+
+      let filteredMetrics = allMetrics.filter(metric => matchesMetricQuery(metric, query));
+      let start = (requestedPage - 1) * requestedPageSize;
+
+      return {
+        items: filteredMetrics.slice(start, start + requestedPageSize),
+        page: {
+          page: requestedPage,
+          pageSize: requestedPageSize,
+          total: filteredMetrics.length
+        }
+      };
+    }
+
     let data = await this.get<unknown>(
       'list metrics',
       '/metrics/search',
@@ -387,12 +711,7 @@ export class SonarQubeClient {
     return await this.get<Record<string, unknown>>(
       'get project measures',
       '/measures/component',
-      {
-        component: params.projectKey,
-        metricKeys: params.metricKeys,
-        branch: params.branch,
-        pullRequest: params.pullRequest
-      }
+      projectMeasuresParams(this.config, params)
     );
   }
 
@@ -430,7 +749,7 @@ export class SonarQubeClient {
     branch?: string;
     pullRequest?: string;
   }) {
-    requireOneProjectStatusIdentifier(params);
+    validateQualityGateStatusParams(params);
     return await this.get<Record<string, unknown>>(
       'get quality gate status',
       '/qualitygates/project_status',
@@ -444,39 +763,12 @@ export class SonarQubeClient {
     );
   }
 
-  async searchIssues(params: {
-    organization?: string;
-    issueKeys?: string[];
-    projectKeys?: string[];
-    componentKeys?: string[];
-    branch?: string;
-    pullRequest?: string;
-    resolved?: boolean;
-    severities?: string[];
-    statuses?: string[];
-    types?: string[];
-    tags?: string[];
-    query?: string;
-    page?: number;
-    pageSize?: number;
-  }) {
-    let organization = requireCloudOrganization(this.config, params.organization);
-    let data = await this.get<unknown>('search issues', '/issues/search', {
-      organization,
-      issues: params.issueKeys,
-      projects: params.projectKeys,
-      componentKeys: params.componentKeys,
-      branch: params.branch,
-      pullRequest: params.pullRequest,
-      resolved: params.resolved,
-      severities: params.severities,
-      statuses: params.statuses,
-      types: params.types,
-      tags: params.tags,
-      q: params.query,
-      p: pageNumber(params.page),
-      ps: pageSize(params.pageSize, 100, 500)
-    });
+  async searchIssues(params: SonarIssueSearchParams) {
+    let data = await this.get<unknown>(
+      'search issues',
+      '/issues/search',
+      issueSearchParams(this.config, params)
+    );
     return normalizeArray<Record<string, unknown>>(data, 'issues');
   }
 
@@ -565,7 +857,7 @@ export class SonarQubeClient {
     pageSize?: number;
   }) {
     let data = await this.get<unknown>('search security hotspots', '/hotspots/search', {
-      projectKey: params.projectKey,
+      ...hotspotProjectSearchParams(this.config, params.projectKey),
       branch: params.branch,
       pullRequest: params.pullRequest,
       files: params.files,
@@ -602,91 +894,58 @@ export class SonarQubeClient {
     );
   }
 
-  async searchRules(params: {
-    organization?: string;
-    query?: string;
-    languages?: string[];
-    repositories?: string[];
-    tags?: string[];
-    severities?: string[];
-    types?: string[];
-    statuses?: string[];
-    page?: number;
-    pageSize?: number;
-  }) {
-    let organization = requireCloudOrganization(this.config, params.organization);
-    let data = await this.get<unknown>('search rules', '/rules/search', {
-      organization,
-      q: params.query,
-      languages: params.languages,
-      repositories: params.repositories,
-      tags: params.tags,
-      severities: params.severities,
-      types: params.types,
-      statuses: params.statuses,
-      f: 'name,repo,langName,severity,status,tags,sysTags',
-      p: pageNumber(params.page),
-      ps: pageSize(params.pageSize, 100, 500)
-    });
+  async searchRules(params: SonarRuleSearchParams) {
+    let data = await this.get<unknown>(
+      'search rules',
+      '/rules/search',
+      ruleSearchParams(this.config, params)
+    );
     return normalizeArray<Record<string, unknown>>(data, 'rules');
   }
 
   async getRule(ruleKey: string, organization?: string) {
-    let resolvedOrganization = requireCloudOrganization(this.config, organization);
-    return await this.get<Record<string, unknown>>('get rule', '/rules/show', {
-      organization: resolvedOrganization,
-      key: ruleKey
-    });
+    return await this.get<Record<string, unknown>>(
+      'get rule',
+      '/rules/show',
+      ruleShowParams(this.config, ruleKey, organization)
+    );
   }
 
   async getSourceRaw(params: { component: string; branch?: string; pullRequest?: string }) {
-    return await this.getText('get raw source', '/sources/raw', {
-      key: params.component,
-      branch: params.branch,
-      pullRequest: params.pullRequest
-    });
+    return await this.getText(
+      'get raw source',
+      '/sources/raw',
+      sourceRawParams(this.config, params)
+    );
   }
 
-  async showSource(params: {
-    component: string;
-    branch?: string;
-    pullRequest?: string;
-    fromLine?: number;
-    toLine?: number;
-  }) {
-    return await this.get<Record<string, unknown>>('show source', '/sources/show', {
-      key: params.component,
-      branch: params.branch,
-      pullRequest: params.pullRequest,
-      from: params.fromLine,
-      to: params.toLine
-    });
+  async showSource(params: { component: string; fromLine?: number; toLine?: number }) {
+    return await this.get<Record<string, unknown>>(
+      'show source',
+      '/sources/show',
+      sourceShowParams(params)
+    );
   }
 
   async getScmInfo(params: {
     component: string;
-    branch?: string;
-    pullRequest?: string;
     fromLine?: number;
     toLine?: number;
     commitsByLine?: boolean;
   }) {
-    return await this.get<Record<string, unknown>>('get source SCM info', '/sources/scm', {
-      key: params.component,
-      branch: params.branch,
-      pullRequest: params.pullRequest,
-      from: params.fromLine,
-      to: params.toLine,
-      commits_by_line: params.commitsByLine
-    });
+    return await this.get<Record<string, unknown>>(
+      'get source SCM info',
+      '/sources/scm',
+      sourceScmParams(params)
+    );
   }
 
   async getDuplications(params: { component: string; branch?: string; pullRequest?: string }) {
-    return await this.get<Record<string, unknown>>('get duplications', '/duplications/show', {
-      key: params.component,
-      branch: params.branch,
-      pullRequest: params.pullRequest
-    });
+    return await this.get<Record<string, unknown>>(
+      'get duplications',
+      '/duplications/show',
+      duplicationShowParams(this.config, params)
+    );
   }
 
   async listQualityGates() {
@@ -697,9 +956,10 @@ export class SonarQubeClient {
     return normalizeArray<Record<string, unknown>>(data, 'qualitygates');
   }
 
-  async listLanguages(params: { query?: string }) {
+  async listLanguages(params: { query?: string; pageSize?: number }) {
     let data = await this.get<unknown>('list languages', '/languages/list', {
-      q: params.query
+      q: params.query,
+      ps: optionalPageSizeIncludingAll(params.pageSize)
     });
     return normalizeArray<Record<string, unknown>>(data, 'languages');
   }

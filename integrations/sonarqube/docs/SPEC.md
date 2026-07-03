@@ -39,7 +39,7 @@ System passcode auth is deferred because it is primarily for endpoints such as m
 
 ## Client Behavior
 
-The client uses `createAuthenticatedAxios`, `requestAxios`, and `requestAxiosData` from `slates`. API failures are normalized with `buildApiServiceError`, including Sonar `errors[].msg`, `msg`, and `message` fields. Cloud 429 responses include rate-limit retry context in the error message.
+The client uses `createAuthenticatedAxios`, `requestAxios`, and `requestAxiosData` from `slates`. API failures are normalized with `buildApiServiceError`, including Sonar `errors[].msg`, `msg`, and `message` fields. Cloud 429 responses include rate-limit retry context in the error message. Project/component not-found responses on project-scoped calls add diagnostics to verify the project key, `cloudRegion`, `organization`, token Browse permission, and branch or pull request scope.
 
 Base URLs:
 
@@ -52,13 +52,13 @@ Arrays are serialized as comma-separated query parameters, matching Sonar Web AP
 
 ## Tool Contracts
 
-All tool input schemas are top-level `z.object` schemas to remain MCP/OpenAI tool bridge compatible. Conditional requirements are described in field descriptions and enforced at runtime with `ServiceError`.
+All tool input schemas are top-level `z.object` schemas to remain MCP/OpenAI tool bridge compatible. Conditional requirements are described in field descriptions and enforced at runtime with `ServiceError`. `search_issues.types` is restricted to supported SonarQube issue types, while current issue status and software-quality filtering use `issueStatuses`, `impactSoftwareQualities`, and `impactSeverities`.
 
 Outputs expose normalized fields for agent workflows and include `raw` objects for Sonar-specific fields that are not normalized yet. Source-code content is returned through Slate text attachments, not inline output fields. No tool returns base64 blobs or destructive mutation outputs.
 
 ## Verification
 
-Package tests cover config/base URL validation, query parameter serialization, pagination caps, Cloud organization checks, project-key fallback, quality gate identifier validation, Server-only status validation, workflow confirmation validation, source attachment metadata, authentication response validation, and Sonar error normalization.
+Package tests cover config/base URL validation, query parameter serialization, deployment-specific hotspot parameters, pagination caps, Cloud organization checks, project-key fallback, quality gate identifier validation, Server-only status validation, workflow confirmation validation, source attachment metadata, authentication response validation, issue-search schema compatibility, and Sonar error normalization.
 
 Schema regression coverage uses `describeMcpCompatibleToolSchemas('SonarQube tool input schemas', provider.actions)`.
 

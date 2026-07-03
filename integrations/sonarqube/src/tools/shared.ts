@@ -170,6 +170,11 @@ export let createClient = (ctx: { auth: { token: string }; config: SonarConfig }
 let optionalString = (value: unknown) =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
 
+let optionalRecord = (value: unknown) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+
 let optionalNumber = (value: unknown) =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 
@@ -256,7 +261,7 @@ export let mapIssue = (issue: Record<string, unknown>) => ({
   key: String(issue.key ?? ''),
   rule: optionalString(issue.rule),
   severity: optionalString(issue.severity),
-  status: optionalString(issue.status),
+  status: optionalString(issue.issueStatus) ?? optionalString(issue.status),
   type: optionalString(issue.type),
   component: optionalString(issue.component),
   project: optionalString(issue.project),
@@ -270,22 +275,33 @@ export let mapIssue = (issue: Record<string, unknown>) => ({
   raw: issue
 });
 
-export let mapHotspot = (hotspot: Record<string, unknown>) => ({
-  key: String(hotspot.key ?? ''),
-  component: optionalString(hotspot.component),
-  project: optionalString(hotspot.project),
-  line: optionalNumber(hotspot.line),
-  message: optionalString(hotspot.message),
-  status: optionalString(hotspot.status),
-  resolution: optionalString(hotspot.resolution),
-  vulnerabilityProbability: optionalString(hotspot.vulnerabilityProbability),
-  ruleKey: optionalString(hotspot.ruleKey) ?? optionalString(hotspot.rule),
-  assignee: optionalString(hotspot.assignee),
-  author: optionalString(hotspot.author),
-  creationDate: optionalString(hotspot.creationDate),
-  updateDate: optionalString(hotspot.updateDate),
-  raw: hotspot
-});
+export let mapHotspot = (hotspot: Record<string, unknown>) => {
+  let component = optionalRecord(hotspot.component);
+  let project = optionalRecord(hotspot.project);
+  let rule = optionalRecord(hotspot.rule);
+
+  return {
+    key: String(hotspot.key ?? ''),
+    component: optionalString(hotspot.component) ?? optionalString(component?.key),
+    project: optionalString(hotspot.project) ?? optionalString(project?.key),
+    line: optionalNumber(hotspot.line),
+    message: optionalString(hotspot.message),
+    status: optionalString(hotspot.status),
+    resolution: optionalString(hotspot.resolution),
+    vulnerabilityProbability:
+      optionalString(hotspot.vulnerabilityProbability) ??
+      optionalString(rule?.vulnerabilityProbability),
+    ruleKey:
+      optionalString(hotspot.ruleKey) ??
+      optionalString(hotspot.rule) ??
+      optionalString(rule?.key),
+    assignee: optionalString(hotspot.assignee),
+    author: optionalString(hotspot.author),
+    creationDate: optionalString(hotspot.creationDate),
+    updateDate: optionalString(hotspot.updateDate),
+    raw: hotspot
+  };
+};
 
 export let mapRule = (rule: Record<string, unknown>) => ({
   key: String(rule.key ?? ''),
@@ -342,12 +358,24 @@ export let projectInput = {
   projectKey: z
     .string()
     .optional()
-    .describe('SonarQube project key. Defaults to config.defaultProjectKey when omitted.')
+    .describe(
+      'Exact SonarQube project key. Use search_projects first when the user gave a project name, partial key, or stale-looking key. Omit only when intentionally using a configured defaultProjectKey.'
+    )
 };
 
 export let branchPullRequestInputs = {
-  branch: z.string().optional().describe('Branch key to query.'),
-  pullRequest: z.string().optional().describe('Pull request id/key to query.')
+  branch: z
+    .string()
+    .optional()
+    .describe(
+      'Branch key to query. Pass a branch only when the user explicitly named it or it was discovered with list_project_branches. Do not guess main or master; omit branch for the default branch unless the user named one. Do not combine with pullRequest.'
+    ),
+  pullRequest: z
+    .string()
+    .optional()
+    .describe(
+      'Pull request id/key to query. Pass a pull request only when the user explicitly named it or it was discovered with list_project_pull_requests. Do not combine with branch.'
+    )
 };
 
 export let paginationInputs = (defaultPageSize: number, maxPageSize: number) => ({

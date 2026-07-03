@@ -1,41 +1,76 @@
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import {
+  asString,
+  createJenkinsClient,
+  type JenkinsAuth,
+  normalizeBaseUrl
+} from './lib/client';
 
 export let auth = SlateAuth.create()
   .output(
     z.object({
-      username: z.string(),
-      token: z.string()
+      baseUrl: z.string().describe('Normalized Jenkins controller base URL.'),
+      username: z.string().describe('Jenkins username used for Basic authentication.'),
+      apiToken: z.string().describe('Jenkins API token used for Basic authentication.'),
+      jenkinsVersion: z
+        .string()
+        .optional()
+        .describe('Jenkins version detected from the controller, when available.')
     })
   )
   .addCustomAuth({
     type: 'auth.custom',
-
-    name: 'Username & API Token',
+    name: 'Jenkins API Token',
     key: 'api_token',
-
+    docs: [
+      {
+        type: 'docs.auth.custom',
+        name: 'Jenkins Remote Access API authentication',
+        url: 'https://www.jenkins.io/doc/book/system-administration/authenticating-scripted-clients/'
+      }
+    ],
     inputSchema: z.object({
-      username: z.string().describe('Jenkins username'),
-      token: z.string().describe('Jenkins API token (found at $JENKINS_URL/me/configure)')
+      baseUrl: z
+        .string()
+        .min(1)
+        .describe('Base URL of the Jenkins controller, such as https://jenkins.example.com.'),
+      username: z.string().min(1).describe('Jenkins username.'),
+      apiToken: z
+        .string()
+        .min(1)
+        .describe('Jenkins API token from the user configuration page.')
     }),
-
     getOutput: async ctx => {
-      return {
-        output: {
-          username: ctx.input.username,
-          token: ctx.input.token
-        }
+      let output: JenkinsAuth = {
+        baseUrl: normalizeBaseUrl(ctx.input.baseUrl),
+        username: ctx.input.username,
+        apiToken: ctx.input.apiToken
       };
-    },
 
-    getProfile: async (ctx: {
-      output: { username: string; token: string };
-      input: { username: string; token: string };
-    }) => {
+      let client = createJenkinsClient({ auth: output });
+      let status = await client.getRoot();
+      output.jenkinsVersion = status.version;
+
+      return { output };
+    },
+    getProfile: async (ctx: { output: JenkinsAuth }) => {
+      let client = createJenkinsClient({ auth: ctx.output });
+      let me = await client.getMe();
+      let id =
+        asString(me.id) ??
+        asString(me.absoluteUrl) ??
+        asString(me.fullName) ??
+        ctx.output.username;
+      let name = asString(me.fullName) ?? ctx.output.username;
+
       return {
         profile: {
-          id: ctx.output.username,
-          name: ctx.output.username
+          id,
+          name,
+          username: ctx.output.username,
+          baseUrl: ctx.output.baseUrl,
+          jenkinsVersion: ctx.output.jenkinsVersion
         }
       };
     }

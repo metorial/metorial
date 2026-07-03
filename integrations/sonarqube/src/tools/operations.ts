@@ -43,7 +43,11 @@ export let listLanguagesTool = readOnlyTool({
 })
   .input(
     z.object({
-      query: z.string().optional().describe('Search text for language key or name.')
+      query: z.string().optional().describe('Search text for language key or name.'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe('Number of languages to return. Use 0 or omit to return all languages.')
     })
   )
   .output(
@@ -74,6 +78,8 @@ export let getSystemStatusTool = readOnlyTool({
   .input(z.object({}))
   .output(
     z.object({
+      id: z.string().optional().describe('SonarQube Server system id.'),
+      version: z.string().optional().describe('SonarQube Server version.'),
       status: z.string().optional().describe('SonarQube Server system status.'),
       raw: rawRecordSchema
     })
@@ -84,6 +90,8 @@ export let getSystemStatusTool = readOnlyTool({
 
     return {
       output: {
+        id: typeof data.id === 'string' ? data.id : undefined,
+        version: typeof data.version === 'string' ? data.version : undefined,
         status: typeof data.status === 'string' ? data.status : undefined,
         raw: data
       },

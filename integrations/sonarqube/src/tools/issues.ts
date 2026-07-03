@@ -25,6 +25,16 @@ let issueActionSchema = z.enum([
 
 let issueSeveritySchema = z.enum(['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'INFO']);
 let issueTypeSchema = z.enum(['BUG', 'VULNERABILITY', 'CODE_SMELL']);
+let issueStatusSchema = z.enum([
+  'OPEN',
+  'CONFIRMED',
+  'FALSE_POSITIVE',
+  'ACCEPTED',
+  'FIXED',
+  'IN_SANDBOX'
+]);
+let issueImpactSoftwareQualitySchema = z.enum(['MAINTAINABILITY', 'RELIABILITY', 'SECURITY']);
+let issueImpactSeveritySchema = z.enum(['INFO', 'LOW', 'MEDIUM', 'HIGH', 'BLOCKER']);
 
 type ManageIssueInput = {
   organization?: string;
@@ -88,7 +98,10 @@ export let validateManageIssueInput = (input: ManageIssueInput) => {
   }
 
   let requiredField = actionFields[input.action][0]!;
-  if (!hasValue(input[requiredField])) {
+  if (requiredField === 'tags' && !Array.isArray(input.tags)) {
+    throw sonarqubeValidationError(`${requiredField} is required for ${input.action}.`);
+  }
+  if (requiredField !== 'tags' && !hasValue(input[requiredField])) {
     throw sonarqubeValidationError(`${requiredField} is required for ${input.action}.`);
   }
 };
@@ -97,7 +110,7 @@ export let searchIssuesTool = readOnlyTool({
   name: 'Search Issues',
   key: 'search_issues',
   description:
-    'Search SonarQube issues by issue key, project, component, branch, pull request, status, severity, type, tags, and text query.'
+    'Search SonarQube issues by issue key, exact project/component keys, branch or pull request, issue status, software quality, impact severity, type, tags, and text query. Use search_projects for project names and list_component_tree for file or directory names when keys are unknown.'
 })
   .input(
     z.object({
@@ -112,11 +125,15 @@ export let searchIssuesTool = readOnlyTool({
       projectKeys: z
         .array(z.string())
         .optional()
-        .describe('Project keys to filter issues. Sent as SonarQube projects.'),
+        .describe(
+          'Exact project keys to filter issues. Use search_projects to discover valid keys.'
+        ),
       componentKeys: z
         .array(z.string())
         .optional()
-        .describe('Component keys to filter issues. Includes matching descendants.'),
+        .describe(
+          'Exact component keys to filter issues. Use list_component_tree to discover file or directory component keys. Combined with projectKeys.'
+        ),
       resolved: z.boolean().optional().describe('Filter resolved or unresolved issues.'),
       severities: z
         .array(z.string())
@@ -125,11 +142,31 @@ export let searchIssuesTool = readOnlyTool({
       statuses: z
         .array(z.string())
         .optional()
-        .describe('Issue statuses, for example OPEN, CONFIRMED, REOPENED, RESOLVED, CLOSED.'),
-      types: z
-        .array(z.string())
+        .describe(
+          'Legacy issue statuses, for example OPEN, CONFIRMED, REOPENED, RESOLVED, CLOSED.'
+        ),
+      issueStatuses: z
+        .array(issueStatusSchema)
         .optional()
-        .describe('Issue types, for example BUG, VULNERABILITY, or CODE_SMELL.'),
+        .describe(
+          'Current issue statuses, for example OPEN, ACCEPTED, FALSE_POSITIVE, or FIXED.'
+        ),
+      impactSoftwareQualities: z
+        .array(issueImpactSoftwareQualitySchema)
+        .optional()
+        .describe(
+          'Software qualities impacted by matching issues, for example SECURITY or RELIABILITY.'
+        ),
+      impactSeverities: z
+        .array(issueImpactSeveritySchema)
+        .optional()
+        .describe('Software quality impact severities, for example LOW, MEDIUM, or HIGH.'),
+      types: z
+        .array(issueTypeSchema)
+        .optional()
+        .describe(
+          'Supported issue types: BUG, VULNERABILITY, or CODE_SMELL. SonarQube does not accept SECURITY_HOTSPOT here; use search_hotspots for legacy hotspots or impactSoftwareQualities=["SECURITY"] for security issues.'
+        ),
       tags: z.array(z.string()).optional().describe('Issue tags to filter by.'),
       query: z.string().optional().describe('Text query for issues. Sent as SonarQube q.'),
       ...branchPullRequestInputs,
@@ -161,7 +198,7 @@ export let getIssueTool = readOnlyTool({
   name: 'Get Issue',
   key: 'get_issue',
   description:
-    'Get one SonarQube issue by issue key, including normalized issue metadata and raw provider fields.'
+    'Read one SonarQube issue by exact issue key without changing it. Use search_issues first when the issue key is unknown.'
 })
   .input(
     z.object({
@@ -237,10 +274,12 @@ export let manageIssueTool = createSonarTool({
   name: 'Manage Issue',
   key: 'manage_issue',
   description:
-    'Manage a SonarQube issue workflow: transition, assign, comment, set tags, set severity, or set type. Requires confirmWrite to be true.',
+    'Perform exactly one SonarQube issue mutation: transition, assign, comment, set tags, set severity, or set type. Requires confirmWrite=true and the matching action-specific field.',
   instructions: [
-    'Use search_issues or get_issue first to identify the issue key and current state.',
-    'Set confirmWrite to true only when the user explicitly asks to update the issue.'
+    'Use search_issues or get_issue first when the issue key or current state is unknown.',
+    'When the user already provided an exact issue key and explicitly asks to update it, call manage_issue directly.',
+    'Set confirmWrite to true only when the user explicitly asks to update the issue.',
+    'Provide only the field required by the selected action; for set_tags, tags is the complete replacement list and [] clears all tags.'
   ],
   readOnly: false,
   destructive: false
@@ -268,7 +307,9 @@ export let manageIssueTool = createSonarTool({
       tags: z
         .array(z.string())
         .optional()
-        .describe('Required for action=set_tags. Complete tag list for the issue.'),
+        .describe(
+          'Required for action=set_tags. Complete tag list for the issue; an empty list clears all tags.'
+        ),
       severity: issueSeveritySchema
         .optional()
         .describe('Required for action=set_severity. New issue severity.'),

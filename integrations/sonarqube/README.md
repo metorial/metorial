@@ -45,7 +45,7 @@ Read quality gate status by exactly one of `analysisId`, `projectId`, or `projec
 
 ### Search Issues / Get Issue / Get Issue Changelog / Manage Issue
 
-Search issues by issue key, project, component, branch, pull request, resolution, status, severity, type, tags, and text query. Read a specific issue, inspect changelog entries, and manage issue workflow updates such as transitions, assignments, comments, tags, severity, and type. Mutating issue actions require explicit `confirmWrite`.
+Search issues by issue key, project, component, branch, pull request, legacy status, current issue status, software quality, impact severity, supported type, tags, and text query. `types` accepts SonarQube issue types such as `BUG`, `VULNERABILITY`, and `CODE_SMELL`; use security-hotspot tools for legacy hotspots or `impactSoftwareQualities` for security issues. Read a specific issue, inspect changelog entries, and manage issue workflow updates such as transitions, assignments, comments, tags, severity, and type. Mutating issue actions require explicit `confirmWrite`.
 
 ### Search Security Hotspots / Get Security Hotspot / Manage Security Hotspot
 

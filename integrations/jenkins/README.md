@@ -1,72 +1,86 @@
-# <img src="https://provider-logos.metorial-cdn.com/jenkins.png" height="20"> Jenkins
+# <img src="logo.png" height="20"> Jenkins
 
-Manage CI/CD pipelines and automation on a Jenkins server. Create, configure, enable, disable, and delete jobs (freestyle, pipeline, multibranch). Trigger builds with or without parameters, stop running builds, and retrieve build status, console output, artifacts, and test results. Manage build queues, views, folders, nodes (agents), plugins, and credentials. Retrieve system information and execute Groovy scripts. Configure webhooks to trigger builds from external systems or send build event notifications to external endpoints.
+Use Jenkins Remote Access API endpoints to inspect CI jobs and builds, trigger and replay builds, read queues and logs, summarize tests and SCM metadata, and check controller status.
+
+This integration uses Jenkins HTTP Basic authentication with a username and API token. It is REST-only: it does not depend on the Jenkins MCP Server plugin, Jenkins CLI, or Jenkins script console.
 
 ## Tools
 
-### Execute Groovy Script
+### Get Job
 
-Execute a Groovy script on the Jenkins master or on a specific node. Returns the script output. Useful for advanced administration tasks, diagnostics, and custom automation.
-
-### Get Build
-
-Retrieve detailed information about a specific build or the last build of a Jenkins job. Includes build status, duration, timestamp, and optionally the console output and test results.
-
-### Get Job Config
-
-Retrieve the raw XML configuration of a Jenkins job. Useful for inspecting the full job configuration, cloning job settings, or preparing configuration updates.
-
-### Get Job Details
-
-Retrieve detailed information about a specific Jenkins job including its configuration, last build status, health reports, and recent builds. Supports jobs inside folders using slash-separated paths.
-
-### Get System Info
-
-Retrieve Jenkins server information including mode, description, number of executors, and the authenticated user's identity.
-
-### List Builds
-
-List recent builds for a Jenkins job. Returns build numbers, results, timestamps, and durations for the most recent builds.
+Get Jenkins job details, including status, health reports, and recent build references.
 
 ### List Jobs
 
-List jobs available on the Jenkins server. Supports filtering by name and listing jobs within a specific folder. Returns job names, URLs, status colors, and whether each job is buildable.
-
-### Manage Credentials
-
-List, get, create, update, or delete credentials stored in Jenkins. Credentials are used in jobs and pipelines for authenticating with external services. Supports scoping credentials to specific domains and folders.
-
-### Manage Folder
-
-Create or delete Jenkins folders for organizing jobs. Folders can be nested inside other folders.
-
-### Manage Job
-
-Create, copy, enable, disable, delete, or update the configuration of a Jenkins job. For **create** and **update**, provide the job's XML configuration. For **copy**, specify the source job name and new job name. For **enable**, **disable**, and **delete**, only the job path is required.
-
-### Manage Node
-
-List, get, create, delete, or toggle online/offline status of Jenkins nodes (agents). Nodes are the machines on which build agents run. Jenkins monitors each node for disk space, free temp space, free swap, clock time/sync, and response time.
-
-### Manage Plugins
-
-List installed Jenkins plugins or install new plugins. Returns plugin names, versions, enabled/active status, and dependency information.
-
-### Manage Build Queue
-
-List items in the Jenkins build queue or cancel a queued build. Use **list** to see all pending builds and their reasons, or **cancel** to remove a specific item from the queue.
-
-### Manage View
-
-Create, delete, or update Jenkins views and manage which jobs are displayed in them. Use **list** to list all views, **get** to get details of a specific view, **create** to create a new view, **delete** to remove a view, **add_job** to add a job to a view, or **remove_job** to remove a job from a view.
-
-### Stop Build
-
-Stop, terminate, or kill a running Jenkins build. Use **stop** for a graceful stop, **terminate** for a harder stop, or **kill** to forcefully end the build process.
+List jobs in the root or a folder, sorted by name with `skip`/`limit` pagination and optional recursion or name filtering.
 
 ### Trigger Build
 
-Trigger a new build for a Jenkins job. Supports parameterized builds by passing key-value parameters. Returns the queue URL for the triggered build which can be used to track build progress.
+Trigger a job build with or without scalar or scalar-array parameters and return the Jenkins queue item reference.
+
+### Get Queue Item
+
+Inspect a queued build by queue item id, including task and executable build details when assigned.
+
+### Get Build
+
+Get build metadata by number, by Jenkins last-build selector, or from `lastBuild` when no build is specified.
+
+### Update Build
+
+Update a Jenkins build display name and/or description through stock build HTTP endpoints.
+
+### Get Build Log
+
+Read build console logs with progressiveText cursors and consoleText fallback.
+
+### Search Build Log
+
+Search build console logs with `pattern`, optional regex/case controls, context lines, bounded line scans, and result counts.
+
+### Rebuild Build
+
+Re-trigger a job, preferring Pipeline Replay when available and otherwise copying parameters from the source build.
+
+### Get Replay Scripts
+
+Read Pipeline Replay scripts when the Jenkins Pipeline Replay HTTP page is available.
+
+### Replay Build
+
+Run Pipeline Replay through the Pipeline Replay HTTP endpoint when available.
+
+### Get Test Results
+
+Fetch JUnit test report counts, suites, optional test cases, failing-case filtering, and truncation metadata.
+
+### Get Flaky Failures
+
+Return Jenkins JUnit `flakyFailure` entries from test metadata.
+
+### Get Job SCM
+
+Parse job `config.xml` and summarize SCM classes, repository URLs, branches, and credential ids.
+
+### Get Build SCM
+
+Return Git SCM metadata attached to a build, including repository URIs, built branches, and commit when Jenkins exposes Git BuildData.
+
+### Get Build Changesets
+
+Return build changeset entries with commit ids, messages, authors, timestamps, and affected paths.
+
+### Find Jobs With SCM URL
+
+Recursively find jobs whose Git SCM config loosely matches a repository URL and optional branch, with `skip`/`limit` pagination.
+
+### Who Am I
+
+Return the Jenkins identity visible to the authenticated API token.
+
+### Get Status
+
+Return controller, queue, node, and executor status from Jenkins HTTP APIs.
 
 ## License
 

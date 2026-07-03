@@ -1,26 +1,38 @@
 import { createTextAttachment } from 'slates';
 import { z } from 'zod';
 import { sonarqubeValidationError } from '../lib/errors';
-import {
-  branchPullRequestInputs,
-  createClient,
-  rawRecordSchema,
-  readOnlyTool,
-  scmLineSchema
-} from './shared';
+import { createClient, rawRecordSchema, readOnlyTool, scmLineSchema } from './shared';
 
 let lineRangeInputs = {
-  fromLine: z.number().optional().describe('First source line to include.'),
-  toLine: z.number().optional().describe('Last source line to include.')
+  fromLine: z.number().optional().describe('First 1-based source line to include.'),
+  toLine: z.number().optional().describe('Last 1-based source line to include.')
 };
 
-let validateLineRange = (input: { fromLine?: number; toLine?: number }) => {
+let cloudBranchPullRequestInputs = {
+  branch: z
+    .string()
+    .optional()
+    .describe(
+      'Branch key to query. Documented for SonarQube Cloud source/duplication reads only; do not combine with pullRequest.'
+    ),
+  pullRequest: z
+    .string()
+    .optional()
+    .describe(
+      'Pull request id/key to query. Documented for SonarQube Cloud source/duplication reads only; do not combine with branch.'
+    )
+};
+
+export let validateLineRange = (input: { fromLine?: number; toLine?: number }) => {
   for (let [label, value] of [
     ['fromLine', input.fromLine],
     ['toLine', input.toLine]
   ] as const) {
-    if (value !== undefined && (!Number.isFinite(value) || value < 1)) {
-      throw sonarqubeValidationError(`${label} must be a positive number.`);
+    if (
+      value !== undefined &&
+      (!Number.isFinite(value) || !Number.isInteger(value) || value < 1)
+    ) {
+      throw sonarqubeValidationError(`${label} must be a positive integer.`);
     }
   }
 
@@ -77,11 +89,34 @@ export let sourceTextFromShowResponse = (data: Record<string, unknown>) =>
     .map(line => line.code)
     .join('\n');
 
+let sourceLinesFromRawText = (content: string) =>
+  content.length === 0 ? [] : content.split(/\r\n|\n|\r/);
+
+export let sourceTextFromRawResponse = (
+  content: string,
+  input: { fromLine?: number; toLine?: number } = {}
+) => {
+  validateLineRange(input);
+
+  let lines = sourceLinesFromRawText(content);
+  let start = input.fromLine === undefined ? 0 : input.fromLine - 1;
+  let end = input.toLine ?? lines.length;
+
+  return lines.slice(start, end).join('\n');
+};
+
+let sourceLineCount = (content: string) => sourceLinesFromRawText(content).length;
+
 export let sourceAttachmentMetadata = (content: string) => ({
   mimeType: 'text/plain',
   byteLength: Buffer.byteLength(content, 'utf8'),
   attachmentCount: 1
 });
+
+export let duplicationFilesFromShowResponse = (data: Record<string, unknown>) =>
+  typeof data.files === 'object' && data.files !== null && !Array.isArray(data.files)
+    ? (data.files as Record<string, unknown>)
+    : {};
 
 let mapScmEntry = (entry: unknown) => {
   if (Array.isArray(entry)) {
@@ -114,12 +149,16 @@ export let getSourceTool = readOnlyTool({
   name: 'Get Source',
   key: 'get_source',
   description:
-    'Retrieve SonarQube source code for a file component. Source text is returned as a Slate text attachment, not inline output.'
+    'Retrieve source code for a SonarQube file component key. Use list_component_tree with FIL qualifiers to discover file keys. Source text is returned as a Slate text attachment, not inline output.'
 })
   .input(
     z.object({
-      component: z.string().describe('File component key to retrieve source for.'),
-      ...branchPullRequestInputs,
+      component: z
+        .string()
+        .describe(
+          'Exact file component key to retrieve source for, usually discovered with list_component_tree using qualifier FIL.'
+        ),
+      ...cloudBranchPullRequestInputs,
       ...lineRangeInputs
     })
   )
@@ -133,38 +172,20 @@ export let getSourceTool = readOnlyTool({
       lineCount: z.number().optional().describe('Number of source lines in the attachment.'),
       mimeType: z.string().describe('Attachment MIME type.'),
       byteLength: z.number().describe('Attachment byte length.'),
-      attachmentCount: z.number().describe('Number of Slate attachments returned.'),
-      raw: rawRecordSchema
-        .optional()
-        .describe('Raw sources/show response for line-range reads.')
+      attachmentCount: z.number().describe('Number of Slate attachments returned.')
     })
   )
   .handleInvocation(async ctx => {
     validateLineRange(ctx.input);
     let client = createClient(ctx);
     let hasRange = ctx.input.fromLine !== undefined || ctx.input.toLine !== undefined;
-
-    let raw: Record<string, unknown> | undefined;
-    let content: string;
-    let lineCount: number | undefined;
-    if (hasRange) {
-      raw = await client.showSource({
-        component: ctx.input.component,
-        branch: ctx.input.branch,
-        pullRequest: ctx.input.pullRequest,
-        fromLine: ctx.input.fromLine,
-        toLine: ctx.input.toLine
-      });
-      let lines = sourceLinesFromShowResponse(raw);
-      content = lines.map(line => line.code).join('\n');
-      lineCount = lines.length;
-    } else {
-      content = await client.getSourceRaw({
-        component: ctx.input.component,
-        branch: ctx.input.branch,
-        pullRequest: ctx.input.pullRequest
-      });
-    }
+    let rawContent = await client.getSourceRaw({
+      component: ctx.input.component,
+      branch: ctx.input.branch,
+      pullRequest: ctx.input.pullRequest
+    });
+    let content = hasRange ? sourceTextFromRawResponse(rawContent, ctx.input) : rawContent;
+    let lineCount = sourceLineCount(content);
 
     let metadata = sourceAttachmentMetadata(content);
 
@@ -176,8 +197,7 @@ export let getSourceTool = readOnlyTool({
         fromLine: ctx.input.fromLine,
         toLine: ctx.input.toLine,
         lineCount,
-        ...metadata,
-        raw
+        ...metadata
       },
       attachments: [createTextAttachment(content, metadata.mimeType)],
       message: `Retrieved SonarQube source for **${ctx.input.component}** as a text attachment.`
@@ -189,16 +209,19 @@ export let getScmInfoTool = readOnlyTool({
   name: 'Get SCM Info',
   key: 'get_scm_info',
   description:
-    'Get SonarQube SCM blame information for a source component, optionally scoped to a line range.'
+    'Get SonarQube SCM blame information for a file component key, optionally scoped to a line range. Use list_component_tree with FIL qualifiers to discover file keys.'
 })
   .input(
     z.object({
-      component: z.string().describe('File component key to retrieve SCM info for.'),
+      component: z
+        .string()
+        .describe(
+          'Exact file component key to retrieve SCM info for, usually discovered with list_component_tree using qualifier FIL.'
+        ),
       commitsByLine: z
         .boolean()
         .optional()
         .describe('Whether SonarQube should return commits grouped by line when supported.'),
-      ...branchPullRequestInputs,
       ...lineRangeInputs
     })
   )
@@ -230,19 +253,24 @@ export let getDuplicationsTool = readOnlyTool({
   name: 'Get Duplications',
   key: 'get_duplications',
   description:
-    'Get SonarQube duplication blocks and related files for a source component, branch, or pull request.'
+    'Get SonarQube duplication blocks and related files for a component key. Use list_component_tree with FIL qualifiers for source files; branch and pullRequest are Cloud-only here.'
 })
   .input(
     z.object({
-      component: z.string().describe('Component key to retrieve duplications for.'),
-      ...branchPullRequestInputs
+      component: z
+        .string()
+        .describe(
+          'Exact component key to retrieve duplications for, usually a file component discovered with list_component_tree.'
+        ),
+      ...cloudBranchPullRequestInputs
     })
   )
   .output(
     z.object({
       component: z.string().describe('Component key used for the request.'),
       duplications: z.array(z.any()).describe('Duplication blocks returned by SonarQube.'),
-      files: z.array(z.any()).describe('Related duplicated files returned by SonarQube.'),
+      files: rawRecordSchema.describe('Related duplicated files keyed by duplication _ref.'),
+      fileCount: z.number().describe('Number of related duplicated files returned.'),
       raw: rawRecordSchema
     })
   )
@@ -250,13 +278,15 @@ export let getDuplicationsTool = readOnlyTool({
     let client = createClient(ctx);
     let data = await client.getDuplications(ctx.input);
     let duplications = Array.isArray(data.duplications) ? data.duplications : [];
-    let files = Array.isArray(data.files) ? data.files : [];
+    let files = duplicationFilesFromShowResponse(data);
+    let fileCount = Object.keys(files).length;
 
     return {
       output: {
         component: ctx.input.component,
         duplications,
         files,
+        fileCount,
         raw: data
       },
       message: `Retrieved **${duplications.length}** duplication block(s) for SonarQube component **${ctx.input.component}**.`
