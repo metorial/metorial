@@ -4,7 +4,7 @@ import {
   asString,
   createJenkinsClient,
   type JenkinsAuth,
-  normalizeBaseUrl
+  normalizeJenkinsAuth
 } from './lib/client';
 
 export let auth = SlateAuth.create()
@@ -42,11 +42,11 @@ export let auth = SlateAuth.create()
         .describe('Jenkins API token from the user configuration page.')
     }),
     getOutput: async ctx => {
-      let output: JenkinsAuth = {
-        baseUrl: normalizeBaseUrl(ctx.input.baseUrl),
+      let output = normalizeJenkinsAuth({
+        baseUrl: ctx.input.baseUrl,
         username: ctx.input.username,
         apiToken: ctx.input.apiToken
-      };
+      });
 
       let client = createJenkinsClient({ auth: output });
       let status = await client.getRoot();

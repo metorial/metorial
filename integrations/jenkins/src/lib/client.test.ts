@@ -7,8 +7,68 @@ import {
   gitScmMatchTargetMatches,
   gitScmUrlsLooselyMatch,
   JenkinsClient,
+  normalizeJenkinsAuth,
   summarizeBuildChangesets
 } from './client';
+
+describe('normalizeJenkinsAuth', () => {
+  it('normalizes base URL and trims Basic auth credentials', () => {
+    expect(
+      normalizeJenkinsAuth({
+        baseUrl: ' https://jenkins.example.com/controller/?unused=true#fragment ',
+        username: ' user ',
+        apiToken: ' token '
+      })
+    ).toEqual({
+      baseUrl: 'https://jenkins.example.com/controller',
+      username: 'user',
+      apiToken: 'token'
+    });
+  });
+
+  it('rejects blank Basic auth credentials after trimming', () => {
+    expect(() =>
+      normalizeJenkinsAuth({
+        baseUrl: 'https://jenkins.example.com',
+        username: '   ',
+        apiToken: 'token'
+      })
+    ).toThrow('username is required.');
+
+    expect(() =>
+      normalizeJenkinsAuth({
+        baseUrl: 'https://jenkins.example.com',
+        username: 'user',
+        apiToken: '   '
+      })
+    ).toThrow('apiToken is required.');
+  });
+});
+
+describe('JenkinsClient authentication', () => {
+  it('sends preemptive HTTP Basic auth with trimmed username and API token', () => {
+    let client = new JenkinsClient({
+      auth: {
+        baseUrl: 'https://jenkins.example.com/',
+        username: ' user ',
+        apiToken: ' token '
+      }
+    });
+    let axios = (
+      client as unknown as {
+        axios: {
+          defaults: {
+            headers: Record<string, unknown>;
+          };
+        };
+      }
+    ).axios;
+
+    expect(axios.defaults.headers.Authorization).toBe(
+      `Basic ${Buffer.from('user:token', 'utf8').toString('base64')}`
+    );
+  });
+});
 
 describe('extractReplayScriptsFromHtml', () => {
   it('extracts Jenkins Replay main script and loaded scripts from the run form', () => {

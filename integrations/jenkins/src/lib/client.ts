@@ -181,6 +181,28 @@ export let normalizeBaseUrl = (baseUrl: string) => {
   return parsed.toString().replace(/\/+$/, '');
 };
 
+let normalizeRequiredAuthString = (value: string, label: string) => {
+  let trimmed = value.trim();
+  if (!trimmed) {
+    throw jenkinsValidationError(`${label} is required.`);
+  }
+  return trimmed;
+};
+
+export let normalizeJenkinsAuth = (auth: JenkinsAuth): JenkinsAuth => {
+  let normalized: JenkinsAuth = {
+    baseUrl: normalizeBaseUrl(auth.baseUrl),
+    username: normalizeRequiredAuthString(auth.username, 'username'),
+    apiToken: normalizeRequiredAuthString(auth.apiToken, 'apiToken')
+  };
+
+  if (auth.jenkinsVersion !== undefined) {
+    normalized.jenkinsVersion = auth.jenkinsVersion;
+  }
+
+  return normalized;
+};
+
 export let encodeJobPath = (fullName: string) => {
   let parts = fullName
     .split('/')
@@ -1106,11 +1128,11 @@ export class JenkinsClient {
   readonly baseUrl: string;
 
   constructor(params: { auth: JenkinsAuth }) {
-    this.baseUrl = normalizeBaseUrl(params.auth.baseUrl);
-    let credentials = Buffer.from(
-      `${params.auth.username}:${params.auth.apiToken}`,
-      'utf8'
-    ).toString('base64');
+    let auth = normalizeJenkinsAuth(params.auth);
+    this.baseUrl = auth.baseUrl;
+    let credentials = Buffer.from(`${auth.username}:${auth.apiToken}`, 'utf8').toString(
+      'base64'
+    );
 
     this.axios = createAxios({
       baseURL: this.baseUrl,
