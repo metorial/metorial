@@ -1,6 +1,118 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAuthenticatedAxios,
+  createAxios,
+  requestAxiosData
+} from 'slates';
+
+type SharePointClientOptions = {
+  graphToken: string;
+  sharepointToken?: string;
+};
+
+type RawSharePointSiteUser = {
+  Id?: unknown;
+  ID?: unknown;
+  id?: unknown;
+  LoginName?: unknown;
+  loginName?: unknown;
+  Email?: unknown;
+  email?: unknown;
+  Title?: unknown;
+  title?: unknown;
+};
+
+type SharePointRestResponse = RawSharePointSiteUser & {
+  d?: RawSharePointSiteUser & {
+    GetByEmail?: RawSharePointSiteUser;
+  };
+};
+
+export type SharePointSiteUser = {
+  id: number;
+  loginName: string;
+  email: string;
+  displayName: string;
+};
 
 let trimSlashes = (value: string) => value.replace(/^\/+|\/+$/g, '');
+
+export let normalizeSharePointSiteUserEmail = (value: string) => {
+  let email = value.trim();
+  if (!email) {
+    throw createApiServiceError('email is required.', {
+      reason: 'sharepoint_site_user_email_required'
+    });
+  }
+
+  if (email.length > 255) {
+    throw createApiServiceError('email must be 255 characters or fewer.', {
+      reason: 'sharepoint_site_user_email_too_long'
+    });
+  }
+
+  return email;
+};
+
+export let getSharePointHostnameFromWebUrl = (webUrl: string) => {
+  try {
+    return new URL(webUrl).hostname;
+  } catch (error) {
+    throw createApiServiceError('SharePoint site webUrl is not a valid URL.', {
+      reason: 'sharepoint_site_web_url_invalid',
+      parent: error
+    });
+  }
+};
+
+let escapeODataString = (value: string) => value.replace(/'/g, "''");
+
+let sharePointRestApiError = (error: unknown, operation = 'SharePoint REST request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'SharePoint REST',
+    reason: 'sharepoint_rest_api_error',
+    operation,
+    detailKeys: ['message', 'error', 'error_description', 'code', 'value'],
+    nestedKeys: ['error', 'details', 'errors']
+  });
+
+let unwrapSharePointSiteUser = (data: SharePointRestResponse): RawSharePointSiteUser =>
+  data.d?.GetByEmail ?? data.d ?? data;
+
+let optionalString = (value: unknown) => (typeof value === 'string' ? value : '');
+
+let requiredString = (value: unknown, field: string) => {
+  if (typeof value === 'string' && value) return value;
+
+  throw createApiServiceError(`SharePoint REST response did not include ${field}.`, {
+    reason: 'sharepoint_rest_response_invalid'
+  });
+};
+
+let mapSharePointSiteUser = (data: SharePointRestResponse): SharePointSiteUser => {
+  let user = unwrapSharePointSiteUser(data);
+  let rawId = user.Id ?? user.ID ?? user.id;
+  let id =
+    typeof rawId === 'number'
+      ? rawId
+      : typeof rawId === 'string'
+        ? Number.parseInt(rawId, 10)
+        : Number.NaN;
+
+  if (!Number.isInteger(id)) {
+    throw createApiServiceError('SharePoint REST response did not include a numeric Id.', {
+      reason: 'sharepoint_rest_response_invalid'
+    });
+  }
+
+  return {
+    id,
+    loginName: requiredString(user.LoginName ?? user.loginName, 'LoginName'),
+    email: optionalString(user.Email ?? user.email),
+    displayName: optionalString(user.Title ?? user.title)
+  };
+};
 
 let buildRootUploadPath = (driveId: string, parentPath: string, fileName: string) => {
   let normalizedParentPath = trimSlashes(parentPath);
@@ -16,15 +128,37 @@ let getLocationHeader = (headers: any) =>
 
 export class SharePointClient {
   private http: ReturnType<typeof createAxios>;
+  private sharepointToken?: string;
 
-  constructor(token: string) {
+  constructor(options: string | SharePointClientOptions) {
+    let graphToken = typeof options === 'string' ? options : options.graphToken;
+    this.sharepointToken =
+      typeof options === 'string' ? undefined : options.sharepointToken?.trim();
     this.http = createAxios({
       baseURL: 'https://graph.microsoft.com/v1.0',
       headers: {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${graphToken}`,
         Accept: 'application/json',
         'Content-Type': 'application/json'
       }
+    });
+  }
+
+  private sharepointHttp(siteWebUrl: string) {
+    if (!this.sharepointToken) {
+      throw createApiServiceError(
+        'SharePoint REST access token is missing. Reconnect SharePoint auth so site user lookups can use the SharePoint REST API.',
+        { reason: 'sharepoint_rest_token_missing' }
+      );
+    }
+
+    return createAuthenticatedAxios({
+      baseURL: siteWebUrl.replace(/\/+$/, ''),
+      authHeader: { value: `Bearer ${this.sharepointToken}` },
+      headers: {
+        Accept: 'application/json;odata=nometadata'
+      },
+      errorAdapter: error => sharePointRestApiError(error)
     });
   }
 
@@ -56,6 +190,21 @@ export class SharePointClient {
   async listSubsites(siteId: string) {
     let response = await this.http.get(`/sites/${siteId}/sites`);
     return response.data as any;
+  }
+
+  async getSiteUserByEmail(siteWebUrl: string, email: string) {
+    let normalizedEmail = normalizeSharePointSiteUserEmail(email);
+    let encodedEmail = encodeURIComponent(escapeODataString(normalizedEmail));
+    let data = await requestAxiosData<SharePointRestResponse>(
+      'get SharePoint site user by email',
+      () =>
+        this.sharepointHttp(siteWebUrl).get(
+          `/_api/web/siteusers/GetByEmail('${encodedEmail}')`
+        ),
+      error => sharePointRestApiError(error, 'get SharePoint site user by email')
+    );
+
+    return mapSharePointSiteUser(data);
   }
 
   // ─── Drives (Document Libraries) ───────────────────────────────

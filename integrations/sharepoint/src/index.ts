@@ -5,6 +5,7 @@ import {
   getDrive,
   getFileVersions,
   getSite,
+  getSiteUser,
   listSites,
   manageColumns,
   manageFile,
@@ -28,6 +29,7 @@ export let provider = Slate.create({
     manageFile,
     getDrive,
     getFileVersions,
+    getSiteUser,
     managePermissions,
     manageColumns,
     getContentTypes

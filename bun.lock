@@ -11290,12 +11290,12 @@
     },
     "integrations/sharepoint": {
       "name": "@slates-integrations/sharepoint",
-      "version": "0.2.0-rc.9",
+      "version": "0.2.0-rc.10",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/oauth-microsoft": "1.0.0-rc.5",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.14",
+        "slates": "1.0.0-rc.15",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -19881,8 +19881,6 @@
 
     "@slates-integrations/sevdesk/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
 
-    "@slates-integrations/sharepoint/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
-
     "@slates-integrations/shipday/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
 
     "@slates-integrations/shipengine/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
@@ -21900,8 +21898,6 @@
     "@slates-integrations/servicem8/slates/@slates/provider": ["@slates/provider@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-l28Ut+NsRYZ5X7Ml+ERaTFvOJe0G72SGJiHV4DNgFdeETjjDDBOKcj/OwIBQN0l0s6AxxqiXQIyZeQsRaDnDlA=="],
 
     "@slates-integrations/sevdesk/slates/@slates/provider": ["@slates/provider@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-l28Ut+NsRYZ5X7Ml+ERaTFvOJe0G72SGJiHV4DNgFdeETjjDDBOKcj/OwIBQN0l0s6AxxqiXQIyZeQsRaDnDlA=="],
-
-    "@slates-integrations/sharepoint/slates/@slates/provider": ["@slates/provider@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-l28Ut+NsRYZ5X7Ml+ERaTFvOJe0G72SGJiHV4DNgFdeETjjDDBOKcj/OwIBQN0l0s6AxxqiXQIyZeQsRaDnDlA=="],
 
     "@slates-integrations/shipday/slates/@slates/provider": ["@slates/provider@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-l28Ut+NsRYZ5X7Ml+ERaTFvOJe0G72SGJiHV4DNgFdeETjjDDBOKcj/OwIBQN0l0s6AxxqiXQIyZeQsRaDnDlA=="],
 

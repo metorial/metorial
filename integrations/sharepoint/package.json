@@ -10,11 +10,11 @@
     "@slates/oauth-microsoft": "1.0.0-rc.5",
     "@lowerdeck/error": "^1.1.0",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.14",
+    "slates": "1.0.0-rc.15",
     "zod": "^4.2"
   },
   "devDependencies": {
     "typescript": "^5"
   },
-  "version": "0.2.0-rc.9"
+  "version": "0.2.0-rc.10"
 }

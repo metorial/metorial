@@ -1,12 +1,14 @@
 {
   "name": "@microsoft/sharepoint",
-  "description": "Manage SharePoint sites, document libraries, lists, and files. Create, read, update, and delete lists and list items with custom columns. Upload, download, move, copy, and version files in document libraries. Search across sites, files, folders, lists, and list items using Microsoft Search. Manage permissions at site, list, and item levels with granular access control. Define and manage content types and site columns. Subscribe to webhooks for list and library change notifications. Retrieve site properties and search for sites across Microsoft 365.",
+  "description": "Manage SharePoint sites, document libraries, lists, and files. Create, read, update, and delete lists and list items with custom columns. Resolve site users to numeric Person/Group LookupId values. Upload, download, move, copy, and version files in document libraries. Search across sites, files, folders, lists, and list items using Microsoft Search. Manage permissions at site, list, and item levels with granular access control. Define and manage content types and site columns. Subscribe to webhooks for list and library change notifications. Retrieve site properties and search for sites across Microsoft 365.",
   "categories": ["apis-and-http-requests", "document-processing", "email-and-messaging"],
   "skills": [
     "manage sites and libraries",
     "upload and download files",
     "create and manage lists",
     "CRUD list items",
+    "resolve site users",
+    "populate person fields",
     "search files and sites",
     "manage permissions",
     "define content types",

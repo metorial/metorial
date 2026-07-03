@@ -2,6 +2,7 @@ export * from './get-content-types';
 export * from './get-drive';
 export * from './get-file-versions';
 export * from './get-site';
+export * from './get-site-user';
 export * from './list-sites';
 export * from './manage-columns';
 export * from './manage-file';

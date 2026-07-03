@@ -41,7 +41,7 @@ Key SharePoint-related scopes for Microsoft Graph include:
 - `User.Read`, `offline_access`
 - `Sites.Selected` — restricts an application's access to specific site collections. Now lists, list items, folders, and files are also supported, and all Selected scopes support delegated and application modes.
 
-Application permissions typically require admin consent. Access tokens generated for Microsoft Graph resources are not valid for the SharePoint REST API — use the correct audience (`https://graph.microsoft.com` vs. `https://{tenant}.sharepoint.com`) depending on which API you call.
+Application permissions typically require admin consent. Access tokens generated for Microsoft Graph resources are not valid for the SharePoint REST API — use the correct audience (`https://graph.microsoft.com` vs. `https://{tenant}.sharepoint.com`) depending on which API you call. SharePoint REST-backed tools derive the tenant SharePoint host from Microsoft Graph and exchange the refresh token for a SharePoint resource token.
 
 ### Certificate-Based Authentication
 
@@ -56,6 +56,10 @@ The SharePoint API in Microsoft Graph supports access to SharePoint sites, lists
 ### Lists and List Items
 
 Lists are the foundation for data storage in SharePoint. You can create lists to store a variety of business data, from a simple customer contact list to a custom business application. When you use columns to define your schema, SharePoint can protect the integrity of your data as well as enable rich indexing, querying, and search capabilities. The API supports full CRUD operations on lists and list items, including defining custom columns.
+
+### Site Users and Person Fields
+
+SharePoint Person/Group list columns store the numeric site-scoped user ID, not the user's Microsoft Entra object ID. The SharePoint REST API exposes site users through `/_api/web/siteusers`, including `GetByEmail(email)`, which returns the numeric `Id`, `LoginName`, `Email`, and `Title` values needed to update Person/Group fields through Graph list item field payloads such as `{fieldName}LookupId`.
 
 ### Document Libraries and Files
 

@@ -1,10 +1,12 @@
 # <img src="https://provider-logos.metorial-cdn.com/sharepoint-icon.svg" height="20"> Sharepoint
 
-Manage SharePoint sites, document libraries, lists, and files. Create, read, update, and delete lists and list items with custom columns. Upload, download, move, copy, and version files in document libraries. Search across sites, files, folders, lists, and list items using Microsoft Search. Manage permissions at site, list, and item levels with granular access control. Define and manage content types and site columns. Subscribe to webhooks for list and library change notifications. Retrieve site properties and search for sites across Microsoft 365.
+Manage SharePoint sites, document libraries, lists, and files. Create, read, update, and delete lists and list items with custom columns. Resolve site users to numeric Person/Group LookupId values. Upload, download, move, copy, and version files in document libraries. Search across sites, files, folders, lists, and list items using Microsoft Search. Manage permissions at site, list, and item levels with granular access control. Define and manage content types and site columns. Subscribe to webhooks for list and library change notifications. Retrieve site properties and search for sites across Microsoft 365.
 
 ## Authentication
 
 When registering the OAuth app in Microsoft Entra ID for local CLI auth, use `http://localhost:45873/callback` as the redirect URI.
+
+SharePoint uses both Microsoft Graph and SharePoint REST APIs. Graph-backed tools use a Graph access token, while SharePoint REST-backed tools such as site user lookup require a token for the tenant SharePoint host.
 
 ## Tools
 
@@ -23,6 +25,10 @@ Retrieve the version history of a file in a SharePoint document library. Returns
 ### Get Site
 
 Retrieve detailed information about a SharePoint site. Look up a site by its ID, hostname and path, or get the root site. Also supports listing subsites of a given site.
+
+### Get Site User
+
+Resolve a user email or UPN to the numeric SharePoint site-scoped user ID required for Person/Group list column `{fieldName}LookupId` values. This reads an existing site user record and does not create or ensure users on the site.
 
 ### List Sites
 
