@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let findMeetingTimes = SlateTool.create(spec, {
   name: 'Find Meeting Times',
   key: 'find_meeting_times',
-  description: `Find available meeting time slots based on attendee availability and time constraints. Suggests optimal times when all or most attendees are free. Useful for scheduling meetings with multiple participants.`,
+  description: `Find available meeting time slots based on organizer and attendee availability and time constraints. Omit attendees or pass an empty list to find free windows for only the organizer. Use preferTimezone to return suggestion timestamps in a specific response time zone instead of UTC.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -22,8 +22,10 @@ export let findMeetingTimes = SlateTool.create(spec, {
             type: z.enum(['required', 'optional', 'resource']).default('required')
           })
         )
-        .min(1)
-        .describe('Attendees to check availability for'),
+        .optional()
+        .describe(
+          'Attendees to check availability for. Omit or pass an empty list to search only the organizer calendar.'
+        ),
       timeSlots: z
         .array(
           z.object({
@@ -35,6 +37,12 @@ export let findMeetingTimes = SlateTool.create(spec, {
         )
         .min(1)
         .describe('Time windows to search within'),
+      preferTimezone: z
+        .string()
+        .optional()
+        .describe(
+          'Windows time zone ID for response timestamps via Prefer: outlook.timezone (for example, "Pacific Standard Time"). If omitted, Microsoft Graph returns suggestions in UTC.'
+        ),
       meetingDuration: z
         .string()
         .optional()
@@ -79,7 +87,7 @@ export let findMeetingTimes = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
 
     let result = await client.findMeetingTimes({
-      attendees: ctx.input.attendees.map(a => ({
+      attendees: (ctx.input.attendees ?? []).map(a => ({
         emailAddress: { address: a.email, name: a.name },
         type: a.type
       })),
@@ -92,7 +100,8 @@ export let findMeetingTimes = SlateTool.create(spec, {
       meetingDuration: ctx.input.meetingDuration,
       maxCandidates: ctx.input.maxCandidates,
       isOrganizerOptional: ctx.input.isOrganizerOptional,
-      minimumAttendeePercentage: ctx.input.minimumAttendeePercentage
+      minimumAttendeePercentage: ctx.input.minimumAttendeePercentage,
+      preferTimezone: ctx.input.preferTimezone
     });
 
     let suggestions = result.meetingTimeSuggestions.map(s => ({

@@ -323,7 +323,7 @@ export class Client {
   }
 
   async findMeetingTimes(params: {
-    attendees: { emailAddress: { address: string; name?: string }; type?: string }[];
+    attendees?: { emailAddress: { address: string; name?: string }; type?: string }[];
     timeConstraint: {
       timeslots: { start: DateTimeTimeZone; end: DateTimeTimeZone }[];
     };
@@ -331,11 +331,19 @@ export class Client {
     maxCandidates?: number;
     isOrganizerOptional?: boolean;
     minimumAttendeePercentage?: number;
+    preferTimezone?: string;
   }): Promise<{
     meetingTimeSuggestions: MeetingTimeSuggestion[];
     emptySuggestionsReason?: string;
   }> {
-    let response = await this.axios.post('/me/findMeetingTimes', params);
+    let { preferTimezone, ...body } = params;
+    let headers: Record<string, string> = {};
+
+    if (preferTimezone) {
+      headers.Prefer = `outlook.timezone="${preferTimezone}"`;
+    }
+
+    let response = await this.axios.post('/me/findMeetingTimes', body, { headers });
     return response.data;
   }
 
