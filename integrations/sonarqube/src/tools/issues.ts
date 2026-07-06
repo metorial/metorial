@@ -23,7 +23,18 @@ let issueActionSchema = z.enum([
   'set_type'
 ]);
 
+let issueTransitionSchema = z.enum(['accept', 'falsepositive', 'reopen']);
 let issueSeveritySchema = z.enum(['BLOCKER', 'CRITICAL', 'MAJOR', 'MINOR', 'INFO']);
+let issueSearchSeveritySchema = z.enum([
+  'INFO',
+  'LOW',
+  'MEDIUM',
+  'HIGH',
+  'BLOCKER',
+  'CRITICAL',
+  'MAJOR',
+  'MINOR'
+]);
 let issueTypeSchema = z.enum(['BUG', 'VULNERABILITY', 'CODE_SMELL']);
 let issueStatusSchema = z.enum([
   'OPEN',
@@ -40,7 +51,7 @@ type ManageIssueInput = {
   organization?: string;
   issueKey: string;
   action: z.infer<typeof issueActionSchema>;
-  transition?: string;
+  transition?: z.infer<typeof issueTransitionSchema>;
   assignee?: string;
   comment?: string;
   tags?: string[];
@@ -134,11 +145,19 @@ export let searchIssuesTool = readOnlyTool({
         .describe(
           'Exact component keys to filter issues. Use list_component_tree to discover file or directory component keys. Combined with projectKeys.'
         ),
-      resolved: z.boolean().optional().describe('Filter resolved or unresolved issues.'),
-      severities: z
+      files: z
         .array(z.string())
         .optional()
-        .describe('Issue severities, for example BLOCKER, CRITICAL, MAJOR, MINOR, INFO.'),
+        .describe(
+          'Exact file component keys to filter issues. Combined with projectKeys and componentKeys.'
+        ),
+      resolved: z.boolean().optional().describe('Filter resolved or unresolved issues.'),
+      severities: z
+        .array(issueSearchSeveritySchema)
+        .optional()
+        .describe(
+          'Severity filters. Current Sonar severities INFO, LOW, MEDIUM, HIGH, and BLOCKER are sent as impactSeverities. Legacy severities CRITICAL, MAJOR, and MINOR are sent as severities. Do not mix current and legacy values.'
+        ),
       statuses: z
         .array(z.string())
         .optional()
@@ -292,10 +311,11 @@ export let manageIssueTool = createSonarTool({
         .optional()
         .describe('SonarQube Cloud organization key used for readback after mutation.'),
       action: issueActionSchema.describe('Issue workflow action to perform.'),
-      transition: z
-        .string()
+      transition: issueTransitionSchema
         .optional()
-        .describe('Required for action=transition. SonarQube transition name.'),
+        .describe(
+          'Required for action=transition. Official SonarQube issue status transition: accept, falsepositive, or reopen.'
+        ),
       assignee: z
         .string()
         .optional()
@@ -325,7 +345,11 @@ export let manageIssueTool = createSonarTool({
   .output(
     z.object({
       issueKey: z.string().describe('Issue key used for the request.'),
+      key: z.string().optional().describe('Issue key returned for transition updates.'),
       action: issueActionSchema.describe('Issue workflow action performed.'),
+      success: z.boolean().optional().describe('Whether the mutation completed.'),
+      status: z.string().optional().describe('Requested issue transition status.'),
+      message: z.string().optional().describe('Mutation result message.'),
       issue: issueSchema.optional().describe('Issue state returned or read after mutation.'),
       raw: rawRecordSchema
     })
@@ -340,6 +364,19 @@ export let manageIssueTool = createSonarTool({
         issueKey: ctx.input.issueKey,
         transition: ctx.input.transition as string
       });
+      let message = `Applied SonarQube issue transition **${ctx.input.transition}** to **${ctx.input.issueKey}**.`;
+      return {
+        output: {
+          issueKey: ctx.input.issueKey,
+          key: ctx.input.issueKey,
+          action: ctx.input.action,
+          success: true,
+          status: ctx.input.transition,
+          message,
+          raw
+        },
+        message
+      };
     } else if (ctx.input.action === 'assign') {
       raw = await client.assignIssue({
         issueKey: ctx.input.issueKey,
@@ -373,6 +410,7 @@ export let manageIssueTool = createSonarTool({
       output: {
         issueKey: ctx.input.issueKey,
         action: ctx.input.action,
+        success: true,
         issue: mapIssue(issue),
         raw
       },

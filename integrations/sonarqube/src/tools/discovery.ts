@@ -20,7 +20,7 @@ export let searchProjectsTool = readOnlyTool({
   name: 'Search Projects',
   key: 'search_projects',
   description:
-    'Search SonarQube projects by text query or exact project keys. Use this before project-scoped tools when the project key is unknown or may be stale.',
+    'Search SonarQube projects by partial project name, exact project key query, or exact project keys. Use this before project-scoped tools when the project key is unknown or may be stale.',
   instructions: [
     'If the user names a project without saying it is an exact project key, search by query first instead of inventing a projectKey for project-scoped tools.',
     'Use the returned project key exactly in follow-up tools such as get_component, get_project_measures, search_issues, and list_component_tree.',
@@ -37,19 +37,21 @@ export let searchProjectsTool = readOnlyTool({
         .string()
         .optional()
         .describe(
-          'Search text for project name or key. Use this when the exact key is unknown.'
+          'Search text for partial project name or exact project key. Use projectKeys when exact keys are known and should be looked up directly.'
         ),
       projectKeys: z
         .array(z.string())
         .optional()
         .describe(
-          'Specific project keys to include. Sent as SonarQube Cloud projects or SonarQube Server projectKeys.'
+          'Specific exact project keys to include. Each key is looked up directly with components/show and merged with query results.'
         ),
       qualifiers: z
         .array(z.string())
         .optional()
-        .describe('Optional SonarQube Server component qualifiers such as TRK, APP, or VW.'),
-      ...paginationInputs(50, 500)
+        .describe(
+          'Optional component qualifiers such as TRK, APP, or VW. Server searches default to TRK.'
+        ),
+      ...paginationInputs(500, 500)
     })
   )
   .output(
@@ -172,7 +174,7 @@ export let listProjectBranchesTool = readOnlyTool({
   name: 'List Project Branches',
   key: 'list_project_branches',
   description:
-    'List analyzed branches for a SonarQube project. Use this when the branch name is unknown before branch-scoped project, issue, measure, quality-gate, or component calls.'
+    'List long-lived branch analyses for a SonarQube project. Use this when the branch name is unknown before branch-scoped project, issue, measure, quality-gate, or component calls. For pull requests, use list_project_pull_requests.'
 })
   .input(z.object(projectInput))
   .output(

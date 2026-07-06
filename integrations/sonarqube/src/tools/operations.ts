@@ -9,6 +9,20 @@ import {
   readOnlyTool
 } from './shared';
 
+let systemStatusDescriptions: Record<string, string> = {
+  UP: 'SonarQube Server is operational.',
+  DOWN: 'SonarQube Server is not operational.',
+  STARTING: 'SonarQube Server is starting and may not be ready for all requests.',
+  RESTARTING: 'SonarQube Server is restarting and may temporarily reject requests.',
+  DB_MIGRATION_NEEDED: 'SonarQube Server requires a database migration before startup.',
+  DB_MIGRATION_RUNNING: 'SonarQube Server is running a database migration.'
+};
+
+export let describeSystemStatus = (status: string | undefined) =>
+  status
+    ? (systemStatusDescriptions[status] ?? `SonarQube Server reported status ${status}.`)
+    : undefined;
+
 export let listQualityGatesTool = readOnlyTool({
   name: 'List Quality Gates',
   key: 'list_quality_gates',
@@ -43,11 +57,7 @@ export let listLanguagesTool = readOnlyTool({
 })
   .input(
     z.object({
-      query: z.string().optional().describe('Search text for language key or name.'),
-      pageSize: z
-        .number()
-        .optional()
-        .describe('Number of languages to return. Use 0 or omit to return all languages.')
+      query: z.string().optional().describe('Search text for language key or name.')
     })
   )
   .output(
@@ -81,6 +91,10 @@ export let getSystemStatusTool = readOnlyTool({
       id: z.string().optional().describe('SonarQube Server system id.'),
       version: z.string().optional().describe('SonarQube Server version.'),
       status: z.string().optional().describe('SonarQube Server system status.'),
+      statusDescription: z
+        .string()
+        .optional()
+        .describe('Human-readable description of the SonarQube Server system status.'),
       raw: rawRecordSchema
     })
   )
@@ -93,6 +107,9 @@ export let getSystemStatusTool = readOnlyTool({
         id: typeof data.id === 'string' ? data.id : undefined,
         version: typeof data.version === 'string' ? data.version : undefined,
         status: typeof data.status === 'string' ? data.status : undefined,
+        statusDescription: describeSystemStatus(
+          typeof data.status === 'string' ? data.status : undefined
+        ),
         raw: data
       },
       message: `SonarQube Server system status is **${typeof data.status === 'string' ? data.status : 'unknown'}**.`

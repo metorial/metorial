@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { SonarConfig } from '../lib/client';
 import { sonarqubeValidationError } from '../lib/errors';
 import {
   branchPullRequestInputs,
@@ -10,7 +9,6 @@ import {
   pageSchema,
   paginationInputs,
   projectInput,
-  projectKeyFromInput,
   rawRecordSchema,
   readOnlyTool
 } from './shared';
@@ -27,28 +25,23 @@ type ManageHotspotInput = {
 };
 
 type SearchHotspotsInput = {
+  projectKey?: string;
+  hotspotKeys?: string[];
   resolution?: z.infer<typeof hotspotResolutionSchema>;
 };
 
-let validateHotspotResolutionForDeployment = (
-  resolution: z.infer<typeof hotspotResolutionSchema> | undefined,
-  config: SonarConfig | undefined
-) => {
-  if (resolution === 'ACKNOWLEDGED' && (config?.deployment ?? 'server') === 'cloud') {
+let hasSearchHotspotKey = (hotspotKeys: string[] | undefined) =>
+  hotspotKeys?.some(value => value.trim().length > 0) === true;
+
+export let validateSearchHotspotsInput = (input: SearchHotspotsInput) => {
+  if (!input.projectKey?.trim() && !hasSearchHotspotKey(input.hotspotKeys)) {
     throw sonarqubeValidationError(
-      'ACKNOWLEDGED hotspot resolution is only supported by SonarQube Server. SonarQube Cloud accepts FIXED or SAFE.'
+      'Provide projectKey or at least one hotspotKeys value to search SonarQube security hotspots.'
     );
   }
 };
 
-export let validateSearchHotspotsInput = (
-  input: SearchHotspotsInput,
-  config?: SonarConfig
-) => {
-  validateHotspotResolutionForDeployment(input.resolution, config);
-};
-
-export let validateManageHotspotInput = (input: ManageHotspotInput, config?: SonarConfig) => {
+export let validateManageHotspotInput = (input: ManageHotspotInput) => {
   if (input.confirmWrite !== true) {
     throw sonarqubeValidationError(
       'confirmWrite must be true to manage a SonarQube security hotspot.'
@@ -62,19 +55,21 @@ export let validateManageHotspotInput = (input: ManageHotspotInput, config?: Son
   if (input.status === 'TO_REVIEW' && input.resolution) {
     throw sonarqubeValidationError('resolution cannot be provided when status is TO_REVIEW.');
   }
-
-  validateHotspotResolutionForDeployment(input.resolution, config);
 };
 
 export let searchHotspotsTool = readOnlyTool({
   name: 'Search Security Hotspots',
   key: 'search_hotspots',
   description:
-    'Search SonarQube security hotspots for an exact project key by branch or pull request, project-relative files, review status, resolution, and assignee ownership. Use search_projects first when the user gave a project name or partial key. For current security issues, prefer search_issues with SECURITY quality filters.'
+    'Search SonarQube security hotspots by exact project key or hotspot key, branch or pull request, project-relative files, review status, resolution, new-code period, and assignee ownership. Use search_projects first when the user gave a project name or partial key. For current security issues, prefer search_issues with SECURITY quality filters.'
 })
   .input(
     z.object({
       ...projectInput,
+      hotspotKeys: z
+        .array(z.string())
+        .optional()
+        .describe('Specific SonarQube security hotspot keys to retrieve.'),
       files: z
         .array(z.string())
         .optional()
@@ -82,40 +77,49 @@ export let searchHotspotsTool = readOnlyTool({
       status: hotspotStatusSchema.optional().describe('Hotspot review status to filter.'),
       resolution: hotspotResolutionSchema
         .optional()
-        .describe(
-          'Hotspot resolution to filter when status is REVIEWED. ACKNOWLEDGED is supported by SonarQube Server only.'
-        ),
+        .describe('Hotspot resolution to filter when status is REVIEWED.'),
       onlyMine: z
         .boolean()
         .optional()
         .describe('Filter to hotspots assigned to the token user.'),
+      sinceLeakPeriod: z
+        .boolean()
+        .optional()
+        .describe('Filter to hotspots created in the new-code period.'),
       ...branchPullRequestInputs,
       ...paginationInputs(100, 500)
     })
   )
   .output(
     z.object({
-      projectKey: z.string().describe('Project key used for the request.'),
+      projectKey: z.string().optional().describe('Project key used for the request.'),
       hotspots: z.array(hotspotSchema).describe('Matching SonarQube security hotspots.'),
       page: pageSchema.optional().describe('Pagination details.')
     })
   )
   .handleInvocation(async ctx => {
-    validateSearchHotspotsInput(ctx.input, ctx.config);
-    let projectKey = projectKeyFromInput(ctx.config, ctx.input);
+    let projectKey = ctx.input.projectKey?.trim() || ctx.config.defaultProjectKey?.trim();
+    validateSearchHotspotsInput({
+      projectKey,
+      hotspotKeys: ctx.input.hotspotKeys,
+      resolution: ctx.input.resolution
+    });
     let client = createClient(ctx);
     let result = await client.searchHotspots({
       projectKey,
+      hotspotKeys: ctx.input.hotspotKeys,
       files: ctx.input.files,
       status: ctx.input.status,
       resolution: ctx.input.resolution,
       onlyMine: ctx.input.onlyMine,
+      sinceLeakPeriod: ctx.input.sinceLeakPeriod,
       branch: ctx.input.branch,
       pullRequest: ctx.input.pullRequest,
       page: ctx.input.page,
       pageSize: ctx.input.pageSize
     });
     let hotspots = result.items.map(mapHotspot);
+    let target = projectKey ? ` for project **${projectKey}**` : '';
 
     return {
       output: {
@@ -123,7 +127,7 @@ export let searchHotspotsTool = readOnlyTool({
         hotspots,
         page: result.page
       },
-      message: `Found **${hotspots.length}** SonarQube security hotspots for project **${projectKey}**.`
+      message: `Found **${hotspots.length}** SonarQube security hotspots${target}.`
     };
   })
   .build();
@@ -174,7 +178,7 @@ export let manageHotspotTool = createSonarTool({
     'Use search_hotspots or get_hotspot first when the hotspot key or current review status is unknown.',
     'When the user already provided an exact hotspot key and explicitly asks to update it, call manage_hotspot directly.',
     'Set confirmWrite to true only when the user explicitly asks to update the hotspot.',
-    'ACKNOWLEDGED resolution is SonarQube Server-only; SonarQube Cloud accepts FIXED or SAFE.'
+    'Use ACKNOWLEDGED when accepting the risk, FIXED when remediation is complete, or SAFE when the hotspot is safe.'
   ],
   readOnly: false,
   destructive: false
@@ -185,9 +189,7 @@ export let manageHotspotTool = createSonarTool({
       status: hotspotStatusSchema.describe('New hotspot review status.'),
       resolution: hotspotResolutionSchema
         .optional()
-        .describe(
-          'Required when status is REVIEWED. Omit when status is TO_REVIEW. ACKNOWLEDGED is supported by SonarQube Server only.'
-        ),
+        .describe('Required when status is REVIEWED. Omit when status is TO_REVIEW.'),
       comment: z.string().optional().describe('Optional review comment.'),
       confirmWrite: z
         .boolean()
@@ -205,7 +207,7 @@ export let manageHotspotTool = createSonarTool({
     })
   )
   .handleInvocation(async ctx => {
-    validateManageHotspotInput(ctx.input, ctx.config);
+    validateManageHotspotInput(ctx.input);
     let client = createClient(ctx);
     await client.changeHotspotStatus({
       hotspotKey: ctx.input.hotspotKey,

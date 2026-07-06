@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { validateManageHotspotInput, validateSearchHotspotsInput } from './hotspots';
 import { validateManageIssueInput } from './issues';
-import { mapHotspot, mapIssue } from './shared';
+import { describeSystemStatus } from './operations';
+import { mapBranch, mapHotspot, mapIssue, mapQualityGate } from './shared';
 import { sourceAttachmentMetadata, sourceTextFromShowResponse } from './source';
 
 describe('SonarQube workflow tool helpers', () => {
@@ -92,39 +93,101 @@ describe('SonarQube workflow tool helpers', () => {
     ).not.toThrow();
   });
 
-  it('validates deployment-specific hotspot resolutions', () => {
+  it('accepts upstream hotspot resolutions and validates search identifiers', () => {
     expect(() =>
-      validateManageHotspotInput(
-        {
-          hotspotKey: 'HOTSPOT-1',
-          status: 'REVIEWED',
-          resolution: 'ACKNOWLEDGED',
-          confirmWrite: true
-        },
-        { deployment: 'server' }
-      )
+      validateManageHotspotInput({
+        hotspotKey: 'HOTSPOT-1',
+        status: 'REVIEWED',
+        resolution: 'ACKNOWLEDGED',
+        confirmWrite: true
+      })
     ).not.toThrow();
 
     expect(() =>
-      validateSearchHotspotsInput(
-        {
-          resolution: 'ACKNOWLEDGED'
-        },
-        { deployment: 'cloud' }
-      )
-    ).toThrow(/SonarQube Cloud/);
+      validateSearchHotspotsInput({
+        hotspotKeys: ['HOTSPOT-1'],
+        resolution: 'ACKNOWLEDGED'
+      })
+    ).not.toThrow();
+
+    expect(() => validateSearchHotspotsInput({ hotspotKeys: [] })).toThrow(/projectKey/);
   });
 
-  it('maps current issueStatus ahead of legacy issue status', () => {
+  it('maps current issueStatus and Clean Code fields from issue search', () => {
     expect(
       mapIssue({
         key: 'ISSUE-1',
         issueStatus: 'ACCEPTED',
-        status: 'RESOLVED'
+        status: 'RESOLVED',
+        cleanCodeAttribute: 'LOGICAL',
+        cleanCodeAttributeCategory: 'INTENTIONAL',
+        impacts: [
+          {
+            softwareQuality: 'RELIABILITY',
+            severity: 'HIGH'
+          }
+        ],
+        textRange: {
+          startLine: 10,
+          endLine: 10
+        }
       })
     ).toMatchObject({
       key: 'ISSUE-1',
-      status: 'ACCEPTED'
+      status: 'ACCEPTED',
+      severity: 'HIGH',
+      cleanCodeAttribute: 'LOGICAL',
+      cleanCodeAttributeCategory: 'INTENTIONAL',
+      impacts: [
+        {
+          softwareQuality: 'RELIABILITY',
+          severity: 'HIGH'
+        }
+      ],
+      textRange: {
+        startLine: 10,
+        endLine: 10
+      }
+    });
+  });
+
+  it('maps branch ids and Cloud quality gate fields', () => {
+    expect(
+      mapBranch({
+        name: 'main',
+        isMain: true,
+        type: 'BRANCH',
+        branchId: 'branch-uuid',
+        status: {
+          qualityGateStatus: 'OK'
+        }
+      })
+    ).toMatchObject({
+      name: 'main',
+      isMain: true,
+      type: 'BRANCH',
+      branchId: 'branch-uuid',
+      status: 'OK'
+    });
+
+    expect(
+      mapQualityGate({
+        id: 123,
+        name: 'Sonar way',
+        isDefault: true,
+        caycStatus: 'compliant',
+        hasStandardConditions: true,
+        hasMQRConditions: false,
+        isAiCodeSupported: true
+      })
+    ).toMatchObject({
+      id: '123',
+      name: 'Sonar way',
+      isDefault: true,
+      caycStatus: 'compliant',
+      hasStandardConditions: true,
+      hasMQRConditions: false,
+      isAiCodeSupported: true
     });
   });
 
@@ -164,5 +227,12 @@ describe('SonarQube workflow tool helpers', () => {
       byteLength: Buffer.byteLength(content, 'utf8'),
       attachmentCount: 1
     });
+  });
+
+  it('describes system statuses for operator-facing output', () => {
+    expect(describeSystemStatus('UP')).toBe('SonarQube Server is operational.');
+    expect(describeSystemStatus('UNKNOWN_CUSTOM')).toBe(
+      'SonarQube Server reported status UNKNOWN_CUSTOM.'
+    );
   });
 });

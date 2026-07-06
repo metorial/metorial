@@ -22,6 +22,7 @@ import {
   listQualityGatesTool,
   manageHotspotTool,
   manageIssueTool,
+  searchDuplicatedFilesTool,
   searchHotspotsTool,
   searchIssuesTool,
   searchMeasureHistoryTool,
@@ -57,6 +58,7 @@ export let provider = Slate.create({
     getRuleTool,
     getSourceTool,
     getScmInfoTool,
+    searchDuplicatedFilesTool,
     getDuplicationsTool
   ],
   triggers: []

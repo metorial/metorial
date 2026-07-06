@@ -98,8 +98,9 @@ export let getProjectMeasuresTool = readOnlyTool({
       metricKeys: z
         .array(z.string())
         .min(1)
+        .optional()
         .describe(
-          'Metric keys to fetch, for example ncloc, coverage, bugs, or vulnerabilities. Use list_metrics to discover valid keys.'
+          'Metric keys to fetch, for example ncloc, coverage, bugs, or vulnerabilities. Use list_metrics to discover valid keys. Omit only when intentionally requesting SonarQube defaults.'
         ),
       ...branchPullRequestInputs
     })
@@ -110,6 +111,10 @@ export let getProjectMeasuresTool = readOnlyTool({
       componentKey: z.string().optional().describe('Component key returned by SonarQube.'),
       componentName: z.string().optional().describe('Component name returned by SonarQube.'),
       measures: z.array(measureSchema).describe('Metric measures for the component.'),
+      metrics: z
+        .array(metricSchema)
+        .optional()
+        .describe('Metric metadata returned by SonarQube when additionalFields=metrics.'),
       raw: rawRecordSchema
     })
   )
@@ -134,6 +139,14 @@ export let getProjectMeasuresTool = readOnlyTool({
           )
           .map(mapMeasureWithPeriodVariants)
       : [];
+    let metrics = Array.isArray(data.metrics)
+      ? data.metrics
+          .filter(
+            (item): item is Record<string, unknown> =>
+              typeof item === 'object' && item !== null
+          )
+          .map(mapMetric)
+      : undefined;
 
     return {
       output: {
@@ -141,6 +154,7 @@ export let getProjectMeasuresTool = readOnlyTool({
         componentKey: typeof component.key === 'string' ? component.key : undefined,
         componentName: typeof component.name === 'string' ? component.name : undefined,
         measures,
+        metrics,
         raw: data
       },
       message: `Retrieved **${measures.length}** measures for SonarQube project **${projectKey}**.`

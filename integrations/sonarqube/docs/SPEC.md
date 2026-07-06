@@ -4,7 +4,7 @@
 
 This package implements a core code-quality and triage SonarQube Web API surface for SonarQube Server and SonarQube Cloud:
 
-- Project discovery through `api/projects/search`
+- Project discovery through `api/components/search`, plus exact project-key lookup through `api/components/show`
 - Component lookup and tree browsing through `api/components`
 - Branch and pull request analysis discovery through `api/project_branches` and `api/project_pull_requests`
 - Metric discovery and measure reads through `api/metrics` and `api/measures`
@@ -12,7 +12,7 @@ This package implements a core code-quality and triage SonarQube Web API surface
 - Issue search, lookup, changelog reads, and guarded workflow updates through `api/issues`
 - Security hotspot search, lookup, and guarded review updates through `api/hotspots`
 - Rule discovery and details through `api/rules`
-- Source, SCM, and duplication context through `api/sources` and `api/duplications`
+- Source, SCM, and duplication context through `api/sources`, `api/measures/component_tree`, and `api/duplications`
 - Quality gate and language discovery through `api/qualitygates/list` and `api/languages/list`
 - SonarQube Server system status through `api/system/status`
 - Compute Engine task/status reads through `api/ce`
@@ -48,18 +48,18 @@ Base URLs:
 - Cloud v1 US: `https://sonarqube.us/api`
 - Cloud v2 helpers are present but unused by public tools until a specific v2 migration is implemented.
 
-Arrays are serialized as comma-separated query parameters, matching Sonar Web API v1 conventions. Page sizes are capped to documented endpoint limits.
+Arrays are serialized as comma-separated query parameters, matching Sonar Web API v1 conventions. Page sizes are capped to documented endpoint limits. Branch and pull request filters are mutually exclusive across branch-aware tools; `branch` is a long-lived SonarQube branch name and `pullRequest` is a SonarQube pull request key/id.
 
 ## Tool Contracts
 
-All tool input schemas are top-level `z.object` schemas to remain MCP/OpenAI tool bridge compatible. Conditional requirements are described in field descriptions and enforced at runtime with `ServiceError`. `search_issues.types` is restricted to supported SonarQube issue types, while current issue status and software-quality filtering use `issueStatuses`, `impactSoftwareQualities`, and `impactSeverities`.
+All tool input schemas are top-level `z.object` schemas to remain MCP/OpenAI tool bridge compatible. Conditional requirements are described in field descriptions and enforced at runtime with `ServiceError`. `search_projects.query` performs partial project-name or exact project-key search through components search, while `projectKeys` performs exact component lookups. `list_project_branches` returns long-lived branch entries suitable for the `branch` parameter, while pull request analyses stay in `list_project_pull_requests`. `search_issues.types` is restricted to supported SonarQube issue types, while current issue status and software-quality filtering use `issueStatuses`, `impactSoftwareQualities`, and `impactSeverities`. For `search_issues.severities`, current Sonar severities map to `impactSeverities`; legacy `CRITICAL`, `MAJOR`, and `MINOR` values map to API `severities`.
 
-Outputs expose normalized fields for agent workflows and include `raw` objects for Sonar-specific fields that are not normalized yet. Source-code content is returned through Slate text attachments, not inline output fields. No tool returns base64 blobs or destructive mutation outputs.
+Outputs expose normalized fields for agent workflows and include `raw` objects for Sonar-specific fields that are not normalized yet. `search_duplicated_files` discovers file component keys with duplication metrics before `get_duplications` retrieves detailed duplication blocks. Source-code content is returned through Slate text attachments, not inline output fields. No tool returns base64 blobs or destructive mutation outputs.
 
 ## Verification
 
-Package tests cover config/base URL validation, query parameter serialization, deployment-specific hotspot parameters, pagination caps, Cloud organization checks, project-key fallback, quality gate identifier validation, Server-only status validation, workflow confirmation validation, source attachment metadata, authentication response validation, issue-search schema compatibility, and Sonar error normalization.
+Package tests cover config/base URL validation, query parameter serialization, component-search project discovery, exact project-key lookup, project qualifier filtering, issue severity routing, branch/pull-request mutual exclusion, hotspot project/key/new-code parameters, duplicated-file discovery, branch filtering, pagination caps, Cloud organization checks, project-key fallback, quality gate identifier validation, Server-only status validation, workflow confirmation validation, source attachment metadata, authentication response validation, issue-search schema compatibility, and Sonar error normalization.
 
 Schema regression coverage uses `describeMcpCompatibleToolSchemas('SonarQube tool input schemas', provider.actions)`.
 
-Private live E2E coverage lives in `tests/integrations/sonarqube/tools.e2e.ts`. It can discover a readable project from the profile, or use optional fixtures for `projectKey`, `metricKeys`, `branch`, `pullRequest`, `issueKey`, and `ceTaskId`.
+Private live E2E coverage lives in `tests/integrations/sonarqube/tools.e2e.ts`. It can discover a readable project from the profile, or use optional fixtures for `projectKey`, `metricKeys`, `branch`, `pullRequest`, `issueKey`, `ceTaskId`, hotspot keys, and source component keys.

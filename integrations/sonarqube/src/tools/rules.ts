@@ -73,7 +73,7 @@ export let getRuleTool = readOnlyTool({
         .string()
         .optional()
         .describe(
-          'SonarQube Cloud organization key. Required on Cloud through input or config; ignored for Server.'
+          'Optional SonarQube Cloud organization key. Defaults to config.organization when configured; ignored for Server.'
         ),
       ruleKey: z.string().describe('SonarQube rule key, for example java:S1135.')
     })

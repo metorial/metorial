@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> SonarQube
 
-Connect to SonarQube Server or SonarQube Cloud to inspect and triage code quality data from the Web API. This integration searches projects, browses components, lists branches and pull request analyses, reads measures and measure history, searches and manages issues, reviews security hotspots, reads rules and source context, checks quality gates, lists operational metadata, and inspects Compute Engine analysis tasks.
+Connect to SonarQube Server or SonarQube Cloud to inspect and triage code quality data from the Web API. This integration searches projects, browses components, lists branches and pull request analyses, reads measures and measure history, searches and manages issues, reviews security hotspots, reads rules and source context, discovers duplicated files, checks quality gates, lists operational metadata, and inspects Compute Engine analysis tasks.
 
 ## Authentication
 
@@ -25,7 +25,7 @@ Credential validation calls `/api/authentication/validate`. Server profiles also
 
 ### Search Projects
 
-Search accessible projects by query or project keys. SonarQube Cloud requires an organization through input or config.
+Search accessible projects by partial project name or exact project key query through component search. Exact `projectKeys` are looked up directly. SonarQube Cloud requires an organization through input or config.
 
 ### Get Component / List Component Tree
 
@@ -33,7 +33,7 @@ Read component metadata and browse child components for projects, directories, f
 
 ### List Project Branches / List Project Pull Requests
 
-List branch and pull request analysis records for a project.
+List long-lived branch records and pull request analysis records for a project.
 
 ### List Metrics / Get Project Measures / Search Measure History
 
@@ -45,19 +45,19 @@ Read quality gate status by exactly one of `analysisId`, `projectId`, or `projec
 
 ### Search Issues / Get Issue / Get Issue Changelog / Manage Issue
 
-Search issues by issue key, project, component, branch, pull request, legacy status, current issue status, software quality, impact severity, supported type, tags, and text query. `types` accepts SonarQube issue types such as `BUG`, `VULNERABILITY`, and `CODE_SMELL`; use security-hotspot tools for legacy hotspots or `impactSoftwareQualities` for security issues. Read a specific issue, inspect changelog entries, and manage issue workflow updates such as transitions, assignments, comments, tags, severity, and type. Mutating issue actions require explicit `confirmWrite`.
+Search issues by issue key, project, component, branch, pull request, legacy status, current issue status, software quality, impact severity, supported type, tags, and text query. Current `severities` values `INFO`, `LOW`, `MEDIUM`, `HIGH`, and `BLOCKER` are sent as impact severities; legacy `CRITICAL`, `MAJOR`, and `MINOR` values remain supported through the legacy API severity filter. `types` accepts SonarQube issue types such as `BUG`, `VULNERABILITY`, and `CODE_SMELL`; use security-hotspot tools for legacy hotspots or `impactSoftwareQualities` for security issues. Read a specific issue, inspect changelog entries, and manage issue workflow updates such as transitions, assignments, comments, tags, severity, and type. Mutating issue actions require explicit `confirmWrite`.
 
 ### Search Security Hotspots / Get Security Hotspot / Manage Security Hotspot
 
-Search security hotspots by project, branch, pull request, file, review status, and resolution. Read hotspot details and change hotspot review status or resolution with explicit `confirmWrite`.
+Search security hotspots by project, hotspot key, branch, pull request, file, review status, resolution, and new-code period. Read hotspot details and change hotspot review status or resolution with explicit `confirmWrite`.
 
 ### Search Rules / Get Rule
 
 Search SonarQube rules by text, language, repository, tag, severity, type, and status. Read rule metadata and raw remediation details by rule key.
 
-### Get Source / Get SCM Info / Get Duplications
+### Get Source / Get SCM Info / Search Duplicated Files / Get Duplications
 
-Retrieve source code as a Slate text attachment, read SCM blame metadata for source lines, and inspect duplicated code blocks for source components.
+Retrieve source code as a Slate text attachment, read SCM blame metadata for source lines, search files with duplicated code in a project, and inspect duplicated code blocks for source components.
 
 ### Get Compute Task / Get Project Analysis Status
 

@@ -183,24 +183,26 @@ export let getQualityGateStatusTool = readOnlyTool({
   name: 'Get Quality Gate Status',
   key: 'get_quality_gate_status',
   description:
-    'Get the SonarQube quality gate status for exactly one project key, project id, or analysis id. Use search_projects first when the user gave a project name or partial key. Branch and pullRequest are only valid with projectKey, and only one of branch or pullRequest may be provided.'
+    'Get the SonarQube quality gate status using a project key, project id, or analysis id. Use search_projects first when the user gave a project name or partial key. Branch and pullRequest are only valid with projectKey, and only one of branch or pullRequest may be provided.'
 })
   .input(
     z.object({
       analysisId: z
         .string()
         .optional()
-        .describe('Analysis id. Cannot be combined with projectId or projectKey.'),
+        .describe(
+          'Analysis id. Provide at least one of analysisId, projectId, or projectKey.'
+        ),
       projectId: z
         .string()
         .optional()
-        .describe(
-          'Project id. Cannot be combined with analysisId, projectKey, branch, or pullRequest.'
-        ),
+        .describe('Project id. Cannot be combined with branch or pullRequest.'),
       projectKey: z
         .string()
         .optional()
-        .describe('Project key. Defaults to config.defaultProjectKey when omitted.'),
+        .describe(
+          'Project key. Defaults to config.defaultProjectKey when no analysisId or projectId is provided.'
+        ),
       branch: z.string().optional().describe('Branch key for projectKey requests.'),
       pullRequest: z
         .string()

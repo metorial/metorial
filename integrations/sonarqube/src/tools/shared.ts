@@ -15,7 +15,11 @@ export let rawRecordSchema = z
 export let pageSchema = z.object({
   page: z.number().optional().describe('Current 1-based page number.'),
   pageSize: z.number().optional().describe('Number of results requested per page.'),
-  total: z.number().optional().describe('Total matching records reported by SonarQube.')
+  total: z.number().optional().describe('Total matching records reported by SonarQube.'),
+  hasNextPage: z
+    .boolean()
+    .optional()
+    .describe('Whether SonarQube reports or the integration computes another page.')
 });
 
 export let componentSchema = z.object({
@@ -39,6 +43,7 @@ export let branchSchema = z.object({
   type: z.string().optional().describe('Branch type reported by SonarQube.'),
   status: z.string().optional().describe('Quality gate or analysis status when available.'),
   analysisDate: z.string().optional().describe('Most recent branch analysis timestamp.'),
+  branchId: z.string().optional().describe('SonarQube branch id when returned.'),
   raw: rawRecordSchema
 });
 
@@ -84,6 +89,27 @@ export let issueSchema = z.object({
   assignee: z.string().optional().describe('Assigned user login when available.'),
   creationDate: z.string().optional().describe('Issue creation timestamp.'),
   updateDate: z.string().optional().describe('Issue update timestamp.'),
+  cleanCodeAttribute: z
+    .string()
+    .optional()
+    .describe('Clean Code attribute reported for the issue when available.'),
+  cleanCodeAttributeCategory: z
+    .string()
+    .optional()
+    .describe('Clean Code attribute category reported for the issue when available.'),
+  impacts: z
+    .array(
+      z.object({
+        softwareQuality: z.string().optional().describe('Impacted software quality.'),
+        severity: z.string().optional().describe('Impact severity.'),
+        raw: rawRecordSchema
+      })
+    )
+    .optional()
+    .describe('Software quality impacts returned by SonarQube.'),
+  textRange: rawRecordSchema
+    .optional()
+    .describe('Issue text range when SonarQube returns one.'),
   tags: z.array(z.string()).optional().describe('Issue tags.'),
   raw: rawRecordSchema
 });
@@ -137,6 +163,22 @@ export let qualityGateSchema = z.object({
   id: z.string().optional().describe('Quality gate id.'),
   name: z.string().optional().describe('Quality gate name.'),
   isDefault: z.boolean().optional().describe('Whether this is the default gate.'),
+  caycStatus: z
+    .string()
+    .optional()
+    .describe('Clean as You Code compliance status when returned.'),
+  hasStandardConditions: z
+    .boolean()
+    .optional()
+    .describe('Whether the gate has standard conditions when returned.'),
+  hasMQRConditions: z
+    .boolean()
+    .optional()
+    .describe('Whether the gate has MQR conditions when returned.'),
+  isAiCodeSupported: z
+    .boolean()
+    .optional()
+    .describe('Whether AI Code Assurance is supported when returned.'),
   raw: rawRecordSchema
 });
 
@@ -212,6 +254,7 @@ export let mapBranch = (branch: Record<string, unknown>) => {
     type: optionalString(branch.type),
     status,
     analysisDate: optionalString(branch.analysisDate),
+    branchId: optionalString(branch.branchId),
     raw: branch
   };
 };
@@ -257,23 +300,51 @@ export let mapMeasure = (measure: Record<string, unknown>) => ({
   raw: measure
 });
 
-export let mapIssue = (issue: Record<string, unknown>) => ({
-  key: String(issue.key ?? ''),
-  rule: optionalString(issue.rule),
-  severity: optionalString(issue.severity),
-  status: optionalString(issue.issueStatus) ?? optionalString(issue.status),
-  type: optionalString(issue.type),
-  component: optionalString(issue.component),
-  project: optionalString(issue.project),
-  line: optionalNumber(issue.line),
-  message: optionalString(issue.message),
-  author: optionalString(issue.author),
-  assignee: optionalString(issue.assignee),
-  creationDate: optionalString(issue.creationDate),
-  updateDate: optionalString(issue.updateDate),
-  tags: optionalStringArray(issue.tags),
-  raw: issue
+let firstIssueImpact = (issue: Record<string, unknown>) =>
+  Array.isArray(issue.impacts)
+    ? issue.impacts.find(
+        (impact): impact is Record<string, unknown> =>
+          typeof impact === 'object' && impact !== null
+      )
+    : undefined;
+
+let mapIssueImpact = (impact: Record<string, unknown>) => ({
+  softwareQuality: optionalString(impact.softwareQuality),
+  severity: optionalString(impact.severity),
+  raw: impact
 });
+
+export let mapIssue = (issue: Record<string, unknown>) => {
+  let firstImpact = firstIssueImpact(issue);
+  return {
+    key: String(issue.key ?? ''),
+    rule: optionalString(issue.rule),
+    severity: optionalString(issue.severity) ?? optionalString(firstImpact?.severity),
+    status: optionalString(issue.issueStatus) ?? optionalString(issue.status),
+    type: optionalString(issue.type),
+    component: optionalString(issue.component),
+    project: optionalString(issue.project),
+    line: optionalNumber(issue.line),
+    message: optionalString(issue.message),
+    author: optionalString(issue.author),
+    assignee: optionalString(issue.assignee),
+    creationDate: optionalString(issue.creationDate),
+    updateDate: optionalString(issue.updateDate),
+    cleanCodeAttribute: optionalString(issue.cleanCodeAttribute),
+    cleanCodeAttributeCategory: optionalString(issue.cleanCodeAttributeCategory),
+    impacts: Array.isArray(issue.impacts)
+      ? issue.impacts
+          .filter(
+            (impact): impact is Record<string, unknown> =>
+              typeof impact === 'object' && impact !== null
+          )
+          .map(mapIssueImpact)
+      : undefined,
+    textRange: optionalRecord(issue.textRange),
+    tags: optionalStringArray(issue.tags),
+    raw: issue
+  };
+};
 
 export let mapHotspot = (hotspot: Record<string, unknown>) => {
   let component = optionalRecord(hotspot.component);
@@ -326,6 +397,10 @@ export let mapQualityGate = (gate: Record<string, unknown>) => ({
         : undefined,
   name: optionalString(gate.name),
   isDefault: optionalBoolean(gate.isDefault) ?? optionalBoolean(gate.default),
+  caycStatus: optionalString(gate.caycStatus),
+  hasStandardConditions: optionalBoolean(gate.hasStandardConditions),
+  hasMQRConditions: optionalBoolean(gate.hasMQRConditions),
+  isAiCodeSupported: optionalBoolean(gate.isAiCodeSupported),
   raw: gate
 });
 
@@ -368,13 +443,13 @@ export let branchPullRequestInputs = {
     .string()
     .optional()
     .describe(
-      'Branch key to query. Pass a branch only when the user explicitly named it or it was discovered with list_project_branches. Do not guess main or master; omit branch for the default branch unless the user named one. Do not combine with pullRequest.'
+      'Long-lived SonarQube branch name to query, for example main or develop. Pass only when the user named it or it was discovered with list_project_branches. Do not guess main or master; omit branch for the default branch unless the user named one. Do not combine with pullRequest.'
     ),
   pullRequest: z
     .string()
     .optional()
     .describe(
-      'Pull request id/key to query. Pass a pull request only when the user explicitly named it or it was discovered with list_project_pull_requests. Do not combine with branch.'
+      'SonarQube pull request key/id to query. Use list_project_pull_requests to discover valid keys; do not pass a git branch name here. Do not combine with branch.'
     )
 };
 

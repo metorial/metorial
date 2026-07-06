@@ -1,26 +1,20 @@
 import { createTextAttachment } from 'slates';
 import { z } from 'zod';
 import { sonarqubeValidationError } from '../lib/errors';
-import { createClient, rawRecordSchema, readOnlyTool, scmLineSchema } from './shared';
+import {
+  branchPullRequestInputs,
+  createClient,
+  pageSchema,
+  projectInput,
+  projectKeyFromInput,
+  rawRecordSchema,
+  readOnlyTool,
+  scmLineSchema
+} from './shared';
 
 let lineRangeInputs = {
   fromLine: z.number().optional().describe('First 1-based source line to include.'),
   toLine: z.number().optional().describe('Last 1-based source line to include.')
-};
-
-let cloudBranchPullRequestInputs = {
-  branch: z
-    .string()
-    .optional()
-    .describe(
-      'Branch key to query. Documented for SonarQube Cloud source/duplication reads only; do not combine with pullRequest.'
-    ),
-  pullRequest: z
-    .string()
-    .optional()
-    .describe(
-      'Pull request id/key to query. Documented for SonarQube Cloud source/duplication reads only; do not combine with branch.'
-    )
 };
 
 export let validateLineRange = (input: { fromLine?: number; toLine?: number }) => {
@@ -158,7 +152,7 @@ export let getSourceTool = readOnlyTool({
         .describe(
           'Exact file component key to retrieve source for, usually discovered with list_component_tree using qualifier FIL.'
         ),
-      ...cloudBranchPullRequestInputs,
+      ...branchPullRequestInputs,
       ...lineRangeInputs
     })
   )
@@ -249,11 +243,94 @@ export let getScmInfoTool = readOnlyTool({
   })
   .build();
 
+let duplicatedFileSchema = z.object({
+  key: z.string().describe('SonarQube file component key.'),
+  name: z.string().optional().describe('File display name.'),
+  path: z.string().optional().describe('Project-relative file path.'),
+  duplicatedLines: z.number().optional().describe('Duplicated line count for the file.'),
+  duplicatedBlocks: z.number().optional().describe('Duplicated block count for the file.'),
+  duplicatedLinesDensity: z
+    .string()
+    .optional()
+    .describe('Duplicated lines density value as returned by SonarQube.'),
+  raw: rawRecordSchema
+});
+
+let duplicationSummarySchema = z.object({
+  duplicatedLines: z.number().optional().describe('Project duplicated line count.'),
+  duplicatedBlocks: z.number().optional().describe('Project duplicated block count.'),
+  duplicatedLinesDensity: z
+    .string()
+    .optional()
+    .describe('Project duplicated lines density value as returned by SonarQube.')
+});
+
+export let searchDuplicatedFilesTool = readOnlyTool({
+  name: 'Search Duplicated Files',
+  key: 'search_duplicated_files',
+  description:
+    'Search for files with code duplications in an exact SonarQube project key. Use this before get_duplications when the duplicated file component key is unknown. If pageIndex or pageSize is omitted, the tool auto-fetches duplicated files across pages up to 10,000 files.'
+})
+  .input(
+    z.object({
+      ...projectInput,
+      ...branchPullRequestInputs,
+      pageIndex: z
+        .number()
+        .optional()
+        .describe(
+          'Optional 1-based page index for manual pagination. If omitted with pageSize, auto-fetches duplicated files across pages.'
+        ),
+      pageSize: z
+        .number()
+        .optional()
+        .describe(
+          'Optional page size for manual pagination, capped at 500. If omitted with pageIndex, auto-fetches duplicated files across pages.'
+        )
+    })
+  )
+  .output(
+    z.object({
+      projectKey: z.string().describe('Project key used for the request.'),
+      files: z
+        .array(duplicatedFileSchema)
+        .describe('Files with duplicated lines. Pass a file key to get_duplications.'),
+      summary: duplicationSummarySchema
+        .optional()
+        .describe('Project-level duplication metrics when returned by SonarQube.'),
+      page: pageSchema.optional().describe('Pagination details.'),
+      raw: rawRecordSchema
+    })
+  )
+  .handleInvocation(async ctx => {
+    let projectKey = projectKeyFromInput(ctx.config, ctx.input);
+    let client = createClient(ctx);
+    let result = await client.searchDuplicatedFiles({
+      projectKey,
+      branch: ctx.input.branch,
+      pullRequest: ctx.input.pullRequest,
+      pageIndex: ctx.input.pageIndex,
+      pageSize: ctx.input.pageSize
+    });
+
+    return {
+      output: {
+        projectKey,
+        files: result.items,
+        summary: result.summary,
+        page: result.page,
+        raw: result.raw
+      },
+      message: `Found **${result.items.length}** duplicated SonarQube files for project **${projectKey}**.`
+    };
+  })
+  .build();
+
 export let getDuplicationsTool = readOnlyTool({
   name: 'Get Duplications',
   key: 'get_duplications',
   description:
-    'Get SonarQube duplication blocks and related files for a component key. Use list_component_tree with FIL qualifiers for source files; branch and pullRequest are Cloud-only here.'
+    'Get SonarQube duplication blocks and related files for a component key. Use search_duplicated_files when you need to discover files with duplications first.'
 })
   .input(
     z.object({
@@ -262,7 +339,7 @@ export let getDuplicationsTool = readOnlyTool({
         .describe(
           'Exact component key to retrieve duplications for, usually a file component discovered with list_component_tree.'
         ),
-      ...cloudBranchPullRequestInputs
+      ...branchPullRequestInputs
     })
   )
   .output(

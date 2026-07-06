@@ -29,6 +29,7 @@ export type SonarPage = {
   page?: number;
   pageSize?: number;
   total?: number;
+  hasNextPage?: boolean;
 };
 
 export type SonarListResult<T> = {
@@ -49,6 +50,7 @@ export type SonarIssueSearchParams = {
   issueKeys?: string[];
   projectKeys?: string[];
   componentKeys?: string[];
+  files?: string[];
   branch?: string;
   pullRequest?: string;
   resolved?: boolean;
@@ -62,6 +64,37 @@ export type SonarIssueSearchParams = {
   query?: string;
   page?: number;
   pageSize?: number;
+};
+
+export type SonarDuplicatedFilesSearchParams = {
+  projectKey: string;
+  branch?: string;
+  pullRequest?: string;
+  pageIndex?: number;
+  pageSize?: number;
+};
+
+export type SonarDuplicatedFile = {
+  key: string;
+  name?: string;
+  path?: string;
+  duplicatedLines?: number;
+  duplicatedBlocks?: number;
+  duplicatedLinesDensity?: string;
+  raw: Record<string, unknown>;
+};
+
+export type SonarDuplicatedFilesSummary = {
+  duplicatedLines?: number;
+  duplicatedBlocks?: number;
+  duplicatedLinesDensity?: string;
+};
+
+export type SonarDuplicatedFilesResult = {
+  items: SonarDuplicatedFile[];
+  page?: SonarPage;
+  summary?: SonarDuplicatedFilesSummary;
+  raw: Record<string, unknown>;
 };
 
 export type SonarRuleSearchParams = {
@@ -228,9 +261,9 @@ export let requireOneProjectStatusIdentifier = (input: {
   let identifiers = [input.analysisId, input.projectId, input.projectKey].filter(
     value => typeof value === 'string' && value.trim().length > 0
   );
-  if (identifiers.length !== 1) {
+  if (identifiers.length < 1) {
     throw sonarqubeValidationError(
-      'Provide exactly one of analysisId, projectId, or projectKey.'
+      'Provide at least one of analysisId, projectId, or projectKey.'
     );
   }
 };
@@ -248,9 +281,15 @@ export let validateQualityGateStatusParams = (input: {
     throw sonarqubeValidationError('Provide either branch or pullRequest, not both.');
   }
 
-  if ((input.analysisId || input.projectId) && (input.branch || input.pullRequest)) {
+  if ((input.branch || input.pullRequest) && !input.projectKey?.trim()) {
     throw sonarqubeValidationError(
       'branch and pullRequest can only be used with projectKey quality gate status requests.'
+    );
+  }
+
+  if (input.projectId && (input.branch || input.pullRequest)) {
+    throw sonarqubeValidationError(
+      'projectId cannot be combined with branch or pullRequest for quality gate status requests.'
     );
   }
 };
@@ -305,50 +344,47 @@ let matchesMetricQuery = (metric: Record<string, unknown>, query: string) =>
     return typeof value === 'string' && value.toLowerCase().includes(query);
   });
 
+let cleanStringArray = (values: string[] | undefined) =>
+  values?.map(value => value.trim()).filter(value => value.length > 0);
+
 export let projectMeasuresParams = (
-  config: SonarConfig,
+  _config: SonarConfig,
   params: {
     projectKey: string;
-    metricKeys: string[];
+    metricKeys?: string[];
     branch?: string;
     pullRequest?: string;
   }
+) => {
+  validateBranchPullRequestChoice(params);
+
+  return {
+    component: params.projectKey,
+    metricKeys: params.metricKeys,
+    branch: params.branch,
+    pullRequest: params.pullRequest,
+    additionalFields: 'metrics'
+  };
+};
+
+export let hotspotProjectSearchParams = (
+  _config: SonarConfig,
+  projectKey: string | undefined
 ) => ({
-  component: params.projectKey,
-  metricKeys: params.metricKeys,
-  branch: params.branch,
-  pullRequest: params.pullRequest,
-  additionalFields: (config.deployment ?? 'server') === 'cloud' ? 'periods' : 'period'
+  projectKey
 });
 
-export let hotspotProjectSearchParams = (config: SonarConfig, projectKey: string) =>
-  (config.deployment ?? 'server') === 'cloud' ? { projectKey } : { project: projectKey };
-
-let validateBranchPullRequestChoice = (params: { branch?: string; pullRequest?: string }) => {
+export let validateBranchPullRequestChoice = (params: {
+  branch?: string;
+  pullRequest?: string;
+}) => {
   if (params.branch && params.pullRequest) {
     throw sonarqubeValidationError('Provide either branch or pullRequest, not both.');
   }
 };
 
-let cloudBranchPullRequestParams = (
-  config: SonarConfig,
-  params: {
-    branch?: string;
-    pullRequest?: string;
-  },
-  operation: string
-) => {
+let branchPullRequestParams = (params: { branch?: string; pullRequest?: string }) => {
   validateBranchPullRequestChoice(params);
-
-  if ((config.deployment ?? 'server') !== 'cloud') {
-    if (params.branch || params.pullRequest) {
-      throw sonarqubeValidationError(
-        `${operation} branch and pullRequest parameters are only documented for SonarQube Cloud.`
-      );
-    }
-
-    return {};
-  }
 
   return {
     branch: params.branch,
@@ -357,7 +393,7 @@ let cloudBranchPullRequestParams = (
 };
 
 export let sourceRawParams = (
-  config: SonarConfig,
+  _config: SonarConfig,
   params: {
     component: string;
     branch?: string;
@@ -365,7 +401,7 @@ export let sourceRawParams = (
   }
 ) => ({
   key: params.component,
-  ...cloudBranchPullRequestParams(config, params, 'sources/raw')
+  ...branchPullRequestParams(params)
 });
 
 export let sourceShowParams = (params: {
@@ -391,7 +427,7 @@ export let sourceScmParams = (params: {
 });
 
 export let duplicationShowParams = (
-  config: SonarConfig,
+  _config: SonarConfig,
   params: {
     component: string;
     branch?: string;
@@ -399,37 +435,134 @@ export let duplicationShowParams = (
   }
 ) => ({
   key: params.component,
-  ...cloudBranchPullRequestParams(config, params, 'duplications/show')
+  ...branchPullRequestParams(params)
 });
 
 let issueComponentFilter = (params: SonarIssueSearchParams) => {
-  let values = [...(params.projectKeys ?? []), ...(params.componentKeys ?? [])].filter(
-    value => typeof value === 'string' && value.length > 0
-  );
+  let values = [
+    ...(params.projectKeys ?? []),
+    ...(params.componentKeys ?? []),
+    ...(params.files ?? [])
+  ].filter(value => typeof value === 'string' && value.length > 0);
   if (values.length === 0) return undefined;
   return [...new Set(values)];
 };
 
 export let projectSearchParams = (config: SonarConfig, params: SonarProjectSearchParams) => {
-  let isCloud = (config.deployment ?? 'server') === 'cloud';
+  let qualifiers = projectSearchQualifiers(config, params.qualifiers);
 
   return {
     organization: requireCloudOrganization(config, params.organization),
-    q: params.query,
-    ...(isCloud
-      ? { projects: params.projectKeys }
-      : {
-          projectKeys: params.projectKeys,
-          qualifiers: params.qualifiers
-        }),
+    q: params.query?.trim() || undefined,
+    qualifiers: (config.deployment ?? 'server') === 'cloud' ? undefined : qualifiers,
     p: pageNumber(params.page),
-    ps: pageSize(params.pageSize, 50, 500)
+    ps: pageSize(params.pageSize, 500, 500)
+  };
+};
+
+let projectSearchQualifiers = (config: SonarConfig, qualifiers: string[] | undefined) => {
+  let concrete = cleanStringArray(qualifiers);
+  if (concrete?.length) return concrete;
+  return (config.deployment ?? 'server') === 'server' ? ['TRK'] : undefined;
+};
+
+let matchesProjectQualifiers = (
+  project: Record<string, unknown>,
+  qualifiers: string[] | undefined
+) => {
+  if (!qualifiers?.length) return true;
+  return typeof project.qualifier === 'string' && qualifiers.includes(project.qualifier);
+};
+
+let mergeProjectItems = (
+  first: Record<string, unknown>[],
+  second: Record<string, unknown>[]
+) => {
+  let seen = new Set<string>();
+  let merged: Record<string, unknown>[] = [];
+
+  for (let item of [...first, ...second]) {
+    let key = typeof item.key === 'string' ? item.key : undefined;
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    merged.push(item);
+  }
+
+  return merged;
+};
+
+let projectSearchPage = (
+  page: SonarPage | undefined,
+  items: Record<string, unknown>[]
+): SonarPage => ({
+  page: page?.page ?? 1,
+  pageSize: page?.pageSize ?? items.length,
+  total: page?.total === undefined ? items.length : Math.max(page.total, items.length),
+  hasNextPage:
+    page?.hasNextPage ??
+    (page?.page ?? 1) * (page?.pageSize ?? items.length) <
+      (page?.total === undefined ? items.length : Math.max(page.total, items.length))
+});
+
+export let issueTransitionParams = (params: { issueKey: string; status: string }) => ({
+  key: params.issueKey,
+  status: params.status
+});
+
+let currentImpactSeverityValues = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'BLOCKER'];
+let legacyIssueSeverityValues = ['CRITICAL', 'MAJOR', 'MINOR'];
+let supportedIssueSeverityValues = new Set([
+  ...currentImpactSeverityValues,
+  ...legacyIssueSeverityValues
+]);
+
+let issueSeverityParams = (params: SonarIssueSearchParams) => {
+  let severities = cleanStringArray(params.severities);
+  let explicitImpactSeverities = cleanStringArray(params.impactSeverities);
+
+  if (!severities?.length) {
+    return {
+      severities: undefined,
+      impactSeverities: explicitImpactSeverities
+    };
+  }
+
+  let invalidSeverity = severities.find(value => !supportedIssueSeverityValues.has(value));
+  if (invalidSeverity) {
+    throw sonarqubeValidationError(
+      `Unsupported SonarQube issue severity filter: ${invalidSeverity}.`
+    );
+  }
+
+  let hasLegacySeverity = severities.some(value => legacyIssueSeverityValues.includes(value));
+  let hasCurrentImpactSeverity = severities.some(value =>
+    currentImpactSeverityValues.includes(value)
+  );
+
+  if (hasLegacySeverity && hasCurrentImpactSeverity) {
+    throw sonarqubeValidationError(
+      'Do not mix current impact severities (INFO, LOW, MEDIUM, HIGH, BLOCKER) with legacy issue severities (CRITICAL, MAJOR, MINOR) in severities.'
+    );
+  }
+
+  if (hasLegacySeverity) {
+    return {
+      severities,
+      impactSeverities: explicitImpactSeverities
+    };
+  }
+
+  return {
+    severities: undefined,
+    impactSeverities: [...new Set([...(explicitImpactSeverities ?? []), ...severities])]
   };
 };
 
 export let issueSearchParams = (config: SonarConfig, params: SonarIssueSearchParams) => {
   let isCloud = (config.deployment ?? 'server') === 'cloud';
   let components = issueComponentFilter(params);
+  let severityParams = issueSeverityParams(params);
+  validateBranchPullRequestChoice(params);
 
   return {
     organization: requireCloudOrganization(config, params.organization),
@@ -438,11 +571,11 @@ export let issueSearchParams = (config: SonarConfig, params: SonarIssueSearchPar
     branch: params.branch,
     pullRequest: params.pullRequest,
     resolved: params.resolved,
-    severities: params.severities,
+    severities: severityParams.severities,
     statuses: params.statuses,
     issueStatuses: params.issueStatuses,
     impactSoftwareQualities: params.impactSoftwareQualities,
-    impactSeverities: params.impactSeverities,
+    impactSeverities: severityParams.impactSeverities,
     types: params.types,
     tags: params.tags,
     q: params.query,
@@ -472,10 +605,42 @@ export let ruleShowParams = (
 ) => ({
   organization:
     (config.deployment ?? 'server') === 'cloud'
-      ? requireCloudOrganization(config, organization)
+      ? optionalCloudOrganization(config, organization)
       : undefined,
   key: ruleKey
 });
+
+let duplicatedFileMetricKeys = [
+  'duplicated_lines',
+  'duplicated_blocks',
+  'duplicated_lines_density'
+];
+
+export let componentTreeMeasuresParams = (params: {
+  component: string;
+  branch?: string;
+  pullRequest?: string;
+  metricKeys: string[];
+  qualifiers?: string[];
+  strategy?: string;
+  pageIndex?: number;
+  pageSize?: number;
+  additionalFields?: string;
+}) => {
+  validateBranchPullRequestChoice(params);
+
+  return {
+    component: params.component,
+    branch: params.branch,
+    metricKeys: params.metricKeys,
+    pullRequest: params.pullRequest,
+    qualifiers: params.qualifiers,
+    strategy: params.strategy,
+    p: pageNumber(params.pageIndex),
+    ps: pageSize(params.pageSize, 500, 500),
+    additionalFields: params.additionalFields
+  };
+};
 
 export let validateAuthenticationResponse = (data: unknown) => {
   if (!isRecord(data) || data.valid !== true) {
@@ -486,6 +651,11 @@ export let validateAuthenticationResponse = (data: unknown) => {
 let optionalRecordNumber = (record: Record<string, unknown>, key: string) =>
   typeof record[key] === 'number' ? record[key] : undefined;
 
+let optionalRecord = (value: unknown) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+
 export let normalizePage = (data: unknown): SonarPage | undefined => {
   if (!isRecord(data)) return undefined;
   let paging = isRecord(data.paging) ? data.paging : undefined;
@@ -494,12 +664,27 @@ export let normalizePage = (data: unknown): SonarPage | undefined => {
   let normalizedPageSize =
     optionalRecordNumber(source, 'pageSize') ?? optionalRecordNumber(source, 'ps');
   let total = optionalRecordNumber(source, 'total');
+  let hasNextPage = typeof source.hasNextPage === 'boolean' ? source.hasNextPage : undefined;
 
-  if (page === undefined && normalizedPageSize === undefined && total === undefined) {
+  if (
+    hasNextPage === undefined &&
+    page === undefined &&
+    normalizedPageSize === undefined &&
+    total === undefined
+  ) {
     return undefined;
   }
 
-  return { page, pageSize: normalizedPageSize, total };
+  return {
+    page,
+    pageSize: normalizedPageSize,
+    total,
+    hasNextPage:
+      hasNextPage ??
+      (page !== undefined && normalizedPageSize !== undefined && total !== undefined
+        ? page * normalizedPageSize < total
+        : undefined)
+  };
 };
 
 let normalizeArray = <T>(data: unknown, key: string): SonarListResult<T> => {
@@ -515,6 +700,64 @@ let normalizeArray = <T>(data: unknown, key: string): SonarListResult<T> => {
 
 let optionalRecordString = (record: Record<string, unknown>, key: string) =>
   typeof record[key] === 'string' && record[key].length > 0 ? record[key] : undefined;
+
+let measuresFromRecord = (record: Record<string, unknown>) =>
+  Array.isArray(record.measures)
+    ? record.measures.filter((measure): measure is Record<string, unknown> =>
+        isRecord(measure)
+      )
+    : [];
+
+let measureValue = (record: Record<string, unknown>, metricKey: string) => {
+  let measure = measuresFromRecord(record).find(item => item.metric === metricKey);
+  return typeof measure?.value === 'string' ? measure.value : undefined;
+};
+
+let integerMeasureValue = (record: Record<string, unknown>, metricKey: string) => {
+  let value = measureValue(record, metricKey);
+  if (value === undefined) return undefined;
+  let parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+let hasDuplicatedLines = (component: Record<string, unknown>) => {
+  let duplicatedLines = integerMeasureValue(component, 'duplicated_lines');
+  return duplicatedLines !== undefined && duplicatedLines > 0;
+};
+
+let mapDuplicatedFile = (component: Record<string, unknown>): SonarDuplicatedFile => ({
+  key: String(component.key ?? ''),
+  name: optionalRecordString(component, 'name'),
+  path: optionalRecordString(component, 'path'),
+  duplicatedLines: integerMeasureValue(component, 'duplicated_lines'),
+  duplicatedBlocks: integerMeasureValue(component, 'duplicated_blocks'),
+  duplicatedLinesDensity: measureValue(component, 'duplicated_lines_density'),
+  raw: component
+});
+
+let duplicationSummaryFromProjectMeasures = (
+  projectMeasures: Record<string, unknown>
+): SonarDuplicatedFilesSummary | undefined => {
+  let component = optionalRecord(projectMeasures.component);
+  if (!component) return undefined;
+
+  let summary = {
+    duplicatedLines: integerMeasureValue(component, 'duplicated_lines'),
+    duplicatedBlocks: integerMeasureValue(component, 'duplicated_blocks'),
+    duplicatedLinesDensity: measureValue(component, 'duplicated_lines_density')
+  };
+
+  return summary.duplicatedLines !== undefined ||
+    summary.duplicatedBlocks !== undefined ||
+    summary.duplicatedLinesDensity !== undefined
+    ? summary
+    : undefined;
+};
+
+let isBranchParameterType = (branch: Record<string, unknown>) => {
+  let type = optionalRecordString(branch, 'type');
+  return type === 'LONG' || type === 'BRANCH';
+};
 
 export let projectAnalysisComponentIdFromBranches = (branches: Record<string, unknown>[]) => {
   let branch =
@@ -634,16 +877,52 @@ export class SonarQubeClient {
     );
   }
 
-  async searchProjects(params: SonarProjectSearchParams) {
+  private async searchProjectsPage(params: SonarProjectSearchParams) {
     let data = await this.get<unknown>(
       'search projects',
-      '/projects/search',
+      '/components/search',
       projectSearchParams(this.config, params)
     );
     return normalizeArray<Record<string, unknown>>(data, 'components');
   }
 
+  private async getComponentByKey(component: string) {
+    let data = await this.get<Record<string, unknown>>('get component', '/components/show', {
+      component
+    });
+    return optionalRecord(data.component) ?? data;
+  }
+
+  async searchProjects(params: SonarProjectSearchParams) {
+    let projectKeys = cleanStringArray(params.projectKeys) ?? [];
+    let hasQuery = Boolean(params.query?.trim());
+    let shouldSearch = hasQuery || projectKeys.length === 0;
+    let qualifiers = projectSearchQualifiers(this.config, params.qualifiers);
+    let searchResult: SonarListResult<Record<string, unknown>> | undefined;
+
+    if (shouldSearch) {
+      searchResult = await this.searchProjectsPage(params);
+    }
+
+    let exactProjects = await Promise.all(
+      projectKeys.map(async projectKey => await this.getComponentByKey(projectKey))
+    );
+    let filteredExactProjects = exactProjects.filter(project =>
+      matchesProjectQualifiers(project, qualifiers)
+    );
+    let filteredSearchProjects = (searchResult?.items ?? []).filter(project =>
+      matchesProjectQualifiers(project, qualifiers)
+    );
+    let items = mergeProjectItems(filteredExactProjects, filteredSearchProjects);
+
+    return {
+      items,
+      page: projectSearchPage(searchResult?.page, items)
+    };
+  }
+
   async getComponent(params: { component: string; branch?: string; pullRequest?: string }) {
+    validateBranchPullRequestChoice(params);
     return await this.get<Record<string, unknown>>('get component', '/components/show', {
       component: params.component,
       branch: params.branch,
@@ -660,6 +939,7 @@ export class SonarQubeClient {
     page?: number;
     pageSize?: number;
   }) {
+    validateBranchPullRequestChoice(params);
     let data = await this.get<unknown>('list component tree', '/components/tree', {
       component: params.component,
       branch: params.branch,
@@ -676,7 +956,11 @@ export class SonarQubeClient {
     let data = await this.get<unknown>('list project branches', '/project_branches/list', {
       project: projectKey
     });
-    return normalizeArray<Record<string, unknown>>(data, 'branches');
+    let result = normalizeArray<Record<string, unknown>>(data, 'branches');
+    return {
+      items: result.items.filter(isBranchParameterType),
+      page: result.page
+    };
   }
 
   async listProjectPullRequests(projectKey: string) {
@@ -794,7 +1078,7 @@ export class SonarQubeClient {
 
   async getProjectMeasures(params: {
     projectKey: string;
-    metricKeys: string[];
+    metricKeys?: string[];
     branch?: string;
     pullRequest?: string;
   }) {
@@ -815,6 +1099,7 @@ export class SonarQubeClient {
     page?: number;
     pageSize?: number;
   }) {
+    validateBranchPullRequestChoice(params);
     let data = await this.get<unknown>('search measure history', '/measures/search_history', {
       component: params.projectKey,
       metrics: params.metricKeys,
@@ -885,10 +1170,10 @@ export class SonarQubeClient {
     return await this.post<Record<string, unknown>>(
       'transition issue',
       '/issues/do_transition',
-      {
-        issue: params.issueKey,
-        transition: params.transition
-      }
+      issueTransitionParams({
+        issueKey: params.issueKey,
+        status: params.transition
+      })
     );
   }
 
@@ -936,23 +1221,35 @@ export class SonarQubeClient {
   }
 
   async searchHotspots(params: {
-    projectKey: string;
+    projectKey?: string;
     branch?: string;
     pullRequest?: string;
+    hotspotKeys?: string[];
     files?: string[];
     status?: string;
     resolution?: string;
+    sinceLeakPeriod?: boolean;
     onlyMine?: boolean;
     page?: number;
     pageSize?: number;
   }) {
+    validateBranchPullRequestChoice(params);
+    let projectKey = params.projectKey?.trim() || undefined;
+    let hotspotKeys = cleanStringArray(params.hotspotKeys);
+    if (!projectKey && !hotspotKeys?.length) {
+      throw sonarqubeValidationError(
+        'Provide projectKey or at least one hotspotKeys value to search SonarQube security hotspots.'
+      );
+    }
     let data = await this.get<unknown>('search security hotspots', '/hotspots/search', {
-      ...hotspotProjectSearchParams(this.config, params.projectKey),
+      ...hotspotProjectSearchParams(this.config, projectKey),
       branch: params.branch,
       pullRequest: params.pullRequest,
+      hotspots: hotspotKeys,
       files: params.files,
       status: params.status,
       resolution: params.resolution,
+      sinceLeakPeriod: params.sinceLeakPeriod,
       onlyMine: params.onlyMine,
       p: pageNumber(params.page),
       ps: pageSize(params.pageSize, 100, 500)
@@ -1038,18 +1335,119 @@ export class SonarQubeClient {
     );
   }
 
+  private async getComponentTreeMeasures(params: {
+    component: string;
+    branch?: string;
+    pullRequest?: string;
+    metricKeys: string[];
+    qualifiers?: string[];
+    strategy?: string;
+    pageIndex?: number;
+    pageSize?: number;
+    additionalFields?: string;
+  }) {
+    let data = await this.get<unknown>(
+      'search duplicated files',
+      '/measures/component_tree',
+      componentTreeMeasuresParams(params)
+    );
+    let result = normalizeArray<Record<string, unknown>>(data, 'components');
+
+    return {
+      data,
+      items: result.items,
+      page: result.page
+    };
+  }
+
+  async searchDuplicatedFiles(
+    params: SonarDuplicatedFilesSearchParams
+  ): Promise<SonarDuplicatedFilesResult> {
+    validateBranchPullRequestChoice(params);
+
+    let projectMeasures = await this.getProjectMeasures({
+      projectKey: params.projectKey,
+      metricKeys: duplicatedFileMetricKeys,
+      branch: params.branch,
+      pullRequest: params.pullRequest
+    });
+    let summary = duplicationSummaryFromProjectMeasures(projectMeasures);
+    let manualPagination = params.pageIndex !== undefined || params.pageSize !== undefined;
+    let pageSizeValue = pageSize(params.pageSize, 500, 500);
+
+    if (manualPagination) {
+      let componentTree = await this.getComponentTreeMeasures({
+        component: params.projectKey,
+        branch: params.branch,
+        pullRequest: params.pullRequest,
+        metricKeys: duplicatedFileMetricKeys,
+        qualifiers: ['FIL'],
+        strategy: 'all',
+        pageIndex: params.pageIndex,
+        pageSize: params.pageSize,
+        additionalFields: 'metrics'
+      });
+      let items = componentTree.items.filter(hasDuplicatedLines).map(mapDuplicatedFile);
+
+      return {
+        items,
+        page: componentTree.page,
+        summary,
+        raw: {
+          projectMeasures,
+          componentTree: componentTree.data
+        }
+      };
+    }
+
+    let duplicatedFiles: Record<string, unknown>[] = [];
+    let rawPages: unknown[] = [];
+    for (let pageIndex = 1; pageIndex <= 20; pageIndex++) {
+      let componentTree = await this.getComponentTreeMeasures({
+        component: params.projectKey,
+        branch: params.branch,
+        pullRequest: params.pullRequest,
+        metricKeys: duplicatedFileMetricKeys,
+        qualifiers: ['FIL'],
+        strategy: 'all',
+        pageIndex,
+        pageSize: pageSizeValue,
+        additionalFields: 'metrics'
+      });
+      rawPages.push(componentTree.data);
+      duplicatedFiles.push(...componentTree.items.filter(hasDuplicatedLines));
+
+      let total = componentTree.page?.total ?? componentTree.items.length;
+      if (componentTree.items.length === 0 || pageIndex * pageSizeValue >= total) break;
+    }
+
+    let items = duplicatedFiles.map(mapDuplicatedFile);
+    return {
+      items,
+      page: {
+        page: 1,
+        pageSize: items.length,
+        total: items.length
+      },
+      summary,
+      raw: {
+        projectMeasures,
+        componentTreePages: rawPages
+      }
+    };
+  }
+
   async listQualityGates() {
-    let organization = requireCloudOrganization(this.config, undefined);
+    let organization = optionalCloudOrganization(this.config, undefined);
     let data = await this.get<unknown>('list quality gates', '/qualitygates/list', {
       organization
     });
     return normalizeArray<Record<string, unknown>>(data, 'qualitygates');
   }
 
-  async listLanguages(params: { query?: string; pageSize?: number }) {
+  async listLanguages(params: { query?: string }) {
     let data = await this.get<unknown>('list languages', '/languages/list', {
-      q: params.query,
-      ps: optionalPageSizeIncludingAll(params.pageSize)
+      q: params.query
     });
     return normalizeArray<Record<string, unknown>>(data, 'languages');
   }

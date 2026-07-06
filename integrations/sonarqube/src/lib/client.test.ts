@@ -7,9 +7,11 @@ import {
 import {
   cloudV1BaseUrl,
   cloudV2BaseUrl,
+  componentTreeMeasuresParams,
   duplicationShowParams,
   hotspotProjectSearchParams,
   issueSearchParams,
+  issueTransitionParams,
   metricsSearchParams,
   normalizePage,
   normalizeServerBaseUrl,
@@ -78,13 +80,17 @@ describe('SonarQube client helpers', () => {
   it('serializes workflow POST parameters as form-compatible Sonar values', () => {
     expect(
       serializeSonarParams({
-        issue: 'ISSUE-1',
-        transition: 'accept',
+        key: 'ISSUE-1',
+        status: 'accept',
         tags: ['security', 'triaged'],
         comment: 'Reviewed',
         empty: undefined
       })
-    ).toBe('issue=ISSUE-1&transition=accept&tags=security%2Ctriaged&comment=Reviewed');
+    ).toBe('key=ISSUE-1&status=accept&tags=security%2Ctriaged&comment=Reviewed');
+    expect(issueTransitionParams({ issueKey: 'ISSUE-1', status: 'reopen' })).toEqual({
+      key: 'ISSUE-1',
+      status: 'reopen'
+    });
   });
 
   it('validates and caps pagination values', () => {
@@ -140,7 +146,8 @@ describe('SonarQube client helpers', () => {
     ).toEqual({
       page: 2,
       pageSize: 20,
-      total: 50
+      total: 50,
+      hasNextPage: true
     });
     expect(
       normalizePage({
@@ -151,7 +158,8 @@ describe('SonarQube client helpers', () => {
     ).toEqual({
       page: 1,
       pageSize: 3,
-      total: 4
+      total: 4,
+      hasNextPage: true
     });
   });
 
@@ -163,8 +171,8 @@ describe('SonarQube client helpers', () => {
     expect(() => requireOneProjectStatusIdentifier({ projectKey: 'app' })).not.toThrow();
     expect(() =>
       requireOneProjectStatusIdentifier({ projectKey: 'app', analysisId: 'analysis' })
-    ).toThrow(/exactly one/);
-    expect(() => requireOneProjectStatusIdentifier({})).toThrow(/exactly one/);
+    ).not.toThrow();
+    expect(() => requireOneProjectStatusIdentifier({})).toThrow(/at least one/);
   });
 
   it('validates quality gate status branch and pull request combinations', () => {
@@ -187,6 +195,13 @@ describe('SonarQube client helpers', () => {
     expect(() =>
       validateQualityGateStatusParams({ analysisId: 'analysis', pullRequest: '42' })
     ).toThrow(/projectKey/);
+    expect(() =>
+      validateQualityGateStatusParams({
+        analysisId: 'analysis',
+        projectKey: 'app',
+        branch: 'main'
+      })
+    ).not.toThrow();
   });
 
   it('validates compute task additional fields by deployment', () => {
@@ -237,10 +252,7 @@ describe('SonarQube client helpers', () => {
       async (_operation: string, path: string, params?: Record<string, unknown>) => {
         requests.push({ path, params });
 
-        if (
-          path === '/ce/component' &&
-          params?.component === 'company_tracker-application'
-        ) {
+        if (path === '/ce/component' && params?.component === 'company_tracker-application') {
           throw new Error('The requested resource was not found.');
         }
 
@@ -249,6 +261,7 @@ describe('SonarQube client helpers', () => {
             branches: [
               {
                 name: 'main',
+                type: 'LONG',
                 isMain: true,
                 branchUuidV1: 'AZ-main-component'
               }
@@ -363,7 +376,7 @@ describe('SonarQube client helpers', () => {
     });
   });
 
-  it('requests deployment-specific project measure period fields', () => {
+  it('requests metric metadata for project measures across deployments', () => {
     expect(
       projectMeasuresParams(
         { deployment: 'server' },
@@ -378,7 +391,7 @@ describe('SonarQube client helpers', () => {
       metricKeys: ['ncloc', 'coverage'],
       branch: 'main',
       pullRequest: undefined,
-      additionalFields: 'period'
+      additionalFields: 'metrics'
     });
 
     expect(
@@ -394,7 +407,22 @@ describe('SonarQube client helpers', () => {
       metricKeys: ['ncloc'],
       branch: undefined,
       pullRequest: undefined,
-      additionalFields: 'periods'
+      additionalFields: 'metrics'
+    });
+
+    expect(
+      projectMeasuresParams(
+        { deployment: 'server' },
+        {
+          projectKey: 'app'
+        }
+      )
+    ).toEqual({
+      component: 'app',
+      metricKeys: undefined,
+      branch: undefined,
+      pullRequest: undefined,
+      additionalFields: 'metrics'
     });
   });
 
@@ -421,10 +449,12 @@ describe('SonarQube client helpers', () => {
         }
       )
     ).toEqual({
-      key: 'app:src/main.ts'
+      key: 'app:src/main.ts',
+      branch: undefined,
+      pullRequest: undefined
     });
 
-    expect(() =>
+    expect(
       sourceRawParams(
         { deployment: 'server' },
         {
@@ -432,7 +462,11 @@ describe('SonarQube client helpers', () => {
           branch: 'feature/example'
         }
       )
-    ).toThrow(/SonarQube Cloud/);
+    ).toEqual({
+      key: 'app:src/main.ts',
+      branch: 'feature/example',
+      pullRequest: undefined
+    });
 
     expect(
       sourceShowParams({
@@ -482,10 +516,12 @@ describe('SonarQube client helpers', () => {
         }
       )
     ).toEqual({
-      key: 'app:src/main.ts'
+      key: 'app:src/main.ts',
+      branch: undefined,
+      pullRequest: undefined
     });
 
-    expect(() =>
+    expect(
       duplicationShowParams(
         { deployment: 'server' },
         {
@@ -493,7 +529,11 @@ describe('SonarQube client helpers', () => {
           pullRequest: '42'
         }
       )
-    ).toThrow(/SonarQube Cloud/);
+    ).toEqual({
+      key: 'app:src/main.ts',
+      branch: undefined,
+      pullRequest: '42'
+    });
 
     expect(() =>
       duplicationShowParams(
@@ -551,26 +591,26 @@ describe('SonarQube client helpers', () => {
       projectKey: 'app'
     });
     expect(hotspotProjectSearchParams({ deployment: 'server' }, 'app')).toEqual({
-      project: 'app'
+      projectKey: 'app'
     });
     expect(
       serializeSonarParams(hotspotProjectSearchParams({ deployment: 'server' }, 'app'))
-    ).toBe('project=app');
+    ).toBe('projectKey=app');
   });
 
-  it('serializes deployment-specific project search parameters', () => {
+  it('serializes component search parameters for project discovery', () => {
     expect(
       serializeSonarParams(
         projectSearchParams(
           { deployment: 'cloud', organization: 'acme' },
           {
-            query: 'api',
+            query: ' api ',
             projectKeys: ['app'],
             qualifiers: ['APP']
           }
         )
       )
-    ).toBe('organization=acme&q=api&projects=app&p=1&ps=50');
+    ).toBe('organization=acme&q=api&p=1&ps=500');
 
     expect(
       serializeSonarParams(
@@ -586,7 +626,295 @@ describe('SonarQube client helpers', () => {
           }
         )
       )
-    ).toBe('q=api&projectKeys=app%2Clib&qualifiers=TRK%2CAPP&p=2&ps=25');
+    ).toBe('q=api&qualifiers=TRK%2CAPP&p=2&ps=25');
+    expect(serializeSonarParams(projectSearchParams({ deployment: 'server' }, {}))).toBe(
+      'qualifiers=TRK&p=1&ps=500'
+    );
+  });
+
+  it('uses the SonarQube Cloud project discovery endpoint for query search', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'cloud', organization: 'tractivecloud' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+
+        if (path !== '/components/search') {
+          throw new Error(`Unexpected request ${path}`);
+        }
+
+        return {
+          paging: {
+            pageIndex: 1,
+            pageSize: 50,
+            total: 1
+          },
+          components: [
+            {
+              key: 'tractivecloud_tracker-application',
+              name: 'Tracker Application'
+            }
+          ]
+        };
+      }
+    );
+
+    await expect(
+      client.searchProjects({
+        query: 'tracker',
+        pageSize: 50
+      })
+    ).resolves.toEqual({
+      items: [
+        {
+          key: 'tractivecloud_tracker-application',
+          name: 'Tracker Application'
+        }
+      ],
+      page: {
+        page: 1,
+        pageSize: 50,
+        total: 1,
+        hasNextPage: false
+      }
+    });
+    expect(requests).toEqual([
+      {
+        path: '/components/search',
+        params: {
+          organization: 'tractivecloud',
+          q: 'tracker',
+          p: 1,
+          ps: 50
+        }
+      }
+    ]);
+  });
+
+  it('uses the components search endpoint for SonarQube Server project discovery', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+
+        if (path !== '/components/search') {
+          throw new Error(`Unexpected request ${path}`);
+        }
+
+        return {
+          paging: {
+            pageIndex: 1,
+            pageSize: 500,
+            total: 1
+          },
+          components: [
+            {
+              key: 'app',
+              name: 'App',
+              qualifier: 'TRK'
+            }
+          ]
+        };
+      }
+    );
+
+    await expect(client.searchProjects({ query: 'app' })).resolves.toEqual({
+      items: [
+        {
+          key: 'app',
+          name: 'App',
+          qualifier: 'TRK'
+        }
+      ],
+      page: {
+        page: 1,
+        pageSize: 500,
+        total: 1,
+        hasNextPage: false
+      }
+    });
+    expect(requests).toEqual([
+      {
+        path: '/components/search',
+        params: {
+          organization: undefined,
+          q: 'app',
+          qualifiers: ['TRK'],
+          p: 1,
+          ps: 500
+        }
+      }
+    ]);
+  });
+
+  it('looks up exact project keys with components show and filters qualifiers', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+
+        if (path !== '/components/show') {
+          throw new Error(`Unexpected request ${path}`);
+        }
+
+        if (params?.component === 'app') {
+          return {
+            component: {
+              key: 'app',
+              name: 'App',
+              qualifier: 'TRK'
+            }
+          };
+        }
+
+        if (params?.component === 'view') {
+          return {
+            component: {
+              key: 'view',
+              name: 'View',
+              qualifier: 'VW'
+            }
+          };
+        }
+
+        throw new Error(`Unexpected component ${params?.component}`);
+      }
+    );
+
+    await expect(
+      client.searchProjects({
+        projectKeys: [' app ', 'view'],
+        qualifiers: ['TRK']
+      })
+    ).resolves.toEqual({
+      items: [
+        {
+          key: 'app',
+          name: 'App',
+          qualifier: 'TRK'
+        }
+      ],
+      page: {
+        page: 1,
+        pageSize: 1,
+        total: 1,
+        hasNextPage: false
+      }
+    });
+    expect(requests).toEqual([
+      {
+        path: '/components/show',
+        params: { component: 'app' }
+      },
+      {
+        path: '/components/show',
+        params: { component: 'view' }
+      }
+    ]);
+  });
+
+  it('merges exact project lookups with query search results by key', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+
+        if (path === '/components/search') {
+          return {
+            paging: {
+              pageIndex: 1,
+              pageSize: 500,
+              total: 2
+            },
+            components: [
+              {
+                key: 'app',
+                name: 'App from query',
+                qualifier: 'TRK'
+              },
+              {
+                key: 'lib',
+                name: 'Library',
+                qualifier: 'TRK'
+              }
+            ]
+          };
+        }
+
+        if (path === '/components/show' && params?.component === 'app') {
+          return {
+            component: {
+              key: 'app',
+              name: 'App exact',
+              qualifier: 'TRK'
+            }
+          };
+        }
+
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+
+    await expect(
+      client.searchProjects({
+        query: 'app',
+        projectKeys: ['app']
+      })
+    ).resolves.toEqual({
+      items: [
+        {
+          key: 'app',
+          name: 'App exact',
+          qualifier: 'TRK'
+        },
+        {
+          key: 'lib',
+          name: 'Library',
+          qualifier: 'TRK'
+        }
+      ],
+      page: {
+        page: 1,
+        pageSize: 500,
+        total: 2,
+        hasNextPage: false
+      }
+    });
+    expect(requests).toEqual([
+      {
+        path: '/components/search',
+        params: {
+          organization: undefined,
+          q: 'app',
+          qualifiers: ['TRK'],
+          p: 1,
+          ps: 500
+        }
+      },
+      {
+        path: '/components/show',
+        params: { component: 'app' }
+      }
+    ]);
   });
 
   it('serializes current issue search filters for SonarQube issues search', () => {
@@ -617,12 +945,365 @@ describe('SonarQube client helpers', () => {
             organization: 'ignored-input',
             projectKeys: ['app'],
             componentKeys: ['app:src/main.ts'],
+            files: ['app:src/extra.ts'],
             issueStatuses: ['OPEN'],
             pageSize: 10
           }
         )
       )
-    ).toBe('components=app%2Capp%3Asrc%2Fmain.ts&issueStatuses=OPEN&p=1&ps=10');
+    ).toBe(
+      'components=app%2Capp%3Asrc%2Fmain.ts%2Capp%3Asrc%2Fextra.ts&issueStatuses=OPEN&p=1&ps=10'
+    );
+
+    expect(
+      serializeSonarParams(
+        issueSearchParams(
+          { deployment: 'server' },
+          {
+            severities: ['HIGH', 'BLOCKER']
+          }
+        )
+      )
+    ).toBe('impactSeverities=HIGH%2CBLOCKER&p=1&ps=100');
+
+    expect(
+      serializeSonarParams(
+        issueSearchParams(
+          { deployment: 'server' },
+          {
+            severities: ['CRITICAL', 'MAJOR']
+          }
+        )
+      )
+    ).toBe('severities=CRITICAL%2CMAJOR&p=1&ps=100');
+
+    expect(() =>
+      issueSearchParams(
+        { deployment: 'server' },
+        {
+          severities: ['HIGH', 'MAJOR']
+        }
+      )
+    ).toThrow(/Do not mix/);
+
+    expect(() =>
+      issueSearchParams(
+        { deployment: 'server' },
+        {
+          branch: 'main',
+          pullRequest: '42'
+        }
+      )
+    ).toThrow(/either branch or pullRequest/);
+
+    expect(() =>
+      projectMeasuresParams(
+        { deployment: 'server' },
+        {
+          projectKey: 'app',
+          metricKeys: ['ncloc'],
+          branch: 'main',
+          pullRequest: '42'
+        }
+      )
+    ).toThrow(/either branch or pullRequest/);
+  });
+
+  it('serializes component tree measures parameters for duplicated file search', () => {
+    expect(
+      serializeSonarParams(
+        componentTreeMeasuresParams({
+          component: 'app',
+          branch: 'main',
+          metricKeys: ['duplicated_lines'],
+          qualifiers: ['FIL'],
+          strategy: 'all'
+        })
+      )
+    ).toBe(
+      'component=app&branch=main&metricKeys=duplicated_lines&qualifiers=FIL&strategy=all&p=1&ps=500'
+    );
+
+    expect(() =>
+      componentTreeMeasuresParams({
+        component: 'app',
+        branch: 'main',
+        pullRequest: '42',
+        metricKeys: ['duplicated_lines']
+      })
+    ).toThrow(/either branch or pullRequest/);
+  });
+
+  it('filters project branches to branch-parameter-compatible entries', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        expect(path).toBe('/project_branches/list');
+        expect(params).toEqual({ project: 'app' });
+        return {
+          branches: [
+            {
+              name: 'main',
+              type: 'LONG'
+            },
+            {
+              name: 'feature',
+              type: 'SHORT'
+            },
+            {
+              name: 'develop',
+              type: 'BRANCH'
+            }
+          ]
+        };
+      }
+    );
+
+    await expect(client.listProjectBranches('app')).resolves.toEqual({
+      items: [
+        {
+          name: 'main',
+          type: 'LONG'
+        },
+        {
+          name: 'develop',
+          type: 'BRANCH'
+        }
+      ],
+      page: undefined
+    });
+  });
+
+  it('sends documented hotspot search project, key, and leak-period parameters', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        return {
+          paging: {
+            pageIndex: 1,
+            pageSize: 10,
+            total: 0
+          },
+          hotspots: []
+        };
+      }
+    );
+
+    await expect(
+      client.searchHotspots({
+        projectKey: 'app',
+        branch: 'main',
+        hotspotKeys: ['hotspot-1', 'hotspot-2'],
+        sinceLeakPeriod: true,
+        pageSize: 10
+      })
+    ).resolves.toEqual({
+      items: [],
+      page: {
+        page: 1,
+        pageSize: 10,
+        total: 0,
+        hasNextPage: false
+      }
+    });
+    expect(requests).toEqual([
+      {
+        path: '/hotspots/search',
+        params: {
+          projectKey: 'app',
+          branch: 'main',
+          pullRequest: undefined,
+          hotspots: ['hotspot-1', 'hotspot-2'],
+          files: undefined,
+          status: undefined,
+          resolution: undefined,
+          sinceLeakPeriod: true,
+          onlyMine: undefined,
+          p: 1,
+          ps: 10
+        }
+      }
+    ]);
+  });
+
+  it('allows hotspot search by hotspot keys without a project key', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        return {
+          paging: {
+            pageIndex: 1,
+            pageSize: 100,
+            total: 1
+          },
+          hotspots: [{ key: 'hotspot-1' }]
+        };
+      }
+    );
+
+    await expect(
+      client.searchHotspots({
+        hotspotKeys: ['hotspot-1']
+      })
+    ).resolves.toMatchObject({
+      items: [{ key: 'hotspot-1' }],
+      page: {
+        page: 1,
+        pageSize: 100,
+        total: 1,
+        hasNextPage: false
+      }
+    });
+    expect(requests).toEqual([
+      {
+        path: '/hotspots/search',
+        params: {
+          projectKey: undefined,
+          branch: undefined,
+          pullRequest: undefined,
+          hotspots: ['hotspot-1'],
+          files: undefined,
+          status: undefined,
+          resolution: undefined,
+          sinceLeakPeriod: undefined,
+          onlyMine: undefined,
+          p: 1,
+          ps: 100
+        }
+      }
+    ]);
+
+    await expect(client.searchHotspots({})).rejects.toThrow(/projectKey/);
+  });
+
+  it('searches duplicated files with project measures and component tree metrics', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+
+        if (path === '/measures/component') {
+          return {
+            component: {
+              key: 'app',
+              measures: [
+                { metric: 'duplicated_lines', value: '30' },
+                { metric: 'duplicated_blocks', value: '2' },
+                { metric: 'duplicated_lines_density', value: '4.5' }
+              ]
+            }
+          };
+        }
+
+        if (path === '/measures/component_tree') {
+          return {
+            paging: {
+              pageIndex: 1,
+              pageSize: 10,
+              total: 2
+            },
+            components: [
+              {
+                key: 'app:src/duplicated.ts',
+                name: 'duplicated.ts',
+                path: 'src/duplicated.ts',
+                measures: [
+                  { metric: 'duplicated_lines', value: '3' },
+                  { metric: 'duplicated_blocks', value: '1' },
+                  { metric: 'duplicated_lines_density', value: '25.0' }
+                ]
+              },
+              {
+                key: 'app:src/clean.ts',
+                name: 'clean.ts',
+                path: 'src/clean.ts',
+                measures: [{ metric: 'duplicated_lines', value: '0' }]
+              }
+            ]
+          };
+        }
+
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+
+    await expect(
+      client.searchDuplicatedFiles({
+        projectKey: 'app',
+        branch: 'main',
+        pageIndex: 1,
+        pageSize: 10
+      })
+    ).resolves.toMatchObject({
+      items: [
+        {
+          key: 'app:src/duplicated.ts',
+          name: 'duplicated.ts',
+          path: 'src/duplicated.ts',
+          duplicatedLines: 3,
+          duplicatedBlocks: 1,
+          duplicatedLinesDensity: '25.0'
+        }
+      ],
+      page: {
+        page: 1,
+        pageSize: 10,
+        total: 2,
+        hasNextPage: false
+      },
+      summary: {
+        duplicatedLines: 30,
+        duplicatedBlocks: 2,
+        duplicatedLinesDensity: '4.5'
+      }
+    });
+    expect(requests).toEqual([
+      {
+        path: '/measures/component',
+        params: {
+          component: 'app',
+          metricKeys: ['duplicated_lines', 'duplicated_blocks', 'duplicated_lines_density'],
+          branch: 'main',
+          pullRequest: undefined,
+          additionalFields: 'metrics'
+        }
+      },
+      {
+        path: '/measures/component_tree',
+        params: {
+          component: 'app',
+          branch: 'main',
+          metricKeys: ['duplicated_lines', 'duplicated_blocks', 'duplicated_lines_density'],
+          pullRequest: undefined,
+          qualifiers: ['FIL'],
+          strategy: 'all',
+          p: 1,
+          ps: 10,
+          additionalFields: 'metrics'
+        }
+      }
+    ]);
   });
 
   it('serializes rule search params according to Cloud and Server API contracts', () => {
@@ -654,7 +1335,48 @@ describe('SonarQube client helpers', () => {
     ).toBe('f=name%2Crepo%2Clang%2ClangName%2Cseverity%2Cstatus%2Ctags%2CsysTags&p=1&ps=10');
   });
 
-  it('serializes rule show params with organization only when Cloud requires it', () => {
+  it('uses optional organization for quality gates and q-only language search', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'cloud' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        if (path === '/qualitygates/list') return { qualitygates: [] };
+        if (path === '/languages/list') return { languages: [] };
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+
+    await expect(client.listQualityGates()).resolves.toEqual({
+      items: [],
+      page: undefined
+    });
+    await expect(client.listLanguages({ query: 'java' })).resolves.toEqual({
+      items: [],
+      page: undefined
+    });
+
+    expect(requests).toEqual([
+      {
+        path: '/qualitygates/list',
+        params: {
+          organization: undefined
+        }
+      },
+      {
+        path: '/languages/list',
+        params: {
+          q: 'java'
+        }
+      }
+    ]);
+  });
+
+  it('serializes rule show params with organization only when configured', () => {
     expect(
       serializeSonarParams(
         ruleShowParams({ deployment: 'cloud', organization: 'acme' }, 'java:S1541', undefined)
@@ -671,8 +1393,8 @@ describe('SonarQube client helpers', () => {
       )
     ).toBe('key=java%3AS1541');
 
-    expect(() => ruleShowParams({ deployment: 'cloud' }, 'java:S1541', undefined)).toThrow(
-      /organization/
-    );
+    expect(
+      serializeSonarParams(ruleShowParams({ deployment: 'cloud' }, 'java:S1541', undefined))
+    ).toBe('key=java%3AS1541');
   });
 });
