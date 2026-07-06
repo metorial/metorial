@@ -2,13 +2,14 @@ import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
-import { jsonObjectSchema, mapRun } from './shared';
+import { jsonObjectSchema, mapRun, validateWaitForFinish } from './shared';
 
 export let getRun = SlateTool.create(spec, {
   name: 'Get Run',
   key: 'get_run',
   description: `Retrieve an Apify Actor run by ID, optionally including JSON dataset items or the run log as a Slate attachment.`,
   instructions: [
+    'Use waitForFinish to long-poll a known runId for up to 60 seconds instead of guessing from List Runs.',
     'Use includeDatasetItems for small JSON previews of the default dataset.',
     'Use includeLog to return the execution log as an attachment instead of inline text.'
   ],
@@ -20,6 +21,10 @@ export let getRun = SlateTool.create(spec, {
   .input(
     z.object({
       runId: z.string().describe('Actor run ID'),
+      waitForFinish: z
+        .number()
+        .optional()
+        .describe('Seconds Apify should wait for this run to finish before returning, 0-60'),
       includeDatasetItems: z
         .boolean()
         .optional()
@@ -61,8 +66,11 @@ export let getRun = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateWaitForFinish(ctx.input.waitForFinish);
     let client = new ApifyClient({ token: ctx.auth.token });
-    let run = await client.getRun(ctx.input.runId);
+    let run = await client.getRun(ctx.input.runId, {
+      waitForFinish: ctx.input.waitForFinish
+    });
     let output = mapRun(run);
 
     let datasetItems: Record<string, any>[] | undefined;

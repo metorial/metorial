@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
+import { apifyValidationError } from '../lib/errors';
 import { spec } from '../spec';
 import {
   ensureAtLeastOne,
@@ -9,7 +10,8 @@ import {
   paginationInput,
   pickDefined,
   requireString,
-  validateRunOptions
+  validateRunOptions,
+  validateWaitForFinish
 } from './shared';
 
 let taskOutput = (task: Record<string, any>) => ({
@@ -36,11 +38,17 @@ let taskOptions = (params: { timeout?: number; memory?: number; build?: string }
 export let manageTask = SlateTool.create(spec, {
   name: 'Manage Task',
   key: 'manage_task',
-  description: `Create, get, update, delete, list, or run Apify Actor Tasks. Tasks save reusable Actor input and run options.`,
+  description: `Create, get, update, delete, list, or run Apify Actor Tasks. Prefer asynchronous task runs to reliably receive a runId for polling.`,
   instructions: [
     'Use action=create with actorId and name to save a reusable task.',
-    'Use action=run with taskId to start a run from saved task settings.',
-    'Run options on action=run override saved task options for that run only.'
+    'Use action=run with taskId and synchronous=false to start a run from saved task settings and receive a runId.',
+    'For reliable follow-up, omit waitForFinish or set it to 0, then poll Get Run with the returned runId.',
+    'Use synchronous=true only for short task runs; it returns datasetItems without a runId and can lose run metadata if the client connection times out.',
+    'Do not recover a timed-out start by guessing from List Runs when concurrent requests may exist.'
+  ],
+  constraints: [
+    'synchronous applies only to action=run.',
+    'waitForFinish applies only to asynchronous action=run calls and must be between 0 and 60 seconds.'
   ],
   tags: {
     destructive: true,
@@ -57,10 +65,22 @@ export let manageTask = SlateTool.create(spec, {
       name: z.string().optional().describe('Task name; required for create'),
       title: z.string().optional().describe('Human-readable title'),
       input: z.any().optional().describe('Saved task input or per-run input override'),
+      synchronous: z
+        .boolean()
+        .optional()
+        .default(false)
+        .describe(
+          'For action=run, wait for completion and return JSON dataset items directly'
+        ),
       timeout: z.number().optional().describe('Run timeout in seconds'),
       memory: z.number().optional().describe('Run memory in MB; must be a power of 2'),
       build: z.string().optional().describe('Build tag or number'),
-      waitForFinish: z.number().optional().describe('Seconds to wait before returning run'),
+      waitForFinish: z
+        .number()
+        .optional()
+        .describe(
+          'Seconds to wait before returning the run object for asynchronous action=run, 0-60'
+        ),
       maxItems: z.number().optional().describe('Maximum dataset items for a run'),
       maxTotalChargeUsd: z.number().optional().describe('Maximum total charge in USD'),
       restartOnError: z.boolean().optional().describe('Whether Apify should restart on error'),
@@ -80,16 +100,28 @@ export let manageTask = SlateTool.create(spec, {
       modifiedAt: z.string().optional(),
       tasks: z.array(z.record(z.string(), z.any())).optional().describe('Task list'),
       total: z.number().optional().describe('Total tasks'),
-      runId: z.string().optional().describe('Run ID when action=run'),
-      runStatus: z.string().optional().describe('Run status when action=run'),
+      runId: z.string().optional().describe('Run ID when asynchronous action=run starts'),
+      runStatus: z
+        .string()
+        .optional()
+        .describe('Run status when asynchronous action=run starts'),
       defaultDatasetId: z.string().optional(),
       defaultKeyValueStoreId: z.string().optional(),
       defaultRequestQueueId: z.string().optional(),
+      datasetItems: z
+        .array(jsonObjectSchema)
+        .optional()
+        .describe('JSON dataset items returned only for synchronous action=run'),
+      itemCount: z.number().optional().describe('Number of synchronous dataset items'),
       deleted: z.boolean().optional().describe('Whether the task was deleted')
     })
   )
   .handleInvocation(async ctx => {
     let client = new ApifyClient({ token: ctx.auth.token });
+
+    if (ctx.input.action !== 'run' && ctx.input.synchronous) {
+      throw apifyValidationError('synchronous applies only to the run action.');
+    }
 
     if (ctx.input.action === 'list') {
       let result = await client.listTasks({
@@ -157,6 +189,28 @@ export let manageTask = SlateTool.create(spec, {
 
     let taskId = requireString(ctx.input.taskId, 'taskId', 'run');
     validateRunOptions(ctx.input);
+    if (ctx.input.synchronous) {
+      let datasetItems = await client.runTaskSync(taskId, {
+        input: ctx.input.input,
+        timeout: ctx.input.timeout,
+        memory: ctx.input.memory,
+        build: ctx.input.build,
+        maxItems: ctx.input.maxItems,
+        maxTotalChargeUsd: ctx.input.maxTotalChargeUsd,
+        webhooks: ctx.input.webhooks
+      });
+
+      return {
+        output: {
+          taskId,
+          datasetItems,
+          itemCount: datasetItems.length
+        },
+        message: `Task \`${taskId}\` ran synchronously and returned **${datasetItems.length}** item(s).`
+      };
+    }
+
+    validateWaitForFinish(ctx.input.waitForFinish);
     let run = await client.runTask(taskId, {
       input: ctx.input.input,
       timeout: ctx.input.timeout,

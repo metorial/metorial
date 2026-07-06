@@ -7,7 +7,11 @@ import { mapRun, paginationInput, requireString } from './shared';
 export let listRuns = SlateTool.create(spec, {
   name: 'List Runs',
   key: 'list_runs',
-  description: `List Apify Actor runs either account-wide or for a specific Actor. Use this to monitor recent runs and find run IDs for status, logs, datasets, or cleanup.`,
+  description: `List Apify Actor runs either account-wide or for a specific Actor. Use this for monitoring known run history, not to recover a missing runId from a timed-out start.`,
+  instructions: [
+    'When starting a run, prefer Run Actor or Manage Task asynchronous mode so the start response returns a runId.',
+    'Do not use list_runs to guess which run came from a timed-out start when concurrent requests may exist.'
+  ],
   tags: {
     destructive: false,
     readOnly: true

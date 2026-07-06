@@ -2,7 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ApifyClient } from '../lib/client';
 import { spec } from '../spec';
-import { jsonObjectSchema, mapRun, validateRunOptions } from './shared';
+import { jsonObjectSchema, mapRun, validateRunOptions, validateWaitForFinish } from './shared';
 
 let webhookSchema = z.object({
   eventTypes: z.array(z.string()).describe('Apify event types, such as ACTOR.RUN.SUCCEEDED'),
@@ -14,14 +14,17 @@ let webhookSchema = z.object({
 export let runActor = SlateTool.create(spec, {
   name: 'Run Actor',
   key: 'run_actor',
-  description: `Start an Apify Actor run. Use asynchronous mode for long-running crawls and synchronous mode only when you need the run's JSON dataset items immediately.`,
+  description: `Start an Apify Actor run. Prefer asynchronous mode to reliably receive a runId for polling; use synchronous mode only for short runs when you need JSON dataset items immediately.`,
   instructions: [
     'Use actorId with either an Actor ID or full Actor name, such as apify/web-scraper.',
-    'Use synchronous=true only for short runs; Apify synchronous dataset retrieval is capped by the API timeout.',
-    'Use webhooks for ad-hoc run callbacks and Get Run or Get Dataset Items for follow-up retrieval.'
+    'For reliable follow-up, leave synchronous=false and omit waitForFinish or set it to 0 so the tool returns a runId immediately.',
+    'Poll Get Run with the returned runId, then use Get Dataset Items with runId or defaultDatasetId to fetch results.',
+    'Use synchronous=true only for short runs; it returns datasetItems without a runId and can lose run metadata if the client connection times out.',
+    'Do not recover a timed-out start by guessing from List Runs when concurrent requests may exist.'
   ],
   constraints: [
     'memory must be a power of 2 and at least 128 MB.',
+    'waitForFinish applies only when synchronous=false and must be between 0 and 60 seconds.',
     'synchronous=true returns datasetItems only and does not expose a runId.'
   ],
   tags: {
@@ -44,7 +47,9 @@ export let runActor = SlateTool.create(spec, {
       waitForFinish: z
         .number()
         .optional()
-        .describe('Seconds Apify should wait before returning the run object'),
+        .describe(
+          'Seconds Apify should wait before returning the run object in asynchronous mode, 0-60'
+        ),
       maxItems: z.number().optional().describe('Maximum number of dataset items to produce'),
       maxTotalChargeUsd: z
         .number()
@@ -101,6 +106,7 @@ export let runActor = SlateTool.create(spec, {
       };
     }
 
+    validateWaitForFinish(ctx.input.waitForFinish);
     let run = await client.runActor(ctx.input.actorId, {
       input: ctx.input.input,
       timeout: ctx.input.timeout,

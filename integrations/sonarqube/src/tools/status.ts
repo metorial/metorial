@@ -135,6 +135,11 @@ export let getProjectAnalysisStatusTool = readOnlyTool({
       currentTask: rawRecordSchema.optional().describe('Current in-progress task.'),
       queue: z.array(rawRecordSchema).optional().describe('Pending tasks for the project.'),
       lastExecutedTask: rawRecordSchema.optional().describe('Most recent executed task.'),
+      statusUnavailable: rawRecordSchema
+        .optional()
+        .describe(
+          'Diagnostic returned when the project is readable but SonarQube does not expose Compute Engine component status for it.'
+        ),
       raw: rawRecordSchema
     })
   )
@@ -160,9 +165,16 @@ export let getProjectAnalysisStatusTool = readOnlyTool({
           typeof data.lastExecutedTask === 'object' && data.lastExecutedTask !== null
             ? (data.lastExecutedTask as Record<string, unknown>)
             : undefined,
+        statusUnavailable:
+          typeof data.statusUnavailable === 'object' && data.statusUnavailable !== null
+            ? (data.statusUnavailable as Record<string, unknown>)
+            : undefined,
         raw: data
       },
-      message: `Retrieved analysis task status for SonarQube project **${projectKey}**.`
+      message:
+        typeof data.statusUnavailable === 'object' && data.statusUnavailable !== null
+          ? `SonarQube project **${projectKey}** is readable, but Compute Engine component status was not available.`
+          : `Retrieved analysis task status for SonarQube project **${projectKey}**.`
     };
   })
   .build();

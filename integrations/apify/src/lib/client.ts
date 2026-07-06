@@ -270,8 +270,12 @@ export class ApifyClient {
     return Array.isArray(data) ? (data as ApifyRecord[]) : [];
   }
 
-  async getRun(runId: string): Promise<ApifyRecord> {
-    return this.wrapped('get actor run', () => this.http.get(`/actor-runs/${runId}`));
+  async getRun(runId: string, params?: { waitForFinish?: number }): Promise<ApifyRecord> {
+    return this.wrapped('get actor run', () =>
+      this.http.get(`/actor-runs/${pathId(runId)}`, {
+        params: compactParams({ waitForFinish: params?.waitForFinish })
+      })
+    );
   }
 
   async listRuns(params?: {
@@ -379,6 +383,33 @@ export class ApifyClient {
         params: runOptionsQuery(params)
       })
     );
+  }
+
+  async runTaskSync(
+    taskId: string,
+    params?: {
+      input?: unknown;
+      timeout?: number;
+      memory?: number;
+      build?: string;
+      maxItems?: number;
+      maxTotalChargeUsd?: number;
+      webhooks?: ApifyRecord[];
+    }
+  ): Promise<ApifyRecord[]> {
+    let data = await requestAxiosData<unknown>(
+      'run actor task synchronously',
+      () =>
+        this.http.post(
+          `/actor-tasks/${pathId(taskId)}/run-sync-get-dataset-items`,
+          params?.input ?? {},
+          {
+            params: runOptionsQuery(params)
+          }
+        ),
+      apifyApiError
+    );
+    return Array.isArray(data) ? (data as ApifyRecord[]) : [];
   }
 
   async listDatasets(params?: {

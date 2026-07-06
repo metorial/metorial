@@ -4,7 +4,11 @@ import {
   requestAxios,
   requestAxiosData
 } from 'slates';
-import { sonarqubeApiError, sonarqubeValidationError } from './errors';
+import {
+  hasProjectLookupFailureMessage,
+  sonarqubeApiError,
+  sonarqubeValidationError
+} from './errors';
 
 export type SonarDeployment = 'server' | 'cloud';
 export type SonarCloudRegion = 'eu' | 'us';
@@ -33,6 +37,12 @@ export type SonarListResult<T> = {
 };
 
 export type SonarComputeTaskAdditionalField = 'scannerContext' | 'warnings' | 'stacktrace';
+
+export type SonarProjectAnalysisStatusUnavailable = {
+  projectKey: string;
+  reason: 'ce_component_not_found';
+  message: string;
+};
 
 export type SonarIssueSearchParams = {
   organization?: string;
@@ -86,6 +96,18 @@ let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 let trimTrailingSlash = (value: string) => value.replace(/\/+$/, '');
+
+let errorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) return error.message;
+  if (isRecord(error)) {
+    let message = error.message;
+    if (typeof message === 'string') return message;
+  }
+  return '';
+};
+
+let isProjectLookupFailure = (error: unknown) =>
+  hasProjectLookupFailureMessage(errorMessage(error));
 
 export let normalizeServerBaseUrl = (serverBaseUrl: string | undefined) => {
   let trimmed = serverBaseUrl?.trim();
@@ -491,6 +513,38 @@ let normalizeArray = <T>(data: unknown, key: string): SonarListResult<T> => {
   };
 };
 
+let optionalRecordString = (record: Record<string, unknown>, key: string) =>
+  typeof record[key] === 'string' && record[key].length > 0 ? record[key] : undefined;
+
+export let projectAnalysisComponentIdFromBranches = (branches: Record<string, unknown>[]) => {
+  let branch =
+    branches.find(item => item.isMain === true) ??
+    branches.find(item => optionalRecordString(item, 'name') === 'main') ??
+    branches[0];
+
+  if (!branch) return undefined;
+
+  return (
+    optionalRecordString(branch, 'branchUuidV1') ??
+    optionalRecordString(branch, 'componentId') ??
+    optionalRecordString(branch, 'uuid') ??
+    optionalRecordString(branch, 'id') ??
+    optionalRecordString(branch, 'branchId')
+  );
+};
+
+export let projectAnalysisStatusUnavailable = (
+  projectKey: string
+): Record<string, unknown> => ({
+  queue: [],
+  statusUnavailable: {
+    projectKey,
+    reason: 'ce_component_not_found',
+    message:
+      'SonarQube confirmed the project is readable through project branches, but its Compute Engine component status resource was not found. This can happen when SonarQube Cloud does not expose CE component status for the project; retry later or use quality gate/project measures for the last completed analysis.'
+  }
+});
+
 let truthyParams = (params: Record<string, unknown>) => params;
 
 export class SonarQubeClient {
@@ -647,14 +701,50 @@ export class SonarQubeClient {
     });
   }
 
-  async getProjectAnalysisStatus(projectKey: string) {
+  private async getProjectAnalysisStatusBy(params: {
+    component?: string;
+    componentId?: string;
+  }) {
     return await this.get<Record<string, unknown>>(
       'get project analysis status',
       '/ce/component',
-      {
-        component: projectKey
-      }
+      params
     );
+  }
+
+  private async getProjectAnalysisStatusByBranchComponentId(projectKey: string) {
+    let branches = await this.listProjectBranches(projectKey);
+    let componentId = projectAnalysisComponentIdFromBranches(branches.items);
+    if (!componentId) return undefined;
+
+    try {
+      return await this.getProjectAnalysisStatusBy({ componentId });
+    } catch (error) {
+      if (isProjectLookupFailure(error)) return undefined;
+      throw error;
+    }
+  }
+
+  async getProjectAnalysisStatus(projectKey: string) {
+    try {
+      return await this.getProjectAnalysisStatusBy({ component: projectKey });
+    } catch (error) {
+      if ((this.config.deployment ?? 'server') !== 'cloud' || !isProjectLookupFailure(error)) {
+        throw error;
+      }
+
+      try {
+        return (
+          (await this.getProjectAnalysisStatusByBranchComponentId(projectKey)) ??
+          projectAnalysisStatusUnavailable(projectKey)
+        );
+      } catch (fallbackError) {
+        if (isProjectLookupFailure(fallbackError)) {
+          throw error;
+        }
+        throw fallbackError;
+      }
+    }
   }
 
   async listMetrics(params: { query?: string; page?: number; pageSize?: number }) {

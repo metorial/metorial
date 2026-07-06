@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   duplicationFilesFromShowResponse,
   sourceTextFromRawResponse,
@@ -17,6 +17,7 @@ import {
   optionalPageSizeIncludingAll,
   pageNumber,
   pageSize,
+  projectAnalysisComponentIdFromBranches,
   projectKeyFor,
   projectMeasuresParams,
   projectSearchParams,
@@ -25,6 +26,7 @@ import {
   requireServerDeployment,
   ruleSearchParams,
   ruleShowParams,
+  SonarQubeClient,
   serializeSonarParams,
   sourceRawParams,
   sourceScmParams,
@@ -204,6 +206,137 @@ describe('SonarQube client helpers', () => {
     expect(() =>
       validateComputeTaskAdditionalFields({ deployment: 'server' }, ['unsupported'])
     ).toThrow(/Unsupported/);
+  });
+
+  it('selects the legacy main-branch component id for Cloud CE status fallback', () => {
+    expect(
+      projectAnalysisComponentIdFromBranches([
+        {
+          name: 'feature',
+          isMain: false,
+          branchUuidV1: 'AZ-feature'
+        },
+        {
+          name: 'main',
+          isMain: true,
+          branchUuidV1: 'AZ-main',
+          branchId: 'modern-main-id'
+        }
+      ])
+    ).toBe('AZ-main');
+  });
+
+  it('retries Cloud analysis status with the readable main branch component id', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'cloud', organization: 'acme' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+
+        if (
+          path === '/ce/component' &&
+          params?.component === 'company_tracker-application'
+        ) {
+          throw new Error('The requested resource was not found.');
+        }
+
+        if (path === '/project_branches/list') {
+          return {
+            branches: [
+              {
+                name: 'main',
+                isMain: true,
+                branchUuidV1: 'AZ-main-component'
+              }
+            ]
+          };
+        }
+
+        if (path === '/ce/component' && params?.componentId === 'AZ-main-component') {
+          return {
+            queue: [],
+            current: {
+              componentId: 'AZ-main-component',
+              componentKey: 'company_tracker-application',
+              status: 'SUCCESS'
+            }
+          };
+        }
+
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+
+    await expect(
+      client.getProjectAnalysisStatus('company_tracker-application')
+    ).resolves.toMatchObject({
+      current: {
+        componentId: 'AZ-main-component',
+        componentKey: 'company_tracker-application',
+        status: 'SUCCESS'
+      }
+    });
+    expect(requests).toEqual([
+      {
+        path: '/ce/component',
+        params: { component: 'company_tracker-application' }
+      },
+      {
+        path: '/project_branches/list',
+        params: { project: 'company_tracker-application' }
+      },
+      {
+        path: '/ce/component',
+        params: { componentId: 'AZ-main-component' }
+      }
+    ]);
+  });
+
+  it('returns a structured unavailable status when Cloud CE component status is hidden', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'cloud', organization: 'acme' }
+    });
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        if (path === '/project_branches/list') {
+          return {
+            branches: [
+              {
+                name: 'main',
+                isMain: true,
+                branchUuidV1: 'AZ-main-component'
+              }
+            ]
+          };
+        }
+
+        if (
+          path === '/ce/component' &&
+          (params?.component === 'company_tracker-application' ||
+            params?.componentId === 'AZ-main-component')
+        ) {
+          throw new Error('The requested resource was not found.');
+        }
+
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+
+    await expect(
+      client.getProjectAnalysisStatus('company_tracker-application')
+    ).resolves.toMatchObject({
+      queue: [],
+      statusUnavailable: {
+        projectKey: 'company_tracker-application',
+        reason: 'ce_component_not_found'
+      }
+    });
   });
 
   it('rejects Server-only operations for SonarQube Cloud configs', () => {

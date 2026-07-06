@@ -67,22 +67,37 @@ export let validateRunOptions = (params: { timeout?: number; memory?: number }) 
   }
 };
 
+export let validateWaitForFinish = (waitForFinish: number | undefined) => {
+  if (
+    waitForFinish !== undefined &&
+    (!Number.isFinite(waitForFinish) || waitForFinish < 0 || waitForFinish > 60)
+  ) {
+    throw apifyValidationError('waitForFinish must be between 0 and 60 seconds.');
+  }
+};
+
 export let pickDefined = (fields: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));
 
-export let mapRun = (run: Record<string, any>) => ({
-  runId: run.id,
-  actorId: run.actId,
-  actorTaskId: run.actorTaskId,
-  status: run.status,
-  startedAt: run.startedAt,
-  finishedAt: run.finishedAt,
-  buildId: run.buildId,
-  defaultDatasetId: run.defaultDatasetId,
-  defaultKeyValueStoreId: run.defaultKeyValueStoreId,
-  defaultRequestQueueId: run.defaultRequestQueueId,
-  usage: run.usage
-});
+let pickRunOutput = <T extends Record<string, unknown>>(fields: T): T =>
+  Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined && value !== null)
+  ) as T;
+
+export let mapRun = (run: Record<string, any>) =>
+  pickRunOutput({
+    runId: run.id,
+    actorId: run.actId,
+    actorTaskId: run.actorTaskId,
+    status: run.status,
+    startedAt: run.startedAt,
+    finishedAt: run.finishedAt,
+    buildId: run.buildId,
+    defaultDatasetId: run.defaultDatasetId,
+    defaultKeyValueStoreId: run.defaultKeyValueStoreId,
+    defaultRequestQueueId: run.defaultRequestQueueId,
+    usage: run.usage
+  });
 
 export let mapActor = (actor: Record<string, any>) => ({
   actorId: actor.id,

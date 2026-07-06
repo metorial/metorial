@@ -70,12 +70,12 @@ describe('SonarQube API error normalization', () => {
 
   it('adds project lookup diagnostics to missing component-key responses', () => {
     let error = sonarqubeApiError(
-      upstreamError("Component key 'tractivecloud_tracker-application' not found"),
+      upstreamError("Component key 'company_tracker-application' not found"),
       'get project analysis status'
     );
 
     expect(error.data.message).toContain(
-      "Component key 'tractivecloud_tracker-application' not found"
+      "Component key 'company_tracker-application' not found"
     );
     expect(error.data.message).toContain('get_component');
     expect(error.data.message).toContain('branch or pullRequest');
