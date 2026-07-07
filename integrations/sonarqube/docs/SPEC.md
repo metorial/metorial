@@ -25,7 +25,7 @@ Config is one top-level object:
 - `deployment`: `server` or `cloud`; defaults to `server`.
 - `serverBaseUrl`: required for Server. The client normalizes it to `<serverBaseUrl>/api` and avoids duplicating `/api`.
 - `cloudRegion`: `eu` or `us`; defaults to `eu`.
-- `organization`: default SonarQube Cloud organization key for organization-scoped tools.
+- `organization`: SonarQube Cloud organization key, injected automatically into organization-scoped calls. Required when deployment is cloud; not used for Server.
 - `defaultProjectKey`: default project key for project-scoped tools.
 
 Runtime validation throws `ServiceError` through `createApiServiceError` when required combinations are missing, such as Cloud project search without an organization or project-scoped calls without `projectKey` or `defaultProjectKey`.

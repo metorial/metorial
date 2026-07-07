@@ -22,7 +22,9 @@ export let config = SlateConfig.create(
     organization: z
       .string()
       .optional()
-      .describe('Default SonarQube Cloud organization key for organization-scoped tools.'),
+      .describe(
+        'SonarQube Cloud organization key, applied automatically to organization-scoped tools. Required when deployment is cloud; not used for SonarQube Server.'
+      ),
     defaultProjectKey: z
       .string()
       .optional()

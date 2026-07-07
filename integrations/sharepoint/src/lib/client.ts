@@ -29,11 +29,62 @@ type SharePointRestResponse = RawSharePointSiteUser & {
   };
 };
 
+type RawSharePointRestField = {
+  Id?: unknown;
+  InternalName?: unknown;
+  StaticName?: unknown;
+  Title?: unknown;
+  Description?: unknown;
+  TypeAsString?: unknown;
+  FieldTypeKind?: unknown;
+  Required?: unknown;
+  ReadOnlyField?: unknown;
+  Hidden?: unknown;
+  DisplayFormat?: unknown;
+};
+
+type SharePointRestCollectionResponse<T> = {
+  value?: T[];
+  d?: {
+    results?: T[];
+  };
+};
+
+type SharePointRestFieldResponse = RawSharePointRestField & {
+  d?: RawSharePointRestField;
+};
+
+type SharePointRestListResponse = {
+  ListItemEntityTypeFullName?: unknown;
+  d?: {
+    ListItemEntityTypeFullName?: unknown;
+  };
+};
+
 export type SharePointSiteUser = {
   id: number;
   loginName: string;
   email: string;
   displayName: string;
+};
+
+export type SharePointRestField = {
+  id?: string;
+  internalName: string;
+  staticName?: string;
+  title: string;
+  description?: string;
+  typeAsString: string;
+  fieldTypeKind?: number;
+  required?: boolean;
+  readOnly: boolean;
+  hidden: boolean;
+  displayFormat?: number;
+};
+
+export type SharePointRestUrlFieldValue = {
+  Url: string;
+  Description: string;
 };
 
 let trimSlashes = (value: string) => value.replace(/^\/+|\/+$/g, '');
@@ -113,6 +164,60 @@ let mapSharePointSiteUser = (data: SharePointRestResponse): SharePointSiteUser =
     displayName: optionalString(user.Title ?? user.title)
   };
 };
+
+let unwrapSharePointRestCollection = <T>(data: SharePointRestCollectionResponse<T>): T[] =>
+  data.value ?? data.d?.results ?? [];
+
+let unwrapSharePointRestList = (data: SharePointRestListResponse) => data.d ?? data;
+
+let unwrapSharePointRestField = (data: SharePointRestFieldResponse) => data.d ?? data;
+
+let optionalBoolean = (value: unknown) => (typeof value === 'boolean' ? value : false);
+
+let optionalNumber = (value: unknown) =>
+  typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number.parseInt(value, 10)
+      : undefined;
+
+let normalizeSharePointRestGuid = (value: string, field: string) => {
+  let guid = value.trim().replace(/^\{|\}$/g, '');
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(guid)) {
+    return guid;
+  }
+
+  throw createApiServiceError(`${field} must be a SharePoint list GUID for REST operations.`, {
+    reason: 'sharepoint_rest_list_guid_invalid'
+  });
+};
+
+let normalizeSharePointRestItemId = (value: string) => {
+  let itemId = value.trim();
+  if (/^\d+$/.test(itemId)) return itemId;
+
+  throw createApiServiceError(
+    'itemId must be a numeric SharePoint list item ID for SharePoint REST update operations.',
+    { reason: 'sharepoint_rest_item_id_invalid' }
+  );
+};
+
+let sharePointRestListPath = (listId: string) =>
+  `/_api/web/lists(guid'${normalizeSharePointRestGuid(listId, 'listId')}')`;
+
+let mapSharePointRestField = (field: RawSharePointRestField): SharePointRestField => ({
+  id: optionalString(field.Id) || undefined,
+  internalName: requiredString(field.InternalName, 'field InternalName'),
+  staticName: optionalString(field.StaticName),
+  title: optionalString(field.Title),
+  description: optionalString(field.Description) || undefined,
+  typeAsString: optionalString(field.TypeAsString),
+  fieldTypeKind: optionalNumber(field.FieldTypeKind),
+  required: typeof field.Required === 'boolean' ? field.Required : undefined,
+  readOnly: optionalBoolean(field.ReadOnlyField),
+  hidden: optionalBoolean(field.Hidden),
+  displayFormat: optionalNumber(field.DisplayFormat)
+});
 
 let buildRootUploadPath = (driveId: string, parentPath: string, fileName: string) => {
   let normalizedParentPath = trimSlashes(parentPath);
@@ -501,6 +606,110 @@ export class SharePointClient {
     await this.http.delete(`/sites/${siteId}/lists/${listId}/items/${itemId}`);
   }
 
+  async getSharePointRestListItemEntityType(siteWebUrl: string, listId: string) {
+    let data = await requestAxiosData<SharePointRestListResponse>(
+      'get SharePoint list REST metadata',
+      () =>
+        this.sharepointHttp(siteWebUrl).get(
+          `${sharePointRestListPath(listId)}?$select=ListItemEntityTypeFullName`
+        ),
+      error => sharePointRestApiError(error, 'get SharePoint list REST metadata')
+    );
+    let list = unwrapSharePointRestList(data);
+
+    return requiredString(list.ListItemEntityTypeFullName, 'ListItemEntityTypeFullName');
+  }
+
+  async listSharePointRestFields(siteWebUrl: string, listId: string) {
+    let data = await requestAxiosData<
+      SharePointRestCollectionResponse<RawSharePointRestField>
+    >(
+      'list SharePoint REST fields',
+      () =>
+        this.sharepointHttp(siteWebUrl).get(
+          `${sharePointRestListPath(listId)}/fields?$select=Id,InternalName,StaticName,Title,Description,TypeAsString,FieldTypeKind,Required,ReadOnlyField,Hidden,DisplayFormat`
+        ),
+      error => sharePointRestApiError(error, 'list SharePoint REST fields')
+    );
+
+    return unwrapSharePointRestCollection(data).map(mapSharePointRestField);
+  }
+
+  async createSharePointRestUrlField(
+    siteWebUrl: string,
+    listId: string,
+    column: {
+      name: string;
+      description?: string;
+      required?: boolean;
+      isPicture?: boolean;
+    }
+  ) {
+    let body: Record<string, unknown> = {
+      __metadata: { type: 'SP.FieldUrl' },
+      Title: column.name,
+      FieldTypeKind: 11,
+      Required: column.required ?? false,
+      DisplayFormat: column.isPicture ? 1 : 0
+    };
+    if (column.description !== undefined) body.Description = column.description;
+
+    let data = await requestAxiosData<SharePointRestFieldResponse>(
+      'create SharePoint URL field',
+      () =>
+        this.sharepointHttp(siteWebUrl).post(
+          `${sharePointRestListPath(listId)}/fields`,
+          body,
+          {
+            headers: {
+              Accept: 'application/json;odata=verbose',
+              'Content-Type': 'application/json;odata=verbose'
+            }
+          }
+        ),
+      error => sharePointRestApiError(error, 'create SharePoint URL field')
+    );
+
+    return mapSharePointRestField(unwrapSharePointRestField(data));
+  }
+
+  async updateSharePointRestListItemUrlFields(
+    siteWebUrl: string,
+    listId: string,
+    itemId: string,
+    fields: Record<string, SharePointRestUrlFieldValue>
+  ) {
+    let entityType = await this.getSharePointRestListItemEntityType(siteWebUrl, listId);
+    let body: Record<string, unknown> = {
+      __metadata: { type: entityType }
+    };
+
+    for (let [fieldName, fieldValue] of Object.entries(fields)) {
+      body[fieldName] = {
+        __metadata: { type: 'SP.FieldUrlValue' },
+        ...fieldValue
+      };
+    }
+
+    await requestAxiosData(
+      'update SharePoint list item URL fields',
+      () =>
+        this.sharepointHttp(siteWebUrl).post(
+          `${sharePointRestListPath(listId)}/items(${normalizeSharePointRestItemId(itemId)})`,
+          body,
+          {
+            headers: {
+              Accept: 'application/json;odata=verbose',
+              'Content-Type': 'application/json;odata=verbose',
+              'If-Match': '*',
+              'X-HTTP-Method': 'MERGE'
+            }
+          }
+        ),
+      error => sharePointRestApiError(error, 'update SharePoint list item URL fields')
+    );
+  }
+
   // ─── List Columns ───────────────────────────────────────────────
 
   async listColumns(siteId: string, listId: string) {
@@ -517,6 +726,7 @@ export class SharePointClient {
       type: string;
       required?: boolean;
       choices?: string[];
+      isPicture?: boolean;
     }
   ) {
     let body: any = {
@@ -546,6 +756,9 @@ export class SharePointClient {
         break;
       case 'personOrGroup':
         body.personOrGroup = {};
+        break;
+      case 'hyperlinkOrPicture':
+        body.hyperlinkOrPicture = { isPicture: column.isPicture ?? false };
         break;
       default:
         body.text = {};

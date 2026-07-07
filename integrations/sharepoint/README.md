@@ -36,7 +36,7 @@ Search for SharePoint sites by keyword, or list subsites of a given site. Return
 
 ### Manage Columns
 
-List, create, update, or delete columns (fields) on a SharePoint list. Columns define the schema and metadata structure of a list. Supports various column types including text, number, boolean, dateTime, choice, currency, and personOrGroup.
+List, create, update, or delete columns (fields) on a SharePoint list. Columns define the schema and metadata structure of a list. Supports various column types including text, number, boolean, dateTime, choice, currency, personOrGroup, and hyperlinkOrPicture.
 
 ### Manage File
 
@@ -44,7 +44,7 @@ Upload, download, move, copy, rename, or delete files and folders in a SharePoin
 
 ### Manage List Items
 
-Full CRUD operations on SharePoint list items. Create, read, update, delete, or list items in a SharePoint list. Supports OData filtering and ordering when listing items. Field values match the list's column schema.
+Full CRUD operations on SharePoint list items. Create, read, update, delete, or list items in a SharePoint list. Supports OData filtering and ordering when listing items. Field values match the list's column schema, including Hyperlink updates with URL and description values.
 
 ### Manage List
 

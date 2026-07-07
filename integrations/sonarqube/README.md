@@ -16,7 +16,7 @@ For SonarQube Cloud, configure:
 
 - `deployment`: `cloud`
 - `cloudRegion`: `eu` for `sonarcloud.io` or `us` for `sonarqube.us`
-- `organization`: default organization key for organization-scoped tools
+- `organization`: your SonarQube Cloud organization key, applied automatically to organization-scoped tools
 - `defaultProjectKey`: optional default project key for project-scoped tools
 
 Credential validation calls `/api/authentication/validate`. Server profiles also read `/api/server/version`. When SonarQube returns `SonarQube-Authentication-Token-Expiration`, the auth profile includes the token expiration timestamp.

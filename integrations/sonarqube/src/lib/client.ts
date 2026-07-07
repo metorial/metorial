@@ -221,7 +221,7 @@ export let requireCloudOrganization = (
   let value = organization?.trim() || config.organization?.trim();
   if (!value) {
     throw sonarqubeValidationError(
-      'organization is required for this SonarQube Cloud operation. Provide organization input or config.'
+      'organization is required for this SonarQube Cloud operation. Set the organization key in the integration config.'
     );
   }
   return value || undefined;

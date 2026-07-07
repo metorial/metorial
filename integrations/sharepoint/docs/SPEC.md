@@ -57,6 +57,8 @@ The SharePoint API in Microsoft Graph supports access to SharePoint sites, lists
 
 Lists are the foundation for data storage in SharePoint. You can create lists to store a variety of business data, from a simple customer contact list to a custom business application. When you use columns to define your schema, SharePoint can protect the integrity of your data as well as enable rich indexing, querying, and search capabilities. The API supports full CRUD operations on lists and list items, including defining custom columns.
 
+SharePoint URL/Hyperlink columns use the SharePoint `URL` field type with `Url` and `Description` values. Microsoft Graph list column metadata can omit the `hyperlinkOrPicture` facet for list columns, so list item updates for Hyperlink object values use SharePoint REST field metadata and `SP.FieldUrlValue` while ordinary scalar field updates continue to use Microsoft Graph.
+
 ### Site Users and Person Fields
 
 SharePoint Person/Group list columns store the numeric site-scoped user ID, not the user's Microsoft Entra object ID. The SharePoint REST API exposes site users through `/_api/web/siteusers`, including `GetByEmail(email)`, which returns the numeric `Id`, `LoginName`, `Email`, and `Title` values needed to update Person/Group fields through Graph list item field payloads such as `{fieldName}LookupId`.
