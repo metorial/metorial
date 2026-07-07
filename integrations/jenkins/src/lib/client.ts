@@ -418,6 +418,32 @@ let splitLogLines = (text: string) => {
   return lines;
 };
 
+let truncateLogTextToMaxLines = (text: string, maxLines: number) => {
+  let lineCount = 0;
+  let newlinePattern = /\r\n|\n|\r/g;
+
+  for (let match of text.matchAll(newlinePattern)) {
+    lineCount += 1;
+    if (lineCount >= maxLines) {
+      let end = (match.index ?? 0) + (match[0]?.length ?? 0);
+      if (end < text.length) {
+        let truncatedText = text.slice(0, end);
+        return {
+          text: truncatedText,
+          truncated: true,
+          byteLength: Buffer.byteLength(truncatedText, 'utf8')
+        };
+      }
+    }
+  }
+
+  return {
+    text,
+    truncated: false,
+    byteLength: Buffer.byteLength(text, 'utf8')
+  };
+};
+
 let appendBuildParameter = (params: URLSearchParams, key: string, value: unknown) => {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     params.append(key, String(value));
@@ -493,17 +519,28 @@ export let parseBuildSelectorPath = (
   buildSelector: JenkinsBuildSelector | undefined,
   buildNumber: number | undefined
 ) => {
+  if (buildNumber !== undefined && (!Number.isFinite(buildNumber) || buildNumber < 1)) {
+    throw jenkinsValidationError('buildNumber must be a positive number.');
+  }
+
   if (buildSelector === undefined) {
-    return buildNumber ? String(Math.floor(buildNumber)) : 'lastBuild';
+    return buildNumber !== undefined ? String(Math.floor(buildNumber)) : 'lastBuild';
   }
 
   let selector = buildSelector;
   if (selector === 'number') {
-    if (!buildNumber || buildNumber < 1) {
+    if (buildNumber === undefined) {
       throw jenkinsValidationError('buildNumber is required when buildSelector is number.');
     }
     return String(Math.floor(buildNumber));
   }
+
+  if (buildNumber !== undefined) {
+    throw jenkinsValidationError(
+      'buildNumber can only be used when buildSelector is number or omitted.'
+    );
+  }
+
   return selector;
 };
 
@@ -1702,7 +1739,15 @@ export class JenkinsClient {
       nextStart = chunk.nextStart;
       chunks += 1;
 
-      let lines = text.split(/\r?\n/);
+      let boundedText = truncateLogTextToMaxLines(text, params.maxLines);
+      if (boundedText.truncated) {
+        text = boundedText.text;
+        nextStart = (params.start ?? 0) + boundedText.byteLength;
+        moreData = true;
+        break;
+      }
+
+      let lines = splitLogLines(text);
       if (
         !moreData ||
         !chunk.nextStart ||
@@ -1862,11 +1907,9 @@ export class JenkinsClient {
     }
 
     if (hasReplayRebuildForm(html)) {
-      return {
-        buildNumber: resolvedBuildNumber,
-        mainScript: '',
-        loadedScripts: {}
-      };
+      throw jenkinsValidationError(
+        'Pipeline Replay rebuild is available for this build, but Jenkins did not expose editable replay scripts in the response.'
+      );
     }
 
     throw jenkinsValidationError(

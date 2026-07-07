@@ -8,6 +8,7 @@ import {
   gitScmUrlsLooselyMatch,
   JenkinsClient,
   normalizeJenkinsAuth,
+  parseBuildSelectorPath,
   summarizeBuildChangesets
 } from './client';
 
@@ -67,6 +68,19 @@ describe('JenkinsClient authentication', () => {
     expect(axios.defaults.headers.Authorization).toBe(
       `Basic ${Buffer.from('user:token', 'utf8').toString('base64')}`
     );
+  });
+});
+
+describe('parseBuildSelectorPath', () => {
+  it('rejects buildNumber with named last-build selectors', () => {
+    expect(() => parseBuildSelectorPath('lastSuccessfulBuild', 42)).toThrow(
+      'buildNumber can only be used when buildSelector is number or omitted.'
+    );
+  });
+
+  it('uses buildNumber when selector is omitted or explicit number', () => {
+    expect(parseBuildSelectorPath(undefined, 42)).toBe('42');
+    expect(parseBuildSelectorPath('number', 42)).toBe('42');
   });
 });
 
@@ -142,6 +156,76 @@ describe('JenkinsClient replay status handling', () => {
     await expect(client.getReplayScripts('folder/job', 7)).rejects.toThrow(
       'Pipeline Replay is not available for this build'
     );
+  });
+
+  it('rejects rebuild-only Replay pages that do not expose editable scripts', async () => {
+    let client = new JenkinsClient({
+      auth: {
+        baseUrl: 'http://jenkins.example',
+        username: 'user',
+        apiToken: 'token'
+      }
+    });
+    let getCalls = 0;
+    (
+      client as unknown as {
+        axios: {
+          get: (path: string) => Promise<{ data: unknown }>;
+        };
+      }
+    ).axios = {
+      get: async () => {
+        getCalls += 1;
+        if (getCalls === 1) {
+          return { data: { number: 7 } };
+        }
+
+        return {
+          data: `
+            <form action="rebuild" method="POST" name="rebuild">
+              <button type="submit">Run</button>
+            </form>
+          `
+        };
+      }
+    };
+
+    await expect(client.getReplayScripts('folder/job', 7)).rejects.toThrow(
+      'Pipeline Replay rebuild is available for this build, but Jenkins did not expose editable replay scripts in the response.'
+    );
+  });
+});
+
+describe('JenkinsClient log reads', () => {
+  it('caps readLogUntil text to maxLines even when Jenkins returns a larger chunk', async () => {
+    let client = new JenkinsClient({
+      auth: {
+        baseUrl: 'http://jenkins.example',
+        username: 'user',
+        apiToken: 'token'
+      }
+    });
+    (
+      client as unknown as {
+        getProgressiveLog: JenkinsClient['getProgressiveLog'];
+      }
+    ).getProgressiveLog = async () => ({
+      text: 'first\nsecond\nthird\n',
+      start: 0,
+      nextStart: Buffer.byteLength('first\nsecond\nthird\n', 'utf8'),
+      moreData: false,
+      progressive: true
+    });
+
+    let log = await client.readLogUntil({
+      jobFullName: 'folder/job',
+      buildNumber: 7,
+      maxLines: 2
+    });
+
+    expect(log.text).toBe('first\nsecond\n');
+    expect(log.moreData).toBe(true);
+    expect(log.nextStart).toBe(Buffer.byteLength('first\nsecond\n', 'utf8'));
   });
 });
 
