@@ -4,20 +4,19 @@
 
 This package implements a core code-quality and triage SonarQube Web API surface for SonarQube Server and SonarQube Cloud:
 
-- Project discovery through `api/components/search`, plus exact project-key lookup through `api/components/show`
-- Component lookup and tree browsing through `api/components`
+- Project discovery through `api/components/search`
 - Branch and pull request analysis discovery through `api/project_branches` and `api/project_pull_requests`
-- Metric discovery and measure reads through `api/metrics` and `api/measures`
+- Metric discovery and current measure reads through `api/metrics` and `api/measures`
 - Quality gate status through `api/qualitygates/project_status`
-- Issue search, lookup, changelog reads, and guarded workflow updates through `api/issues`
-- Security hotspot search, lookup, and guarded review updates through `api/hotspots`
-- Rule discovery and details through `api/rules`
+- Issue search and status changes through `api/issues`
+- Security hotspot search, detail reads, and review status changes through `api/hotspots`
+- Rule details through `api/rules`
 - Source, SCM, and duplication context through `api/sources`, `api/measures/component_tree`, and `api/duplications`
+- Coverage discovery through `api/measures/component_tree` (files by coverage) and `api/sources/lines` (line-by-line coverage details)
 - Quality gate and language discovery through `api/qualitygates/list` and `api/languages/list`
 - SonarQube Server system status through `api/system/status`
-- Compute Engine task/status reads through `api/ce`
 
-Project lifecycle management, token/user/group administration, webhooks, branch deletion, and quality gate administration remain out of scope. Issue and security-hotspot workflow mutations are in scope only through explicit `confirmWrite` tool inputs.
+Project lifecycle management, token/user/group administration, webhooks, branch deletion, quality gate administration, Compute Engine task/status reads, measure history, broad component browsing, issue changelog reads, and rule search remain out of scope.
 
 ## Configuration
 
@@ -46,20 +45,20 @@ Base URLs:
 - Server v1: normalized `<serverBaseUrl>/api`
 - Cloud v1 EU: `https://sonarcloud.io/api`
 - Cloud v1 US: `https://sonarqube.us/api`
-- Cloud v2 helpers are present but unused by public tools until a specific v2 migration is implemented.
+- Cloud v2 helpers are used by `run_advanced_code_analysis` and `search_dependency_risks`. Server dependency-risk calls use `/api/v2/sca/issues-releases`.
 
-Arrays are serialized as comma-separated query parameters, matching Sonar Web API v1 conventions. Page sizes are capped to documented endpoint limits. Branch and pull request filters are mutually exclusive across branch-aware tools; `branch` is a long-lived SonarQube branch name and `pullRequest` is a SonarQube pull request key/id.
+Arrays are serialized as comma-separated query parameters, matching Sonar Web API conventions. Page sizes are capped to documented endpoint limits. Branch and pull request filters are mutually exclusive across branch-aware tools; `branch` is a long-lived SonarQube branch name and `pullRequest` is a SonarQube pull request key/id.
 
 ## Tool Contracts
 
-All tool input schemas are top-level `z.object` schemas to remain MCP/OpenAI tool bridge compatible. Conditional requirements are described in field descriptions and enforced at runtime with `ServiceError`. `search_projects.query` performs partial project-name or exact project-key search through components search, while `projectKeys` performs exact component lookups. `list_project_branches` returns long-lived branch entries suitable for the `branch` parameter, while pull request analyses stay in `list_project_pull_requests`. `search_issues.types` is restricted to supported SonarQube issue types, while current issue status and software-quality filtering use `issueStatuses`, `impactSoftwareQualities`, and `impactSeverities`. For `search_issues.severities`, current Sonar severities map to `impactSeverities`; legacy `CRITICAL`, `MAJOR`, and `MINOR` values map to API `severities`.
+All tool input schemas are top-level `z.object` schemas to remain MCP/OpenAI tool bridge compatible. Conditional requirements are described in field descriptions and enforced at runtime with `ServiceError`. `search_my_sonarqube_projects.q` performs project-name or project-key search through components search. `list_branches` returns long-lived branch entries suitable for the `branch` parameter, while pull request analyses stay in `list_pull_requests`. `search_sonar_issues_in_projects` uses the official current issue fields: `projects`, `files`, `issueKey`, `severities`, `issueStatuses`, and `impactSoftwareQualities`. `run_advanced_code_analysis` mirrors the official tool input fields (`projectKey`, `branchName`, `filePath`, `fileScope`), reads `filePath` from the current local workspace, sends file content to the A3S API, and returns `issues`, `patchResult`, and `analysisErrors`. `search_dependency_risks` mirrors the official SCA response with `issuesReleases` and `paging`. `search_files_by_coverage` mirrors the official coverage search (component tree sorted ascending by the `coverage` metric, files without coverage dropped, `maxCoverage` filter inclusive) and `get_file_coverage_details` computes the official line/branch coverage summary from `api/sources/lines` records.
 
-Outputs expose normalized fields for agent workflows and include `raw` objects for Sonar-specific fields that are not normalized yet. `search_duplicated_files` discovers file component keys with duplication metrics before `get_duplications` retrieves detailed duplication blocks. Source-code content is returned through Slate text attachments, not inline output fields. No tool returns base64 blobs or destructive mutation outputs.
+Outputs expose normalized fields for agent workflows. `search_duplicated_files` discovers file component keys with duplication metrics before `get_duplications` retrieves detailed duplication blocks. Source-code content is returned through Slate text attachments, not inline output fields. No tool returns base64 blobs or full source text in structured output.
 
 ## Verification
 
-Package tests cover config/base URL validation, query parameter serialization, component-search project discovery, exact project-key lookup, project qualifier filtering, issue severity routing, branch/pull-request mutual exclusion, hotspot project/key/new-code parameters, duplicated-file discovery, branch filtering, pagination caps, Cloud organization checks, project-key fallback, quality gate identifier validation, Server-only status validation, workflow confirmation validation, source attachment metadata, authentication response validation, issue-search schema compatibility, and Sonar error normalization.
+Package tests cover config/base URL validation, query parameter serialization, component-search project discovery, project qualifier filtering, issue severity routing, branch/pull-request mutual exclusion, hotspot project/key/new-code parameters, duplicated-file discovery, branch filtering, pagination caps, Cloud organization checks, project-key fallback, quality gate identifier validation, Server-only status validation, source attachment metadata, authentication response validation, advanced-analysis and dependency-risk endpoint routing, issue-search schema compatibility, and Sonar error normalization.
 
 Schema regression coverage uses `describeMcpCompatibleToolSchemas('SonarQube tool input schemas', provider.actions)`.
 
-Private live E2E coverage lives in `tests/integrations/sonarqube/tools.e2e.ts`. It can discover a readable project from the profile, or use optional fixtures for `projectKey`, `metricKeys`, `branch`, `pullRequest`, `issueKey`, `ceTaskId`, hotspot keys, and source component keys.
+Private live E2E coverage lives in `tests/integrations/sonarqube/tools.e2e.ts`. It can discover a readable project from the profile, or use optional fixtures for `projectKey`, `projectSearchQuery`, `metricKeys`, `branch`, `pullRequest`, `issueKey`, hotspot keys, rule keys, mutable finding keys, source component keys, dependency-risk enablement, and advanced-analysis file content.

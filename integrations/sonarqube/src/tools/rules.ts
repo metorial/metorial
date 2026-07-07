@@ -1,105 +1,92 @@
 import { z } from 'zod';
-import {
-  createClient,
-  mapRule,
-  pageSchema,
-  paginationInputs,
-  rawRecordSchema,
-  readOnlyTool,
-  ruleSchema
-} from './shared';
+import { createClient, readOnlyTool } from './shared';
 
-export let searchRulesTool = readOnlyTool({
-  name: 'Search Rules',
-  key: 'search_rules',
-  description:
-    'Search SonarQube rules by text query, language, repository, tags, severity, type, and status. Use this before get_rule when the exact rule key is unknown.'
-})
-  .input(
-    z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe('Optional SonarQube Cloud organization key. Ignored for SonarQube Server.'),
-      query: z.string().optional().describe('Search text for rule key, name, or description.'),
-      languages: z.array(z.string()).optional().describe('Language keys to filter rules.'),
-      repositories: z.array(z.string()).optional().describe('Rule repositories to filter.'),
-      tags: z.array(z.string()).optional().describe('Rule tags to filter.'),
-      severities: z
-        .array(z.string())
-        .optional()
-        .describe('Rule severities, for example BLOCKER, CRITICAL, MAJOR, MINOR, INFO.'),
-      types: z
-        .array(z.string())
-        .optional()
-        .describe('Rule types, for example BUG, VULNERABILITY, or CODE_SMELL.'),
-      statuses: z
-        .array(z.string())
-        .optional()
-        .describe('Rule statuses, for example READY, BETA, DEPRECATED, or REMOVED.'),
-      ...paginationInputs(100, 500)
-    })
-  )
-  .output(
-    z.object({
-      rules: z.array(ruleSchema).describe('Matching SonarQube rules.'),
-      page: pageSchema.optional().describe('Pagination details.')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.searchRules(ctx.input);
-    let rules = result.items.map(mapRule);
+let ruleImpactSchema = z.object({
+  softwareQuality: z
+    .string()
+    .describe('Software quality dimension (MAINTAINABILITY, RELIABILITY, SECURITY)'),
+  severity: z.string().describe('Impact severity level')
+});
 
-    return {
-      output: {
-        rules,
-        page: result.page
-      },
-      message: `Found **${rules.length}** SonarQube rules.`
-    };
-  })
-  .build();
+let ruleDescriptionSectionSchema = z.object({
+  content: z.string().describe('Section content in HTML format')
+});
+
+let optionalString = (value: unknown) => (typeof value === 'string' ? value : undefined);
+
+let optionalRecord = (value: unknown) =>
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+
+let mapImpacts = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map(impact => {
+        let record = optionalRecord(impact) ?? {};
+        return {
+          softwareQuality: String(record.softwareQuality ?? ''),
+          severity: String(record.severity ?? '')
+        };
+      })
+    : [];
+
+let mapDescriptionSections = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map(section => {
+        let record = optionalRecord(section) ?? {};
+        return {
+          content: String(record.content ?? '')
+        };
+      })
+    : [];
 
 export let getRuleTool = readOnlyTool({
-  name: 'Get Rule',
-  key: 'get_rule',
-  description:
-    'Get one SonarQube rule by exact rule key, including rule metadata and raw remediation details returned by SonarQube.'
+  name: 'Show SonarQube Rule Details',
+  key: 'show_rule',
+  description: 'Shows detailed information about a SonarQube rule.'
 })
   .input(
     z.object({
-      organization: z
-        .string()
-        .optional()
-        .describe(
-          'Optional SonarQube Cloud organization key. Defaults to config.organization when configured; ignored for Server.'
-        ),
-      ruleKey: z.string().describe('SonarQube rule key, for example java:S1135.')
+      key: z.string().describe('The rule key (e.g. javascript:EmptyBlock)')
     })
   )
   .output(
     z.object({
-      ruleKey: z.string().describe('Rule key used for the request.'),
-      rule: ruleSchema.describe('Normalized SonarQube rule.'),
-      raw: rawRecordSchema
+      key: z.string().describe('Unique rule key'),
+      name: z.string().describe('Rule display name'),
+      severity: z.string().describe('Rule severity level'),
+      type: z.string().describe('Rule type (BUG, VULNERABILITY, CODE_SMELL, etc.)'),
+      lang: z.string().describe('Language key the rule applies to'),
+      langName: z.string().describe('Human-readable language name'),
+      htmlDesc: z.string().optional().describe('HTML description of the rule'),
+      impacts: z
+        .array(ruleImpactSchema)
+        .optional()
+        .describe('Software quality impacts of this rule'),
+      descriptionSections: z
+        .array(ruleDescriptionSectionSchema)
+        .optional()
+        .describe('Detailed description sections')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let data = await client.getRule(ctx.input.ruleKey, ctx.input.organization);
-    let rule =
-      typeof data.rule === 'object' && data.rule !== null
-        ? (data.rule as Record<string, unknown>)
-        : data;
+    let data = await client.getRule(ctx.input.key);
+    let rule = optionalRecord(data.rule) ?? data;
 
     return {
       output: {
-        ruleKey: ctx.input.ruleKey,
-        rule: mapRule(rule),
-        raw: data
+        key: String(rule.key ?? ''),
+        name: String(rule.name ?? ''),
+        severity: String(rule.severity ?? ''),
+        type: String(rule.type ?? ''),
+        lang: String(rule.lang ?? ''),
+        langName: String(rule.langName ?? ''),
+        htmlDesc: optionalString(rule.htmlDesc),
+        impacts: mapImpacts(rule.impacts),
+        descriptionSections: mapDescriptionSections(rule.descriptionSections)
       },
-      message: `Retrieved SonarQube rule **${ctx.input.ruleKey}**.`
+      message: `Retrieved SonarQube rule **${ctx.input.key}**.`
     };
   })
   .build();

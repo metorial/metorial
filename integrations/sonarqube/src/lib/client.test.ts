@@ -1,17 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  duplicationFilesFromShowResponse,
-  sourceTextFromRawResponse,
-  validateLineRange
-} from '../tools/source';
+import { duplicationFilesFromShowResponse } from '../tools/source';
 import {
   cloudV1BaseUrl,
   cloudV2BaseUrl,
   componentTreeMeasuresParams,
+  dependencyRiskParams,
   duplicationShowParams,
   hotspotProjectSearchParams,
   issueSearchParams,
-  issueTransitionParams,
+  isVersionAtLeast,
   metricsSearchParams,
   normalizePage,
   normalizeServerBaseUrl,
@@ -19,22 +16,19 @@ import {
   optionalPageSizeIncludingAll,
   pageNumber,
   pageSize,
-  projectAnalysisComponentIdFromBranches,
   projectKeyFor,
   projectMeasuresParams,
   projectSearchParams,
   requireCloudOrganization,
   requireOneProjectStatusIdentifier,
   requireServerDeployment,
-  ruleSearchParams,
+  resolveV2BaseUrl,
   ruleShowParams,
   SonarQubeClient,
   serializeSonarParams,
   sourceRawParams,
   sourceScmParams,
-  sourceShowParams,
   validateAuthenticationResponse,
-  validateComputeTaskAdditionalFields,
   validateQualityGateStatusParams
 } from './client';
 
@@ -62,6 +56,15 @@ describe('SonarQube client helpers', () => {
     expect(cloudV1BaseUrl('us')).toBe('https://sonarqube.us/api');
     expect(cloudV2BaseUrl('eu')).toBe('https://api.sonarcloud.io');
     expect(cloudV2BaseUrl('us')).toBe('https://api.sonarqube.us');
+    expect(resolveV2BaseUrl({ deployment: 'cloud', cloudRegion: 'us' })).toBe(
+      'https://api.sonarqube.us'
+    );
+    expect(
+      resolveV2BaseUrl({
+        deployment: 'server',
+        serverBaseUrl: 'https://sonarqube.example.com'
+      })
+    ).toBe('https://sonarqube.example.com/api');
   });
 
   it('serializes Sonar parameters using comma-separated arrays and omits empty values', () => {
@@ -77,20 +80,16 @@ describe('SonarQube client helpers', () => {
     ).toBe('metricKeys=ncloc%2Ccoverage&page=2&resolved=false');
   });
 
-  it('serializes workflow POST parameters as form-compatible Sonar values', () => {
+  it('serializes form-compatible Sonar values', () => {
     expect(
       serializeSonarParams({
-        key: 'ISSUE-1',
-        status: 'accept',
+        issue: 'ISSUE-1',
+        transition: 'accept',
         tags: ['security', 'triaged'],
         comment: 'Reviewed',
         empty: undefined
       })
-    ).toBe('key=ISSUE-1&status=accept&tags=security%2Ctriaged&comment=Reviewed');
-    expect(issueTransitionParams({ issueKey: 'ISSUE-1', status: 'reopen' })).toEqual({
-      key: 'ISSUE-1',
-      status: 'reopen'
-    });
+    ).toBe('issue=ISSUE-1&transition=accept&tags=security%2Ctriaged&comment=Reviewed');
   });
 
   it('validates and caps pagination values', () => {
@@ -188,13 +187,13 @@ describe('SonarQube client helpers', () => {
         branch: 'main',
         pullRequest: '42'
       })
-    ).toThrow(/either branch or pullRequest/);
+    ).toThrow(/'branch' and 'pullRequest' together/);
     expect(() =>
       validateQualityGateStatusParams({ projectId: 'uuid', branch: 'main' })
-    ).toThrow(/projectKey/);
+    ).toThrow(/projectId/);
     expect(() =>
       validateQualityGateStatusParams({ analysisId: 'analysis', pullRequest: '42' })
-    ).toThrow(/projectKey/);
+    ).not.toThrow();
     expect(() =>
       validateQualityGateStatusParams({
         analysisId: 'analysis',
@@ -202,154 +201,6 @@ describe('SonarQube client helpers', () => {
         branch: 'main'
       })
     ).not.toThrow();
-  });
-
-  it('validates compute task additional fields by deployment', () => {
-    expect(() =>
-      validateComputeTaskAdditionalFields({ deployment: 'server' }, [
-        'scannerContext',
-        'warnings',
-        'stacktrace'
-      ])
-    ).not.toThrow();
-    expect(() =>
-      validateComputeTaskAdditionalFields({ deployment: 'cloud' }, ['scannerContext'])
-    ).not.toThrow();
-    expect(() =>
-      validateComputeTaskAdditionalFields({ deployment: 'cloud' }, ['stacktrace'])
-    ).toThrow(/Server/);
-    expect(() =>
-      validateComputeTaskAdditionalFields({ deployment: 'server' }, ['unsupported'])
-    ).toThrow(/Unsupported/);
-  });
-
-  it('selects the legacy main-branch component id for Cloud CE status fallback', () => {
-    expect(
-      projectAnalysisComponentIdFromBranches([
-        {
-          name: 'feature',
-          isMain: false,
-          branchUuidV1: 'AZ-feature'
-        },
-        {
-          name: 'main',
-          isMain: true,
-          branchUuidV1: 'AZ-main',
-          branchId: 'modern-main-id'
-        }
-      ])
-    ).toBe('AZ-main');
-  });
-
-  it('retries Cloud analysis status with the readable main branch component id', async () => {
-    let client = new SonarQubeClient({
-      auth: { token: 'token' },
-      config: { deployment: 'cloud', organization: 'acme' }
-    });
-    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
-
-    (client as unknown as { get: unknown }).get = vi.fn(
-      async (_operation: string, path: string, params?: Record<string, unknown>) => {
-        requests.push({ path, params });
-
-        if (path === '/ce/component' && params?.component === 'company_tracker-application') {
-          throw new Error('The requested resource was not found.');
-        }
-
-        if (path === '/project_branches/list') {
-          return {
-            branches: [
-              {
-                name: 'main',
-                type: 'LONG',
-                isMain: true,
-                branchUuidV1: 'AZ-main-component'
-              }
-            ]
-          };
-        }
-
-        if (path === '/ce/component' && params?.componentId === 'AZ-main-component') {
-          return {
-            queue: [],
-            current: {
-              componentId: 'AZ-main-component',
-              componentKey: 'company_tracker-application',
-              status: 'SUCCESS'
-            }
-          };
-        }
-
-        throw new Error(`Unexpected request ${path}`);
-      }
-    );
-
-    await expect(
-      client.getProjectAnalysisStatus('company_tracker-application')
-    ).resolves.toMatchObject({
-      current: {
-        componentId: 'AZ-main-component',
-        componentKey: 'company_tracker-application',
-        status: 'SUCCESS'
-      }
-    });
-    expect(requests).toEqual([
-      {
-        path: '/ce/component',
-        params: { component: 'company_tracker-application' }
-      },
-      {
-        path: '/project_branches/list',
-        params: { project: 'company_tracker-application' }
-      },
-      {
-        path: '/ce/component',
-        params: { componentId: 'AZ-main-component' }
-      }
-    ]);
-  });
-
-  it('returns a structured unavailable status when Cloud CE component status is hidden', async () => {
-    let client = new SonarQubeClient({
-      auth: { token: 'token' },
-      config: { deployment: 'cloud', organization: 'acme' }
-    });
-
-    (client as unknown as { get: unknown }).get = vi.fn(
-      async (_operation: string, path: string, params?: Record<string, unknown>) => {
-        if (path === '/project_branches/list') {
-          return {
-            branches: [
-              {
-                name: 'main',
-                isMain: true,
-                branchUuidV1: 'AZ-main-component'
-              }
-            ]
-          };
-        }
-
-        if (
-          path === '/ce/component' &&
-          (params?.component === 'company_tracker-application' ||
-            params?.componentId === 'AZ-main-component')
-        ) {
-          throw new Error('The requested resource was not found.');
-        }
-
-        throw new Error(`Unexpected request ${path}`);
-      }
-    );
-
-    await expect(
-      client.getProjectAnalysisStatus('company_tracker-application')
-    ).resolves.toMatchObject({
-      queue: [],
-      statusUnavailable: {
-        projectKey: 'company_tracker-application',
-        reason: 'ce_component_not_found'
-      }
-    });
   });
 
   it('rejects Server-only operations for SonarQube Cloud configs', () => {
@@ -370,7 +221,7 @@ describe('SonarQube client helpers', () => {
   });
 
   it('requests only documented metrics search pagination parameters', () => {
-    expect(metricsSearchParams({ page: 2, pageSize: 10, query: 'coverage' })).toEqual({
+    expect(metricsSearchParams({ page: 2, pageSize: 10 })).toEqual({
       p: 2,
       ps: 10
     });
@@ -469,18 +320,6 @@ describe('SonarQube client helpers', () => {
     });
 
     expect(
-      sourceShowParams({
-        component: 'app:src/main.ts',
-        fromLine: 2,
-        toLine: 4
-      })
-    ).toEqual({
-      key: 'app:src/main.ts',
-      from: 2,
-      to: 4
-    });
-
-    expect(
       sourceScmParams({
         component: 'app:src/main.ts',
         fromLine: 1,
@@ -544,26 +383,7 @@ describe('SonarQube client helpers', () => {
           pullRequest: '42'
         }
       )
-    ).toThrow(/either branch or pullRequest/);
-  });
-
-  it('slices raw source text with documented integer line ranges', () => {
-    expect(
-      sourceTextFromRawResponse('line 1\nline 2\nline 3\nline 4', {
-        fromLine: 2,
-        toLine: 3
-      })
-    ).toBe('line 2\nline 3');
-
-    expect(sourceTextFromRawResponse('line 1\r\nline 2\r\nline 3', { fromLine: 2 })).toBe(
-      'line 2\nline 3'
-    );
-
-    expect(() => validateLineRange({ fromLine: 1.5 })).toThrow(/positive integer/);
-    expect(() => validateLineRange({ toLine: 0 })).toThrow(/positive integer/);
-    expect(() => validateLineRange({ fromLine: 3, toLine: 2 })).toThrow(
-      /greater than or equal/
-    );
+    ).toThrow(/'branch' and 'pullRequest' together/);
   });
 
   it('normalizes documented duplication file maps', () => {
@@ -605,7 +425,6 @@ describe('SonarQube client helpers', () => {
           { deployment: 'cloud', organization: 'acme' },
           {
             query: ' api ',
-            projectKeys: ['app'],
             qualifiers: ['APP']
           }
         )
@@ -619,7 +438,6 @@ describe('SonarQube client helpers', () => {
           {
             organization: 'ignored-input',
             query: 'api',
-            projectKeys: ['app', 'lib'],
             qualifiers: ['TRK', 'APP'],
             page: 2,
             pageSize: 25
@@ -756,167 +574,6 @@ describe('SonarQube client helpers', () => {
     ]);
   });
 
-  it('looks up exact project keys with components show and filters qualifiers', async () => {
-    let client = new SonarQubeClient({
-      auth: { token: 'token' },
-      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
-    });
-    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
-
-    (client as unknown as { get: unknown }).get = vi.fn(
-      async (_operation: string, path: string, params?: Record<string, unknown>) => {
-        requests.push({ path, params });
-
-        if (path !== '/components/show') {
-          throw new Error(`Unexpected request ${path}`);
-        }
-
-        if (params?.component === 'app') {
-          return {
-            component: {
-              key: 'app',
-              name: 'App',
-              qualifier: 'TRK'
-            }
-          };
-        }
-
-        if (params?.component === 'view') {
-          return {
-            component: {
-              key: 'view',
-              name: 'View',
-              qualifier: 'VW'
-            }
-          };
-        }
-
-        throw new Error(`Unexpected component ${params?.component}`);
-      }
-    );
-
-    await expect(
-      client.searchProjects({
-        projectKeys: [' app ', 'view'],
-        qualifiers: ['TRK']
-      })
-    ).resolves.toEqual({
-      items: [
-        {
-          key: 'app',
-          name: 'App',
-          qualifier: 'TRK'
-        }
-      ],
-      page: {
-        page: 1,
-        pageSize: 1,
-        total: 1,
-        hasNextPage: false
-      }
-    });
-    expect(requests).toEqual([
-      {
-        path: '/components/show',
-        params: { component: 'app' }
-      },
-      {
-        path: '/components/show',
-        params: { component: 'view' }
-      }
-    ]);
-  });
-
-  it('merges exact project lookups with query search results by key', async () => {
-    let client = new SonarQubeClient({
-      auth: { token: 'token' },
-      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
-    });
-    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
-
-    (client as unknown as { get: unknown }).get = vi.fn(
-      async (_operation: string, path: string, params?: Record<string, unknown>) => {
-        requests.push({ path, params });
-
-        if (path === '/components/search') {
-          return {
-            paging: {
-              pageIndex: 1,
-              pageSize: 500,
-              total: 2
-            },
-            components: [
-              {
-                key: 'app',
-                name: 'App from query',
-                qualifier: 'TRK'
-              },
-              {
-                key: 'lib',
-                name: 'Library',
-                qualifier: 'TRK'
-              }
-            ]
-          };
-        }
-
-        if (path === '/components/show' && params?.component === 'app') {
-          return {
-            component: {
-              key: 'app',
-              name: 'App exact',
-              qualifier: 'TRK'
-            }
-          };
-        }
-
-        throw new Error(`Unexpected request ${path}`);
-      }
-    );
-
-    await expect(
-      client.searchProjects({
-        query: 'app',
-        projectKeys: ['app']
-      })
-    ).resolves.toEqual({
-      items: [
-        {
-          key: 'app',
-          name: 'App exact',
-          qualifier: 'TRK'
-        },
-        {
-          key: 'lib',
-          name: 'Library',
-          qualifier: 'TRK'
-        }
-      ],
-      page: {
-        page: 1,
-        pageSize: 500,
-        total: 2,
-        hasNextPage: false
-      }
-    });
-    expect(requests).toEqual([
-      {
-        path: '/components/search',
-        params: {
-          organization: undefined,
-          q: 'app',
-          qualifiers: ['TRK'],
-          p: 1,
-          ps: 500
-        }
-      },
-      {
-        path: '/components/show',
-        params: { component: 'app' }
-      }
-    ]);
-  });
-
   it('serializes current issue search filters for SonarQube issues search', () => {
     expect(
       serializeSonarParams(
@@ -994,7 +651,7 @@ describe('SonarQube client helpers', () => {
           pullRequest: '42'
         }
       )
-    ).toThrow(/either branch or pullRequest/);
+    ).toThrow(/'branch' and 'pullRequest' together/);
 
     expect(() =>
       projectMeasuresParams(
@@ -1006,7 +663,7 @@ describe('SonarQube client helpers', () => {
           pullRequest: '42'
         }
       )
-    ).toThrow(/either branch or pullRequest/);
+    ).toThrow(/'branch' and 'pullRequest' together/);
   });
 
   it('serializes component tree measures parameters for duplicated file search', () => {
@@ -1017,11 +674,11 @@ describe('SonarQube client helpers', () => {
           branch: 'main',
           metricKeys: ['duplicated_lines'],
           qualifiers: ['FIL'],
-          strategy: 'all'
+          strategy: 'leaves'
         })
       )
     ).toBe(
-      'component=app&branch=main&metricKeys=duplicated_lines&qualifiers=FIL&strategy=all&p=1&ps=500'
+      'component=app&branch=main&metricKeys=duplicated_lines&qualifiers=FIL&strategy=leaves&p=1&ps=500'
     );
 
     expect(() =>
@@ -1031,7 +688,45 @@ describe('SonarQube client helpers', () => {
         pullRequest: '42',
         metricKeys: ['duplicated_lines']
       })
-    ).toThrow(/either branch or pullRequest/);
+    ).toThrow(/'branch' and 'pullRequest' together/);
+  });
+
+  it('serializes documented dependency risk parameters', () => {
+    expect(
+      dependencyRiskParams({
+        projectKey: 'app',
+        branch: 'main',
+        pageIndex: 2.9,
+        pageSize: 25.8
+      })
+    ).toEqual({
+      projectKey: 'app',
+      branchKey: 'main',
+      pullRequestKey: undefined,
+      pageIndex: 2,
+      pageSize: 25
+    });
+
+    expect(() =>
+      dependencyRiskParams({
+        projectKey: 'app',
+        branch: 'main',
+        pullRequest: '42'
+      })
+    ).toThrow(/'branch' and 'pullRequest' together/);
+    expect(() => dependencyRiskParams({ projectKey: 'app', pageIndex: 0 })).toThrow(
+      /pageIndex/
+    );
+    expect(() => dependencyRiskParams({ projectKey: 'app', pageSize: 501 })).toThrow(
+      /pageSize/
+    );
+  });
+
+  it('checks SonarQube Server dependency risk minimum versions', () => {
+    expect(isVersionAtLeast('2025.4.0.1234', '2025.4')).toBe(true);
+    expect(isVersionAtLeast('2026.1', '2025.4')).toBe(true);
+    expect(isVersionAtLeast('2025.3.9', '2025.4')).toBe(false);
+    expect(isVersionAtLeast('10.8.1', '2025.4')).toBe(false);
   });
 
   it('filters project branches to branch-parameter-compatible entries', async () => {
@@ -1192,6 +887,247 @@ describe('SonarQube client helpers', () => {
     await expect(client.searchHotspots({})).rejects.toThrow(/projectKey/);
   });
 
+  it('lists project pull requests from the documented endpoint', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        return {
+          pullRequests: [
+            {
+              key: '42',
+              title: 'Add feature',
+              branch: 'feature/example'
+            }
+          ]
+        };
+      }
+    );
+
+    await expect(client.listProjectPullRequests('app')).resolves.toMatchObject({
+      items: [{ key: '42', title: 'Add feature', branch: 'feature/example' }]
+    });
+    expect(requests).toEqual([
+      {
+        path: '/project_pull_requests/list',
+        params: { project: 'app' }
+      }
+    ]);
+  });
+
+  it('fetches security hotspot details from the documented endpoint', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        return {
+          key: 'hotspot-1',
+          status: 'TO_REVIEW'
+        };
+      }
+    );
+
+    await expect(client.getHotspot('hotspot-1')).resolves.toEqual({
+      key: 'hotspot-1',
+      status: 'TO_REVIEW'
+    });
+    expect(requests).toEqual([
+      {
+        path: '/hotspots/show',
+        params: { hotspot: 'hotspot-1' }
+      }
+    ]);
+  });
+
+  it('posts issue transitions with the documented form parameters', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { post: unknown }).post = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        return {};
+      }
+    );
+
+    await expect(
+      client.changeIssueStatus({ issueKey: 'ISSUE-1', transition: 'accept' })
+    ).resolves.toEqual({});
+    expect(requests).toEqual([
+      {
+        path: '/issues/do_transition',
+        params: {
+          issue: 'ISSUE-1',
+          transition: 'accept'
+        }
+      }
+    ]);
+  });
+
+  it('posts security hotspot status changes with the documented form parameters', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { post: unknown }).post = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        return {};
+      }
+    );
+
+    await expect(
+      client.changeHotspotStatus({
+        hotspotKey: 'hotspot-1',
+        status: 'REVIEWED',
+        resolution: 'SAFE',
+        comment: 'Reviewed and safe'
+      })
+    ).resolves.toEqual({});
+    expect(requests).toEqual([
+      {
+        path: '/hotspots/change_status',
+        params: {
+          hotspot: 'hotspot-1',
+          status: 'REVIEWED',
+          resolution: 'SAFE',
+          comment: 'Reviewed and safe'
+        }
+      }
+    ]);
+  });
+
+  it('searches files by coverage with the official component tree sorting', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+
+        if (path === '/measures/component') {
+          return {
+            component: {
+              key: 'app',
+              measures: [{ metric: 'coverage', value: '55.5' }]
+            }
+          };
+        }
+
+        return {
+          paging: {
+            pageIndex: 1,
+            pageSize: 100,
+            total: 1
+          },
+          components: [
+            {
+              key: 'app:src/main.ts',
+              path: 'src/main.ts',
+              measures: [{ metric: 'coverage', value: '10.0' }]
+            }
+          ]
+        };
+      }
+    );
+
+    await expect(
+      client.searchFilesByCoverage({ projectKey: 'app', pageSize: 1000 })
+    ).resolves.toMatchObject({
+      items: [{ key: 'app:src/main.ts' }],
+      pageIndex: 1,
+      pageSize: 500
+    });
+    expect(requests).toEqual([
+      {
+        path: '/measures/component',
+        params: {
+          component: 'app',
+          metricKeys: ['coverage', 'lines_to_cover', 'uncovered_lines'],
+          branch: undefined,
+          pullRequest: undefined,
+          additionalFields: 'metrics'
+        }
+      },
+      {
+        path: '/measures/component_tree',
+        params: {
+          component: 'app',
+          branch: undefined,
+          pullRequest: undefined,
+          metricKeys: [
+            'coverage',
+            'line_coverage',
+            'branch_coverage',
+            'lines_to_cover',
+            'uncovered_lines',
+            'conditions_to_cover',
+            'uncovered_conditions'
+          ],
+          qualifiers: ['FIL'],
+          strategy: 'all',
+          s: 'metric',
+          metricSort: 'coverage',
+          asc: true,
+          p: 1,
+          ps: 500,
+          additionalFields: undefined
+        }
+      }
+    ]);
+  });
+
+  it('fetches source lines for coverage details from the documented endpoint', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        return {
+          sources: [{ line: 1, code: 'let x = 1;', lineHits: 2 }]
+        };
+      }
+    );
+
+    await expect(
+      client.getSourceLines({ key: 'app:src/main.ts', branch: 'main' })
+    ).resolves.toEqual({
+      sources: [{ line: 1, code: 'let x = 1;', lineHits: 2 }]
+    });
+    expect(requests).toEqual([
+      {
+        path: '/sources/lines',
+        params: {
+          key: 'app:src/main.ts',
+          branch: 'main',
+          pullRequest: undefined
+        }
+      }
+    ]);
+  });
+
   it('searches duplicated files with project measures and component tree metrics', async () => {
     let client = new SonarQubeClient({
       auth: { token: 'token' },
@@ -1297,42 +1233,13 @@ describe('SonarQube client helpers', () => {
           metricKeys: ['duplicated_lines', 'duplicated_blocks', 'duplicated_lines_density'],
           pullRequest: undefined,
           qualifiers: ['FIL'],
-          strategy: 'all',
+          strategy: 'leaves',
           p: 1,
           ps: 10,
           additionalFields: 'metrics'
         }
       }
     ]);
-  });
-
-  it('serializes rule search params according to Cloud and Server API contracts', () => {
-    expect(
-      serializeSonarParams(
-        ruleSearchParams(
-          { deployment: 'cloud', organization: 'acme' },
-          {
-            languages: ['java'],
-            page: 2,
-            pageSize: 999
-          }
-        )
-      )
-    ).toBe(
-      'organization=acme&languages=java&f=name%2Crepo%2Clang%2ClangName%2Cseverity%2Cstatus%2Ctags%2CsysTags&p=2&ps=500'
-    );
-
-    expect(
-      serializeSonarParams(
-        ruleSearchParams(
-          { deployment: 'server', organization: 'acme' },
-          {
-            organization: 'ignored-on-server',
-            pageSize: 10
-          }
-        )
-      )
-    ).toBe('f=name%2Crepo%2Clang%2ClangName%2Cseverity%2Cstatus%2Ctags%2CsysTags&p=1&ps=10');
   });
 
   it('uses optional organization for quality gates and q-only language search', async () => {
@@ -1374,6 +1281,234 @@ describe('SonarQube client helpers', () => {
         }
       }
     ]);
+  });
+
+  it('uses official Cloud v2 dependency risk feature and search endpoints', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'cloud', organization: 'acme' }
+    });
+    let requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { getV2: unknown }).getV2 = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        requests.push({ path, params });
+        if (path === '/sca/feature-enabled') return { enabled: true };
+        if (path === '/sca/issues-releases') {
+          return {
+            issuesReleases: [],
+            page: {
+              pageIndex: 1,
+              pageSize: 100,
+              total: 0
+            }
+          };
+        }
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+
+    await expect(
+      client.searchDependencyRisks({
+        projectKey: 'app',
+        pullRequest: '42',
+        pageIndex: 1,
+        pageSize: 100
+      })
+    ).resolves.toMatchObject({
+      issuesReleases: [],
+      page: {
+        pageIndex: 1,
+        pageSize: 100,
+        total: 0
+      }
+    });
+
+    expect(requests).toEqual([
+      {
+        path: '/sca/feature-enabled',
+        params: {
+          organization: 'acme'
+        }
+      },
+      {
+        path: '/sca/issues-releases',
+        params: {
+          projectKey: 'app',
+          branchKey: undefined,
+          pullRequestKey: '42',
+          pageIndex: 1,
+          pageSize: 100
+        }
+      }
+    ]);
+  });
+
+  it('uses official Server v2 dependency risk endpoint after version and feature checks', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let v1Requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+    let v2Requests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+
+    (client as unknown as { getServerVersion: unknown }).getServerVersion = vi.fn(
+      async () => '2025.4.0.1234'
+    );
+    (client as unknown as { get: unknown }).get = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        v1Requests.push({ path, params });
+        if (path === '/features/list') return ['sca'];
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+    (client as unknown as { getV2: unknown }).getV2 = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        v2Requests.push({ path, params });
+        if (path === '/v2/sca/issues-releases') {
+          return {
+            issuesReleases: [],
+            page: {
+              pageIndex: 2,
+              pageSize: 50,
+              total: 0
+            }
+          };
+        }
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+
+    await expect(
+      client.searchDependencyRisks({
+        projectKey: 'app',
+        branch: 'main',
+        pageIndex: 2,
+        pageSize: 50
+      })
+    ).resolves.toMatchObject({
+      issuesReleases: [],
+      page: {
+        pageIndex: 2,
+        pageSize: 50,
+        total: 0
+      }
+    });
+
+    expect(v1Requests).toEqual([{ path: '/features/list', params: undefined }]);
+    expect(v2Requests).toEqual([
+      {
+        path: '/v2/sca/issues-releases',
+        params: {
+          projectKey: 'app',
+          branchKey: 'main',
+          pullRequestKey: undefined,
+          pageIndex: 2,
+          pageSize: 50
+        }
+      }
+    ]);
+  });
+
+  it('uses official Cloud v2 advanced analysis entitlement and analysis endpoints', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'cloud', organization: 'acme' }
+    });
+    let getRequests: Array<{ path: string; params?: Record<string, unknown> }> = [];
+    let postRequests: Array<{ path: string; data?: Record<string, unknown> }> = [];
+
+    (client as unknown as { getV2: unknown }).getV2 = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        getRequests.push({ path, params });
+        if (path === '/organizations/organizations') return [{ uuidV4: 'org-uuid' }];
+        if (path === '/a3s-analysis/org-config/org-uuid') return { enabled: true };
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+    (client as unknown as { postJsonV2: unknown }).postJsonV2 = vi.fn(
+      async (_operation: string, path: string, data: Record<string, unknown>) => {
+        postRequests.push({ path, data });
+        if (path === '/a3s-analysis/analyses') {
+          return {
+            issues: [],
+            errors: [{ code: 'WARN', message: 'Non-fatal warning' }]
+          };
+        }
+        throw new Error(`Unexpected request ${path}`);
+      }
+    );
+
+    await expect(
+      client.runAdvancedCodeAnalysis({
+        organizationKey: 'acme',
+        projectKey: 'app',
+        branchName: 'main',
+        filePath: 'src/main.ts',
+        fileContent: 'const value = 1;',
+        fileScope: 'MAIN'
+      })
+    ).resolves.toEqual({
+      issues: [],
+      errors: [{ code: 'WARN', message: 'Non-fatal warning' }]
+    });
+
+    expect(getRequests).toEqual([
+      {
+        path: '/organizations/organizations',
+        params: {
+          organizationKey: 'acme',
+          excludeEligibility: true
+        }
+      },
+      {
+        path: '/a3s-analysis/org-config/org-uuid',
+        params: undefined
+      }
+    ]);
+    expect(postRequests).toEqual([
+      {
+        path: '/a3s-analysis/analyses',
+        data: {
+          organizationKey: 'acme',
+          projectKey: 'app',
+          branchName: 'main',
+          filePath: 'src/main.ts',
+          fileContent: 'const value = 1;',
+          fileScope: 'MAIN'
+        }
+      }
+    ]);
+  });
+
+  it('requests system status anonymously for SonarQube Server', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let authenticatedGet = vi.fn();
+    let anonymousGet = vi.fn(
+      async (_operation: string, path: string, params?: Record<string, unknown>) => {
+        expect(path).toBe('/system/status');
+        expect(params).toBeUndefined();
+        return {
+          status: 'UP',
+          id: 'server-id',
+          version: '2025.4'
+        };
+      }
+    );
+
+    (client as unknown as { get: unknown }).get = authenticatedGet;
+    (client as unknown as { getAnonymous: unknown }).getAnonymous = anonymousGet;
+
+    await expect(client.getSystemStatus()).resolves.toEqual({
+      status: 'UP',
+      id: 'server-id',
+      version: '2025.4'
+    });
+    expect(authenticatedGet).not.toHaveBeenCalled();
+    expect(anonymousGet).toHaveBeenCalledTimes(1);
   });
 
   it('serializes rule show params with organization only when configured', () => {

@@ -1,81 +1,98 @@
 import { z } from 'zod';
+import { sonarqubeValidationError } from '../lib/errors';
 import {
   branchPullRequestInputs,
   createClient,
-  mapMeasure,
-  mapMetric,
-  measureSchema,
-  metricSchema,
-  pageSchema,
-  paginationInputs,
   projectInput,
   projectKeyFromInput,
-  rawRecordSchema,
   readOnlyTool
 } from './shared';
 
-let optionalRecord = (value: unknown) =>
-  typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-
-let firstPeriodRecord = (measure: Record<string, unknown>) => {
-  let period = optionalRecord(measure.period);
-  if (period) return period;
-
-  if (!Array.isArray(measure.periods)) return undefined;
-  return measure.periods.find(
-    (item): item is Record<string, unknown> =>
-      typeof item === 'object' && item !== null && !Array.isArray(item)
-  );
+let requiredMetricString = (metric: Record<string, unknown>, field: string) => {
+  let value = metric[field];
+  if (typeof value !== 'string') {
+    throw sonarqubeValidationError(`SonarQube response did not include metric ${field}.`);
+  }
+  return value;
 };
 
-export let mapMeasureWithPeriodVariants = (measure: Record<string, unknown>) => {
-  let mapped = mapMeasure(measure);
-  let period = firstPeriodRecord(measure);
-
-  return {
-    ...mapped,
-    bestValue:
-      mapped.bestValue ??
-      (typeof period?.bestValue === 'boolean' ? period.bestValue : undefined),
-    periodValue:
-      mapped.periodValue ?? (typeof period?.value === 'string' ? period.value : undefined)
-  };
+let optionalMetricString = (metric: Record<string, unknown>, field: string) => {
+  let value = metric[field];
+  return typeof value === 'string' ? value : undefined;
 };
+
+let metricBoolean = (metric: Record<string, unknown>, field: string) => metric[field] === true;
+
+export let mapSearchMetric = (metric: Record<string, unknown>) => ({
+  id: requiredMetricString(metric, 'id'),
+  key: requiredMetricString(metric, 'key'),
+  name: requiredMetricString(metric, 'name'),
+  description: optionalMetricString(metric, 'description'),
+  domain: optionalMetricString(metric, 'domain'),
+  type: requiredMetricString(metric, 'type'),
+  hidden: metricBoolean(metric, 'hidden'),
+  custom: metricBoolean(metric, 'custom')
+});
 
 export let listMetricsTool = readOnlyTool({
-  name: 'List Metrics',
-  key: 'list_metrics',
-  description:
-    'List SonarQube metric keys that can be requested from get_project_measures and search_measure_history, such as coverage, bugs, vulnerabilities, code smells, duplicated lines density, and ncloc.'
+  name: 'Search SonarQube Metrics',
+  key: 'search_metrics',
+  description: 'Search for available metrics'
 })
   .input(
     z.object({
-      query: z
-        .string()
+      p: z.number().int().positive().optional().describe('1-based page number (default: 1)'),
+      ps: z
+        .number()
+        .int()
+        .positive()
+        .max(500)
         .optional()
         .describe(
-          'Search text for metric key or name. Use this to discover valid metricKeys.'
-        ),
-      ...paginationInputs(100, 500)
+          'Page size. Must be greater than 0 and less than or equal to 500 (default: 100)'
+        )
     })
   )
   .output(
     z.object({
-      metrics: z.array(metricSchema).describe('Available SonarQube metrics.'),
-      page: pageSchema.optional().describe('Pagination details.')
+      metrics: z
+        .array(
+          z.object({
+            id: z.string().describe('Metric unique identifier'),
+            key: z.string().describe('Metric key'),
+            name: z.string().describe('Metric display name'),
+            description: z.string().optional().describe('Metric description'),
+            domain: z.string().optional().describe('Metric domain/category'),
+            type: z.string().describe('Metric value type'),
+            hidden: z.boolean().describe('Whether the metric is hidden'),
+            custom: z.boolean().describe('Whether this is a custom metric')
+          })
+        )
+        .describe('List of metrics matching the search'),
+      total: z.number().int().describe('Total number of metrics'),
+      page: z.number().int().describe('Current page number'),
+      pageSize: z.number().int().describe('Number of items per page')
     })
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let result = await client.listMetrics(ctx.input);
-    let metrics = result.items.map(mapMetric);
+    let result = await client.listMetrics({ page: ctx.input.p, pageSize: ctx.input.ps });
+    let page = result.page;
+
+    if (page?.total === undefined || page.page === undefined || page.pageSize === undefined) {
+      throw sonarqubeValidationError(
+        'SonarQube response did not include metrics pagination details.'
+      );
+    }
+
+    let metrics = result.items.map(mapSearchMetric);
 
     return {
       output: {
         metrics,
-        page: result.page
+        total: page.total,
+        page: page.page,
+        pageSize: page.pageSize
       },
       message: `Found **${metrics.length}** SonarQube metrics.`
     };
@@ -83,39 +100,57 @@ export let listMetricsTool = readOnlyTool({
   .build();
 
 export let getProjectMeasuresTool = readOnlyTool({
-  name: 'Get Project Measures',
-  key: 'get_project_measures',
+  name: 'Get SonarQube Project Measures',
+  key: 'get_component_measures',
   description:
-    'Get current metric measures for an exact SonarQube project key, optionally scoped to one branch or one pull request. Use search_projects first when the user gave a project name or partial key; use list_metrics first when metric keys are unknown.',
-  instructions: [
-    'Request only the metrics the user asked for. Do not send a broad all-metrics list unless the user explicitly asks for every metric.',
-    'Do not guess branch names such as main or master; omit branch for the default branch unless the user provided or discovered a branch.'
-  ]
+    'Get SonarQube measures for a project, such as ncloc, complexity, violations, coverage, etc.'
 })
   .input(
     z.object({
       ...projectInput,
+      ...branchPullRequestInputs,
       metricKeys: z
         .array(z.string())
-        .min(1)
         .optional()
-        .describe(
-          'Metric keys to fetch, for example ncloc, coverage, bugs, or vulnerabilities. Use list_metrics to discover valid keys. Omit only when intentionally requesting SonarQube defaults.'
-        ),
-      ...branchPullRequestInputs
+        .describe('The metric keys to retrieve (e.g. ncloc, complexity, violations, coverage)')
     })
   )
   .output(
     z.object({
-      projectKey: z.string().describe('Project key used for the request.'),
-      componentKey: z.string().optional().describe('Component key returned by SonarQube.'),
-      componentName: z.string().optional().describe('Component name returned by SonarQube.'),
-      measures: z.array(measureSchema).describe('Metric measures for the component.'),
+      component: z
+        .object({
+          key: z.string().describe('Component key'),
+          name: z.string().describe('Component display name'),
+          qualifier: z
+            .string()
+            .describe('Component qualifier (TRK for project, FIL for file, etc.)'),
+          description: z.string().optional().describe('Component description'),
+          language: z.string().optional().describe('Programming language'),
+          path: z.string().optional().describe('Component path')
+        })
+        .describe('Component information'),
+      measures: z
+        .array(
+          z.object({
+            metric: z.string().describe('Metric key'),
+            value: z.string().optional().describe('Measure value')
+          })
+        )
+        .describe('List of measures for the component'),
       metrics: z
-        .array(metricSchema)
+        .array(
+          z.object({
+            key: z.string().describe('Metric key'),
+            name: z.string().describe('Metric display name'),
+            description: z.string().describe('Metric description'),
+            domain: z.string().describe('Metric domain/category'),
+            type: z.string().describe('Metric value type'),
+            hidden: z.boolean().describe('Whether the metric is hidden'),
+            custom: z.boolean().describe('Whether this is a custom metric')
+          })
+        )
         .optional()
-        .describe('Metric metadata returned by SonarQube when additionalFields=metrics.'),
-      raw: rawRecordSchema
+        .describe('Metadata about the metrics')
     })
   )
   .handleInvocation(async ctx => {
@@ -127,17 +162,51 @@ export let getProjectMeasuresTool = readOnlyTool({
       branch: ctx.input.branch,
       pullRequest: ctx.input.pullRequest
     });
+
+    let requiredString = (record: Record<string, unknown>, field: string) => {
+      let value = record[field];
+      return typeof value === 'string' ? value : '';
+    };
+
+    let optionalString = (record: Record<string, unknown>, field: string) => {
+      let value = record[field];
+      return typeof value === 'string' ? value : undefined;
+    };
+
+    let requiredBoolean = (record: Record<string, unknown>, field: string) => {
+      let value = record[field];
+      return typeof value === 'boolean' ? value : false;
+    };
+
     let component =
       typeof data.component === 'object' && data.component !== null
         ? (data.component as Record<string, unknown>)
-        : {};
+        : undefined;
+
+    if (!component) {
+      return {
+        output: {
+          component: {
+            key: '',
+            name: '',
+            qualifier: ''
+          },
+          measures: []
+        },
+        message: `Retrieved **0** measures for SonarQube project **${projectKey}**.`
+      };
+    }
+
     let measures = Array.isArray(component.measures)
       ? component.measures
           .filter(
             (item): item is Record<string, unknown> =>
               typeof item === 'object' && item !== null
           )
-          .map(mapMeasureWithPeriodVariants)
+          .map(measure => ({
+            metric: requiredString(measure, 'metric'),
+            value: optionalString(measure, 'value')
+          }))
       : [];
     let metrics = Array.isArray(data.metrics)
       ? data.metrics
@@ -145,118 +214,31 @@ export let getProjectMeasuresTool = readOnlyTool({
             (item): item is Record<string, unknown> =>
               typeof item === 'object' && item !== null
           )
-          .map(mapMetric)
+          .map(metric => ({
+            key: requiredString(metric, 'key'),
+            name: requiredString(metric, 'name'),
+            description: requiredString(metric, 'description'),
+            domain: requiredString(metric, 'domain'),
+            type: requiredString(metric, 'type'),
+            hidden: requiredBoolean(metric, 'hidden'),
+            custom: requiredBoolean(metric, 'custom')
+          }))
       : undefined;
 
     return {
       output: {
-        projectKey,
-        componentKey: typeof component.key === 'string' ? component.key : undefined,
-        componentName: typeof component.name === 'string' ? component.name : undefined,
+        component: {
+          key: requiredString(component, 'key'),
+          name: requiredString(component, 'name'),
+          qualifier: requiredString(component, 'qualifier'),
+          description: optionalString(component, 'description'),
+          language: optionalString(component, 'language'),
+          path: optionalString(component, 'path')
+        },
         measures,
-        metrics,
-        raw: data
+        metrics
       },
       message: `Retrieved **${measures.length}** measures for SonarQube project **${projectKey}**.`
-    };
-  })
-  .build();
-
-export let searchMeasureHistoryTool = readOnlyTool({
-  name: 'Search Measure History',
-  key: 'search_measure_history',
-  description:
-    'Search historical SonarQube measures for an exact project key over time, optionally scoped to one branch or one pull request. Use search_projects first when the user gave a project name or partial key; use get_project_measures for current values.',
-  instructions: [
-    'Request only the metrics the user asked for. Do not send a broad all-metrics list unless the user explicitly asks for every metric.',
-    'Do not guess branch names such as main or master; omit branch for the default branch unless the user provided or discovered a branch.'
-  ]
-})
-  .input(
-    z.object({
-      ...projectInput,
-      metricKeys: z
-        .array(z.string())
-        .min(1)
-        .describe(
-          'Metric keys to fetch history for. Use list_metrics to discover valid keys.'
-        ),
-      from: z.string().optional().describe('Start date/time for history search.'),
-      to: z.string().optional().describe('End date/time for history search.'),
-      ...branchPullRequestInputs,
-      ...paginationInputs(100, 1000)
-    })
-  )
-  .output(
-    z.object({
-      projectKey: z.string().describe('Project key used for the request.'),
-      measures: z
-        .array(
-          z.object({
-            metric: z.string().describe('Metric key.'),
-            history: z
-              .array(
-                z.object({
-                  date: z.string().optional().describe('Measure timestamp.'),
-                  value: z.string().optional().describe('Measure value.'),
-                  raw: rawRecordSchema
-                })
-              )
-              .describe('Historical values for the metric.'),
-            raw: rawRecordSchema
-          })
-        )
-        .describe('Historical measures grouped by metric.'),
-      page: pageSchema.optional().describe('Pagination details.'),
-      raw: rawRecordSchema
-    })
-  )
-  .handleInvocation(async ctx => {
-    let projectKey = projectKeyFromInput(ctx.config, ctx.input);
-    let client = createClient(ctx);
-    let result = await client.searchMeasureHistory({
-      projectKey,
-      metricKeys: ctx.input.metricKeys,
-      from: ctx.input.from,
-      to: ctx.input.to,
-      branch: ctx.input.branch,
-      pullRequest: ctx.input.pullRequest,
-      page: ctx.input.page,
-      pageSize: ctx.input.pageSize
-    });
-    let data = result.data as Record<string, unknown>;
-    let measures = Array.isArray(data.measures)
-      ? data.measures
-          .filter(
-            (item): item is Record<string, unknown> =>
-              typeof item === 'object' && item !== null
-          )
-          .map(measure => ({
-            metric: String(measure.metric ?? ''),
-            history: Array.isArray(measure.history)
-              ? measure.history
-                  .filter(
-                    (item): item is Record<string, unknown> =>
-                      typeof item === 'object' && item !== null
-                  )
-                  .map(item => ({
-                    date: typeof item.date === 'string' ? item.date : undefined,
-                    value: typeof item.value === 'string' ? item.value : undefined,
-                    raw: item
-                  }))
-              : [],
-            raw: measure
-          }))
-      : [];
-
-    return {
-      output: {
-        projectKey,
-        measures,
-        page: result.page,
-        raw: data
-      },
-      message: `Retrieved measure history for **${measures.length}** metrics in SonarQube project **${projectKey}**.`
     };
   })
   .build();

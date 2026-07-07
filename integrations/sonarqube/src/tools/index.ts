@@ -1,3 +1,6 @@
+export * from './analysis';
+export * from './coverage';
+export * from './dependency-risks';
 export * from './discovery';
 export * from './hotspots';
 export * from './issues';

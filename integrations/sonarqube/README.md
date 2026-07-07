@@ -1,6 +1,6 @@
 # <img src="logo.svg" height="20"> SonarQube
 
-Connect to SonarQube Server or SonarQube Cloud to inspect and triage code quality data from the Web API. This integration searches projects, browses components, lists branches and pull request analyses, reads measures and measure history, searches and manages issues, reviews security hotspots, reads rules and source context, discovers duplicated files, checks quality gates, lists operational metadata, and inspects Compute Engine analysis tasks.
+Connect to SonarQube Server or SonarQube Cloud to inspect and triage code quality data from the Web API. This integration searches projects, lists branches and pull request analyses, reads metrics and measures, explores test coverage, searches issues, changes issue status, reviews security hotspots, reads rules and source context, discovers duplicated files, checks quality gates, searches dependency risks, runs SonarQube Cloud advanced code analysis, and lists operational metadata.
 
 ## Authentication
 
@@ -25,53 +25,57 @@ Credential validation calls `/api/authentication/validate`. Server profiles also
 
 ### Search Projects
 
-Search accessible projects by partial project name or exact project key query through component search. Exact `projectKeys` are looked up directly. SonarQube Cloud requires an organization through input or config.
+`search_my_sonarqube_projects` searches accessible projects by project name or key query through component search. Use returned keys as `projectKey` inputs for project-scoped tools.
 
-### Get Component / List Component Tree
+### List Branches / List Pull Requests
 
-Read component metadata and browse child components for projects, directories, files, tests, branches, or pull requests.
+`list_branches` returns long-lived branch names for a project. `list_pull_requests` returns pull request analysis keys for a project.
 
-### List Project Branches / List Project Pull Requests
+### Search Metrics / Get Component Measures
 
-List long-lived branch records and pull request analysis records for a project.
+`search_metrics` discovers available metric keys. `get_component_measures` reads current project measures for project, branch, or pull request analysis.
 
-### List Metrics / Get Project Measures / Search Measure History
+### Search Files by Coverage / Get File Coverage Details
 
-Discover available metrics, read current measures, and inspect historical measures for project, branch, or pull request quality trends.
+`search_files_by_coverage` lists project files sorted by coverage ascending (worst first), with an optional `maxCoverage` threshold filter and a project-level coverage summary. `get_file_coverage_details` reads line-by-line coverage for one file, reporting uncovered lines and partially covered conditions.
 
-### Get Quality Gate Status
+### Get Project Quality Gate Status
 
-Read quality gate status by exactly one of `analysisId`, `projectId`, or `projectKey`. `projectKey` may default from config.
+`get_project_quality_gate_status` reads quality gate status by `analysisId`, `projectId`, or `projectKey`. Branch and pull request filters are supported with `analysisId` or `projectKey`, but not with `projectId`.
 
-### Search Issues / Get Issue / Get Issue Changelog / Manage Issue
+### Search Issues / Change Issue Status
 
-Search issues by issue key, project, component, branch, pull request, legacy status, current issue status, software quality, impact severity, supported type, tags, and text query. Current `severities` values `INFO`, `LOW`, `MEDIUM`, `HIGH`, and `BLOCKER` are sent as impact severities; legacy `CRITICAL`, `MAJOR`, and `MINOR` values remain supported through the legacy API severity filter. `types` accepts SonarQube issue types such as `BUG`, `VULNERABILITY`, and `CODE_SMELL`; use security-hotspot tools for legacy hotspots or `impactSoftwareQualities` for security issues. Read a specific issue, inspect changelog entries, and manage issue workflow updates such as transitions, assignments, comments, tags, severity, and type. Mutating issue actions require explicit `confirmWrite`.
+`search_sonar_issues_in_projects` searches issues by issue key, project, file, branch, pull request, current severity, issue status, and software quality. `change_sonar_issue_status` changes an issue to `accept`, `falsepositive`, or `reopen`.
 
-### Search Security Hotspots / Get Security Hotspot / Manage Security Hotspot
+### Run Advanced Code Analysis
 
-Search security hotspots by project, hotspot key, branch, pull request, file, review status, resolution, and new-code period. Read hotspot details and change hotspot review status or resolution with explicit `confirmWrite`.
+`run_advanced_code_analysis` runs SonarQube Cloud Advanced Code Analysis for one project file using `projectKey`, `branchName`, a workspace-relative `filePath`, and optional `fileScope` (`MAIN` or `TEST`). It reads the file from the current local workspace. It requires SonarQube Cloud organization config and an organization with Advanced Code Analysis enabled.
 
-### Search Rules / Get Rule
+### Search Dependency Risks
 
-Search SonarQube rules by text, language, repository, tag, severity, type, and status. Read rule metadata and raw remediation details by rule key.
+`search_dependency_risks` searches software composition analysis dependency risks for a project, branch, or pull request. SonarQube Cloud requires Advanced Security for the configured organization. SonarQube Server requires version 2025.4 Enterprise or higher with Advanced Security enabled.
 
-### Get Source / Get SCM Info / Search Duplicated Files / Get Duplications
+### Search Security Hotspots / Show Security Hotspot / Change Security Hotspot Status
 
-Retrieve source code as a Slate text attachment, read SCM blame metadata for source lines, search files with duplicated code in a project, and inspect duplicated code blocks for source components.
+`search_security_hotspots` searches hotspots by project, hotspot key, branch, pull request, file, review status, resolution, and new-code period. `show_security_hotspot` reads detailed hotspot context. `change_security_hotspot_status` changes hotspot review status and resolution.
 
-### Get Compute Task / Get Project Analysis Status
+### Show Rule
 
-Inspect Compute Engine task details and current project analysis queue/status.
+`show_rule` reads detailed SonarQube rule metadata by rule key.
+
+### Get Raw Source / Get SCM Info / Search Duplicated Files / Get Duplications
+
+`get_raw_source` retrieves source code as a Slate text attachment instead of inline output. `get_scm_info` reads SCM blame metadata for source lines. `search_duplicated_files` discovers files with duplicated code in a project, and `get_duplications` inspects duplicated code blocks for a file.
 
 ### List Quality Gates / List Languages / Get System Status
 
-List quality gates, list languages known to SonarQube, and read SonarQube Server system status. System status is Server-only and returns a validation error for SonarQube Cloud configs.
+`list_quality_gates` lists quality gates, `list_languages` lists languages known to SonarQube, and `get_system_status` reads SonarQube Server system status. System status is Server-only and returns a validation error for SonarQube Cloud configs.
 
 ## Deferred Tools
 
 OAuth, system passcode auth, user token administration, project creation/deletion, project visibility updates, branch deletion, webhooks, user/group administration, and quality gate administration are intentionally deferred. The package focuses on code-quality read workflows plus explicit issue and security-hotspot triage actions.
 
-SonarQube Cloud is migrating some capabilities to Web API v2. This package uses stable Web API v1 endpoints for the initial tool surface and keeps Cloud v2 base URL handling isolated in the client for future migration.
+SonarQube Cloud is migrating some capabilities to Web API v2. This package uses Web API v2 for advanced code analysis and dependency risks, and Web API v1 for the rest of the current tool surface.
 
 ## License
 

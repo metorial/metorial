@@ -63,7 +63,7 @@ describe('SonarQube API error normalization', () => {
     );
 
     expect(error.data.message).toContain("Project doesn't exist");
-    expect(error.data.message).toContain('search_projects');
+    expect(error.data.message).toContain('search_my_sonarqube_projects');
     expect(error.data.message).toContain('cloudRegion');
     expect(error.data.message).toContain('Browse permission');
   });
@@ -71,13 +71,13 @@ describe('SonarQube API error normalization', () => {
   it('adds project lookup diagnostics to missing component-key responses', () => {
     let error = sonarqubeApiError(
       upstreamError("Component key 'company_tracker-application' not found"),
-      'get project analysis status'
+      'get raw source'
     );
 
     expect(error.data.message).toContain(
       "Component key 'company_tracker-application' not found"
     );
-    expect(error.data.message).toContain('get_component');
+    expect(error.data.message).toContain('search_my_sonarqube_projects');
     expect(error.data.message).toContain('branch or pullRequest');
   });
 
@@ -88,10 +88,10 @@ describe('SonarQube API error normalization', () => {
     );
     let issueError = sonarqubeApiError(
       upstreamError('The requested resource was not found.'),
-      'get issue changelog'
+      'show rule'
     );
 
-    expect(projectError.data.message).toContain('search_projects');
-    expect(issueError.data.message).not.toContain('search_projects');
+    expect(projectError.data.message).toContain('search_my_sonarqube_projects');
+    expect(issueError.data.message).not.toContain('search_my_sonarqube_projects');
   });
 });

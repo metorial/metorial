@@ -1,197 +1,164 @@
 import { z } from 'zod';
-import {
-  branchPullRequestInputs,
-  branchSchema,
-  componentSchema,
-  createClient,
-  mapBranch,
-  mapComponent,
-  mapPullRequest,
-  pageSchema,
-  paginationInputs,
-  projectInput,
-  projectKeyFromInput,
-  pullRequestSchema,
-  rawRecordSchema,
-  readOnlyTool
-} from './shared';
+import { sonarqubeValidationError } from '../lib/errors';
+import { createClient, projectInput, projectKeyFromInput, readOnlyTool } from './shared';
 
 export let searchProjectsTool = readOnlyTool({
-  name: 'Search Projects',
-  key: 'search_projects',
+  name: 'Search My SonarQube Projects',
+  key: 'search_my_sonarqube_projects',
   description:
-    'Search SonarQube projects by partial project name, exact project key query, or exact project keys. Use this before project-scoped tools when the project key is unknown or may be stale.',
-  instructions: [
-    'If the user names a project without saying it is an exact project key, search by query first instead of inventing a projectKey for project-scoped tools.',
-    'Use the returned project key exactly in follow-up tools such as get_component, get_project_measures, search_issues, and list_component_tree.',
-    'For SonarQube Cloud, provide organization input or configure a default organization.'
-  ]
+    'Find SonarQube projects in your organization or instance. Supports searching by project name or key. Use this first when projectKey is unknown - most other tools require the project key from this response.'
 })
   .input(
     z.object({
-      organization: z
+      page: z.number().optional().describe('An optional page number. Defaults to 1.'),
+      pageSize: z
+        .number()
+        .optional()
+        .describe(
+          'An optional page size. Must be greater than 0 and less than or equal to 500. Defaults to 500.'
+        ),
+      q: z
         .string()
         .optional()
-        .describe('SonarQube Cloud organization key. Defaults to config.organization.'),
-      query: z
-        .string()
-        .optional()
         .describe(
-          'Search text for partial project name or exact project key. Use projectKeys when exact keys are known and should be looked up directly.'
-        ),
-      projectKeys: z
-        .array(z.string())
-        .optional()
-        .describe(
-          'Specific exact project keys to include. Each key is looked up directly with components/show and merged with query results.'
-        ),
-      qualifiers: z
-        .array(z.string())
-        .optional()
-        .describe(
-          'Optional component qualifiers such as TRK, APP, or VW. Server searches default to TRK.'
-        ),
-      ...paginationInputs(500, 500)
+          'An optional search query to filter projects by name (partial match) or key (exact match).'
+        )
     })
   )
   .output(
     z.object({
-      projects: z.array(componentSchema).describe('Matching SonarQube projects/components.'),
-      page: pageSchema.optional().describe('Pagination details.')
+      projects: z
+        .array(
+          z.object({
+            key: z.string().describe('Unique project key'),
+            name: z.string().describe('Project display name')
+          })
+        )
+        .describe('List of projects found'),
+      paging: z
+        .object({
+          pageIndex: z.number().int().describe('Current page index (1-based)'),
+          pageSize: z.number().int().describe('Number of items per page'),
+          total: z.number().int().describe('Total number of items across all pages'),
+          hasNextPage: z.boolean().describe('Whether there are more pages available')
+        })
+        .describe('Pagination information for the results')
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.pageSize !== undefined &&
+      (ctx.input.pageSize <= 0 || ctx.input.pageSize > 500)
+    ) {
+      throw sonarqubeValidationError(
+        'Page size must be greater than 0 and less than or equal to 500.'
+      );
+    }
+
     let client = createClient(ctx);
-    let result = await client.searchProjects(ctx.input);
-    let projects = result.items.map(mapComponent);
+    let result = await client.searchProjects({
+      query: ctx.input.q,
+      page: ctx.input.page,
+      pageSize: ctx.input.pageSize
+    });
+    let projects = result.items.map(project => ({
+      key: String(project.key ?? ''),
+      name: typeof project.name === 'string' ? project.name : String(project.name ?? '')
+    }));
+    let pageIndex = result.page?.page ?? ctx.input.page ?? 1;
+    let pageSize = result.page?.pageSize ?? ctx.input.pageSize ?? 500;
+    let total = result.page?.total ?? projects.length;
+    let hasNextPage = result.page?.hasNextPage ?? pageIndex * pageSize < total;
 
     return {
       output: {
         projects,
-        page: result.page
+        paging: {
+          pageIndex,
+          pageSize,
+          total,
+          hasNextPage
+        }
       },
       message: `Found **${projects.length}** SonarQube projects.`
     };
   })
   .build();
 
-export let getComponentTool = readOnlyTool({
-  name: 'Get Component',
-  key: 'get_component',
-  description:
-    'Get metadata for one exact SonarQube component key, such as a project, directory, or file. Use search_projects for project names and list_component_tree for file or directory names when the exact component key is unknown.'
-})
-  .input(
-    z.object({
-      component: z
-        .string()
-        .describe(
-          'Exact component key to retrieve. For a project, use the project key returned by search_projects.'
-        ),
-      ...branchPullRequestInputs
-    })
-  )
-  .output(
-    z.object({
-      component: componentSchema.describe('Normalized SonarQube component.'),
-      ancestors: z.array(componentSchema).optional().describe('Ancestor components.'),
-      raw: rawRecordSchema
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let data = await client.getComponent(ctx.input);
-    let component =
-      typeof data.component === 'object' && data.component !== null
-        ? (data.component as Record<string, unknown>)
-        : data;
-    let ancestors = Array.isArray(data.ancestors)
-      ? data.ancestors
-          .filter(
-            (item): item is Record<string, unknown> =>
-              typeof item === 'object' && item !== null
-          )
-          .map(mapComponent)
-      : undefined;
-
-    return {
-      output: {
-        component: mapComponent(component),
-        ancestors,
-        raw: data
-      },
-      message: `Retrieved SonarQube component **${ctx.input.component}**.`
-    };
-  })
-  .build();
-
-export let listComponentTreeTool = readOnlyTool({
-  name: 'List Component Tree',
-  key: 'list_component_tree',
-  description:
-    'List child components under an exact SonarQube project, directory, or file component key. Use search_projects first when the project was described by name or partial key; use this to discover file component keys before get_source, get_scm_info, or get_duplications.'
-})
-  .input(
-    z.object({
-      component: z
-        .string()
-        .describe(
-          'Exact root component key to browse, usually a project key from search_projects.'
-        ),
-      query: z.string().optional().describe('Search text for child components.'),
-      qualifiers: z
-        .array(z.string())
-        .optional()
-        .describe(
-          'Component qualifiers to include, such as DIR for directories, FIL for source files, or UTS for tests. Omit for general browsing.'
-        ),
-      ...branchPullRequestInputs,
-      ...paginationInputs(100, 500)
-    })
-  )
-  .output(
-    z.object({
-      components: z.array(componentSchema).describe('Matching child components.'),
-      page: pageSchema.optional().describe('Pagination details.')
-    })
-  )
-  .handleInvocation(async ctx => {
-    let client = createClient(ctx);
-    let result = await client.listComponentTree(ctx.input);
-    let components = result.items.map(mapComponent);
-
-    return {
-      output: {
-        components,
-        page: result.page
-      },
-      message: `Found **${components.length}** components under **${ctx.input.component}**.`
-    };
-  })
-  .build();
-
 export let listProjectBranchesTool = readOnlyTool({
-  name: 'List Project Branches',
-  key: 'list_project_branches',
+  name: 'List SonarQube Branches',
+  key: 'list_branches',
   description:
-    'List long-lived branch analyses for a SonarQube project. Use this when the branch name is unknown before branch-scoped project, issue, measure, quality-gate, or component calls. For pull requests, use list_project_pull_requests.'
+    'List long-lived branches for a project (e.g. main, develop, master). Use returned branch names as the branch parameter on other tools (e.g. get_project_quality_gate_status, get_component_measures). For pull requests, use list_pull_requests instead.'
 })
   .input(z.object(projectInput))
   .output(
     z.object({
-      projectKey: z.string().describe('Project key used for the request.'),
-      branches: z.array(branchSchema).describe('Project branches.')
+      projectKey: z.string().describe('Project key'),
+      totalBranches: z.number().int().describe('Total number of branches'),
+      branches: z
+        .array(
+          z.object({
+            name: z
+              .string()
+              .describe(
+                'Branch name that can be used with other tools as the branch parameter'
+              ),
+            isMain: z.boolean().describe('Whether this is the main branch'),
+            type: z
+              .enum(['LONG', 'SHORT', 'BRANCH'])
+              .optional()
+              .describe(
+                'Branch type in SonarQube (LONG on SonarQube Cloud, BRANCH on SonarQube Server)'
+              ),
+            qualityGateStatus: z
+              .enum(['OK', 'ERROR', 'WARN', 'NONE'])
+              .optional()
+              .describe('Quality gate status for this branch'),
+            analysisDate: z.string().optional().describe('Date of the last analysis'),
+            branchId: z.string().describe('Internal branch identifier')
+          })
+        )
+        .describe('List of branches for this project')
     })
   )
   .handleInvocation(async ctx => {
     let projectKey = projectKeyFromInput(ctx.config, ctx.input);
     let client = createClient(ctx);
     let result = await client.listProjectBranches(projectKey);
-    let branches = result.items.map(mapBranch);
+    let branchTypes = ['LONG', 'SHORT', 'BRANCH'] as const;
+    let qualityGateStatuses = ['OK', 'ERROR', 'WARN', 'NONE'] as const;
+    let isBranchType = (value: unknown): value is (typeof branchTypes)[number] =>
+      typeof value === 'string' && branchTypes.includes(value as (typeof branchTypes)[number]);
+    let isQualityGateStatus = (
+      value: unknown
+    ): value is (typeof qualityGateStatuses)[number] =>
+      typeof value === 'string' &&
+      qualityGateStatuses.includes(value as (typeof qualityGateStatuses)[number]);
+    let branches = result.items.map(branch => {
+      let type = isBranchType(branch.type) ? branch.type : undefined;
+      let status = branch.status;
+      let statusValue =
+        typeof status === 'object' && status !== null && 'qualityGateStatus' in status
+          ? status.qualityGateStatus
+          : undefined;
+      let qualityGateStatus = isQualityGateStatus(statusValue) ? statusValue : undefined;
+
+      return {
+        name: String(branch.name ?? ''),
+        isMain: branch.isMain === true,
+        type,
+        qualityGateStatus,
+        analysisDate:
+          typeof branch.analysisDate === 'string' ? branch.analysisDate : undefined,
+        branchId: String(branch.branchId ?? '')
+      };
+    });
 
     return {
       output: {
         projectKey,
+        totalBranches: branches.length,
         branches
       },
       message: `Found **${branches.length}** branches for SonarQube project **${projectKey}**.`
@@ -200,27 +167,45 @@ export let listProjectBranchesTool = readOnlyTool({
   .build();
 
 export let listProjectPullRequestsTool = readOnlyTool({
-  name: 'List Project Pull Requests',
-  key: 'list_project_pull_requests',
+  name: 'List SonarQube Pull Requests',
+  key: 'list_pull_requests',
   description:
-    'List pull request analyses for a SonarQube project. Use this when the pull request id or key is unknown before pull-request-scoped project, issue, measure, quality-gate, or component calls.'
+    'List all pull requests for a project. Use this tool to discover available pull requests and their corresponding branch names before analyzing their coverage, issues, or quality. Returns the pull request key/ID and source branch for each PR, which can be used with other tools that accept a pullRequest parameter. For long-lived branches (main, develop), use list_branches instead.'
 })
   .input(z.object(projectInput))
   .output(
     z.object({
-      projectKey: z.string().describe('Project key used for the request.'),
-      pullRequests: z.array(pullRequestSchema).describe('Project pull request analyses.')
+      projectKey: z.string().describe('Project key'),
+      totalPullRequests: z.number().int().describe('Total number of pull requests'),
+      pullRequests: z
+        .array(
+          z.object({
+            key: z
+              .string()
+              .describe(
+                'Pull request key/ID that can be used with other tools as the pullRequest parameter'
+              ),
+            title: z.string().describe('Pull request title'),
+            branch: z.string().describe('Source branch name associated with this pull request')
+          })
+        )
+        .describe('List of pull requests for this project')
     })
   )
   .handleInvocation(async ctx => {
     let projectKey = projectKeyFromInput(ctx.config, ctx.input);
     let client = createClient(ctx);
     let result = await client.listProjectPullRequests(projectKey);
-    let pullRequests = result.items.map(mapPullRequest);
+    let pullRequests = result.items.map(pullRequest => ({
+      key: String(pullRequest.key ?? ''),
+      title: String(pullRequest.title ?? ''),
+      branch: String(pullRequest.branch ?? '')
+    }));
 
     return {
       output: {
         projectKey,
+        totalPullRequests: pullRequests.length,
         pullRequests
       },
       message: `Found **${pullRequests.length}** pull requests for SonarQube project **${projectKey}**.`

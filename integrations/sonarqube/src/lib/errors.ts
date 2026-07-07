@@ -1,22 +1,18 @@
 import { buildApiServiceError, createApiServiceError } from 'slates';
 
 let PROJECT_LOOKUP_HINT =
-  'Verify the project key with search_projects or get_component, check the SonarQube Cloud cloudRegion and organization config, confirm the token has Browse permission on the project, and make sure any branch or pullRequest value exists for that project.';
+  'Verify the project key with search_my_sonarqube_projects, check the SonarQube Cloud cloudRegion and organization config, confirm the token has Browse permission on the project, and make sure any branch or pullRequest value exists for that project.';
 
 let PROJECT_SCOPED_OPERATIONS = new Set([
-  'get component',
-  'list component tree',
   'list project branches',
   'list project pull requests',
-  'get project analysis status',
   'get project measures',
-  'search measure history',
   'get quality gate status',
   'search issues',
   'search security hotspots',
   'get raw source',
-  'show source',
   'get source SCM info',
+  'search duplicated files',
   'get duplications'
 ]);
 
