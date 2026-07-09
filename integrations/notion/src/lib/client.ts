@@ -116,13 +116,9 @@ export class NotionClient {
 
   async appendBlockChildren(
     blockId: string,
-    children: any[],
-    position?: Record<string, any>
+    children: any[]
   ): Promise<PaginatedResponse<any>> {
-    let body: Record<string, any> = { children };
-    if (position) body.position = position;
-
-    let response = await this.axios.patch(`/blocks/${blockId}/children`, body);
+    let response = await this.axios.patch(`/blocks/${blockId}/children`, { children });
     return response.data;
   }
 
