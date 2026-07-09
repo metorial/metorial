@@ -1,8 +1,27 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { gmailActionScopes } from '../scopes';
 import { spec } from '../spec';
+
+let requireLabelId = (labelId: string | undefined, action: string) => {
+  if (!labelId) {
+    throw createApiServiceError(`labelId is required for ${action} action.`);
+  }
+
+  return labelId;
+};
+
+let requireUserLabel = async (client: Client, labelId: string, action: string) => {
+  let label = await client.getLabel(labelId);
+  if (label.type === 'system') {
+    throw createApiServiceError(
+      `System label ${label.name || labelId} cannot be ${action}d. Use a user-created label ID.`
+    );
+  }
+
+  return label;
+};
 
 let labelSchema = z.object({
   labelId: z.string().describe('Label ID.'),
@@ -98,7 +117,9 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('name is required for create action');
+      if (!ctx.input.name) {
+        throw createApiServiceError('name is required for create action.');
+      }
       let label = await client.createLabel({
         name: ctx.input.name,
         messageListVisibility: ctx.input.messageListVisibility,
@@ -113,8 +134,9 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.labelId) throw new Error('labelId is required for update action');
-      let label = await client.updateLabel(ctx.input.labelId, {
+      let labelId = requireLabelId(ctx.input.labelId, action);
+      await requireUserLabel(client, labelId, 'update');
+      let label = await client.updateLabel(labelId, {
         name: ctx.input.name,
         messageListVisibility: ctx.input.messageListVisibility,
         labelListVisibility: ctx.input.labelListVisibility,
@@ -123,13 +145,13 @@ export let manageLabels = SlateTool.create(spec, {
       });
       return {
         output: { label: mapLabel(label) },
-        message: `Label **${ctx.input.labelId}** updated.`
+        message: `Label **${labelId}** updated.`
       };
     }
 
     if (action === 'get') {
-      if (!ctx.input.labelId) throw new Error('labelId is required for get action');
-      let label = await client.getLabel(ctx.input.labelId);
+      let labelId = requireLabelId(ctx.input.labelId, action);
+      let label = await client.getLabel(labelId);
       return {
         output: { label: mapLabel(label) },
         message: `Retrieved label "${label.name}".`
@@ -137,13 +159,14 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.labelId) throw new Error('labelId is required for delete action');
-      await client.deleteLabel(ctx.input.labelId);
+      let labelId = requireLabelId(ctx.input.labelId, action);
+      await requireUserLabel(client, labelId, 'delete');
+      await client.deleteLabel(labelId);
       return {
         output: { deleted: true },
-        message: `Label **${ctx.input.labelId}** deleted.`
+        message: `Label **${labelId}** deleted.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown label action: ${action}.`);
   });
