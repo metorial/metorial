@@ -1,10 +1,14 @@
-import { buildApiServiceError, createApiServiceError } from 'slates';
+import { buildApiServiceError, createApiServiceError, SlateError } from 'slates';
 
 export let elasticsearchServiceError = (message: string) =>
   createApiServiceError(message, { reason: 'elasticsearch_validation_error' });
 
-export let elasticsearchApiError = (error: unknown, operation = 'request') =>
-  buildApiServiceError(error, {
+export let elasticsearchApiError = (error: unknown, operation = 'request') => {
+  if (SlateError.is(error)) {
+    return error;
+  }
+
+  return buildApiServiceError(error, {
     providerLabel: 'Elasticsearch',
     operation,
     reason: 'elasticsearch_api_error',
@@ -21,3 +25,4 @@ export let elasticsearchApiError = (error: unknown, operation = 'request') =>
       return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
     }
   });
+};
