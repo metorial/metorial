@@ -7,6 +7,7 @@ import {
   gitScmMatchTargetMatches,
   gitScmUrlsLooselyMatch,
   JenkinsClient,
+  jobFullNameFromInput,
   normalizeJenkinsAuth,
   parseBuildSelectorPath,
   summarizeBuildChangesets
@@ -81,6 +82,14 @@ describe('parseBuildSelectorPath', () => {
   it('uses buildNumber when selector is omitted or explicit number', () => {
     expect(parseBuildSelectorPath(undefined, 42)).toBe('42');
     expect(parseBuildSelectorPath('number', 42)).toBe('42');
+  });
+});
+
+describe('jobFullNameFromInput', () => {
+  it('rejects missing job input when no default job is configured', () => {
+    expect(() => jobFullNameFromInput(undefined, undefined)).toThrow(
+      'jobFullName is required. Provide jobFullName input or configure defaultJobFullName.'
+    );
   });
 });
 
@@ -226,6 +235,188 @@ describe('JenkinsClient log reads', () => {
     expect(log.text).toBe('first\nsecond\n');
     expect(log.moreData).toBe(true);
     expect(log.nextStart).toBe(Buffer.byteLength('first\nsecond\n', 'utf8'));
+  });
+
+  it('treats a negative limit as a tail window', async () => {
+    let client = new JenkinsClient({
+      auth: {
+        baseUrl: 'http://jenkins.example',
+        username: 'user',
+        apiToken: 'token'
+      }
+    });
+    client.getBuild = async () => ({ number: 7 });
+    client.getProgressiveLog = async () => ({
+      text: 'first\nsecond\nthird\n',
+      start: 0,
+      nextStart: Buffer.byteLength('first\nsecond\nthird\n', 'utf8'),
+      moreData: false,
+      progressive: true
+    });
+
+    let page = await client.getBuildLog({
+      jobFullName: 'folder/job',
+      buildNumber: 7,
+      limit: -2,
+      maxLines: 100
+    });
+
+    expect(page.lines).toEqual(['second', 'third']);
+    expect(page.startLine).toBe(2);
+    expect(page.endLine).toBe(3);
+  });
+});
+
+describe('JenkinsClient SCM search', () => {
+  let createClient = () =>
+    new JenkinsClient({
+      auth: {
+        baseUrl: 'http://jenkins.example',
+        username: 'user',
+        apiToken: 'token'
+      }
+    });
+
+  let createJobs = (count: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      name: `job-${index + 1}`,
+      fullName: `folder/job-${index + 1}`,
+      isFolder: false,
+      raw: {}
+    }));
+
+  let createScmResult = (url = 'https://github.com/example/app.git') => ({
+    summary: {
+      scmClasses: ['hudson.plugins.git.GitSCM'],
+      urls: [url],
+      branches: ['*/main'],
+      credentialsIds: []
+    },
+    gitScms: [],
+    gitScmMatchTargets: [
+      {
+        uri: url,
+        repositoryName: 'origin',
+        branchSpecs: ['*/main']
+      }
+    ],
+    parsedConfig: {}
+  });
+
+  it('never exceeds eight concurrent SCM reads and marks an early stop incomplete', async () => {
+    let client = createClient();
+    let jobs = createJobs(20);
+    client.listJobs = async () => jobs;
+    let activeRequests = 0;
+    let maxActiveRequests = 0;
+    let inspectedJobs: string[] = [];
+    client.getJobScm = async jobFullName => {
+      inspectedJobs.push(jobFullName);
+      activeRequests += 1;
+      maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
+      await Promise.resolve();
+      activeRequests -= 1;
+      return createScmResult();
+    };
+
+    let result = await client.findJobsWithScmUrl({
+      scmUrl: 'git@github.com:example/app.git',
+      skip: 0,
+      limit: 2
+    });
+
+    expect(result.matches.map(match => match.job.fullName)).toEqual([
+      'folder/job-1',
+      'folder/job-2'
+    ]);
+    expect(maxActiveRequests).toBe(8);
+    expect(inspectedJobs).toHaveLength(8);
+    expect(result).toMatchObject({
+      listedCount: 20,
+      inspectedCount: 8,
+      skippedCount: 0,
+      matchCount: 8,
+      searchComplete: false
+    });
+  });
+
+  it('keeps job order under out-of-order completion and applies nonzero skip pagination', async () => {
+    let client = createClient();
+    let jobs = createJobs(8);
+    client.listJobs = async () => jobs;
+    let scmResult = createScmResult();
+    let pending = new Map<string, (result: typeof scmResult) => void>();
+    client.getJobScm = jobFullName =>
+      new Promise(resolve => {
+        pending.set(jobFullName, resolve);
+      });
+
+    let search = client.findJobsWithScmUrl({
+      scmUrl: 'git@github.com:example/app.git',
+      skip: 2,
+      limit: 3
+    });
+    while (pending.size < jobs.length) {
+      await Promise.resolve();
+    }
+    for (let job of [...jobs].reverse()) {
+      pending.get(job.fullName)?.(scmResult);
+    }
+
+    let result = await search;
+
+    expect(result.matches.map(match => match.job.fullName)).toEqual([
+      'folder/job-3',
+      'folder/job-4',
+      'folder/job-5'
+    ]);
+    expect(result).toMatchObject({
+      listedCount: 8,
+      inspectedCount: 8,
+      skippedCount: 0,
+      matchCount: 8,
+      searchComplete: true
+    });
+  });
+
+  it('counts missing names and failed SCM reads as skipped and incomplete', async () => {
+    let client = createClient();
+    let jobs = [
+      ...createJobs(1),
+      { name: 'job-2', isFolder: false, raw: {} },
+      ...createJobs(3).slice(2)
+    ];
+    jobs.push({
+      name: 'job-4',
+      fullName: 'folder/job-4',
+      isFolder: false,
+      raw: {}
+    });
+    client.listJobs = async () => jobs;
+    client.getJobScm = async jobFullName => {
+      if (jobFullName === 'folder/job-3') {
+        throw new Error('SCM config unavailable');
+      }
+      return createScmResult(
+        jobFullName === 'folder/job-4' ? 'https://github.com/example/other.git' : undefined
+      );
+    };
+
+    let result = await client.findJobsWithScmUrl({
+      scmUrl: 'git@github.com:example/app.git',
+      skip: 0,
+      limit: 10
+    });
+
+    expect(result.matches.map(match => match.job.fullName)).toEqual(['folder/job-1']);
+    expect(result).toMatchObject({
+      listedCount: 4,
+      inspectedCount: 2,
+      skippedCount: 2,
+      matchCount: 1,
+      searchComplete: false
+    });
+    expect(result.inspectedCount + result.skippedCount).toBe(result.listedCount);
   });
 });
 

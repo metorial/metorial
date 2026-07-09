@@ -6791,7 +6791,7 @@
     },
     "integrations/jenkins": {
       "name": "@slates-integrations/jenkins",
-      "version": "0.2.0-rc.9",
+      "version": "0.2.0-rc.10",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
