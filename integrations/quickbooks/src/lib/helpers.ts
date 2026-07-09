@@ -3,7 +3,7 @@ import { quickBooksServiceError } from './errors';
 
 export interface ContextLike {
   config: { environment: 'sandbox' | 'production'; companyId?: string };
-  auth: { token: string; realmId?: string };
+  auth: { token: string; realmId?: string; environment?: 'sandbox' | 'production' };
 }
 
 export let createClientFromContext = (ctx: ContextLike): QuickBooksClient => {
@@ -17,6 +17,6 @@ export let createClientFromContext = (ctx: ContextLike): QuickBooksClient => {
   return new QuickBooksClient({
     token: ctx.auth.token,
     companyId,
-    environment: ctx.config.environment
+    environment: ctx.auth.environment ?? ctx.config.environment
   });
 };
