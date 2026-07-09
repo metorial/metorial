@@ -40,7 +40,9 @@ export let getGenericRates = SlateTool.create(spec, {
       instrumentTypes: z
         .array(genericInstrumentTypeSchema)
         .min(1)
-        .describe('Instrument types to retrieve'),
+        .describe(
+          'Norges Bank instrument codes to retrieve: TBIL for treasury bills or GBON for government bonds. Use these exact codes.'
+        ),
       startPeriod: z
         .string()
         .describe('Start period. Use YYYY-MM-DD for B, YYYY-MM for M, or YYYY for A.'),
