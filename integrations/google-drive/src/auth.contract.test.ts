@@ -116,7 +116,7 @@ describe('google-drive auth contract', () => {
     });
   });
 
-  it('fails refreshes cleanly when no refresh token is stored', async () => {
+  it('returns an actionable request error when no refresh token is stored', async () => {
     let client = await loadProviderClient();
 
     await expectSlateError(
@@ -131,7 +131,16 @@ describe('google-drive auth contract', () => {
           clientSecret: 'client-secret',
           scopes: [googleDriveScopes.drive]
         }),
-      { code: 'internal.unexpected', kind: 'internal', status: 500 }
+      {
+        code: 'request.bad',
+        kind: 'request',
+        status: 400,
+        baggage: {
+          serviceError: {
+            reason: 'google_drive_missing_refresh_token'
+          }
+        }
+      }
     );
   });
 

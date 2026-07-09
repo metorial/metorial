@@ -1,4 +1,4 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { googleDriveScopes } from './scopes';
 
@@ -135,7 +135,10 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No Google refresh token is available. Reconnect Google Drive to restore offline access.',
+          { reason: 'google_drive_missing_refresh_token' }
+        );
       }
 
       let response = await oauthAxios.post(
