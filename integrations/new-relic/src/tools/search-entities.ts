@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { NerdGraphClient } from '../lib/client';
+import { NerdGraphClient, requireEntitySearchQuery } from '../lib/client';
 import { spec } from '../spec';
 
 let entitySchema = z.object({
@@ -32,7 +32,7 @@ export let searchEntities = SlateTool.create(spec, {
 Use a query string with New Relic entity search syntax. Supports filtering by type, domain, name, tags, and alert severity.`,
   instructions: [
     "Query syntax examples: `name LIKE 'my-app'`, `type = 'APPLICATION'`, `domain = 'APM'`, `tags.environment = 'production'`.",
-    'Combine conditions with `AND`/`OR`. Leave query empty to list all entities.',
+    'Combine conditions with `AND`/`OR`. A non-empty query is required unless `entityGuid` is provided.',
     'Use `entityGuid` to provide an exact entity GUID to get detailed information about a specific entity.'
   ],
   tags: {
@@ -44,7 +44,9 @@ Use a query string with New Relic entity search syntax. Supports filtering by ty
       query: z
         .string()
         .optional()
-        .describe('Entity search query string using New Relic entity search syntax'),
+        .describe(
+          'Non-empty entity search query using New Relic entity search syntax. Required when entityGuid is not provided.'
+        ),
       entityGuid: z
         .string()
         .optional()
@@ -100,9 +102,10 @@ Use a query string with New Relic entity search syntax. Supports filtering by ty
       };
     }
 
+    let query = requireEntitySearchQuery(ctx.input.query);
     ctx.progress('Searching entities...');
     let result = await client.searchEntities({
-      query: ctx.input.query,
+      query,
       cursor: ctx.input.cursor
     });
 
