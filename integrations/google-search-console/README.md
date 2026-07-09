@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/google_search_console-logo.svg" height="20"> Google Search Console
 
-Query search traffic analytics including clicks, impressions, CTR, and average position, with filtering by query, page, country, device, search type, and date. Manage Search Console site properties by adding, removing, and listing sites. Submit, list, retrieve, and delete sitemaps. Inspect URLs to check indexing status, AMP results, rich results, and mobile usability. Run mobile-friendly tests on URLs to check Google's mobile-friendliness standards.
+Query search traffic analytics including clicks, impressions, CTR, and average position, with filtering by query, page, country, device, search type, and date. Manage Search Console site properties by adding, removing, and listing sites. Submit, list, retrieve, and delete sitemaps. Inspect URLs to check indexing status, AMP results, rich results, and mobile usability.
 
 ## Tools
 
@@ -23,10 +23,6 @@ List, retrieve, submit, or delete sitemaps for a Search Console site property. U
 ### Query Search Analytics
 
 Query Google Search traffic data for a site property. Returns metrics like clicks, impressions, click-through rate (CTR), and average position. Results can be grouped by dimensions such as query, page, country, device, and date. Supports filtering and pagination for large result sets.
-
-### Run Mobile-Friendly Test
-
-Run Google's Mobile-Friendly Test for a given URL. Checks whether a page is mobile-friendly according to Google's standards and reports any issues found.
 
 ## License
 

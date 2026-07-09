@@ -111,27 +111,6 @@ export interface UrlInspectionResult {
   };
 }
 
-export interface MobileFriendlyTestRequest {
-  url: string;
-  requestScreenshot?: boolean;
-}
-
-export interface MobileFriendlyTestResponse {
-  testStatus: {
-    status: string;
-    details?: string;
-  };
-  mobileFriendliness: string;
-  mobileFriendlyIssues?: Array<{
-    rule: string;
-  }>;
-  resourceIssues?: Array<{
-    blockedResource: {
-      url: string;
-    };
-  }>;
-}
-
 export class SearchConsoleClient {
   private webmastersApi;
   private searchConsoleApi;
@@ -262,29 +241,5 @@ export class SearchConsoleClient {
     });
 
     return response.data.inspectionResult;
-  }
-}
-
-// Mobile-Friendly Test uses a separate client since it uses API key auth
-export class MobileFriendlyTestClient {
-  private api;
-
-  constructor() {
-    this.api = createAxios({
-      baseURL: 'https://searchconsole.googleapis.com/v1'
-    });
-  }
-
-  async runTest(
-    request: MobileFriendlyTestRequest,
-    token: string
-  ): Promise<MobileFriendlyTestResponse> {
-    let response = await this.api.post('/urlTestingTools/mobileFriendlyTest:run', request, {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
-    });
-
-    return response.data;
   }
 }

@@ -5710,7 +5710,7 @@
     },
     "integrations/google-search-console": {
       "name": "@slates-integrations/google-search-console",
-      "version": "0.2.0-rc.6",
+      "version": "0.2.0-rc.7",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.14",

@@ -16,7 +16,6 @@ export let googleSearchConsoleActionScopes = {
   querySearchAnalytics: siteRead,
   listSites: siteRead,
   inspectUrl: siteRead,
-  runMobileFriendlyTest: siteRead,
   manageSite: siteRead,
   manageSitemap: siteRead,
   inboundWebhook: siteRead
