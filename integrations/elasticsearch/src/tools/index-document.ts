@@ -7,6 +7,12 @@ export let indexDocumentTool = SlateTool.create(spec, {
   name: 'Index Document',
   key: 'index_document',
   description: `Create or replace a document in an Elasticsearch index. Provide JSON document content and optionally specify a document ID. If no ID is provided, Elasticsearch will auto-generate one. If an ID is provided and a document already exists with that ID, it will be replaced.`,
+  instructions: [
+    'Use this tool to write one JSON document, including when an existing ingest pipeline should process it.',
+    'Pass the existing ingest pipeline name in the "pipeline" field; do not use manage_pipeline merely because an indexing request names a pipeline.',
+    'Use get_document and list_indices only for read-only requests; they do not index document content.',
+    'Use bulk_operations instead when the user asks to write multiple documents.'
+  ],
   tags: {
     destructive: false,
     readOnly: false
