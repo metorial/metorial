@@ -1,7 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { ServiceError } from '@lowerdeck/error';
+import { describe, expect, it, vi } from 'vitest';
 import {
   assertValidEvents,
   assertValidMetrics,
+  NerdGraphClient,
+  requireEntitySearchQuery,
   toAlertIssuesFilterInput,
   toDashboardPageInputs,
   toMetricPayload,
@@ -227,5 +230,63 @@ describe('New Relic client payload helpers', () => {
       policyIds: [456],
       sources: ['newrelic']
     });
+  });
+
+  it('requires a non-empty query for entity search', () => {
+    expect(() => requireEntitySearchQuery()).toThrow(ServiceError);
+    expect(() => requireEntitySearchQuery('   ')).toThrow(ServiceError);
+    expect(requireEntitySearchQuery("  type = 'APPLICATION'  ")).toBe("type = 'APPLICATION'");
+  });
+
+  it('sends entity search as a required GraphQL variable', async () => {
+    let client = new NerdGraphClient({
+      token: 'token',
+      region: 'us',
+      accountId: '123'
+    });
+    let query = vi.spyOn(client, 'query').mockResolvedValue({
+      actor: { entitySearch: { count: 0, results: { entities: [] } } }
+    });
+
+    await client.searchEntities({
+      query: "  type = 'APPLICATION'  ",
+      cursor: 'next-page'
+    });
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('query($query: String!, $cursor: String)'),
+      {
+        query: "type = 'APPLICATION'",
+        cursor: 'next-page'
+      }
+    );
+  });
+
+  it('opts alert issue queries into the AiIssues schema', async () => {
+    let client = new NerdGraphClient({
+      token: 'token',
+      region: 'us',
+      accountId: '123'
+    });
+    let query = vi.spyOn(client, 'query').mockResolvedValue({
+      actor: {
+        account: {
+          aiIssues: { issues: { issues: [], nextCursor: null } }
+        }
+      }
+    });
+
+    await client.listAlertIssues({ filter: { states: ['ACTIVATED'] } });
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('$filter: AiIssuesFilterIssues'),
+      {
+        accountId: 123,
+        cursor: undefined,
+        filter: { states: ['ACTIVATED'] },
+        timeWindow: undefined
+      },
+      { 'nerd-graph-unsafe-experimental-opt-in': 'AiIssues' }
+    );
   });
 });

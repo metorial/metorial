@@ -1998,6 +1998,74 @@ export class JenkinsClient {
     };
   }
 
+  async findJobsWithScmUrl(params: {
+    folderFullName?: string;
+    scmUrl: string;
+    branch?: string;
+    skip: number;
+    limit: number;
+  }) {
+    let jobs = await this.listJobs({
+      folderFullName: params.folderFullName,
+      recursive: true,
+      includeFolders: false,
+      maxDepth: 20
+    });
+    let matches = [] as {
+      job: JenkinsJobSummary;
+      scm: Awaited<ReturnType<JenkinsClient['getJobScm']>>;
+    }[];
+    let inspectedCount = 0;
+    let skippedCount = 0;
+    let matchCount = 0;
+    let batchSize = 8;
+
+    for (let offset = 0; offset < jobs.length; offset += batchSize) {
+      let batch = jobs.slice(offset, offset + batchSize);
+      let results = await Promise.all(
+        batch.map(async job => {
+          if (!job.fullName) return { job, scm: undefined };
+          try {
+            return { job, scm: await this.getJobScm(job.fullName) };
+          } catch {
+            return { job, scm: undefined };
+          }
+        })
+      );
+
+      for (let result of results) {
+        if (!result.scm) {
+          skippedCount += 1;
+          continue;
+        }
+        inspectedCount += 1;
+
+        let hasMatch = result.scm.gitScmMatchTargets.some(target =>
+          gitScmMatchTargetMatches(target, params.scmUrl, params.branch)
+        );
+        if (!hasMatch) continue;
+
+        if (matchCount >= params.skip && matches.length < params.limit) {
+          matches.push({ job: result.job, scm: result.scm });
+        }
+        matchCount += 1;
+      }
+
+      if (params.limit > 0 && matches.length >= params.limit) {
+        break;
+      }
+    }
+
+    return {
+      listedCount: jobs.length,
+      inspectedCount,
+      skippedCount,
+      matchCount,
+      searchComplete: inspectedCount === jobs.length,
+      matches
+    };
+  }
+
   async getBuildScm(jobFullName: string, buildNumber: number | undefined) {
     let build = await this.getBuild(
       jobFullName,

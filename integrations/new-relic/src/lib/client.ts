@@ -254,6 +254,15 @@ export let toAlertIssuesFilterInput = (filter?: NewRelicAlertIssuesFilter) => {
   return filterInput;
 };
 
+export let requireEntitySearchQuery = (query?: string) => {
+  let normalizedQuery = query?.trim();
+  if (!normalizedQuery) {
+    throw createApiServiceError('query is required when entityGuid is not provided');
+  }
+
+  return normalizedQuery;
+};
+
 export class NerdGraphClient {
   private http: ReturnType<typeof createAxios>;
   private accountId: string;
@@ -269,12 +278,20 @@ export class NerdGraphClient {
     });
   }
 
-  async query(graphqlQuery: string, variables?: Record<string, any>): Promise<any> {
+  async query(
+    graphqlQuery: string,
+    variables?: Record<string, any>,
+    headers?: Record<string, string>
+  ): Promise<any> {
     try {
-      let response = await this.http.post('', {
-        query: graphqlQuery,
-        variables: variables || {}
-      });
+      let response = await this.http.post(
+        '',
+        {
+          query: graphqlQuery,
+          variables: variables || {}
+        },
+        headers ? { headers } : undefined
+      );
 
       if (response.data?.errors?.length) {
         throw newRelicGraphqlErrors('NerdGraph request', response.data.errors);
@@ -308,9 +325,10 @@ export class NerdGraphClient {
     return data?.actor?.account?.nrql;
   }
 
-  async searchEntities(params: { query?: string; cursor?: string }): Promise<any> {
+  async searchEntities(params: { query: string; cursor?: string }): Promise<any> {
+    let query = requireEntitySearchQuery(params.query);
     let data = await this.query(
-      `query($query: String, $cursor: String) {
+      `query($query: String!, $cursor: String) {
         actor {
           entitySearch(query: $query) {
             results(cursor: $cursor) {
@@ -332,7 +350,7 @@ export class NerdGraphClient {
           }
         }
       }`,
-      { query: params.query || undefined, cursor: params.cursor }
+      { query, cursor: params.cursor }
     );
 
     return data?.actor?.entitySearch;
@@ -1173,7 +1191,8 @@ export class NerdGraphClient {
         cursor: params?.cursor,
         filter: Object.keys(filterInput).length > 0 ? filterInput : undefined,
         timeWindow: params?.timeWindow
-      }
+      },
+      { 'nerd-graph-unsafe-experimental-opt-in': 'AiIssues' }
     );
 
     return data?.actor?.account?.aiIssues?.issues;

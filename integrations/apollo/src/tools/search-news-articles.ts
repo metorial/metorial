@@ -35,6 +35,24 @@ let validateDate = (value: string | undefined, label: string) => {
   return value;
 };
 
+export let validatePublishedAtRange = (
+  publishedAtMin: string | undefined,
+  publishedAtMax: string | undefined
+) => {
+  let min = validateDate(publishedAtMin, 'publishedAtMin');
+  let max = validateDate(publishedAtMax, 'publishedAtMax');
+
+  if ((min === undefined) !== (max === undefined)) {
+    throw apolloServiceError('Provide both publishedAtMin and publishedAtMax, or omit both.');
+  }
+
+  if (min !== undefined && max !== undefined && min > max) {
+    throw apolloServiceError('publishedAtMin must be on or before publishedAtMax.');
+  }
+
+  return { publishedAtMin: min, publishedAtMax: max };
+};
+
 let nestedRecord = (value: unknown) => (isRecord(value) ? value : undefined);
 
 let nestedString = (value: unknown, key: string) => optionalString(nestedRecord(value)?.[key]);
@@ -110,11 +128,15 @@ export let searchNewsArticles = SlateTool.create(spec, {
       publishedAtMin: z
         .string()
         .optional()
-        .describe('Lower publication date bound in YYYY-MM-DD format.'),
+        .describe(
+          'Lower publication date bound in YYYY-MM-DD format. Requires publishedAtMax.'
+        ),
       publishedAtMax: z
         .string()
         .optional()
-        .describe('Upper publication date bound in YYYY-MM-DD format.'),
+        .describe(
+          'Upper publication date bound in YYYY-MM-DD format. Requires publishedAtMin.'
+        ),
       page: z.number().int().positive().optional().describe('Page number (default: 1)'),
       perPage: z
         .number()
@@ -133,16 +155,10 @@ export let searchNewsArticles = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let publishedAtMin = validateDate(ctx.input.publishedAtMin, 'publishedAtMin');
-    let publishedAtMax = validateDate(ctx.input.publishedAtMax, 'publishedAtMax');
-
-    if (
-      publishedAtMin !== undefined &&
-      publishedAtMax !== undefined &&
-      publishedAtMin > publishedAtMax
-    ) {
-      throw apolloServiceError('publishedAtMin must be on or before publishedAtMax.');
-    }
+    let { publishedAtMin, publishedAtMax } = validatePublishedAtRange(
+      ctx.input.publishedAtMin,
+      ctx.input.publishedAtMax
+    );
 
     let client = new Client({ token: ctx.auth.token, authType: ctx.auth.authType });
     let result = await client.searchNewsArticles({

@@ -8,7 +8,6 @@ import {
   asString,
   createJenkinsClient,
   folderFullNameFromInput,
-  gitScmMatchTargetMatches,
   isFolderJobRecord,
   type JenkinsBuildSelector,
   type JenkinsRecord,
@@ -1795,9 +1794,25 @@ export let findJobsWithScmUrl = readOnlyTool({
       branch: z.string().optional(),
       skip: z.number(),
       limit: z.number(),
-      inspectedCount: z.number(),
-      skippedCount: z.number(),
-      matchCount: z.number(),
+      listedCount: z.number().describe('Number of Jenkins jobs found in the traversal.'),
+      inspectedCount: z
+        .number()
+        .describe('Number of Jenkins job SCM configurations successfully inspected.'),
+      skippedCount: z
+        .number()
+        .describe(
+          'Number of processed jobs that had no full name or whose SCM configuration could not be read.'
+        ),
+      matchCount: z
+        .number()
+        .describe(
+          'Number of SCM matches found among successfully inspected jobs. This is the exact total for all listed jobs only when searchComplete is true.'
+        ),
+      searchComplete: z
+        .boolean()
+        .describe(
+          'Whether the SCM configuration of every listed Jenkins job was successfully inspected.'
+        ),
       jobs: z.array(
         z.object({
           name: z.string().optional(),
@@ -1815,53 +1830,20 @@ export let findJobsWithScmUrl = readOnlyTool({
     let branch = ctx.input.branch?.trim() || undefined;
     let skip = normalizeFindJobsWithScmUrlSkip(ctx.input.skip);
     let limit = normalizeFindJobsWithScmUrlLimit(ctx.input.limit);
-    let jobs = await client.listJobs({
+    let search = await client.findJobsWithScmUrl({
       folderFullName,
-      recursive: true,
-      includeFolders: false,
-      maxDepth: 20
+      scmUrl: ctx.input.scmUrl,
+      branch,
+      skip,
+      limit
     });
-    let skippedCount = 0;
-    let matchCount = 0;
-    let matches: {
-      name?: string;
-      fullName?: string;
-      url?: string;
-      scm: {
-        scmClasses: string[];
-        urls: string[];
-        branches: string[];
-        credentialsIds: string[];
-      };
-      raw?: JenkinsRecord;
-    }[] = [];
-
-    for (let job of jobs) {
-      if (!job.fullName) continue;
-      let scm: Awaited<ReturnType<typeof client.getJobScm>>;
-      try {
-        scm = await client.getJobScm(job.fullName);
-      } catch {
-        skippedCount += 1;
-        continue;
-      }
-
-      let hasMatch = scm.gitScmMatchTargets.some(target =>
-        gitScmMatchTargetMatches(target, ctx.input.scmUrl, branch)
-      );
-      if (hasMatch) {
-        if (matchCount >= skip && matches.length < limit) {
-          matches.push({
-            name: job.name,
-            fullName: job.fullName,
-            url: job.url,
-            scm: scm.summary,
-            raw: ctx.input.includeRaw ? job.raw : undefined
-          });
-        }
-        matchCount += 1;
-      }
-    }
+    let matches = search.matches.map(({ job, scm }) => ({
+      name: job.name,
+      fullName: job.fullName,
+      url: job.url,
+      scm: scm.summary,
+      raw: ctx.input.includeRaw ? job.raw : undefined
+    }));
 
     return {
       output: {
@@ -1869,12 +1851,16 @@ export let findJobsWithScmUrl = readOnlyTool({
         branch,
         skip,
         limit,
-        inspectedCount: jobs.length,
-        skippedCount,
-        matchCount,
+        listedCount: search.listedCount,
+        inspectedCount: search.inspectedCount,
+        skippedCount: search.skippedCount,
+        matchCount: search.matchCount,
+        searchComplete: search.searchComplete,
         jobs: matches
       },
-      message: `Found ${matches.length} Jenkins job${matches.length === 1 ? '' : 's'} matching SCM URL.`
+      message: search.searchComplete
+        ? `Found ${matches.length} Jenkins job${matches.length === 1 ? '' : 's'} matching SCM URL.`
+        : `Found ${matches.length} Jenkins job${matches.length === 1 ? '' : 's'} matching SCM URL. Search incomplete: successfully inspected ${search.inspectedCount} of ${search.listedCount} listed jobs; ${search.skippedCount} processed job${search.skippedCount === 1 ? '' : 's'} could not be inspected.`
     };
   })
   .build();

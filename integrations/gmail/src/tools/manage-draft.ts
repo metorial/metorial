@@ -1,8 +1,16 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client, parseMessage } from '../lib/client';
 import { gmailActionScopes } from '../scopes';
 import { spec } from '../spec';
+
+let requireDraftId = (draftId: string | undefined, action: string) => {
+  if (!draftId) {
+    throw createApiServiceError(`draftId is required for ${action} action.`);
+  }
+
+  return draftId;
+};
 
 export let manageDraft = SlateTool.create(spec, {
   name: 'Manage Draft',
@@ -98,9 +106,9 @@ export let manageDraft = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.draftId) throw new Error('draftId is required for update action');
+      let draftId = requireDraftId(ctx.input.draftId, action);
 
-      let draft = await client.updateDraft(ctx.input.draftId, {
+      let draft = await client.updateDraft(draftId, {
         to: ctx.input.to || [],
         cc: ctx.input.cc,
         bcc: ctx.input.bcc,
@@ -116,14 +124,14 @@ export let manageDraft = SlateTool.create(spec, {
           messageId: draft.message.id,
           threadId: draft.message.threadId
         },
-        message: `Draft **${ctx.input.draftId}** updated.`
+        message: `Draft **${draftId}** updated.`
       };
     }
 
     if (action === 'send') {
-      if (!ctx.input.draftId) throw new Error('draftId is required for send action');
+      let draftId = requireDraftId(ctx.input.draftId, action);
 
-      let message = await client.sendDraft(ctx.input.draftId);
+      let message = await client.sendDraft(draftId);
       let parsed = parseMessage(message);
 
       return {
@@ -139,9 +147,9 @@ export let manageDraft = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!ctx.input.draftId) throw new Error('draftId is required for get action');
+      let draftId = requireDraftId(ctx.input.draftId, action);
 
-      let draft = await client.getDraft(ctx.input.draftId);
+      let draft = await client.getDraft(draftId);
       let parsed = parseMessage(draft.message);
 
       return {
@@ -179,17 +187,17 @@ export let manageDraft = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.draftId) throw new Error('draftId is required for delete action');
+      let draftId = requireDraftId(ctx.input.draftId, action);
 
-      await client.deleteDraft(ctx.input.draftId);
+      await client.deleteDraft(draftId);
 
       return {
         output: {
-          draftId: ctx.input.draftId
+          draftId
         },
-        message: `Draft **${ctx.input.draftId}** permanently deleted.`
+        message: `Draft **${draftId}** permanently deleted.`
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown draft action: ${action}.`);
   });

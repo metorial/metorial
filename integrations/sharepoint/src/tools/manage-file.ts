@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SharePointClient } from '../lib/client';
 import { spec } from '../spec';
@@ -19,6 +19,18 @@ let fileOutputSchema = z.object({
   parentPath: z.string().optional().describe('Path of the parent folder')
 });
 
+let serviceError = (message: string, reason: string, parent?: unknown) =>
+  createApiServiceError(message, { reason, parent });
+
+let requireField = (value: string | undefined, fieldName: string, action: string) => {
+  if (value) return value;
+
+  throw serviceError(
+    `${fieldName} is required for ${action} action.`,
+    `sharepoint_${fieldName.toLowerCase()}_required`
+  );
+};
+
 export let manageFile = SlateTool.create(spec, {
   name: 'Manage File',
   key: 'manage_file',
@@ -26,10 +38,10 @@ export let manageFile = SlateTool.create(spec, {
   instructions: [
     'Set **action** to "upload", "download", "get", "list", "createFolder", "move", "copy", "rename", or "delete".',
     'For **upload**, provide **fileContent** (text/base64), **fileName**, and either **parentPath** or **parentFolderId**.',
-    'For **download**, returns the download URL of the file.',
-    "For **list**, provide **driveId** and optionally **folderId** to list a specific folder's contents.",
+    'For **download**, provide **driveId** and either **itemId** or **itemPath**; returns the download URL of the file.',
+    "For **list**, provide **driveId** and optionally **folderId** or **itemPath** to list a specific folder's contents.",
     'For **move**, provide **destinationFolderId** in the same drive.',
-    'For **copy**, provide **destinationDriveId** and **destinationFolderId**.'
+    'For **copy**, provide **destinationDriveId** and **destinationFolderId**. Copy is asynchronous: this tool only initiates it and returns **copyMonitorUrl**; optionally set **conflictBehavior** ("fail" by default, "replace", or "rename").'
   ],
   tags: {
     destructive: false,
@@ -60,7 +72,7 @@ export let manageFile = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Path to the item relative to the drive root (alternative to itemId for get)'
+          'Path to the item relative to the drive root (alternative to itemId for get/download; folder path for list)'
         ),
       fileName: z
         .string()
@@ -90,7 +102,13 @@ export let manageFile = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Destination drive ID (for copy across drives)'),
-      newName: z.string().optional().describe('New name (for rename)')
+      newName: z.string().optional().describe('New name (for rename)'),
+      conflictBehavior: z
+        .enum(['fail', 'replace', 'rename'])
+        .optional()
+        .describe(
+          'Naming conflict resolution for copy (default "fail"). Copy is asynchronous: this call only initiates it, and conflicts are reported via the returned copyMonitorUrl rather than this response. "replace" is only supported for files.'
+        )
     })
   )
   .output(
@@ -123,7 +141,8 @@ export let manageFile = SlateTool.create(spec, {
       folderId,
       destinationFolderId,
       destinationDriveId,
-      newName
+      newName,
+      conflictBehavior
     } = ctx.input;
 
     let mapItem = (item: any) => ({
@@ -161,7 +180,24 @@ export let manageFile = SlateTool.create(spec, {
       }
 
       case 'list': {
-        let data = await client.listDriveItems(driveId, folderId);
+        if (folderId && itemPath) {
+          throw serviceError(
+            'Provide either folderId or itemPath for list action, not both.',
+            'sharepoint_list_folder_conflict'
+          );
+        }
+        let resolvedFolderId = folderId;
+        if (itemPath) {
+          let folder = await client.getDriveItemByPath(driveId, itemPath);
+          if (!folder.folder) {
+            throw serviceError(
+              'itemPath must point to a folder for list action.',
+              'sharepoint_folder_path_required'
+            );
+          }
+          resolvedFolderId = folder.id;
+        }
+        let data = await client.listDriveItems(driveId, resolvedFolderId);
         let files = (data.value || []).map(mapItem);
         return {
           output: { files },
@@ -170,8 +206,13 @@ export let manageFile = SlateTool.create(spec, {
       }
 
       case 'upload': {
-        if (!fileName) throw new Error('fileName is required for upload.');
-        if (fileContent === undefined) throw new Error('fileContent is required for upload.');
+        fileName = requireField(fileName, 'fileName', 'upload');
+        if (fileContent === undefined) {
+          throw serviceError(
+            'fileContent is required for upload action.',
+            'sharepoint_filecontent_required'
+          );
+        }
         let item: any;
         if (parentFolderId) {
           item = await client.uploadSmallFileToFolder(
@@ -191,16 +232,33 @@ export let manageFile = SlateTool.create(spec, {
       }
 
       case 'download': {
-        if (!itemId) throw new Error('itemId is required for download.');
-        let downloadUrl = await client.getFileDownloadUrl(driveId, itemId);
+        let item: any;
+        if (itemPath) {
+          item = await client.getDriveItemByPath(driveId, itemPath);
+        } else if (itemId) {
+          item = await client.getDriveItem(driveId, itemId);
+        } else {
+          throw oneOfRequiredError(
+            'For download action, one of itemId or itemPath must be provided.',
+            ['itemId', 'itemPath']
+          );
+        }
+
+        let downloadUrl = item['@microsoft.graph.downloadUrl'];
+        if (typeof downloadUrl !== 'string' || !downloadUrl) {
+          throw serviceError(
+            'The requested drive item does not have a download URL. Verify it is a file, not a folder.',
+            'sharepoint_download_url_missing'
+          );
+        }
         return {
-          output: { downloadUrl },
-          message: `Download URL generated for item \`${itemId}\`.`
+          output: { downloadUrl, file: mapItem(item) },
+          message: `Download URL generated for **${item.name}**.`
         };
       }
 
       case 'createFolder': {
-        if (!fileName) throw new Error('fileName is required for createFolder.');
+        fileName = requireField(fileName, 'fileName', 'createFolder');
         let parent = parentFolderId || 'root';
         let item = await client.createFolder(driveId, parent, fileName);
         return {
@@ -210,8 +268,8 @@ export let manageFile = SlateTool.create(spec, {
       }
 
       case 'move': {
-        if (!itemId) throw new Error('itemId is required for move.');
-        if (!destinationFolderId) throw new Error('destinationFolderId is required for move.');
+        itemId = requireField(itemId, 'itemId', 'move');
+        destinationFolderId = requireField(destinationFolderId, 'destinationFolderId', 'move');
         let item = await client.moveDriveItem(driveId, itemId, destinationFolderId, newName);
         return {
           output: { file: mapItem(item) },
@@ -220,15 +278,16 @@ export let manageFile = SlateTool.create(spec, {
       }
 
       case 'copy': {
-        if (!itemId) throw new Error('itemId is required for copy.');
-        if (!destinationFolderId) throw new Error('destinationFolderId is required for copy.');
+        itemId = requireField(itemId, 'itemId', 'copy');
+        destinationFolderId = requireField(destinationFolderId, 'destinationFolderId', 'copy');
         let targetDrive = destinationDriveId || driveId;
         let copy = await client.copyDriveItem(
           driveId,
           itemId,
           targetDrive,
           destinationFolderId,
-          fileName
+          fileName,
+          conflictBehavior
         );
         return {
           output: {
@@ -240,8 +299,8 @@ export let manageFile = SlateTool.create(spec, {
       }
 
       case 'rename': {
-        if (!itemId) throw new Error('itemId is required for rename.');
-        if (!newName) throw new Error('newName is required for rename.');
+        itemId = requireField(itemId, 'itemId', 'rename');
+        newName = requireField(newName, 'newName', 'rename');
         let item = await client.renameDriveItem(driveId, itemId, newName);
         return {
           output: { file: mapItem(item) },
@@ -250,7 +309,7 @@ export let manageFile = SlateTool.create(spec, {
       }
 
       case 'delete': {
-        if (!itemId) throw new Error('itemId is required for delete.');
+        itemId = requireField(itemId, 'itemId', 'delete');
         await client.deleteDriveItem(driveId, itemId);
         return {
           output: { deleted: true },

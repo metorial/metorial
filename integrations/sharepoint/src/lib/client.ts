@@ -219,9 +219,21 @@ let mapSharePointRestField = (field: RawSharePointRestField): SharePointRestFiel
   displayFormat: optionalNumber(field.DisplayFormat)
 });
 
+// Microsoft Graph requires RFC 3986 percent-encoding of drive path segments
+// (for example spaces and "#"). Encode each segment; "/" separators stay as-is.
+// https://learn.microsoft.com/en-us/graph/onedrive-addressing-driveitems#path-encoding
+let encodeDrivePath = (path: string) =>
+  trimSlashes(path)
+    .split('/')
+    .map(segment => encodeURIComponent(segment))
+    .join('/');
+
 let buildRootUploadPath = (driveId: string, parentPath: string, fileName: string) => {
-  let normalizedParentPath = trimSlashes(parentPath);
-  let relativePath = normalizedParentPath ? `${normalizedParentPath}/${fileName}` : fileName;
+  let encodedParentPath = encodeDrivePath(parentPath);
+  let encodedFileName = encodeURIComponent(fileName);
+  let relativePath = encodedParentPath
+    ? `${encodedParentPath}/${encodedFileName}`
+    : encodedFileName;
   return `/drives/${driveId}/root:/${relativePath}:/content`;
 };
 
@@ -345,9 +357,9 @@ export class SharePointClient {
   }
 
   async getDriveItemByPath(driveId: string, itemPath: string) {
-    let normalizedPath = trimSlashes(itemPath);
+    let encodedPath = encodeDrivePath(itemPath);
     let response = await this.http.get(
-      normalizedPath ? `/drives/${driveId}/root:/${normalizedPath}` : `/drives/${driveId}/root`
+      encodedPath ? `/drives/${driveId}/root:/${encodedPath}` : `/drives/${driveId}/root`
     );
     return response.data as any;
   }
@@ -388,7 +400,7 @@ export class SharePointClient {
     content: string
   ) {
     let response = await this.http.put(
-      `/drives/${driveId}/items/${folderId}:/${fileName}:/content`,
+      `/drives/${driveId}/items/${folderId}:/${encodeURIComponent(fileName)}:/content`,
       content,
       {
         headers: { 'Content-Type': 'application/octet-stream' }
@@ -430,7 +442,8 @@ export class SharePointClient {
     itemId: string,
     newParentDriveId: string,
     newParentId: string,
-    newName?: string
+    newName?: string,
+    conflictBehavior?: 'fail' | 'replace' | 'rename'
   ) {
     let body: any = {
       parentReference: {
@@ -441,7 +454,15 @@ export class SharePointClient {
     if (newName) {
       body.name = newName;
     }
-    let response = await this.http.post(`/drives/${driveId}/items/${itemId}/copy`, body);
+    // Graph resolves copy naming conflicts via a query parameter; the default
+    // behavior is "fail" (reported asynchronously through the monitor URL).
+    let query = conflictBehavior
+      ? `?@microsoft.graph.conflictBehavior=${conflictBehavior}`
+      : '';
+    let response = await this.http.post(
+      `/drives/${driveId}/items/${itemId}/copy${query}`,
+      body
+    );
     return {
       copyMonitorUrl: getLocationHeader(response.headers)
     };

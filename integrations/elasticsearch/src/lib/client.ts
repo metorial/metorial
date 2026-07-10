@@ -1,5 +1,23 @@
-import { createAxios } from 'slates';
-import { elasticsearchApiError } from './errors';
+import { createAxios, SlateError } from 'slates';
+import { elasticsearchApiError, mapElasticsearchAxiosError } from './errors';
+
+let getErrorStatus = (error: unknown): number | undefined => {
+  if (SlateError.is(error)) {
+    return error.status ?? error.data.upstream?.status;
+  }
+
+  if (typeof error !== 'object' || error === null) {
+    return undefined;
+  }
+
+  let response = (error as { response?: { status?: unknown } }).response;
+  if (typeof response?.status === 'number') {
+    return response.status;
+  }
+
+  let data = (error as { data?: { upstreamStatus?: unknown } }).data;
+  return typeof data?.upstreamStatus === 'number' ? data.upstreamStatus : undefined;
+};
 
 export class ElasticsearchClient {
   private baseUrl: string;
@@ -16,6 +34,9 @@ export class ElasticsearchClient {
       headers: {
         Authorization: this.authHeader,
         'Content-Type': 'application/json'
+      },
+      errorMapping: {
+        mapAxiosError: mapElasticsearchAxiosError
       }
     });
 
@@ -165,20 +186,7 @@ export class ElasticsearchClient {
       await this.axios.head(`/${encodeURIComponent(index)}`);
       return true;
     } catch (error) {
-      let status =
-        typeof error === 'object' &&
-        error !== null &&
-        'response' in error &&
-        typeof (error as { response?: { status?: unknown } }).response?.status === 'number'
-          ? (error as { response: { status: number } }).response.status
-          : typeof error === 'object' &&
-              error !== null &&
-              'data' in error &&
-              typeof (error as { data?: { upstreamStatus?: unknown } }).data
-                ?.upstreamStatus === 'number'
-            ? (error as { data: { upstreamStatus: number } }).data.upstreamStatus
-            : undefined;
-      if (status === 404) {
+      if (getErrorStatus(error) === 404) {
         return false;
       }
 

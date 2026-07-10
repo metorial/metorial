@@ -10,11 +10,12 @@ export let appendBlocks = SlateTool.create(spec, {
 Blocks can be nested up to 2 levels deep in a single request.`,
   instructions: [
     'Block format follows Notion\'s block object structure, e.g. { "type": "paragraph", "paragraph": { "rich_text": [{ "type": "text", "text": { "content": "Hello" } }] } }',
-    'Use the position parameter to control where blocks are inserted.'
+    'Use **afterBlockId** to insert the new blocks directly after an existing child block of the parent.'
   ],
   constraints: [
     'Maximum 100 blocks per request.',
-    'Up to 2 levels of nesting in a single request.'
+    'Up to 2 levels of nesting in a single request.',
+    'Blocks are appended to the end of the parent unless afterBlockId is provided.'
   ],
   tags: {
     destructive: false,
@@ -27,15 +28,11 @@ Blocks can be nested up to 2 levels deep in a single request.`,
       children: z
         .array(z.record(z.string(), z.any()))
         .describe('Array of block objects to append'),
-      position: z
-        .enum(['end', 'start'])
-        .optional()
-        .describe('Where to insert the blocks (defaults to end)'),
       afterBlockId: z
         .string()
         .optional()
         .describe(
-          'Insert blocks after this specific block ID (takes precedence over position)'
+          'ID of an existing child block of the parent to insert the new blocks after. When omitted, blocks are appended to the end of the parent.'
         )
     })
   )
@@ -49,17 +46,10 @@ Blocks can be nested up to 2 levels deep in a single request.`,
   .handleInvocation(async ctx => {
     let client = new NotionClient({ token: ctx.auth.token });
 
-    let position: Record<string, any> | undefined;
-    if (ctx.input.afterBlockId) {
-      position = { type: 'after_block', after_block: { id: ctx.input.afterBlockId } };
-    } else if (ctx.input.position === 'start') {
-      position = { type: 'start' };
-    }
-
     let result = await client.appendBlockChildren(
       ctx.input.blockId,
       ctx.input.children,
-      position
+      ctx.input.afterBlockId
     );
 
     return {

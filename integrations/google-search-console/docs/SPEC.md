@@ -33,10 +33,6 @@ For the Google Search Console API, use the following scopes:
 
 You can generate OAuth 2.0 credentials for web applications, service accounts, or installed applications. Service accounts can be used for server-to-server access. The service account email must be added as a user on the relevant Search Console property.
 
-**API Keys:**
-
-Requests to the Search Console Testing Tools API for public data must be accompanied by an identifier, which can be an API key or an access token. API keys are only applicable for public data endpoints (e.g., Mobile-Friendly Test), not for accessing private Search Console property data.
-
 ## Features
 
 ### Search Analytics
@@ -67,10 +63,6 @@ You can request the data Search Console has about the indexed version of a URL; 
 - Presently only the status of the version in the Google index is available; you cannot test the indexability of a live URL.
 - Request parameters include the inspection URL, the site URL (property), and an optional language code.
 - This doesn't submit the URLs for indexing – it only checks their current indexing status and related data.
-
-### Mobile-Friendly Test (Testing Tools)
-
-Runs Mobile-Friendly Test for a given URL. This is a public endpoint that does not require OAuth — it can be accessed with just an API key. It checks whether a given URL is mobile-friendly according to Google's standards.
 
 ## Events
 

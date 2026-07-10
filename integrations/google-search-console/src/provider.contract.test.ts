@@ -12,15 +12,14 @@ describe('google-search-console provider contract', () => {
         id: 'google-search-console',
         name: 'Google Search Console',
         description:
-          "Monitor your site's presence in Google Search results. Query search traffic analytics, manage site properties and sitemaps, inspect URL indexing status, and run mobile-friendly tests."
+          "Monitor your site's presence in Google Search results. Query search traffic analytics, manage site properties and sitemaps, and inspect URL indexing status."
       },
       toolIds: [
         'query_search_analytics',
         'list_sites',
         'manage_site',
         'manage_sitemap',
-        'inspect_url',
-        'run_mobile_friendly_test'
+        'inspect_url'
       ],
       triggerIds: ['inbound_webhook'],
       authMethodIds: ['oauth'],
@@ -29,13 +28,12 @@ describe('google-search-console provider contract', () => {
         { id: 'list_sites', readOnly: true, destructive: false },
         { id: 'manage_site', readOnly: false, destructive: true },
         { id: 'manage_sitemap', readOnly: false, destructive: true },
-        { id: 'inspect_url', readOnly: true, destructive: false },
-        { id: 'run_mobile_friendly_test', readOnly: true, destructive: false }
+        { id: 'inspect_url', readOnly: true, destructive: false }
       ],
       triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
     });
 
-    expect(contract.actions).toHaveLength(7);
+    expect(contract.actions).toHaveLength(6);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -44,7 +42,6 @@ describe('google-search-console provider contract', () => {
       manage_site: googleSearchConsoleActionScopes.manageSite,
       manage_sitemap: googleSearchConsoleActionScopes.manageSitemap,
       inspect_url: googleSearchConsoleActionScopes.inspectUrl,
-      run_mobile_friendly_test: googleSearchConsoleActionScopes.runMobileFriendlyTest,
       inbound_webhook: googleSearchConsoleActionScopes.inboundWebhook
     };
 
