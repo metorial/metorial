@@ -15,6 +15,7 @@ let financeHandoffActionSchema = z
   .enum([
     'export_to_package',
     'import_from_package',
+    'get_azure_write_url',
     'get_execution_summary_status',
     'get_execution_summary_page_url',
     'get_exported_package_url',
@@ -36,6 +37,12 @@ let inputSchema = z.object({
     ),
   packageName: z.string().optional().describe('Package file name for export_to_package.'),
   packageUrl: z.string().optional().describe('Package URL for import_from_package.'),
+  uniqueFileName: z
+    .string()
+    .optional()
+    .describe(
+      'Unique blob file name for get_azure_write_url. Defaults to a generated unique name.'
+    ),
   executionId: z
     .string()
     .optional()
@@ -75,6 +82,7 @@ let outputSchema = z.object({
   executionId: z.string().optional(),
   result: z.unknown().optional(),
   url: z.string().optional(),
+  blobId: z.string().optional(),
   status: z.string().optional(),
   rawStatus: z.unknown().optional(),
   isTerminal: z.boolean().optional(),
@@ -138,7 +146,8 @@ export let manageFinanceHandoff = SlateTool.create(spec, {
     'Start and inspect Dynamics 365 Finance and Operations Data Management package handoff executions for Project Operations finance integration.',
   constraints: [
     'Requires auth to include a Finance and Operations token for the configured environment URL.',
-    'Import defaults to execute=false and requires confirmImport=true. Posting, invoice confirmation, and ledger posting are not exposed.'
+    'Import defaults to execute=false and requires confirmImport=true. Posting, invoice confirmation, and ledger posting are not exposed.',
+    'To import a local package, first call get_azure_write_url, upload the package to the returned blob URL, then pass that URL as packageUrl.'
   ],
   tags: {
     readOnly: false,
@@ -197,6 +206,21 @@ export let manageFinanceHandoff = SlateTool.create(spec, {
           result
         },
         message: `Started Finance and Operations import handoff${executionId ? ` **${executionId}**` : ''}.`
+      };
+    }
+
+    if (ctx.input.action === 'get_azure_write_url') {
+      let blob = await client.getAzureWriteUrl({ uniqueFileName: ctx.input.uniqueFileName });
+
+      return {
+        output: {
+          action: ctx.input.action,
+          url: blob.blobUrl,
+          blobId: blob.blobId,
+          result: blob.raw
+        },
+        message:
+          'Retrieved a writable Azure blob URL. Upload the package with HTTP PUT (x-ms-blob-type: BlockBlob), then pass the URL as packageUrl to import_from_package.'
       };
     }
 

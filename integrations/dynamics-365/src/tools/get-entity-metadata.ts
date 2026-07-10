@@ -63,7 +63,7 @@ export let listEntities = SlateTool.create(spec, {
       logicalName: e.logicalName || '',
       displayName: e.displayName || e.logicalName || '',
       entitySetName: e.entitySetName || '',
-      isCustomEntity: false,
+      isCustomEntity: e.isCustomEntity ?? false,
       description: e.description || '',
       primaryIdAttribute: e.primaryIdAttribute,
       primaryNameAttribute: e.primaryNameAttribute,

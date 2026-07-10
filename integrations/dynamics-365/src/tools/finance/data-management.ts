@@ -21,6 +21,7 @@ let financeDataManagementActionSchema = z
   .enum([
     'export_to_package',
     'import_from_package',
+    'get_azure_write_url',
     'get_execution_summary_status',
     'get_exported_package_url'
   ])
@@ -91,7 +92,8 @@ export let runDataManagementPackageOperation = SlateTool.create(spec, {
     'Start or inspect Dynamics 365 Finance Data Management package export/import workflows. File bytes are not returned in JSON output.',
   instructions: [
     'Use export_to_package or import_from_package to start package workflows, then poll get_execution_summary_status with the returned executionId.',
-    'For import_from_package, set confirmImport=true. If execute is omitted, the package is staged with execute=false; set execute=true only when ready to run target processing.'
+    'For import_from_package, set confirmImport=true. If execute is omitted, the package is staged with execute=false; set execute=true only when ready to run target processing.',
+    'To import a local package, first call get_azure_write_url, upload the package to the returned blobUrl with an HTTP PUT (x-ms-blob-type: BlockBlob), then pass that URL as packageUrl to import_from_package.'
   ],
   constraints: [
     'This tool does not download package files or import error files.',
@@ -111,6 +113,7 @@ export let runDataManagementPackageOperation = SlateTool.create(spec, {
       isTerminal: z.boolean().optional(),
       isSuccess: z.boolean().optional(),
       url: z.string().optional(),
+      blobId: z.string().optional(),
       result: z.unknown().optional()
     })
   )
@@ -169,6 +172,21 @@ export let runDataManagementPackageOperation = SlateTool.create(spec, {
           result
         },
         message: `Started Finance Data Management import **${returnedExecutionId}**.`
+      };
+    }
+
+    if (input.action === 'get_azure_write_url') {
+      let blob = await client.getAzureWriteUrl({ uniqueFileName: input.uniqueFileName });
+
+      return {
+        output: {
+          action: input.action,
+          url: blob.blobUrl,
+          blobId: blob.blobId,
+          result: blob.raw
+        },
+        message:
+          'Retrieved a writable Azure blob URL. Upload the package with HTTP PUT (x-ms-blob-type: BlockBlob), then pass the URL as packageUrl to import_from_package.'
       };
     }
 

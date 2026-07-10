@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 export let DATAVERSE_DEFAULT_API_VERSION = 'v9.2';
 export let DATAVERSE_DEFAULT_MAX_PAGE_SIZE = 5000;
+export let DATAVERSE_SEARCH_MAX_TOP = 100;
 export let DATAVERSE_DEFAULT_MAX_PAGES = 10;
 export let DATAVERSE_MAX_PAGES = 100;
 export let DATAVERSE_MAX_RECORDS = 50_000;
@@ -106,7 +107,13 @@ export let getRecordInputSchema = z.object({
   recordId: z.string().optional().describe('Record GUID'),
   alternateKey: dataverseAlternateKeySchema.optional().describe('Alternate key values'),
   select: z.array(z.string()).optional().describe('Columns to return'),
-  expand: z.string().optional().describe('OData $expand expression')
+  expand: z.string().optional().describe('OData $expand expression'),
+  includeAnnotations: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, requests OData annotations such as formatted values and lookup logical names'
+    )
 });
 
 export let updateRecordInputSchema = z.object({
@@ -140,7 +147,13 @@ export let listRecordsInputSchema = z.object({
     .optional()
     .describe('Preferred page size for Dataverse pagination'),
   nextLink: z.string().optional().describe('Dataverse @odata.nextLink from a previous page'),
-  includeCount: z.boolean().optional().describe('Whether to request @odata.count')
+  includeCount: z.boolean().optional().describe('Whether to request @odata.count'),
+  includeAnnotations: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, requests OData annotations such as formatted values and lookup logical names'
+    )
 });
 
 export let paginateRecordsInputSchema = listRecordsInputSchema.extend({
@@ -161,7 +174,11 @@ export let paginateRecordsInputSchema = listRecordsInputSchema.extend({
 export let fetchXmlInputSchema = z.object({
   entitySetName: z.string().describe('OData entity set name'),
   fetchXml: z.string().describe('FetchXML query document'),
-  pageSize: z.number().int().positive().optional().describe('Preferred page size')
+  pageSize: z.number().int().positive().optional().describe('Preferred page size'),
+  nextLink: z
+    .string()
+    .optional()
+    .describe('Dataverse @odata.nextLink from a previous FetchXML page; overrides fetchXml')
 });
 
 export let dataverseSearchInputSchema = z.object({
@@ -535,11 +552,13 @@ let preferHeaders = (values: string[]) =>
       }
     : undefined;
 
-export let buildDataverseListHeaders = (pageSize?: number) => {
+export let buildDataverseListHeaders = (pageSize?: number, includeAnnotations?: boolean) => {
   let pagination = normalizeDataversePagination({ pageSize });
-  return preferHeaders(
-    pagination.pageSize !== undefined ? [`odata.maxpagesize=${pagination.pageSize}`] : []
-  );
+  let prefer: string[] = [];
+  if (pagination.pageSize !== undefined)
+    prefer.push(`odata.maxpagesize=${pagination.pageSize}`);
+  if (includeAnnotations) prefer.push('odata.include-annotations="*"');
+  return preferHeaders(prefer);
 };
 
 export type DataverseAttributeMetadata = {
@@ -567,6 +586,7 @@ export type DataverseEntityMetadata = {
   primaryNameAttribute?: string;
   ownershipType?: string;
   isActivity?: boolean;
+  isCustomEntity?: boolean;
   metadataId?: string;
   attributes?: DataverseAttributeMetadata[];
 };
@@ -640,6 +660,8 @@ export let parseDataverseEntityMetadata = (entity: unknown): DataverseEntityMeta
         : undefined,
     ownershipType: typeof entity.OwnershipType === 'string' ? entity.OwnershipType : undefined,
     isActivity: typeof entity.IsActivity === 'boolean' ? entity.IsActivity : undefined,
+    isCustomEntity:
+      typeof entity.IsCustomEntity === 'boolean' ? entity.IsCustomEntity : undefined,
     metadataId: typeof entity.MetadataId === 'string' ? entity.MetadataId : undefined,
     attributes: Array.isArray(entity.Attributes)
       ? entity.Attributes.map(parseDataverseAttributeMetadata)
@@ -1068,6 +1090,21 @@ let parseDataverseSearchResponse = (data: unknown) => {
       return data;
     }
   }
+
+  // The search endpoint mirrors the searchquery action and nests the payload
+  // as an escaped JSON string under a top-level "response" property.
+  if (isRecord(parsed) && parsed.response !== undefined) {
+    let inner = parsed.response;
+    if (typeof inner === 'string') {
+      try {
+        inner = JSON.parse(inner);
+      } catch {
+        return parsed;
+      }
+    }
+    if (isRecord(inner)) return inner;
+  }
+
   return parsed;
 };
 
@@ -1078,6 +1115,22 @@ let keyFromInput = (
   if (recordId) return recordId;
   if (alternateKey) return alternateKey;
   throw dataverseValidationError('Either recordId or alternateKey is required.');
+};
+
+// Without Prefer: return=representation Dataverse responds 204 with the record
+// URI only in the OData-EntityId header; surface it as @odata.id so callers can
+// still recover the record id.
+let recordWithEntityIdFallback = <T extends DataverseRecord>(
+  response: DataverseHttpResponse<T>
+): T => {
+  if (isRecord(response.data) && Object.keys(response.data).length > 0) {
+    return response.data;
+  }
+
+  let entityId = getResponseHeaderValue(response.headers, 'odata-entityid');
+  if (entityId) return { '@odata.id': entityId } as unknown as T;
+
+  return isRecord(response.data) ? response.data : ({} as T);
 };
 
 export class DataverseClient {
@@ -1126,18 +1179,23 @@ export class DataverseClient {
       headers['MSCRM.SuppressDuplicateDetection'] = 'false';
     }
 
-    return this.data<T>('create record', () =>
+    let response = await this.response<T>('create record', () =>
       this.http.post(buildDataverseEntitySetPath(entitySetName), data, { headers })
     );
+    return recordWithEntityIdFallback(response);
   }
 
   async getRecord<T extends DataverseRecord = DataverseRecord>(
     entitySetName: string,
     recordKey: DataverseRecordKey,
-    options: Pick<DataverseODataQueryOptions, 'select' | 'expand'> = {}
+    options: Pick<DataverseODataQueryOptions, 'select' | 'expand'> & {
+      includeAnnotations?: boolean;
+    } = {}
   ) {
     return this.data<T>('get record', () =>
-      this.http.get(buildDataverseRecordUrl(entitySetName, recordKey, options))
+      this.http.get(buildDataverseRecordUrl(entitySetName, recordKey, options), {
+        headers: buildDataverseListHeaders(undefined, options.includeAnnotations)
+      })
     );
   }
 
@@ -1156,9 +1214,10 @@ export class DataverseClient {
       headers['If-Match'] = '*';
     }
 
-    return this.data<T>('update record', () =>
+    let response = await this.response<T>('update record', () =>
       this.http.patch(buildDataverseRecordPath(entitySetName, recordKey), data, { headers })
     );
+    return recordWithEntityIdFallback(response);
   }
 
   async deleteRecord(entitySetName: string, recordKey: DataverseRecordKey) {
@@ -1172,6 +1231,7 @@ export class DataverseClient {
     options: DataverseODataQueryOptions & {
       pageSize?: number;
       nextLink?: string;
+      includeAnnotations?: boolean;
     } = {}
   ): Promise<DataverseListResponse<T>> {
     let url = options.nextLink ?? buildDataverseCollectionUrl(entitySetName, options);
@@ -1181,7 +1241,7 @@ export class DataverseClient {
       '@odata.count'?: number;
     }>('list records', () =>
       this.http.get(url, {
-        headers: buildDataverseListHeaders(options.pageSize)
+        headers: buildDataverseListHeaders(options.pageSize, options.includeAnnotations)
       })
     );
 
@@ -1197,6 +1257,7 @@ export class DataverseClient {
     options: DataverseODataQueryOptions & {
       pageSize?: number;
       nextLink?: string;
+      includeAnnotations?: boolean;
       maxPages?: number;
       maxRecords?: number;
     } = {}
@@ -1250,13 +1311,14 @@ export class DataverseClient {
   async fetchXml<T extends DataverseRecord = DataverseRecord>(
     entitySetName: string,
     fetchXml: string,
-    options: { pageSize?: number } = {}
+    options: { pageSize?: number; nextLink?: string } = {}
   ): Promise<DataverseListResponse<T>> {
+    let url = options.nextLink ?? buildDataverseCollectionUrl(entitySetName, { fetchXml });
     let data = await this.data<{
       value?: T[];
       '@odata.nextLink'?: string;
     }>('fetch xml', () =>
-      this.http.get(buildDataverseCollectionUrl(entitySetName, { fetchXml }), {
+      this.http.get(url, {
         headers: buildDataverseListHeaders(options.pageSize)
       })
     );
@@ -1278,10 +1340,17 @@ export class DataverseClient {
     }
     if (options.filter) body.filter = options.filter;
     if (options.top !== undefined)
-      body.top = normalizeDataversePositiveInteger(options.top, 'top');
+      body.top = normalizeDataversePositiveInteger(
+        options.top,
+        'top',
+        DATAVERSE_SEARCH_MAX_TOP
+      );
     if (options.skip !== undefined)
       body.skip = normalizeDataverseNonNegativeInteger(options.skip, 'skip');
-    if (options.facets) body.facets = options.facets;
+    // The search API types facets as a JSON-encoded string, not an array.
+    if (options.facets && options.facets.length > 0) {
+      body.facets = JSON.stringify(options.facets);
+    }
 
     let data = await this.data<unknown>('search records', () =>
       this.http.post(`${this.instanceUrl}/api/search/v2.0/query`, body)
@@ -1329,14 +1398,38 @@ export class DataverseClient {
             'IsValidForCreate',
             'IsValidForUpdate',
             'IsValidForRead',
-            'Targets',
             'AttributeOf',
             'MetadataId'
           ]
         })}`
       )
     );
-    return (data.value ?? []).map(parseDataverseAttributeMetadata);
+    let attributes = (data.value ?? []).map(parseDataverseAttributeMetadata);
+
+    // Targets is only defined on LookupAttributeMetadata; selecting it on the
+    // base AttributeMetadata collection is rejected, so fetch it via the
+    // derived-type cast and merge.
+    let lookups = await this.data<{ value?: unknown[] }>('get lookup attribute targets', () =>
+      this.http.get(
+        `EntityDefinitions(${key})/Attributes/${DATAVERSE_DEFAULT_NAMESPACE}.LookupAttributeMetadata${buildDataverseODataQuery(
+          { select: ['LogicalName', 'Targets'] }
+        )}`
+      )
+    );
+    let targetsByLogicalName = new Map<string, string[]>();
+    for (let lookup of lookups.value ?? []) {
+      let parsedLookup = parseDataverseAttributeMetadata(lookup);
+      if (parsedLookup.logicalName && parsedLookup.targets) {
+        targetsByLogicalName.set(parsedLookup.logicalName, parsedLookup.targets);
+      }
+    }
+
+    return attributes.map(attribute => {
+      let targets = attribute.logicalName
+        ? targetsByLogicalName.get(attribute.logicalName)
+        : undefined;
+      return targets ? { ...attribute, targets } : attribute;
+    });
   }
 
   async associateRecord(params: {
@@ -1377,10 +1470,14 @@ export class DataverseClient {
     recordKey: DataverseRecordKey;
     navigationProperty: string;
     query?: Pick<DataverseODataQueryOptions, 'select' | 'filter' | 'top' | 'expand'>;
+    includeAnnotations?: boolean;
   }) {
     let data = await this.data<{ value?: T[]; '@odata.nextLink'?: string }>(
       'get related records',
-      () => this.http.get(buildDataverseGetRelatedUrl(params))
+      () =>
+        this.http.get(buildDataverseGetRelatedUrl(params), {
+          headers: buildDataverseListHeaders(undefined, params.includeAnnotations)
+        })
     );
 
     return {

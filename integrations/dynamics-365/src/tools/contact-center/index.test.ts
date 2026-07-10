@@ -26,6 +26,18 @@ describe('Dynamics 365 Contact Center resource defaults', () => {
     );
     expect(resolveResource('routing_state').defaultSelect).not.toContain('msdyn_name');
   });
+
+  it('selects the lookup projection for linked case customers', () => {
+    expect(resolveResource('linked_case').defaultSelect).toContain('_customerid_value');
+    expect(resolveResource('linked_case').defaultSelect).not.toContain('customerid');
+  });
+
+  it('does not select File-type transcript columns by default', () => {
+    expect(resolveResource('transcript').defaultSelect).not.toContain('msdyn_voicetranscript');
+    expect(resolveResource('transcript').defaultSelect).not.toContain(
+      'msdyn_voicetranscript_formatted'
+    );
+  });
 });
 
 describe('buildTranscriptExportRequest', () => {

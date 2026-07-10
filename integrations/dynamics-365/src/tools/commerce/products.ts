@@ -39,10 +39,10 @@ let productInputSchema = commerceProductInputSchema.extend({
 });
 
 export let lookupProductsPricesInventory = SlateTool.create(spec, {
-  name: 'Lookup Commerce Products, Prices, Promotions, And Inventory',
+  name: 'Lookup Commerce Products, Prices, And Inventory',
   key: 'lookup_products_prices_inventory',
   description:
-    'Search Dynamics 365 Commerce products, retrieve product details, get active prices, inspect promotions, and check product or estimated inventory availability through Retail Server.',
+    'Search Dynamics 365 Commerce products, retrieve product details, get active prices, and check product or estimated inventory availability through Retail Server. Promotions are evaluated per cart with the cart tools.',
   tags: {
     destructive: false,
     readOnly: true
@@ -76,9 +76,6 @@ export let lookupProductsPricesInventory = SlateTool.create(spec, {
           buildDocumentedGetActivePricesRequest(withCommercePaginationDefaults(ctx, input))
         );
         break;
-      case 'get_product_promotions':
-        result = await client.getProductPromotions(input as any);
-        break;
       case 'get_product_availabilities':
         result = await client.execute(
           buildDocumentedGetProductAvailabilitiesRequest(
@@ -99,7 +96,7 @@ export let lookupProductsPricesInventory = SlateTool.create(spec, {
     return {
       output,
       message: commerceMessage(
-        'Commerce products, prices, promotions, and inventory',
+        'Commerce products, prices, and inventory',
         input.action,
         output
       )

@@ -228,10 +228,11 @@ export let buildDocumentedAddCartLinesRequest = (input: {
     }
   });
 
+// UpdateCartLines takes only (ID, cartLines); unlike AddCartLines and Checkout
+// there is no cartVersion parameter in the CSU consumer API.
 export let buildDocumentedUpdateCartLinesRequest = (input: {
   cartId?: string;
   cartLines?: unknown[];
-  cartVersion?: number;
 }) =>
   buildCommerceRequest({
     method: 'POST',
@@ -239,8 +240,7 @@ export let buildDocumentedUpdateCartLinesRequest = (input: {
     operation: 'update cart lines',
     body: {
       ID: requireCommerceString(input.cartId, 'cartId'),
-      cartLines: requireCommerceArray(input.cartLines, 'cartLines'),
-      cartVersion: input.cartVersion
+      cartLines: requireCommerceArray(input.cartLines, 'cartLines')
     }
   });
 

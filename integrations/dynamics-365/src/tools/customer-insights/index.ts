@@ -22,7 +22,6 @@ let customerInsightsResourceTypes = [
   'segment',
   'measure',
   'customer_measure',
-  'activity',
   'unified_activity',
   'enrichment',
   'prediction',
@@ -63,10 +62,6 @@ let customerInsightsResources: Record<
   customer_measure: {
     entitySetName: 'msdynci_customermeasures',
     displayName: 'customer measures'
-  },
-  activity: {
-    entitySetName: 'msdynci_unifiedactivities',
-    displayName: 'activities'
   },
   unified_activity: {
     entitySetName: 'msdynci_unifiedactivities',

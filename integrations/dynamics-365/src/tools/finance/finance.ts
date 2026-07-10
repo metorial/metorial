@@ -31,16 +31,16 @@ export let listLedgerEntries = createListRecordsTool({
   key: 'list_ledger_entries',
   name: 'List Finance Ledger Entries',
   description:
-    'List Dynamics 365 Finance general ledger entry records by legal entity, filters, and OData query options.',
+    'List Dynamics 365 Finance ledger journal line records by legal entity, filters, and OData query options. Posted general ledger account entries are not exposed through OData; export them with the data management package tools instead.',
   outputKey: 'ledgerEntries',
-  entitySetName: 'GeneralJournalAccountEntryEntity',
+  entitySetName: 'LedgerJournalLines',
   companyScoped: true,
-  idFields: ['GeneralJournalAccountEntryRecId', 'RecId'],
-  numberFields: ['Voucher', 'JournalNumber', 'DocumentNumber'],
+  idFields: ['RecId', 'LineNumber'],
+  numberFields: ['JournalBatchNumber', 'Voucher', 'DocumentNumber'],
   nameFields: ['Text', 'Description'],
-  dateFields: ['AccountingDate', 'TransDate'],
-  amountFields: ['AccountingCurrencyAmount', 'TransactionCurrencyAmount', 'AmountMST'],
-  currencyFields: ['TransactionCurrencyCode', 'AccountingCurrency']
+  dateFields: ['TransDate', 'AccountingDate'],
+  amountFields: ['DebitAmount', 'CreditAmount', 'AmountCurDebit', 'AmountCurCredit'],
+  currencyFields: ['CurrencyCode']
 });
 
 export let listJournals = createListRecordsTool({

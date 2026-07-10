@@ -58,14 +58,13 @@ let contactCenterResources: Record<
   transcript: {
     entitySetName: 'msdyn_transcripts',
     displayName: 'transcripts',
+    // File columns such as msdyn_voicetranscript cannot be $select-ed as
+    // values; download them through the file column tools instead.
     defaultSelect: [
       'msdyn_transcriptid',
       'msdyn_name',
       'msdyn_transcripturi',
-      'msdyn_voicetranscript',
       'msdyn_voicetranscript_name',
-      'msdyn_voicetranscript_formatted',
-      'msdyn_voicetranscript_formatted_name',
       'createdon',
       'modifiedon'
     ]
@@ -102,11 +101,13 @@ let contactCenterResources: Record<
   linked_case: {
     entitySetName: 'incidents',
     displayName: 'linked cases',
+    // customerid is a polymorphic lookup; only its _customerid_value
+    // projection is valid inside $select.
     defaultSelect: [
       'incidentid',
       'ticketnumber',
       'title',
-      'customerid',
+      '_customerid_value',
       'statecode',
       'statuscode',
       'createdon',

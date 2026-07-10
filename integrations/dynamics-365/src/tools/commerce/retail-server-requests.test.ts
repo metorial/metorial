@@ -13,6 +13,7 @@ import {
   buildDocumentedGetProductRequest,
   buildDocumentedGetProductsByIdsRequest,
   buildDocumentedSearchProductsRequest,
+  buildDocumentedUpdateCartLinesRequest,
   findCatalogById
 } from './retail-server-requests';
 
@@ -228,6 +229,19 @@ describe('documented Commerce Retail Server requests', () => {
         cartVersion: 7
       }
     });
+
+    let updateCartLinesRequest = buildDocumentedUpdateCartLinesRequest({
+      cartId: 'cart-1',
+      cartLines: [{ LineId: 'line-1', Quantity: 2 }]
+    });
+    expect(updateCartLinesRequest).toMatchObject({
+      path: 'Carts/UpdateCartLines',
+      body: {
+        ID: 'cart-1',
+        cartLines: [{ LineId: 'line-1', Quantity: 2 }]
+      }
+    });
+    expect(updateCartLinesRequest.body).not.toHaveProperty('cartVersion');
 
     expect(
       buildDocumentedCheckoutCartRequest({

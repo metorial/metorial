@@ -2,7 +2,8 @@ import {
   createDynamicsFinOpsClient,
   dynamicsFinOpsServiceError,
   FINOPS_DEFAULT_PAGE_SIZE,
-  type FinOpsODataQuery
+  type FinOpsODataQuery,
+  resolveFinOpsInputLegalEntity
 } from '@slates/dynamics-finops-recipes';
 import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
@@ -201,7 +202,7 @@ let buildQuery = (
   ctx: FinOpsToolContext,
   definition: FinOpsResourceDefinition
 ): FinOpsODataQuery => {
-  let explicitLegalEntity = ctx.input.legalEntity ?? ctx.input.dataAreaId;
+  let explicitLegalEntity = resolveFinOpsInputLegalEntity(ctx.input, definition);
   let finOpsDefaultLegalEntity =
     definition.companyScoped && ctx.input.crossCompany !== true
       ? ctx.config?.finOpsDefaultLegalEntity

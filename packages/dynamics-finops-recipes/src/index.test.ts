@@ -4,6 +4,7 @@ import { z } from 'zod';
 import {
   buildDataManagementExecutionRequest,
   buildDataManagementExportToPackageRequest,
+  buildDataManagementGetAzureWriteUrlRequest,
   buildDataManagementImportFromPackageRequest,
   buildFinOpsDataUrl,
   buildFinOpsEntityPath,
@@ -25,6 +26,7 @@ import {
   normalizeDataManagementStatus,
   normalizeFinOpsBaseUrl,
   odataQueryInputSchema,
+  parseDataManagementWritableBlob,
   parseFinOpsMetadata,
   recurringIntegrationOperationInputSchema,
   resolveFinOpsLegalEntity,
@@ -295,10 +297,31 @@ describe('dynamics finance and operations recipes', () => {
         packageUrl: 'https://storage.example/package.zip',
         definitionGroupId: 'Customers import',
         executionId: 'exec-2',
-        execute: true,
+        execute: false,
         overwrite: false,
         legalEntityId: 'DEMF'
       }
+    });
+
+    expect(
+      buildDataManagementGetAzureWriteUrlRequest({ uniqueFileName: 'import-package.zip' })
+    ).toEqual({
+      path: 'data/DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetAzureWriteUrl',
+      body: {
+        uniqueFileName: 'import-package.zip'
+      }
+    });
+
+    expect(
+      parseDataManagementWritableBlob({
+        value: JSON.stringify({
+          BlobId: '11111111-2222-3333-4444-555555555555',
+          BlobUrl: 'https://storage.example/upload?sig=abc'
+        })
+      })
+    ).toMatchObject({
+      blobId: '11111111-2222-3333-4444-555555555555',
+      blobUrl: 'https://storage.example/upload?sig=abc'
     });
 
     expect(

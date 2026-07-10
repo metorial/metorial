@@ -202,7 +202,7 @@ describe('dynamics commerce recipes', () => {
         searchLocationValue: 2
       })
     ).toMatchObject({
-      path: 'SalesOrders/GetByTransactionId',
+      path: 'SalesOrders/GetSalesOrderDetailsByTransactionId',
       body: {
         transactionId: 'txn-123',
         searchLocationValue: 2
@@ -251,12 +251,12 @@ describe('dynamics commerce recipes', () => {
       path: 'Products/GetActivePrices',
       body: {
         productIds: [1001, 1002],
-        projectionDomain: {
+        projectDomain: {
           ChannelId: 5637145359,
           CatalogId: 0,
           CurrencyCode: 'USD'
         },
-        customerAccountNumber: 'C-100',
+        customerId: 'C-100',
         activeDate: '2026-02-03T12:00:00Z'
       }
     });

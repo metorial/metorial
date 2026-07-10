@@ -193,6 +193,7 @@ describe('Dynamics 365 merged provider contract', () => {
       'finOpsDefaultMaxPages',
       'finOpsDefaultPageSize',
       'projectOperationsDefaultPageSize',
+      'recordChangedEntitySetName',
       'retailServerUrl'
     ]);
 

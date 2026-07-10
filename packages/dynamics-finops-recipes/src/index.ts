@@ -217,6 +217,37 @@ export let resolveFinOpsLegalEntity = ({
   return defaultLegalEntity ? normalizeFinOpsLegalEntity(defaultLegalEntity) : undefined;
 };
 
+export let resolveFinOpsInputLegalEntity = (
+  input: { legalEntity?: string; dataAreaId?: string },
+  definition: { name: string; companyScoped?: boolean },
+  options: { nonCompanyScopedRemediation?: string } = {}
+) => {
+  let legalEntity = input.legalEntity;
+  let dataAreaId = input.dataAreaId;
+
+  if (legalEntity && dataAreaId) {
+    if (normalizeFinOpsLegalEntity(legalEntity) !== normalizeFinOpsLegalEntity(dataAreaId)) {
+      throw dynamicsFinOpsServiceError(
+        'legalEntity and dataAreaId are aliases and must match when both are provided.'
+      );
+    }
+
+    return legalEntity;
+  }
+
+  let explicitLegalEntity = legalEntity ?? dataAreaId;
+
+  if (!definition.companyScoped && explicitLegalEntity) {
+    throw dynamicsFinOpsServiceError(
+      `${definition.name} is not legal-entity scoped. ${
+        options.nonCompanyScopedRemediation ?? 'Omit legalEntity/dataAreaId for this entity.'
+      }`
+    );
+  }
+
+  return explicitLegalEntity;
+};
+
 let encodeODataString = (value: string) => encodeURIComponent(value).replace(/'/g, "''");
 
 export let formatODataStringLiteral = (value: string) => `'${encodeODataString(value)}'`;
@@ -730,7 +761,9 @@ export let DATA_MANAGEMENT_ACTION_PATHS = {
   getExportedPackageUrl:
     'DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetExportedPackageUrl',
   getMessageStatus:
-    'DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetMessageStatus'
+    'DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetMessageStatus',
+  getAzureWriteUrl:
+    'DataManagementDefinitionGroups/Microsoft.Dynamics.DataEntities.GetAzureWriteUrl'
 } as const;
 
 export let createFinOpsExecutionId = (prefix = 'slates') => `${prefix}-${randomUUID()}`;
@@ -759,7 +792,8 @@ export let buildDataManagementImportFromPackageRequest = (
     packageUrl: assertNonEmptyString(input.packageUrl, 'packageUrl'),
     definitionGroupId: assertNonEmptyString(input.definitionGroupId, 'definitionGroupId'),
     executionId: input.executionId ?? createFinOpsExecutionId('import'),
-    execute: input.execute ?? true,
+    // Default to staging-only; immediate target execution must be opted into.
+    execute: input.execute ?? false,
     overwrite: input.overwrite ?? false,
     legalEntityId: normalizeOptionalLegalEntityId(input.legalEntityId)
   })
@@ -774,6 +808,43 @@ export let buildDataManagementExecutionRequest = (
     executionId: assertNonEmptyString(input.executionId, 'executionId')
   }
 });
+
+export type DataManagementGetAzureWriteUrlInput = {
+  uniqueFileName?: string;
+};
+
+export let buildDataManagementGetAzureWriteUrlRequest = (
+  input: DataManagementGetAzureWriteUrlInput = {}
+) => ({
+  path: buildFinOpsDataPath(DATA_MANAGEMENT_ACTION_PATHS.getAzureWriteUrl),
+  body: {
+    uniqueFileName: input.uniqueFileName ?? createFinOpsExecutionId('upload')
+  }
+});
+
+// GetAzureWriteUrl returns {"value": "{\"BlobId\":\"…\",\"BlobUrl\":\"…\"}"} —
+// the blob descriptor is a JSON-serialized string inside the OData value.
+export let parseDataManagementWritableBlob = (response: unknown) => {
+  let value = normalizeDataManagementResponseValue(response);
+  let parsed: unknown = value;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      parsed = value;
+    }
+  }
+
+  if (isRecord(parsed)) {
+    return {
+      blobId: typeof parsed.BlobId === 'string' ? parsed.BlobId : undefined,
+      blobUrl: typeof parsed.BlobUrl === 'string' ? parsed.BlobUrl : undefined,
+      raw: value
+    };
+  }
+
+  return { blobId: undefined, blobUrl: undefined, raw: value };
+};
 
 export let normalizeDataManagementResponseValue = (response: unknown) => {
   if (!isRecord(response) || !('value' in response)) {
@@ -929,6 +1000,7 @@ export let dataManagementPackageOperationInputSchema = z.object({
     .enum([
       'export_to_package',
       'import_from_package',
+      'get_azure_write_url',
       'get_execution_summary_status',
       'get_execution_summary_page_url',
       'get_exported_package_url',
@@ -939,6 +1011,12 @@ export let dataManagementPackageOperationInputSchema = z.object({
   packageName: z.string().optional(),
   packageUrl: z.string().optional(),
   executionId: z.string().optional(),
+  uniqueFileName: z
+    .string()
+    .optional()
+    .describe(
+      'Unique blob file name for get_azure_write_url. Defaults to a generated unique name.'
+    ),
   reExecute: z.boolean().optional(),
   execute: z.boolean().optional(),
   overwrite: z.boolean().optional(),
@@ -1280,6 +1358,15 @@ export class DynamicsFinOpsClient {
     );
 
     return normalizeDataManagementResponseValue(response);
+  }
+
+  async getAzureWriteUrl(input: DataManagementGetAzureWriteUrlInput = {}) {
+    let request = buildDataManagementGetAzureWriteUrlRequest(input);
+    let response = await this.request<unknown>('get Azure writable blob URL', () =>
+      this.api.post(request.path, request.body)
+    );
+
+    return parseDataManagementWritableBlob(response);
   }
 
   async enqueueRecurringIntegration(input: RecurringIntegrationEnqueueInput) {

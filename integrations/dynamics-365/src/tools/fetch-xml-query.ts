@@ -10,7 +10,8 @@ export let fetchXmlQuery = SlateTool.create(spec, {
   instructions: [
     'Provide the full FetchXML string including the <fetch> root element.',
     'The entitySetName must match the entity referenced in the FetchXML.',
-    'FetchXML supports aggregate functions like count, sum, avg, min, max via the "aggregate" attribute.'
+    'FetchXML supports aggregate functions like count, sum, avg, min, max via the "aggregate" attribute.',
+    'To paginate, pass the nextLink value from the previous response back as nextLink.'
   ],
   tags: {
     destructive: false,
@@ -21,7 +22,13 @@ export let fetchXmlQuery = SlateTool.create(spec, {
     z.object({
       entitySetName: z.string().describe('OData entity set name matching the FetchXML entity'),
       fetchXml: z.string().describe('Complete FetchXML query string'),
-      pageSize: z.number().int().positive().optional().describe('Preferred page size')
+      pageSize: z.number().int().positive().optional().describe('Preferred page size'),
+      nextLink: z
+        .string()
+        .optional()
+        .describe(
+          'Pagination URL from a previous response; when set, fetches the next page instead of re-running the query'
+        )
     })
   )
   .output(
@@ -43,7 +50,8 @@ export let fetchXmlQuery = SlateTool.create(spec, {
     let client = createDynamicsClient(ctx);
 
     let result = await client.fetchXml(ctx.input.entitySetName, ctx.input.fetchXml, {
-      pageSize: ctx.input.pageSize
+      pageSize: ctx.input.pageSize,
+      nextLink: ctx.input.nextLink
     });
 
     return {

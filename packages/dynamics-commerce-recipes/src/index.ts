@@ -331,10 +331,6 @@ export let buildRetailServerHeaders = (input: {
     headers['Accept-Language'] = input.locale.trim();
   }
 
-  if (input.channelId !== undefined) {
-    headers['x-ms-commerce-channelid'] = String(input.channelId);
-  }
-
   return {
     ...headers,
     ...input.headers
@@ -712,25 +708,10 @@ export let buildGetActivePricesRequest = (input: {
     operation: 'get active prices',
     body: {
       productIds: requireCommerceArray(input.productIds, 'productIds'),
-      projectionDomain: buildCommerceProjectionDomain(input),
-      customerAccountNumber: input.customerAccountNumber,
+      projectDomain: buildCommerceProjectionDomain(input),
+      customerId: input.customerAccountNumber,
       activeDate: input.activeDate,
       affiliationLoyaltyTiers: input.affiliationLoyaltyTiers
-    }
-  });
-
-export let buildGetProductPromotionsRequest = (input: {
-  productIds: CommerceId[];
-  channelId?: CommerceId;
-  catalogId?: CommerceId;
-}): CommerceRequestSpec =>
-  buildCommerceRequest({
-    method: 'POST',
-    path: buildCommerceActionPath('Products', 'GetPromotions'),
-    operation: 'get product promotions',
-    body: {
-      productIds: requireCommerceArray(input.productIds, 'productIds'),
-      projectionDomain: buildCommerceProjectionDomain(input)
     }
   });
 
@@ -1032,7 +1013,7 @@ export let buildGetOrderByTransactionIdRequest = (input: {
 }): CommerceRequestSpec =>
   buildCommerceRequest({
     method: 'POST',
-    path: buildCommerceActionPath('SalesOrders', 'GetByTransactionId'),
+    path: buildCommerceActionPath('SalesOrders', 'GetSalesOrderDetailsByTransactionId'),
     operation: 'get order by transaction id',
     body: {
       transactionId: requireCommerceString(input.transactionId, 'transactionId'),
@@ -1043,7 +1024,7 @@ export let buildGetOrderByTransactionIdRequest = (input: {
 export let buildGetOrderBySalesIdRequest = (input: { salesId: string }): CommerceRequestSpec =>
   buildCommerceRequest({
     method: 'POST',
-    path: buildCommerceActionPath('SalesOrders', 'GetBySalesId'),
+    path: buildCommerceActionPath('SalesOrders', 'GetSalesOrderDetailsBySalesId'),
     operation: 'get order by sales id',
     body: {
       salesId: requireCommerceString(input.salesId, 'salesId')
@@ -1176,10 +1157,6 @@ export class DynamicsCommerceRetailServerClient {
 
   async getActivePrices(input: Parameters<typeof buildGetActivePricesRequest>[0]) {
     return this.execute(buildGetActivePricesRequest(input));
-  }
-
-  async getProductPromotions(input: Parameters<typeof buildGetProductPromotionsRequest>[0]) {
-    return this.execute(buildGetProductPromotionsRequest(input));
   }
 
   async getProductAvailabilities(
@@ -1320,11 +1297,10 @@ export let commerceProductInputSchema = z.object({
       'get_product',
       'get_products_by_ids',
       'get_active_prices',
-      'get_product_promotions',
       'get_product_availabilities',
       'get_estimated_availability'
     ])
-    .describe('Product, price, promotion, or inventory operation to build.'),
+    .describe('Product, price, or inventory operation to build.'),
   productId: commerceIdSchema.optional().describe('Single product record id for get_product.'),
   productIds: z.array(commerceIdSchema).optional().describe('Product record ids.'),
   itemIds: z.array(z.string()).optional().describe('Inventory item ids.'),

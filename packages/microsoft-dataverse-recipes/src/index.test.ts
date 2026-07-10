@@ -186,6 +186,7 @@ describe('microsoft dataverse metadata helpers', () => {
       PrimaryNameAttribute: 'name',
       OwnershipType: 'UserOwned',
       IsActivity: false,
+      IsCustomEntity: true,
       MetadataId: 'metadata-id',
       Attributes: [
         {
@@ -207,6 +208,7 @@ describe('microsoft dataverse metadata helpers', () => {
       displayName: 'Account',
       description: 'Business account',
       primaryIdAttribute: 'accountid',
+      isCustomEntity: true,
       attributes: [
         {
           logicalName: 'name',
@@ -228,6 +230,141 @@ describe('microsoft dataverse metadata helpers', () => {
       logicalName: 'parentcustomerid',
       type: 'Lookup',
       targets: ['account', 'contact']
+    });
+  });
+});
+
+describe('microsoft dataverse client request behavior', () => {
+  let createMockClient = (overrides: Partial<Record<keyof DataverseHttpClient, any>> = {}) => {
+    let http = {
+      get: vi.fn(async () => ({ data: {} })),
+      post: vi.fn(async () => ({ data: {} })),
+      patch: vi.fn(async () => ({ data: {} })),
+      put: vi.fn(async () => ({ data: {} })),
+      delete: vi.fn(async () => ({ data: {} })),
+      ...overrides
+    };
+    let client = new DataverseClient({
+      token: 'token',
+      instanceUrl: 'https://org.crm.dynamics.com',
+      http: http as unknown as DataverseHttpClient
+    });
+    return { client, http };
+  };
+
+  it('sends stringified facets, caps top at 100, and unwraps the search response envelope', async () => {
+    let post = vi.fn(async () => ({
+      data: {
+        response: JSON.stringify({
+          Value: [{ Id: '00000000-0000-0000-0000-000000000001', EntityName: 'account' }],
+          Count: 1
+        })
+      }
+    }));
+    let { client, http } = createMockClient({ post });
+
+    let result = (await client.searchRecords({
+      search: 'contoso',
+      facets: ['entityname,count:100'],
+      top: 10
+    })) as Record<string, any>;
+
+    expect(http.post).toHaveBeenCalledWith(
+      'https://org.crm.dynamics.com/api/search/v2.0/query',
+      {
+        search: 'contoso',
+        count: true,
+        top: 10,
+        facets: JSON.stringify(['entityname,count:100'])
+      }
+    );
+    expect(result.Value).toEqual([
+      { Id: '00000000-0000-0000-0000-000000000001', EntityName: 'account' }
+    ]);
+    expect(result.Count).toBe(1);
+
+    await expect(client.searchRecords({ search: 'contoso', top: 101 })).rejects.toThrow(
+      ServiceError
+    );
+  });
+
+  it('recovers the record id from OData-EntityId when no representation is returned', async () => {
+    let post = vi.fn(async () => ({
+      data: '',
+      headers: {
+        'odata-entityid':
+          'https://org.crm.dynamics.com/api/data/v9.2/accounts(00000000-0000-0000-0000-000000000001)'
+      }
+    }));
+    let { client } = createMockClient({ post });
+
+    let record = await client.createRecord(
+      'accounts',
+      { name: 'Contoso' },
+      { returnRepresentation: false }
+    );
+
+    expect(record['@odata.id']).toBe(
+      'https://org.crm.dynamics.com/api/data/v9.2/accounts(00000000-0000-0000-0000-000000000001)'
+    );
+  });
+
+  it('fetches lookup targets through the derived-type cast instead of the base attribute select', async () => {
+    let get = vi.fn(async (url: string) => {
+      if (url.includes('LookupAttributeMetadata')) {
+        return {
+          data: {
+            value: [{ LogicalName: 'parentcustomerid', Targets: ['account', 'contact'] }]
+          }
+        };
+      }
+      return {
+        data: {
+          value: [
+            { LogicalName: 'name', AttributeType: 'String' },
+            { LogicalName: 'parentcustomerid', AttributeType: 'Lookup' }
+          ]
+        }
+      };
+    });
+    let { client, http } = createMockClient({ get });
+
+    let attributes = await client.getEntityAttributes('account');
+
+    let baseUrl = http.get.mock.calls[0][0] as string;
+    expect(baseUrl).not.toContain('Targets');
+    let castUrl = http.get.mock.calls[1][0] as string;
+    expect(castUrl).toContain('Microsoft.Dynamics.CRM.LookupAttributeMetadata');
+    expect(castUrl).toContain('$select=LogicalName,Targets');
+    expect(attributes).toMatchObject([
+      { logicalName: 'name' },
+      { logicalName: 'parentcustomerid', targets: ['account', 'contact'] }
+    ]);
+  });
+
+  it('follows a FetchXML nextLink instead of re-running the first page', async () => {
+    let nextLink =
+      'https://org.crm.dynamics.com/api/data/v9.2/accounts?fetchXml=...&$skiptoken=token';
+    let { client, http } = createMockClient();
+
+    await client.fetchXml('accounts', '<fetch />', { nextLink });
+
+    expect(http.get.mock.calls[0][0]).toBe(nextLink);
+  });
+
+  it('requests OData annotations when includeAnnotations is set', async () => {
+    let { client, http } = createMockClient();
+
+    await client.listRecords('accounts', { includeAnnotations: true, pageSize: 10 });
+    expect(http.get.mock.calls[0][1]).toEqual({
+      headers: { Prefer: 'odata.maxpagesize=10,odata.include-annotations="*"' }
+    });
+
+    await client.getRecord('accounts', '00000000-0000-0000-0000-000000000001', {
+      includeAnnotations: true
+    });
+    expect(http.get.mock.calls[1][1]).toEqual({
+      headers: { Prefer: 'odata.include-annotations="*"' }
     });
   });
 });

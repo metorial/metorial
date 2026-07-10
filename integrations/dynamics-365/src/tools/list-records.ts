@@ -51,7 +51,13 @@ Use this to retrieve multiple records based on criteria. Supports standard OData
       nextLink: z
         .string()
         .optional()
-        .describe('Dataverse @odata.nextLink from a previous response')
+        .describe('Dataverse @odata.nextLink from a previous response'),
+      includeAnnotations: z
+        .boolean()
+        .optional()
+        .describe(
+          'When true, includes OData annotations such as formatted values and lookup logical names'
+        )
     })
   )
   .output(
@@ -82,7 +88,8 @@ Use this to retrieve multiple records based on criteria. Supports standard OData
       expand: ctx.input.expand,
       pageSize: ctx.input.pageSize,
       includeCount: ctx.input.includeCount,
-      nextLink: ctx.input.nextLink ?? ctx.input.skipToken
+      nextLink: ctx.input.nextLink ?? ctx.input.skipToken,
+      includeAnnotations: ctx.input.includeAnnotations
     });
 
     return {

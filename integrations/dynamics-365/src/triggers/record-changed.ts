@@ -7,7 +7,7 @@ export let recordChanged = SlateTrigger.create(spec, {
   name: 'Record Changed',
   key: 'record_changed',
   description:
-    'Triggers when records in a specified Dynamics 365 entity are created or modified. Polls for records with a modifiedon timestamp newer than the last check. Detects both new records (createdon equals modifiedon) and updated records.'
+    'Triggers when records in a specified Dynamics 365 entity are created or modified. Polls for records with a modifiedon timestamp newer than the last check. Detects both new records (createdon equals modifiedon) and updated records. The polled table is set by the recordChangedEntitySetName config value and defaults to accounts.'
 })
   .input(
     z.object({
@@ -38,8 +38,13 @@ export let recordChanged = SlateTrigger.create(spec, {
     pollEvents: async ctx => {
       let client = createDynamicsClient(ctx);
 
-      let entitySetName = ctx.state?.entitySetName || 'accounts';
-      let lastPolled = ctx.state?.lastPolled || new Date(Date.now() - 60000).toISOString();
+      let entitySetName =
+        ctx.config?.recordChangedEntitySetName || ctx.state?.entitySetName || 'accounts';
+      // Restart the cursor when the watched table changes; the stored timestamp
+      // belongs to the previously polled table.
+      let lastPolled =
+        (ctx.state?.entitySetName === entitySetName ? ctx.state?.lastPolled : undefined) ||
+        new Date(Date.now() - 60000).toISOString();
 
       let result = await client.listRecords(entitySetName, {
         filter: `modifiedon gt ${lastPolled}`,

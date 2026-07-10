@@ -35,7 +35,15 @@ export let getRecord = SlateTool.create(spec, {
       expand: z
         .string()
         .optional()
-        .describe('Navigation property to expand (e.g., "primarycontactid($select=fullname)")')
+        .describe(
+          'Navigation property to expand (e.g., "primarycontactid($select=fullname)")'
+        ),
+      includeAnnotations: z
+        .boolean()
+        .optional()
+        .describe(
+          'When true, includes OData annotations such as formatted values and lookup logical names'
+        )
     })
   )
   .output(
@@ -54,7 +62,8 @@ export let getRecord = SlateTool.create(spec, {
 
     let record = await client.getRecord(ctx.input.entitySetName, recordKey, {
       select: ctx.input.select,
-      expand: ctx.input.expand
+      expand: ctx.input.expand,
+      includeAnnotations: ctx.input.includeAnnotations
     });
 
     return {

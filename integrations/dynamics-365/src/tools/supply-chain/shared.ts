@@ -3,7 +3,7 @@ import {
   dynamicsFinOpsServiceError,
   FINOPS_DEFAULT_PAGE_SIZE,
   type FinOpsODataQuery,
-  normalizeFinOpsLegalEntity
+  resolveFinOpsInputLegalEntity
 } from '@slates/dynamics-finops-recipes';
 import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
@@ -198,42 +198,14 @@ let resolveEntitySetName = (
   return entitySetName;
 };
 
-let resolveInputLegalEntity = (
-  input: FinOpsInputContext,
-  definition: FinOpsResourceDefinition
-) => {
-  let legalEntity = input.legalEntity;
-  let dataAreaId = input.dataAreaId;
-
-  if (legalEntity && dataAreaId) {
-    let normalizedLegalEntity = normalizeFinOpsLegalEntity(legalEntity);
-    let normalizedDataAreaId = normalizeFinOpsLegalEntity(dataAreaId);
-
-    if (normalizedLegalEntity !== normalizedDataAreaId) {
-      throw dynamicsFinOpsServiceError(
-        'legalEntity and dataAreaId are aliases and must match when both are provided.'
-      );
-    }
-
-    return legalEntity;
-  }
-
-  let explicitLegalEntity = legalEntity ?? dataAreaId;
-
-  if (!definition.companyScoped && explicitLegalEntity) {
-    throw dynamicsFinOpsServiceError(
-      `${definition.name} is not legal-entity scoped. Omit legalEntity/dataAreaId or use released-product tools for legal-entity product data.`
-    );
-  }
-
-  return explicitLegalEntity;
-};
-
 let buildQuery = (
   ctx: FinOpsToolContext,
   definition: FinOpsResourceDefinition
 ): FinOpsODataQuery => {
-  let explicitLegalEntity = resolveInputLegalEntity(ctx.input, definition);
+  let explicitLegalEntity = resolveFinOpsInputLegalEntity(ctx.input, definition, {
+    nonCompanyScopedRemediation:
+      'Omit legalEntity/dataAreaId or use released-product tools for legal-entity product data.'
+  });
   let finOpsDefaultLegalEntity =
     definition.companyScoped && ctx.input.crossCompany !== true
       ? ctx.config?.finOpsDefaultLegalEntity
