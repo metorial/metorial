@@ -3,7 +3,8 @@ import { buildApiServiceError, createApiServiceError, SlateError } from '@slates
 let detailKeys = ['message', 'error', 'error_description', 'detail', 'title'] as const;
 let nestedKeys = ['error', 'errors'] as const;
 
-export let apolloServiceError = (message: string) => createApiServiceError(message);
+export let apolloServiceError = (message: string) =>
+  createApiServiceError(message, { reason: 'apollo_validation_error' });
 
 export let apolloApiError = (error: unknown, operation = 'request') => {
   if (SlateError.is(error)) {

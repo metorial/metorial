@@ -286,7 +286,7 @@ describe('New Relic client payload helpers', () => {
         filter: { states: ['ACTIVATED'] },
         timeWindow: undefined
       },
-      { 'NewRelic-Experimental': 'AiIssues' }
+      { 'nerd-graph-unsafe-experimental-opt-in': 'AiIssues' }
     );
   });
 });

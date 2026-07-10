@@ -1,4 +1,9 @@
-import { createAxios, SlateAuth } from '@slates/provider';
+import {
+  createAxios,
+  getOAuthExpiresAtFromExpiresIn,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from '@slates/provider';
 import { z } from 'zod';
 import { quickBooksApiError, quickBooksServiceError } from './lib/errors';
 
@@ -76,7 +81,6 @@ let createQuickBooksOauth = (
   },
 
   handleCallback: async (ctx: any) => {
-    let resolvedEnvironment = environment ?? ctx.config?.environment;
     let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
     try {
@@ -97,21 +101,27 @@ let createQuickBooksOauth = (
       );
 
       let data = response.data;
-      if (!data?.access_token) {
-        throw quickBooksServiceError(
-          'QuickBooks OAuth token exchange did not return an access token.'
-        );
-      }
-
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let token = normalizeOAuthTokenResponse(data, {
+        providerLabel: 'QuickBooks',
+        operation: 'token exchange',
+        accessTokenMessage: 'QuickBooks OAuth token exchange did not return an access token.'
+      });
+      let refreshTokenExpiresAt = getOAuthExpiresAtFromExpiresIn(
+        data?.x_refresh_token_expires_in,
+        { providerLabel: 'QuickBooks', operation: 'token exchange' }
+      );
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
+          token: token.token,
+          refreshToken: token.refreshToken,
+          expiresAt: token.expiresAt,
+          refreshTokenExpiresAt,
           realmId: ctx.callbackParams?.realmId,
-          ...(resolvedEnvironment ? { environment: resolvedEnvironment } : {})
+          // Only dedicated environment-pinned auth methods persist the
+          // environment. The generic method leaves it unset so tools keep
+          // following the live config value.
+          ...(environment ? { environment } : {})
         }
       };
     } catch (error) {
@@ -124,7 +134,9 @@ let createQuickBooksOauth = (
       throw quickBooksServiceError('QuickBooks OAuth refresh requires a refresh token.');
     }
 
-    let resolvedEnvironment = environment ?? ctx.output.environment ?? ctx.config?.environment;
+    // Preserve an environment that is already persisted (or pinned by a
+    // dedicated auth method), but never introduce one from live config.
+    let resolvedEnvironment = environment ?? ctx.output.environment;
     let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
     try {
@@ -144,19 +156,24 @@ let createQuickBooksOauth = (
       );
 
       let data = response.data;
-      if (!data?.access_token) {
-        throw quickBooksServiceError(
-          'QuickBooks OAuth refresh did not return an access token.'
-        );
-      }
-
-      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
+      let token = normalizeOAuthTokenResponse(data, {
+        providerLabel: 'QuickBooks',
+        operation: 'token refresh',
+        previousRefreshToken: ctx.output.refreshToken,
+        accessTokenMessage: 'QuickBooks OAuth refresh did not return an access token.'
+      });
+      let refreshTokenExpiresAt =
+        getOAuthExpiresAtFromExpiresIn(data?.x_refresh_token_expires_in, {
+          providerLabel: 'QuickBooks',
+          operation: 'token refresh'
+        }) ?? ctx.output.refreshTokenExpiresAt;
 
       return {
         output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
-          expiresAt,
+          token: token.token,
+          refreshToken: token.refreshToken,
+          expiresAt: token.expiresAt,
+          refreshTokenExpiresAt,
           realmId: ctx.output.realmId,
           ...(resolvedEnvironment ? { environment: resolvedEnvironment } : {})
         }
@@ -171,6 +188,7 @@ let createQuickBooksOauth = (
       token: string;
       refreshToken?: string;
       expiresAt?: string;
+      refreshTokenExpiresAt?: string;
       realmId?: string;
       environment?: QuickBooksEnvironment;
     };
@@ -217,6 +235,7 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
+      refreshTokenExpiresAt: z.string().optional(),
       realmId: z.string().optional(),
       environment: z.enum(['sandbox', 'production']).optional()
     })

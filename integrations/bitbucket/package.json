@@ -4,17 +4,17 @@
   "type": "module",
   "scripts": {
     "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
-    "test": "bun test tests",
+    "test": "vitest run --config vitest.config.ts --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@lowerdeck/error": "^1.1.0",
     "@slates/provider": "1.0.0-rc.16",
     "@types/node": "^20",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.1.2"
   },
-  "version": "0.2.0-rc.14"
+  "version": "0.2.0-rc.15"
 }

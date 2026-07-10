@@ -1,6 +1,7 @@
 import { buildApiServiceError, createApiServiceError, SlateError } from '@slates/provider';
 
-export let bitbucketServiceError = (message: string) => createApiServiceError(message);
+export let bitbucketServiceError = (message: string) =>
+  createApiServiceError(message, { reason: 'bitbucket_validation_error' });
 
 export let bitbucketApiError = (error: unknown, operation = 'request') => {
   if (SlateError.is(error)) {

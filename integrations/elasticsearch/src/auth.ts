@@ -1,9 +1,17 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
-import { elasticsearchApiError } from './lib/errors';
+import { elasticsearchApiError, mapElasticsearchAxiosError } from './lib/errors';
+
+let createAuthAxios = (baseUrl: string) =>
+  createAxios({
+    baseURL: baseUrl,
+    errorMapping: {
+      mapAxiosError: mapElasticsearchAxiosError
+    }
+  });
 
 let loadProfile = async (baseUrl: string, authHeader: string) => {
-  let ax = createAxios({ baseURL: baseUrl });
+  let ax = createAuthAxios(baseUrl);
 
   try {
     return await ax.get('/_security/_authenticate', {
@@ -42,7 +50,7 @@ export let auth = SlateAuth.create()
       let credentials = btoa(`${ctx.input.username}:${ctx.input.password}`);
       let baseUrl = ctx.input.elasticsearchUrl.replace(/\/+$/, '');
 
-      let ax = createAxios({ baseURL: baseUrl });
+      let ax = createAuthAxios(baseUrl);
       try {
         await ax.get('/', {
           headers: {
@@ -94,7 +102,7 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       let baseUrl = ctx.input.elasticsearchUrl.replace(/\/+$/, '');
 
-      let ax = createAxios({ baseURL: baseUrl });
+      let ax = createAuthAxios(baseUrl);
       try {
         await ax.get('/', {
           headers: {
@@ -144,7 +152,7 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       let baseUrl = ctx.input.elasticsearchUrl.replace(/\/+$/, '');
 
-      let ax = createAxios({ baseURL: baseUrl });
+      let ax = createAuthAxios(baseUrl);
       try {
         await ax.get('/', {
           headers: {

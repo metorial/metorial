@@ -1,6 +1,6 @@
-import { defineConfig } from 'vitest/config';
+import { createSlatesVitestConfig } from '@slates/test/config';
 
-export default defineConfig({
+export default createSlatesVitestConfig({
   test: {
     include: ['src/**/*.test.ts']
   }

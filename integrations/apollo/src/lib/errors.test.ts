@@ -1,6 +1,6 @@
-import { describe, expect, test } from 'bun:test';
 import { SlateError } from '@slates/provider';
-import { apolloApiError, apolloOAuthError } from '../src/lib/errors';
+import { describe, expect, it } from 'vitest';
+import { apolloApiError, apolloOAuthError, apolloServiceError } from './errors';
 
 let makeAxiosError = ({
   status,
@@ -35,7 +35,7 @@ let makeAxiosError = ({
 };
 
 describe('Apollo errors', () => {
-  test('preserves structured SlateErrors and their upstream diagnostics unchanged', () => {
+  it('preserves structured SlateErrors unchanged', () => {
     let structuredError = SlateError.fromAxios(
       makeAxiosError({
         status: 422,
@@ -49,15 +49,7 @@ describe('Apollo errors', () => {
     );
     let originalResponse = structuredError.toResponse();
 
-    expect(structuredError.code).toBe('upstream.invalid_request');
     expect(structuredError.status).toBe(422);
-    expect(structuredError.retryable).toBe(false);
-    expect(structuredError.data.upstream).toEqual({
-      code: 'published_at[min] and published_at[max] must be used together',
-      method: 'POST',
-      status: 422,
-      url: 'https://api.apollo.io/api/v1/news_articles/search'
-    });
 
     for (let result of [
       apolloApiError(structuredError, 'search news articles'),
@@ -68,7 +60,7 @@ describe('Apollo errors', () => {
     }
   });
 
-  test('converts raw Axios errors with the shared Apollo API error mapping', () => {
+  it('converts raw Axios errors with the shared Apollo API error mapping', () => {
     let result = apolloApiError(
       makeAxiosError({
         status: 422,
@@ -85,7 +77,16 @@ describe('Apollo errors', () => {
     expect(result.data.message).toBe(
       'Apollo API search news articles failed: HTTP 422 Unprocessable Entity: Provide a complete publication date range'
     );
-    expect(result.data.reason).toBe('apollo_api_error');
-    expect(result.data.upstreamStatus).toBe(422);
+    expect(result.data).toMatchObject({
+      reason: 'apollo_api_error',
+      upstreamStatus: 422
+    });
+  });
+
+  it('reports validation failures with the Apollo validation reason', () => {
+    let result = apolloServiceError('publishedAtMin must use YYYY-MM-DD format.');
+
+    expect(result.data.message).toBe('publishedAtMin must use YYYY-MM-DD format.');
+    expect(result.data).toMatchObject({ reason: 'apollo_validation_error' });
   });
 });

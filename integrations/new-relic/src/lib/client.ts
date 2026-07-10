@@ -1192,7 +1192,7 @@ export class NerdGraphClient {
         filter: Object.keys(filterInput).length > 0 ? filterInput : undefined,
         timeWindow: params?.timeWindow
       },
-      { 'NewRelic-Experimental': 'AiIssues' }
+      { 'nerd-graph-unsafe-experimental-opt-in': 'AiIssues' }
     );
 
     return data?.actor?.account?.aiIssues?.issues;

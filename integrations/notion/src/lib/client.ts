@@ -116,9 +116,13 @@ export class NotionClient {
 
   async appendBlockChildren(
     blockId: string,
-    children: any[]
+    children: any[],
+    after?: string
   ): Promise<PaginatedResponse<any>> {
-    let response = await this.axios.patch(`/blocks/${blockId}/children`, { children });
+    let response = await this.axios.patch(`/blocks/${blockId}/children`, {
+      children,
+      ...(after ? { after } : {})
+    });
     return response.data;
   }
 

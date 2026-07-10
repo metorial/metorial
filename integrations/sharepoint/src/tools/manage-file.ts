@@ -41,7 +41,7 @@ export let manageFile = SlateTool.create(spec, {
     'For **download**, provide **driveId** and either **itemId** or **itemPath**; returns the download URL of the file.',
     "For **list**, provide **driveId** and optionally **folderId** or **itemPath** to list a specific folder's contents.",
     'For **move**, provide **destinationFolderId** in the same drive.',
-    'For **copy**, provide **destinationDriveId** and **destinationFolderId**.'
+    'For **copy**, provide **destinationDriveId** and **destinationFolderId**. Copy is asynchronous: this tool only initiates it and returns **copyMonitorUrl**; optionally set **conflictBehavior** ("fail" by default, "replace", or "rename").'
   ],
   tags: {
     destructive: false,
@@ -102,7 +102,13 @@ export let manageFile = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Destination drive ID (for copy across drives)'),
-      newName: z.string().optional().describe('New name (for rename)')
+      newName: z.string().optional().describe('New name (for rename)'),
+      conflictBehavior: z
+        .enum(['fail', 'replace', 'rename'])
+        .optional()
+        .describe(
+          'Naming conflict resolution for copy (default "fail"). Copy is asynchronous: this call only initiates it, and conflicts are reported via the returned copyMonitorUrl rather than this response. "replace" is only supported for files.'
+        )
     })
   )
   .output(
@@ -135,7 +141,8 @@ export let manageFile = SlateTool.create(spec, {
       folderId,
       destinationFolderId,
       destinationDriveId,
-      newName
+      newName,
+      conflictBehavior
     } = ctx.input;
 
     let mapItem = (item: any) => ({
@@ -173,6 +180,12 @@ export let manageFile = SlateTool.create(spec, {
       }
 
       case 'list': {
+        if (folderId && itemPath) {
+          throw serviceError(
+            'Provide either folderId or itemPath for list action, not both.',
+            'sharepoint_list_folder_conflict'
+          );
+        }
         let resolvedFolderId = folderId;
         if (itemPath) {
           let folder = await client.getDriveItemByPath(driveId, itemPath);
@@ -273,7 +286,8 @@ export let manageFile = SlateTool.create(spec, {
           itemId,
           targetDrive,
           destinationFolderId,
-          fileName
+          fileName,
+          conflictBehavior
         );
         return {
           output: {
