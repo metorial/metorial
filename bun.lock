@@ -3974,7 +3974,7 @@
     },
     "integrations/dynamics-365": {
       "name": "@slates-integrations/dynamics-365",
-      "version": "0.3.0-rc.6",
+      "version": "0.3.0-rc.7",
       "dependencies": {
         "@slates/dynamics-commerce-recipes": "1.0.0-rc.4",
         "@slates/dynamics-finops-recipes": "1.0.0-rc.0",
@@ -4064,7 +4064,7 @@
     },
     "integrations/elasticsearch": {
       "name": "@slates-integrations/elasticsearch",
-      "version": "0.2.0-rc.9",
+      "version": "0.2.0-rc.12",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -14203,7 +14203,7 @@
     },
     "packages/dynamics-commerce-recipes": {
       "name": "@slates/dynamics-commerce-recipes",
-      "version": "1.0.0-rc.4",
+      "version": "1.0.0-rc.5",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "slates": "1.0.0-rc.15",
@@ -14217,7 +14217,7 @@
     },
     "packages/dynamics-finops-recipes": {
       "name": "@slates/dynamics-finops-recipes",
-      "version": "1.0.0-rc.0",
+      "version": "1.0.0-rc.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "slates": "1.0.0-rc.15",
@@ -14246,7 +14246,7 @@
     },
     "packages/microsoft-dataverse-recipes": {
       "name": "@slates/microsoft-dataverse-recipes",
-      "version": "1.0.0-rc.4",
+      "version": "1.0.0-rc.5",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "slates": "1.0.0-rc.15",
@@ -18860,6 +18860,12 @@
     "@slates-integrations/dub/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
 
     "@slates-integrations/duo-security/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
+
+    "@slates-integrations/dynamics-365/@slates/dynamics-commerce-recipes": ["@slates/dynamics-commerce-recipes@1.0.0-rc.4", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "slates": "1.0.0-rc.15", "zod": "^4.2" } }, "sha512-kRYd2Lor7xpiCr3vnlaJu2s+O3hWvoyUrGQZnLi1/uimSc1+TC965LXY2ZuB7yrXOIlI/Kb5Wq0tjxMJWc2WYg=="],
+
+    "@slates-integrations/dynamics-365/@slates/dynamics-finops-recipes": ["@slates/dynamics-finops-recipes@1.0.0-rc.0", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "slates": "1.0.0-rc.15", "zod": "^4.2" } }, "sha512-6GLXxemVDtlKBrhY2gC80uwmY1UtK5JrdJwdjlN5AJhs2rataubsH64g5rkgjg+DC0WGr72GxLYIfms2Rh2zLw=="],
+
+    "@slates-integrations/dynamics-365/@slates/microsoft-dataverse-recipes": ["@slates/microsoft-dataverse-recipes@1.0.0-rc.4", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "slates": "1.0.0-rc.15", "zod": "^4.2" } }, "sha512-9W26KrCJSfNLG0zhPTw3PZiHAznv4wmGWfSdwGAtxU4YaPwBclCUI4UK5pGZUTltTHL6gY27ucxOGgQf7R+KAg=="],
 
     "@slates-integrations/dynapictures/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
 
