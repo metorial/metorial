@@ -8,9 +8,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates/dynamics-commerce-recipes": "1.0.0-rc.4",
-    "@slates/dynamics-finops-recipes": "1.0.0-rc.0",
-    "@slates/microsoft-dataverse-recipes": "1.0.0-rc.4",
+    "@slates/dynamics-commerce-recipes": "1.0.0-rc.5",
+    "@slates/dynamics-finops-recipes": "1.0.0-rc.1",
+    "@slates/microsoft-dataverse-recipes": "1.0.0-rc.5",
     "@types/node": "^20",
     "slates": "1.0.0-rc.15",
     "zod": "^4.2"
