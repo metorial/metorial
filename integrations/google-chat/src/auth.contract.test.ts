@@ -78,7 +78,10 @@ describe('google-chat auth contract', () => {
       `${googleChatScopes.messages} ${googleChatScopes.userInfoEmail}`
     );
     expect(url.searchParams.get('access_type')).toBe('offline');
-    expect(url.searchParams.get('include_granted_scopes')).toBe('true');
+    // include_granted_scopes must stay absent: with a shared OAuth client it merges
+    // every previously granted scope into the new grant, and large accumulated
+    // grants make Google return 400 Bad Request at consent completion.
+    expect(url.searchParams.has('include_granted_scopes')).toBe(false);
     expect(url.searchParams.get('prompt')).toBe('consent');
   });
 

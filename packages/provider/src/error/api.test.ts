@@ -1,6 +1,7 @@
 import { ServiceError } from '@lowerdeck/error';
 import { describe, expect, it } from 'vitest';
 import { buildApiServiceError, collectApiErrorDetails, createApiServiceError } from './api';
+import { SlateError } from './base';
 
 describe('API service error helpers', () => {
   it('collects unique nested API error details', () => {
@@ -50,6 +51,28 @@ describe('API service error helpers', () => {
     expect(error.data.reason).toBe('example_api_error');
     expect(error.data.upstreamStatus).toBe(429);
     expect(error.data.upstreamCode).toBe('RATE_LIMITED');
+  });
+
+  it('recovers the upstream status from interceptor-normalized SlateErrors', () => {
+    // Runtime axios instances reject with SlateError, not AxiosError: the
+    // response interceptor consumes error.response, so the status only
+    // survives at data.upstream.status / data.status.
+    let parent = new SlateError({
+      code: 'not_found',
+      message: 'Method not found.',
+      upstream: { status: 404 }
+    });
+
+    let error = buildApiServiceError(parent, {
+      providerLabel: 'Example',
+      operation: 'search messages',
+      reason: 'example_api_error'
+    });
+
+    expect(error.data.upstreamStatus).toBe(404);
+    expect(error.data.message).toBe(
+      'Example API search messages failed: HTTP 404: Method not found.'
+    );
   });
 
   it('allows provider-specific status and message extraction', () => {

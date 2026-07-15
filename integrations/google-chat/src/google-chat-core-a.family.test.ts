@@ -1,8 +1,9 @@
 import { ServiceError } from '@lowerdeck/error';
 import { expectMcpCompatibleToolSchema } from '@slates/test';
-import { createApiServiceError } from 'slates';
+import { createApiServiceError, createSlateError } from 'slates';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GoogleChatClient } from './lib/client';
+import { googleChatApiError } from './lib/errors';
 import { googleChatActionAuthMethods, googleChatActionScopes } from './scopes';
 import { listMessages } from './tools/list-messages';
 import { buildManageMessageRequest, manageMessage } from './tools/manage-message';
@@ -359,6 +360,32 @@ describe('google-chat core A tool family', () => {
     });
     expect(result.message).toContain('spaces.messages.list fallback');
     expect(result.message).toContain('Developer Preview');
+  });
+
+  it('falls back on the interceptor-normalized 404 shape that live requests produce', async () => {
+    // At runtime createAxios rejects with SlateError (no .response), which
+    // googleChatApiError wraps; non-enrolled tenants get exactly this shape
+    // with "Method not found." — the fallback must still engage.
+    requestSpy
+      .mockRejectedValueOnce(
+        googleChatApiError(
+          createSlateError({
+            code: 'not_found',
+            message: 'Method not found.',
+            upstream: { status: 404 }
+          }),
+          'search messages'
+        )
+      )
+      .mockResolvedValueOnce({
+        messages: [{ name: 'spaces/space-2/messages/message-1', text: 'release ready' }]
+      });
+
+    let result = await searchMessages.handleInvocation(
+      createContext({ query: '"release ready"', conversationId: 'spaces/space-2' })
+    );
+
+    expect(result.output).toMatchObject({ searchMethod: 'list_fallback' });
   });
 
   it('explains the Developer Preview requirement when the fallback lacks a conversationId', async () => {

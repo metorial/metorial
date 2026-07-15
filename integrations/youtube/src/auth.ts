@@ -99,7 +99,6 @@ export let auth = SlateAuth.create()
         scope: ctx.scopes.join(' '),
         state: ctx.state,
         access_type: 'offline',
-        include_granted_scopes: 'true',
         prompt: 'consent'
       });
 

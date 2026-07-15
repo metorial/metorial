@@ -62,7 +62,10 @@ describe('youtube auth contract', () => {
     expect(url.searchParams.get('scope')).toBe(
       `${youtubeScopes.youtubeReadonly} ${youtubeScopes.youtubeUpload}`
     );
-    expect(url.searchParams.get('include_granted_scopes')).toBe('true');
+    // include_granted_scopes must stay absent: with a shared OAuth client it merges
+    // every previously granted scope into the new grant, and large accumulated
+    // grants make Google return 400 Bad Request at consent completion.
+    expect(url.searchParams.has('include_granted_scopes')).toBe(false);
   });
 
   it('maps callback and refresh token responses into the stored auth shape', async () => {
