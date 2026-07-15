@@ -8,6 +8,11 @@ import { spec } from '../spec';
 
 let attachmentDataNamePattern =
   /^spaces\/[^/\s?#]+\/(?:messages\/[^/\s?#]+\/)?attachments\/[^/\s?#]+$/;
+// Live attachmentDataRef.resourceName values are opaque base64 media tokens
+// (e.g. "ClxzcGFjZXMv..."), not spaces/... names — verified against the real
+// API on 2026-07-15. Restrict them to base64 characters so the value stays a
+// safe media/{resourceName} path.
+let opaqueMediaTokenPattern = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
 export let resolveGoogleChatAttachmentDataName = (resourceName: string) => {
   let resolved = resourceName.trim();
@@ -15,9 +20,11 @@ export let resolveGoogleChatAttachmentDataName = (resourceName: string) => {
     resolved.includes('\\') ||
     /%(?:2e|2f|5c)/i.test(resolved) ||
     resolved.split('/').some(segment => segment === '.' || segment === '..');
-  if (!attachmentDataNamePattern.test(resolved) || hasUnsafePathSegment) {
+  let hasAllowedShape =
+    attachmentDataNamePattern.test(resolved) || opaqueMediaTokenPattern.test(resolved);
+  if (!hasAllowedShape || hasUnsafePathSegment) {
     throw googleChatValidationError(
-      'attachmentDataResourceName must be a safe uploaded Google Chat attachment data resource under spaces/{space}/attachments/{attachment} or spaces/{space}/messages/{message}/attachments/{attachment}.'
+      'attachmentDataResourceName must be a safe uploaded Google Chat attachment data resource: the opaque attachmentDataRef.resourceName token, or a name under spaces/{space}/attachments/{attachment} or spaces/{space}/messages/{message}/attachments/{attachment}.'
     );
   }
   return resolved;

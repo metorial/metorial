@@ -401,6 +401,15 @@ describe('google-chat resource tool family B', () => {
       path: 'media/spaces/AAAA/attachments/upload-1',
       params: { alt: 'media' }
     });
+    // Live attachmentDataRef.resourceName values are opaque base64 tokens
+    // (verified against the real API 2026-07-15), not spaces/... names.
+    expect(buildDownloadAttachmentRequest('ClxzcGFjZXMvQUFRQU9jdDluUHcvbWVzc2FnZXM0gEA')).toEqual(
+      {
+        attachmentDataResourceName: 'ClxzcGFjZXMvQUFRQU9jdDluUHcvbWVzc2FnZXM0gEA',
+        path: 'media/ClxzcGFjZXMvQUFRQU9jdDluUHcvbWVzc2FnZXM0gEA',
+        params: { alt: 'media' }
+      }
+    );
     expect(
       buildListSpaceEventsRequest({
         space: 'AAAA',
