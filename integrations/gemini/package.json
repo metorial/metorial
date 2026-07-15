@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/provider": "1.0.0-rc.15",
+    "@slates/provider": "1.0.0-rc.16",
     "@types/node": "^20",
     "zod": "^4.2"
   },
