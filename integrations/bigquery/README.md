@@ -8,6 +8,10 @@ Execute SQL queries against BigQuery datasets, including DML and DDL statements.
 
 Run a GoogleSQL (standard SQL) query against BigQuery. Supports SELECT, DML (INSERT, UPDATE, DELETE, MERGE), and DDL (CREATE, ALTER, DROP) statements. The query is submitted as a job, polled for completion, and results are returned. Parameterized queries are supported for safe value interpolation. You can optionally write results to a destination table.
 
+### Execute Read-only SQL Query
+
+Run a single read-only GoogleSQL `SELECT` query. BigQuery first dry-runs the exact SQL and the tool rejects scripts, procedure calls, DML, DDL, or an unknown statement type. After execution, the completed job is checked again before any results are returned. Parameterized queries, default datasets, job labels, byte limits, and result limits are supported.
+
 ### Export Table to Cloud Storage
 
 Export a BigQuery table to Google Cloud Storage as CSV, JSON, or Avro. Creates an asynchronous extract job. Use wildcards in the destination URI for sharded exports of large tables (e.g., gs://bucket/file-\*.csv).

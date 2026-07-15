@@ -1,7 +1,7 @@
 import { createLocalSlateTestClient, expectSlateContract } from '@slates/test';
 import { describe, expect, it } from 'vitest';
 import { provider } from './index';
-import { youtubeActionScopes } from './scopes';
+import { youtubeActionScopes, youtubeScopes } from './scopes';
 
 describe('youtube provider contract', () => {
   it('exposes the expected provider, tool, trigger, and auth surface', async () => {
@@ -18,6 +18,8 @@ describe('youtube provider contract', () => {
         'search_content',
         'list_videos',
         'get_video',
+        'get_video_rating',
+        'upload_video',
         'update_video',
         'delete_video',
         'rate_video',
@@ -31,6 +33,8 @@ describe('youtube provider contract', () => {
         'list_comments',
         'manage_subscriptions',
         'list_captions',
+        'download_caption',
+        'set_thumbnail',
         'list_activities'
       ],
       triggerIds: ['inbound_webhook', 'channel_activity', 'new_video'],
@@ -39,6 +43,8 @@ describe('youtube provider contract', () => {
         { id: 'search_content', readOnly: true, destructive: false },
         { id: 'list_videos', readOnly: true, destructive: false },
         { id: 'get_video', readOnly: true, destructive: false },
+        { id: 'get_video_rating', readOnly: true, destructive: false },
+        { id: 'upload_video', readOnly: false, destructive: false },
         { id: 'update_video', readOnly: false, destructive: false },
         { id: 'delete_video', readOnly: false, destructive: true },
         { id: 'get_channel', readOnly: true, destructive: false },
@@ -46,7 +52,9 @@ describe('youtube provider contract', () => {
         { id: 'list_playlists', readOnly: true, destructive: false },
         { id: 'list_metadata', readOnly: true, destructive: false },
         { id: 'list_comments', readOnly: true, destructive: false },
-        { id: 'list_activities', readOnly: true, destructive: false }
+        { id: 'list_activities', readOnly: true, destructive: false },
+        { id: 'download_caption', readOnly: true, destructive: false },
+        { id: 'set_thumbnail', readOnly: false, destructive: false }
       ],
       triggers: [
         { id: 'inbound_webhook', invocationType: 'webhook' },
@@ -55,13 +63,15 @@ describe('youtube provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(20);
+    expect(contract.actions).toHaveLength(24);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
       search_content: youtubeActionScopes.searchContent,
       list_videos: youtubeActionScopes.listVideos,
       get_video: youtubeActionScopes.getVideo,
+      get_video_rating: youtubeActionScopes.getVideoRating,
+      upload_video: youtubeActionScopes.uploadVideo,
       update_video: youtubeActionScopes.updateVideo,
       delete_video: youtubeActionScopes.deleteVideo,
       rate_video: youtubeActionScopes.rateVideo,
@@ -75,6 +85,8 @@ describe('youtube provider contract', () => {
       list_comments: youtubeActionScopes.listComments,
       manage_subscriptions: youtubeActionScopes.manageSubscriptions,
       list_captions: youtubeActionScopes.listCaptions,
+      download_caption: youtubeActionScopes.downloadCaption,
+      set_thumbnail: youtubeActionScopes.setThumbnail,
       list_activities: youtubeActionScopes.listActivities,
       channel_activity: youtubeActionScopes.channelActivity,
       new_video: youtubeActionScopes.newVideo,
@@ -98,5 +110,23 @@ describe('youtube provider contract', () => {
     );
     expect(scopeTitles.has('Manage Account')).toBe(true);
     expect(scopeTitles.has('Read Only')).toBe(true);
+    expect(scopeTitles.has('Upload Videos')).toBe(true);
+    expect(
+      (oauth.authenticationMethod.scopes ?? []).some(
+        scope => scope.id === youtubeScopes.youtubeUpload
+      )
+    ).toBe(true);
+    expect(
+      (oauth.authenticationMethod.scopes ?? []).filter(scope =>
+        [youtubeScopes.userinfoEmail, youtubeScopes.userinfoProfile].includes(
+          scope.id as typeof youtubeScopes.userinfoEmail
+        )
+      )
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: youtubeScopes.userinfoEmail, defaultChecked: true }),
+        expect.objectContaining({ id: youtubeScopes.userinfoProfile, defaultChecked: true })
+      ])
+    );
   });
 });

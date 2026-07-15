@@ -17,7 +17,7 @@ let queryParameterSchema = z.object({
     .object({
       value: z.string().optional().describe('Scalar value'),
       arrayValues: z
-        .array(z.object({ value: z.string() }))
+        .array(z.object({ value: z.string().describe('Array element value') }))
         .optional()
         .describe('Array values')
     })
@@ -33,7 +33,8 @@ Parameterized queries are supported for safe value interpolation. You can option
     'Use standard GoogleSQL syntax, not legacy SQL.',
     'For parameterized queries, set parameterMode to "NAMED" and provide queryParameters with matching @param_name references in the query.',
     'Use dryRun=true to validate and estimate costs without executing.',
-    'Set maximumBytesBilled to limit query costs.'
+    'Set maximumBytesBilled to limit query costs.',
+    'Queries against Drive-backed external tables (e.g. Google Sheets federated tables) require Google Drive access, which this connection does not request; such queries fail with a permission error.'
   ],
   constraints: [
     'Query results are limited to maxResults rows per response (default 1000).',

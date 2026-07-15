@@ -69,6 +69,10 @@ The API allows retrieving roster information for a specific class, including its
 
 Assignments, quizzes, and homework can be retrieved, created, updated, or deleted. The API can create and update submissions, set maximum point values for assignments, and assign grade values to student submissions. All stream items can contain supplementary materials, such as Google Drive files, YouTube videos, Google Forms, URL hyperlinks, and Classroom add-on attachments. All stream items can be assigned to a subset of the students in the course.
 
+The `update_coursework` tool uses `courses.courseWork.patch` with an explicit `updateMask`. It supports the teacher-editable fields documented by Google: title, description, state, due date and time, maximum points, scheduled publication time, submission modification mode, topic, and grading period. The request body contains only supplied field values, so fields that Google allows to be empty can be cleared by including them in `updateMask` and omitting their value. Title cannot be cleared, and no grading-period association is represented by an empty `gradingPeriodId`. Updating `dueDate` can make Google recalculate the grading-period association; include `gradingPeriodId` in the mask and body to preserve a custom or empty association. Google requires `dueDate` and `dueTime` to be set together and cleared together, so the tool validates locally that both fields change together (in `updateMask` and in the provided values) before calling the API. Assignees are not patchable through this endpoint.
+
+The destructive `delete_coursework` tool uses `courses.courseWork.delete`. Google requires the writable `classroom.coursework.students` scope for both update and delete, and the OAuth developer project making either request must be the same project that created the coursework.
+
 ### Announcements
 
 Teachers create announcements at the top of the Stream page in the Classroom UI, and the API supports Announcement, CourseWork, and CourseWorkMaterial stream item types. Announcements can be created, viewed, updated, and managed programmatically, including posting to individual students.

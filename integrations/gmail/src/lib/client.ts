@@ -32,6 +32,7 @@ export interface GmailMessage {
   internalDate: string;
   payload: MessagePart;
   sizeEstimate: number;
+  raw?: string;
 }
 
 export interface GmailThread {
@@ -106,6 +107,22 @@ export interface GmailFilter {
     removeLabelIds?: string[];
     forward?: string;
   };
+}
+
+export interface ImapSettings {
+  enabled: boolean;
+  autoExpunge: boolean;
+  expungeBehavior: 'expungeBehaviorUnspecified' | 'archive' | 'trash' | 'deleteForever';
+  maxFolderSize: number;
+}
+
+export interface PopSettings {
+  accessWindow: 'accessWindowUnspecified' | 'disabled' | 'fromNowOn' | 'allMail';
+  disposition: 'dispositionUnspecified' | 'leaveInInbox' | 'archive' | 'trash' | 'markRead';
+}
+
+export interface LanguageSettings {
+  displayLanguage: string;
 }
 
 export class Client {
@@ -198,6 +215,15 @@ export class Client {
     let response = await gmailAxios.post(`users/${this.userId}/messages/send`, payload, {
       headers: this.headers()
     });
+    return response.data;
+  }
+
+  async sendRawMessage(raw: string): Promise<GmailMessage> {
+    let response = await gmailAxios.post(
+      `users/${this.userId}/messages/send`,
+      { raw: encodeBase64Url(raw) },
+      { headers: this.headers() }
+    );
     return response.data;
   }
 
@@ -581,6 +607,48 @@ export class Client {
 
   async updateVacationSettings(settings: VacationSettings): Promise<VacationSettings> {
     let response = await gmailAxios.put(`users/${this.userId}/settings/vacation`, settings, {
+      headers: this.headers()
+    });
+    return response.data;
+  }
+
+  async getImapSettings(): Promise<ImapSettings> {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/imap`, {
+      headers: this.headers()
+    });
+    return response.data;
+  }
+
+  async updateImapSettings(settings: Partial<ImapSettings>): Promise<ImapSettings> {
+    let response = await gmailAxios.put(`users/${this.userId}/settings/imap`, settings, {
+      headers: this.headers()
+    });
+    return response.data;
+  }
+
+  async getPopSettings(): Promise<PopSettings> {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/pop`, {
+      headers: this.headers()
+    });
+    return response.data;
+  }
+
+  async updatePopSettings(settings: Partial<PopSettings>): Promise<PopSettings> {
+    let response = await gmailAxios.put(`users/${this.userId}/settings/pop`, settings, {
+      headers: this.headers()
+    });
+    return response.data;
+  }
+
+  async getLanguageSettings(): Promise<LanguageSettings> {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/language`, {
+      headers: this.headers()
+    });
+    return response.data;
+  }
+
+  async updateLanguageSettings(settings: LanguageSettings): Promise<LanguageSettings> {
+    let response = await gmailAxios.put(`users/${this.userId}/settings/language`, settings, {
       headers: this.headers()
     });
     return response.data;

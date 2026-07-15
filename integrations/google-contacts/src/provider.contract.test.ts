@@ -28,7 +28,10 @@ describe('google-contacts provider contract', () => {
         'list_other_contacts',
         'search_other_contacts',
         'copy_other_contact',
-        'search_directory'
+        'search_directory',
+        'get_my_profile',
+        'manage_contact_photo',
+        'batch_modify_contacts'
       ],
       triggerIds: ['inbound_webhook', 'contact_changed'],
       authMethodIds: ['google_oauth', 'api_key'],
@@ -48,7 +51,10 @@ describe('google-contacts provider contract', () => {
         { id: 'list_other_contacts', readOnly: true, destructive: false },
         { id: 'search_other_contacts', readOnly: true, destructive: false },
         { id: 'copy_other_contact', readOnly: false, destructive: false },
-        { id: 'search_directory', readOnly: true, destructive: false }
+        { id: 'search_directory', readOnly: true, destructive: false },
+        { id: 'get_my_profile', readOnly: true, destructive: false },
+        { id: 'manage_contact_photo', readOnly: false, destructive: true },
+        { id: 'batch_modify_contacts', readOnly: false, destructive: true }
       ],
       triggers: [
         { id: 'inbound_webhook', invocationType: 'webhook' },
@@ -56,7 +62,7 @@ describe('google-contacts provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(18);
+    expect(contract.actions).toHaveLength(21);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -76,6 +82,9 @@ describe('google-contacts provider contract', () => {
       search_other_contacts: googleContactsActionScopes.searchOtherContacts,
       copy_other_contact: googleContactsActionScopes.copyOtherContact,
       search_directory: googleContactsActionScopes.searchDirectory,
+      get_my_profile: googleContactsActionScopes.getMyProfile,
+      manage_contact_photo: googleContactsActionScopes.manageContactPhoto,
+      batch_modify_contacts: googleContactsActionScopes.batchModifyContacts,
       inbound_webhook: googleContactsActionScopes.inboundWebhook,
       contact_changed: googleContactsActionScopes.contactChanged
     };

@@ -11,6 +11,7 @@ import {
   deleteRoutine,
   deleteTable,
   executeQuery,
+  executeSqlReadonly,
   exportData,
   getDataset,
   getJob,
@@ -35,6 +36,7 @@ export let provider = Slate.create({
   spec,
   tools: [
     executeQuery,
+    executeSqlReadonly,
     listDatasets,
     getDataset,
     createDataset,

@@ -45,16 +45,6 @@ export let auth = SlateAuth.create()
         scope: googleSlidesScopes.driveFile
       },
       {
-        title: 'Drive',
-        description: 'See, edit, create, and delete all Google Drive files.',
-        scope: googleSlidesScopes.drive
-      },
-      {
-        title: 'Drive (Read-only)',
-        description: 'See and download all Google Drive files.',
-        scope: googleSlidesScopes.driveReadonly
-      },
-      {
         title: 'Spreadsheets (Read-only)',
         description:
           'See all Google Sheets spreadsheets. Required for refreshing linked charts.',

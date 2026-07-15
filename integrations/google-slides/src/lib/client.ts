@@ -1,6 +1,21 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  getResponseHeaderValue
+} from 'slates';
 
 let BASE_URL = 'https://slides.googleapis.com/v1';
+let PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+export type SlideThumbnailSize = 'LARGE' | 'MEDIUM' | 'SMALL';
+
+export interface SlideThumbnailDownload {
+  width: number;
+  height: number;
+  mimeType: 'image/png';
+  content: Buffer;
+}
 
 export class SlidesClient {
   private http: ReturnType<typeof createAxios>;
@@ -29,6 +44,129 @@ export class SlidesClient {
       `/presentations/${presentationId}/pages/${pageObjectId}`
     );
     return response.data;
+  }
+
+  async getPageThumbnail(
+    presentationId: string,
+    pageObjectId: string,
+    thumbnailSize?: SlideThumbnailSize
+  ): Promise<SlideThumbnailDownload> {
+    let params: Record<string, string> = {
+      'thumbnailProperties.mimeType': 'PNG'
+    };
+    if (thumbnailSize !== undefined) {
+      params['thumbnailProperties.thumbnailSize'] = thumbnailSize;
+    }
+
+    let thumbnailResponse: any;
+    try {
+      thumbnailResponse = await this.http.get(
+        `/presentations/${encodeURIComponent(presentationId)}/pages/${encodeURIComponent(pageObjectId)}/thumbnail`,
+        { params }
+      );
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Slides',
+        operation: 'generate slide thumbnail',
+        reason: 'google_slides_thumbnail_api_error',
+        nestedKeys: ['error', 'errors']
+      });
+    }
+
+    let { contentUrl, width, height } = thumbnailResponse.data ?? {};
+    if (
+      typeof contentUrl !== 'string' ||
+      contentUrl.length === 0 ||
+      !Number.isInteger(width) ||
+      width <= 0 ||
+      !Number.isInteger(height) ||
+      height <= 0
+    ) {
+      throw createApiServiceError(
+        'Google Slides returned incomplete thumbnail metadata. Retry the request.',
+        { reason: 'google_slides_thumbnail_metadata_invalid' }
+      );
+    }
+
+    let parsedContentUrl: URL;
+    try {
+      parsedContentUrl = new URL(contentUrl);
+    } catch {
+      throw createApiServiceError(
+        'Google Slides returned an invalid thumbnail content URL. Retry the request.',
+        { reason: 'google_slides_thumbnail_content_url_invalid' }
+      );
+    }
+    if (parsedContentUrl.protocol !== 'https:') {
+      throw createApiServiceError(
+        'Google Slides returned a non-HTTPS thumbnail content URL, so the image was not downloaded.',
+        { reason: 'google_slides_thumbnail_content_url_invalid' }
+      );
+    }
+
+    let downloadResponse: any;
+    try {
+      // Google documents this requester-tagged URL as directly accessible to anyone who
+      // has it. Fetch it without OAuth so a bearer token can never leak to the URL host.
+      let downloadHttp = createAxios();
+      downloadResponse = await downloadHttp.get(parsedContentUrl.toString(), {
+        responseType: 'arraybuffer'
+      });
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Slides',
+        operation: 'download generated slide thumbnail',
+        reason: 'google_slides_thumbnail_download_error',
+        nestedKeys: ['error', 'errors']
+      });
+    }
+
+    let downloadedData = downloadResponse?.data;
+    let content: Buffer;
+    if (Buffer.isBuffer(downloadedData)) {
+      content = downloadedData;
+    } else if (downloadedData instanceof ArrayBuffer) {
+      content = Buffer.from(downloadedData);
+    } else if (ArrayBuffer.isView(downloadedData)) {
+      content = Buffer.from(
+        downloadedData.buffer,
+        downloadedData.byteOffset,
+        downloadedData.byteLength
+      );
+    } else {
+      throw createApiServiceError(
+        'Google Slides returned an invalid thumbnail download response.',
+        { reason: 'google_slides_thumbnail_content_invalid' }
+      );
+    }
+
+    let responseMimeType = getResponseHeaderValue(downloadResponse.headers, 'content-type')
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase();
+    if (responseMimeType !== 'image/png') {
+      throw createApiServiceError(
+        responseMimeType
+          ? `Google Slides returned thumbnail content with unexpected MIME type "${responseMimeType}".`
+          : 'Google Slides returned thumbnail content without the required image/png MIME type.',
+        { reason: 'google_slides_thumbnail_mime_type_invalid' }
+      );
+    }
+    if (
+      content.length < PNG_SIGNATURE.length ||
+      !content.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)
+    ) {
+      throw createApiServiceError('Google Slides returned invalid PNG thumbnail content.', {
+        reason: 'google_slides_thumbnail_content_invalid'
+      });
+    }
+
+    return {
+      width,
+      height,
+      mimeType: 'image/png',
+      content
+    };
   }
 
   async batchUpdate(presentationId: string, requests: any[]): Promise<any> {

@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/Google_Photos.svg" height="20"> Google Photos
 
-Upload, manage, and organize photos and videos in users' Google Photos libraries. Create and manage albums, add enrichments (text, location, map markers), and change album titles and cover photos. Upload media items, edit descriptions, and search app-created content with filters including date ranges, content categories, and favorites. Create picker sessions that let users securely select photos and videos from their library to share with your application. Access media metadata including camera information, creation time, dimensions, and exposure details.
+Upload, manage, and organize photos and videos in users' Google Photos libraries. Create and manage albums, add enrichments (text, location, map markers), and change album titles and cover photos. Upload, download, edit, and search app-created media items with filters including date ranges, content categories, and favorites. Create picker sessions that let users securely select photos and videos from their library to share with your application. Access media metadata including camera information, creation time, dimensions, and exposure details.
 
 ## Tools
 
@@ -19,6 +19,10 @@ Create a new Google Photos Picker session that generates a URI where the user ca
 ### Delete Picker Session
 
 Delete a Google Photos Picker session. This revokes access to the session and any media items selected during the session.
+
+### Download Media Item
+
+Download one app-created Library API photo or READY video up to 50 MiB and return its bytes as a Slate attachment. The tool retrieves fresh media metadata for each call and immediately uses the temporary Library API base URL, which remains valid for 60 minutes. Picker API selections use separate IDs and access rules and cannot be downloaded with this tool.
 
 ### Get Album
 
@@ -59,6 +63,10 @@ Update the description of a media item created by your app.
 ### Upload Media
 
 Create media items in the user's Google Photos library from previously obtained upload tokens. Each item requires an upload token (from the bytes upload step), a filename, and optionally a description. Items can be added to an album at creation time.
+
+## API Access Limits
+
+Since April 1, 2025, the Google Photos Library API read methods can access only media items and albums created by the app. Use the Picker API when a user needs to select content from the rest of their library. Library API media base URLs remain valid for 60 minutes, so download media promptly or invoke **Download Media Item** again to obtain a fresh URL and attachment.
 
 ## License
 

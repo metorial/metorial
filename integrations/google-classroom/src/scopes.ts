@@ -70,6 +70,8 @@ export let googleClassroomActionScopes = {
     googleClassroomScopes.classroomCourseworkStudents,
     googleClassroomScopes.classroomCourseworkMe
   ),
+  updateCoursework: anyOf(googleClassroomScopes.classroomCourseworkStudents),
+  deleteCoursework: anyOf(googleClassroomScopes.classroomCourseworkStudents),
   manageSubmissions: anyOf(
     googleClassroomScopes.classroomCourseworkStudents,
     googleClassroomScopes.classroomCourseworkStudentsReadonly,

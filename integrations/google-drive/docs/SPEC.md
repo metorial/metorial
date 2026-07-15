@@ -50,6 +50,8 @@ API keys can be used for accessing publicly shared files only. An API key can be
 
 Download files from Drive and upload files to Drive. Create, copy, move, rename, trash, and permanently delete files and folders. Supports uploading via simple, multipart, and resumable upload methods. When you create a file, you can convert some file types into a Google Docs, Google Sheets, or Google Slides document. Files can be exported from Google Workspace formats (Docs, Sheets, Slides) to standard formats (PDF, DOCX, XLSX, etc.).
 
+`upload_file` performs Drive-native conversion by pairing a source media MIME type (for example, `text/markdown`) with a Google Workspace metadata MIME type (for example, `application/vnd.google-apps.document`). `create_file` creates empty native Docs, Sheets, and Slides when given the corresponding Google Workspace MIME type. These existing contracts make a separate conversion flag unnecessary.
+
 ### Search and Querying
 
 Search for files and folders stored in Drive. Create complex search queries that return any of the file metadata fields in the files resource. Queries can filter by name, MIME type, parent folder, ownership, modification date, shared status, labels, and many other metadata fields.
@@ -66,6 +68,8 @@ A shared drive is a storage location that owns files that multiple users collabo
 
 Files support threaded comments and replies. You can create, read, update, and delete comments and replies on files, and resolve/reopen comment threads.
 
+`update_comment` patches the parent comment by default. Supplying `replyId` uses the Drive replies update endpoint instead, so callers can edit a reply without changing the parent comment.
+
 ### File Revisions
 
 Track and manage the revision history of files. You can list, get, update, and delete revisions. Revisions can be downloaded to retrieve earlier versions of a file.
@@ -81,6 +85,12 @@ Create third-party shortcuts that are external links to data stored outside of D
 ### Change Tracking
 
 The changes collection provides an efficient way to detect all file changes, including those shared with a user. If the file has changed, the collection provides the current state of each file. Uses a page token mechanism to retrieve incremental changes since the last check.
+
+`list_changes` has two modes in one object-shaped input contract. When `pageToken` is omitted it returns a fresh `startPageToken` and no historical changes; `driveId` can select a shared drive in this mode. When `pageToken` is supplied it returns the current page of file or shared-drive changes plus `nextPageToken` or `newStartPageToken`; `driveId`, `includeRemoved`, `pageSize`, and `spaces` map to the Drive v3 changes API in this mode.
+
+### Account and Quota Information
+
+`get_about` returns the authenticated Drive user's permission ID, display name, email address, and available storage quota limit and usage values from Drive v3 `about.get`. All user fields are optional in the output because Drive can return a partial `user` object in some contexts.
 
 ### App Data Folder
 

@@ -82,7 +82,10 @@ You can list, search, and retrieve albums and media items that were created by y
 - Search within app-created content with filters including date ranges, content categories (e.g., landscapes, selfies, animals), and favorites.
 - Search results can be sorted newest first or oldest first.
 - Access media metadata including camera information, creation time, dimensions, and exposure details.
+- Download an app-created photo or READY video up to 50 MiB as a Slate attachment. The download flow retrieves the item with `mediaItems.get`, then immediately uses its temporary `baseUrl` with `=d` for photos or `=dv` for videos. Videos whose metadata reports a non-READY status (still processing) fail with retry advice; videos missing `mediaMetadata.video` entirely fail with a distinct error stating the video metadata is unavailable, since their processing status cannot be verified. The byte request accepts only HTTPS Google media hosts without redirects and validates response size, MIME family, and common file signatures before attaching the content.
 - The Library API no longer allows access to elements in a user's library that were not uploaded by your app.
+
+Library API base URLs remain valid for 60 minutes. A caller should invoke the download tool again rather than reuse an expired URL. Picker API media selections are separate from app-created Library API media: they use Picker IDs, Picker authorization, and Picker base URL rules, so the Library API download tool does not accept them.
 
 ## Events
 

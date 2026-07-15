@@ -4,6 +4,7 @@ import {
   createCourse,
   createCoursework,
   deleteCourse,
+  deleteCoursework,
   getCourse,
   getUserProfile,
   listCourses,
@@ -17,7 +18,8 @@ import {
   manageRubrics,
   manageSubmissions,
   manageTopics,
-  updateCourse
+  updateCourse,
+  updateCoursework
 } from './tools';
 import {
   announcementChanges,
@@ -39,6 +41,8 @@ export let provider = Slate.create({
     manageInvitations,
     listCoursework,
     createCoursework,
+    updateCoursework,
+    deleteCoursework,
     manageSubmissions,
     manageAnnouncements,
     manageTopics,

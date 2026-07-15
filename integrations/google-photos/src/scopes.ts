@@ -29,6 +29,7 @@ export let googlePhotosActionScopes = {
     googlePhotosScopes.photoslibraryReadonlyAppcreateddata,
     googlePhotosScopes.photoslibraryAppendonly
   ),
+  downloadMediaItem: anyOf(googlePhotosScopes.photoslibraryReadonlyAppcreateddata),
   searchMediaItems: anyOf(googlePhotosScopes.photoslibraryReadonlyAppcreateddata),
   updateMediaItem: anyOf(googlePhotosScopes.photoslibraryEditAppcreateddata),
   uploadMedia: anyOf(googlePhotosScopes.photoslibraryAppendonly),

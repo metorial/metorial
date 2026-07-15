@@ -62,6 +62,7 @@ describe('youtube auth contract', () => {
     expect(url.searchParams.get('scope')).toBe(
       `${youtubeScopes.youtubeReadonly} ${youtubeScopes.youtubeUpload}`
     );
+    expect(url.searchParams.get('include_granted_scopes')).toBe('true');
   });
 
   it('maps callback and refresh token responses into the stored auth shape', async () => {
@@ -163,5 +164,19 @@ describe('youtube auth contract', () => {
       name: 'YouTube Test User',
       imageUrl: 'https://example.com/avatar.png'
     });
+  });
+
+  it('skips Google UserInfo when identity scopes were not granted', async () => {
+    let client = await loadProviderClient();
+
+    let result = await client.getAuthProfile({
+      authenticationMethodId: 'oauth2',
+      output: { token: 'profile-token' },
+      input: {},
+      scopes: [youtubeScopes.youtubeUpload]
+    });
+
+    expect(result.profile).toEqual({});
+    expect(profileGet).not.toHaveBeenCalled();
   });
 });

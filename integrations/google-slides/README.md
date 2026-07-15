@@ -36,6 +36,10 @@ Embed a chart from a Google Sheets spreadsheet into a slide, or refresh an exist
 
 Retrieves the full structure of a Google Slides presentation including all slides, page elements, masters, and layouts. Use this to inspect the presentation's content before making modifications.
 
+### Get Slide Thumbnail
+
+Generates a PNG thumbnail of a slide page using Google's optional SMALL, MEDIUM, or LARGE size preset. The temporary Google content URL is downloaded immediately and the image is returned as a Slate attachment with metadata-only structured output.
+
 ### Manage Slides
 
 Create, duplicate, reorder, or delete slides within a presentation. Supports specifying a predefined layout (e.g. BLANK, TITLE, TITLE_AND_BODY) or a custom layout ID when creating slides. Use one action at a time.

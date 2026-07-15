@@ -1,0 +1,15 @@
+{
+  "name": "@google/compute-engine",
+  "description": "Connect a Google Cloud project to the Compute Engine API for virtual machine, disk, image, machine type, accelerator, instance group, template, reservation, commitment, and operation workflows.",
+  "categories": ["apis-and-http-requests"],
+  "skills": [
+    "manage virtual machine instances",
+    "inspect persistent disks and snapshots",
+    "browse machine and accelerator catalogs",
+    "inspect managed instance groups",
+    "inspect instance templates",
+    "inspect reservations and commitments",
+    "monitor Compute Engine operations"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

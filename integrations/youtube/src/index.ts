@@ -2,8 +2,10 @@ import { Slate } from '@slates/provider';
 import { spec } from './spec';
 import {
   deleteVideo,
+  downloadCaption,
   getChannel,
   getVideo,
+  getVideoRating,
   listActivities,
   listCaptions,
   listComments,
@@ -16,8 +18,10 @@ import {
   manageSubscriptions,
   rateVideo,
   searchContent,
+  setThumbnail,
   updateChannel,
-  updateVideo
+  updateVideo,
+  uploadVideo
 } from './tools';
 import { channelActivity, inboundWebhook, newVideo } from './triggers';
 
@@ -27,6 +31,8 @@ export let provider = Slate.create({
     searchContent,
     listVideos,
     getVideo,
+    getVideoRating,
+    uploadVideo,
     updateVideo,
     deleteVideo,
     rateVideo,
@@ -40,6 +46,8 @@ export let provider = Slate.create({
     listComments,
     manageSubscriptions,
     listCaptions,
+    downloadCaption,
+    setThumbnail,
     listActivities
   ],
   triggers: [inboundWebhook, channelActivity, newVideo]

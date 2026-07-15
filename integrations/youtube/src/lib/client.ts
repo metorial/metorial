@@ -1,5 +1,7 @@
+import { ServiceError } from '@lowerdeck/error';
 import { createAxios } from '@slates/provider';
 import { youtubeApiError, youtubeServiceError } from './errors';
+import { probeSourceUrl, readSourceUrlChunk } from './source-url';
 import type {
   YouTubeActivity,
   YouTubeCaption,
@@ -22,11 +24,66 @@ type YouTubeAuthConfig = {
 
 type AxiosResponse<T> = {
   data: T;
+  headers?: unknown;
+  status?: number;
+};
+
+// The pinned @slates/provider version used by integrations does not yet expose
+// the workspace's shared response-header helper.
+let getHeaderValue = (headers: unknown, name: string) => {
+  if (!headers || typeof headers !== 'object') return undefined;
+  let getter = (headers as { get?: unknown }).get;
+  if (typeof getter === 'function') {
+    let value = getter.call(headers, name);
+    return typeof value === 'string' ? value : undefined;
+  }
+  let lowerName = name.toLowerCase();
+  for (let [headerName, value] of Object.entries(headers as Record<string, unknown>)) {
+    if (headerName.toLowerCase() !== lowerName) continue;
+    if (Array.isArray(value)) value = value[0];
+    return typeof value === 'string' ? value : undefined;
+  }
+  return undefined;
+};
+
+export const MAX_BASE64_VIDEO_BYTES = 6 * 1024 * 1024;
+export const MAX_YOUTUBE_VIDEO_BYTES = 256 * 1000 * 1000 * 1000;
+// Operational cap for server-side sourceUrl fetches. YouTube itself accepts up
+// to 256 GB, but streaming that through sequential 8 MiB chunk round-trips is
+// guaranteed to outlive any tool-invocation window and is a resource-
+// consumption vector, so sourceUrl uploads are bounded to 2 GiB.
+export const MAX_SOURCE_URL_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024;
+export const MAX_THUMBNAIL_BYTES = 2 * 1000 * 1000;
+const RESUMABLE_CHUNK_BYTES = 8 * 1024 * 1024;
+const MAX_UPLOAD_RETRIES = 3;
+
+type UploadVideoParams = {
+  title: string;
+  description?: string;
+  tags?: string[];
+  categoryId?: string;
+  privacyStatus?: 'private' | 'public' | 'unlisted';
+  notifySubscribers?: boolean;
+  mimeType?: string;
+  content?: Buffer;
+  sourceUrl?: string;
+};
+
+type ThumbnailResource = Partial<
+  Record<
+    'default' | 'medium' | 'high' | 'standard' | 'maxres',
+    { url: string; width?: number; height?: number }
+  >
+>;
+
+type ThumbnailSetResponse = {
+  items?: ThumbnailResource[];
 };
 
 export class Client {
   private axios;
   private apiKey?: string;
+  private oauthToken?: string;
 
   constructor(config: YouTubeAuthConfig) {
     this.apiKey =
@@ -34,6 +91,7 @@ export class Client {
         ? (config.apiKey ?? config.token)
         : undefined;
     let oauthToken = this.apiKey ? undefined : config.token;
+    this.oauthToken = oauthToken;
 
     if (!this.apiKey && !oauthToken) {
       throw youtubeServiceError('YouTube credentials are missing');
@@ -74,7 +132,372 @@ export class Client {
     }
   }
 
+  private requireOAuth(operation: string) {
+    if (!this.oauthToken) {
+      throw youtubeServiceError(`${operation} requires OAuth 2.0 authentication.`);
+    }
+  }
+
+  private validateMediaMimeType(mimeType: string) {
+    let normalized = mimeType.trim().toLowerCase();
+    if (
+      normalized !== 'application/octet-stream' &&
+      !/^video\/[a-z0-9!#$&^_.+-]+$/.test(normalized)
+    ) {
+      throw youtubeServiceError('Video mimeType must be video/* or application/octet-stream.');
+    }
+    return normalized;
+  }
+
+  private validateUploadSessionUrl(value: string) {
+    let url: URL;
+    try {
+      url = new URL(value);
+    } catch {
+      throw youtubeServiceError('YouTube returned an invalid resumable upload URL.');
+    }
+    if (
+      url.protocol !== 'https:' ||
+      !url.hostname.endsWith('.googleapis.com') ||
+      !url.pathname.startsWith('/upload/youtube/v3/videos')
+    ) {
+      throw youtubeServiceError('YouTube returned an unexpected resumable upload URL.');
+    }
+    return url.toString();
+  }
+
+  private async startVideoUpload(params: {
+    title: string;
+    description?: string;
+    tags?: string[];
+    categoryId?: string;
+    privacyStatus: 'private' | 'public' | 'unlisted';
+    notifySubscribers: boolean;
+    contentLength: number;
+    mimeType: string;
+  }) {
+    let snippet: Record<string, unknown> = { title: params.title };
+    if (params.description !== undefined) snippet.description = params.description;
+    if (params.tags !== undefined) snippet.tags = params.tags;
+    if (params.categoryId !== undefined) snippet.categoryId = params.categoryId;
+
+    let response: AxiosResponse<unknown>;
+    try {
+      response = await this.axios.post(
+        'https://www.googleapis.com/upload/youtube/v3/videos',
+        {
+          snippet,
+          status: { privacyStatus: params.privacyStatus }
+        },
+        {
+          params: {
+            uploadType: 'resumable',
+            part: 'snippet,status',
+            notifySubscribers: params.notifySubscribers
+          },
+          headers: {
+            'Content-Type': 'application/json; charset=UTF-8',
+            'X-Upload-Content-Length': String(params.contentLength),
+            'X-Upload-Content-Type': params.mimeType
+          }
+        }
+      );
+    } catch (error) {
+      throw youtubeApiError(error, 'start resumable video upload');
+    }
+
+    let location = getHeaderValue(response.headers, 'location');
+    if (!location) {
+      throw youtubeServiceError('YouTube did not return a resumable upload URL.');
+    }
+    return this.validateUploadSessionUrl(location);
+  }
+
+  // Returns the number of bytes YouTube has committed, or undefined when the
+  // 308 response carries no Range header — which, per the resumable upload
+  // protocol, means no bytes have been committed yet.
+  private committedUploadOffset(headers: unknown): number | undefined {
+    let range = getHeaderValue(headers, 'range');
+    if (!range) return undefined;
+    let match = range.match(/^bytes=0-(\d+)$/i);
+    let offset = match ? Number(match[1]) + 1 : Number.NaN;
+    if (!Number.isSafeInteger(offset) || offset <= 0) {
+      throw youtubeServiceError('YouTube returned an invalid resumable upload range.');
+    }
+    return offset;
+  }
+
+  private retryAfterMs(headers: unknown, attempt: number) {
+    let value = getHeaderValue(headers, 'retry-after');
+    let requestedDelay: number | undefined;
+    if (value !== undefined) {
+      let seconds = Number(value);
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        requestedDelay = seconds * 1000;
+      } else {
+        let timestamp = Date.parse(value);
+        if (Number.isFinite(timestamp)) requestedDelay = Math.max(0, timestamp - Date.now());
+      }
+    }
+    return Math.min(requestedDelay ?? 250 * 2 ** Math.max(0, attempt - 1), 60_000);
+  }
+
+  private isRetryableUploadError(error: unknown) {
+    if (error instanceof ServiceError) return false;
+    let status = (error as any)?.response?.status;
+    return status === undefined || [500, 502, 503, 504].includes(Number(status));
+  }
+
+  private requireUploadedVideo(value: unknown) {
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      typeof (value as { id?: unknown }).id !== 'string' ||
+      (value as { id: string }).id.length === 0
+    ) {
+      throw youtubeServiceError(
+        'YouTube completed the resumable upload without returning a video resource.'
+      );
+    }
+    return value as YouTubeVideo;
+  }
+
+  private async queryUploadStatus(sessionUrl: string, totalBytes: number) {
+    let response: AxiosResponse<YouTubeVideo> = await this.axios.put(sessionUrl, null, {
+      headers: {
+        'Content-Length': '0',
+        'Content-Range': `bytes */${totalBytes}`
+      },
+      validateStatus: (status: number) => status === 308 || (status >= 200 && status < 300)
+    });
+    if (response.status === 308) {
+      let retryAfter = getHeaderValue(response.headers, 'retry-after');
+      return {
+        // No Range header on a 308 means nothing was committed yet.
+        offset: this.committedUploadOffset(response.headers) ?? 0,
+        retryAfterMs: retryAfter === undefined ? 0 : this.retryAfterMs(response.headers, 1)
+      };
+    }
+    return {
+      offset: totalBytes,
+      video: this.requireUploadedVideo(response.data),
+      retryAfterMs: 0
+    };
+  }
+
+  private async recoverUploadStatus(
+    sessionUrl: string,
+    totalBytes: number,
+    initialError?: unknown
+  ) {
+    let error = initialError;
+    for (let attempt = 0; attempt <= MAX_UPLOAD_RETRIES; attempt += 1) {
+      if (error !== undefined) {
+        if (!this.isRetryableUploadError(error) || attempt === MAX_UPLOAD_RETRIES) {
+          throw youtubeApiError(error, 'query resumable video upload status');
+        }
+        let headers = (error as any)?.response?.headers;
+        await new Promise(resolve =>
+          setTimeout(resolve, this.retryAfterMs(headers, attempt + 1))
+        );
+      }
+
+      try {
+        return await this.queryUploadStatus(sessionUrl, totalBytes);
+      } catch (statusError) {
+        error = statusError;
+      }
+    }
+    throw youtubeApiError(error, 'query resumable video upload status');
+  }
+
+  private async uploadVideoChunks(
+    sessionUrl: string,
+    totalBytes: number,
+    mimeType: string,
+    readChunk: (start: number, end: number) => Promise<Buffer>
+  ) {
+    let offset = 0;
+    let stalledAttempts = 0;
+
+    while (offset < totalBytes) {
+      let end = Math.min(offset + RESUMABLE_CHUNK_BYTES, totalBytes) - 1;
+      let chunk = await readChunk(offset, end);
+      if (chunk.length !== end - offset + 1) {
+        throw youtubeServiceError('Video source returned an incomplete upload chunk.');
+      }
+
+      try {
+        let response: AxiosResponse<YouTubeVideo> = await this.axios.put(sessionUrl, chunk, {
+          headers: {
+            'Content-Length': String(chunk.length),
+            'Content-Range': `bytes ${offset}-${end}/${totalBytes}`,
+            'Content-Type': mimeType
+          },
+          maxBodyLength: Number.POSITIVE_INFINITY,
+          maxContentLength: Number.POSITIVE_INFINITY,
+          validateStatus: (status: number) => status === 308 || (status >= 200 && status < 300)
+        });
+
+        if (response.status !== 308) {
+          return this.requireUploadedVideo(response.data);
+        }
+        let committed = this.committedUploadOffset(response.headers);
+        if (committed !== undefined && (committed < offset || committed > end + 1)) {
+          throw youtubeServiceError('YouTube returned an invalid resumable upload range.');
+        }
+        // A Range-less 308 means nothing was committed: restart from byte 0,
+        // bounded by the stalled-attempt retry limit below.
+        let nextOffset = committed ?? 0;
+        let madeProgress = nextOffset > offset;
+        if (!madeProgress) {
+          stalledAttempts += 1;
+          if (stalledAttempts > MAX_UPLOAD_RETRIES) {
+            throw youtubeServiceError(
+              'YouTube resumable upload made no progress after repeated attempts.'
+            );
+          }
+        } else {
+          stalledAttempts = 0;
+        }
+        offset = nextOffset;
+        let retryAfter = getHeaderValue(response.headers, 'retry-after');
+        if (retryAfter !== undefined || !madeProgress) {
+          await new Promise(resolve =>
+            setTimeout(resolve, this.retryAfterMs(response.headers, stalledAttempts || 1))
+          );
+        }
+      } catch (error) {
+        if (error instanceof ServiceError) throw error;
+        if (!this.isRetryableUploadError(error)) {
+          throw youtubeApiError(error, 'upload video bytes');
+        }
+
+        let statusResult = await this.recoverUploadStatus(sessionUrl, totalBytes, error);
+        if (statusResult.video) return statusResult.video;
+        // An offset of 0 is a Range-less 308 status probe: nothing committed,
+        // so restart from byte 0 under the same stalled-attempt bound.
+        if (
+          (statusResult.offset !== 0 && statusResult.offset < offset) ||
+          statusResult.offset > end + 1
+        ) {
+          throw youtubeServiceError('YouTube returned an invalid resumable upload range.');
+        }
+        stalledAttempts = statusResult.offset > offset ? 0 : stalledAttempts + 1;
+        if (stalledAttempts > MAX_UPLOAD_RETRIES) {
+          throw youtubeServiceError(
+            'YouTube resumable upload made no progress after repeated retries.'
+          );
+        }
+        offset = statusResult.offset;
+        if (statusResult.retryAfterMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, statusResult.retryAfterMs));
+        }
+      }
+    }
+
+    let statusResult = await this.recoverUploadStatus(sessionUrl, totalBytes);
+    if (statusResult.video) return statusResult.video;
+    throw youtubeServiceError('YouTube resumable upload did not return a video resource.');
+  }
+
   // --- Videos ---
+
+  async uploadVideo(params: UploadVideoParams): Promise<{
+    video: YouTubeVideo;
+    mimeType: string;
+    sizeBytes: number;
+    sourceType: 'base64' | 'url';
+  }> {
+    this.requireOAuth('Uploading videos');
+    let hasContent = params.content !== undefined;
+    let hasSourceUrl = params.sourceUrl !== undefined;
+    if (hasContent === hasSourceUrl) {
+      throw youtubeServiceError('Provide exactly one video source: content or sourceUrl.');
+    }
+
+    let sizeBytes: number;
+    let mimeType: string;
+    let sourceType: 'base64' | 'url';
+    let readChunk: (start: number, end: number) => Promise<Buffer>;
+
+    if (params.content) {
+      sizeBytes = params.content.length;
+      mimeType = params.mimeType ?? 'application/octet-stream';
+      sourceType = 'base64';
+      readChunk = async (start, end) => params.content!.subarray(start, end + 1);
+    } else {
+      let source = await probeSourceUrl(params.sourceUrl!);
+      if (source.contentLength > MAX_SOURCE_URL_UPLOAD_BYTES) {
+        throw youtubeServiceError(
+          `sourceUrl reports ${source.contentLength} bytes, above the ${MAX_SOURCE_URL_UPLOAD_BYTES}-byte (2 GiB) operational limit for server-side URL uploads.`
+        );
+      }
+      sizeBytes = source.contentLength;
+      mimeType = params.mimeType ?? source.mimeType;
+      sourceType = 'url';
+      readChunk = async (start, end) => {
+        // Defense in depth: never stream source bytes past the operational cap
+        // even if the declared length were bypassed or inconsistent.
+        if (end + 1 > MAX_SOURCE_URL_UPLOAD_BYTES) {
+          throw youtubeServiceError(
+            `sourceUrl uploads are limited to ${MAX_SOURCE_URL_UPLOAD_BYTES} bytes (2 GiB); refusing to stream past that limit.`
+          );
+        }
+        return await readSourceUrlChunk(source, start, end);
+      };
+    }
+
+    if (sizeBytes <= 0 || sizeBytes > MAX_YOUTUBE_VIDEO_BYTES) {
+      throw youtubeServiceError(
+        `Video content must be between 1 byte and ${MAX_YOUTUBE_VIDEO_BYTES} bytes.`
+      );
+    }
+    mimeType = this.validateMediaMimeType(mimeType);
+
+    let privacyStatus = params.privacyStatus ?? 'private';
+    let sessionUrl = await this.startVideoUpload({
+      title: params.title,
+      description: params.description,
+      tags: params.tags,
+      categoryId: params.categoryId,
+      privacyStatus,
+      notifySubscribers: params.notifySubscribers ?? false,
+      contentLength: sizeBytes,
+      mimeType
+    });
+    let video = await this.uploadVideoChunks(sessionUrl, sizeBytes, mimeType, readChunk);
+    return { video, mimeType, sizeBytes, sourceType };
+  }
+
+  async setThumbnail(params: {
+    videoId: string;
+    content: Buffer;
+    mimeType: 'image/jpeg' | 'image/png';
+  }): Promise<ThumbnailSetResponse> {
+    this.requireOAuth('Setting a video thumbnail');
+    if (params.content.length === 0 || params.content.length > MAX_THUMBNAIL_BYTES) {
+      throw youtubeServiceError(
+        `Thumbnail content must be between 1 byte and ${MAX_THUMBNAIL_BYTES} bytes.`
+      );
+    }
+
+    return await this.request('set video thumbnail', () =>
+      this.axios.post(
+        'https://www.googleapis.com/upload/youtube/v3/thumbnails/set',
+        params.content,
+        {
+          params: { videoId: params.videoId, uploadType: 'media' },
+          headers: {
+            'Content-Length': String(params.content.length),
+            'Content-Type': params.mimeType
+          },
+          maxBodyLength: MAX_THUMBNAIL_BYTES,
+          maxContentLength: MAX_THUMBNAIL_BYTES
+        }
+      )
+    );
+  }
 
   async listVideos(params: {
     part: string[];
@@ -201,6 +624,7 @@ export class Client {
   async getVideoRating(
     videoIds: string[]
   ): Promise<{ items: Array<{ videoId: string; rating: string }> }> {
+    this.requireOAuth('Getting video ratings');
     return await this.request('get video rating', () =>
       this.axios.get('/videos/getRating', {
         params: this.withAuthParams({
@@ -750,6 +1174,31 @@ export class Client {
         params: this.withAuthParams({ id: captionId })
       })
     );
+  }
+
+  async downloadCaption(params: {
+    captionId: string;
+    format?: 'sbv' | 'scc' | 'srt' | 'ttml' | 'vtt';
+    language?: string;
+  }): Promise<{ content: Buffer; mimeType: string }> {
+    this.requireOAuth('Downloading captions');
+    let response: AxiosResponse<ArrayBuffer>;
+    try {
+      response = await this.axios.get(`/captions/${encodeURIComponent(params.captionId)}`, {
+        params: {
+          tfmt: params.format,
+          tlang: params.language
+        },
+        responseType: 'arraybuffer'
+      });
+    } catch (error) {
+      throw youtubeApiError(error, 'download caption');
+    }
+
+    let content = Buffer.from(response.data);
+    let mimeType =
+      getHeaderValue(response.headers, 'content-type') ?? 'application/octet-stream';
+    return { content, mimeType: mimeType.split(';')[0]!.trim() };
   }
 
   // --- Activities ---

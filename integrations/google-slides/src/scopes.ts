@@ -29,6 +29,7 @@ let slidesWrite = anyOf(
 export let googleSlidesActionScopes = {
   createPresentation: slidesWrite,
   getPresentation: slidesRead,
+  getSlideThumbnail: slidesRead,
   batchUpdate: slidesWrite,
   addImage: slidesWrite,
   addShape: slidesWrite,

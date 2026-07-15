@@ -23,12 +23,10 @@ OAuth 2.0: Whenever your application requests private user data, it must send an
 | `https://www.googleapis.com/auth/presentations`          | See, edit, create, and delete all Google Slides presentations.                        | Sensitive                   |
 | `https://www.googleapis.com/auth/presentations.readonly` | See all Google Slides presentations.                                                  | Sensitive                   |
 | `https://www.googleapis.com/auth/drive.file`             | See, edit, create, and delete only the specific Google Drive files used with the app. | Non-sensitive (Recommended) |
-| `https://www.googleapis.com/auth/drive`                  | See, edit, create, and delete all Google Drive files.                                 | Restricted                  |
-| `https://www.googleapis.com/auth/drive.readonly`         | See and download all Google Drive files.                                              | Restricted                  |
 | `https://www.googleapis.com/auth/spreadsheets.readonly`  | See all Google Sheets spreadsheets.                                                   | Sensitive                   |
 | `https://www.googleapis.com/auth/spreadsheets`           | See, edit, create, and delete all Google Sheets spreadsheets.                         | Sensitive                   |
 
-Use the Drive scopes if you also plan to use the Drive API to manage the sharing settings or parent folders of presentations. The Sheets scopes are only required when creating or refreshing charts linked to Google Sheets.
+The restricted broad Drive scopes (`drive`, `drive.readonly`) are not requested by this integration. Connections that granted them previously keep working; new connections use `drive.file`, so Drive-level operations (change-notification polling across presentations) apply only to files created or opened through this connection. The Sheets scopes are only required when creating or refreshing charts linked to Google Sheets.
 
 ### Service Accounts
 
@@ -43,6 +41,10 @@ There are two ways to identify your application: using an OAuth 2.0 token and/or
 ### Presentation Management
 
 Create new presentations and retrieve the full structure of existing presentations, including all slides, layouts, masters, and their page elements. A presentation in the Slides API is made up of pages, which contain page elements. The presentationId corresponds to the ID of the Drive File resource.
+
+### Slide Thumbnails
+
+Generate a PNG thumbnail of the latest version of a slide page with Google's SMALL (target width 200 px), MEDIUM (800 px), or LARGE (1600 px) size preset. The Slides API returns a requester-tagged content URL with a default lifetime of 30 minutes; the integration downloads that URL immediately without forwarding the OAuth bearer token, discards the temporary URL, and returns the image bytes only through a Slate attachment. Structured output contains page, pixel-dimension, MIME-type, file-name, and byte-size metadata only.
 
 ### Slide Creation and Manipulation
 

@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createAxios } from 'slates';
 
 // Google Docs API types
 export interface Document {
@@ -589,9 +589,21 @@ export interface DriveStartPageTokenResponse {
   startPageToken: string;
 }
 
+export const GOOGLE_DOCS_MIME_TYPE = 'application/vnd.google-apps.document';
+
+const GOOGLE_DOCS_DRIVE_FILE_FIELDS = 'id,name,mimeType,modifiedTime,createdTime,webViewLink';
+
+export let buildMarkdownMultipartBody = (
+  metadata: Record<string, unknown>,
+  markdown: string,
+  boundary: string
+) =>
+  `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: text/markdown\r\n\r\n${markdown}\r\n--${boundary}--`;
+
 export class GoogleDocsClient {
   private docsAxios;
   private driveAxios;
+  private driveUploadAxios;
 
   constructor(private config: { token: string }) {
     this.docsAxios = createAxios({
@@ -599,6 +611,12 @@ export class GoogleDocsClient {
     });
     this.driveAxios = createAxios({
       baseURL: 'https://www.googleapis.com/drive/v3'
+    });
+    this.driveUploadAxios = createAxios({
+      baseURL: 'https://www.googleapis.com/upload/drive/v3',
+      headers: {
+        Authorization: `Bearer ${this.config.token}`
+      }
     });
   }
 
@@ -677,6 +695,75 @@ export class GoogleDocsClient {
       headers: this.getAuthHeaders()
     });
     return response.data;
+  }
+
+  async createDocumentFromMarkdown(title: string, markdown: string): Promise<DriveFile> {
+    let metadata = {
+      name: title,
+      mimeType: GOOGLE_DOCS_MIME_TYPE
+    };
+    let boundary = `-------slate_boundary_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2)}`;
+
+    try {
+      let response = await this.driveUploadAxios.post(
+        'files',
+        buildMarkdownMultipartBody(metadata, markdown, boundary),
+        {
+          params: {
+            uploadType: 'multipart',
+            fields: GOOGLE_DOCS_DRIVE_FILE_FIELDS,
+            supportsAllDrives: true
+          },
+          headers: {
+            'Content-Type': `multipart/related; boundary=${boundary}`
+          }
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Drive',
+        operation: 'create a Google Docs document from Markdown',
+        reason: 'google_docs_markdown_create_failed'
+      });
+    }
+  }
+
+  async updateDocumentFromMarkdown(documentId: string, markdown: string): Promise<DriveFile> {
+    let metadata = {
+      mimeType: GOOGLE_DOCS_MIME_TYPE
+    };
+    let boundary = `-------slate_boundary_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2)}`;
+
+    try {
+      let response = await this.driveUploadAxios.patch(
+        `files/${encodeURIComponent(documentId)}`,
+        buildMarkdownMultipartBody(metadata, markdown, boundary),
+        {
+          params: {
+            uploadType: 'multipart',
+            fields: GOOGLE_DOCS_DRIVE_FILE_FIELDS,
+            supportsAllDrives: true
+          },
+          headers: {
+            'Content-Type': `multipart/related; boundary=${boundary}`
+          }
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Drive',
+        operation: 'replace a Google Docs document from Markdown',
+        reason: 'google_docs_markdown_update_failed'
+      });
+    }
   }
 
   async watchFile(

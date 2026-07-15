@@ -22,6 +22,7 @@ describe('google-photos provider contract', () => {
         'manage_album_media',
         'add_album_enrichment',
         'get_media_item',
+        'download_media_item',
         'search_media_items',
         'update_media_item',
         'upload_media',
@@ -36,6 +37,7 @@ describe('google-photos provider contract', () => {
         { id: 'list_albums', readOnly: true },
         { id: 'get_album', readOnly: true },
         { id: 'get_media_item', readOnly: true },
+        { id: 'download_media_item', readOnly: true },
         { id: 'search_media_items', readOnly: true },
         { id: 'get_picker_session', readOnly: true },
         { id: 'list_picked_media', readOnly: true },
@@ -44,7 +46,7 @@ describe('google-photos provider contract', () => {
       triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
     });
 
-    expect(contract.actions).toHaveLength(15);
+    expect(contract.actions).toHaveLength(16);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -55,6 +57,7 @@ describe('google-photos provider contract', () => {
       manage_album_media: googlePhotosActionScopes.manageAlbumMedia,
       add_album_enrichment: googlePhotosActionScopes.addAlbumEnrichment,
       get_media_item: googlePhotosActionScopes.getMediaItem,
+      download_media_item: googlePhotosActionScopes.downloadMediaItem,
       search_media_items: googlePhotosActionScopes.searchMediaItems,
       update_media_item: googlePhotosActionScopes.updateMediaItem,
       upload_media: googlePhotosActionScopes.uploadMedia,

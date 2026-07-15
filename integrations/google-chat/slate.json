@@ -1,0 +1,14 @@
+{
+  "name": "@google/google-chat",
+  "description": "Connect Google Chat for authenticated space, membership, message, reaction, attachment, and space-event workflows.",
+  "categories": ["email-and-messaging"],
+  "skills": [
+    "send and manage messages",
+    "find and manage spaces",
+    "manage space memberships",
+    "manage message reactions",
+    "upload and download attachments",
+    "inspect Google Chat space events"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google-chat.svg"
+}

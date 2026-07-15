@@ -18,6 +18,7 @@ describe('google-forms provider contract', () => {
         'create_form',
         'get_form',
         'update_form',
+        'set_publish_settings',
         'get_response',
         'list_responses',
         'manage_watches'
@@ -28,6 +29,7 @@ describe('google-forms provider contract', () => {
         { id: 'create_form', readOnly: false, destructive: false },
         { id: 'get_form', readOnly: true, destructive: false },
         { id: 'update_form', readOnly: false, destructive: true },
+        { id: 'set_publish_settings', readOnly: false, destructive: false },
         { id: 'get_response', readOnly: true, destructive: false },
         { id: 'list_responses', readOnly: true, destructive: false },
         { id: 'manage_watches', readOnly: false, destructive: false }
@@ -39,12 +41,13 @@ describe('google-forms provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(9);
+    expect(contract.actions).toHaveLength(10);
 
     let expectedScopes = {
       create_form: googleFormsActionScopes.createForm,
       get_form: googleFormsActionScopes.getForm,
       update_form: googleFormsActionScopes.updateForm,
+      set_publish_settings: googleFormsActionScopes.setPublishSettings,
       get_response: googleFormsActionScopes.getResponse,
       list_responses: googleFormsActionScopes.listResponses,
       manage_watches: googleFormsActionScopes.manageWatches,

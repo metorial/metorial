@@ -1,6 +1,8 @@
 import { anyOf } from '@slates/provider';
 
 export let youtubeScopes = {
+  userinfoEmail: 'https://www.googleapis.com/auth/userinfo.email',
+  userinfoProfile: 'https://www.googleapis.com/auth/userinfo.profile',
   youtube: 'https://www.googleapis.com/auth/youtube',
   youtubeReadonly: 'https://www.googleapis.com/auth/youtube.readonly',
   youtubeForceSsl: 'https://www.googleapis.com/auth/youtube.force-ssl',
@@ -38,6 +40,24 @@ export let youtubeActionScopes = {
     youtubeScopes.youtubeReadonly,
     youtubeScopes.youtube,
     youtubeScopes.youtubeForceSsl
+  ),
+  uploadVideo: anyOf(
+    youtubeScopes.youtubeUpload,
+    youtubeScopes.youtube,
+    youtubeScopes.youtubeForceSsl,
+    youtubeScopes.youtubepartner
+  ),
+  setThumbnail: anyOf(
+    youtubeScopes.youtubeUpload,
+    youtubeScopes.youtube,
+    youtubeScopes.youtubeForceSsl,
+    youtubeScopes.youtubepartner
+  ),
+  downloadCaption: anyOf(youtubeScopes.youtubeForceSsl, youtubeScopes.youtubepartner),
+  getVideoRating: anyOf(
+    youtubeScopes.youtube,
+    youtubeScopes.youtubeForceSsl,
+    youtubeScopes.youtubepartner
   ),
   updateVideo: youtubeWrite,
   deleteVideo: youtubeWrite,

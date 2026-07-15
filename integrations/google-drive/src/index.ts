@@ -10,7 +10,9 @@ import {
   deleteSharedDriveTool,
   downloadFileTool,
   exportFileTool,
+  getAboutTool,
   getFileTool,
+  listChangesTool,
   listCommentsTool,
   listPermissionsTool,
   listRevisionsTool,
@@ -19,6 +21,7 @@ import {
   replyToCommentTool,
   searchFilesTool,
   shareFileTool,
+  updateCommentTool,
   updateFileTool,
   updatePermissionTool,
   updateSharedDriveTool,
@@ -35,6 +38,7 @@ export let provider = Slate.create({
     uploadFileTool,
     downloadFileTool,
     exportFileTool,
+    getAboutTool,
     updateFileTool,
     copyFileTool,
     deleteFileTool,
@@ -45,12 +49,14 @@ export let provider = Slate.create({
     listCommentsTool,
     createCommentTool,
     replyToCommentTool,
+    updateCommentTool,
     deleteCommentTool,
     listRevisionsTool,
     listSharedDrivesTool,
     createSharedDriveTool,
     updateSharedDriveTool,
-    deleteSharedDriveTool
+    deleteSharedDriveTool,
+    listChangesTool
   ],
   triggers: [inboundWebhook, fileChangesTrigger]
 });

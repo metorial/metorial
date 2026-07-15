@@ -1,4 +1,118 @@
-import { createAxios } from 'slates';
+import {
+  buildApiServiceError,
+  createApiServiceError,
+  createAxios,
+  getResponseHeaderValue,
+  setIfDefined
+} from 'slates';
+
+export let PLACE_AUTOCOMPLETE_FIELD_MASK = [
+  'suggestions.placePrediction.place',
+  'suggestions.placePrediction.placeId',
+  'suggestions.placePrediction.text.text',
+  'suggestions.placePrediction.structuredFormat.mainText.text',
+  'suggestions.placePrediction.structuredFormat.secondaryText.text',
+  'suggestions.placePrediction.types',
+  'suggestions.placePrediction.distanceMeters',
+  'suggestions.queryPrediction.text.text',
+  'suggestions.queryPrediction.structuredFormat.mainText.text',
+  'suggestions.queryPrediction.structuredFormat.secondaryText.text'
+].join(',');
+
+export let PLACE_DETAILS_FIELD_MASK = [
+  'id',
+  'displayName',
+  'formattedAddress',
+  'location',
+  'rating',
+  'userRatingCount',
+  'types',
+  'primaryType',
+  'businessStatus',
+  'priceLevel',
+  'websiteUri',
+  'nationalPhoneNumber',
+  'internationalPhoneNumber',
+  'regularOpeningHours',
+  'reviews',
+  'editorialSummary',
+  'shortFormattedAddress',
+  'addressComponents',
+  'adrFormatAddress',
+  'googleMapsUri',
+  'photos'
+].join(',');
+
+export let MAX_GOOGLE_MAPS_PLACE_PHOTO_BYTES = 50 * 1024 * 1024;
+
+// The photo segment comes verbatim from get_place_details output; Google emits
+// URL-safe base64 references, so allow '=' padding alongside [A-Za-z0-9_-].
+let PLACE_PHOTO_NAME_PATTERN = /^places\/([A-Za-z0-9_-]+)\/photos\/([A-Za-z0-9_=-]+)$/;
+let PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+let JPEG_SIGNATURE = Buffer.from([0xff, 0xd8, 0xff]);
+let GIF87A_SIGNATURE = Buffer.from('GIF87a', 'ascii');
+let GIF89A_SIGNATURE = Buffer.from('GIF89a', 'ascii');
+let RIFF_SIGNATURE = Buffer.from('RIFF', 'ascii');
+let WEBP_SIGNATURE = Buffer.from('WEBP', 'ascii');
+let ISO_BASE_MEDIA_FILE_SIGNATURE = Buffer.from('ftyp', 'ascii');
+
+let readIsoBaseMediaBrands = (content: Buffer) => {
+  if (!startsWith(content, ISO_BASE_MEDIA_FILE_SIGNATURE, 4) || content.length < 12) {
+    return [];
+  }
+
+  let boxSize = content.readUInt32BE(0);
+  if (boxSize < 16 || boxSize > content.length) return [];
+
+  let brands = [content.subarray(8, 12).toString('ascii')];
+  for (let offset = 16; offset + 4 <= boxSize; offset += 4) {
+    brands.push(content.subarray(offset, offset + 4).toString('ascii'));
+  }
+  return brands;
+};
+
+let hasIsoBaseMediaBrand = (content: Buffer, acceptedBrands: Set<string>) =>
+  readIsoBaseMediaBrands(content).some(brand => acceptedBrands.has(brand));
+
+let startsWith = (content: Buffer, signature: Buffer, offset = 0) =>
+  content.length >= offset + signature.length &&
+  content.subarray(offset, offset + signature.length).equals(signature);
+
+let hasKnownImageSignature = (mimeType: string, content: Buffer) => {
+  switch (mimeType) {
+    case 'image/jpeg':
+      return startsWith(content, JPEG_SIGNATURE);
+    case 'image/png':
+      return startsWith(content, PNG_SIGNATURE);
+    case 'image/gif':
+      return startsWith(content, GIF87A_SIGNATURE) || startsWith(content, GIF89A_SIGNATURE);
+    case 'image/webp':
+      return startsWith(content, RIFF_SIGNATURE) && startsWith(content, WEBP_SIGNATURE, 8);
+    case 'image/avif':
+      return hasIsoBaseMediaBrand(content, new Set(['avif', 'avis']));
+    case 'image/heic':
+      return hasIsoBaseMediaBrand(
+        content,
+        new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis'])
+      );
+    case 'image/heif':
+      return hasIsoBaseMediaBrand(
+        content,
+        new Set(['mif1', 'msf1', 'heic', 'heix', 'hevc', 'hevx', 'heim', 'heis'])
+      );
+    default:
+      return false;
+  }
+};
+
+let binaryResponseToBuffer = (value: unknown): Buffer | undefined => {
+  if (Buffer.isBuffer(value)) return value;
+  if (value instanceof ArrayBuffer) return Buffer.from(value);
+  if (ArrayBuffer.isView(value)) {
+    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  }
+  return undefined;
+};
 
 let mapsAxios = createAxios({
   baseURL: 'https://maps.googleapis.com'
@@ -7,6 +121,10 @@ let mapsAxios = createAxios({
 let placesAxios = createAxios({
   baseURL: 'https://places.googleapis.com'
 });
+
+// Place Photos returns a temporary googleusercontent.com URL. Use a separate
+// requester so the Maps API key is never forwarded to that media host.
+let placePhotoDownloadAxios = createAxios();
 
 let routesAxios = createAxios({
   baseURL: 'https://routes.googleapis.com'
@@ -192,18 +310,271 @@ export class GoogleMapsClient {
     return response.data;
   }
 
-  async getPlaceDetails(params: { placeId: string; languageCode?: string }) {
+  async autocompletePlaces(params: {
+    input: string;
+    locationBias?: { latitude: number; longitude: number; radiusMeters: number };
+    locationRestriction?: { latitude: number; longitude: number; radiusMeters: number };
+    includedPrimaryTypes?: string[];
+    includedRegionCodes?: string[];
+    languageCode?: string;
+    regionCode?: string;
+    origin?: { latitude: number; longitude: number };
+    inputOffset?: number;
+    includeQueryPredictions?: boolean;
+    sessionToken?: string;
+    includePureServiceAreaBusinesses?: boolean;
+    includeFutureOpeningBusinesses?: boolean;
+  }) {
+    let body: Record<string, unknown> = { input: params.input };
+    setIfDefined(body, 'includedPrimaryTypes', params.includedPrimaryTypes);
+    setIfDefined(body, 'includedRegionCodes', params.includedRegionCodes);
+    setIfDefined(body, 'languageCode', params.languageCode);
+    setIfDefined(body, 'regionCode', params.regionCode);
+    setIfDefined(body, 'origin', params.origin);
+    setIfDefined(body, 'inputOffset', params.inputOffset);
+    setIfDefined(body, 'includeQueryPredictions', params.includeQueryPredictions);
+    setIfDefined(body, 'sessionToken', params.sessionToken);
+    setIfDefined(
+      body,
+      'includePureServiceAreaBusinesses',
+      params.includePureServiceAreaBusinesses
+    );
+    setIfDefined(
+      body,
+      'includeFutureOpeningBusinesses',
+      params.includeFutureOpeningBusinesses
+    );
+
+    if (params.locationBias) {
+      body.locationBias = {
+        circle: {
+          center: {
+            latitude: params.locationBias.latitude,
+            longitude: params.locationBias.longitude
+          },
+          radius: params.locationBias.radiusMeters
+        }
+      };
+    }
+    if (params.locationRestriction) {
+      body.locationRestriction = {
+        circle: {
+          center: {
+            latitude: params.locationRestriction.latitude,
+            longitude: params.locationRestriction.longitude
+          },
+          radius: params.locationRestriction.radiusMeters
+        }
+      };
+    }
+
+    try {
+      let response = await placesAxios.post('/v1/places:autocomplete', body, {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': this.token,
+          'X-Goog-FieldMask': PLACE_AUTOCOMPLETE_FIELD_MASK
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Maps',
+        operation: 'retrieve place autocomplete suggestions',
+        reason: 'google_maps_autocomplete_api_error',
+        nestedKeys: ['error', 'errors']
+      });
+    }
+  }
+
+  async getPlaceDetails(params: {
+    placeId: string;
+    languageCode?: string;
+    sessionToken?: string;
+  }) {
     let response = await placesAxios.get(`/v1/places/${params.placeId}`, {
       headers: {
         'X-Goog-Api-Key': this.token,
-        'X-Goog-FieldMask':
-          'id,displayName,formattedAddress,location,rating,userRatingCount,types,primaryType,businessStatus,priceLevel,websiteUri,nationalPhoneNumber,internationalPhoneNumber,regularOpeningHours,reviews,editorialSummary,shortFormattedAddress,addressComponents,adrFormatAddress,googleMapsUri'
+        'X-Goog-FieldMask': PLACE_DETAILS_FIELD_MASK
       },
       params: {
-        languageCode: params.languageCode
+        languageCode: params.languageCode,
+        sessionToken: params.sessionToken
       }
     });
     return response.data;
+  }
+
+  async getPlacePhoto(params: {
+    photoName: string;
+    maxWidthPx?: number;
+    maxHeightPx?: number;
+  }): Promise<{ photoName: string; placeId: string; mimeType: string; content: Buffer }> {
+    let photoNameMatch = PLACE_PHOTO_NAME_PATTERN.exec(params.photoName);
+    if (!photoNameMatch) {
+      throw createApiServiceError(
+        'Provide a current Places API photo resource name in the format places/{placeId}/photos/{photoReference}.',
+        { reason: 'google_maps_place_photo_name_invalid' }
+      );
+    }
+
+    if (params.maxWidthPx === undefined && params.maxHeightPx === undefined) {
+      throw createApiServiceError(
+        'Provide maxWidthPx, maxHeightPx, or both when requesting a place photo.',
+        { reason: 'google_maps_place_photo_dimensions_required' }
+      );
+    }
+    for (let dimension of [params.maxWidthPx, params.maxHeightPx]) {
+      if (
+        dimension !== undefined &&
+        (!Number.isInteger(dimension) || dimension < 1 || dimension > 4800)
+      ) {
+        throw createApiServiceError(
+          'Place photo dimensions must be whole numbers from 1 through 4800 pixels.',
+          { reason: 'google_maps_place_photo_dimensions_invalid' }
+        );
+      }
+    }
+
+    let mediaResponse: any;
+    try {
+      mediaResponse = await placesAxios.get(`/v1/${params.photoName}/media`, {
+        headers: { 'X-Goog-Api-Key': this.token },
+        params: {
+          maxWidthPx: params.maxWidthPx,
+          maxHeightPx: params.maxHeightPx,
+          skipHttpRedirect: true
+        }
+      });
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Maps',
+        operation: 'request place photo media',
+        reason: 'google_maps_place_photo_api_error',
+        nestedKeys: ['error', 'errors']
+      });
+    }
+
+    let expectedMediaName = `${params.photoName}/media`;
+    let mediaName = mediaResponse?.data?.name;
+    let photoUri = mediaResponse?.data?.photoUri;
+    if (
+      mediaName !== expectedMediaName ||
+      typeof photoUri !== 'string' ||
+      photoUri.trim().length === 0
+    ) {
+      throw createApiServiceError(
+        'Google Maps returned invalid place photo media metadata. Request a current photo name and retry.',
+        { reason: 'google_maps_place_photo_metadata_invalid' }
+      );
+    }
+
+    let parsedPhotoUri: URL;
+    try {
+      parsedPhotoUri = new URL(photoUri);
+    } catch {
+      throw createApiServiceError(
+        'Google Maps returned an invalid place photo media URL, so no download was attempted.',
+        { reason: 'google_maps_place_photo_uri_invalid' }
+      );
+    }
+    let hostname = parsedPhotoUri.hostname.toLowerCase();
+    if (
+      parsedPhotoUri.protocol !== 'https:' ||
+      parsedPhotoUri.username.length > 0 ||
+      parsedPhotoUri.password.length > 0 ||
+      parsedPhotoUri.port.length > 0 ||
+      parsedPhotoUri.hash.length > 0 ||
+      !hostname.endsWith('.googleusercontent.com') ||
+      (this.token.length > 0 && parsedPhotoUri.toString().includes(this.token))
+    ) {
+      throw createApiServiceError(
+        'Google Maps returned an unsafe place photo media URL, so no download was attempted.',
+        { reason: 'google_maps_place_photo_uri_invalid' }
+      );
+    }
+
+    let downloadResponse: any;
+    try {
+      downloadResponse = await placePhotoDownloadAxios.get(parsedPhotoUri.toString(), {
+        responseType: 'arraybuffer',
+        maxRedirects: 0,
+        maxBodyLength: MAX_GOOGLE_MAPS_PLACE_PHOTO_BYTES,
+        maxContentLength: MAX_GOOGLE_MAPS_PLACE_PHOTO_BYTES
+      });
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Maps',
+        operation: 'download place photo bytes',
+        reason: 'google_maps_place_photo_download_error',
+        nestedKeys: ['error', 'errors']
+      });
+    }
+
+    let declaredContentLength = getResponseHeaderValue(
+      downloadResponse?.headers,
+      'content-length'
+    );
+    if (/^\d+$/.test(declaredContentLength ?? '')) {
+      let contentLength = Number(declaredContentLength);
+      if (contentLength > MAX_GOOGLE_MAPS_PLACE_PHOTO_BYTES) {
+        throw createApiServiceError(
+          `Google Maps returned a place photo larger than the ${MAX_GOOGLE_MAPS_PLACE_PHOTO_BYTES}-byte attachment limit.`,
+          { reason: 'google_maps_place_photo_content_too_large' }
+        );
+      }
+    }
+
+    let content = binaryResponseToBuffer(downloadResponse?.data);
+    if (!content || content.length === 0) {
+      throw createApiServiceError(
+        'Google Maps returned an empty or invalid place photo download response.',
+        { reason: 'google_maps_place_photo_content_invalid' }
+      );
+    }
+    if (content.length > MAX_GOOGLE_MAPS_PLACE_PHOTO_BYTES) {
+      throw createApiServiceError(
+        `Google Maps returned a place photo larger than the ${MAX_GOOGLE_MAPS_PLACE_PHOTO_BYTES}-byte attachment limit.`,
+        { reason: 'google_maps_place_photo_content_too_large' }
+      );
+    }
+
+    let downloadedMimeType = getResponseHeaderValue(downloadResponse.headers, 'content-type')
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase();
+    if (downloadedMimeType === 'image/jpg') downloadedMimeType = 'image/jpeg';
+    if (!downloadedMimeType || !hasKnownImageSignature(downloadedMimeType, content)) {
+      let supportedMimeTypes = new Set([
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'image/avif',
+        'image/heic',
+        'image/heif'
+      ]);
+      throw createApiServiceError(
+        downloadedMimeType && supportedMimeTypes.has(downloadedMimeType)
+          ? `Google Maps returned content that does not match the ${downloadedMimeType} file signature.`
+          : downloadedMimeType
+            ? `Google Maps returned place photo content with unexpected MIME type "${downloadedMimeType}".`
+            : 'Google Maps returned place photo content without an image MIME type.',
+        {
+          reason:
+            downloadedMimeType && supportedMimeTypes.has(downloadedMimeType)
+              ? 'google_maps_place_photo_content_invalid'
+              : 'google_maps_place_photo_mime_type_invalid'
+        }
+      );
+    }
+
+    return {
+      photoName: params.photoName,
+      placeId: photoNameMatch[1]!,
+      mimeType: downloadedMimeType,
+      content
+    };
   }
 
   // ── Directions (Legacy) ──

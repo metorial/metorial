@@ -7,9 +7,9 @@ import { spec } from '../spec';
 export let deleteSpreadsheet = SlateTool.create(spec, {
   name: 'Delete Spreadsheet',
   key: 'delete_spreadsheet',
-  description: `Permanently deletes a spreadsheet from Google Drive. This action cannot be undone. Requires Drive scope.`,
+  description: `Permanently deletes a spreadsheet from Google Drive. This action cannot be undone. Requires Drive file access.`,
   constraints: [
-    'Requires the https://www.googleapis.com/auth/drive scope.',
+    'Requires Drive file access: with the default drive.file consent, only spreadsheets created or opened through this connection can be deleted.',
     'This permanently deletes the file - it cannot be recovered.'
   ],
   tags: {

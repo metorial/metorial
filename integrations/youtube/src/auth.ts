@@ -40,6 +40,18 @@ export let auth = SlateAuth.create()
 
     scopes: [
       {
+        title: 'Google Account Email',
+        description: 'View your Google Account email address for connection identity',
+        scope: youtubeScopes.userinfoEmail,
+        defaultChecked: true
+      },
+      {
+        title: 'Google Account Profile',
+        description: 'View your basic Google Account profile for connection identity',
+        scope: youtubeScopes.userinfoProfile,
+        defaultChecked: true
+      },
+      {
         title: 'Manage Account',
         description: 'Manage your YouTube account',
         scope: youtubeScopes.youtube
@@ -87,6 +99,7 @@ export let auth = SlateAuth.create()
         scope: ctx.scopes.join(' '),
         state: ctx.state,
         access_type: 'offline',
+        include_granted_scopes: 'true',
         prompt: 'consent'
       });
 
@@ -180,6 +193,11 @@ export let auth = SlateAuth.create()
       input: any;
       scopes: string[];
     }) => {
+      let canReadProfile =
+        ctx.scopes.includes(youtubeScopes.userinfoProfile) ||
+        ctx.scopes.includes(youtubeScopes.userinfoEmail);
+      if (!canReadProfile) return { profile: {} };
+
       let response: any;
       try {
         response = await userInfoAxios.get('/oauth2/v2/userinfo', {

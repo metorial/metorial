@@ -90,11 +90,6 @@ export let auth = SlateAuth.create()
         title: 'Cloud Platform Read Only',
         description: 'View your data across Google Cloud Platform services',
         scope: 'https://www.googleapis.com/auth/cloud-platform.read-only'
-      },
-      {
-        title: 'Google Drive',
-        description: 'Required for querying data from Google Sheets via federated queries',
-        scope: 'https://www.googleapis.com/auth/drive'
       }
     ],
 

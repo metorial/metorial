@@ -1,6 +1,10 @@
 # <img src="logo.jpeg" height="20"> Google Maps
 
-Access Google Maps Platform geospatial and mapping services. Geocode addresses to coordinates and reverse geocode coordinates to addresses. Validate and standardize mailing addresses. Search for places by text or proximity, retrieve place details including ratings, reviews, and photos. Compute directions and travel times for driving, walking, cycling, and transit modes. Calculate route matrices between multiple origins and destinations. Optimize multi-stop routes for fleet logistics and delivery planning. Snap GPS data to roads and retrieve speed limits. Get elevation data for any point on Earth. Retrieve air quality, pollen, solar potential, and weather data for locations. Determine time zones for given coordinates. Generate static map images and Street View panoramas. Access aerial view fly-over videos and photorealistic 3D map tiles. Upload and manage custom geospatial datasets.
+Access Google Maps Platform geospatial services through tools for geocoding, address validation, Places search and details, Places Autocomplete (New), place-photo downloads, directions and route matrices, elevation, time zones, air quality, road snapping, static-map URLs, and geolocation.
+
+Place autocomplete supports Google billing session tokens, place/query predictions, type and region filters, origin distance, and circular location bias or restriction. Place Details returns current photo resource names and author attributions. `get_place_photo` downloads a current photo resource with Google-supported dimensions and returns validated image bytes only as a Slate attachment; temporary media URLs and API keys are never returned.
+
+Use a Google Maps Platform API key from a billing-enabled project. Enable each API used by the selected tools, including Places API (New) for autocomplete, Place Details, and place photos. Apply server-side API and address restrictions appropriate for the runtime.
 
 ## License
 

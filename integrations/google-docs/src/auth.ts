@@ -53,16 +53,6 @@ export let auth = SlateAuth.create()
         scope: googleDocsScopes.driveFile
       },
       {
-        title: 'Drive',
-        description: 'See, edit, create, and delete all Google Drive files',
-        scope: googleDocsScopes.drive
-      },
-      {
-        title: 'Drive Read-only',
-        description: 'See and download all Google Drive files',
-        scope: googleDocsScopes.driveReadonly
-      },
-      {
         title: 'User Profile',
         description: 'View your basic profile info',
         scope: googleDocsScopes.userInfoProfile

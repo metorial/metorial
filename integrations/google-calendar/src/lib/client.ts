@@ -12,6 +12,7 @@ export interface EventAttendee {
   optional?: boolean;
   responseStatus?: string;
   comment?: string;
+  self?: boolean;
 }
 
 export interface EventReminder {
@@ -27,6 +28,7 @@ export interface CalendarEvent {
   start?: EventDateTime;
   end?: EventDateTime;
   attendees?: EventAttendee[];
+  attendeesOmitted?: boolean;
   recurrence?: string[];
   reminders?: {
     useDefault: boolean;
@@ -79,6 +81,12 @@ export interface CalendarListEntry {
   defaultReminders?: EventReminder[];
   primary?: boolean;
   summaryOverride?: string;
+}
+
+export interface CalendarSetting {
+  id?: string;
+  value?: string;
+  etag?: string;
 }
 
 export interface AclRule {
@@ -398,8 +406,21 @@ export class GoogleCalendarClient {
 
   // Settings
 
-  async listSettings(): Promise<{ items: Array<{ id?: string; value?: string }> }> {
-    let response = await this.api.get('/users/me/settings');
+  async listSettings(params?: {
+    maxResults?: number;
+    pageToken?: string;
+    syncToken?: string;
+  }): Promise<{
+    items: CalendarSetting[];
+    nextPageToken?: string;
+    nextSyncToken?: string;
+  }> {
+    let response = await this.api.get('/users/me/settings', { params });
+    return response.data;
+  }
+
+  async getSetting(settingId: string): Promise<CalendarSetting> {
+    let response = await this.api.get(`/users/me/settings/${encodeURIComponent(settingId)}`);
     return response.data;
   }
 

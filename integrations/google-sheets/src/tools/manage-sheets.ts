@@ -7,11 +7,12 @@ import { spec } from '../spec';
 export let manageSheets = SlateTool.create(spec, {
   name: 'Manage Sheets',
   key: 'manage_sheets',
-  description: `Add, delete, duplicate, or update individual sheet tabs within a spreadsheet. Rename a tab by using action "update" with the numeric sheetId and new title. Configure sheet properties like grid size, frozen rows/columns, tab color, and visibility.`,
+  description: `Add, delete, duplicate, update, or copy individual sheet tabs. Rename a tab by using action "update" with the numeric sheetId and new title. Use "copy_to_spreadsheet" to copy a tab into another spreadsheet. Configure sheet properties like grid size, frozen rows/columns, tab color, and visibility.`,
   instructions: [
     'To add a sheet, set action to "add" and provide a title.',
     'To delete a sheet, set action to "delete" and provide the sheetId (numeric, not the title).',
     'To duplicate a sheet, set action to "duplicate" and provide the sourceSheetId.',
+    'To copy a sheet into another spreadsheet, set action to "copy_to_spreadsheet" and provide sourceSheetId and destinationSpreadsheetId.',
     'To rename or update sheet properties, set action to "update" and provide the sheetId along with title or the properties to change.',
     'This tool performs one sheet-tab operation per call. For multiple raw Google Sheets API requests, use batch_update with a requests array.'
   ],
@@ -25,8 +26,10 @@ export let manageSheets = SlateTool.create(spec, {
     z.object({
       spreadsheetId: z.string().describe('Unique ID of the spreadsheet'),
       action: z
-        .enum(['add', 'delete', 'duplicate', 'update'])
-        .describe('Operation to perform on the sheet tab. Use "update" with title to rename.'),
+        .enum(['add', 'delete', 'duplicate', 'update', 'copy_to_spreadsheet'])
+        .describe(
+          'Operation to perform on the sheet tab. Use "update" with title to rename, or "copy_to_spreadsheet" to copy a tab into another spreadsheet.'
+        ),
       sheetId: z
         .number()
         .optional()
@@ -38,7 +41,13 @@ export let manageSheets = SlateTool.create(spec, {
       sourceSheetId: z
         .number()
         .optional()
-        .describe('Sheet ID to duplicate (required for duplicate)'),
+        .describe(
+          'Numeric ID of the source sheet (required for duplicate and copy_to_spreadsheet)'
+        ),
+      destinationSpreadsheetId: z
+        .string()
+        .optional()
+        .describe('ID of the destination spreadsheet (required for copy_to_spreadsheet)'),
       newSheetName: z.string().optional().describe('Name for the duplicated sheet'),
       insertSheetIndex: z
         .number()
@@ -68,6 +77,10 @@ export let manageSheets = SlateTool.create(spec, {
     z.object({
       sheetId: z.number().optional().describe('ID of the affected sheet'),
       title: z.string().optional().describe('Title of the affected sheet'),
+      destinationSpreadsheetId: z
+        .string()
+        .optional()
+        .describe('ID of the spreadsheet that received the copied sheet'),
       action: z.string().describe('The action that was performed')
     })
   )
@@ -144,6 +157,31 @@ export let manageSheets = SlateTool.create(spec, {
           action: 'duplicate'
         },
         message: `Duplicated sheet to **"${reply?.title ?? ctx.input.newSheetName}"** (ID: ${reply?.sheetId}).`
+      };
+    }
+
+    if (action === 'copy_to_spreadsheet') {
+      if (ctx.input.sourceSheetId === undefined)
+        throw createApiServiceError('sourceSheetId is required for copy_to_spreadsheet');
+      if (!ctx.input.destinationSpreadsheetId)
+        throw createApiServiceError(
+          'destinationSpreadsheetId is required for copy_to_spreadsheet'
+        );
+
+      let result = await client.copySheetToSpreadsheet(
+        spreadsheetId,
+        ctx.input.sourceSheetId,
+        ctx.input.destinationSpreadsheetId
+      );
+
+      return {
+        output: {
+          sheetId: result.sheetId,
+          title: result.title,
+          destinationSpreadsheetId: ctx.input.destinationSpreadsheetId,
+          action: 'copy_to_spreadsheet'
+        },
+        message: `Copied sheet ${ctx.input.sourceSheetId} to spreadsheet **${ctx.input.destinationSpreadsheetId}** as **"${result.title}"** (ID: ${result.sheetId}).`
       };
     }
 

@@ -69,6 +69,8 @@ Clear all completed tasks from a specified task list in a single operation.
 
 When listing tasks, you can filter by completion status and use the `updatedMin` parameter to retrieve only tasks modified after a certain time, enabling efficient incremental sync.
 
+The `list_tasks` tool accepts an optional task-list ID. Supplying an ID lists tasks only from that list, preserving the original single-list behavior. An empty or whitespace-only `taskListId` is rejected with a validation error instead of being forwarded to Google, which would otherwise produce an opaque upstream failure. Omitting it paginates through every task list and every task page, returning each task with its source task-list ID and title; aggregating across all task lists can be slow and produce large results for accounts with many lists.
+
 ## Events
 
 The provider does not support events. Google Tasks API does not offer webhooks, push notifications, or any built-in mechanism for subscribing to changes. Detecting changes requires polling the API using the task listing endpoints with appropriate filters (e.g., `updatedMin`).

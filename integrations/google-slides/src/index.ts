@@ -9,6 +9,7 @@ import {
   editText,
   embedSheetsChart,
   getPresentation,
+  getSlideThumbnail,
   manageSlides,
   manageSpeakerNotes,
   replaceText
@@ -20,6 +21,7 @@ export let provider = Slate.create({
   tools: [
     createPresentation,
     getPresentation,
+    getSlideThumbnail,
     manageSlides,
     editText,
     replaceText,

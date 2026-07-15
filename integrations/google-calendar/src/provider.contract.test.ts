@@ -18,14 +18,17 @@ describe('google-calendar provider contract', () => {
         'create_event',
         'list_events',
         'get_event',
+        'respond_to_event',
         'update_event',
+        'batch_modify_events',
         'delete_event',
         'quick_add_event',
         'list_calendars',
         'manage_calendar',
         'find_free_busy',
         'manage_sharing',
-        'get_colors'
+        'get_colors',
+        'get_settings'
       ],
       triggerIds: ['event_changes', 'calendar_list_changes'],
       authMethodIds: ['oauth'],
@@ -33,14 +36,17 @@ describe('google-calendar provider contract', () => {
         { id: 'create_event', readOnly: false, destructive: false },
         { id: 'list_events', readOnly: true, destructive: false },
         { id: 'get_event', readOnly: true, destructive: false },
+        { id: 'respond_to_event', readOnly: false, destructive: false },
         { id: 'update_event', readOnly: false, destructive: false },
+        { id: 'batch_modify_events', readOnly: false, destructive: true },
         { id: 'delete_event', readOnly: false, destructive: true },
         { id: 'quick_add_event', readOnly: false, destructive: false },
         { id: 'list_calendars', readOnly: true, destructive: false },
         { id: 'manage_calendar', readOnly: false, destructive: true },
         { id: 'find_free_busy', readOnly: true, destructive: false },
         { id: 'manage_sharing', readOnly: false, destructive: true },
-        { id: 'get_colors', readOnly: true, destructive: false }
+        { id: 'get_colors', readOnly: true, destructive: false },
+        { id: 'get_settings', readOnly: true, destructive: false }
       ],
       triggers: [
         { id: 'event_changes', invocationType: 'webhook' },
@@ -48,14 +54,16 @@ describe('google-calendar provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(13);
+    expect(contract.actions).toHaveLength(16);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
       create_event: googleCalendarActionScopes.createEvent,
       list_events: googleCalendarActionScopes.listEvents,
       get_event: googleCalendarActionScopes.getEvent,
+      respond_to_event: googleCalendarActionScopes.respondToEvent,
       update_event: googleCalendarActionScopes.updateEvent,
+      batch_modify_events: googleCalendarActionScopes.batchModifyEvents,
       delete_event: googleCalendarActionScopes.deleteEvent,
       quick_add_event: googleCalendarActionScopes.quickAddEvent,
       list_calendars: googleCalendarActionScopes.listCalendars,
@@ -63,6 +71,7 @@ describe('google-calendar provider contract', () => {
       find_free_busy: googleCalendarActionScopes.findFreeBusy,
       manage_sharing: googleCalendarActionScopes.manageSharing,
       get_colors: googleCalendarActionScopes.getColors,
+      get_settings: googleCalendarActionScopes.getSettings,
       event_changes: googleCalendarActionScopes.eventChanges,
       calendar_list_changes: googleCalendarActionScopes.calendarListChanges
     };

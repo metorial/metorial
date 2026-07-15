@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  batchModifyContacts,
   copyOtherContact,
   createContact,
   createContactGroup,
@@ -8,9 +9,11 @@ import {
   deleteContactGroup,
   getContact,
   getContactGroup,
+  getMyProfile,
   listContactGroups,
   listContacts,
   listOtherContacts,
+  manageContactPhoto,
   modifyGroupMembers,
   searchContacts,
   searchDirectory,
@@ -38,7 +41,10 @@ export let provider = Slate.create({
     listOtherContacts,
     searchOtherContacts,
     copyOtherContact,
-    searchDirectory
+    searchDirectory,
+    getMyProfile,
+    manageContactPhoto,
+    batchModifyContacts
   ],
   triggers: [inboundWebhook, contactChanged]
 });

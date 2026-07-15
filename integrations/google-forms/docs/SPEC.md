@@ -2,7 +2,7 @@
 
 ## Overview
 
-Google Forms is a Google Workspace application for creating and distributing forms, surveys, and quizzes. The Google Forms API is a RESTful interface that lets you create and modify forms and quizzes, retrieve form responses and quiz grades, set up quiz answer keys with automatic feedback, and receive push notifications.
+Google Forms is a Google Workspace application for creating and distributing forms, surveys, and quizzes. The Google Forms API is a RESTful interface that lets you create, publish, and modify forms and quizzes, retrieve form responses and quiz grades, set up quiz answer keys with automatic feedback, and receive push notifications.
 
 ## Authentication
 
@@ -29,11 +29,9 @@ Google Forms API uses **OAuth 2.0** for authentication. A Google Cloud project w
 | `https://www.googleapis.com/auth/forms.body`               | See, edit, create, and delete all your Google Forms forms.                                                  |
 | `https://www.googleapis.com/auth/forms.body.readonly`      | See all your Google Forms forms.                                                                            |
 | `https://www.googleapis.com/auth/forms.responses.readonly` | See all responses to your Google Forms forms.                                                               |
-| `https://www.googleapis.com/auth/drive`                    | See, edit, create, and delete all of your Google Drive files. (broader scope that also grants Forms access) |
 | `https://www.googleapis.com/auth/drive.file`               | See, edit, create, and delete only the specific Google Drive files you use with this app.                   |
-| `https://www.googleapis.com/auth/drive.readonly`           | See and download all your Google Drive files. (read-only alternative)                                       |
 
-Use the most narrowly scoped option that satisfies your needs. The `forms.body` and `forms.responses.readonly` scopes are preferred over the broader Drive scopes.
+Use the most narrowly scoped option that satisfies your needs. The restricted broad Drive scopes (`drive`, `drive.readonly`) are not requested by this integration; all Forms operations run on the Forms scopes. Connections that granted broad Drive scopes previously keep working.
 
 ## Features
 
@@ -43,7 +41,17 @@ Create new forms and quizzes programmatically, retrieve form content and metadat
 
 - Supports various question types: short answer, paragraph, multiple choice, checkboxes, dropdowns, linear scales, date, time, and question groups such as grid questions.
 - Images can be added to questions and form headers.
-- Forms created with the API after March 31, 2026 will have an unpublished state by default, requiring explicit publishing.
+- Forms created with the API after June 30, 2026 have an unpublished state by default, requiring explicit publishing before they can receive responses.
+
+### Publishing and Response Acceptance
+
+Use **Set Publish Settings** to apply a form's complete `publishState` through `forms.setPublishSettings`. Both `isPublished` and `isAcceptingResponses` are required. Supported combinations are:
+
+- `true` / `true`: publish the form and accept responses.
+- `true` / `false`: keep the form published but stop accepting responses.
+- `false` / `false`: unpublish the form; unpublished forms cannot accept responses.
+
+The integration sends the narrow `publishState` update mask. The API also accepts `*`, but replacing unrelated future publish settings is unnecessary. Legacy forms without a `publishSettings` field do not support this method.
 
 ### Quiz Configuration
 

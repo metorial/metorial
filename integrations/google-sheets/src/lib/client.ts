@@ -241,6 +241,18 @@ export class SheetsClient {
     ]);
   }
 
+  async copySheetToSpreadsheet(
+    spreadsheetId: string,
+    sheetId: number,
+    destinationSpreadsheetId: string
+  ) {
+    let response = await this.axios.post(
+      `/spreadsheets/${encodeURIComponent(spreadsheetId)}/sheets/${sheetId}:copyTo`,
+      { destinationSpreadsheetId }
+    );
+    return response.data;
+  }
+
   async updateSheetProperties(
     spreadsheetId: string,
     properties: Record<string, any>,

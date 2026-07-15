@@ -6,6 +6,8 @@ import type {
   GoogleFormsBatchUpdateResponse,
   GoogleFormsListResponsesResult,
   GoogleFormsListWatchesResult,
+  GoogleFormsPublishState,
+  GoogleFormsSetPublishSettingsResponse,
   GoogleFormsWatch
 } from './types';
 
@@ -47,6 +49,17 @@ export class GoogleFormsClient {
   ): Promise<GoogleFormsBatchUpdateResponse> {
     let response = await this.axios.post(`/forms/${formId}:batchUpdate`, request);
     return response.data as GoogleFormsBatchUpdateResponse;
+  }
+
+  async setPublishSettings(
+    formId: string,
+    publishState: GoogleFormsPublishState
+  ): Promise<GoogleFormsSetPublishSettingsResponse> {
+    let response = await this.axios.post(`/forms/${formId}:setPublishSettings`, {
+      publishSettings: { publishState },
+      updateMask: 'publishState'
+    });
+    return response.data as GoogleFormsSetPublishSettingsResponse;
   }
 
   // ─── Responses ──────────────────────────────────────────────────

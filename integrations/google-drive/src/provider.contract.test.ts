@@ -25,6 +25,7 @@ describe('google-drive provider contract', () => {
         'upload_file',
         'download_file',
         'export_file',
+        'get_about',
         'update_file',
         'copy_file',
         'delete_file',
@@ -35,12 +36,14 @@ describe('google-drive provider contract', () => {
         'list_comments',
         'create_comment',
         'reply_to_comment',
+        'update_comment',
         'delete_comment',
         'list_revisions',
         'list_shared_drives',
         'create_shared_drive',
         'update_shared_drive',
-        'delete_shared_drive'
+        'delete_shared_drive',
+        'list_changes'
       ],
       triggerIds: ['inbound_webhook', 'file_changes'],
       authMethodIds: ['oauth'],
@@ -51,6 +54,7 @@ describe('google-drive provider contract', () => {
         { id: 'upload_file', readOnly: false, destructive: false },
         { id: 'download_file', readOnly: true, destructive: false },
         { id: 'export_file', readOnly: true, destructive: false },
+        { id: 'get_about', readOnly: true, destructive: false },
         { id: 'update_file', readOnly: false, destructive: false },
         { id: 'copy_file', readOnly: false, destructive: false },
         { id: 'delete_file', readOnly: false, destructive: true },
@@ -61,12 +65,14 @@ describe('google-drive provider contract', () => {
         { id: 'list_comments', readOnly: true, destructive: false },
         { id: 'create_comment', readOnly: false, destructive: false },
         { id: 'reply_to_comment', readOnly: false, destructive: false },
+        { id: 'update_comment', readOnly: false, destructive: true },
         { id: 'delete_comment', readOnly: false, destructive: true },
         { id: 'list_revisions', readOnly: true, destructive: false },
         { id: 'list_shared_drives', readOnly: true, destructive: false },
         { id: 'create_shared_drive', readOnly: false, destructive: false },
         { id: 'update_shared_drive', readOnly: false, destructive: false },
-        { id: 'delete_shared_drive', readOnly: false, destructive: true }
+        { id: 'delete_shared_drive', readOnly: false, destructive: true },
+        { id: 'list_changes', readOnly: true, destructive: false }
       ],
       triggers: [
         { id: 'inbound_webhook', invocationType: 'webhook' },
@@ -74,7 +80,7 @@ describe('google-drive provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(24);
+    expect(contract.actions).toHaveLength(27);
 
     let expectedScopes = {
       search_files: googleDriveActionScopes.searchFiles,
@@ -83,6 +89,7 @@ describe('google-drive provider contract', () => {
       upload_file: googleDriveActionScopes.uploadFile,
       download_file: googleDriveActionScopes.downloadFile,
       export_file: googleDriveActionScopes.exportFile,
+      get_about: googleDriveActionScopes.getAbout,
       update_file: googleDriveActionScopes.updateFile,
       copy_file: googleDriveActionScopes.copyFile,
       delete_file: googleDriveActionScopes.deleteFile,
@@ -93,12 +100,14 @@ describe('google-drive provider contract', () => {
       list_comments: googleDriveActionScopes.listComments,
       create_comment: googleDriveActionScopes.createComment,
       reply_to_comment: googleDriveActionScopes.replyToComment,
+      update_comment: googleDriveActionScopes.updateComment,
       delete_comment: googleDriveActionScopes.deleteComment,
       list_revisions: googleDriveActionScopes.listRevisions,
       list_shared_drives: googleDriveActionScopes.listSharedDrives,
       create_shared_drive: googleDriveActionScopes.createSharedDrive,
       update_shared_drive: googleDriveActionScopes.updateSharedDrive,
       delete_shared_drive: googleDriveActionScopes.deleteSharedDrive,
+      list_changes: googleDriveActionScopes.listChanges,
       inbound_webhook: googleDriveActionScopes.inboundWebhook,
       file_changes: googleDriveActionScopes.fileChanges
     };

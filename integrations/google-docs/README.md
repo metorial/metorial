@@ -8,6 +8,10 @@ Create, read, edit, and format Google Docs documents. Insert and style text, man
 
 Creates a new empty Google Docs document with the specified title. Returns the document ID which can be used to add content using other tools.
 
+### Create Document from Markdown
+
+Creates an editable native Google Docs document from Markdown with a Drive multipart upload. The result can be used with all existing document tools.
+
 ### Edit Document
 
 Performs one or more editing operations on a Google Docs document. Supports inserting, deleting, and replacing text, formatting, inserting images, tables, page breaks, and creating bullet lists. Operations are executed in order.
@@ -27,6 +31,10 @@ Creates or deletes named ranges in a Google Docs document. Named ranges act as b
 ### Merge Template
 
 Replaces placeholder text in a Google Docs document with dynamic values. Useful for mail merge, generating personalized documents from templates, or populating forms. Each placeholder is replaced with its corresponding value throughout the document.
+
+### Update Document from Markdown
+
+Replaces the full body of an existing native Google Docs document from Markdown while preserving its Drive file ID and sharing settings.
 
 ## License
 
