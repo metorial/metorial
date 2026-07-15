@@ -50,6 +50,12 @@ export let findMeetingTimes = SlateTool.create(spec, {
           'Duration in ISO 8601 format (e.g., "PT1H" for 1 hour, "PT30M" for 30 minutes)'
         ),
       maxCandidates: z.number().optional().describe('Maximum number of suggestions to return'),
+      activityDomain: z
+        .enum(['work', 'personal', 'unrestricted', 'unknown'])
+        .optional()
+        .describe(
+          'Which hours qualify for suggestions: "work" (default) restricts to configured working hours, "unrestricted" searches the full time window.'
+        ),
       isOrganizerOptional: z
         .boolean()
         .optional()
@@ -92,6 +98,7 @@ export let findMeetingTimes = SlateTool.create(spec, {
         type: a.type
       })),
       timeConstraint: {
+        activityDomain: ctx.input.activityDomain,
         timeslots: ctx.input.timeSlots.map(ts => ({
           start: { dateTime: ts.startDateTime, timeZone: ts.startTimeZone },
           end: { dateTime: ts.endDateTime, timeZone: ts.endTimeZone }

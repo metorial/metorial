@@ -16,5 +16,5 @@
     "@vercel/ncc": "^0.38.4",
     "typescript": "^5"
   },
-  "version": "0.2.0-rc.6"
+  "version": "0.2.0-rc.7"
 }

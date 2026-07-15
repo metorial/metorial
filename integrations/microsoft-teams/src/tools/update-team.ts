@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let updateTeam = SlateTool.create(spec, {
@@ -12,6 +13,7 @@ export let updateTeam = SlateTool.create(spec, {
     'To archive or unarchive, set the "action" field accordingly.'
   ]
 })
+  .scopes(microsoftTeamsActionScopes.updateTeam)
   .input(
     z.object({
       teamId: z.string().describe('ID of the team to update'),

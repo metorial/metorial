@@ -1,117 +1,130 @@
 import { createMicrosoftGraphOauth } from '@slates/oauth-microsoft';
 import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { microsoftTeamsScopes } from './scopes';
 
-let scopes = [
-  { title: 'User Profile', description: 'Read signed-in user profile', scope: 'User.Read' },
+// Every scope declared on an auth method is requested in production, so
+// scope tiers are separate auth methods:
+// the standard methods request only scopes Microsoft lets regular users
+// consent to, while "Work Only (Full Access)" adds the admin-consent-gated
+// scopes and therefore shows "Need admin approval" until a Microsoft Entra
+// admin grants tenant-wide consent.
+let baseScopes = [
+  {
+    title: 'User Profile',
+    description: 'Read signed-in user profile',
+    scope: microsoftTeamsScopes.userRead
+  },
   {
     title: 'Offline Access',
     description: 'Obtain refresh tokens for long-lived access',
-    scope: 'offline_access'
+    scope: microsoftTeamsScopes.offlineAccess
   },
   {
     title: 'Read Teams',
     description: 'Read basic team properties',
-    scope: 'Team.ReadBasic.All'
+    scope: microsoftTeamsScopes.teamReadBasicAll
   },
   {
-    title: 'Read Team Settings',
-    description: 'Read team settings',
-    scope: 'TeamSettings.Read.All'
-  },
-  {
-    title: 'Read/Write Team Settings',
-    description: 'Read and modify team settings',
-    scope: 'TeamSettings.ReadWrite.All'
+    title: 'Create Teams',
+    description: 'Create new teams',
+    scope: microsoftTeamsScopes.teamCreate
   },
   {
     title: 'Read Channels',
     description: 'Read basic channel properties',
-    scope: 'Channel.ReadBasic.All'
+    scope: microsoftTeamsScopes.channelReadBasicAll
   },
-  {
-    title: 'Create Channels',
-    description: 'Create channels in teams',
-    scope: 'Channel.Create'
-  },
-  {
-    title: 'Delete Channels',
-    description: 'Delete channels in teams',
-    scope: 'Channel.Delete.All'
-  },
-  { title: 'Read Chats', description: 'Read user chat messages', scope: 'Chat.Read' },
   {
     title: 'Read/Write Chats',
-    description: 'Read and send chat messages',
-    scope: 'Chat.ReadWrite'
-  },
-  {
-    title: 'Read Chat Messages',
-    description: 'Read chat and channel messages',
-    scope: 'ChatMessage.Read'
-  },
-  {
-    title: 'Send Chat Messages',
-    description: 'Send chat messages',
-    scope: 'ChatMessage.Send'
-  },
-  {
-    title: 'Read Channel Messages',
-    description: 'Read messages in channels',
-    scope: 'ChannelMessage.Read.All'
+    description: 'Read, create, and send user chat messages',
+    scope: microsoftTeamsScopes.chatReadWrite
   },
   {
     title: 'Send Channel Messages',
     description: 'Send messages in channels',
-    scope: 'ChannelMessage.Send'
-  },
-  {
-    title: 'Read Online Meetings',
-    description: 'Read online meeting details',
-    scope: 'OnlineMeetings.Read'
+    scope: microsoftTeamsScopes.channelMessageSend
   },
   {
     title: 'Read/Write Online Meetings',
     description: 'Create and manage online meetings',
-    scope: 'OnlineMeetings.ReadWrite'
+    scope: microsoftTeamsScopes.onlineMeetingsReadWrite
   },
   {
     title: 'Read Presence',
     description: 'Read user presence information',
-    scope: 'Presence.Read.All'
+    scope: microsoftTeamsScopes.presenceReadAll
+  }
+];
+
+let adminConsentScopes = [
+  {
+    title: 'Read/Write Team Settings',
+    description: 'Update, archive, and unarchive teams (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.teamSettingsReadWriteAll
+  },
+  {
+    title: 'Create Channels',
+    description: 'Create channels in teams (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.channelCreate
+  },
+  {
+    title: 'Update Channels',
+    description:
+      'Update channel names, descriptions, and settings (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.channelSettingsReadWriteAll
+  },
+  {
+    title: 'Delete Channels',
+    description: 'Delete channels in teams (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.channelDeleteAll
+  },
+  {
+    title: 'Read Channel Messages',
+    description: 'Read messages in channels (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.channelMessageReadAll
   },
   {
     title: 'Read/Write Team Members',
-    description: 'Read and manage team members',
-    scope: 'TeamMember.ReadWrite.All'
+    description: 'Read and manage team members (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.teamMemberReadWriteAll
+  },
+  {
+    title: 'Read/Write Channel Members',
+    description:
+      'Read and manage members of private and shared channels (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.channelMemberReadWriteAll
   },
   {
     title: 'Read/Write Team Tags',
-    description: 'Create and manage team tags and tag membership',
-    scope: 'TeamworkTag.ReadWrite'
-  },
-  {
-    title: 'Read Group Members',
-    description: 'Read group membership',
-    scope: 'GroupMember.Read.All'
-  },
-  {
-    title: 'Read/Write Group Members',
-    description: 'Read and manage group membership',
-    scope: 'GroupMember.ReadWrite.All'
+    description:
+      'Create and manage team tags and tag membership (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.teamworkTagReadWrite
   },
   {
     title: 'Read/Write Groups',
-    description: 'Update or delete the Microsoft 365 groups that back Teams',
-    scope: 'Group.ReadWrite.All'
+    description:
+      'Rename or delete the Microsoft 365 groups that back teams (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.groupReadWriteAll
   },
-  { title: 'Read Directory', description: 'Read directory data', scope: 'Directory.Read.All' },
   {
     title: 'Read/Write Shifts',
-    description: 'Read and write shift schedules',
-    scope: 'Schedule.ReadWrite.All'
+    description: 'Read and write shift schedules (requires Entra admin consent)',
+    scope: microsoftTeamsScopes.scheduleReadWriteAll
+  }
+];
+
+let docs = [
+  {
+    type: 'docs.auth.oauth' as const,
+    name: 'OAuth documentation',
+    url: 'https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow'
   },
-  { title: 'Read Shifts', description: 'Read shift schedules', scope: 'Schedule.Read.All' }
+  {
+    type: 'docs.auth.oauth_scopes' as const,
+    name: 'OAuth scopes',
+    url: 'https://learn.microsoft.com/en-us/graph/permissions-reference'
+  }
 ];
 
 export let auth = SlateAuth.create()
@@ -127,19 +140,8 @@ export let auth = SlateAuth.create()
       name: 'Work & Personal',
       key: 'oauth_common',
       tenant: 'common',
-      scopes,
-      docs: [
-        {
-          type: 'docs.auth.oauth',
-          name: 'OAuth documentation',
-          url: 'https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow'
-        },
-        {
-          type: 'docs.auth.oauth_scopes',
-          name: 'OAuth scopes',
-          url: 'https://learn.microsoft.com/en-us/graph/permissions-reference'
-        }
-      ],
+      scopes: baseScopes,
+      docs,
       missingRefreshTokenMessage: 'No refresh token available'
     })
   )
@@ -148,19 +150,18 @@ export let auth = SlateAuth.create()
       name: 'Work Only',
       key: 'oauth_organizations',
       tenant: 'organizations',
-      scopes,
-      docs: [
-        {
-          type: 'docs.auth.oauth',
-          name: 'OAuth documentation',
-          url: 'https://learn.microsoft.com/en-us/entra/identity-platform/v2-oauth2-auth-code-flow'
-        },
-        {
-          type: 'docs.auth.oauth_scopes',
-          name: 'OAuth scopes',
-          url: 'https://learn.microsoft.com/en-us/graph/permissions-reference'
-        }
-      ],
+      scopes: baseScopes,
+      docs,
+      missingRefreshTokenMessage: 'No refresh token available'
+    })
+  )
+  .addOauth(
+    createMicrosoftGraphOauth({
+      name: 'Work Only (Full Access)',
+      key: 'oauth_organizations_full',
+      tenant: 'organizations',
+      scopes: [...baseScopes, ...adminConsentScopes],
+      docs,
       missingRefreshTokenMessage: 'No refresh token available'
     })
   );

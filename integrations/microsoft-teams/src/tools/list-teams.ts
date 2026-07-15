@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let listTeams = SlateTool.create(spec, {
@@ -11,6 +12,7 @@ export let listTeams = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(microsoftTeamsActionScopes.listTeams)
   .input(z.object({}))
   .output(
     z.object({

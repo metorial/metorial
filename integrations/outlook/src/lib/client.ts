@@ -325,6 +325,7 @@ export class Client {
   async findMeetingTimes(params: {
     attendees?: { emailAddress: { address: string; name?: string }; type?: string }[];
     timeConstraint: {
+      activityDomain?: string;
       timeslots: { start: DateTimeTimeZone; end: DateTimeTimeZone }[];
     };
     meetingDuration?: string;

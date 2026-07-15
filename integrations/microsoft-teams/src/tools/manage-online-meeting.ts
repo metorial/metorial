@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let manageOnlineMeeting = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageOnlineMeeting = SlateTool.create(spec, {
     'For updating, provide meetingId and the fields to update.'
   ]
 })
+  .scopes(microsoftTeamsActionScopes.manageOnlineMeeting)
   .input(
     z.object({
       action: z

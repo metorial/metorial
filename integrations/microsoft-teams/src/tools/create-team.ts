@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let createTeam = SlateTool.create(spec, {
@@ -11,6 +12,7 @@ export let createTeam = SlateTool.create(spec, {
     destructive: false
   }
 })
+  .scopes(microsoftTeamsActionScopes.createTeam)
   .input(
     z.object({
       displayName: z.string().describe('Display name for the new team'),

@@ -4,29 +4,9 @@ import { z } from 'zod';
 
 let scopes = [
   {
-    title: 'Read Files',
-    description: "Read the signed-in user's files",
-    scope: 'Files.Read'
-  },
-  {
-    title: 'Read All Files',
-    description: 'Read all files the user can access',
-    scope: 'Files.Read.All'
-  },
-  {
-    title: 'Read & Write Files',
-    description: "Read and write the signed-in user's files",
-    scope: 'Files.ReadWrite'
-  },
-  {
     title: 'Read & Write All Files',
     description: 'Read and write all files the user can access',
     scope: 'Files.ReadWrite.All'
-  },
-  {
-    title: 'Read SharePoint Sites',
-    description: 'Read items in all site collections',
-    scope: 'Sites.Read.All'
   },
   {
     title: 'Read & Write SharePoint Sites',

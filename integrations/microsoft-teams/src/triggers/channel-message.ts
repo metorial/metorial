@@ -1,6 +1,7 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let channelMessageTrigger = SlateTrigger.create(spec, {
@@ -9,6 +10,7 @@ export let channelMessageTrigger = SlateTrigger.create(spec, {
   description:
     'Triggers when a new message is posted or updated in a team channel. Uses Microsoft Graph webhooks to receive real-time notifications.'
 })
+  .scopes(microsoftTeamsActionScopes.channelMessage)
   .input(
     z.object({
       changeType: z.string().describe('Type of change: created, updated, or deleted'),

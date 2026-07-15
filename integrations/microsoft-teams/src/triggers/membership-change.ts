@@ -1,6 +1,7 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let membershipChangeTrigger = SlateTrigger.create(spec, {
@@ -9,6 +10,7 @@ export let membershipChangeTrigger = SlateTrigger.create(spec, {
   description:
     'Triggers when members are added, updated, or removed from a specific team. Uses Microsoft Graph webhooks for real-time membership notifications.'
 })
+  .scopes(microsoftTeamsActionScopes.membershipChange)
   .input(
     z.object({
       changeType: z.string().describe('Type of change: created, updated, or deleted'),

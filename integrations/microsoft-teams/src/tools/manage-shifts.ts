@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let manageShifts = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageShifts = SlateTool.create(spec, {
     'Use action "create" to add a new shift with start/end times and assigned user.'
   ]
 })
+  .scopes(microsoftTeamsActionScopes.manageShifts)
   .input(
     z.object({
       teamId: z.string().describe('ID of the team'),

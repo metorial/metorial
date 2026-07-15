@@ -4,30 +4,9 @@ import { z } from 'zod';
 
 let scopes = [
   {
-    title: 'Read Notes',
-    description: 'Read-only access to all OneNote notebooks owned by or shared with you.',
-    scope: 'Notes.Read'
-  },
-  {
     title: 'Read & Write Notes',
     description: 'Read and modify OneNote content.',
     scope: 'Notes.ReadWrite'
-  },
-  {
-    title: 'Create Notes',
-    description: 'Create new OneNote notebooks, sections, and pages.',
-    scope: 'Notes.Create'
-  },
-  {
-    title: 'Read All Notes',
-    description: 'Read all OneNote notebooks you have access to in the organization.',
-    scope: 'Notes.Read.All'
-  },
-  {
-    title: 'Read & Write All Notes',
-    description:
-      'Read, share, and modify all OneNote notebooks you have access to in the organization.',
-    scope: 'Notes.ReadWrite.All'
   },
   {
     title: 'Offline Access',

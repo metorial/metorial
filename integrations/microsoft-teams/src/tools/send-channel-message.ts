@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let sendChannelMessage = SlateTool.create(spec, {
@@ -12,6 +13,7 @@ export let sendChannelMessage = SlateTool.create(spec, {
     'To reply to an existing message thread, provide the parentMessageId.'
   ]
 })
+  .scopes(microsoftTeamsActionScopes.sendChannelMessage)
   .input(
     z.object({
       teamId: z.string().describe('ID of the team'),

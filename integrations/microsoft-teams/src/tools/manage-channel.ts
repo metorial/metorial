@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let manageChannel = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageChannel = SlateTool.create(spec, {
     'For deleting, provide teamId, channelId, and action="delete".'
   ]
 })
+  .scopes(microsoftTeamsActionScopes.manageChannel)
   .input(
     z.object({
       teamId: z.string().describe('ID of the team'),

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
+import { microsoftTeamsActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let manageTags = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageTags = SlateTool.create(spec, {
     'To add/remove tag members, use action "add_member" or "remove_member".'
   ]
 })
+  .scopes(microsoftTeamsActionScopes.manageTags)
   .input(
     z.object({
       teamId: z.string().describe('ID of the team'),

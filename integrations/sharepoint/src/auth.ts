@@ -46,12 +46,14 @@ type TokenRefreshContext = {
   scopes: string[];
 };
 
+// De-escalated 2026-07 (every declared scope is requested in production):
+// Sites.FullControl.All removed because no tool
+// performs site-collection administration (the ceiling is list/column
+// management via Sites.Manage.All) and it was the only SharePoint scope
+// requiring Entra admin consent — offering it walled every non-admin user with
+// "Need admin approval". Sites.Read.All/Files.Read.All removed as strict
+// subsets of the ReadWrite scopes.
 let scopes = [
-  {
-    title: 'Sites Read',
-    description: 'Read items in all site collections',
-    scope: 'Sites.Read.All'
-  },
   {
     title: 'Sites Read Write',
     description: 'Read and write items in all site collections',
@@ -61,16 +63,6 @@ let scopes = [
     title: 'Sites Manage',
     description: 'Create, edit, and delete items and lists in all site collections',
     scope: 'Sites.Manage.All'
-  },
-  {
-    title: 'Sites Full Control',
-    description: 'Full control of all site collections',
-    scope: 'Sites.FullControl.All'
-  },
-  {
-    title: 'Files Read',
-    description: 'Read all files that user can access',
-    scope: 'Files.Read.All'
   },
   {
     title: 'Files Read Write',

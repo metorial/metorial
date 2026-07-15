@@ -4,11 +4,6 @@ import { z } from 'zod';
 
 let scopes = [
   {
-    title: 'Read Mail',
-    description: 'Read email messages in user mailboxes',
-    scope: 'Mail.Read'
-  },
-  {
     title: 'Read/Write Mail',
     description: 'Read and write email messages in user mailboxes',
     scope: 'Mail.ReadWrite'

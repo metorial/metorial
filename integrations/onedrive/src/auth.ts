@@ -4,39 +4,9 @@ import { z } from 'zod';
 
 let scopes = [
   {
-    title: 'Read Files',
-    description: "Read the signed-in user's files",
-    scope: 'Files.Read'
-  },
-  {
-    title: 'Read All Files',
-    description: 'Read all files the signed-in user can access',
-    scope: 'Files.Read.All'
-  },
-  {
-    title: 'Read/Write Files',
-    description: "Read, create, update, and delete the signed-in user's files",
-    scope: 'Files.ReadWrite'
-  },
-  {
     title: 'Read/Write All Files',
     description: 'Read, create, update, and delete all files the signed-in user can access',
     scope: 'Files.ReadWrite.All'
-  },
-  {
-    title: 'App Folder',
-    description: "Write files into the app's folder in OneDrive (personal accounts only)",
-    scope: 'Files.ReadWrite.AppFolder'
-  },
-  {
-    title: 'Read Sites',
-    description: 'Read items in all site collections',
-    scope: 'Sites.Read.All'
-  },
-  {
-    title: 'Read/Write Sites',
-    description: 'Read and write items in all site collections',
-    scope: 'Sites.ReadWrite.All'
   },
   {
     title: 'Offline Access',

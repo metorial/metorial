@@ -12,7 +12,8 @@ export let copyContent = SlateTool.create(spec, {
     'Set resourceType to "notebook", "section", or "page" to specify what to copy.',
     'For pages, provide the destinationSectionId where the page should be copied.',
     'For sections, provide either destinationNotebookId or destinationSectionGroupId.',
-    'For notebooks, optionally provide groupId or site details for the destination.'
+    'For notebooks, optionally provide groupId or site details for the destination.',
+    'Copying into a Microsoft 365 group or SharePoint site destination requires the Notes.ReadWrite.All scope, which the default consent list no longer includes; such copies fail with a permission error unless that scope was granted.'
   ]
 })
   .input(
