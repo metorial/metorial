@@ -168,7 +168,7 @@ describe('google-tasks auth contract', () => {
     });
   });
 
-  it('returns a null profile when userinfo scopes are not granted', async () => {
+  it('returns an empty profile when userinfo scopes are not granted', async () => {
     let client = await loadProviderClient();
 
     let result = await client.getAuthProfile({
@@ -181,6 +181,6 @@ describe('google-tasks auth contract', () => {
     });
 
     expect(profileGet).not.toHaveBeenCalled();
-    expect(result.profile).toBeNull();
+    expect(result.profile).toEqual({});
   });
 });

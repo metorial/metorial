@@ -1,3 +1,4 @@
+export * from './autocomplete';
 export * from './compute-route-matrix';
 export * from './generate-static-map';
 export * from './geocode';
@@ -6,6 +7,7 @@ export * from './get-air-quality';
 export * from './get-directions';
 export * from './get-elevation';
 export * from './get-place-details';
+export * from './get-place-photo';
 export * from './get-timezone';
 export * from './search-places';
 export * from './snap-to-roads';

@@ -37,9 +37,9 @@ Sheets API scopes are applied to a spreadsheet file and cannot be limited to a s
 
 - `https://www.googleapis.com/auth/spreadsheets` — Full read/write access to all spreadsheets.
 - `https://www.googleapis.com/auth/spreadsheets.readonly` — Read-only access to all spreadsheets.
-- `https://www.googleapis.com/auth/drive` — Full access to Google Drive (includes Sheets); needed for file-level operations like creating or deleting spreadsheets.
-- `https://www.googleapis.com/auth/drive.readonly` — Read-only access to Drive files.
 - `https://www.googleapis.com/auth/drive.file` — Access only to files created or opened by the app.
+
+The restricted broad Drive scopes (`drive`, `drive.readonly`) are not requested by this integration. Connections that granted them previously keep working; new connections use `drive.file`, so Drive-level operations (deleting spreadsheets, change-notification watches) apply only to files created or opened through this connection.
 
 ## Features
 
@@ -61,7 +61,7 @@ Apply formatting to cells including text styles (bold, italic, font size, color)
 
 ### Sheet Management
 
-Add, delete, copy, and rename individual sheets (tabs) within a spreadsheet. Configure sheet properties such as grid size, frozen rows/columns, and tab color. Reorder sheets within a spreadsheet.
+Add, delete, duplicate, and rename individual sheets (tabs) within a spreadsheet. Configure sheet properties such as grid size, frozen rows/columns, and tab color. Reorder sheets within a spreadsheet. The `manage_sheets` tool's `copy_to_spreadsheet` action copies one sheet into another spreadsheet by source spreadsheet ID, numeric source sheet ID, and destination spreadsheet ID. Google returns the newly created sheet's properties. This action accepts the `spreadsheets`, `drive`, or `drive.file` OAuth scope.
 
 ### Protected Ranges
 

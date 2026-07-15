@@ -53,8 +53,10 @@ Create, read, update, and delete events on any accessible calendar. Events conta
 
 - **Recurring events**: Define events with recurrence rules (RRULE). Individual instances of recurring events can be modified or cancelled independently.
 - **Attendee management**: Invite attendees by email and control whether notification emails are sent on creation or update.
+- **Invitation responses**: `respond_to_event` accepts, declines, or tentatively accepts an invitation. It reads the event to select the attendee marked `self`, or an explicitly supplied attendee email, then sends an `attendeesOmitted` patch containing only that attendee so the rest of the attendee list is preserved. Attendee entries without an email address are skipped during selection. The recorded response and comment in the tool output are read back from the patched event returned by Google, falling back to the input values when absent. For recurring events, responding with the series master event ID applies the response to every instance; use a specific instance ID to respond to one occurrence. Optional response comments and `sendUpdates` are supported.
 - **Quick add**: Create events from a simple text string (natural language parsing).
 - Events can be moved between calendars.
+- **Batch modification**: `batch_modify_events` accepts one to 50 create, update, or delete operations. The tool intentionally issues sequential per-item Calendar API calls instead of a multipart `/batch/calendar/v3` request, which keeps validation and partial-failure reporting explicit. Each item returns its own success or user-facing error result, and one failed item does not stop later operations.
 
 ### Calendar Management
 
@@ -62,7 +64,7 @@ Calendars are collections of events, each with associated metadata such as descr
 
 ### Calendar List Management
 
-The calendar list represents all calendars on a user's calendar list in the Calendar UI. You can add (subscribe to) or remove calendars from a user's list, and customize per-user display properties like color and visibility.
+The calendar list represents all calendars on a user's calendar list in the Calendar UI. You can add (subscribe to) or remove calendars from a user's list, and customize per-user display properties like color and visibility. The `manage_calendar` tool's additive `update_subscription` action patches `colorId`, `hidden`, `selected`, and `summaryOverride` for an already-subscribed calendar.
 
 ### Access Control (Sharing)
 
@@ -80,7 +82,9 @@ The API supports special event types beyond standard events, including focus tim
 
 ### Settings
 
-View user-level Calendar settings such as timezone, date format, default event length, and notification preferences (read-only via API).
+View user-level Calendar settings such as timezone, date format, default event length, and notification preferences (read-only via API). `get_settings` lists explicitly stored settings with pagination and incremental `syncToken` support, or retrieves one setting by `settingId`. Google can omit settings that currently use their default value.
+
+`get_settings` accepts the full Calendar scope, the Calendar read-only scope, or the dedicated `calendar.settings.readonly` scope. Event responses use the same write-scope clause as `update_event`; batch event modifications accept the supported Calendar event-write scopes.
 
 ### Colors
 
@@ -89,6 +93,10 @@ Retrieve the set of available calendar and event color definitions used in the G
 ### Incremental Synchronization
 
 The API supports efficient sync of calendar data using sync tokens. After an initial full fetch, subsequent requests return only changed items. This is useful for keeping a local copy of calendar data up to date.
+
+## Error Contract
+
+New tool validation and upstream Google Calendar API failures use the shared `ServiceError` contract. Batch event failures are converted into the corresponding item's `error` field so callers receive all ordered results; validation and upstream failures outside a batch remain user-facing `ServiceError` failures.
 
 ## Events
 

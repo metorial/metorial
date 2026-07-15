@@ -34,7 +34,7 @@ Retrieve all task lists for the authenticated user. Returns the complete set of 
 
 ### List Tasks
 
-Retrieve tasks from a task list with optional filtering. Supports filtering by completion status, due date range, completion date range, and last modification time. Returns all matching tasks with pagination handled automatically.
+Retrieve tasks from one task list, or omit the task-list ID to retrieve tasks from every list. Supports filtering by completion status, due date range, completion date range, and last modification time. Returns all matching tasks with source task-list context and pagination handled automatically.
 
 ### Move Task
 

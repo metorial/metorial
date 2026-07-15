@@ -8,22 +8,13 @@ Google Maps Platform is a suite of APIs and SDKs by Google that provides geospat
 
 ### API Key (Primary Method)
 
-Google Maps Platform APIs and SDKs require API keys or, where supported, OAuth 2.0 to authenticate.
+This integration exposes API-key authentication. Google Maps Platform also supports OAuth 2.0 for some APIs, but this integration does not currently expose an OAuth or service-account auth method.
 
 - API keys link API calls to your billing account. Create one by going to the Google Maps Platform Credentials page in the Google Cloud Console and selecting "Create credentials" then "API key."
-- API keys are passed as a query parameter (`key=YOUR_API_KEY`) on HTTP requests.
+- Legacy Maps web services receive the API key as a query parameter. Places API (New) requests send it in the `X-Goog-Api-Key` header.
 - For client-side applications running on end user devices, API keys are the recommended authentication method.
 - Keys can be restricted by application type (HTTP referrers, IP addresses, Android apps, iOS apps) and by specific APIs.
 - A Google Cloud project with billing enabled is required.
-
-### OAuth 2.0 (Service Account)
-
-The intended use case for OAuth 2.0 with Maps Platform is for the developer to utilize temporary access tokens for authorizing their application to call an API on behalf of their Google Cloud project service account.
-
-- OAuth 2.0 is recommended for authorizing server-to-server calls between a developer's trusted server-side applications and Google's Maps Platform servers.
-- A service account is required—an account that belongs to your application, not an individual end user. Your application calls APIs on behalf of the service account.
-- The OAuth token uses the scope `https://www.googleapis.com/auth/cloud-platform`. The Google Cloud project ID with billing enabled must be passed in the `X-Goog-User-Project` header.
-- Not all Maps Platform APIs support OAuth 2.0; check individual API documentation for support. Newer APIs (e.g., Places API (New), Address Validation, Aerial View, Routes, Datasets, Air Quality, Solar, Pollen) generally support it.
 
 ## Features
 
@@ -37,8 +28,16 @@ The intended use case for OAuth 2.0 with Maps Platform is for the developer to u
 
 - Using a place ID, you can request details about a particular establishment or point of interest, returning comprehensive information such as complete address, phone number, user rating, and reviews.
 - Supports text-based search, nearby search, place autocomplete, and place photos.
+- `autocomplete` calls `POST /v1/places:autocomplete` with a fixed response field mask for place/query text, structured text, place IDs and resource names, types, and origin distance. Inputs cover Google session tokens, type and region restrictions, cursor offset, origin, service-area/future businesses, and circular location bias or restriction. Bias and restriction are mutually exclusive.
+- `(cities)` and `(regions)` must each be used alone in `includedPrimaryTypes`. Query predictions cannot be combined with `includedRegionCodes` because Google does not return query predictions when region restrictions are present.
+- Autocomplete session tokens are optional but recommended. Create a URL-safe token of at most 36 characters (UUID v4 is recommended), reuse it while the user types, then pass the same token to `get_place_details` for the selected place. Do not reuse a completed session token.
+- `get_place_details` includes current `photos[].name`, dimensions, and `authorAttributions` in its field mask and output. Photo names can expire and must not be cached. Display every returned author attribution with the related image.
+- `get_place_photo` appends `/media` to a current photo name and requests `skipHttpRedirect=true` with the API key. It validates the returned short-lived Google media URL, then downloads it through a separate unauthenticated HTTP client so the API key cannot reach the media host.
+- Place photo requests require `maxWidthPx`, `maxHeightPx`, or both. Each value must be an integer from 1 through 4800. Downloads are limited to 52,428,800 bytes, require a supported image MIME type and matching file signature, and return bytes only through one Slate attachment. Temporary media URLs and base64 content never appear in structured output.
 - AI-generated summaries of places and areas are available via Gemini integration.
 - Place types cover a wide range of categories (restaurants, EV charging stations, hospitals, etc.).
+
+The private live suite resolves a current photo name through Place Details for every run. It intentionally does not store a photo-name fixture because Google prohibits caching photo names and names can expire. Live Places coverage requires Places API (New) and billing to be enabled for the API-key project.
 
 ### Routes and Directions
 

@@ -24,10 +24,14 @@ let docsWrite = anyOf(
   googleDocsScopes.driveFile
 );
 
+let driveWrite = anyOf(googleDocsScopes.drive, googleDocsScopes.driveFile);
+
 export let googleDocsActionScopes = {
   createDocument: docsWrite,
+  createDocumentMarkdown: driveWrite,
   getDocument: docsRead,
   editDocument: docsWrite,
+  updateDocumentMarkdown: driveWrite,
   mergeTemplate: docsWrite,
   listDocuments: docsRead,
   manageNamedRanges: docsWrite,

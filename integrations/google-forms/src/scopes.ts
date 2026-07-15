@@ -37,6 +37,7 @@ export let googleFormsActionScopes = {
   getResponse: formResponsesRead,
   createForm: formStructureWrite,
   updateForm: formStructureWrite,
+  setPublishSettings: formStructureWrite,
   manageWatches: formStructureWrite,
   newResponse: formResponsesRead,
   formUpdated: formStructureRead,

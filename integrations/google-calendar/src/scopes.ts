@@ -53,6 +53,17 @@ export let googleCalendarActionScopes = {
     googleCalendarScopes.calendarEvents,
     googleCalendarScopes.calendarEventsOwned
   ),
+  respondToEvent: anyOf(
+    googleCalendarScopes.calendar,
+    googleCalendarScopes.calendarEvents,
+    googleCalendarScopes.calendarEventsOwned
+  ),
+  batchModifyEvents: anyOf(
+    googleCalendarScopes.calendar,
+    googleCalendarScopes.calendarEvents,
+    googleCalendarScopes.calendarAppCreated,
+    googleCalendarScopes.calendarEventsOwned
+  ),
   deleteEvent: anyOf(
     googleCalendarScopes.calendar,
     googleCalendarScopes.calendarEvents,
@@ -95,6 +106,11 @@ export let googleCalendarActionScopes = {
     googleCalendarScopes.calendarEventsOwned,
     googleCalendarScopes.calendarEventsOwnedReadonly,
     googleCalendarScopes.calendarEventsPublicReadonly
+  ),
+  getSettings: anyOf(
+    googleCalendarScopes.calendar,
+    googleCalendarScopes.calendarReadonly,
+    googleCalendarScopes.calendarSettingsReadonly
   ),
   eventChanges: anyOf(
     googleCalendarScopes.calendar,

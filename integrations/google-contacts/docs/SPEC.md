@@ -42,6 +42,21 @@ The API facilitates managing contacts by creating, updating, and deleting contac
 - When updating contacts, include the etag field to ensure the contact hasn't changed since last read.
 - Only contact-based people can be modified by mutation endpoints. Profile and domain contact mutations are not supported.
 
+#### Contact photos
+
+`manage_contact_photo` updates or deletes a contact photo through the People API's dedicated photo endpoints. Updating requires raw image bytes encoded as base64. Both operations require the full `contacts` scope and return the contact's current names, email addresses, and photos when Google includes the person in its response; the tool succeeds without the person payload otherwise. After deleting a custom photo, Google may expose a default profile photo for the person.
+
+#### Batch operations
+
+`batch_modify_contacts` consolidates the People API batch create, update, delete, and get endpoints:
+
+- `create` accepts up to 200 contact payloads.
+- `update` accepts up to 200 contacts and one shared field mask. Each selected field is replaced or cleared for every contact in the request. The tool reads the current People metadata first and rejects stale etags before submitting the batch update. If Google still rejects the batch with an etag mismatch (HTTP 400 `FAILED_PRECONDITION`), the tool reports a validation error asking the caller to re-fetch the contacts for fresh etags. Google may return an empty `updateResult` on success, in which case the reported count falls back to the number of submitted updates.
+- `delete` accepts up to 500 contact resource names and permanently deletes their contact data.
+- `get` accepts up to 200 contact resource names and preserves Google's per-resource response status. Like the mutating actions, `get` requires the full `contacts` scope; connections granted only `contacts.readonly` should use `get_contact` instead.
+
+Google recommends sending mutation requests for the same user sequentially to avoid lock contention and elevated failure rates.
+
 ### Contact Search and Listing
 
 You can list all contacts of the authenticated user and search across contacts by name, email, phone number, and other fields. The People API merges data from various sources like public profiles, private profiles, contacts, and domain information based on verified email addresses, phone numbers, or profile URLs.
@@ -66,7 +81,7 @@ Google Workspace users can utilize the API to list and search domain profiles an
 
 ### Profile Information
 
-The API can retrieve information about a person, including the authenticated user using `people/me` or by specifying a resource name. The `people.get` endpoint does not require any scopes to read public Google profile data.
+`get_my_profile` retrieves the authenticated user through `people.get` with `people/me`, requesting names, email addresses, photos, organizations, phone numbers, and biographies. It is read-only and accepts the `contacts`, `contacts.readonly`, or `userinfo.profile` OAuth scope. The general People API can also retrieve public Google profile data without OAuth when the requested fields are public.
 
 ## Events
 

@@ -6,6 +6,7 @@ export * from './delete-element';
 export * from './edit-text';
 export * from './embed-sheets-chart';
 export * from './get-presentation';
+export * from './get-slide-thumbnail';
 export * from './manage-slides';
 export * from './manage-speaker-notes';
 export * from './replace-text';

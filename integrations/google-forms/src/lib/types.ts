@@ -12,6 +12,15 @@ export interface GoogleFormsSettings {
   quizSettings?: GoogleFormsQuizSettings;
 }
 
+export interface GoogleFormsPublishState {
+  isPublished: boolean;
+  isAcceptingResponses: boolean;
+}
+
+export interface GoogleFormsPublishSettings {
+  publishState?: GoogleFormsPublishState;
+}
+
 export interface GoogleFormsImage {
   contentUri?: string;
   altText?: string;
@@ -135,6 +144,12 @@ export interface GoogleForm {
   revisionId?: string;
   responderUri?: string;
   linkedSheetId?: string;
+  publishSettings?: GoogleFormsPublishSettings;
+}
+
+export interface GoogleFormsSetPublishSettingsResponse {
+  formId?: string;
+  publishSettings?: GoogleFormsPublishSettings;
 }
 
 export interface GoogleFormsTextAnswer {

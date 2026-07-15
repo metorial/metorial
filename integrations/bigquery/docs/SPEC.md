@@ -31,7 +31,7 @@ BigQuery declares several OAuth 2.0 scopes:
 - `https://www.googleapis.com/auth/cloud-platform` — View and manage your data across Google Cloud Platform services.
 - `https://www.googleapis.com/auth/cloud-platform.read-only` — View your data across Google Cloud Platform services.
 
-Additional scopes for Google Drive (`https://www.googleapis.com/auth/drive`) may be needed when querying data from Google Sheets via federated queries.
+Google Drive access is not requested by this integration. Queries against Drive-backed external tables (e.g. Google Sheets federated tables) fail with a permission error; use a dedicated Drive connection to manage such source files.
 
 ### Required Inputs
 
@@ -43,6 +43,8 @@ Additional scopes for Google Drive (`https://www.googleapis.com/auth/drive`) may
 ### SQL Query Execution
 
 Run SQL queries against BigQuery datasets. Queries are executed as asynchronous jobs that can be polled for status and results. Supports both interactive (on-demand) and batch query priorities. Queries use GoogleSQL (standard SQL) syntax, including DML (INSERT, UPDATE, DELETE, MERGE) and DDL (CREATE, ALTER, DROP) statements.
+
+For read-only analytics, `execute_sql_readonly` accepts only a single BigQuery-classified `SELECT` statement. It submits the exact SQL as a dry run first and rejects scripts, procedure calls, DML, DDL, and missing statement classifications. The real job reuses the validated query configuration, and the completed job's statement type is checked again before results are returned. The tool supports a default dataset, maximum bytes billed, result limits, parameters, and job labels, but it does not expose destination-table or write-disposition options.
 
 ### Dataset Management
 

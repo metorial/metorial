@@ -37,6 +37,19 @@ let driveMetadataWrite = anyOf(googleDriveScopes.driveMetadata, googleDriveScope
 
 let driveSharingWrite = anyOf(googleDriveScopes.drive, googleDriveScopes.driveFile);
 
+let driveCommentWrite = anyOf(googleDriveScopes.drive, googleDriveScopes.driveFile);
+
+// Shared by about.get and changes.* reads: any Drive scope grants access.
+let driveAnyScopeRead = anyOf(
+  googleDriveScopes.drive,
+  googleDriveScopes.driveAppdata,
+  googleDriveScopes.driveFile,
+  googleDriveScopes.driveMetadata,
+  googleDriveScopes.driveMetadataReadonly,
+  googleDriveScopes.drivePhotosReadonly,
+  googleDriveScopes.driveReadonly
+);
+
 export let googleDriveActionScopes = {
   searchFiles: driveMetadataRead,
   getFile: driveContentRead,
@@ -51,9 +64,12 @@ export let googleDriveActionScopes = {
   updateFile: driveMetadataWrite,
   copyFile: driveContentWrite,
   deleteFile: driveContentWrite,
-  createComment: driveContentWrite,
-  replyToComment: driveContentWrite,
-  deleteComment: driveContentWrite,
+  createComment: driveCommentWrite,
+  replyToComment: driveCommentWrite,
+  updateComment: driveCommentWrite,
+  deleteComment: driveCommentWrite,
+  getAbout: driveAnyScopeRead,
+  listChanges: driveAnyScopeRead,
   shareFile: driveSharingWrite,
   updatePermission: driveSharingWrite,
   removePermission: driveSharingWrite,

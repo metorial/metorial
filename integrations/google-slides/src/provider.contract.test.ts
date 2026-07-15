@@ -17,6 +17,7 @@ describe('google-slides provider contract', () => {
       toolIds: [
         'create_presentation',
         'get_presentation',
+        'get_slide_thumbnail',
         'manage_slides',
         'edit_text',
         'replace_text',
@@ -32,6 +33,7 @@ describe('google-slides provider contract', () => {
       tools: [
         { id: 'create_presentation', readOnly: false, destructive: false },
         { id: 'get_presentation', readOnly: true, destructive: false },
+        { id: 'get_slide_thumbnail', readOnly: true, destructive: false },
         { id: 'manage_slides', readOnly: false, destructive: true },
         { id: 'edit_text', readOnly: false, destructive: true },
         { id: 'replace_text', readOnly: false, destructive: true },
@@ -48,11 +50,12 @@ describe('google-slides provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(13);
+    expect(contract.actions).toHaveLength(14);
 
     let expectedScopes = {
       create_presentation: googleSlidesActionScopes.createPresentation,
       get_presentation: googleSlidesActionScopes.getPresentation,
+      get_slide_thumbnail: googleSlidesActionScopes.getSlideThumbnail,
       manage_slides: googleSlidesActionScopes.manageSlides,
       edit_text: googleSlidesActionScopes.editText,
       replace_text: googleSlidesActionScopes.replaceText,

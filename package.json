@@ -4,6 +4,8 @@
     "biome:check": "biome check --write .",
     "integrations:cli": "bun packages/cli/src/cli.ts",
     "integrations:validate-pr": "bun scripts/validate-pr-integrations.ts",
+    "local-deps:check": "bun scripts/check-package-local-node-modules.ts",
+    "local-deps:clean": "bun scripts/check-package-local-node-modules.ts --fix",
     "package-local": "bun scripts/package-local.ts",
     "packages:sync-versions": "bun scripts/update-integration-package-versions.ts",
     "packages:build": "turbo run build --filter=./packages/*",

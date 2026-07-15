@@ -39,19 +39,9 @@ export let auth = SlateAuth.create()
         scope: googleSheetsScopes.spreadsheetsReadonly
       },
       {
-        title: 'Drive (Full)',
-        description:
-          'Full access to Google Drive, needed for creating/deleting spreadsheets and push notifications',
-        scope: googleSheetsScopes.drive
-      },
-      {
-        title: 'Drive (Read)',
-        description: 'Read-only access to Google Drive files',
-        scope: googleSheetsScopes.driveReadonly
-      },
-      {
         title: 'Drive (App Files)',
-        description: 'Access only to files created or opened by the app',
+        description:
+          'Access only to files created or opened by the app; used for deleting spreadsheets and push notifications',
         scope: googleSheetsScopes.driveFile
       },
       {

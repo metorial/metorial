@@ -44,21 +44,10 @@ export let auth = SlateAuth.create()
         scope: googleFormsScopes.formsResponsesReadonly
       },
       {
-        title: 'Drive (Full)',
-        description:
-          'See, edit, create, and delete all of your Google Drive files (broader scope that also grants Forms access)',
-        scope: googleFormsScopes.drive
-      },
-      {
         title: 'Drive (App files)',
         description:
           'See, edit, create, and delete only the specific Google Drive files you use with this app',
         scope: googleFormsScopes.driveFile
-      },
-      {
-        title: 'Drive (Read-only)',
-        description: 'See and download all your Google Drive files',
-        scope: googleFormsScopes.driveReadonly
       },
       {
         title: 'User Profile',

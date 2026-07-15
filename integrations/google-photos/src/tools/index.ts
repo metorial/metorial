@@ -2,6 +2,7 @@ export { addAlbumEnrichment } from './add-album-enrichment';
 export { createAlbum } from './create-album';
 export { createPickerSession } from './create-picker-session';
 export { deletePickerSession } from './delete-picker-session';
+export { downloadMediaItem } from './download-media-item';
 export { getAlbum } from './get-album';
 export { getMediaItem } from './get-media-item';
 export { getPickerSession } from './get-picker-session';

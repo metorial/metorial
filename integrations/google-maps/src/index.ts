@@ -1,6 +1,7 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
 import {
+  autocompleteTool,
   computeRouteMatrixTool,
   generateStaticMapTool,
   geocodeTool,
@@ -9,6 +10,7 @@ import {
   getDirectionsTool,
   getElevationTool,
   getPlaceDetailsTool,
+  getPlacePhotoTool,
   getTimezoneTool,
   searchPlacesTool,
   snapToRoadsTool,
@@ -23,7 +25,9 @@ export let provider = Slate.create({
     geocodeTool,
     validateAddressTool,
     searchPlacesTool,
+    autocompleteTool,
     getPlaceDetailsTool,
+    getPlacePhotoTool,
     getDirectionsTool,
     computeRouteMatrixTool,
     getElevationTool,

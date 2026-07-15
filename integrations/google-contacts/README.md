@@ -60,6 +60,18 @@ Searches "Other contacts" by name, email, or phone number. Other contacts are au
 
 Updates an existing contact's data. You must provide the contact's resource name and etag (obtained from a previous get/list/search). Only the fields you include will be updated; omitted fields remain unchanged.
 
+### Get My Profile
+
+Retrieves the authenticated Google user's People profile, including names, email addresses, photos, organizations, phone numbers, and biographies.
+
+### Manage Contact Photo
+
+Updates or deletes the photo for a contact in the authenticated user's Google Contacts.
+
+### Batch Modify Contacts
+
+Creates, updates, deletes, or gets multiple Google contacts in one People API request. Create, update, and get accept up to 200 contacts; delete accepts up to 500.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

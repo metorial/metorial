@@ -1,6 +1,7 @@
 import {
   type ContactInput,
   DEFAULT_PERSON_FIELDS,
+  googlePeopleApiError,
   READONLY_PERSON_FIELDS
 } from '@slates/google-people-recipes';
 import axios from 'axios';
@@ -55,21 +56,111 @@ export class Client {
   }
 
   async batchGetContacts(resourceNames: string[], personFields?: string) {
-    let response = await api.get('people:batchGet', {
-      params: {
-        resourceNames,
-        personFields: personFields || DEFAULT_PERSON_FIELDS
-      },
-      headers: this.headers
-    });
-    return response.data;
+    try {
+      let params = new URLSearchParams();
+      for (let resourceName of resourceNames) {
+        params.append('resourceNames', resourceName);
+      }
+      params.set('personFields', personFields || DEFAULT_PERSON_FIELDS);
+
+      let response = await api.get('people:batchGet', {
+        params,
+        headers: this.headers
+      });
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'batch get contacts');
+    }
+  }
+
+  async getMyProfile() {
+    try {
+      let response = await api.get('people/me', {
+        params: {
+          personFields: 'names,emailAddresses,photos,organizations,phoneNumbers,biographies'
+        },
+        headers: this.headers
+      });
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'get authenticated profile');
+    }
+  }
+
+  async updateContactPhoto(resourceName: string, photoBytes: string) {
+    try {
+      let response = await api.patch(
+        `${resourceName}:updateContactPhoto`,
+        {
+          photoBytes,
+          personFields: 'names,emailAddresses,photos'
+        },
+        { headers: this.headers }
+      );
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'update contact photo');
+    }
   }
 
   async deleteContactPhoto(resourceName: string) {
-    let response = await api.delete(`${resourceName}:deleteContactPhoto`, {
-      headers: this.headers
-    });
-    return response.data;
+    try {
+      let response = await api.delete(`${resourceName}:deleteContactPhoto`, {
+        params: { personFields: 'names,emailAddresses,photos' },
+        headers: this.headers
+      });
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'delete contact photo');
+    }
+  }
+
+  async batchCreateContacts(contacts: ContactInput[]) {
+    try {
+      let response = await api.post(
+        'people:batchCreateContacts',
+        {
+          contacts: contacts.map(contactPerson => ({ contactPerson })),
+          readMask: DEFAULT_PERSON_FIELDS
+        },
+        { headers: this.headers }
+      );
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'batch create contacts');
+    }
+  }
+
+  async batchUpdateContacts(
+    contacts: Record<string, ContactInput & Record<string, unknown>>,
+    updateMask: string
+  ) {
+    try {
+      let response = await api.post(
+        'people:batchUpdateContacts',
+        {
+          contacts,
+          updateMask,
+          readMask: DEFAULT_PERSON_FIELDS
+        },
+        { headers: this.headers }
+      );
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'batch update contacts');
+    }
+  }
+
+  async batchDeleteContacts(resourceNames: string[]) {
+    try {
+      await api.post(
+        'people:batchDeleteContacts',
+        { resourceNames },
+        { headers: this.headers }
+      );
+    } catch (error) {
+      throw googlePeopleApiError(error, 'batch delete contacts');
+    }
   }
 
   // ---- Contact Groups ----

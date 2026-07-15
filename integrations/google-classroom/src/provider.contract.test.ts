@@ -23,6 +23,8 @@ describe('google-classroom provider contract', () => {
         'manage_invitations',
         'list_coursework',
         'create_coursework',
+        'update_coursework',
+        'delete_coursework',
         'manage_submissions',
         'manage_announcements',
         'manage_topics',
@@ -44,6 +46,8 @@ describe('google-classroom provider contract', () => {
         { id: 'delete_course', destructive: true },
         { id: 'list_roster', readOnly: true },
         { id: 'list_coursework', readOnly: true },
+        { id: 'update_coursework', readOnly: false, destructive: false },
+        { id: 'delete_coursework', readOnly: false, destructive: true },
         { id: 'get_user_profile', readOnly: true }
       ],
       triggers: [
@@ -54,7 +58,7 @@ describe('google-classroom provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(21);
+    expect(contract.actions).toHaveLength(23);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -68,6 +72,8 @@ describe('google-classroom provider contract', () => {
       manage_invitations: googleClassroomActionScopes.manageInvitations,
       list_coursework: googleClassroomActionScopes.listCoursework,
       create_coursework: googleClassroomActionScopes.createCoursework,
+      update_coursework: googleClassroomActionScopes.updateCoursework,
+      delete_coursework: googleClassroomActionScopes.deleteCoursework,
       manage_submissions: googleClassroomActionScopes.manageSubmissions,
       manage_announcements: googleClassroomActionScopes.manageAnnouncements,
       manage_topics: googleClassroomActionScopes.manageTopics,

@@ -62,6 +62,10 @@ describe('youtube auth contract', () => {
     expect(url.searchParams.get('scope')).toBe(
       `${youtubeScopes.youtubeReadonly} ${youtubeScopes.youtubeUpload}`
     );
+    // include_granted_scopes must stay absent: with a shared OAuth client it merges
+    // every previously granted scope into the new grant, and large accumulated
+    // grants make Google return 400 Bad Request at consent completion.
+    expect(url.searchParams.has('include_granted_scopes')).toBe(false);
   });
 
   it('maps callback and refresh token responses into the stored auth shape', async () => {
@@ -163,5 +167,19 @@ describe('youtube auth contract', () => {
       name: 'YouTube Test User',
       imageUrl: 'https://example.com/avatar.png'
     });
+  });
+
+  it('skips Google UserInfo when identity scopes were not granted', async () => {
+    let client = await loadProviderClient();
+
+    let result = await client.getAuthProfile({
+      authenticationMethodId: 'oauth2',
+      output: { token: 'profile-token' },
+      input: {},
+      scopes: [youtubeScopes.youtubeUpload]
+    });
+
+    expect(result.profile).toEqual({});
+    expect(profileGet).not.toHaveBeenCalled();
   });
 });

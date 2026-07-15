@@ -84,7 +84,11 @@ export interface SharedDrive {
 }
 
 export interface DriveChange {
+  /** Drive v3 does not expose a change ID; retained for compatibility with older responses. */
   changeId: string;
+  /** Current Drive v3 resource type; optional so existing typed consumers remain source-compatible. */
+  changeType?: string;
+  /** @deprecated Use changeType. */
   type: string;
   time: string;
   removed: boolean;

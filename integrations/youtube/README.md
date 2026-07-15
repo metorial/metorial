@@ -16,6 +16,10 @@ Retrieve detailed information about YouTube channels. Look up by channel ID, use
 
 Retrieve detailed information about one or more YouTube videos by ID. Returns snippet (title, description, tags), statistics (views, likes, comments), content details (duration, definition), and status (privacy, license).
 
+### Get Video Rating
+
+Retrieve the authenticated user's rating for one or more YouTube videos.
+
 ### List Activities
 
 Retrieve activity feed for a YouTube channel or the authenticated user. Activities include uploads, likes, favorites, comments, subscriptions, and more. Results can be filtered by date range.
@@ -23,6 +27,10 @@ Retrieve activity feed for a YouTube channel or the authenticated user. Activiti
 ### List Captions
 
 List all caption tracks for a YouTube video. Returns caption metadata including language, track kind, status, and whether it's auto-generated. Can also delete a caption track by ID.
+
+### Download Caption
+
+Download an editable caption track in its original or a converted format as a Slate attachment, optionally machine-translated to a BCP-47 language tag. The authenticated user must have permission to edit the video.
 
 ### List Comments
 
@@ -64,6 +72,10 @@ Rate a YouTube video (like, dislike, or remove rating). Can also retrieve the au
 
 Search for videos, channels, and playlists on YouTube. Supports filtering by search terms, channel, type, date range, region, video duration, definition, and more. Returns paginated results with snippet information.
 
+### Set Video Thumbnail
+
+Set a JPEG or PNG custom thumbnail on an owned video. Thumbnail content is limited to YouTube's 2 MB upload limit.
+
 ### Update Channel
 
 Update branding settings for a YouTube channel. Can modify the channel description, keywords, unsubscribed trailer, and country. Requires channel ownership.
@@ -71,6 +83,10 @@ Update branding settings for a YouTube channel. Can modify the channel descripti
 ### Update Video
 
 Update a YouTube video's metadata and/or status settings. Can update title, description, tags, category, privacy status, license, and other settings in a single call. Requires ownership of the video.
+
+### Upload Video
+
+Upload a video and its metadata with Google's resumable protocol. Small clips can use base64 content; larger files (up to an operational limit of 2 GiB) can be fetched from a security-validated public HTTPS URL. Uploads default to private with subscriber notifications disabled.
 
 ## License
 

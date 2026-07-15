@@ -1,7 +1,8 @@
 import { createLocalSlateTestClient, expectSlateContract } from '@slates/test';
 import { describe, expect, it } from 'vitest';
 import { provider } from './index';
-import { googleSheetsActionScopes } from './scopes';
+import { googleSheetsActionScopes, googleSheetsScopes } from './scopes';
+import { manageSheets } from './tools/manage-sheets';
 
 describe('google-sheets provider contract', () => {
   it('exposes the expected provider, tool, trigger, and auth surface', async () => {
@@ -83,6 +84,30 @@ describe('google-sheets provider contract', () => {
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {
       expect(contract.actions.find(action => action.id === actionId)?.scopes).toEqual(scopes);
     }
+
+    expect(googleSheetsActionScopes.manageSheets).toEqual({
+      AND: [
+        {
+          OR: [
+            googleSheetsScopes.spreadsheets,
+            googleSheetsScopes.drive,
+            googleSheetsScopes.driveFile
+          ]
+        }
+      ]
+    });
+    let manageSheetsJsonSchema = manageSheets.inputSchema.toJSONSchema() as {
+      properties?: { action?: { enum?: string[] } };
+      type?: string;
+    };
+    expect(manageSheetsJsonSchema.type).toBe('object');
+    expect(manageSheetsJsonSchema.properties?.action?.enum).toEqual([
+      'add',
+      'delete',
+      'duplicate',
+      'update',
+      'copy_to_spreadsheet'
+    ]);
 
     let oauth = await client.getAuthMethod('oauth');
     expect(oauth.authenticationMethod.type).toBe('auth.oauth');

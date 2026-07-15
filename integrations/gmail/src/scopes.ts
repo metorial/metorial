@@ -1,4 +1,4 @@
-import { anyOf } from 'slates';
+import { allOf, anyOf } from 'slates';
 
 export let gmailScopes = {
   gmailReadonly: 'https://www.googleapis.com/auth/gmail.readonly',
@@ -28,15 +28,24 @@ let gmailHistory = anyOf(
   gmailScopes.fullMail
 );
 
+let gmailSend = anyOf(
+  gmailScopes.gmailSend,
+  gmailScopes.gmailCompose,
+  gmailScopes.gmailModify,
+  gmailScopes.fullMail
+);
+
 export let gmailActionScopes = {
-  sendEmail: anyOf(
-    gmailScopes.gmailSend,
+  sendEmail: gmailSend,
+  forwardMessage: allOf(gmailReadBody, gmailSend),
+  searchMessages: gmailReadBody,
+  getMessage: gmailReadBody,
+  getProfile: anyOf(
+    gmailScopes.gmailReadonly,
     gmailScopes.gmailCompose,
     gmailScopes.gmailModify,
     gmailScopes.fullMail
   ),
-  searchMessages: gmailReadBody,
-  getMessage: gmailReadBody,
   getAttachment: gmailReadBody,
   modifyMessage: anyOf(gmailScopes.gmailModify, gmailScopes.fullMail),
   manageDraft: anyOf(gmailScopes.gmailCompose, gmailScopes.gmailModify, gmailScopes.fullMail),

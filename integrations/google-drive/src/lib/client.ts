@@ -22,6 +22,7 @@ let FILE_FIELDS =
 export let MAX_DRIVE_DOWNLOAD_BYTES = 6 * 1024 * 1024;
 export let GOOGLE_DRIVE_DEFAULT_PAGE_SIZE = 100;
 export let GOOGLE_DRIVE_MAX_PAGE_SIZE = 100;
+export let GOOGLE_DRIVE_CHANGES_MAX_PAGE_SIZE = 1000;
 
 const GOOGLE_WORKSPACE_MIME_PREFIX = 'application/vnd.google-apps.';
 const INVALID_PAGE_TOKEN_PLACEHOLDERS = new Set([
@@ -174,7 +175,8 @@ let mapSharedDrive = (raw: any): SharedDrive => ({
 
 let mapChange = (raw: any): DriveChange => ({
   changeId: raw.changeId || raw.id || '',
-  type: raw.type,
+  changeType: raw.changeType || raw.type || '',
+  type: raw.changeType || raw.type || '',
   time: raw.time,
   removed: raw.removed || false,
   fileId: raw.fileId,
@@ -211,6 +213,23 @@ export function normalizeGoogleDrivePageSize(pageSize?: number): number {
     throw createApiServiceError(
       `pageSize must be an integer between 1 and ${GOOGLE_DRIVE_MAX_PAGE_SIZE}.`,
       { reason: 'invalid_page_size' }
+    );
+  }
+
+  return pageSize;
+}
+
+export function normalizeGoogleDriveChangesPageSize(pageSize?: number): number {
+  if (pageSize === undefined) return GOOGLE_DRIVE_DEFAULT_PAGE_SIZE;
+
+  if (
+    !Number.isInteger(pageSize) ||
+    pageSize < 1 ||
+    pageSize > GOOGLE_DRIVE_CHANGES_MAX_PAGE_SIZE
+  ) {
+    throw createApiServiceError(
+      `pageSize must be an integer between 1 and ${GOOGLE_DRIVE_CHANGES_MAX_PAGE_SIZE} for Drive changes.`,
+      { reason: 'invalid_changes_page_size' }
     );
   }
 
@@ -728,6 +747,20 @@ export class GoogleDriveClient {
     return mapReply(response.data);
   }
 
+  async updateReply(
+    fileId: string,
+    commentId: string,
+    replyId: string,
+    content: string
+  ): Promise<DriveReply> {
+    let response = await this.api.patch(
+      `/files/${encodeURIComponent(fileId)}/comments/${encodeURIComponent(commentId)}/replies/${encodeURIComponent(replyId)}`,
+      { content },
+      { params: { fields: 'id,content,createdTime,modifiedTime,author,action' } }
+    );
+    return mapReply(response.data);
+  }
+
   async deleteReply(fileId: string, commentId: string, replyId: string): Promise<void> {
     await this.api.delete(
       `/files/${encodeURIComponent(fileId)}/comments/${encodeURIComponent(commentId)}/replies/${encodeURIComponent(replyId)}`
@@ -877,10 +910,18 @@ export class GoogleDriveClient {
       spaces?: string;
     }
   ): Promise<ChangeListResponse> {
+    let normalizedPageToken = normalizeGoogleDrivePageToken(pageToken);
+    if (!normalizedPageToken) {
+      throw createApiServiceError(
+        'pageToken is required to list Drive changes. Call getStartPageToken first.',
+        { reason: 'missing_changes_page_token' }
+      );
+    }
+
     let requestParams: Record<string, any> = {
-      pageToken,
-      fields: `nextPageToken,newStartPageToken,changes(changeId,type,time,removed,fileId,file(${FILE_FIELDS}),driveId,drive(id,name,createdTime))`,
-      pageSize: params?.pageSize || 100,
+      pageToken: normalizedPageToken,
+      fields: `nextPageToken,newStartPageToken,changes(changeType,time,removed,fileId,file(${FILE_FIELDS}),driveId,drive(id,name,createdTime,hidden))`,
+      pageSize: normalizeGoogleDriveChangesPageSize(params?.pageSize),
       supportsAllDrives: true,
       includeItemsFromAllDrives: true
     };
@@ -944,9 +985,9 @@ export class GoogleDriveClient {
   // ---- About ----
 
   async getAbout(): Promise<{
-    userId: string;
-    displayName: string;
-    emailAddress: string;
+    userId?: string;
+    displayName?: string;
+    emailAddress?: string;
     storageQuotaLimit?: string;
     storageQuotaUsage?: string;
   }> {

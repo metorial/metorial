@@ -52,9 +52,13 @@ Restricted scopes provide wide access to Google User Data and require a restrict
 
 Create and send email messages with support for recipients (to, cc, bcc), subject, body (plain text and HTML), and file attachments. Messages can be sent directly or saved as drafts first and sent later. Drafts can be created, updated, listed, and deleted.
 
+Existing messages can be forwarded with `forward_message`. The tool fetches the source in Gmail's raw RFC 2822 format, rewrites the recipient and `Fwd:` subject headers, and sends a new message while preserving the complete original MIME body and attachments. It omits the source thread ID and reply headers so the forward starts a distinct Gmail thread. It requires both a body-readable Gmail scope and a send-capable Gmail scope; `gmail.modify` and `mail.google.com` can each satisfy both requirements on their own. If the original subject already carries a `Fwd:` prefix, the tool keeps it instead of producing `Fwd: Fwd:`. Note the payload ceiling: the rebuilt raw MIME is submitted base64-encoded inside a JSON `messages.send` request, so forwards whose original attachments total more than roughly 5 MB fail with a Gmail 4xx error.
+
 ### Reading and Searching Messages
 
 Read individual email messages including headers, body, and attachments. Search for messages using Gmail's query syntax (the same operators available in the Gmail search bar, e.g., `from:`, `to:`, `subject:`, `has:attachment`, `after:`, `before:`). List messages in a mailbox, optionally filtered by label or query.
+
+`get_profile` returns the authenticated mailbox email address, total message and thread counts, and the current history ID for incremental synchronization.
 
 ### Google Contacts Lookup
 
@@ -76,9 +80,9 @@ Manage various mailbox settings programmatically:
 - **Forwarding:** Configure email forwarding addresses and rules.
 - **Filters:** Create and manage mail filters that automatically label, archive, or forward incoming mail.
 - **Vacation Responder:** Enable, configure, and disable auto-reply/vacation messages.
-- **POP and IMAP settings:** Enable or disable POP/IMAP access.
+- **POP and IMAP settings:** `manage_settings` can read and update POP/IMAP access, IMAP expunge behavior and folder-size limits, and the post-fetch POP disposition. Updates first read the current settings and preserve fields omitted by the caller. Fields whose current value is a Google `*Unspecified` enum placeholder (`expungeBehaviorUnspecified`, `accessWindowUnspecified`, `dispositionUnspecified`) are omitted from the update request instead of being echoed back, since Gmail can reject them with a 400.
 - **Delegates:** A Gmail user can grant mailbox access to another user in the same Google Workspace organization. Delegate management is restricted to service accounts with domain-wide delegation.
-- **Language settings:** Set the display language for the Gmail interface.
+- **Language settings:** `manage_settings` can read or set the Gmail display language using an RFC 3066 language tag.
 
 ### S/MIME Certificates
 

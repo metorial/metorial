@@ -8,6 +8,9 @@ export let listDocuments = SlateTool.create(spec, {
   name: 'List Documents',
   key: 'list_documents',
   description: `Lists Google Docs documents accessible to the user. Can filter by name, folder, or other criteria. Returns document metadata including IDs for use with other tools.`,
+  instructions: [
+    'Results depend on the granted Drive scope: with the default drive.file consent, only documents created or opened through this connection are listed.'
+  ],
   tags: {
     destructive: false,
     readOnly: true

@@ -1,4 +1,5 @@
 export * from './execute-query';
+export * from './execute-sql-readonly';
 export * from './export-data';
 export * from './load-data';
 export * from './manage-datasets';

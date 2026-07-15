@@ -33,8 +33,8 @@ OAuth2 allows you to make API calls on behalf of a given user. In this model, th
 | `https://www.googleapis.com/auth/documents`          | See, edit, create, and delete all Google Docs documents                   | Sensitive                   |
 | `https://www.googleapis.com/auth/documents.readonly` | See all Google Docs documents                                             | Sensitive                   |
 | `https://www.googleapis.com/auth/drive.file`         | See, edit, create, and delete only specific Drive files used with the app | Non-sensitive (Recommended) |
-| `https://www.googleapis.com/auth/drive`              | See, edit, create, and delete all Google Drive files                      | Restricted                  |
-| `https://www.googleapis.com/auth/drive.readonly`     | See and download all Google Drive files                                   | Restricted                  |
+
+The restricted broad Drive scopes (`drive`, `drive.readonly`) are not requested by this integration. Connections that granted them previously keep working; new connections rely on the Docs scopes plus `drive.file`, so Drive-level operations (listing documents, replacing content via Markdown upload) apply only to files created or opened through this connection.
 
 ### Service Account (Server-to-Server)
 
@@ -56,8 +56,12 @@ Service accounts use JWT-based authentication. They can access documents owned b
 Create new documents with a title and retrieve existing documents by their ID. The create method returns a documentId you can use to add content to the document afterwards with the batchUpdate method. There is no parameter to directly add content.
 
 - Create empty documents with specified titles
+- Create native Google Docs documents by importing Markdown through Drive
+- Replace a native document's full body by re-importing Markdown while preserving its file ID
 - Retrieve document content as structured JSON
 - Export document content for processing
+
+Markdown conversion uses Drive v3 multipart uploads with `text/markdown` media and the target MIME type `application/vnd.google-apps.document`. `create_document_markdown` sends `files.create`; `update_document_markdown` sends `files.update`, whose import behavior replaces the full document contents. Both tools require `drive.file` or broader writable Drive access and accept at most 5 MiB minus 16 KiB (5,226,496 bytes) of non-empty UTF-8 Markdown, reserving headroom for the multipart metadata part within Drive's 5 MiB multipart request limit.
 
 ### Content Editing
 

@@ -2,6 +2,7 @@ import { createLocalSlateTestClient, expectSlateContract } from '@slates/test';
 import { describe, expect, it } from 'vitest';
 import { provider } from './index';
 import { googleTasksActionScopes } from './scopes';
+import { listTasks } from './tools';
 
 describe('google-tasks provider contract', () => {
   it('exposes the expected provider, tool, trigger, and auth surface', async () => {
@@ -69,6 +70,15 @@ describe('google-tasks provider contract', () => {
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {
       expect(contract.actions.find(action => action.id === actionId)?.scopes).toEqual(scopes);
     }
+
+    let listTasksJsonSchema = listTasks.inputSchema.toJSONSchema() as {
+      properties?: Record<string, unknown>;
+      required?: string[];
+      type?: string;
+    };
+    expect(listTasksJsonSchema.type).toBe('object');
+    expect(listTasksJsonSchema.properties).toHaveProperty('taskListId');
+    expect(listTasksJsonSchema.required ?? []).not.toContain('taskListId');
 
     let oauth = await client.getAuthMethod('oauth');
     expect(oauth.authenticationMethod.type).toBe('auth.oauth');

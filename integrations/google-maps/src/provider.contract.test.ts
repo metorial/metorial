@@ -15,7 +15,9 @@ describe('google-maps provider contract', () => {
         'geocode',
         'validate_address',
         'search_places',
+        'autocomplete',
         'get_place_details',
+        'get_place_photo',
         'get_directions',
         'compute_route_matrix',
         'get_elevation',
@@ -30,7 +32,12 @@ describe('google-maps provider contract', () => {
       triggers: [{ id: 'inbound_webhook', invocationType: 'webhook' }]
     });
 
-    expect(contract.actions).toHaveLength(13);
+    expect(contract.actions).toHaveLength(15);
+
+    for (let toolId of ['autocomplete', 'get_place_photo']) {
+      let action = contract.actions.find(action => action.id === toolId);
+      expect(action?.tags).toMatchObject({ readOnly: true, destructive: false });
+    }
 
     for (let action of contract.actions) {
       expect(action.scopes).toBeUndefined();

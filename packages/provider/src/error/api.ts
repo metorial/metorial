@@ -106,9 +106,27 @@ export let collectApiErrorDetails = (
   }
 };
 
-export let getApiErrorResponse = (error: unknown): ApiErrorResponse | undefined => {
-  if (!isApiErrorRecord(error) || !isApiErrorRecord(error.response)) {
+// Runtime axios instances from createAxios reject with SlateError (the raw
+// AxiosError is consumed by the response interceptor), so the upstream HTTP
+// status only survives inside SlateError.data — read it back from there or
+// every buildApiServiceError caller loses status-based handling in production.
+let getSlateErrorResponse = (error: Record<string, unknown>): ApiErrorResponse | undefined => {
+  if (error.name !== 'SlateError' || !isApiErrorRecord(error.data)) {
     return undefined;
+  }
+
+  let data = error.data;
+  let upstream = isApiErrorRecord(data.upstream) ? data.upstream : undefined;
+  let status = upstream?.status ?? data.status;
+  return typeof status === 'number' || typeof status === 'string' ? { status } : undefined;
+};
+
+export let getApiErrorResponse = (error: unknown): ApiErrorResponse | undefined => {
+  if (!isApiErrorRecord(error)) {
+    return undefined;
+  }
+  if (!isApiErrorRecord(error.response)) {
+    return getSlateErrorResponse(error);
   }
 
   let response = error.response;

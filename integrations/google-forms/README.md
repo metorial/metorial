@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/google.svg" height="20"> Google Forms
 
-Create, retrieve, and update Google Forms, surveys, and quizzes. Configure quiz answer keys with point values and automatic feedback. Retrieve form responses and quiz grades, with filtering by timestamp. Set up push notification watches for form schema changes and new response submissions. Supports various question types including short answer, paragraph, multiple choice, checkboxes, dropdowns, linear scales, date, time, and grid questions. Add images and videos to forms.
+Create, retrieve, publish, and update Google Forms, surveys, and quizzes. Configure quiz answer keys with point values and automatic feedback. Retrieve form responses and quiz grades, with filtering by timestamp. Set up push notification watches for form schema changes and new response submissions. Supports various question types including short answer, paragraph, multiple choice, checkboxes, dropdowns, linear scales, date, time, and grid questions. Add images and videos to forms.
 
 ## Tools
 
@@ -23,6 +23,10 @@ Lists all responses for a Google Form, with optional filtering by submission tim
 ### Manage Watches
 
 Creates, lists, renews, or deletes push notification watches on a Google Form. Watches deliver notifications to a Google Cloud Pub/Sub topic when form events occur. Supports two event types: **SCHEMA** (form structure/settings changes) and **RESPONSES** (new or updated response submissions).
+
+### Set Publish Settings
+
+Publishes or unpublishes a Google Form and controls whether a published form accepts new responses. The tool sets the complete publish state with Google's `publishState` field mask. Legacy forms that do not expose publish settings are not supported by the API.
 
 ### Update Form
 

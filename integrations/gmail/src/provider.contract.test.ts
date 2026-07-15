@@ -18,8 +18,10 @@ describe('gmail provider contract', () => {
       },
       toolIds: [
         'send_email',
+        'forward_message',
         'search_messages',
         'get_message',
+        'get_profile',
         'modify_message',
         'delete_messages_permanently',
         'manage_draft',
@@ -36,8 +38,10 @@ describe('gmail provider contract', () => {
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'send_email', readOnly: false, destructive: false },
+        { id: 'forward_message', readOnly: false, destructive: false },
         { id: 'search_messages', readOnly: true, destructive: false },
         { id: 'get_message', readOnly: true, destructive: false },
+        { id: 'get_profile', readOnly: true, destructive: false },
         { id: 'modify_message', readOnly: false, destructive: true },
         { id: 'delete_messages_permanently', readOnly: false, destructive: true },
         { id: 'manage_draft', readOnly: false, destructive: false },
@@ -56,13 +60,15 @@ describe('gmail provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(16);
+    expect(contract.actions).toHaveLength(18);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['userId']);
 
     let expectedScopes = {
       send_email: gmailActionScopes.sendEmail,
+      forward_message: gmailActionScopes.forwardMessage,
       search_messages: gmailActionScopes.searchMessages,
       get_message: gmailActionScopes.getMessage,
+      get_profile: gmailActionScopes.getProfile,
       modify_message: gmailActionScopes.modifyMessage,
       delete_messages_permanently: gmailActionScopes.deleteMessagesPermanently,
       manage_draft: gmailActionScopes.manageDraft,
@@ -159,6 +165,33 @@ describe('gmail provider contract', () => {
     expect(gmailActionScopes.manageThread).toEqual(expectedModifyScopes);
     expect(gmailActionScopes.deleteMessagesPermanently).toEqual(expectedPermanentDeleteScopes);
     expect(gmailActionScopes.deleteThreadPermanently).toEqual(expectedPermanentDeleteScopes);
+    expect(gmailActionScopes.forwardMessage).toEqual({
+      AND: [
+        {
+          OR: [gmailScopes.gmailReadonly, gmailScopes.gmailModify, gmailScopes.fullMail]
+        },
+        {
+          OR: [
+            gmailScopes.gmailSend,
+            gmailScopes.gmailCompose,
+            gmailScopes.gmailModify,
+            gmailScopes.fullMail
+          ]
+        }
+      ]
+    });
+    expect(gmailActionScopes.getProfile).toEqual({
+      AND: [
+        {
+          OR: [
+            gmailScopes.gmailReadonly,
+            gmailScopes.gmailCompose,
+            gmailScopes.gmailModify,
+            gmailScopes.fullMail
+          ]
+        }
+      ]
+    });
   });
 });
 

@@ -1,6 +1,8 @@
 export * from './delete-video';
+export * from './download-caption';
 export * from './get-channel';
 export * from './get-video';
+export * from './get-video-rating';
 export * from './list-activities';
 export * from './list-captions';
 export * from './list-comments';
@@ -13,5 +15,7 @@ export * from './manage-playlist-items';
 export * from './manage-subscriptions';
 export * from './rate-video';
 export * from './search-content';
+export * from './set-thumbnail';
 export * from './update-channel';
 export * from './update-video';
+export * from './upload-video';

@@ -39,6 +39,13 @@ export let googleContactsActionScopes = {
     googleContactsScopes.contactsOtherReadonly
   ),
   searchDirectory: anyOf(googleContactsScopes.directoryReadonly),
+  getMyProfile: anyOf(
+    googleContactsScopes.contacts,
+    googleContactsScopes.contactsReadonly,
+    googleContactsScopes.userInfoProfile
+  ),
+  manageContactPhoto: anyOf(googleContactsScopes.contacts),
+  batchModifyContacts: anyOf(googleContactsScopes.contacts),
   inboundWebhook: anyOf(googleContactsScopes.contactsReadonly, googleContactsScopes.contacts),
   contactChanged: anyOf(googleContactsScopes.contacts, googleContactsScopes.contactsReadonly)
 } as const;

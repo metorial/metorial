@@ -1,6 +1,7 @@
 export * from './create-course';
 export * from './create-coursework';
 export * from './delete-course';
+export * from './delete-coursework';
 export * from './get-course';
 export * from './get-user-profile';
 export * from './list-courses';
@@ -15,3 +16,4 @@ export * from './manage-rubrics';
 export * from './manage-submissions';
 export * from './manage-topics';
 export * from './update-course';
+export * from './update-coursework';
