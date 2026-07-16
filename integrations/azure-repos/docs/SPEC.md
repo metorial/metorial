@@ -16,13 +16,11 @@ Microsoft Entra ID authentication is the recommended approach for production app
 - **Resource URI**: `499b84ac-1321-427f-aa17-267ca6975798` (Azure DevOps resource identifier).
 - **Token endpoint**: Standard Microsoft Entra ID token endpoints (`https://login.microsoftonline.com/{tenantId}/oauth2/v2.0/token`).
 - **Tenant ID**: Required — the Microsoft Entra tenant associated with the Azure DevOps organization.
-- **Scopes for Azure Repos**:
-  - `vso.code` — Read source code, metadata about commits, branches, and other version control artifacts.
-  - `vso.code_write` — Read, update, and delete source code; create and manage pull requests.
-  - `vso.code_manage` — Full repository management including creating/deleting repositories.
-  - `vso.code_full` — Full access to all source code operations.
-  - `vso.code_status` — Read and write commit and pull request status.
-- Some scopes include others (for example, `vso.code_manage` includes `vso.code_write`).
+- **Scopes requested by this integration** (every declared scope is requested in production, so the list is the minimal covering set):
+  - `vso.code_manage` — Full repository management including creating/deleting repositories. Includes `vso.code_write` (read/write source code, pull requests) and `vso.code` (read), so those are not requested separately.
+  - `vso.hooks_write` — Create and manage the service hook subscriptions that power the triggers (code push, pull request, repository events).
+  - `vso.profile` — Read the authenticated user's profile (connection identity).
+- Not requested: `vso.code_full` and `vso.code_status` (no tool or trigger uses them). All Azure DevOps delegated permissions are user-consentable in Microsoft Entra (no admin-consent flags).
 - Supports service principals and managed identities for non-interactive scenarios.
 
 ### 2. Personal Access Tokens (PATs)

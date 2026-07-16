@@ -4,58 +4,17 @@ import { z } from 'zod';
 
 let scopes = [
   { title: 'Profile', description: 'Read user profile', scope: 'vso.profile' },
-  {
-    title: 'Identity',
-    description: 'Read identities and groups',
-    scope: 'vso.identity',
-    defaultChecked: false
-  },
   { title: 'Project Read', description: 'Read projects and teams', scope: 'vso.project' },
   {
-    title: 'Project Manage',
-    description: 'Create and manage projects',
-    scope: 'vso.project_manage',
-    defaultChecked: false
-  },
-  {
-    title: 'Work Items Read',
-    description: 'Read work items, boards, and queries',
-    scope: 'vso.work',
-    defaultChecked: false
-  },
-  {
     title: 'Work Items Write',
-    description: 'Create and update work items',
-    scope: 'vso.work_write',
-    defaultChecked: false
-  },
-  {
-    title: 'Work Items Full',
-    description: 'Full access to work items including delete',
-    scope: 'vso.work_full'
-  },
-  {
-    title: 'Code Read',
-    description: 'Read repositories and code',
-    scope: 'vso.code',
-    defaultChecked: false
-  },
-  {
-    title: 'Code Write',
-    description: 'Read and write repositories',
-    scope: 'vso.code_write',
-    defaultChecked: false
+    description: 'Read, create, update, and delete work items, boards, and queries',
+    scope: 'vso.work_write'
   },
   {
     title: 'Code Manage',
-    description: 'Full access to code repositories',
+    description:
+      'Read repositories and code, manage pull requests, and create repositories',
     scope: 'vso.code_manage'
-  },
-  {
-    title: 'Build Read',
-    description: 'Read build pipelines and results',
-    scope: 'vso.build',
-    defaultChecked: false
   },
   {
     title: 'Build Execute',
@@ -63,27 +22,14 @@ let scopes = [
     scope: 'vso.build_execute'
   },
   {
-    title: 'Wiki Read',
-    description: 'Read Azure DevOps wikis and pages',
-    scope: 'vso.wiki',
-    defaultChecked: false
-  },
-  {
     title: 'Wiki Write',
-    description: 'Create and update Azure DevOps wikis and pages',
+    description: 'Read, create, and update Azure DevOps wikis and pages',
     scope: 'vso.wiki_write'
   },
   {
-    title: 'Release Manage',
-    description: 'Manage release pipelines',
-    scope: 'vso.release_manage',
-    defaultChecked: false
-  },
-  {
     title: 'Service Hooks Write',
-    description: 'Create and manage service hook subscriptions',
-    scope: 'vso.hooks_write',
-    defaultChecked: false
+    description: 'Create and manage the service hook subscriptions that power triggers',
+    scope: 'vso.hooks_write'
   }
 ];
 

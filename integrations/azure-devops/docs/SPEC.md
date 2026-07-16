@@ -25,17 +25,19 @@ The recommended approach for new production applications. Register an applicatio
 - Microsoft Entra apps don't natively support Microsoft account (MSA) users for the Azure DevOps resource.
 - Requires: `client_id`, `client_secret`, `tenant_id`, and the organization name.
 
-**Granular Scopes** (used in both Entra ID and legacy OAuth): Scopes follow the `vso.*` naming convention. Key scopes include:
+**Granular Scopes** (used in both Entra ID and legacy OAuth): Scopes follow the `vso.*` naming convention. Higher tiers include lower ones (for example, `vso.code_manage` includes `vso.code_write` which includes `vso.code`).
 
-- `vso.work` / `vso.work_write` / `vso.work_full` — Work items
-- `vso.code` / `vso.code_write` / `vso.code_manage` — Code/repos
-- `vso.build` / `vso.build_execute` — Build pipelines
-- `vso.release_manage` — Release pipelines
-- `vso.project` / `vso.project_manage` — Projects
-- `vso.profile` — User profiles
-- `vso.identity` — Identities
-- `vso.hooks_write` — Service hooks
-- Some scopes include others (for example, `vso.code_manage` includes `vso.code_write`).
+Scopes requested by this integration (every declared scope is requested in production, so the list is the minimal covering set — one scope per resource family a tool or trigger needs):
+
+- `vso.profile` — User profile (connection identity)
+- `vso.project` — Read projects and teams
+- `vso.work_write` — Read, create, update, and delete work items (includes `vso.work`; the work-item delete API is covered by `vso.work_write`, so `vso.work_full` is not needed)
+- `vso.code_manage` — Repositories, code reads, and pull requests, including repository creation (includes `vso.code_write` and `vso.code`)
+- `vso.build_execute` — Read and run build pipelines (includes `vso.build`)
+- `vso.wiki_write` — Read, create, and update wikis and pages (includes `vso.wiki`)
+- `vso.hooks_write` — Create and manage the service hook subscriptions that power the triggers
+
+Not requested: `vso.identity`, `vso.project_manage`, `vso.release_manage`, and `vso.work_full` (no tool or trigger uses them). All Azure DevOps delegated permissions are user-consentable in Microsoft Entra (no admin-consent flags).
 
 ### 2. Personal Access Tokens (PATs)
 

@@ -5,33 +5,15 @@ import { toAzureDevOpsAuthHeader } from './lib/auth';
 
 let scopes = [
   {
-    title: 'Code Read',
-    description:
-      'Read source code, metadata about commits, branches, and other version control artifacts.',
-    scope: 'vso.code',
-    defaultChecked: false
-  },
-  {
-    title: 'Code Read & Write',
-    description: 'Read, update, and delete source code; create and manage pull requests.',
-    scope: 'vso.code_write',
-    defaultChecked: false
-  },
-  {
     title: 'Code Manage',
-    description: 'Full repository management including creating/deleting repositories.',
+    description:
+      'Read and write source code, manage pull requests, and create or delete repositories.',
     scope: 'vso.code_manage'
   },
   {
-    title: 'Code Full',
-    description: 'Full access to all source code operations.',
-    scope: 'vso.code_full'
-  },
-  {
-    title: 'Code Status',
-    description: 'Read and write commit and pull request status.',
-    scope: 'vso.code_status',
-    defaultChecked: false
+    title: 'Service Hooks Write',
+    description: 'Create and manage the service hook subscriptions that power triggers.',
+    scope: 'vso.hooks_write'
   },
   {
     title: 'Profile',
