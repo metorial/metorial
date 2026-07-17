@@ -343,7 +343,7 @@ export class Client {
   }
 
   async bulkEnrichPeople(params: BulkPersonEnrichmentParams): Promise<{
-    matches: ApolloPerson[];
+    matches: Array<ApolloPerson | null>;
     totalRequested: number;
     uniqueEnriched: number;
     creditsConsumed: number;
