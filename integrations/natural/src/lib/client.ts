@@ -1,6 +1,8 @@
 import { createAuthenticatedAxios, requestAxiosData } from 'slates';
 import type { NaturalRecord } from './envelopes';
-import { naturalApiError, naturalServiceError } from './errors';
+import { naturalApiError, naturalAxiosErrorMapping, naturalServiceError } from './errors';
+
+export const NATURAL_API_BASE_URL = 'https://api.natural.com';
 
 export type NaturalAuth = {
   token: string;
@@ -18,6 +20,11 @@ type RequestOptions = {
   idempotencyKey?: string;
   agentId?: string;
   instanceId?: string;
+  /**
+   * Require an instance ID for agent-key requests that perform agent-attributed money movement.
+   * Party and unknown key types keep their existing header behavior.
+   */
+  requiresAgentInstance?: boolean;
 };
 
 const serializeParams = (params: NaturalRecord) => {
@@ -44,12 +51,12 @@ export class NaturalClient {
 
   constructor(private readonly options: { auth: NaturalAuth; config?: NaturalConfig }) {
     this.axios = createAuthenticatedAxios({
-      baseURL: 'https://api.natural.co',
+      baseURL: NATURAL_API_BASE_URL,
       authHeader: {
         value: `Bearer ${options.auth.token}`
       },
       paramsSerializer: { serialize: serializeParams },
-      errorAdapter: naturalApiError
+      errorMapping: naturalAxiosErrorMapping
     });
   }
 
@@ -72,6 +79,16 @@ export class NaturalClient {
       }
 
       headers['X-Agent-ID'] = agentId;
+    }
+
+    if (
+      options.requiresAgentInstance &&
+      this.options.auth.keyType === 'agent_key' &&
+      (typeof instanceId !== 'string' || instanceId.trim().length === 0)
+    ) {
+      throw naturalServiceError(
+        'X-Instance-ID is required for agent-attributed money movement when using a Natural agent key. Configure instanceId or provide it for this request.'
+      );
     }
 
     if (instanceId) headers['X-Instance-ID'] = instanceId;

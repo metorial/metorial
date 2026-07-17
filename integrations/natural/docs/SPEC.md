@@ -2,13 +2,13 @@
 
 ## Overview
 
-Natural is an agentic payments platform for wallet, payment, transfer, delegation, approval, key, webhook, and event workflows. The integration is REST-first and follows Natural OpenAPI 3.1.1, API version `0.2.0`, using `https://api.natural.co` as the base URL.
+Natural is an agentic payments platform for wallet, payment, transfer, delegation, approval, key, webhook, and event workflows. The integration is REST-first and follows Natural OpenAPI 3.1.1, API version `0.2.0`, using `https://api.natural.com` as the base URL.
 
 ## Authentication And Configuration
 
 Authentication uses a token auth secret named `apiKey`. Party keys use the `sk_ntl_` prefix and agent keys use the `ak_ntl_` prefix. The client sends `Authorization: Bearer <token>` and `Content-Type: application/json`.
 
-Configuration supports optional `agentId` and `instanceId` values. When an `X-Agent-ID` header is sent, the client also requires and sends `X-Instance-ID`. If the credential prefix indicates an agent key, configured `agentId` usage is rejected because agent keys are already bound to one agent.
+Configuration supports optional `agentId` and `instanceId` values. `instanceId` must contain 1-1024 characters. When an `X-Agent-ID` header is sent, the client also requires and sends `X-Instance-ID`. If the credential prefix indicates an agent key, configured `agentId` usage is rejected because agent keys are already bound to one agent.
 
 ## API Model
 

@@ -3,6 +3,7 @@ import { spec } from './spec';
 import {
   approveApproval,
   cancelPayment,
+  cancelPaymentRequest,
   createAgent,
   createAgentKey,
   createApiKey,
@@ -59,16 +60,19 @@ import {
   revokeCustomerAgent,
   revokeCustomerInvitation,
   revokePartyInvitation,
+  rotateAgentKey,
   rotateWebhookSecret,
   updateAgent,
   updateParty,
   updateWebhook,
+  whoAmI,
   withdrawFunds
 } from './tools';
 
 export const provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
     listAgents,
     createAgent,
     getAgent,
@@ -97,6 +101,7 @@ export const provider = Slate.create({
     listIncomingPaymentRequests,
     createPaymentRequest,
     getPaymentRequest,
+    cancelPaymentRequest,
     fulfillPaymentRequest,
     declinePaymentRequest,
     listTransactions,
@@ -124,6 +129,7 @@ export const provider = Slate.create({
     listAgentKeys,
     createAgentKey,
     revokeAgentKey,
+    rotateAgentKey,
     listWebhooks,
     createWebhook,
     getWebhook,

@@ -12,8 +12,7 @@ let scopes = [
   },
   {
     title: 'Code Manage',
-    description:
-      'Read repositories and code, manage pull requests, and create repositories',
+    description: 'Read repositories and code, manage pull requests, and create repositories',
     scope: 'vso.code_manage'
   },
   {

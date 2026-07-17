@@ -9,7 +9,12 @@ export const config = SlateConfig.create(
       .describe('Optional default Natural agent ID to send as X-Agent-ID for party API keys.'),
     instanceId: z
       .string()
+      .trim()
+      .min(1)
+      .max(1024)
       .optional()
-      .describe('Optional default Natural instance ID to send as X-Instance-ID.')
+      .describe(
+        'Optional default Natural instance ID to send as X-Instance-ID (1-1024 characters).'
+      )
   })
 );
