@@ -14,6 +14,15 @@ export interface ConfigOutput {
   baseUrl?: string;
 }
 
+export let resolveContentIdAlias = (input: { pageId?: string; contentId?: string }) => {
+  let selectedId = input.pageId !== undefined ? input.pageId : input.contentId;
+  return selectedId?.trim() || undefined;
+};
+
+export let resolveLimitAlias = (input: { limit?: number; maxResults?: number }) => {
+  return input.limit ?? input.maxResults ?? 25;
+};
+
 export let createClient = (auth: AuthOutput, config: ConfigOutput): ConfluenceClient => {
   let cloudId = auth.cloudId || config.cloudId;
   let providedBaseUrl = auth.baseUrl || config.baseUrl;

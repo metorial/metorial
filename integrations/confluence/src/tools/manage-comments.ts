@@ -1,6 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { confluenceServiceError } from '../lib/errors';
+import { createClient, resolveContentIdAlias, resolveLimitAlias } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getComments = SlateTool.create(spec, {
@@ -11,8 +12,24 @@ export let getComments = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageId: z.string().describe('The page ID to get comments for'),
-      limit: z.number().optional().default(25).describe('Maximum number of comments'),
+      pageId: z
+        .string()
+        .optional()
+        .describe('The page ID to get comments for. Use this field for new calls.'),
+      contentId: z
+        .string()
+        .optional()
+        .describe('Compatibility alias for pageId, used only when pageId is omitted.'),
+      limit: z
+        .number()
+        .optional()
+        .describe('Maximum number of comments. Defaults to 25 when omitted.'),
+      maxResults: z
+        .number()
+        .optional()
+        .describe(
+          'Compatibility alias for limit, used only when limit is omitted. Defaults to 25 when both fields are omitted.'
+        ),
       cursor: z.string().optional().describe('Pagination cursor')
     })
   )
@@ -32,9 +49,14 @@ export let getComments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let pageId = resolveContentIdAlias(ctx.input);
+    if (!pageId) {
+      throw confluenceServiceError('Provide a pageId or contentId to get comments.');
+    }
+
     let client = createClient(ctx.auth, ctx.config);
-    let response = await client.getPageFooterComments(ctx.input.pageId, {
-      limit: ctx.input.limit,
+    let response = await client.getPageFooterComments(pageId, {
+      limit: resolveLimitAlias(ctx.input),
       cursor: ctx.input.cursor
     });
 
@@ -56,7 +78,7 @@ export let getComments = SlateTool.create(spec, {
 
     return {
       output: { comments, nextCursor },
-      message: `Found **${comments.length}** comments on page ${ctx.input.pageId}`
+      message: `Found **${comments.length}** comments on page ${pageId}`
     };
   })
   .build();

@@ -1,6 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { confluenceServiceError } from '../lib/errors';
+import { createClient, resolveContentIdAlias } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getPageChildren = SlateTool.create(spec, {
@@ -11,7 +12,14 @@ export let getPageChildren = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageId: z.string().describe('The parent page ID'),
+      pageId: z
+        .string()
+        .optional()
+        .describe('The parent page ID. Use this field for new calls.'),
+      contentId: z
+        .string()
+        .optional()
+        .describe('Compatibility alias for pageId, used only when pageId is omitted.'),
       limit: z
         .number()
         .optional()
@@ -36,8 +44,13 @@ export let getPageChildren = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let pageId = resolveContentIdAlias(ctx.input);
+    if (!pageId) {
+      throw confluenceServiceError('Provide a pageId or contentId to get page children.');
+    }
+
     let client = createClient(ctx.auth, ctx.config);
-    let response = await client.getPageChildren(ctx.input.pageId, {
+    let response = await client.getPageChildren(pageId, {
       limit: ctx.input.limit,
       cursor: ctx.input.cursor
     });
@@ -58,7 +71,7 @@ export let getPageChildren = SlateTool.create(spec, {
 
     return {
       output: { children, nextCursor },
-      message: `Found **${children.length}** child pages under page ${ctx.input.pageId}`
+      message: `Found **${children.length}** child pages under page ${pageId}`
     };
   })
   .build();

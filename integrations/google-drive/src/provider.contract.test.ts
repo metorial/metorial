@@ -4,6 +4,7 @@ import {
   expectSlateContract
 } from '@slates/test';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { provider } from './index';
 import { googleDriveActionScopes } from './scopes';
 
@@ -130,3 +131,14 @@ describe('google-drive provider contract', () => {
 });
 
 describeMcpCompatibleToolSchemas('Google Drive tool input schemas', provider.actions);
+
+describe('Google Drive search_files input schema', () => {
+  it('exports the documented files.list pageSize maximum', () => {
+    let action = provider.actions.find(child => child.key === 'search_files');
+    let inputSchema = z.toJSONSchema(action?.inputSchema ?? z.object({})) as {
+      properties?: Record<string, { maximum?: number }>;
+    };
+
+    expect(inputSchema.properties?.pageSize?.maximum).toBe(1000);
+  });
+});

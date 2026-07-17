@@ -78,14 +78,12 @@ describe('GoogleDriveClient pagination validation', () => {
   it('rejects page sizes outside the Drive files.list range', () => {
     expect(normalizeGoogleDrivePageSize(undefined)).toBe(GOOGLE_DRIVE_DEFAULT_PAGE_SIZE);
     expect(normalizeGoogleDrivePageSize(1)).toBe(1);
-    expect(normalizeGoogleDrivePageSize(GOOGLE_DRIVE_MAX_PAGE_SIZE)).toBe(
-      GOOGLE_DRIVE_MAX_PAGE_SIZE
-    );
+    expect(normalizeGoogleDrivePageSize(200)).toBe(200);
+    expect(GOOGLE_DRIVE_MAX_PAGE_SIZE).toBe(1000);
+    expect(normalizeGoogleDrivePageSize(1000)).toBe(1000);
 
     expect(() => normalizeGoogleDrivePageSize(0)).toThrow(ServiceError);
-    expect(() => normalizeGoogleDrivePageSize(GOOGLE_DRIVE_MAX_PAGE_SIZE + 1)).toThrow(
-      ServiceError
-    );
+    expect(() => normalizeGoogleDrivePageSize(1001)).toThrow(ServiceError);
     expect(() => normalizeGoogleDrivePageSize(1.5)).toThrow(ServiceError);
   });
 
@@ -351,5 +349,35 @@ describe('GoogleDriveClient download guards', () => {
         upstreamStatus: 404
       }
     });
+  });
+});
+
+describe('GoogleDriveClient export guards', () => {
+  it.each([
+    ['a regular Drive file', 'text/plain', 'notes.txt', 'Use the **Download File** tool'],
+    [
+      'an unsupported Google Workspace item',
+      'application/vnd.google-apps.folder',
+      'Folder',
+      'Drive does not provide an export format'
+    ],
+    [
+      'a Google Vids file',
+      'application/vnd.google-apps.vid',
+      'Project video',
+      'Google Vids cannot be exported, and downloading Google Vids is not currently supported by this integration. Use the Google Drive `files.download` API outside this integration.'
+    ]
+  ])('rejects %s with an actionable ServiceError', async (_case, mimeType, name, guidance) => {
+    axiosMocks.api.get.mockResolvedValue({ data: { mimeType, name } });
+
+    let client = new GoogleDriveClient('token');
+
+    await expect(client.exportFile('text-file-id', 'application/pdf')).rejects.toMatchObject({
+      message: expect.stringContaining(guidance),
+      data: {
+        reason: 'google_drive_file_not_exportable'
+      }
+    });
+    expect(axiosMocks.api.get).toHaveBeenCalledTimes(1);
   });
 });

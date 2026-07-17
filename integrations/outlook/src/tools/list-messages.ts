@@ -76,7 +76,22 @@ export let listMessages = SlateTool.create(spec, {
       filter: ctx.input.filter,
       orderby: ctx.input.orderby || 'receivedDateTime desc',
       top: ctx.input.top || 10,
-      skip: ctx.input.skip
+      skip: ctx.input.skip,
+      select: [
+        'id',
+        'subject',
+        'bodyPreview',
+        'from',
+        'toRecipients',
+        'receivedDateTime',
+        'isRead',
+        'isDraft',
+        'importance',
+        'hasAttachments',
+        'conversationId',
+        'webLink',
+        'categories'
+      ]
     });
 
     let messages = result.value.map(msg => ({

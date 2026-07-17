@@ -1,6 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { confluenceServiceError } from '../lib/errors';
+import { createClient, resolveContentIdAlias } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getPage = SlateTool.create(spec, {
@@ -11,7 +12,14 @@ export let getPage = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pageId: z.string().describe('The ID of the page to retrieve'),
+      pageId: z
+        .string()
+        .optional()
+        .describe('The ID of the page to retrieve. Use this field for new calls.'),
+      contentId: z
+        .string()
+        .optional()
+        .describe('Compatibility alias for pageId, used only when pageId is omitted.'),
       includeBody: z
         .boolean()
         .optional()
@@ -38,8 +46,13 @@ export let getPage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let pageId = resolveContentIdAlias(ctx.input);
+    if (!pageId) {
+      throw confluenceServiceError('Provide a pageId or contentId to retrieve a page.');
+    }
+
     let client = createClient(ctx.auth, ctx.config);
-    let page = await client.getPageById(ctx.input.pageId, ctx.input.includeBody);
+    let page = await client.getPageById(pageId, ctx.input.includeBody);
 
     return {
       output: {

@@ -21,10 +21,18 @@ let FILE_FIELDS =
 /** Max bytes returned in one **Download File** response (base64 in JSON); avoids MCP / JSON payload limits. */
 export let MAX_DRIVE_DOWNLOAD_BYTES = 6 * 1024 * 1024;
 export let GOOGLE_DRIVE_DEFAULT_PAGE_SIZE = 100;
-export let GOOGLE_DRIVE_MAX_PAGE_SIZE = 100;
+export let GOOGLE_DRIVE_MAX_PAGE_SIZE = 1000;
 export let GOOGLE_DRIVE_CHANGES_MAX_PAGE_SIZE = 1000;
 
 const GOOGLE_WORKSPACE_MIME_PREFIX = 'application/vnd.google-apps.';
+const GOOGLE_VIDS_MIME_TYPE = 'application/vnd.google-apps.vid';
+const EXPORTABLE_GOOGLE_WORKSPACE_MIME_TYPES = new Set([
+  'application/vnd.google-apps.document',
+  'application/vnd.google-apps.spreadsheet',
+  'application/vnd.google-apps.presentation',
+  'application/vnd.google-apps.drawing',
+  'application/vnd.google-apps.script'
+]);
 const INVALID_PAGE_TOKEN_PLACEHOLDERS = new Set([
   '(no output)',
   'no output',
@@ -480,6 +488,20 @@ export class GoogleDriveClient {
     fileId: string,
     exportMimeType: string
   ): Promise<{ contentBase64: string; mimeType?: string; byteLength: number }> {
+    let meta = await this.getFileLightMeta(fileId);
+    if (!meta.mimeType || !EXPORTABLE_GOOGLE_WORKSPACE_MIME_TYPES.has(meta.mimeType)) {
+      let guidance =
+        meta.mimeType === GOOGLE_VIDS_MIME_TYPE
+          ? 'Google Vids cannot be exported, and downloading Google Vids is not currently supported by this integration. Use the Google Drive `files.download` API outside this integration.'
+          : meta.mimeType?.startsWith(GOOGLE_WORKSPACE_MIME_PREFIX)
+            ? 'Drive does not provide an export format for this type of Google Workspace item.'
+            : 'Drive only exports Google Workspace files. Use the **Download File** tool instead.';
+      throw createApiServiceError(
+        `This file cannot be exported (${meta.mimeType ?? 'unknown MIME type'}${meta.name ? `, "${meta.name}"` : ''}). ${guidance}`,
+        { reason: 'google_drive_file_not_exportable' }
+      );
+    }
+
     let response: any;
     try {
       response = await this.api.get(`/files/${encodeURIComponent(fileId)}/export`, {

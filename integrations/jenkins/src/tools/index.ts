@@ -202,33 +202,67 @@ let buildChangeSetSchema = z.object({
 });
 
 let testSuiteSchema = z.object({
-  name: z.string().optional().describe('JUnit suite name.'),
-  id: z.string().optional().describe('Jenkins suite id.'),
+  name: z.string().optional().describe('JUnit suite name, capped at 4,000 UTF-8 bytes.'),
+  id: z.string().optional().describe('Jenkins suite id, capped at 4,000 UTF-8 bytes.'),
   duration: z.number().optional().describe('Suite duration in seconds.'),
   totalCount: z.number().optional().describe('Number of test cases in the suite.'),
   failCount: z.number().optional().describe('Number of failed cases in the suite.'),
   skipCount: z.number().optional().describe('Number of skipped cases in the suite.'),
   passCount: z.number().optional().describe('Number of passed cases in the suite.'),
-  timestamp: z.string().optional().describe('Suite timestamp when Jenkins exposes one.'),
-  stdout: z.string().optional().describe('Suite stdout when Jenkins exposes it.'),
-  stderr: z.string().optional().describe('Suite stderr when Jenkins exposes it.')
+  timestamp: z
+    .string()
+    .optional()
+    .describe('Suite timestamp when Jenkins exposes one, capped at 4,000 UTF-8 bytes.'),
+  stdout: z
+    .string()
+    .optional()
+    .describe('Suite stdout, capped at 4,000 UTF-8 bytes with a truncation marker.'),
+  stderr: z
+    .string()
+    .optional()
+    .describe('Suite stderr, capped at 4,000 UTF-8 bytes with a truncation marker.')
 });
 
 let testCaseSchema = z.object({
-  className: z.string().optional().describe('JUnit test class name.'),
-  name: z.string().optional().describe('JUnit test case name.'),
-  status: z.string().optional().describe('Jenkins case status, such as PASSED or FAILED.'),
+  className: z
+    .string()
+    .optional()
+    .describe('JUnit test class name, capped at 4,000 UTF-8 bytes.'),
+  name: z.string().optional().describe('JUnit test case name, capped at 4,000 UTF-8 bytes.'),
+  status: z
+    .string()
+    .optional()
+    .describe('Jenkins case status, such as PASSED or FAILED, capped at 4,000 UTF-8 bytes.'),
   age: z.number().optional().describe('Consecutive failing build age for this case.'),
   duration: z.number().optional().describe('Case duration in seconds.'),
-  errorDetails: z.string().optional().describe('Failure message, when present.'),
-  errorStackTrace: z.string().optional().describe('Failure stack trace, when present.'),
+  errorDetails: z
+    .string()
+    .optional()
+    .describe('Failure message, capped at 4,000 UTF-8 bytes with a truncation marker.'),
+  errorStackTrace: z
+    .string()
+    .optional()
+    .describe('Failure stack trace, capped at 4,000 UTF-8 bytes with a truncation marker.'),
   failedSince: z.number().optional().describe('Build number where this case started failing.'),
   skipped: z.boolean().optional().describe('Whether Jenkins marks this case as skipped.'),
-  skippedMessage: z.string().optional().describe('Skip reason, when Jenkins exposes one.'),
-  stdout: z.string().optional().describe('Case stdout when Jenkins exposes it.'),
-  stderr: z.string().optional().describe('Case stderr when Jenkins exposes it.'),
-  properties: rawRecordSchema.optional().describe('JUnit case properties, when present.'),
-  raw: rawRecordSchema.optional()
+  skippedMessage: z
+    .string()
+    .optional()
+    .describe('Skip reason, capped at 4,000 UTF-8 bytes with a truncation marker.'),
+  stdout: z
+    .string()
+    .optional()
+    .describe('Case stdout, capped at 4,000 UTF-8 bytes with a truncation marker.'),
+  stderr: z
+    .string()
+    .optional()
+    .describe('Case stderr, capped at 4,000 UTF-8 bytes with a truncation marker.'),
+  properties: rawRecordSchema
+    .optional()
+    .describe('JUnit case properties when they fit within the aggregate response budget.'),
+  raw: rawRecordSchema
+    .optional()
+    .describe('Raw Jenkins case data when includeRaw is requested and budget permits.')
 });
 
 let flakyFailureSchema = z.object({
@@ -409,6 +443,75 @@ let nonEmptyRecord = (value: unknown) => {
 
 let normalizedTestStatus = (value: unknown) => asString(value)?.toUpperCase();
 
+export let testResultsOutputBudgetBytes = 1_000_000;
+export let testResultTextBudgetBytes = 4000;
+export let testResultTruncationSuffix = '\n...[truncated]';
+
+let serializedUtf8Bytes = (value: unknown) =>
+  Buffer.byteLength(JSON.stringify(value) ?? '', 'utf8');
+
+let serializedUtf8BytesUpTo = (value: unknown, maxBytes: number) => {
+  let lowerBoundBytes = 0;
+  let budgetExceeded = Symbol('Jenkins serialized output budget exceeded');
+  let serialized: string | undefined;
+
+  try {
+    serialized = JSON.stringify(value, function (key, currentValue) {
+      if (key && !Array.isArray(this)) {
+        lowerBoundBytes += Buffer.byteLength(key, 'utf8');
+      }
+      if (typeof currentValue === 'string') {
+        lowerBoundBytes += Buffer.byteLength(currentValue, 'utf8');
+      } else if (
+        typeof currentValue === 'number' ||
+        typeof currentValue === 'boolean' ||
+        currentValue === null
+      ) {
+        lowerBoundBytes += 1;
+      }
+
+      if (lowerBoundBytes >= maxBytes) throw budgetExceeded;
+      return currentValue;
+    });
+  } catch (error) {
+    if (error === budgetExceeded) return maxBytes;
+    throw error;
+  }
+
+  return Buffer.byteLength(serialized ?? '', 'utf8');
+};
+
+export let truncateUtf8Text = (value: unknown, maxBytes = testResultTextBudgetBytes) => {
+  let text = asString(value);
+  if (!text) return { text: undefined, truncated: false };
+  if (Buffer.byteLength(text, 'utf8') <= maxBytes) return { text, truncated: false };
+
+  let suffixBytes = Buffer.byteLength(testResultTruncationSuffix, 'utf8');
+  let suffix = suffixBytes <= maxBytes ? testResultTruncationSuffix : '';
+  let contentBudget = Math.max(0, maxBytes - Buffer.byteLength(suffix, 'utf8'));
+  let prefix = '';
+  let prefixBytes = 0;
+
+  for (let codePoint of text) {
+    let codePointBytes = Buffer.byteLength(codePoint, 'utf8');
+    if (prefixBytes + codePointBytes > contentBudget) break;
+    prefix += codePoint;
+    prefixBytes += codePointBytes;
+  }
+
+  return { text: `${prefix}${suffix}`, truncated: true };
+};
+
+type TestResultProjectionStats = {
+  truncatedTextFieldCount: number;
+};
+
+let boundedTestResultText = (value: unknown, stats?: TestResultProjectionStats) => {
+  let result = truncateUtf8Text(value);
+  if (result.truncated && stats) stats.truncatedTextFieldCount += 1;
+  return result.text;
+};
+
 let isFailingTestStatus = (status: string | undefined) =>
   status === 'FAILED' || status === 'REGRESSION';
 
@@ -436,53 +539,67 @@ let countsFromCases = (cases: { status?: string; skipped?: boolean }[]) => {
   };
 };
 
-let testSuitesFromReport = (report: JenkinsRecord) => {
+export let testSuitesFromReport = (
+  report: JenkinsRecord,
+  stats?: TestResultProjectionStats
+) => {
   let suites: z.infer<typeof testSuiteSchema>[] = [];
 
   for (let suite of asArray(report.suites)) {
     let record = asRecord(suite);
-    let cases = testCasesFromSuite(record, false);
-    let counts = countsFromCases(cases);
+    let counts = countsFromCases(
+      asArray(record.cases).map(value => {
+        let testCase = asRecord(value);
+        return {
+          status: asString(testCase.status),
+          skipped: asBoolean(testCase.skipped)
+        };
+      })
+    );
     suites.push({
-      name: asString(record.name),
-      id: asString(record.id),
+      name: boundedTestResultText(record.name, stats),
+      id: boundedTestResultText(record.id, stats),
       duration: asNumber(record.duration),
       totalCount: asNumber(record.totalCount) ?? counts.totalCount,
       failCount: asNumber(record.failCount) ?? counts.failCount,
       skipCount: asNumber(record.skipCount) ?? counts.skipCount,
       passCount: asNumber(record.passCount) ?? counts.passCount,
-      timestamp: asString(record.timestamp),
-      stdout: asString(record.stdout),
-      stderr: asString(record.stderr)
+      timestamp: boundedTestResultText(record.timestamp, stats),
+      stdout: boundedTestResultText(record.stdout, stats),
+      stderr: boundedTestResultText(record.stderr, stats)
     });
   }
 
   for (let child of asArray(report.childReports)) {
     let childReport = asRecord(asRecord(child).result);
-    suites.push(...testSuitesFromReport(childReport));
+    suites.push(...testSuitesFromReport(childReport, stats));
   }
 
   return suites;
 };
 
-let testCasesFromSuite = (suite: JenkinsRecord, includeRaw: boolean) => {
+let testCasesFromSuite = (
+  suite: JenkinsRecord,
+  stats?: TestResultProjectionStats,
+  includeRaw = false
+) => {
   let cases: z.infer<typeof testCaseSchema>[] = [];
 
   for (let testCase of asArray(suite.cases)) {
     let record = asRecord(testCase);
     cases.push({
-      className: asString(record.className),
-      name: asString(record.name),
-      status: asString(record.status),
+      className: boundedTestResultText(record.className, stats),
+      name: boundedTestResultText(record.name, stats),
+      status: boundedTestResultText(record.status, stats),
       age: asNumber(record.age),
       duration: asNumber(record.duration),
-      errorDetails: asString(record.errorDetails),
-      errorStackTrace: asString(record.errorStackTrace),
+      errorDetails: boundedTestResultText(record.errorDetails, stats),
+      errorStackTrace: boundedTestResultText(record.errorStackTrace, stats),
       failedSince: asNumber(record.failedSince),
       skipped: asBoolean(record.skipped),
-      skippedMessage: asString(record.skippedMessage),
-      stdout: asString(record.stdout),
-      stderr: asString(record.stderr),
+      skippedMessage: boundedTestResultText(record.skippedMessage, stats),
+      stdout: boundedTestResultText(record.stdout, stats),
+      stderr: boundedTestResultText(record.stderr, stats),
       properties: nonEmptyRecord(record.properties),
       raw: includeRaw ? record : undefined
     });
@@ -491,19 +608,191 @@ let testCasesFromSuite = (suite: JenkinsRecord, includeRaw: boolean) => {
   return cases;
 };
 
-let testCasesFromReport = (report: JenkinsRecord, includeRaw = true) => {
+export let testCasesFromReport = (
+  report: JenkinsRecord,
+  stats?: TestResultProjectionStats,
+  includeRaw = false
+) => {
   let cases: z.infer<typeof testCaseSchema>[] = [];
 
   for (let suite of asArray(report.suites)) {
-    cases.push(...testCasesFromSuite(asRecord(suite), includeRaw));
+    cases.push(...testCasesFromSuite(asRecord(suite), stats, includeRaw));
   }
 
   for (let child of asArray(report.childReports)) {
     let childReport = asRecord(asRecord(child).result);
-    cases.push(...testCasesFromReport(childReport, includeRaw));
+    cases.push(...testCasesFromReport(childReport, stats, includeRaw));
   }
 
   return cases;
+};
+
+export let buildTestResultsResponse = (params: {
+  jobFullName: string;
+  buildNumber: number;
+  report: JenkinsRecord;
+  onlyFailingTests: boolean;
+  includeCases: boolean;
+  maxCases: number;
+  includeRawRequested: boolean;
+}) => {
+  let failCount = asNumber(params.report.failCount);
+  let skipCount = asNumber(params.report.skipCount);
+  let passCount = asNumber(params.report.passCount);
+  let totalCount =
+    asNumber(params.report.totalCount) ??
+    (failCount !== undefined && skipCount !== undefined && passCount !== undefined
+      ? failCount + skipCount + passCount
+      : undefined);
+  passCount =
+    passCount ??
+    (totalCount !== undefined && failCount !== undefined && skipCount !== undefined
+      ? Math.max(totalCount - failCount - skipCount, 0)
+      : undefined);
+
+  let projectionStats: TestResultProjectionStats = { truncatedTextFieldCount: 0 };
+  let suites = testSuitesFromReport(params.report, projectionStats);
+  let allCases = params.includeCases
+    ? testCasesFromReport(params.report, projectionStats, params.includeRawRequested)
+    : [];
+  let matchingCases = params.onlyFailingTests
+    ? allCases.filter(testCase => isFailingTestStatus(normalizedTestStatus(testCase.status)))
+    : allCases;
+  let candidateCases = params.includeCases ? matchingCases.slice(0, params.maxCases) : [];
+  let jobFullNameResult = truncateUtf8Text(params.jobFullName);
+  if (jobFullNameResult.truncated) projectionStats.truncatedTextFieldCount += 1;
+  let safeJobFullName = jobFullNameResult.text ?? '';
+
+  let outputBase = {
+    jobFullName: safeJobFullName,
+    buildNumber: params.buildNumber,
+    totalCount,
+    failCount,
+    skipCount,
+    passCount,
+    duration: asNumber(params.report.duration),
+    onlyFailingTests: params.onlyFailingTests,
+    suiteCount: suites.length,
+    returnedSuiteCount: suites.length,
+    truncatedSuites: false,
+    caseCount: params.includeCases ? matchingCases.length : undefined,
+    returnedCaseCount: params.includeCases ? candidateCases.length : undefined,
+    truncatedCases: params.includeCases
+      ? matchingCases.length > candidateCases.length
+      : undefined,
+    truncatedTextFieldCount: projectionStats.truncatedTextFieldCount,
+    outputTruncated: false,
+    outputBudgetBytes: testResultsOutputBudgetBytes,
+    rawIncluded: false,
+    rawOmitted: false,
+    suites: [] as z.infer<typeof testSuiteSchema>[],
+    cases: params.includeCases ? ([] as z.infer<typeof testCaseSchema>[]) : undefined
+  };
+  type TestResultsOutput = typeof outputBase & { raw?: JenkinsRecord };
+  let output: TestResultsOutput = outputBase;
+  let response: { output: TestResultsOutput; message: string } = {
+    output,
+    message: `Retrieved Jenkins test results for **${safeJobFullName} #${params.buildNumber}**.`
+  };
+  let usedBytes = serializedUtf8Bytes(response);
+
+  if (params.includeRawRequested) {
+    let outputWithRaw: TestResultsOutput = {
+      ...output,
+      raw: params.report,
+      rawIncluded: true
+    };
+    let responseWithRaw = { ...response, output: outputWithRaw };
+    let rawResponseBytes = serializedUtf8BytesUpTo(
+      responseWithRaw,
+      testResultsOutputBudgetBytes
+    );
+    if (rawResponseBytes < testResultsOutputBudgetBytes) {
+      output = outputWithRaw;
+      response = responseWithRaw;
+      usedBytes = rawResponseBytes;
+    } else {
+      output.rawOmitted = true;
+      usedBytes = serializedUtf8Bytes(response);
+    }
+  }
+
+  let tryAppend = <T>(items: T[], item: T) => {
+    let remainingBytes = testResultsOutputBudgetBytes - usedBytes;
+    let addedBytes =
+      serializedUtf8BytesUpTo(item, remainingBytes) + (items.length > 0 ? 1 : 0);
+    if (addedBytes >= remainingBytes) return false;
+    items.push(item);
+    usedBytes += addedBytes;
+    return true;
+  };
+
+  let caseDetailsAllowed = true;
+  let omittedCaseDetails = false;
+  for (let testCase of candidateCases) {
+    if (!output.cases) break;
+
+    let { properties, raw, ...summary } = testCase;
+    if (!caseDetailsAllowed) {
+      if (tryAppend(output.cases, summary)) continue;
+      break;
+    }
+
+    if (tryAppend(output.cases, testCase)) continue;
+
+    if (properties !== undefined || raw !== undefined) {
+      omittedCaseDetails = true;
+      caseDetailsAllowed = false;
+      if (tryAppend(output.cases, summary)) continue;
+    }
+
+    break;
+  }
+  for (let suite of suites) {
+    if (!tryAppend(output.suites, suite)) break;
+  }
+
+  output.returnedCaseCount = params.includeCases ? output.cases?.length : undefined;
+  output.truncatedCases = params.includeCases
+    ? matchingCases.length > (output.cases?.length ?? 0)
+    : undefined;
+  output.returnedSuiteCount = output.suites.length;
+  output.truncatedSuites = suites.length > output.suites.length;
+  output.outputTruncated =
+    projectionStats.truncatedTextFieldCount > 0 ||
+    output.truncatedSuites ||
+    output.truncatedCases === true ||
+    output.rawOmitted ||
+    omittedCaseDetails;
+
+  while (serializedUtf8Bytes(response) >= testResultsOutputBudgetBytes) {
+    if (output.suites.length > 0) {
+      output.suites.pop();
+      output.returnedSuiteCount = output.suites.length;
+      output.truncatedSuites = true;
+      output.outputTruncated = true;
+      continue;
+    }
+    if (output.cases && output.cases.length > 0) {
+      output.cases.pop();
+      output.returnedCaseCount = output.cases.length;
+      output.truncatedCases = true;
+      output.outputTruncated = true;
+      continue;
+    }
+    if (output.raw !== undefined) {
+      let { raw: _raw, ...outputWithoutRaw } = output;
+      output = outputWithoutRaw;
+      response.output = output;
+      output.rawIncluded = false;
+      output.rawOmitted = true;
+      output.outputTruncated = true;
+      continue;
+    }
+    break;
+  }
+
+  return response;
 };
 
 let flakyFailuresFromTestCase = (testCase: JenkinsRecord) =>
@@ -1432,7 +1721,7 @@ export let getTestResults = readOnlyTool({
   name: 'Get Test Results',
   key: 'get_test_results',
   description:
-    'Get Jenkins JUnit test report counts, suites, and representative failing test cases for a build.'
+    'Get Jenkins JUnit test report counts, bounded suite summaries, and representative test cases for a build. The complete serialized response is kept below 1,000,000 UTF-8 bytes.'
 })
   .input(
     z.object({
@@ -1453,7 +1742,7 @@ export let getTestResults = readOnlyTool({
         .boolean()
         .optional()
         .describe(
-          'Include individual test cases. Defaults to false unless onlyFailingTests is true.'
+          'Include individual test cases. Defaults to false unless onlyFailingTests is true. The aggregate response budget may return fewer cases than requested.'
         ),
       maxCases: z
         .number()
@@ -1462,9 +1751,14 @@ export let getTestResults = readOnlyTool({
         .max(1000)
         .optional()
         .describe(
-          'Maximum individual test cases to return when includeCases or onlyFailingTests is true. Defaults to 100.'
+          'Candidate ceiling for individual test cases when includeCases or onlyFailingTests is true. Defaults to 100; the aggregate 1,000,000-byte response budget may return fewer.'
         ),
-      ...includeRawInput
+      includeRaw: z
+        .boolean()
+        .optional()
+        .describe(
+          'Include the raw Jenkins test report and raw case objects when they fit within the aggregate response budget. Oversized raw data is omitted and reported through rawOmitted.'
+        )
     })
   )
   .output(
@@ -1477,17 +1771,51 @@ export let getTestResults = readOnlyTool({
       passCount: z.number().optional(),
       duration: z.number().optional(),
       onlyFailingTests: z.boolean(),
+      suiteCount: z.number().describe('Total number of suites found across child reports.'),
+      returnedSuiteCount: z.number().describe('Number of suite summaries returned.'),
+      truncatedSuites: z
+        .boolean()
+        .describe('Whether suite summaries were omitted by the aggregate response budget.'),
       caseCount: z
         .number()
         .optional()
         .describe(
-          'Number of cases matching the requested case filter before maxCases truncation.'
+          'Number of cases matching the requested case filter before maxCases and response-budget truncation.'
         ),
-      returnedCaseCount: z.number().optional(),
-      truncatedCases: z.boolean().optional(),
-      suites: z.array(testSuiteSchema),
-      cases: z.array(testCaseSchema).optional(),
-      raw: rawRecordSchema.optional()
+      returnedCaseCount: z.number().optional().describe('Number of test cases returned.'),
+      truncatedCases: z
+        .boolean()
+        .optional()
+        .describe('Whether maxCases or the aggregate response budget omitted matching cases.'),
+      truncatedTextFieldCount: z
+        .number()
+        .describe('Number of projected text fields truncated to 4,000 UTF-8 bytes.'),
+      outputTruncated: z
+        .boolean()
+        .describe(
+          'Whether text, suites, cases, or a requested raw report was truncated or omitted.'
+        ),
+      outputBudgetBytes: z
+        .number()
+        .describe(
+          'Strict upper bound for the complete serialized tool response in UTF-8 bytes.'
+        ),
+      rawIncluded: z
+        .boolean()
+        .describe('Whether the requested top-level raw Jenkins test report was returned.'),
+      rawOmitted: z
+        .boolean()
+        .describe('Whether a requested top-level raw Jenkins test report was omitted.'),
+      suites: z
+        .array(testSuiteSchema)
+        .describe('Suite summaries retained within the aggregate response budget.'),
+      cases: z
+        .array(testCaseSchema)
+        .optional()
+        .describe('Representative cases retained within maxCases and the aggregate budget.'),
+      raw: rawRecordSchema
+        .optional()
+        .describe('Raw Jenkins test report when includeRaw is true and budget permits.')
     })
   )
   .handleInvocation(async ctx => {
@@ -1496,47 +1824,19 @@ export let getTestResults = readOnlyTool({
       jobFullName,
       ctx.input.buildNumber
     );
-    let failCount = asNumber(report.failCount);
-    let skipCount = asNumber(report.skipCount);
-    let passCount = asNumber(report.passCount);
-    let totalCount =
-      asNumber(report.totalCount) ??
-      (failCount !== undefined && skipCount !== undefined && passCount !== undefined
-        ? failCount + skipCount + passCount
-        : undefined);
-    passCount =
-      passCount ??
-      (totalCount !== undefined && failCount !== undefined && skipCount !== undefined
-        ? Math.max(totalCount - failCount - skipCount, 0)
-        : undefined);
-    let allCases = testCasesFromReport(report, ctx.input.includeRaw);
     let onlyFailingTests = ctx.input.onlyFailingTests ?? false;
-    let matchingCases = onlyFailingTests
-      ? allCases.filter(testCase => isFailingTestStatus(normalizedTestStatus(testCase.status)))
-      : allCases;
     let includeCases = ctx.input.includeCases === true || onlyFailingTests;
     let maxCases = normalizeLimit(ctx.input.maxCases, 100, 1000, 'maxCases');
-    let cases = includeCases ? matchingCases.slice(0, maxCases) : undefined;
 
-    return {
-      output: {
-        jobFullName,
-        buildNumber,
-        totalCount,
-        failCount,
-        skipCount,
-        passCount,
-        duration: asNumber(report.duration),
-        onlyFailingTests,
-        caseCount: includeCases ? matchingCases.length : undefined,
-        returnedCaseCount: cases?.length,
-        truncatedCases: includeCases ? matchingCases.length > maxCases : undefined,
-        suites: testSuitesFromReport(report),
-        cases,
-        raw: ctx.input.includeRaw ? report : undefined
-      },
-      message: `Retrieved Jenkins test results for **${jobFullName} #${buildNumber}**.`
-    };
+    return buildTestResultsResponse({
+      jobFullName,
+      buildNumber,
+      report,
+      onlyFailingTests,
+      includeCases,
+      maxCases,
+      includeRawRequested: ctx.input.includeRaw === true
+    });
   })
   .build();
 

@@ -719,9 +719,12 @@ export class Client {
 
   // ─── Code Search ───
 
-  async searchCode(searchQuery: string, opts?: { page?: number; pageLen?: number }) {
+  async searchCode(
+    searchQuery: string,
+    opts?: { repository?: string; page?: number; pageLen?: number }
+  ) {
     let params: Record<string, string> = {
-      search_query: searchQuery
+      search_query: opts?.repository ? `${searchQuery} repo:${opts.repository}` : searchQuery
     };
     if (opts?.page) params.page = String(opts.page);
     if (opts?.pageLen) params.pagelen = String(opts.pageLen);

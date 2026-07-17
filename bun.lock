@@ -1486,13 +1486,14 @@
     },
     "integrations/bitbucket": {
       "name": "@slates-integrations/bitbucket",
-      "version": "0.2.0-rc.15",
+      "version": "0.2.0-rc.16",
       "dependencies": {
         "@slates/provider": "1.0.0-rc.16",
         "@types/node": "^20",
         "zod": "^4.2",
       },
       "devDependencies": {
+        "@slates/test": "1.0.0-rc.9",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -2815,7 +2816,7 @@
     },
     "integrations/confluence": {
       "name": "@slates-integrations/confluence",
-      "version": "0.2.0-rc.13",
+      "version": "0.2.0-rc.14",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/provider": "1.0.0-rc.15",
@@ -5677,7 +5678,7 @@
     },
     "integrations/google-drive": {
       "name": "@slates-integrations/google-drive",
-      "version": "0.2.0-rc.10",
+      "version": "0.2.0-rc.11",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.15",
@@ -6829,7 +6830,7 @@
     },
     "integrations/jenkins": {
       "name": "@slates-integrations/jenkins",
-      "version": "0.2.0-rc.10",
+      "version": "0.2.0-rc.11",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -9074,7 +9075,7 @@
     },
     "integrations/outlook": {
       "name": "@slates-integrations/microsoft-outlook",
-      "version": "0.2.0-rc.12",
+      "version": "0.2.0-rc.13",
       "dependencies": {
         "@slates/oauth-microsoft": "1.0.0-rc.5",
         "@types/node": "^20",
