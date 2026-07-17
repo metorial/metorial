@@ -14,8 +14,13 @@ export interface ConfigOutput {
   baseUrl?: string;
 }
 
-export let resolveContentIdAlias = (input: { pageId?: string; contentId?: string }) => {
-  let selectedId = input.pageId !== undefined ? input.pageId : input.contentId;
+export let resolveContentIdAlias = (input: {
+  pageId?: string;
+  contentId?: string;
+  page_id?: string;
+  content_id?: string;
+}) => {
+  let selectedId = input.pageId ?? input.contentId ?? input.page_id ?? input.content_id;
   return selectedId?.trim() || undefined;
 };
 

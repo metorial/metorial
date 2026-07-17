@@ -20,6 +20,16 @@ export let getPage = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Compatibility alias for pageId, used only when pageId is omitted.'),
+      page_id: z
+        .string()
+        .optional()
+        .describe('Compatibility alias for pageId, used only when camelCase IDs are omitted.'),
+      content_id: z
+        .string()
+        .optional()
+        .describe(
+          'Compatibility alias for pageId, used only when other ID fields are omitted.'
+        ),
       includeBody: z
         .boolean()
         .optional()
@@ -48,7 +58,9 @@ export let getPage = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let pageId = resolveContentIdAlias(ctx.input);
     if (!pageId) {
-      throw confluenceServiceError('Provide a pageId or contentId to retrieve a page.');
+      throw confluenceServiceError(
+        'Provide a pageId, contentId, page_id, or content_id to retrieve a page.'
+      );
     }
 
     let client = createClient(ctx.auth, ctx.config);

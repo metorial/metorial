@@ -2816,7 +2816,7 @@
     },
     "integrations/confluence": {
       "name": "@slates-integrations/confluence",
-      "version": "0.2.0-rc.14",
+      "version": "0.2.0-rc.15",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/provider": "1.0.0-rc.15",
