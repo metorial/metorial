@@ -21,6 +21,18 @@ export type JenkinsConfig = {
   maxLogLines?: number;
 };
 
+export type JenkinsListJobsOptions = {
+  folderFullName?: string;
+  recursive?: boolean;
+  maxDepth?: number;
+  nameContains?: string;
+  includeFolders?: boolean;
+  maxItems?: number;
+  maxRequests?: number;
+  requestTimeoutMs?: number;
+  bestEffort?: boolean;
+};
+
 export type JenkinsRecord = Record<string, unknown>;
 
 export type JenkinsJobSummary = {
@@ -116,6 +128,13 @@ export type JenkinsReplayBuildResult = {
   location?: string;
   queueItem?: JenkinsRecord;
 };
+
+// Keep controller-wide SCM scans inside the platform's 60-second invocation deadline.
+export let scmSearchBatchSize = 16;
+export let scmSearchInspectionLimit = 96;
+export let scmSearchListingRequestLimit = 12;
+export let scmSearchListingRequestTimeoutMs = 2000;
+export let scmSearchRequestTimeoutMs = 4000;
 
 let xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -1304,26 +1323,37 @@ export class JenkinsClient {
     };
   }
 
-  async listJobs(
-    options: {
-      folderFullName?: string;
-      recursive?: boolean;
-      maxDepth?: number;
-      nameContains?: string;
-      includeFolders?: boolean;
-    } = {}
-  ) {
+  async listJobsWithStatus(options: JenkinsListJobsOptions = {}) {
     let maxDepth = normalizeLimit(options.maxDepth, options.recursive ? 5 : 1, 20, 'maxDepth');
     let jobs: JenkinsJobSummary[] = [];
+    let requestCount = 0;
+    let traversalComplete = true;
 
     let visit = async (folderFullName: string | undefined, depth: number) => {
-      let data = await this.requestData<JenkinsRecord>('list jobs', () =>
-        this.axios.get(`${this.folderPath(folderFullName)}/api/json`, {
-          params: {
-            tree: 'jobs[name,fullName,url,color,buildable,_class,jobs[name,fullName,url,color,buildable,_class]]'
-          }
-        })
-      );
+      if (
+        (options.maxItems !== undefined && jobs.length >= options.maxItems) ||
+        (options.maxRequests !== undefined && requestCount >= options.maxRequests)
+      ) {
+        traversalComplete = false;
+        return;
+      }
+
+      requestCount += 1;
+      let data: JenkinsRecord;
+      try {
+        data = await this.requestData<JenkinsRecord>('list jobs', () =>
+          this.axios.get(`${this.folderPath(folderFullName)}/api/json`, {
+            params: {
+              tree: 'jobs[name,fullName,url,color,buildable,_class,jobs[name,fullName,url,color,buildable,_class]]'
+            },
+            timeout: options.requestTimeoutMs
+          })
+        );
+      } catch (error) {
+        if (!options.bestEffort || requestCount === 1) throw error;
+        traversalComplete = false;
+        return;
+      }
 
       let childJobs = asArray(data.jobs)
         .map(rawJob => {
@@ -1333,6 +1363,11 @@ export class JenkinsClient {
         .sort(compareJobSummariesByName);
 
       for (let summary of childJobs) {
+        if (options.maxItems !== undefined && jobs.length >= options.maxItems) {
+          traversalComplete = false;
+          break;
+        }
+
         let fullName = summary.fullName;
         if (!summary.isFolder || options.includeFolders) {
           jobs.push(summary);
@@ -1352,7 +1387,11 @@ export class JenkinsClient {
       );
     }
 
-    return jobs;
+    return { jobs, traversalComplete };
+  }
+
+  async listJobs(options: JenkinsListJobsOptions = {}) {
+    return (await this.listJobsWithStatus(options)).jobs;
   }
 
   async getJob(jobFullName: string) {
@@ -1971,17 +2010,18 @@ export class JenkinsClient {
     return report;
   }
 
-  async getConfigXml(jobFullName: string) {
+  async getConfigXml(jobFullName: string, timeoutMs?: number) {
     return this.requestData<string>('get job config XML', () =>
       this.axios.get(`${this.jobPath(jobFullName)}/config.xml`, {
         responseType: 'text',
-        headers: { Accept: 'application/xml,text/xml,text/plain' }
+        headers: { Accept: 'application/xml,text/xml,text/plain' },
+        timeout: timeoutMs
       })
     );
   }
 
-  async getJobScm(jobFullName: string) {
-    let xml = await this.getConfigXml(jobFullName);
+  async getJobScm(jobFullName: string, timeoutMs?: number) {
+    let xml = await this.getConfigXml(jobFullName, timeoutMs);
     let parsed: unknown;
     try {
       parsed = xmlParser.parse(xml);
@@ -2005,12 +2045,20 @@ export class JenkinsClient {
     skip: number;
     limit: number;
   }) {
-    let jobs = await this.listJobs({
+    let listing = await this.listJobsWithStatus({
       folderFullName: params.folderFullName,
       recursive: true,
       includeFolders: false,
-      maxDepth: 20
+      maxDepth: 20,
+      maxItems: scmSearchInspectionLimit + 1,
+      maxRequests: scmSearchListingRequestLimit,
+      requestTimeoutMs: scmSearchListingRequestTimeoutMs,
+      bestEffort: true
     });
+    let listedJobs = listing.jobs;
+    let discoveryComplete =
+      listing.traversalComplete && listedJobs.length <= scmSearchInspectionLimit;
+    let jobs = listedJobs.slice(0, scmSearchInspectionLimit);
     let matches = [] as {
       job: JenkinsJobSummary;
       scm: Awaited<ReturnType<JenkinsClient['getJobScm']>>;
@@ -2018,15 +2066,17 @@ export class JenkinsClient {
     let inspectedCount = 0;
     let skippedCount = 0;
     let matchCount = 0;
-    let batchSize = 8;
 
-    for (let offset = 0; offset < jobs.length; offset += batchSize) {
-      let batch = jobs.slice(offset, offset + batchSize);
+    for (let offset = 0; offset < jobs.length; offset += scmSearchBatchSize) {
+      let batch = jobs.slice(offset, offset + scmSearchBatchSize);
       let results = await Promise.all(
         batch.map(async job => {
           if (!job.fullName) return { job, scm: undefined };
           try {
-            return { job, scm: await this.getJobScm(job.fullName) };
+            return {
+              job,
+              scm: await this.getJobScm(job.fullName, scmSearchRequestTimeoutMs)
+            };
           } catch {
             return { job, scm: undefined };
           }
@@ -2057,11 +2107,12 @@ export class JenkinsClient {
     }
 
     return {
-      listedCount: jobs.length,
+      listedCount: listedJobs.length,
       inspectedCount,
       skippedCount,
       matchCount,
-      searchComplete: inspectedCount === jobs.length,
+      discoveryComplete,
+      searchComplete: discoveryComplete && inspectedCount === jobs.length,
       matches
     };
   }

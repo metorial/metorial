@@ -10,6 +10,11 @@ import {
   jobFullNameFromInput,
   normalizeJenkinsAuth,
   parseBuildSelectorPath,
+  scmSearchBatchSize,
+  scmSearchInspectionLimit,
+  scmSearchListingRequestLimit,
+  scmSearchListingRequestTimeoutMs,
+  scmSearchRequestTimeoutMs,
   summarizeBuildChangesets
 } from './client';
 
@@ -303,10 +308,125 @@ describe('JenkinsClient SCM search', () => {
     parsedConfig: {}
   });
 
-  it('never exceeds eight concurrent SCM reads and marks an early stop incomplete', async () => {
+  it('bounds recursive discovery requests and propagates their timeout', async () => {
+    let client = createClient();
+    let requestTimeouts: (number | undefined)[] = [];
+    let requestCount = 0;
+    (
+      client as unknown as {
+        axios: {
+          get: (
+            path: string,
+            config?: { timeout?: number }
+          ) => Promise<{ data: Record<string, unknown> }>;
+        };
+      }
+    ).axios = {
+      get: async (_path, config) => {
+        requestCount += 1;
+        requestTimeouts.push(config?.timeout);
+        let folderParts = Array.from(
+          { length: requestCount },
+          (_, index) => `folder-${index + 1}`
+        );
+        return {
+          data: {
+            jobs: [
+              ...(requestCount === 1
+                ? [{ name: 'root-job', fullName: 'root-job', _class: 'hudson.model.Job' }]
+                : []),
+              {
+                name: folderParts.at(-1),
+                fullName: folderParts.join('/'),
+                _class: 'com.cloudbees.hudson.plugins.folder.Folder',
+                jobs: []
+              }
+            ]
+          }
+        };
+      }
+    };
+
+    let result = await client.listJobsWithStatus({
+      recursive: true,
+      maxDepth: 20,
+      maxRequests: 2,
+      requestTimeoutMs: 321,
+      bestEffort: true
+    });
+
+    expect(requestCount).toBe(2);
+    expect(requestTimeouts).toEqual([321, 321]);
+    expect(result).toEqual({
+      jobs: [expect.objectContaining({ fullName: 'root-job' })],
+      traversalComplete: false
+    });
+  });
+
+  it('preserves partial discovery results when a folder request fails', async () => {
+    let client = createClient();
+    let requestCount = 0;
+    (
+      client as unknown as {
+        axios: {
+          get: () => Promise<{ data: Record<string, unknown> }>;
+        };
+      }
+    ).axios = {
+      get: async () => {
+        requestCount += 1;
+        if (requestCount > 1) throw new Error('folder request timed out');
+        return {
+          data: {
+            jobs: [
+              { name: 'root-job', fullName: 'root-job', _class: 'hudson.model.Job' },
+              {
+                name: 'folder',
+                fullName: 'folder',
+                _class: 'com.cloudbees.hudson.plugins.folder.Folder',
+                jobs: []
+              }
+            ]
+          }
+        };
+      }
+    };
+
+    let result = await client.listJobsWithStatus({
+      recursive: true,
+      maxDepth: 20,
+      bestEffort: true
+    });
+
+    expect(requestCount).toBe(2);
+    expect(result.jobs).toEqual([expect.objectContaining({ fullName: 'root-job' })]);
+    expect(result.traversalComplete).toBe(false);
+  });
+
+  it('surfaces an initial discovery request failure', async () => {
+    let client = createClient();
+    (
+      client as unknown as {
+        axios: { get: () => Promise<never> };
+      }
+    ).axios = {
+      get: async () => {
+        throw new Error('controller unavailable');
+      }
+    };
+
+    await expect(
+      client.listJobsWithStatus({
+        recursive: true,
+        bestEffort: true
+      })
+    ).rejects.toThrow('Jenkins API list jobs failed');
+  });
+
+  it('never exceeds the SCM batch size and marks an early stop incomplete', async () => {
     let client = createClient();
     let jobs = createJobs(20);
-    client.listJobs = async () => jobs;
+    client.listJobsWithStatus = async () => ({ jobs, traversalComplete: true });
     let activeRequests = 0;
     let maxActiveRequests = 0;
     let inspectedJobs: string[] = [];
@@ -329,21 +449,65 @@ describe('JenkinsClient SCM search', () => {
       'folder/job-1',
       'folder/job-2'
     ]);
-    expect(maxActiveRequests).toBe(8);
-    expect(inspectedJobs).toHaveLength(8);
+    expect(maxActiveRequests).toBe(scmSearchBatchSize);
+    expect(inspectedJobs).toHaveLength(scmSearchBatchSize);
     expect(result).toMatchObject({
       listedCount: 20,
-      inspectedCount: 8,
+      inspectedCount: scmSearchBatchSize,
       skippedCount: 0,
-      matchCount: 8,
+      matchCount: scmSearchBatchSize,
       searchComplete: false
+    });
+  });
+
+  it('bounds controller-wide discovery and each SCM config read', async () => {
+    let client = createClient();
+    let jobs = createJobs(scmSearchInspectionLimit + 20);
+    let requestedOptions: Parameters<JenkinsClient['listJobsWithStatus']>[0];
+    client.listJobsWithStatus = async options => {
+      requestedOptions = options;
+      return {
+        jobs: jobs.slice(0, options?.maxItems),
+        traversalComplete: false
+      };
+    };
+    let inspectedJobs: string[] = [];
+    let requestTimeouts: (number | undefined)[] = [];
+    client.getJobScm = async (jobFullName, timeoutMs) => {
+      inspectedJobs.push(jobFullName);
+      requestTimeouts.push(timeoutMs);
+      return createScmResult('https://github.com/example/other.git');
+    };
+
+    let result = await client.findJobsWithScmUrl({
+      scmUrl: 'git@github.com:example/app.git',
+      skip: 0,
+      limit: 10
+    });
+
+    expect(requestedOptions).toMatchObject({
+      maxItems: scmSearchInspectionLimit + 1,
+      maxRequests: scmSearchListingRequestLimit,
+      requestTimeoutMs: scmSearchListingRequestTimeoutMs,
+      bestEffort: true
+    });
+    expect(inspectedJobs).toHaveLength(scmSearchInspectionLimit);
+    expect(new Set(requestTimeouts)).toEqual(new Set([scmSearchRequestTimeoutMs]));
+    expect(result).toMatchObject({
+      listedCount: scmSearchInspectionLimit + 1,
+      discoveryComplete: false,
+      inspectedCount: scmSearchInspectionLimit,
+      skippedCount: 0,
+      matchCount: 0,
+      searchComplete: false,
+      matches: []
     });
   });
 
   it('keeps job order under out-of-order completion and applies nonzero skip pagination', async () => {
     let client = createClient();
     let jobs = createJobs(8);
-    client.listJobs = async () => jobs;
+    client.listJobsWithStatus = async () => ({ jobs, traversalComplete: true });
     let scmResult = createScmResult();
     let pending = new Map<string, (result: typeof scmResult) => void>();
     client.getJobScm = jobFullName =>
@@ -372,6 +536,7 @@ describe('JenkinsClient SCM search', () => {
     ]);
     expect(result).toMatchObject({
       listedCount: 8,
+      discoveryComplete: true,
       inspectedCount: 8,
       skippedCount: 0,
       matchCount: 8,
@@ -392,7 +557,7 @@ describe('JenkinsClient SCM search', () => {
       isFolder: false,
       raw: {}
     });
-    client.listJobs = async () => jobs;
+    client.listJobsWithStatus = async () => ({ jobs, traversalComplete: true });
     client.getJobScm = async jobFullName => {
       if (jobFullName === 'folder/job-3') {
         throw new Error('SCM config unavailable');

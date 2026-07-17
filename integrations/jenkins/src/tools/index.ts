@@ -2094,7 +2094,16 @@ export let findJobsWithScmUrl = readOnlyTool({
       branch: z.string().optional(),
       skip: z.number(),
       limit: z.number(),
-      listedCount: z.number().describe('Number of Jenkins jobs found in the traversal.'),
+      listedCount: z
+        .number()
+        .describe(
+          'Number of Jenkins jobs discovered before bounded traversal stopped. This is the controller total only when discoveryComplete is true.'
+        ),
+      discoveryComplete: z
+        .boolean()
+        .describe(
+          'Whether controller discovery completed. False means the bounded traversal stopped before discovering every job.'
+        ),
       inspectedCount: z
         .number()
         .describe('Number of Jenkins job SCM configurations successfully inspected.'),
@@ -2111,7 +2120,7 @@ export let findJobsWithScmUrl = readOnlyTool({
       searchComplete: z
         .boolean()
         .describe(
-          'Whether the SCM configuration of every listed Jenkins job was successfully inspected.'
+          'Whether controller discovery completed and every discovered Jenkins job SCM configuration was successfully inspected.'
         ),
       jobs: z.array(
         z.object({
@@ -2152,6 +2161,7 @@ export let findJobsWithScmUrl = readOnlyTool({
         skip,
         limit,
         listedCount: search.listedCount,
+        discoveryComplete: search.discoveryComplete,
         inspectedCount: search.inspectedCount,
         skippedCount: search.skippedCount,
         matchCount: search.matchCount,
@@ -2160,7 +2170,7 @@ export let findJobsWithScmUrl = readOnlyTool({
       },
       message: search.searchComplete
         ? `Found ${matches.length} Jenkins job${matches.length === 1 ? '' : 's'} matching SCM URL.`
-        : `Found ${matches.length} Jenkins job${matches.length === 1 ? '' : 's'} matching SCM URL. Search incomplete: successfully inspected ${search.inspectedCount} of ${search.listedCount} listed jobs; ${search.skippedCount} processed job${search.skippedCount === 1 ? '' : 's'} could not be inspected.`
+        : `Found ${matches.length} Jenkins job${matches.length === 1 ? '' : 's'} matching SCM URL. Search incomplete: discovery ${search.discoveryComplete ? 'completed' : 'was truncated'} after ${search.listedCount} job${search.listedCount === 1 ? '' : 's'}; successfully inspected ${search.inspectedCount}; ${search.skippedCount} processed job${search.skippedCount === 1 ? '' : 's'} could not be inspected.`
     };
   })
   .build();
