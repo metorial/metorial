@@ -22,6 +22,9 @@ import type {
   UserProfile
 } from './types';
 
+const quoteMessageSearch = (search: string) =>
+  `"${search.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+
 export class Client {
   private axios;
 
@@ -61,8 +64,10 @@ export class Client {
     if (params?.top) queryParams.$top = String(params.top);
     if (params?.skip) queryParams.$skip = String(params.skip);
     if (params?.filter) queryParams.$filter = params.filter;
+    // Microsoft Graph controls message search ordering by sent date, so do not
+    // send a caller-provided $orderby with $search.
     if (params?.orderby && !params.search) queryParams.$orderby = params.orderby;
-    if (params?.search) queryParams.$search = `"${params.search}"`;
+    if (params?.search) queryParams.$search = quoteMessageSearch(params.search);
     if (params?.select?.length) queryParams.$select = params.select.join(',');
 
     let headers: Record<string, string> = {};

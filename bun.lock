@@ -9076,7 +9076,7 @@
     },
     "integrations/outlook": {
       "name": "@slates-integrations/microsoft-outlook",
-      "version": "0.2.0-rc.13",
+      "version": "0.2.0-rc.14",
       "dependencies": {
         "@slates/oauth-microsoft": "1.0.0-rc.5",
         "@types/node": "^20",
