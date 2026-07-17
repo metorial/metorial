@@ -175,15 +175,15 @@ describe('google-chat provider contract', () => {
       (oauth.authenticationMethod.scopes ?? []).map(scope => [scope.id, scope.defaultChecked])
     ).toEqual([
       [googleChatScopes.messages, true],
-      [googleChatScopes.messagesReadonly, false],
-      [googleChatScopes.messagesCreate, false],
-      [googleChatScopes.spaces, false],
-      [googleChatScopes.spacesReadonly, false],
-      [googleChatScopes.delete, false],
-      [googleChatScopes.memberships, false],
-      [googleChatScopes.membershipsReadonly, false],
-      [googleChatScopes.membershipsApp, false],
-      [googleChatScopes.messageReactions, false],
+      [googleChatScopes.messagesReadonly, undefined],
+      [googleChatScopes.messagesCreate, undefined],
+      [googleChatScopes.spaces, undefined],
+      [googleChatScopes.spacesReadonly, undefined],
+      [googleChatScopes.delete, undefined],
+      [googleChatScopes.memberships, undefined],
+      [googleChatScopes.membershipsReadonly, undefined],
+      [googleChatScopes.membershipsApp, undefined],
+      [googleChatScopes.messageReactions, undefined],
       [googleChatScopes.userInfoEmail, true],
       [googleChatScopes.userInfoProfile, true]
     ]);

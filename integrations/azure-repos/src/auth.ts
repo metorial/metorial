@@ -11,11 +11,6 @@ let scopes = [
     scope: 'vso.code_manage'
   },
   {
-    title: 'Service Hooks Write',
-    description: 'Create and manage the service hook subscriptions that power triggers.',
-    scope: 'vso.hooks_write'
-  },
-  {
     title: 'Profile',
     description: 'Read user profile information.',
     scope: 'vso.profile'

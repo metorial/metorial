@@ -115,7 +115,7 @@ describe('gmail provider contract', () => {
     );
     expect(otherContactScope).toMatchObject({
       title: 'Google Other Contacts (Read-only)',
-      defaultChecked: false
+      defaultChecked: undefined
     });
   });
 

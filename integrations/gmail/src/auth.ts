@@ -89,7 +89,6 @@ export let auth = SlateAuth.create()
       {
         title: 'Google Other Contacts (Read-only)',
         description: 'See and download contact info automatically saved in "Other contacts".',
-        defaultChecked: false,
         scope: gmailScopes.contactsOtherReadonly
       },
       {

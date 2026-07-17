@@ -24,11 +24,6 @@ let scopes = [
     title: 'Wiki Write',
     description: 'Read, create, and update Azure DevOps wikis and pages',
     scope: 'vso.wiki_write'
-  },
-  {
-    title: 'Service Hooks Write',
-    description: 'Create and manage the service hook subscriptions that power triggers',
-    scope: 'vso.hooks_write'
   }
 ];
 

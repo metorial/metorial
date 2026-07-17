@@ -72,6 +72,8 @@ describe('bigquery provider contract', () => {
       (oauth.authenticationMethod.scopes ?? []).map(scope => scope.title)
     );
     expect(scopeTitles.has('BigQuery Read Only')).toBe(true);
+    expect(scopeTitles.has('Google Account Email')).toBe(true);
+    expect(scopeTitles.has('Google Account Profile')).toBe(true);
 
     let serviceAccount = await client.getAuthMethod('service_account');
     expect(serviceAccount.authenticationMethod.type).toBe('auth.custom');

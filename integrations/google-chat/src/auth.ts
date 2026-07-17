@@ -183,57 +183,48 @@ export let auth = SlateAuth.create()
       {
         title: 'Messages (Read Only)',
         description: 'View Google Chat messages.',
-        scope: googleChatScopes.messagesReadonly,
-        defaultChecked: false
+        scope: googleChatScopes.messagesReadonly
       },
       {
         title: 'Create Messages',
         description: 'Create Google Chat messages without broader message access.',
-        scope: googleChatScopes.messagesCreate,
-        defaultChecked: false
+        scope: googleChatScopes.messagesCreate
       },
       {
         title: 'Spaces',
         description: 'Create Google Chat spaces and view or edit their metadata.',
-        scope: googleChatScopes.spaces,
-        defaultChecked: false
+        scope: googleChatScopes.spaces
       },
       {
         title: 'Spaces (Read Only)',
         description: 'View Google Chat spaces.',
-        scope: googleChatScopes.spacesReadonly,
-        defaultChecked: false
+        scope: googleChatScopes.spacesReadonly
       },
       {
         title: 'Delete Spaces',
         description: 'Delete Google Chat spaces and remove access to associated files.',
-        scope: googleChatScopes.delete,
-        defaultChecked: false
+        scope: googleChatScopes.delete
       },
       {
         title: 'Memberships',
         description: 'View and manage Google Chat space memberships.',
-        scope: googleChatScopes.memberships,
-        defaultChecked: false
+        scope: googleChatScopes.memberships
       },
       {
         title: 'Memberships (Read Only)',
         description: 'View Google Chat space memberships.',
-        scope: googleChatScopes.membershipsReadonly,
-        defaultChecked: false
+        scope: googleChatScopes.membershipsReadonly
       },
       {
         title: 'Chat Memberships (App)',
         description:
           'Add and remove the Chat app itself from Google Chat conversations and spaces.',
-        scope: googleChatScopes.membershipsApp,
-        defaultChecked: false
+        scope: googleChatScopes.membershipsApp
       },
       {
         title: 'Message Reactions',
         description: 'View, create, and delete reactions to Google Chat messages.',
-        scope: googleChatScopes.messageReactions,
-        defaultChecked: false
+        scope: googleChatScopes.messageReactions
       },
       {
         title: 'Google Account Email',

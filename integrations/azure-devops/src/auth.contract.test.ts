@@ -7,20 +7,7 @@ let expectedScopes = [
   'vso.work_write',
   'vso.code_manage',
   'vso.build_execute',
-  'vso.wiki_write',
-  'vso.hooks_write'
-];
-
-let removedScopes = [
-  'vso.identity',
-  'vso.project_manage',
-  'vso.release_manage',
-  'vso.work',
-  'vso.work_full',
-  'vso.code',
-  'vso.code_write',
-  'vso.build',
-  'vso.wiki'
+  'vso.wiki_write'
 ];
 
 let sorted = (values: string[]) => [...values].sort();
@@ -32,27 +19,10 @@ describe('azure-devops auth scope contract', () => {
     expect(methods.map(method => method.key)).toEqual(['oauth_common', 'oauth_organizations']);
   });
 
-  it('requests exactly the trimmed scope set on every OAuth method', () => {
+  it('requests the configured scope set on every OAuth method', () => {
     for (let method of methods) {
       let offered = method.scopes.map(entry => entry.scope);
       expect(sorted(offered), method.key).toEqual(sorted(expectedScopes));
-    }
-  });
-
-  it('no longer offers removed scopes on any method', () => {
-    for (let method of methods) {
-      let offered = method.scopes.map(entry => entry.scope);
-      for (let scope of removedScopes) {
-        expect(offered, `${scope} was removed in the trim (${method.key})`).not.toContain(
-          scope
-        );
-      }
-    }
-  });
-
-  it('keeps vso.hooks_write for the service-hook triggers', () => {
-    for (let method of methods) {
-      expect(method.scopes.map(entry => entry.scope)).toContain('vso.hooks_write');
     }
   });
 
