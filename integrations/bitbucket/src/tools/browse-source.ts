@@ -1,6 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { bitbucketServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let browseSourceTool = SlateTool.create(spec, {
@@ -15,7 +16,14 @@ Returns directory listings or file contents depending on the path.`,
   .input(
     z.object({
       repoSlug: z.string().describe('Repository slug'),
-      revision: z.string().describe('Branch name, tag, or commit hash'),
+      revision: z
+        .string()
+        .optional()
+        .describe('Branch name, tag, or commit hash. Defaults to the repository main branch.'),
+      at: z
+        .string()
+        .optional()
+        .describe('Legacy alias for revision, used only when revision is omitted.'),
       path: z
         .string()
         .optional()
@@ -44,9 +52,21 @@ Returns directory listings or file contents depending on the path.`,
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token, workspace: ctx.config.workspace });
     let path = ctx.input.path || '';
+    let revision = ctx.input.revision?.trim() || ctx.input.at?.trim();
+
+    if (!revision) {
+      let repository = await client.getRepository(ctx.input.repoSlug);
+      revision = repository.mainbranch?.name;
+    }
+
+    if (!revision) {
+      throw bitbucketServiceError(
+        'The repository has no main branch. Provide a branch, tag, or commit hash in revision.'
+      );
+    }
 
     let result = await client.getSource(ctx.input.repoSlug, {
-      revision: ctx.input.revision,
+      revision,
       path
     });
 
@@ -64,7 +84,7 @@ Returns directory listings or file contents depending on the path.`,
           path: path || '/',
           entries
         },
-        message: `Directory **${path || '/'}** at ${ctx.input.revision}: **${entries.length}** entries.`
+        message: `Directory **${path || '/'}** at ${revision}: **${entries.length}** entries.`
       };
     }
 
@@ -78,7 +98,7 @@ Returns directory listings or file contents depending on the path.`,
         content,
         size: content.length
       },
-      message: `File **${path}** at ${ctx.input.revision}: ${content.length} bytes.`
+      message: `File **${path}** at ${revision}: ${content.length} bytes.`
     };
   })
   .build();

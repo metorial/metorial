@@ -49,3 +49,23 @@ describe('Bitbucket code search client', () => {
     });
   });
 });
+
+describe('Bitbucket source client', () => {
+  it.each([
+    'e5626804d6c3c238dac1add29e754cf2190d2417',
+    '071b90683'
+  ])('uses commit revision %s without probing refs', async revision => {
+    axiosMocks.api.get.mockResolvedValue({ data: 'file contents' });
+    let client = new Client({ token: 'token', workspace: 'acme-workspace' });
+
+    await client.getSource('repo-one', {
+      revision,
+      path: 'src/file name.ts'
+    });
+
+    expect(axiosMocks.api.get).toHaveBeenCalledTimes(1);
+    expect(axiosMocks.api.get).toHaveBeenCalledWith(
+      `/repositories/acme-workspace/repo-one/src/${revision}/src/file%20name.ts`
+    );
+  });
+});
