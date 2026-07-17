@@ -67,6 +67,18 @@ let statusLabelFor = (response?: ErrorResponse) =>
 export let jiraServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
+export let resolveJiraIssueIdOrKey = (input: { issueIdOrKey?: string; issueKey?: string }) => {
+  let issueIdOrKey = input.issueIdOrKey ?? input.issueKey;
+
+  if (issueIdOrKey === undefined) {
+    throw jiraServiceError(
+      'Provide the issue key or ID in issueIdOrKey. The legacy issueKey alias is also accepted.'
+    );
+  }
+
+  return issueIdOrKey;
+};
+
 export let jiraApiError = (error: unknown, operation = 'request') => {
   if (error instanceof ServiceError) {
     return error;

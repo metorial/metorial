@@ -1,6 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { JiraClient } from '../lib/client';
+import { resolveJiraIssueIdOrKey } from '../lib/errors';
 import { spec } from '../spec';
 
 export let getIssueTool = SlateTool.create(spec, {
@@ -13,7 +14,14 @@ export let getIssueTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      issueIdOrKey: z.string().describe('The issue key (e.g., "PROJ-123") or numeric ID.'),
+      issueIdOrKey: z
+        .string()
+        .optional()
+        .describe('The issue key (e.g., "PROJ-123") or numeric ID. Preferred field.'),
+      issueKey: z
+        .string()
+        .optional()
+        .describe('Legacy alias for issueIdOrKey, used only when issueIdOrKey is omitted.'),
       fields: z
         .array(z.string())
         .optional()
@@ -68,7 +76,8 @@ export let getIssueTool = SlateTool.create(spec, {
       refreshToken: ctx.auth.refreshToken
     });
 
-    let issue = await client.getIssue(ctx.input.issueIdOrKey, {
+    let issueIdOrKey = resolveJiraIssueIdOrKey(ctx.input);
+    let issue = await client.getIssue(issueIdOrKey, {
       fields: ctx.input.fields,
       expand: ctx.input.expand
     });
