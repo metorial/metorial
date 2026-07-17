@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   mapAdvancedIssue,
   readWorkspaceFileContent,
+  resolveAdvancedAnalysisFileContent,
   resolveWorkspaceFilePath
 } from './analysis';
 import {
@@ -84,6 +85,18 @@ describe('SonarQube workflow tool helpers', () => {
     expect(() => resolveWorkspaceFilePath('/tmp/outside.ts', process.cwd())).toThrow(
       /relative/
     );
+  });
+
+  it('uses supplied advanced-analysis content without reading the integration workspace', async () => {
+    await expect(
+      resolveAdvancedAnalysisFileContent(
+        'source/not-present-in-provider-runtime.ts',
+        'const answer = 42;'
+      )
+    ).resolves.toBe('const answer = 42;');
+    await expect(
+      resolveAdvancedAnalysisFileContent('../outside.ts', 'const answer = 42;')
+    ).rejects.toThrow(/within the current workspace/);
   });
 
   it('omits empty advanced-analysis flows and locations like the official mapper', () => {

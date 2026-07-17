@@ -93,6 +93,15 @@ export let readWorkspaceFileContent = async (
   }
 };
 
+export let resolveAdvancedAnalysisFileContent = async (
+  filePath: string,
+  fileContent: string | undefined,
+  workspaceRoot: string = process.cwd()
+) => {
+  resolveWorkspaceFilePath(filePath, workspaceRoot);
+  return fileContent ?? (await readWorkspaceFileContent(filePath, workspaceRoot));
+};
+
 let textRangeFrom = (value: unknown) => {
   let record = optionalRecord(value);
   if (!record) return undefined;
@@ -172,7 +181,7 @@ export let runAdvancedCodeAnalysisTool = readOnlyTool({
   name: 'SonarQube Advanced Code Analysis',
   key: 'run_advanced_code_analysis',
   description:
-    "Run advanced code analysis on a single file using SonarQube Cloud's server-side engine. Identifies code quality and security issues, leveraging the project's full analysis context for deeper cross-file detection. The filePath must point to a local file in the current workspace. Always specify the file scope (MAIN or TEST) for more accurate results."
+    "Run advanced code analysis on a single file using SonarQube Cloud's server-side engine. Identifies code quality and security issues, leveraging the project's full analysis context for deeper cross-file detection. Provide the complete fileContent when the file is not available in the integration runtime; otherwise filePath is read from its current workspace. Always specify the file scope (MAIN or TEST) for more accurate results."
 })
   .input(
     z.object({
@@ -185,7 +194,13 @@ export let runAdvancedCodeAnalysisTool = readOnlyTool({
       filePath: z
         .string()
         .describe(
-          "Project-relative path of the file to analyze (e.g., 'src/main/java/MyClass.java')."
+          "Project-relative path of the file to analyze (e.g., 'src/main/java/MyClass.java'). SonarQube uses this path to match project analysis context."
+        ),
+      fileContent: z
+        .string()
+        .optional()
+        .describe(
+          'Complete current file content. Provide this when the file is not available in the integration runtime; when omitted, filePath is read from its current workspace.'
         ),
       fileScope: z
         .enum(['MAIN', 'TEST'])
@@ -236,7 +251,10 @@ export let runAdvancedCodeAnalysisTool = readOnlyTool({
       throw sonarqubeValidationError('filePath is required.');
     }
     let client = createClient(ctx);
-    let fileContent = await readWorkspaceFileContent(ctx.input.filePath);
+    let fileContent = await resolveAdvancedAnalysisFileContent(
+      ctx.input.filePath,
+      ctx.input.fileContent
+    );
     let data = await client.runAdvancedCodeAnalysis({
       organizationKey,
       projectKey: projectKeyFromInput(ctx.config, ctx.input),

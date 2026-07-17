@@ -163,6 +163,7 @@ describe('SonarQube advanced analysis schema', () => {
       projectKey: 'app',
       branchName: 'main',
       filePath: 'src/main.ts',
+      fileContent: 'const answer = 42;',
       fileScope: 'MAIN'
     });
 
