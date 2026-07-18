@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/scrapeunblocker",
+  "description": "Scrape pages that block ordinary HTTP requests. Fetch fully rendered content from any URL behind anti-bot protections such as Cloudflare, DataDome, PerimeterX and Akamai, return raw HTML or AI-parsed structured JSON, choose the exit country for geo-restricted content, and extract Google search results.",
+  "categories": ["apis-and-http-requests", "web-search"],
+  "skills": [
+    "scrape web page content",
+    "bypass anti-bot protection",
+    "render JavaScript pages",
+    "extract structured page data",
+    "geolocated proxy requests",
+    "scrape Google search results",
+    "collect SERP rankings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/scrapeunblocker.png"
+}
