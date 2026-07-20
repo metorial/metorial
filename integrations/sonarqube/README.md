@@ -49,7 +49,7 @@ Credential validation calls `/api/authentication/validate`. Server profiles also
 
 ### Run Advanced Code Analysis
 
-`run_advanced_code_analysis` runs SonarQube Cloud Advanced Code Analysis for one project file using `projectKey`, `branchName`, a project-relative `filePath`, optional complete `fileContent`, and optional `fileScope` (`MAIN` or `TEST`). Provide `fileContent` when the repository is not available in the integration runtime; otherwise the tool reads `filePath` from its current workspace. It requires SonarQube Cloud organization config and an organization with Advanced Code Analysis enabled.
+`run_advanced_code_analysis` runs SonarQube Cloud Advanced Code Analysis for one project file using `projectKey`, `branchName`, a workspace-relative `filePath`, and optional `fileScope` (`MAIN` or `TEST`). It remains exposed so clients can discover it, but invocation returns a validation error unless `filePath` exists in the current workspace. It requires SonarQube Cloud organization config and an organization with Advanced Code Analysis enabled.
 
 ### Search Dependency Risks
 
