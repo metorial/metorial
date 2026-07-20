@@ -704,7 +704,7 @@
     },
     "integrations/apify": {
       "name": "@slates-integrations/apify",
-      "version": "0.2.0-rc.7",
+      "version": "0.2.0-rc.8",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.15",
@@ -754,7 +754,7 @@
     },
     "integrations/apollo": {
       "name": "@slates-integrations/apolloio",
-      "version": "0.2.0-rc.18",
+      "version": "0.2.0-rc.19",
       "dependencies": {
         "@slates/provider": "1.0.0-rc.16",
         "@types/node": "^20",
@@ -1486,7 +1486,7 @@
     },
     "integrations/bitbucket": {
       "name": "@slates-integrations/bitbucket",
-      "version": "0.2.0-rc.16",
+      "version": "0.2.0-rc.17",
       "dependencies": {
         "@slates/provider": "1.0.0-rc.16",
         "@types/node": "^20",
@@ -2816,7 +2816,7 @@
     },
     "integrations/confluence": {
       "name": "@slates-integrations/confluence",
-      "version": "0.2.0-rc.14",
+      "version": "0.2.0-rc.15",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/provider": "1.0.0-rc.15",
@@ -6830,7 +6830,7 @@
     },
     "integrations/jenkins": {
       "name": "@slates-integrations/jenkins",
-      "version": "0.2.0-rc.11",
+      "version": "0.2.0-rc.12",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -6858,7 +6858,7 @@
     },
     "integrations/jira": {
       "name": "@slates-integrations/jira",
-      "version": "0.2.0-rc.11",
+      "version": "0.2.0-rc.12",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/provider": "1.0.0-rc.15",
@@ -6866,6 +6866,7 @@
         "zod": "^4.2",
       },
       "devDependencies": {
+        "@slates/test": "1.0.0-rc.9",
         "typescript": "^5",
       },
     },
@@ -9075,7 +9076,7 @@
     },
     "integrations/outlook": {
       "name": "@slates-integrations/microsoft-outlook",
-      "version": "0.2.0-rc.13",
+      "version": "0.2.0-rc.14",
       "dependencies": {
         "@slates/oauth-microsoft": "1.0.0-rc.5",
         "@types/node": "^20",
@@ -11749,7 +11750,7 @@
     },
     "integrations/sonarqube": {
       "name": "@slates-integrations/sonarqube",
-      "version": "0.1.0-rc.12",
+      "version": "0.1.0-rc.13",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -12042,7 +12043,7 @@
     },
     "integrations/stern-financial-data": {
       "name": "@slates-integrations/stern-financial-data",
-      "version": "0.1.0-rc.7",
+      "version": "0.1.0-rc.8",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@mixmark-io/domino": "^2.2.0",

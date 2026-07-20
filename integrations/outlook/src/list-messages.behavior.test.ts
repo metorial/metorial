@@ -55,4 +55,27 @@ describe('List Emails behavior', () => {
       ]
     });
   });
+
+  it('does not request custom ordering when searching messages', async () => {
+    clientMocks.listMessages.mockResolvedValue({ value: [] });
+
+    await listMessages.handleInvocation({
+      auth: { token: 'test-token' },
+      input: {
+        folderId: 'inbox',
+        search: 'quarterly update',
+        orderby: 'receivedDateTime desc',
+        top: 15
+      }
+    } as any);
+
+    expect(clientMocks.listMessages).toHaveBeenCalledWith(
+      expect.objectContaining({
+        folderId: 'inbox',
+        search: 'quarterly update',
+        orderby: undefined,
+        top: 15
+      })
+    );
+  });
 });

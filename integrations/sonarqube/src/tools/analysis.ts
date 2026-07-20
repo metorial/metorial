@@ -84,7 +84,7 @@ export let readWorkspaceFileContent = async (
     let code = (error as NodeJS.ErrnoException).code;
     if (code === 'ENOENT') {
       throw sonarqubeValidationError(
-        `filePath '${filePath}' does not exist within the current workspace.`
+        `Could not read filePath '${filePath}' from the current workspace because it does not exist.`
       );
     }
     throw sonarqubeValidationError(
@@ -172,7 +172,7 @@ export let runAdvancedCodeAnalysisTool = readOnlyTool({
   name: 'SonarQube Advanced Code Analysis',
   key: 'run_advanced_code_analysis',
   description:
-    "Run advanced code analysis on a single file using SonarQube Cloud's server-side engine. Identifies code quality and security issues, leveraging the project's full analysis context for deeper cross-file detection. The filePath must point to a local file in the current workspace. Always specify the file scope (MAIN or TEST) for more accurate results."
+    "Run advanced code analysis on a single file using SonarQube Cloud's server-side engine. Identifies code quality and security issues, leveraging the project's full analysis context for deeper cross-file detection. Always specify the file scope (MAIN or TEST) for more accurate results."
 })
   .input(
     z.object({

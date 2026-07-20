@@ -29,6 +29,7 @@ export let BETA_FIELDS = [
 export type ErpField = (typeof ERP_FIELDS)[number];
 export type BetaField = (typeof BETA_FIELDS)[number];
 export type SourceId = 'erp' | 'us_industry_betas' | 'global_industry_betas';
+export type SourceInputId = SourceId | 'ctryprem' | 'betas';
 export type SourceKind = 'erp' | 'beta';
 export type SourceType = 'workbook' | 'html';
 export type BetaRowType = 'industry' | 'aggregate';
@@ -143,6 +144,19 @@ export let SOURCES: Record<SourceId, SternSource> = {
 
 export let SOURCE_IDS = Object.keys(SOURCES) as SourceId[];
 export let SOURCE_LIST = SOURCE_IDS.map(sourceId => SOURCES[sourceId]);
+export let SOURCE_INPUT_IDS = [
+  'erp',
+  'us_industry_betas',
+  'global_industry_betas',
+  'ctryprem',
+  'betas'
+] as const satisfies readonly SourceInputId[];
+
+export let normalizeSourceId = (sourceId: SourceInputId): SourceId => {
+  if (sourceId === 'ctryprem') return 'erp';
+  if (sourceId === 'betas') return 'us_industry_betas';
+  return sourceId;
+};
 
 export let isSourceId = (value: string): value is SourceId =>
   SOURCE_IDS.includes(value as SourceId);

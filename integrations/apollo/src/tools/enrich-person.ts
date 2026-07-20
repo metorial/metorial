@@ -2,7 +2,22 @@ import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { apolloServiceError } from '../lib/errors';
+import type { ApolloPerson } from '../lib/types';
 import { spec } from '../spec';
+
+export let mapBulkPersonMatches = (matches: Array<ApolloPerson | null>) =>
+  matches
+    .filter((person): person is ApolloPerson => person !== null)
+    .map(person => ({
+      personId: person.id,
+      firstName: person.first_name,
+      lastName: person.last_name,
+      name: person.name,
+      email: person.email,
+      title: person.title,
+      linkedinUrl: person.linkedin_url,
+      organizationName: person.organization?.name
+    }));
 
 export let enrichPerson = SlateTool.create(spec, {
   name: 'Enrich Person',
@@ -153,16 +168,7 @@ Supports both single and bulk enrichment (up to 10 records per request).`,
         revealPhoneNumber: ctx.input.revealPhoneNumber
       });
 
-      let matches = result.matches.map(p => ({
-        personId: p.id,
-        firstName: p.first_name,
-        lastName: p.last_name,
-        name: p.name,
-        email: p.email,
-        title: p.title,
-        linkedinUrl: p.linkedin_url,
-        organizationName: p.organization?.name
-      }));
+      let matches = mapBulkPersonMatches(result.matches);
 
       return {
         output: {

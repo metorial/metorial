@@ -32,6 +32,38 @@ describe('Confluence content ID input aliases', () => {
     expect(result.output.pageId).toBe('page-1');
   });
 
+  it.each(['page_id', 'content_id'] as const)('accepts %s for get_page', async alias => {
+    let getPageById = vi.spyOn(ConfluenceClient.prototype, 'getPageById').mockResolvedValue({
+      id: 'page-1',
+      title: 'Release notes',
+      status: 'current'
+    } as any);
+
+    let input = getPage.inputSchema.parse({ [alias]: 'page-1' });
+    let result = await getPage.handleInvocation(createCtx(input));
+
+    expect(getPageById).toHaveBeenCalledWith('page-1', false);
+    expect(result.output.pageId).toBe('page-1');
+  });
+
+  it('prefers pageId over all get_page compatibility aliases', async () => {
+    let getPageById = vi.spyOn(ConfluenceClient.prototype, 'getPageById').mockResolvedValue({
+      id: 'canonical-page',
+      title: 'Release notes',
+      status: 'current'
+    } as any);
+
+    let input = getPage.inputSchema.parse({
+      pageId: 'canonical-page',
+      contentId: 'camel-alias',
+      page_id: 'snake-page-alias',
+      content_id: 'snake-content-alias'
+    });
+    await getPage.handleInvocation(createCtx(input));
+
+    expect(getPageById).toHaveBeenCalledWith('canonical-page', false);
+  });
+
   it('accepts contentId for get_page_children', async () => {
     let getPageChildrenSpy = vi
       .spyOn(ConfluenceClient.prototype, 'getPageChildren')

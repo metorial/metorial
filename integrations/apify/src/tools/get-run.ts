@@ -33,7 +33,7 @@ export let getRun = SlateTool.create(spec, {
       datasetItemsLimit: z
         .number()
         .int()
-        .positive()
+        .nonnegative()
         .optional()
         .default(100)
         .describe('Maximum number of dataset items to return'),

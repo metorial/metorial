@@ -563,6 +563,12 @@ export class Client {
   }
 
   private async resolveSourceRevision(repoSlug: string, revision: string) {
+    // Commit hashes are already valid source revisions. Avoid unrelated ref-list
+    // requests, which can fail even when the commit itself is readable.
+    if (/^[0-9a-f]{7,40}$/i.test(revision)) {
+      return revision;
+    }
+
     let branchHash = await this.findRefCommitHash(repoSlug, 'branches', revision);
     if (branchHash) {
       return branchHash;

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { SternFinancialDataClient } from '../lib/client';
 import { sternFinancialDataServiceError } from '../lib/errors';
 import { applySourceFilters, type BetaFilters, type ErpFilters } from '../lib/filters';
+import { normalizeSourceId, SOURCE_INPUT_IDS, type SourceId } from '../lib/sources';
 import { spec } from '../spec';
 
 let commonControls = {
@@ -37,9 +38,9 @@ let percentageDescription = 'Decimal percentage value; for example, 0.05 means 5
 
 let inputSchema = z.object({
   source: z
-    .enum(['erp', 'us_industry_betas', 'global_industry_betas'])
+    .enum(SOURCE_INPUT_IDS)
     .describe(
-      'Source id to retrieve. Allowed values: erp, us_industry_betas, global_industry_betas.'
+      'Source id to retrieve. Prefer canonical ids erp, us_industry_betas, and global_industry_betas. Stern dataset aliases ctryprem and betas are also accepted for ERP and US industry betas.'
     ),
   ...commonControls,
   countries: z
@@ -199,8 +200,8 @@ let rejectUnsupportedFilters = (
   }
 };
 
-let validateInput = (input: GetSourceInput) => {
-  if (input.source === 'erp') {
+let validateInput = (input: GetSourceInput, sourceId: SourceId) => {
+  if (sourceId === 'erp') {
     rejectUnsupportedFilters(input, betaOnlyFilterKeys, 'Industry beta');
     validateRange(input.minEquityRiskPremium, input.maxEquityRiskPremium, 'equityRiskPremium');
     validateRange(
@@ -235,14 +236,16 @@ export let getSource = SlateTool.create(spec, {
   .input(inputSchema)
   .output(outputSchema)
   .handleInvocation(async ctx => {
-    validateInput(ctx.input);
+    let sourceId = normalizeSourceId(ctx.input.source);
+    validateInput(ctx.input, sourceId);
 
     let client = new SternFinancialDataClient();
-    let result = await client.getSource(ctx.input.source);
+    let result = await client.getSource(sourceId);
+    let sourceFilters = { ...ctx.input, source: sourceId };
     let paginated = applySourceFilters(
-      ctx.input.source,
+      sourceId,
       result.rows,
-      ctx.input.source === 'erp' ? (ctx.input as ErpFilters) : (ctx.input as BetaFilters)
+      sourceId === 'erp' ? (sourceFilters as ErpFilters) : (sourceFilters as BetaFilters)
     );
 
     return {
@@ -257,7 +260,7 @@ export let getSource = SlateTool.create(spec, {
         truncated: paginated.truncated,
         rows: paginated.returnedRows
       },
-      message: `Retrieved **${paginated.returnedRowCount}** of **${paginated.filteredRowCount}** filtered Stern **${ctx.input.source}** rows.`
+      message: `Retrieved **${paginated.returnedRowCount}** of **${paginated.filteredRowCount}** filtered Stern **${sourceId}** rows.`
     };
   })
   .build();

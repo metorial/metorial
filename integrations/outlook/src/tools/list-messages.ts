@@ -29,7 +29,9 @@ export let listMessages = SlateTool.create(spec, {
       orderby: z
         .string()
         .optional()
-        .describe('OData orderby expression (e.g., "receivedDateTime desc")'),
+        .describe(
+          'OData orderby expression (e.g., "receivedDateTime desc"). Ignored when search is provided because Microsoft Graph controls search-result ordering.'
+        ),
       top: z
         .number()
         .optional()
@@ -74,7 +76,7 @@ export let listMessages = SlateTool.create(spec, {
       folderId: ctx.input.folderId,
       search: ctx.input.search,
       filter: ctx.input.filter,
-      orderby: ctx.input.orderby || 'receivedDateTime desc',
+      orderby: ctx.input.search ? undefined : ctx.input.orderby || 'receivedDateTime desc',
       top: ctx.input.top || 10,
       skip: ctx.input.skip,
       select: [

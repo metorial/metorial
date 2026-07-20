@@ -84,6 +84,11 @@ describe('SonarQube workflow tool helpers', () => {
     expect(() => resolveWorkspaceFilePath('/tmp/outside.ts', process.cwd())).toThrow(
       /relative/
     );
+    await expect(
+      readWorkspaceFileContent('source/not-present-in-provider-runtime.ts', process.cwd())
+    ).rejects.toThrow(
+      /Could not read filePath 'source\/not-present-in-provider-runtime\.ts' from the current workspace/
+    );
   });
 
   it('omits empty advanced-analysis flows and locations like the official mapper', () => {

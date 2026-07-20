@@ -1,5 +1,6 @@
 import { describeMcpCompatibleToolSchemas } from '@slates/test';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 import { provider } from './index';
 
 describeMcpCompatibleToolSchemas('SonarQube tool input schemas', provider.actions);
@@ -167,6 +168,14 @@ describe('SonarQube advanced analysis schema', () => {
     });
 
     expect(result?.success).toBe(true);
+  });
+
+  it('does not expose fileContent in the workspace-backed schema', () => {
+    let schema = z.toJSONSchema(advancedAnalysisTool?.inputSchema ?? z.object({})) as {
+      properties?: Record<string, unknown>;
+    };
+
+    expect(schema.properties).not.toHaveProperty('fileContent');
   });
 
   it('rejects unsupported advanced analysis file scopes', () => {

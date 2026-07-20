@@ -1,6 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { JiraClient } from '../lib/client';
+import { resolveJiraIssueIdOrKey } from '../lib/errors';
 import { spec } from '../spec';
 
 export let addCommentTool = SlateTool.create(spec, {
@@ -162,7 +163,11 @@ export let listCommentsTool = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      issueIdOrKey: z.string().describe('The issue key or ID.'),
+      issueIdOrKey: z.string().optional().describe('The issue key or ID. Preferred field.'),
+      issueKey: z
+        .string()
+        .optional()
+        .describe('Legacy alias for issueIdOrKey, used only when issueIdOrKey is omitted.'),
       startAt: z.number().optional().default(0).describe('Pagination start index.'),
       maxResults: z.number().optional().default(50).describe('Maximum comments to return.')
     })
@@ -189,7 +194,8 @@ export let listCommentsTool = SlateTool.create(spec, {
       refreshToken: ctx.auth.refreshToken
     });
 
-    let result = await client.getComments(ctx.input.issueIdOrKey, {
+    let issueIdOrKey = resolveJiraIssueIdOrKey(ctx.input);
+    let result = await client.getComments(issueIdOrKey, {
       startAt: ctx.input.startAt,
       maxResults: ctx.input.maxResults
     });
@@ -208,7 +214,7 @@ export let listCommentsTool = SlateTool.create(spec, {
         total: result.total,
         comments
       },
-      message: `Found **${result.total}** comments on **${ctx.input.issueIdOrKey}**. Returned ${comments.length}.`
+      message: `Found **${result.total}** comments on **${issueIdOrKey}**. Returned ${comments.length}.`
     };
   })
   .build();
