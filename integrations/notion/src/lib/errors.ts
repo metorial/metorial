@@ -1,7 +1,11 @@
-import { buildApiServiceError } from 'slates';
+import { buildApiServiceError, SlateError } from 'slates';
 
-export let notionApiError = (error: unknown, operation = 'request') =>
-  buildApiServiceError(error, {
+export let notionApiError = (error: unknown, operation = 'request') => {
+  if (SlateError.is(error)) {
+    return error;
+  }
+
+  return buildApiServiceError(error, {
     providerLabel: 'Notion',
     operation,
     reason: 'notion_api_error',
@@ -14,3 +18,4 @@ export let notionApiError = (error: unknown, operation = 'request') =>
       return typeof code === 'string' || typeof code === 'number' ? String(code) : undefined;
     }
   });
+};
