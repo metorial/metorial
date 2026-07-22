@@ -1,5 +1,11 @@
 {
   "vitest.disableWorkspaceWarning": true,
   "typescript.tsdk": "node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "json.schemas": [
+    {
+      "fileMatch": ["/integrations/*/slate.json", "/test-integrations/*/slate.json"],
+      "url": "./slate.schema.json"
+    }
+  ]
 }

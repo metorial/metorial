@@ -1,5 +1,12 @@
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import {
+  API_VERSION_DESCRIPTION,
+  DEFAULT_API_VERSION,
+  normalizeConnection,
+  SERVER_URL_DESCRIPTION,
+  SITE_CONTENT_URL_DESCRIPTION
+} from './lib/connection';
 import { tableauApiError, tableauServiceError } from './lib/errors';
 
 type TableauAuthOutput = {
@@ -8,6 +15,9 @@ type TableauAuthOutput = {
   userId: string;
   expiresAt?: string;
   authMethod?: 'personal_access_token' | 'username_password' | 'connected_app_jwt';
+  serverUrl?: string;
+  apiVersion?: string;
+  siteContentUrl?: string;
 };
 
 type TableauSignInInput = {
@@ -44,20 +54,31 @@ let estimateTokenExpiresAt = (serverUrl: string) => {
   return new Date(Date.now() + lifetimeMinutes * 60 * 1000).toISOString();
 };
 
+let withSignInHint = (serviceError: ReturnType<typeof tableauApiError>) => {
+  let message = serviceError.data?.message;
+  if (typeof message === 'string' && message.includes('401001')) {
+    serviceError.data.message =
+      `${message} — check that the site content URL is only the site name after /site/ in your Tableau browser URL (e.g. "mysite", not a full URL), ` +
+      `that the credentials are still valid (Tableau Cloud personal access tokens expire after 15 days without use and are invalidated when a token with the same name is created), ` +
+      `and that the signing-in user has access to the site.`;
+  }
+  return serviceError;
+};
+
 let signIn = async (
   input: TableauSignInInput,
   credentials: Record<string, unknown>,
   authMethod: NonNullable<TableauAuthOutput['authMethod']>
 ) => {
-  let baseUrl = input.serverUrl.replace(/\/+$/, '');
-  let http = createAxios({ baseURL: baseUrl });
+  let { serverUrl, siteContentUrl, apiVersion } = normalizeConnection(input);
+  let http = createAxios({ baseURL: serverUrl });
 
   try {
-    let response = await http.post(`/api/${input.apiVersion}/auth/signin`, {
+    let response = await http.post(`/api/${apiVersion}/auth/signin`, {
       credentials: {
         ...credentials,
         site: {
-          contentUrl: input.siteContentUrl
+          contentUrl: siteContentUrl
         }
       }
     });
@@ -78,12 +99,15 @@ let signIn = async (
         token: responseCredentials.token,
         siteId: responseCredentials.site.id,
         userId: responseCredentials.user.id,
-        expiresAt: estimateTokenExpiresAt(input.serverUrl),
-        authMethod
+        expiresAt: estimateTokenExpiresAt(serverUrl),
+        authMethod,
+        serverUrl,
+        apiVersion,
+        siteContentUrl
       }
     };
   } catch (error) {
-    throw tableauApiError(error, 'sign-in');
+    throw withSignInHint(tableauApiError(error, 'sign-in'));
   }
 };
 
@@ -92,10 +116,18 @@ let getProfile = async (ctx: { output: TableauAuthOutput; input: any }) => {
     profile: {
       id: ctx.output.userId,
       siteId: ctx.output.siteId,
+      siteContentUrl: ctx.output.siteContentUrl,
+      serverUrl: ctx.output.serverUrl,
       authMethod: ctx.output.authMethod,
       expiresAt: ctx.output.expiresAt
     }
   };
+};
+
+let connectionInputFields = {
+  serverUrl: z.string().describe(SERVER_URL_DESCRIPTION),
+  siteContentUrl: z.string().default('').describe(SITE_CONTENT_URL_DESCRIPTION),
+  apiVersion: z.string().default(DEFAULT_API_VERSION).describe(API_VERSION_DESCRIPTION)
 };
 
 let personalAccessTokenAuth = {
@@ -103,10 +135,16 @@ let personalAccessTokenAuth = {
   name: 'Personal Access Token',
   key: 'personal_access_token',
 
+  docs: [
+    {
+      type: 'docs.auth.custom' as const,
+      name: 'Tableau personal access tokens',
+      url: 'https://help.tableau.com/current/online/en-us/security_personal_access_tokens.htm'
+    }
+  ],
+
   inputSchema: z.object({
-    serverUrl: z.string().describe('Tableau Server or Cloud URL'),
-    siteContentUrl: z.string().default('').describe('Site content URL'),
-    apiVersion: z.string().default('3.28').describe('API version'),
+    ...connectionInputFields,
     tokenName: z.string().describe('Personal access token name'),
     tokenSecret: z.string().describe('Personal access token secret')
   }),
@@ -145,10 +183,16 @@ let usernamePasswordAuth = {
   name: 'Username & Password',
   key: 'username_password',
 
+  docs: [
+    {
+      type: 'docs.auth.custom' as const,
+      name: 'Tableau REST API sign-in',
+      url: 'https://help.tableau.com/current/api/rest_api/en-us/REST/rest_api_concepts_auth.htm'
+    }
+  ],
+
   inputSchema: z.object({
-    serverUrl: z.string().describe('Tableau Server or Cloud URL'),
-    siteContentUrl: z.string().default('').describe('Site content URL'),
-    apiVersion: z.string().default('3.28').describe('API version'),
+    ...connectionInputFields,
     username: z.string().describe('Tableau username'),
     password: z.string().describe('Tableau password')
   }),
@@ -187,10 +231,16 @@ let connectedAppJwtAuth = {
   name: 'Connected App JWT',
   key: 'connected_app_jwt',
 
+  docs: [
+    {
+      type: 'docs.auth.custom' as const,
+      name: 'Tableau connected apps',
+      url: 'https://help.tableau.com/current/online/en-us/connected_apps.htm'
+    }
+  ],
+
   inputSchema: z.object({
-    serverUrl: z.string().describe('Tableau Server or Cloud URL'),
-    siteContentUrl: z.string().default('').describe('Site content URL'),
-    apiVersion: z.string().default('3.28').describe('API version'),
+    ...connectionInputFields,
     jwt: z.string().describe('JWT generated for a Tableau connected app or UAT'),
     isUat: z
       .boolean()
@@ -227,7 +277,19 @@ export let auth = SlateAuth.create()
       authMethod: z
         .enum(['personal_access_token', 'username_password', 'connected_app_jwt'])
         .optional()
-        .describe('Authentication method used to obtain the Tableau credentials token')
+        .describe('Authentication method used to obtain the Tableau credentials token'),
+      serverUrl: z
+        .string()
+        .optional()
+        .describe('Normalized Tableau base URL the credentials token was issued by'),
+      apiVersion: z
+        .string()
+        .optional()
+        .describe('Tableau REST API version used at sign-in'),
+      siteContentUrl: z
+        .string()
+        .optional()
+        .describe('Normalized site content URL (site name) used at sign-in')
     })
   )
   .addCustomAuth(personalAccessTokenAuth)

@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Slate manifest (slate.json)",
+  "description": "Metadata for a Slates integration package. The Slates registry validates this file at publish time; this schema mirrors that validation for editor and CI feedback.",
+  "type": "object",
+  "required": ["name"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Slate identifier in @scope/name form, e.g. @metorial/tableau. Must match the registry scope and slate identifiers at publish time."
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable summary of the integration. Falls back to the package.json description when omitted."
+    },
+    "categories": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "skills": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "logoUrl": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "description": "Ignored by the registry; the published version always comes from package.json."
+    },
+    "timeout": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 900,
+      "description": "Function timeout in seconds for the deployed slate. The platform default applies when omitted. Maximum is 900 — the AWS Lambda hard limit; Function Bay passes the value through unclamped, so larger values fail the deployment."
+    }
+  }
+}

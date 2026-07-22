@@ -1471,7 +1471,7 @@
     },
     "integrations/bigquery": {
       "name": "@slates-integrations/bigquery",
-      "version": "0.2.0-rc.8",
+      "version": "0.2.0-rc.9",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -2801,7 +2801,7 @@
     },
     "integrations/compute-engine": {
       "name": "@slates-integrations/compute-engine",
-      "version": "0.1.0-rc.1",
+      "version": "0.1.0-rc.2",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -5425,7 +5425,7 @@
     },
     "integrations/gmail": {
       "name": "@slates-integrations/gmail",
-      "version": "0.2.0-rc.16",
+      "version": "0.2.0-rc.17",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/google-people-recipes": "1.0.0-rc.4",
@@ -5562,7 +5562,7 @@
     },
     "integrations/google-chat": {
       "name": "@slates-integrations/google-chat",
-      "version": "0.1.0-rc.1",
+      "version": "0.1.0-rc.2",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -8482,7 +8482,7 @@
     },
     "integrations/natural": {
       "name": "@slates-integrations/natural",
-      "version": "0.1.0-rc.2",
+      "version": "0.1.0-rc.3",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -8709,14 +8709,16 @@
     },
     "integrations/notion": {
       "name": "@slates-integrations/notion",
-      "version": "0.2.0-rc.9",
+      "version": "0.2.0-rc.10",
       "dependencies": {
         "@types/node": "^20",
-        "slates": "1.0.0-rc.13",
+        "slates": "1.0.0-rc.15",
         "zod": "^4.2",
       },
       "devDependencies": {
+        "@slates/test": "1.0.0-rc.9",
         "typescript": "^5",
+        "vitest": "^3.1.2",
       },
     },
     "integrations/nozbe-teams": {
@@ -12379,7 +12381,7 @@
     },
     "integrations/tableau": {
       "name": "@slates-integrations/tableau",
-      "version": "0.2.0-rc.12",
+      "version": "0.2.0-rc.13",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -12388,6 +12390,7 @@
       },
       "devDependencies": {
         "typescript": "^5",
+        "vitest": "^3.1.2",
       },
     },
     "integrations/taggun": {

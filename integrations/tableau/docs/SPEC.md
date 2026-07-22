@@ -8,7 +8,9 @@ The default REST API version is `3.28`, matching Tableau 2026.1 documentation. C
 
 ## Authentication
 
-The integration signs in to Tableau and stores the returned credentials token, site LUID, user LUID, estimated expiration time, and auth method.
+The integration signs in to Tableau and stores the returned credentials token, site LUID, user LUID, estimated expiration time, auth method, and the normalized connection details (server URL, API version, site content URL) the token was issued for. Tools build their API client from the stored auth output, so requests always target the server that issued the token.
+
+Connection details are collected on each authentication method (not in the deployment config): the server URL is the Tableau base URL (e.g. `https://dub01.online.tableau.com`), and the site content URL is only the site name that appears after `/site/` in the Tableau browser URL (e.g. `mysite`). Inputs are normalized before sign-in — full browser URLs pasted into either field are reduced to the base URL / site name, and an empty site content URL is rejected on Tableau Cloud, which has no default site.
 
 Supported sign-in methods:
 
