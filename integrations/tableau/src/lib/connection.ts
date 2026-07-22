@@ -43,8 +43,9 @@ export let normalizeSiteContentUrl = (raw: string | undefined) => {
   let trimmed = (raw ?? '').trim();
   if (!trimmed) return '';
 
-  // Users often paste the full browser URL (.../#/site/<name>/...); extract the site name.
-  let siteSegment = trimmed.match(/(?:^|[/#])site\/([^/?#]+)/i);
+  // Users often paste a full Tableau URL — browser URLs (.../#/site/<name>/...) or
+  // share/embed links (.../t/<name>/...); extract the site name.
+  let siteSegment = trimmed.match(/(?:^|[/#])(?:site|t)\/([^/?#]+)/i);
   if (siteSegment) return siteSegment[1];
 
   let cleaned = trimmed.replace(/^[#/]+|\/+$/g, '');

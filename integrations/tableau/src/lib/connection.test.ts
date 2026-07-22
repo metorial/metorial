@@ -22,7 +22,7 @@ describe('normalizeServerUrl', () => {
   });
 
   it('strips pasted browser paths and hashes', () => {
-    expect(normalizeServerUrl('https://dub01.online.tableau.com/#/site/tractive/home')).toBe(
+    expect(normalizeServerUrl('https://dub01.online.tableau.com/#/site/acme/home')).toBe(
       'https://dub01.online.tableau.com'
     );
   });
@@ -50,21 +50,28 @@ describe('normalizeServerUrl', () => {
 
 describe('normalizeSiteContentUrl', () => {
   it('keeps a bare site name', () => {
-    expect(normalizeSiteContentUrl('tractive')).toBe('tractive');
+    expect(normalizeSiteContentUrl('acme')).toBe('acme');
   });
 
   it('extracts the site name from a pasted full browser URL', () => {
     expect(
-      normalizeSiteContentUrl('https://dub01.online.tableau.com/#/site/tractive')
-    ).toBe('tractive');
+      normalizeSiteContentUrl('https://dub01.online.tableau.com/#/site/acme')
+    ).toBe('acme');
   });
 
   it('extracts the site name from URL fragments and deeper paths', () => {
-    expect(normalizeSiteContentUrl('#/site/tractive')).toBe('tractive');
-    expect(normalizeSiteContentUrl('/site/tractive/workbooks')).toBe('tractive');
+    expect(normalizeSiteContentUrl('#/site/acme')).toBe('acme');
+    expect(normalizeSiteContentUrl('/site/acme/workbooks')).toBe('acme');
     expect(
-      normalizeSiteContentUrl('https://dub01.online.tableau.com/#/site/tractive/views?x=1')
-    ).toBe('tractive');
+      normalizeSiteContentUrl('https://dub01.online.tableau.com/#/site/acme/views?x=1')
+    ).toBe('acme');
+  });
+
+  it('extracts the site name from /t/ share and embed links', () => {
+    expect(
+      normalizeSiteContentUrl('https://dub01.online.tableau.com/t/acme/views/Dashboard')
+    ).toBe('acme');
+    expect(normalizeSiteContentUrl('/t/acme')).toBe('acme');
   });
 
   it('passes through empty values for the Tableau Server default site', () => {
@@ -74,7 +81,7 @@ describe('normalizeSiteContentUrl', () => {
   });
 
   it('trims surrounding slashes and hashes', () => {
-    expect(normalizeSiteContentUrl('/tractive/')).toBe('tractive');
+    expect(normalizeSiteContentUrl('/acme/')).toBe('acme');
   });
 
   it('rejects URLs and hostnames without a /site/ segment', () => {
@@ -107,16 +114,16 @@ describe('normalizeApiVersion', () => {
 });
 
 describe('normalizeConnection', () => {
-  it('normalizes the exact customer input', () => {
+  it('normalizes a full pasted browser URL in both fields', () => {
     expect(
       normalizeConnection({
         serverUrl: 'https://dub01.online.tableau.com/',
-        siteContentUrl: 'https://dub01.online.tableau.com/#/site/tractive',
+        siteContentUrl: 'https://dub01.online.tableau.com/#/site/acme',
         apiVersion: '3.28'
       })
     ).toEqual({
       serverUrl: 'https://dub01.online.tableau.com',
-      siteContentUrl: 'tractive',
+      siteContentUrl: 'acme',
       apiVersion: '3.28'
     });
   });
