@@ -1,7 +1,34 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { LookerClient } from '../lib/client';
 import { spec } from '../spec';
+
+function optionalString(value: unknown) {
+  return typeof value === 'string' ? value : undefined;
+}
+
+function optionalStringArray(value: unknown) {
+  if (!Array.isArray(value)) return undefined;
+  return value.filter((item): item is string => typeof item === 'string');
+}
+
+function requireArray(value: unknown, action: string): unknown[] {
+  if (!Array.isArray(value)) {
+    throw createApiServiceError(`Looker returned an invalid response for ${action}.`, {
+      reason: 'looker_connection_response_invalid'
+    });
+  }
+
+  return value;
+}
+
+function requireConnectionName(connectionName: string | undefined) {
+  if (connectionName) return connectionName;
+
+  throw createApiServiceError('connectionName is required for this action', {
+    reason: 'looker_connection_name_required'
+  });
+}
 
 export let manageConnection = SlateTool.create(spec, {
   name: 'Manage Connection',
@@ -30,7 +57,28 @@ export let manageConnection = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Schema name (for list_tables, list_columns)'),
-      tableName: z.string().optional().describe('Table name (for list_columns)')
+      tableName: z.string().optional().describe('Exact table name (for list_columns)'),
+      tests: z
+        .array(z.string().min(1))
+        .min(1)
+        .optional()
+        .describe('Connection test names to run (for test); omit to run all supported tests'),
+      useCache: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether to use cached metadata (for list_schemas, list_tables, list_columns)'
+        ),
+      tableFilter: z
+        .string()
+        .optional()
+        .describe('Return tables whose names contain this value (for list_tables)'),
+      tableLimit: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Maximum tables to return per schema (for list_tables, list_columns)')
     })
   )
   .output(
@@ -111,96 +159,147 @@ export let manageConnection = SlateTool.create(spec, {
 
     switch (ctx.input.action) {
       case 'list': {
-        let connections = await client.listConnections();
-        let mapped = (connections || []).map((c: any) => ({
-          connectionName: c.name,
-          host: c.host,
-          port: c.port ? String(c.port) : undefined,
-          database: c.database,
-          dialectName: c.dialect_name,
-          schema: c.schema
-        }));
+        let connections = requireArray(await client.listConnections(), 'list connections');
+        let mapped = connections.flatMap((connection: any) => {
+          let connectionName = optionalString(connection?.name);
+          if (!connectionName) return [];
+
+          return [
+            {
+              connectionName,
+              host: optionalString(connection.host),
+              port: connection.port == null ? undefined : String(connection.port),
+              database: optionalString(connection.database),
+              dialectName: optionalString(connection.dialect_name),
+              schema: optionalString(connection.schema)
+            }
+          ];
+        });
         return {
           output: { connections: mapped },
           message: `Found **${mapped.length}** database connection(s).`
         };
       }
       case 'get': {
-        if (!ctx.input.connectionName) throw new Error('connectionName is required');
-        let conn = await client.getConnection(ctx.input.connectionName);
+        let connectionName = requireConnectionName(ctx.input.connectionName);
+        let conn = await client.getConnection(connectionName);
         return {
           output: {
             connection: {
-              connectionName: conn.name,
-              host: conn.host,
-              port: conn.port ? String(conn.port) : undefined,
-              database: conn.database,
-              dialectName: conn.dialect_name,
-              schema: conn.schema,
-              createdAt: conn.created_at,
-              userAttributeFields: conn.user_attribute_fields
+              connectionName: optionalString(conn.name) ?? connectionName,
+              host: optionalString(conn.host),
+              port: conn.port == null ? undefined : String(conn.port),
+              database: optionalString(conn.database),
+              dialectName: optionalString(conn.dialect_name),
+              schema: optionalString(conn.schema),
+              createdAt: optionalString(conn.created_at),
+              userAttributeFields: optionalStringArray(conn.user_attribute_fields)
             }
           },
-          message: `Retrieved connection **${conn.name}** (${conn.dialect_name}).`
+          message: `Retrieved connection **${optionalString(conn.name) ?? connectionName}**${conn.dialect_name ? ` (${conn.dialect_name})` : ''}.`
         };
       }
       case 'test': {
-        if (!ctx.input.connectionName) throw new Error('connectionName is required');
-        let results = await client.testConnection(ctx.input.connectionName);
-        let testResults = (results || []).map((r: any) => ({
-          name: r.name,
-          status: r.status,
-          message: r.message
+        let connectionName = requireConnectionName(ctx.input.connectionName);
+        let results = requireArray(
+          await client.testConnection(connectionName, { tests: ctx.input.tests }),
+          'test a connection'
+        );
+        let testResults = results.map((result: any) => ({
+          name: optionalString(result?.name),
+          status: optionalString(result?.status),
+          message: optionalString(result?.message)
         }));
         let passed = testResults.filter((r: any) => r.status === 'success').length;
         return {
           output: { testResults },
-          message: `Connection test for **${ctx.input.connectionName}**: ${passed}/${testResults.length} tests passed.`
+          message: `Connection test for **${connectionName}**: ${passed}/${testResults.length} tests passed.`
         };
       }
       case 'list_schemas': {
-        if (!ctx.input.connectionName) throw new Error('connectionName is required');
-        let schemas = await client.connectionSchemas(ctx.input.connectionName, {
-          database: ctx.input.database
+        let connectionName = requireConnectionName(ctx.input.connectionName);
+        let schemas = requireArray(
+          await client.connectionSchemas(connectionName, {
+            database: ctx.input.database,
+            cache: ctx.input.useCache
+          }),
+          'list connection schemas'
+        );
+        let mapped = schemas.flatMap((schema: any) => {
+          let schemaName = optionalString(schema?.name);
+          if (!schemaName) return [];
+
+          return [
+            {
+              schemaName,
+              isDefault: typeof schema.is_default === 'boolean' ? schema.is_default : undefined
+            }
+          ];
         });
-        let mapped = (schemas || []).map((s: any) => ({
-          schemaName: s.name,
-          isDefault: s.is_default
-        }));
         return {
           output: { schemas: mapped },
-          message: `Found **${mapped.length}** schema(s) in connection **${ctx.input.connectionName}**.`
+          message: `Found **${mapped.length}** schema(s) in connection **${connectionName}**.`
         };
       }
       case 'list_tables': {
-        if (!ctx.input.connectionName) throw new Error('connectionName is required');
-        let tables = await client.connectionTables(ctx.input.connectionName, {
-          database: ctx.input.database,
-          schema_name: ctx.input.schemaName
-        });
-        let mapped = (tables || []).map((t: any) => ({
-          tableName: t.name,
-          schemaName: t.schema,
-          rows: t.rows
-        }));
+        let connectionName = requireConnectionName(ctx.input.connectionName);
+        let schemaTables = requireArray(
+          await client.connectionTables(connectionName, {
+            database: ctx.input.database,
+            schema_name: ctx.input.schemaName,
+            cache: ctx.input.useCache,
+            table_filter: ctx.input.tableFilter,
+            table_limit: ctx.input.tableLimit
+          }),
+          'list connection tables'
+        );
+        let mapped = schemaTables.flatMap((schema: any) =>
+          (Array.isArray(schema?.tables) ? schema.tables : []).flatMap((table: any) => {
+            let tableName = optionalString(table.name);
+            if (!tableName) return [];
+
+            return [
+              {
+                tableName,
+                schemaName: optionalString(table.schema_name) ?? optionalString(schema.name),
+                rows: typeof table.rows === 'number' ? table.rows : undefined
+              }
+            ];
+          })
+        );
         return {
           output: { tables: mapped },
           message: `Found **${mapped.length}** table(s)${ctx.input.schemaName ? ` in schema ${ctx.input.schemaName}` : ''}.`
         };
       }
       case 'list_columns': {
-        if (!ctx.input.connectionName) throw new Error('connectionName is required');
-        let columns = await client.connectionColumns(ctx.input.connectionName, {
-          database: ctx.input.database,
-          schema_name: ctx.input.schemaName,
-          table_name: ctx.input.tableName
-        });
-        let mapped = (columns || []).map((c: any) => ({
-          columnName: c.name,
-          dataType: c.data_type,
-          tableName: c.table_name,
-          schemaName: c.schema_name
-        }));
+        let connectionName = requireConnectionName(ctx.input.connectionName);
+        let schemaColumns = requireArray(
+          await client.connectionColumns(connectionName, {
+            database: ctx.input.database,
+            schema_name: ctx.input.schemaName,
+            cache: ctx.input.useCache,
+            table_limit: ctx.input.tableLimit,
+            table_names: ctx.input.tableName
+          }),
+          'list connection columns'
+        );
+        let mapped = schemaColumns.flatMap((table: any) =>
+          (Array.isArray(table?.columns) ? table.columns : []).flatMap((column: any) => {
+            let columnName = optionalString(column.name);
+            if (!columnName) return [];
+
+            return [
+              {
+                columnName,
+                dataType: optionalString(column.data_type),
+                tableName: optionalString(table.name),
+                schemaName:
+                  optionalString(column.schema_name) ?? optionalString(table.schema_name)
+              }
+            ];
+          })
+        );
         return {
           output: { columns: mapped },
           message: `Found **${mapped.length}** column(s)${ctx.input.tableName ? ` in table ${ctx.input.tableName}` : ''}.`

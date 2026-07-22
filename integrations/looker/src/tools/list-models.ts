@@ -1,7 +1,25 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient } from '../lib/client';
+import {
+  LookerClient,
+  type LookerLookmlModel,
+  type LookerLookmlModelExploreField,
+  type LookerLookmlModelNavExplore
+} from '../lib/client';
 import { spec } from '../spec';
+
+let requireResponseName = (
+  value: string | null | undefined,
+  resource: 'model' | 'explore' | 'field'
+) => {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw createApiServiceError(`Looker returned a ${resource} without a name.`, {
+      reason: `looker_lookml_${resource}_name_missing`
+    });
+  }
+
+  return value;
+};
 
 export let listModels = SlateTool.create(spec, {
   name: 'List LookML Models',
@@ -48,6 +66,7 @@ export let listModels = SlateTool.create(spec, {
         .describe('List of models'),
       explore: z
         .object({
+          exploreId: z.string().optional().describe('Fully qualified explore identifier'),
           exploreName: z.string().describe('Explore name'),
           modelName: z.string().describe('Model name'),
           label: z.string().optional().describe('Explore label'),
@@ -86,7 +105,18 @@ export let listModels = SlateTool.create(spec, {
                   })
                 )
                 .optional()
-                .describe('Available filter-only fields')
+                .describe('Available filter-only fields'),
+              parameters: z
+                .array(
+                  z.object({
+                    name: z.string().describe('Parameter name'),
+                    label: z.string().optional().describe('Parameter label'),
+                    type: z.string().optional().describe('Parameter type'),
+                    description: z.string().optional().describe('Parameter description')
+                  })
+                )
+                .optional()
+                .describe('Available parameter fields')
             })
             .optional()
             .describe('Available fields (only for explore details)')
@@ -96,75 +126,100 @@ export let listModels = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.modelName !== undefined && ctx.input.modelName.length === 0) {
+      throw createApiServiceError('modelName cannot be empty.', {
+        reason: 'looker_model_name_empty'
+      });
+    }
+    if (ctx.input.exploreName !== undefined && ctx.input.exploreName.length === 0) {
+      throw createApiServiceError('exploreName cannot be empty.', {
+        reason: 'looker_explore_name_empty'
+      });
+    }
+    if (ctx.input.exploreName !== undefined && ctx.input.modelName === undefined) {
+      throw createApiServiceError('modelName is required when exploreName is provided.', {
+        reason: 'looker_explore_model_name_required'
+      });
+    }
+
     let client = new LookerClient({
       instanceUrl: ctx.config.instanceUrl,
       token: ctx.auth.token
     });
 
-    if (ctx.input.modelName && ctx.input.exploreName) {
+    if (ctx.input.modelName !== undefined && ctx.input.exploreName !== undefined) {
       let explore = await client.getLookmlModelExplore(
         ctx.input.modelName,
         ctx.input.exploreName
       );
 
-      let mapField = (f: any) => ({
-        name: f.name,
-        label: f.label_short || f.label,
-        type: f.type,
-        description: f.description
+      let mapField = (field: LookerLookmlModelExploreField) => ({
+        name: requireResponseName(field.name, 'field'),
+        label: field.label_short ?? field.label ?? undefined,
+        type: field.type ?? undefined,
+        description: field.description ?? undefined
       });
 
       return {
         output: {
           explore: {
-            exploreName: explore.name,
-            modelName: explore.model_name,
-            label: explore.label,
-            description: explore.description,
+            exploreId:
+              typeof explore.id === 'string' && explore.id.length > 0 ? explore.id : undefined,
+            exploreName: requireResponseName(explore.name, 'explore'),
+            modelName: requireResponseName(explore.model_name, 'model'),
+            label: explore.label ?? undefined,
+            description: explore.description ?? undefined,
             fields: {
               dimensions: explore.fields?.dimensions?.map(mapField),
               measures: explore.fields?.measures?.map(mapField),
-              filters: explore.fields?.filters?.map(mapField)
+              filters: explore.fields?.filters?.map(mapField),
+              parameters: explore.fields?.parameters?.map(mapField)
             }
           }
         },
-        message: `Retrieved explore **${explore.label || explore.name}** from model **${ctx.input.modelName}** with ${explore.fields?.dimensions?.length || 0} dimensions and ${explore.fields?.measures?.length || 0} measures.`
+        message: `Retrieved explore **${explore.label ?? explore.name ?? ctx.input.exploreName}** from model **${ctx.input.modelName}** with ${explore.fields?.dimensions?.length ?? 0} dimensions and ${explore.fields?.measures?.length ?? 0} measures.`
       };
     }
 
-    if (ctx.input.modelName) {
+    if (ctx.input.modelName !== undefined) {
       let model = await client.getLookmlModel(ctx.input.modelName);
       return {
         output: {
           models: [
             {
-              modelName: model.name,
-              label: model.label,
-              projectName: model.project_name,
-              explores: model.explores?.map((e: any) => ({
-                exploreName: e.name,
-                label: e.label,
-                description: e.description,
-                hidden: e.hidden
+              modelName: requireResponseName(model.name, 'model'),
+              label: model.label ?? undefined,
+              projectName: model.project_name ?? undefined,
+              explores: model.explores?.map(explore => ({
+                exploreName: requireResponseName(explore.name, 'explore'),
+                label: explore.label ?? undefined,
+                description: explore.description ?? undefined,
+                hidden: explore.hidden ?? undefined
               }))
             }
           ]
         },
-        message: `Retrieved model **${model.label || model.name}** with ${model.explores?.length || 0} explore(s).`
+        message: `Retrieved model **${model.label ?? model.name ?? ctx.input.modelName}** with ${model.explores?.length ?? 0} explore(s).`
       };
     }
 
     let models = await client.listLookmlModels();
-    let mappedModels = (models || []).map((m: any) => ({
-      modelName: m.name,
-      label: m.label,
-      projectName: m.project_name,
-      explores: m.explores?.map((e: any) => ({
-        exploreName: e.name,
-        label: e.label,
-        description: e.description,
-        hidden: e.hidden
-      }))
+    if (!Array.isArray(models)) {
+      throw createApiServiceError('Looker returned an invalid LookML model list.', {
+        reason: 'looker_lookml_model_list_invalid'
+      });
+    }
+    let mapExplore = (explore: LookerLookmlModelNavExplore) => ({
+      exploreName: requireResponseName(explore.name, 'explore'),
+      label: explore.label ?? undefined,
+      description: explore.description ?? undefined,
+      hidden: explore.hidden ?? undefined
+    });
+    let mappedModels = models.map((model: LookerLookmlModel) => ({
+      modelName: requireResponseName(model.name, 'model'),
+      label: model.label ?? undefined,
+      projectName: model.project_name ?? undefined,
+      explores: model.explores?.map(mapExplore)
     }));
 
     return {

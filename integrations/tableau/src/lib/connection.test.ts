@@ -54,9 +54,9 @@ describe('normalizeSiteContentUrl', () => {
   });
 
   it('extracts the site name from a pasted full browser URL', () => {
-    expect(
-      normalizeSiteContentUrl('https://dub01.online.tableau.com/#/site/acme')
-    ).toBe('acme');
+    expect(normalizeSiteContentUrl('https://dub01.online.tableau.com/#/site/acme')).toBe(
+      'acme'
+    );
   });
 
   it('extracts the site name from URL fragments and deeper paths', () => {
@@ -85,9 +85,9 @@ describe('normalizeSiteContentUrl', () => {
   });
 
   it('rejects URLs and hostnames without a /site/ segment', () => {
-    expect(() =>
-      normalizeSiteContentUrl('https://dub01.online.tableau.com')
-    ).toThrowError(/not a Tableau site name/);
+    expect(() => normalizeSiteContentUrl('https://dub01.online.tableau.com')).toThrowError(
+      /not a Tableau site name/
+    );
     expect(() => normalizeSiteContentUrl('dub01.online.tableau.com')).toThrowError(
       /not a Tableau site name/
     );

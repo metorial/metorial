@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient } from '../lib/client';
+import { LookerClient, type LookerDashboard, type LookerUpdateDashboard } from '../lib/client';
 import { spec } from '../spec';
 
 let dashboardOutputSchema = z.object({
@@ -41,12 +41,12 @@ let dashboardOutputSchema = z.object({
 export let manageDashboard = SlateTool.create(spec, {
   name: 'Manage Dashboard',
   key: 'manage_dashboard',
-  description: `Get, create, update, or delete a Looker dashboard. When getting a dashboard, also retrieves its elements and filters. For updates, only provide the fields you want to change.`,
+  description: `Get, create, update, or permanently delete a Looker dashboard. When getting a dashboard, also retrieves its elements and filters. For updates, only provide the fields you want to change. Delete is permanent and cannot be recovered.`,
   instructions: [
     'To get a dashboard with its elements: set action to "get" and provide the dashboardId.',
     'To create: set action to "create" with title and folderId.',
     'To update: set action to "update" with dashboardId and any fields to change.',
-    'To delete: set action to "delete" with the dashboardId.'
+    'To delete permanently: set action to "delete" with the dashboardId. This cannot be undone.'
   ]
 })
   .input(
@@ -69,19 +69,31 @@ export let manageDashboard = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let dashboard: any;
+    let dashboard: LookerDashboard;
     let actionMessage: string;
 
     switch (ctx.input.action) {
       case 'get': {
-        if (!ctx.input.dashboardId) throw new Error('dashboardId is required for get action');
+        if (!ctx.input.dashboardId) {
+          throw createApiServiceError('dashboardId is required for get action', {
+            reason: 'looker_dashboard_id_required'
+          });
+        }
         dashboard = await client.getDashboard(ctx.input.dashboardId);
         actionMessage = `Retrieved dashboard **${dashboard.title}**`;
         break;
       }
       case 'create': {
-        if (!ctx.input.title) throw new Error('title is required for create action');
-        if (!ctx.input.folderId) throw new Error('folderId is required for create action');
+        if (!ctx.input.title) {
+          throw createApiServiceError('title is required for create action', {
+            reason: 'looker_dashboard_title_required'
+          });
+        }
+        if (!ctx.input.folderId) {
+          throw createApiServiceError('folderId is required for create action', {
+            reason: 'looker_dashboard_folder_id_required'
+          });
+        }
         dashboard = await client.createDashboard({
           title: ctx.input.title,
           description: ctx.input.description,
@@ -92,21 +104,33 @@ export let manageDashboard = SlateTool.create(spec, {
         break;
       }
       case 'update': {
-        if (!ctx.input.dashboardId)
-          throw new Error('dashboardId is required for update action');
-        let updateBody: Record<string, any> = {};
+        if (!ctx.input.dashboardId) {
+          throw createApiServiceError('dashboardId is required for update action', {
+            reason: 'looker_dashboard_id_required'
+          });
+        }
+        let updateBody: LookerUpdateDashboard = {};
         if (ctx.input.title !== undefined) updateBody.title = ctx.input.title;
         if (ctx.input.description !== undefined)
           updateBody.description = ctx.input.description;
         if (ctx.input.folderId !== undefined) updateBody.folder_id = ctx.input.folderId;
         if (ctx.input.hidden !== undefined) updateBody.hidden = ctx.input.hidden;
+        if (Object.keys(updateBody).length === 0) {
+          throw createApiServiceError(
+            'At least one of title, description, folderId, or hidden is required for update action',
+            { reason: 'looker_dashboard_update_fields_required' }
+          );
+        }
         dashboard = await client.updateDashboard(ctx.input.dashboardId, updateBody);
         actionMessage = `Updated dashboard **${dashboard.title}**`;
         break;
       }
       case 'delete': {
-        if (!ctx.input.dashboardId)
-          throw new Error('dashboardId is required for delete action');
+        if (!ctx.input.dashboardId) {
+          throw createApiServiceError('dashboardId is required for delete action', {
+            reason: 'looker_dashboard_id_required'
+          });
+        }
         dashboard = await client.getDashboard(ctx.input.dashboardId);
         await client.deleteDashboard(ctx.input.dashboardId);
         actionMessage = `Deleted dashboard **${dashboard.title}** (ID: ${ctx.input.dashboardId})`;
@@ -114,18 +138,24 @@ export let manageDashboard = SlateTool.create(spec, {
       }
     }
 
+    if (typeof dashboard.id !== 'string' || dashboard.id.length === 0) {
+      throw createApiServiceError('Looker returned a dashboard without an ID.', {
+        reason: 'looker_dashboard_invalid_response'
+      });
+    }
+
     let elements =
-      dashboard.dashboard_elements?.map((el: any) => ({
-        elementId: el.id ? String(el.id) : undefined,
+      dashboard.dashboard_elements?.map(el => ({
+        elementId: el.id !== undefined ? String(el.id) : undefined,
         title: el.title,
         type: el.type,
-        lookId: el.look_id ? String(el.look_id) : undefined,
-        queryId: el.query_id ? String(el.query_id) : undefined
+        lookId: el.look_id !== undefined ? String(el.look_id) : undefined,
+        queryId: el.query_id !== undefined ? String(el.query_id) : undefined
       })) || undefined;
 
     let filters =
-      dashboard.dashboard_filters?.map((f: any) => ({
-        filterId: f.id ? String(f.id) : undefined,
+      dashboard.dashboard_filters?.map(f => ({
+        filterId: f.id !== undefined ? String(f.id) : undefined,
         name: f.name,
         title: f.title,
         type: f.type,
@@ -137,11 +167,11 @@ export let manageDashboard = SlateTool.create(spec, {
         dashboardId: String(dashboard.id),
         title: dashboard.title,
         description: dashboard.description,
-        folderId: dashboard.folder_id ? String(dashboard.folder_id) : undefined,
+        folderId: dashboard.folder_id !== undefined ? String(dashboard.folder_id) : undefined,
         createdAt: dashboard.created_at,
         updatedAt: dashboard.updated_at,
         hidden: dashboard.hidden,
-        deleted: dashboard.deleted,
+        deleted: ctx.input.action === 'delete' ? true : dashboard.deleted,
         elements,
         filters
       },

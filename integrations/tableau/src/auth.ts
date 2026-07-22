@@ -282,10 +282,7 @@ export let auth = SlateAuth.create()
         .string()
         .optional()
         .describe('Normalized Tableau base URL the credentials token was issued by'),
-      apiVersion: z
-        .string()
-        .optional()
-        .describe('Tableau REST API version used at sign-in'),
+      apiVersion: z.string().optional().describe('Tableau REST API version used at sign-in'),
       siteContentUrl: z
         .string()
         .optional()

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { LookerClient } from '../lib/client';
 import { spec } from '../spec';
@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let runQuery = SlateTool.create(spec, {
   name: 'Run Query',
   key: 'run_query',
-  description: `Run an inline query against a LookML model and retrieve results. Specify the model, explore (view), fields, filters, sorts, and limits to build a query on the fly. Results are returned in JSON format. Use this to programmatically extract data from your Looker models without needing to save a Look first.`,
+  description: `Run an inline query against a LookML model and retrieve results without saving a Look first. Specify the model, Explore (view), fields, filters, sorts, limit, and output format. JSON formats are returned inline; file and text formats are returned as attachments.`,
   tags: {
     readOnly: true
   }
@@ -24,6 +24,10 @@ export let runQuery = SlateTool.create(spec, {
         .describe(
           'Filter expressions keyed by field name (e.g., {"users.state": "California"})'
         ),
+      filterExpression: z
+        .string()
+        .optional()
+        .describe('Advanced Looker filter expression, including filters with OR conditions'),
       sorts: z
         .array(z.string())
         .optional()
@@ -39,15 +43,29 @@ export let runQuery = SlateTool.create(spec, {
         .optional()
         .describe('Timezone for the query (e.g., "America/Los_Angeles")'),
       resultFormat: z
-        .enum(['json', 'json_detail', 'csv', 'txt', 'html', 'md', 'xlsx', 'sql'])
+        .enum([
+          'json',
+          'json_bi',
+          'json_detail',
+          'csv',
+          'txt',
+          'html',
+          'md',
+          'xlsx',
+          'sql',
+          'png',
+          'jpg'
+        ])
         .optional()
-        .describe('Output format for results (default "json")')
+        .describe(
+          'Output format for results (default "json"); non-JSON formats are returned as attachments'
+        )
     })
   )
   .output(
     z.object({
-      results: z.any().describe('Query results in the requested format'),
-      sql: z.string().optional().describe('Generated SQL query (only for json_detail format)')
+      results: z.any().describe('Query results, or attachment metadata for non-JSON formats'),
+      sql: z.string().optional().describe('Generated SQL query for json_detail format')
     })
   )
   .handleInvocation(async ctx => {
@@ -56,14 +74,15 @@ export let runQuery = SlateTool.create(spec, {
       token: ctx.auth.token
     });
 
-    let format = ctx.input.resultFormat || 'json';
+    let format = ctx.input.resultFormat ?? 'json';
 
-    let results = await client.runInlineQuery(
+    let queryResult = await client.runInlineQuery(
       {
         model: ctx.input.model,
         view: ctx.input.view,
         fields: ctx.input.fields,
         filters: ctx.input.filters,
+        filter_expression: ctx.input.filterExpression,
         sorts: ctx.input.sorts,
         limit: ctx.input.limit,
         pivots: ctx.input.pivots,
@@ -73,8 +92,10 @@ export let runQuery = SlateTool.create(spec, {
       format
     );
 
+    let results = queryResult.results;
+
     let sql: string | undefined;
-    if (format === 'json_detail' && results?.sql) {
+    if (format === 'json_detail' && typeof results?.sql === 'string') {
       sql = results.sql;
     }
 
@@ -86,6 +107,14 @@ export let runQuery = SlateTool.create(spec, {
 
     return {
       output: { results, sql },
+      attachments: queryResult.attachment
+        ? [
+            createBase64Attachment(
+              queryResult.attachment.contentBase64,
+              queryResult.attachment.mimeType
+            )
+          ]
+        : undefined,
       message: `Query executed on **${ctx.input.model}/${ctx.input.view}**${rowCount !== undefined ? ` returning ${rowCount} rows` : ''}.`
     };
   })

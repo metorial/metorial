@@ -50,15 +50,15 @@ Get, create, update, or delete a Looker user. Can also search for users by name 
 
 ### Run Query
 
-Run an inline query against a LookML model and retrieve results. Specify the model, explore (view), fields, filters, sorts, and limits to build a query on the fly. Results are returned in JSON format. Use this to programmatically extract data from your Looker models without needing to save a Look first.
+Run an inline query against a LookML model and retrieve results. Specify the model, explore (view), fields, filters, sorts, and limits to build a query on the fly. JSON results are returned directly; file formats such as CSV and XLSX are returned as attachments.
 
 ### Run SQL Query
 
-Execute raw SQL against a database connection using Looker's SQL Runner. Provide the connection name and SQL statement to run arbitrary queries. Results are returned in JSON format.
+Execute raw SQL with Looker's SQL Runner. Provide exactly one connection name or model name plus the SQL statement. JSON results are returned directly; CSV and TXT results are returned as attachments.
 
 ### Search Dashboards
 
-Search for dashboards by title, description, or folder. Returns a list of matching dashboards with their metadata. Use this to discover dashboards or find specific ones.
+Search for dashboards by title, description, folder, or creator user ID. Results include creator IDs and names when Looker provides them. Use Manage User to discover a creator's user ID from their name or email.
 
 ### Search Looks
 

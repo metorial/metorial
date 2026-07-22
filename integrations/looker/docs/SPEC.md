@@ -1,5 +1,3 @@
-Now let me get the full API reference to see all endpoint categories:Now I have comprehensive information to write the specification.
-
 # Slates Specification for Looker
 
 ## Overview
@@ -8,32 +6,32 @@ Looker is a Google Cloud business intelligence and data analytics platform that 
 
 ## Authentication
 
-Looker supports two primary authentication methods:
+The integration authenticates with Looker API3 client credentials. The
+instance URL is required in the authentication input — production
+authentication runs without access to provider configuration, so the auth
+input is the authoritative login URL. The `instanceUrl` in the provider
+settings is used by tool invocations and must point to the same instance; if
+both values are present during authentication, they must normalize to the same
+URL or authentication is rejected.
 
-### 1. API Key Credentials (Client ID / Client Secret)
+Instance URLs are trimmed, required to use HTTPS, and normalized to avoid
+duplicating a trailing `/api/4.0` path. Explicit ports and proxy path prefixes
+are preserved. Credentials are sent as an `application/x-www-form-urlencoded`
+body to `POST /api/4.0/login`, never in the URL.
 
-The Looker API implements OAuth 2.0's "Resource Owner Password Credentials Grant" pattern. An API key consisting of a `client_id` and `client_secret` is required to log in and use the API. You obtain a short-term OAuth 2.0 access token by calling the `POST /api/4.0/login` endpoint, providing the `client_id` and `client_secret`. You then place that access token in the HTTP Authorization header of subsequent requests.
+Each new login stores the access token, its expiry, and the normalized instance
+binding. Expiring tokens are refreshed automatically by exchanging the stored
+API3 credentials again. The authenticated profile is loaded from
+`GET /api/4.0/user`.
 
-- **Credentials**: `client_id` and `client_secret` (called "API3 Keys" in Looker)
-- **How to obtain**: Created on the Users page in the Admin section of your Looker instance. If you're not a Looker admin, ask your admin to create the API3 credentials for you.
-- **Token endpoint**: `POST https://<your-looker-instance>/api/4.0/login` with `client_id` and `client_secret` as form parameters
-- **Token lifetime**: Tokens typically expire after one hour, so scripts should handle automatic reauthentication.
-- **Usage**: Include `Authorization: token <access_token>` in request headers
-- **Custom input required**: The Looker instance base URL (e.g., `https://mycompany.looker.com` or `https://mycompany.cloud.looker.com`). For instances hosted on Google Cloud or Azure, and for AWS instances created on or after 07/07/2020, the default API port is 443. For older AWS instances, it uses port 19999.
-- API3 credentials are always bound to a Looker user account. API requests execute "as" the user associated with the credentials. Calls to the API will only return data that the user is allowed to see, and modify only what the user is allowed to modify.
-- Multiple sets of API3 credentials can be bound to a single Looker user account.
-
-### 2. OAuth 2.0 (Authorization Code with PKCE, for browser-based apps)
-
-Looker uses OAuth to let OAuth client applications authenticate into the Looker API without exposing client IDs and client secrets to the browser. Authentication using OAuth is available only with the Looker API 4.0.
-
-- OAuth client applications must first be registered with Looker using the API before users of the application can authenticate into Looker.
-- The OAuth flow involves redirecting to the Looker UI's `/auth` endpoint, receiving an authorization code, and exchanging it at the `/token` API endpoint.
-- This method is primarily used for CORS/browser-based applications and requires the origin be added to Looker's embedded domain allowlist.
-
-### User Impersonation
-
-Backend services can authenticate with API credentials, can use the API with a service account, and can conveniently impersonate API requests on behalf of end users. Looker provides `login_user` (sudo) functionality to make API calls on behalf of specific users using a service account's credentials.
+Before credentials, tokens, or tool requests are sent, the integration checks
+that the current instance still matches the stored normalized binding. Changing
+the host or other normalized URL components requires reauthentication. Token
+refresh and profile lookups fall back to the stored instance binding when
+neither provider configuration nor an auth-input URL is available. Older
+stored auth without an instance binding remains compatible; during
+authentication, when both provider configuration and auth input are available,
+strict normalized URL matching still applies.
 
 ## Features
 

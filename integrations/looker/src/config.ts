@@ -5,8 +5,10 @@ export let config = SlateConfig.create(
   z.object({
     instanceUrl: z
       .string()
+      .trim()
+      .min(1, 'Looker instance URL is required.')
       .describe(
-        'The base URL of your Looker instance (e.g., https://mycompany.looker.com or https://mycompany.cloud.looker.com)'
+        'HTTPS base URL of your Looker instance, matching the URL used during authentication. Include any explicit port or proxy path prefix, and omit credentials, query parameters, fragments, and the /api/4.0 suffix.'
       )
   })
 );
