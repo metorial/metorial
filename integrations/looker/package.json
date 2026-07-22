@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@types/node": "^20",
-    "slates": "1.0.0-rc.14",
+    "slates": "1.0.0-rc.15",
     "zod": "^4.2"
   },
   "devDependencies": {
