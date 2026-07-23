@@ -1,6 +1,16 @@
 # <img src="https://provider-logos.metorial-cdn.com/slack.svg" height="20"> Slack
 
-Use Slack bot OAuth or user OAuth to send, update, delete, and schedule messages; list and cancel scheduled messages; open DMs and group DMs; manage conversations, members, files, reactions, pins, bookmarks, reminders, user groups, and user status; search messages and files with user scopes; and retrieve user, conversation, and workspace info.
+Use Slack bot OAuth or user OAuth to work with messages, threads, conversations, search, files, Canvases, Lists, profiles, reactions, reminders, and personal productivity settings. The integration keeps the original tool surface while adding focused discovery, file downloads and binary uploads, Slack-native documents, structured Lists, and connected-user controls.
+
+## Authentication and compatibility
+
+The existing `oauth`, `user_oauth`, `bot_token`, and `user_token` connection methods remain supported. Existing OAuth connections keep their previously granted scopes and continue to work with the original tools. Reconnect the same OAuth method to approve the expanded scope manifest before using tools that need modern search, Canvas, Lists, custom emoji, DND, or presence permissions. Pasted tokens do not have a consent flow and must already carry each tool's required scopes.
+
+Real-time private search is user-authenticated and searches only content visible to the connected user. `search_public_and_private` must be used only after the user explicitly consents to searching private channels, DMs, or group DMs. The legacy `search_messages` and `search_files` tools remain available.
+
+File downloads and Slack List exports return downloadable files capped at 10 MiB per call, alongside structured metadata. Binary uploads accept validated base64 input up to 6 MiB decoded; use another transfer path for larger files.
+
+Canvas and Slack List availability depends on the workspace plan and Slack permissions. Canvas section lookup is supported, but a full `read_canvas` tool is not implemented because the public API does not provide a confirmed full-content read route. Attached Slack drafts are also not implemented because Slack does not expose a supported public draft-writing API.
 
 ## Tools
 
@@ -87,6 +97,114 @@ Send a message to a Slack channel, group DM, or direct message conversation. Sup
 ### Update Message
 
 Update or delete an existing Slack message. Use this to edit message content or remove a message entirely.
+
+### Who Am I
+
+Identify the connected Slack actor and workspace before self-relative searches or writes.
+
+### Read Thread
+
+Read a thread's parent message and replies with bounded pagination, hydrated context, and a permalink.
+
+### Get Message Permalink
+
+Resolve a stable Slack permalink for a known conversation ID and message timestamp.
+
+### Read File
+
+Download the content of a known Slack file and return its metadata and Slack permalink when available.
+
+### Upload File
+
+Upload validated binary content to Slack and optionally share it to a conversation or thread.
+
+### Search Public
+
+Use Slack Real-time Search for content in public conversations accessible to the connected user.
+
+### Search Public and Private
+
+Search accessible public and private channels, DMs, and group DMs after the user explicitly consents to private-content search.
+
+### Search Channels
+
+Find accessible Slack conversations by partial name, topic, or purpose before another read or write.
+
+### Search Users
+
+Find Slack users by name, display name, title, department, or email when the granted scopes permit it.
+
+### Create Canvas
+
+Create a Slack Canvas from Canvas-flavored Markdown. Availability and channel requirements depend on the Slack workspace plan.
+
+### Edit Canvas
+
+Insert, replace, delete, or rename targeted Canvas content. Whole-document replacement is destructive and should be explicitly requested.
+
+### Lookup Canvas Sections
+
+Find Canvas section IDs for focused edits. This is section discovery, not a full Canvas content reader.
+
+### Search Emojis
+
+Find custom workspace emoji and aliases by name without exposing emoji-administration operations.
+
+### Update User Profile
+
+Update supported profile fields for the connected Slack user while leaving custom status management to `manage_user_status`.
+
+### Create Slack List
+
+Create a Slack List with structured columns for action registers, projects, and task tracking. Slack Lists require a supported paid plan.
+
+### List Slack List Items
+
+Read and paginate structured Slack List rows, including the row and column IDs needed for later updates.
+
+### Create Slack List Item
+
+Add a structured row to a Slack List.
+
+### Update Slack List Items
+
+Update typed cells on one or more existing Slack List rows.
+
+### Delete Slack List Items
+
+Delete explicitly selected Slack List rows. This is a destructive operation.
+
+### Manage Canvas Access
+
+Set or remove user or channel access to a Canvas.
+
+### Delete Canvas
+
+Permanently delete an explicitly selected Canvas.
+
+### Manage Slack List Access
+
+Set or remove user or channel access to a Slack List on a supported paid plan.
+
+### Download Slack List
+
+Start and poll a bounded Slack List export, then return the completed file for download.
+
+### Get Message
+
+Retrieve one exact Slack message by conversation ID and timestamp, including a permalink and optional surrounding context or replies.
+
+### Mark Conversation Read
+
+Advance the connected user's read cursor for a conversation to an explicit message timestamp.
+
+### Manage DND
+
+Read or change the connected user's Slack Do Not Disturb and snooze state.
+
+### Manage Presence
+
+Read Slack presence or set the connected actor's presence to automatic or away.
 
 ## License
 

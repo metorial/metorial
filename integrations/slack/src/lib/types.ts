@@ -90,6 +90,7 @@ export interface SlackUserProfile {
   real_name_normalized?: string;
   display_name?: string;
   display_name_normalized?: string;
+  pronouns?: string;
   status_text?: string;
   status_emoji?: string;
   status_expiration?: number;
@@ -209,4 +210,98 @@ export interface SlackBookmark {
   last_updated_by_user_id?: string;
   shortcut_id?: string;
   entity_id?: string;
+}
+
+export interface SlackAuthIdentity {
+  url?: string;
+  team?: string;
+  user?: string;
+  team_id?: string;
+  user_id?: string;
+  bot_id?: string;
+  enterprise_id?: string;
+  is_enterprise_install?: boolean;
+}
+
+export type SlackSearchContentType = 'messages' | 'files' | 'channels' | 'users';
+
+export type SlackSearchChannelType = 'public_channel' | 'private_channel' | 'im' | 'mpim';
+
+export interface SlackSearchContextResult {
+  messages?: Record<string, unknown>[];
+  files?: Record<string, unknown>[];
+  channels?: Record<string, unknown>[];
+  users?: Record<string, unknown>[];
+  nextCursor?: string;
+  raw?: Record<string, unknown>;
+}
+
+export interface SlackFileDownload {
+  content: Buffer;
+  contentType?: string;
+  contentLength: number;
+}
+
+export interface SlackCanvas {
+  id: string;
+  title?: string;
+  created?: number;
+  updated?: number;
+  raw?: Record<string, unknown>;
+}
+
+export interface SlackCanvasSection {
+  id?: string;
+  section_id?: string;
+  section_type?: string;
+  heading_level?: number;
+  text?: string;
+  raw?: Record<string, unknown>;
+}
+
+export interface SlackList {
+  id: string;
+  name?: string;
+  title?: string;
+  description?: unknown;
+  schema?: Record<string, unknown>[];
+  todo_mode?: boolean;
+  raw?: Record<string, unknown>;
+}
+
+export interface SlackListItem {
+  id?: string;
+  item_id?: string;
+  row_id?: string;
+  fields?: Record<string, unknown>[];
+  cells?: Record<string, unknown>[];
+  raw?: Record<string, unknown>;
+}
+
+export interface SlackListDownloadJob {
+  jobId?: string;
+  status?: string;
+  downloadUrl?: string;
+  fileName?: string;
+  mimeType?: string;
+  raw?: Record<string, unknown>;
+}
+
+export interface SlackDndInfo {
+  dnd_enabled?: boolean;
+  next_dnd_start_ts?: number;
+  next_dnd_end_ts?: number;
+  snooze_enabled?: boolean;
+  snooze_endtime?: number;
+  snooze_remaining?: number;
+  users?: Record<string, unknown>;
+}
+
+export interface SlackPresence {
+  presence?: 'active' | 'away';
+  online?: boolean;
+  auto_away?: boolean;
+  manual_away?: boolean;
+  connection_count?: number;
+  last_activity?: number;
 }

@@ -81,11 +81,6 @@ export let slackBotOAuthScopes = [
     scope: 'users:read.email'
   },
   {
-    title: 'Read User Profile',
-    description: 'View profile details about people in a workspace',
-    scope: 'users.profile:read'
-  },
-  {
     title: 'Read Files',
     description: 'View files shared in channels and conversations',
     scope: 'files:read'
@@ -94,6 +89,31 @@ export let slackBotOAuthScopes = [
     title: 'Write Files',
     description: 'Upload, edit, and delete files',
     scope: 'files:write'
+  },
+  {
+    title: 'Read Canvases',
+    description: 'View Slack Canvas sections and access settings',
+    scope: 'canvases:read'
+  },
+  {
+    title: 'Write Canvases',
+    description: 'Create and manage Slack Canvases',
+    scope: 'canvases:write'
+  },
+  {
+    title: 'Read Lists',
+    description: 'View Slack Lists and their items',
+    scope: 'lists:read'
+  },
+  {
+    title: 'Write Lists',
+    description: 'Create and manage Slack Lists and their items',
+    scope: 'lists:write'
+  },
+  {
+    title: 'Read Custom Emoji',
+    description: 'View custom emoji in a workspace',
+    scope: 'emoji:read'
   },
   {
     title: 'Read Reactions',
@@ -135,16 +155,6 @@ export let slackBotOAuthScopes = [
     title: 'Read Team Info',
     description: 'View the name, email domain, and icon for workspaces',
     scope: 'team:read'
-  },
-  {
-    title: 'Commands',
-    description: 'Add shortcuts and slash commands that people can use',
-    scope: 'commands'
-  },
-  {
-    title: 'Incoming Webhooks',
-    description: 'Post messages to specific channels',
-    scope: 'incoming-webhook'
   }
 ];
 
@@ -227,6 +237,11 @@ export let slackUserOAuthScopes = [
     scope: 'users.profile:write'
   },
   {
+    title: 'Write User Presence',
+    description: "Set the authorized user's Slack presence",
+    scope: 'users:write'
+  },
+  {
     title: 'Read Files',
     description: 'View files shared in channels and conversations',
     scope: 'files:read'
@@ -235,6 +250,31 @@ export let slackUserOAuthScopes = [
     title: 'Write Files',
     description: 'Upload, edit, and delete files',
     scope: 'files:write'
+  },
+  {
+    title: 'Read Canvases',
+    description: 'View Slack Canvas sections and access settings',
+    scope: 'canvases:read'
+  },
+  {
+    title: 'Write Canvases',
+    description: 'Create and manage Slack Canvases',
+    scope: 'canvases:write'
+  },
+  {
+    title: 'Read Lists',
+    description: 'View Slack Lists and their items',
+    scope: 'lists:read'
+  },
+  {
+    title: 'Write Lists',
+    description: 'Create and manage Slack Lists and their items',
+    scope: 'lists:write'
+  },
+  {
+    title: 'Read Custom Emoji',
+    description: 'View custom emoji in a workspace',
+    scope: 'emoji:read'
   },
   {
     title: 'Read Reactions',
@@ -287,6 +327,46 @@ export let slackUserOAuthScopes = [
     title: 'Search Workspace',
     description: 'Search messages and files with user-token search APIs',
     scope: 'search:read'
+  },
+  {
+    title: 'Search Public Content',
+    description: 'Search messages and channels in public conversations',
+    scope: 'search:read.public'
+  },
+  {
+    title: 'Search Private Content',
+    description: 'Search content in private channels the authorized user can access',
+    scope: 'search:read.private'
+  },
+  {
+    title: 'Search Direct Messages',
+    description: 'Search direct messages the authorized user can access',
+    scope: 'search:read.im'
+  },
+  {
+    title: 'Search Group Direct Messages',
+    description: 'Search group direct messages the authorized user can access',
+    scope: 'search:read.mpim'
+  },
+  {
+    title: 'Search Files',
+    description: 'Include files in Real-time Search results',
+    scope: 'search:read.files'
+  },
+  {
+    title: 'Search Users',
+    description: 'Include people in Real-time Search results',
+    scope: 'search:read.users'
+  },
+  {
+    title: 'Read Do Not Disturb',
+    description: 'View Do Not Disturb settings',
+    scope: 'dnd:read'
+  },
+  {
+    title: 'Write Do Not Disturb',
+    description: "Manage the authorized user's Do Not Disturb settings",
+    scope: 'dnd:write'
   }
 ];
 
@@ -327,11 +407,32 @@ export let slackActionScopes = {
   reactions: allOf('reactions:read', 'reactions:write'),
   pins: allOf('pins:read', 'pins:write'),
   files: allOf('files:read', 'files:write'),
+  filesRead: anyOf('files:read'),
+  filesWrite: anyOf('files:write'),
+  canvasesRead: anyOf('canvases:read'),
+  canvasesWrite: anyOf('canvases:write'),
+  listsRead: anyOf('lists:read'),
+  listsWrite: anyOf('lists:write'),
+  emojiRead: anyOf('emoji:read'),
   userGroups: allOf('usergroups:read', 'usergroups:write'),
   bookmarks: allOf('bookmarks:read', 'bookmarks:write'),
   teamInfo: anyOf('team:read'),
   search: anyOf('search:read'),
+  searchPublic: anyOf('search:read.public'),
+  searchPrivate: allOf(
+    'search:read.public',
+    'search:read.private',
+    'search:read.im',
+    'search:read.mpim'
+  ),
+  searchUsers: anyOf('search:read.users'),
   userStatus: allOf('users.profile:read', 'users.profile:write'),
+  userProfileWrite: anyOf('users.profile:write'),
+  dndRead: anyOf('dnd:read'),
+  dndWrite: anyOf('dnd:write'),
+  presenceRead: anyOf('users:read'),
+  presenceWrite: anyOf('users:write'),
+  markConversationRead: anyOf('channels:write', 'groups:write', 'im:write', 'mpim:write'),
   reminders: allOf('reminders:read', 'reminders:write'),
   messagePolling: allOf(slackConversationReadScopes, slackConversationHistoryScopes),
   messageEvents: slackConversationHistoryScopes,

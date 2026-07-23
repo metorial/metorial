@@ -1,198 +1,98 @@
-Now let me get the full list of event types from Slack's reference page:Now I have comprehensive information. Let me compile the specification.
+# Slack integration specification
 
-# Slates Specification for Slack
+## Product surface
 
-## Overview
+This integration exposes Slack messaging and collaboration through bot OAuth, user OAuth, bot tokens, and user tokens. It supports classic messaging and conversation workflows together with focused identity, thread, file, search, Canvas, Slack List, profile, DND, presence, and read-cursor tools.
 
-Slack is a workplace messaging and collaboration platform by Salesforce. Its API provides programmatic access to messaging, channels, users, files, reactions, and workspace administration. The Slack Web API is an interface for querying information from and enacting change in a Slack workspace.
+The release is additive. These 21 established tool keys remain registered with their existing contracts:
+
+- `send_message`, `update_message`, `schedule_message`, `manage_scheduled_messages`
+- `get_conversation_history`, `get_conversation_info`, `open_conversation`, `list_conversations`
+- `manage_channel`, `manage_channel_members`
+- `get_user_info`, `manage_user_status`
+- `manage_reactions`, `manage_pins`, `manage_files`
+- `search_messages`, `search_files`
+- `manage_reminders`, `manage_user_groups`, `manage_bookmarks`, `get_team_info`
+
+The existing `new_message`, message-webhook, channel-activity, reaction, file, and user-change triggers are unchanged.
+
+## Added tools
+
+### Identity and message retrieval
+
+- `who_am_i` identifies the connected actor and workspace without requiring an extra scope.
+- `read_thread` reads a parent message and replies with pagination and a permalink.
+- `get_message_permalink` resolves a Slack navigation URL for a known message.
+- `get_message` retrieves one exact message and can include bounded context or replies.
+- `mark_conversation_read` advances the connected user's read cursor to an explicit timestamp.
+
+### Files and exports
+
+- `read_file` downloads a known Slack file and returns metadata plus a Slack permalink when available.
+- `upload_file` uploads validated base64-encoded binary content up to 6 MiB decoded through Slack's external upload flow.
+
+Downloaded file bytes are never returned in structured output. `read_file` and `download_slack_list` return metadata alongside downloadable files capped at 10 MiB per call. Downloaded content must be treated as untrusted user data. The existing `manage_files(get)` remains the metadata-oriented operation, and `manage_files(upload)` remains a text-snippet convenience.
+
+### Search and discovery
+
+- `search_public` uses Slack Real-time Search for accessible public content.
+- `search_public_and_private` searches accessible public channels, private channels, DMs, and group DMs.
+- `search_channels` resolves partial channel names, topics, and purposes.
+- `search_users` resolves people by profile fields.
+- `search_emojis` finds custom emoji names and aliases.
+
+`search_public_and_private` is consent-sensitive. An agent must obtain explicit user consent before invoking it because results may include private-channel and direct-message content. Search never expands access beyond content the connected Slack user can already read. All four Real-time Search tools (`search_public`, `search_public_and_private`, `search_channels`, `search_users`) are user-auth-only, as are `update_user_profile`, `mark_conversation_read`, `manage_dnd`, and the pre-existing `manage_reminders`, `manage_user_status`, `search_messages`, and `search_files`. Legacy `search_messages` and `search_files` remain registered for compatibility and classic search behavior.
+
+### Canvases
+
+- `create_canvas` creates a Slack Canvas from Canvas-flavored Markdown.
+- `edit_canvas` inserts, replaces, deletes, or renames Canvas content.
+- `lookup_canvas_sections` finds section IDs for safe focused edits.
+- `manage_canvas_access` sets or removes user or channel access.
+- `delete_canvas` permanently deletes an explicitly selected Canvas.
+
+Canvas availability and channel requirements depend on the workspace plan. Whole-document replacement and deletion are destructive and require explicit targets and intent. `lookup_canvas_sections` is not a general Canvas content reader. `read_canvas` is intentionally not implemented because no confirmed public Web API route returns complete Canvas content with section mapping.
+
+### Slack Lists
+
+- `create_slack_list` creates a List with structured columns.
+- `list_slack_list_items` reads and paginates rows.
+- `create_slack_list_item` adds a row.
+- `update_slack_list_items` updates typed cells on existing rows.
+- `delete_slack_list_items` removes explicitly selected rows.
+- `manage_slack_list_access` sets or removes user or channel access.
+- `download_slack_list` starts and polls a bounded export and returns the completed file for download.
+
+Slack Lists require a supported paid Slack plan. List row deletion and access removal are destructive or permission-sensitive. The tools expose stable List, row, and column IDs needed for follow-up operations.
+
+### Connected-user productivity
+
+- `update_user_profile` updates supported profile fields for the connected user.
+- `manage_dnd` reads or changes the connected user's Do Not Disturb and snooze state.
+- `manage_presence` reads presence or sets the connected actor to automatic or away.
+
+Custom status remains the responsibility of `manage_user_status`. Attached Slack message drafts are intentionally not implemented because Slack has no supported public Web API for creating them.
 
 ## Authentication
 
-Slack uses **OAuth 2.0** as its primary authentication mechanism. OAuth allows a user in any Slack workspace to install your app. At the end of the OAuth flow, your app gains an access token, which opens the door to Slack API methods, events, and other features.
+The auth-method keys remain stable:
 
-**OAuth 2.0 Flow (V2):**
+- `oauth`: Slack bot OAuth
+- `user_oauth`: Slack user OAuth
+- `bot_token`: pasted bot token
+- `user_token`: pasted user token
 
-1. Redirect the user to the authorization URL: `https://slack.com/oauth/v2/authorize` with query parameters including `client_id`, `scope` (bot scopes), optionally `user_scope` (user-level scopes), `redirect_uri`, and `state`.
-2. Parse the HTTP request that lands at your Redirect URL for a `code` field — that's a temporary authorization code, which expires after ten minutes.
-3. Exchange the code for an access token by calling `oauth.v2.access` for bot or combined OAuth scopes, or `oauth.v2.user.access` for user-only OAuth scopes, with your `code`, `client_id`, and `client_secret`.
+The bot OAuth method includes the existing collaboration scopes plus `canvases:read`, `canvases:write`, `lists:read`, `lists:write`, and `emoji:read`. Unused `commands`, `incoming-webhook`, and `users.profile:read` scopes are not requested; the profile tools are user-auth-only, so profile scopes live only on the user method.
 
-**Credentials Required:**
+The user OAuth method retains legacy `search:read` for the established search tools and adds the granular search scopes `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`, and `search:read.users`. It also includes Canvas, Lists, custom emoji, `dnd:read`, `dnd:write`, and `users:write` scopes for the added user-productivity tools.
 
-- **Client ID** and **Client Secret**: Obtained when creating a Slack app at `api.slack.com/apps`.
-- **Redirect URL**: Must be configured in the app settings under OAuth & Permissions. Must use HTTPS.
+Existing OAuth connections keep their previously granted scopes and continue to pass established tool gates. New tools remain unavailable until the customer reconnects the same auth method and approves its expanded scope manifest. This is expected upgrade behavior. Pasted tokens have no OAuth reconnection step; each new tool becomes available only when the pasted token already carries its required scopes.
 
-**Token Types:**
+## API and behavior constraints
 
-Slack uses bot tokens (`xoxb-` prefix), user tokens (`xoxp-` prefix), and app-level tokens (`xapp-` prefix).
-
-- **Bot Token (`xoxb-`)**: The app's independent identity. Posts messages, listens to events. This is the default token for most integrations.
-- **User Token (`xoxp-`)**: Acts on behalf of a specific user for user-centric actions.
-- **App-Level Token (`xapp-`)**: Enables Socket Mode and cross-workspace management.
-
-**Token Usage:**
-
-Authenticate your Web API requests by providing a bearer token, which identifies a single user or bot user relationship. Tokens are passed in the `Authorization: Bearer <token>` header.
-
-**Token Expiration:**
-
-OAuth tokens do not expire. If they are no longer needed, they can be revoked. Additionally, for Slack apps using granular permissions, you can exchange your access token for a refresh token and an expiring access token with token rotation.
-
-**Scopes:**
-
-Slack apps use OAuth scopes to govern what they can access. These are added in the app settings when building an app. You will attach these scopes to your tokens. Slack uses scopes that refer to the object they grant access to, followed by the class of actions on that object they allow (e.g., `file:write`).
-
-Key scope categories include:
-
-- `channels:read`, `channels:manage`, `channels:history` — Public channel access
-- `groups:read`, `groups:history` — Private channel access
-- `im:read`, `im:history`, `im:write` — Direct message access
-- `mpim:read`, `mpim:history`, `mpim:write` — Group DM access
-- `chat:write` — Send messages
-- `files:read`, `files:write` — File access
-- `users:read`, `users:write` — User information
-- `reactions:read`, `reactions:write` — Emoji reactions
-- `pins:read`, `pins:write` — Pinned items
-- `usergroups:read`, `usergroups:write` — User groups
-- `team:read` — Workspace information
-- `bookmarks:read`, `bookmarks:write` — Channel bookmarks
-- `canvases:read`, `canvases:write` — Canvas documents
-- `lists:write` — Lists management
-- `search:read` — Search messages and files
-- Various `admin.*` scopes for Enterprise Grid administration
-
-## Features
-
-### Messaging
-
-Send, update, delete, and schedule messages in channels, group DMs, and direct messages. Messages support rich formatting via Block Kit, attachments, and threaded replies. You can also post ephemeral messages visible only to specific users.
-
-### Conversations (Channels) Management
-
-Create, archive, and manage conversations using conversation-specific Web APIs. This includes public channels, private channels, direct messages, and group DMs. You can invite/remove members, set topics and purposes, and retrieve conversation history.
-
-### User Management
-
-Retrieve user profiles, presence status, and workspace membership information. On Enterprise Grid plans, admin APIs allow provisioning users, assigning roles, and managing invite requests. SCIM API is available for user provisioning at scale.
-
-### File Management
-
-Upload, list, retrieve, and delete files shared within a workspace. Files can be shared to specific channels or conversations.
-
-### Reactions
-
-Add, remove, and list emoji reactions on messages, files, and file comments.
-
-### Pins & Bookmarks
-
-Pin and unpin messages in channels. Create and manage channel bookmarks (saved links).
-
-### Search
-
-Search for messages and files across the workspace, filtered by query terms. Requires a user token with the `search:read` scope.
-
-### User Groups
-
-Create, update, disable, and manage user groups (also known as handle groups). Manage group membership.
-
-### Reminders
-
-Create, list, complete, and delete reminders for users.
-
-### Incoming Webhooks
-
-Incoming webhooks allow external services to post messages directly into a specified Slack channel, providing real-time updates or notifications. These are simple URLs that accept a JSON payload and do not require a full OAuth flow.
-
-### Canvases & Lists
-
-Create and edit canvases (rich documents) and lists within Slack.
-
-### Workspace & Team Administration
-
-Access workspace information, manage preferences, and configure workspace settings. On Enterprise Grid, admin APIs provide organization-wide management of conversations, users, teams, roles, and app approvals.
-
-### Slack Connect
-
-Manage shared channels between different Slack organizations, including sending, accepting, approving, and declining invitations.
-
-### Interactive Surfaces
-
-Create and update a Home tab to give users a persistent space to interact. Empower users to invoke interaction at any time with shortcuts. Open modals to collect info and provide a space for displaying dynamic details.
-
-- **Slash Commands**: Register custom commands that users can invoke with `/command`.
-- **Shortcuts**: Global and message-level shortcuts for quick actions.
-- **Modals**: Multi-step forms and interactive dialogs.
-- **App Home**: A dedicated tab for your app per user.
-
-### Audit Logs (Enterprise Grid)
-
-Audit Logs API are tailored for building security information and event management tools. Available only for Enterprise Grid organizations.
-
-## Events
-
-The Events API is a streamlined way to build apps that respond to activities in Slack. When you use the Events API, Slack calls you. You have two options: you can either use Socket Mode or you can designate a public HTTP endpoint that your app listens on, choose what events to subscribe to, and Slack sends the appropriate events to you.
-
-The Events API leverages Slack's existing object-driven OAuth scope system to control access to events. For example, if your app has access to files through the `files:read` scope, you can choose to subscribe to any or none of the file-related events such as `file_created` and `file_deleted`.
-
-Event subscriptions are configured in the app settings and are split into **Bot Events** (received on behalf of the bot user) and **User Events** (received on behalf of users who installed the app).
-
-### Message Events
-
-Activity related to messages across channels, DMs, group DMs, and the App Home. Includes new messages, edits, deletions, and message metadata changes. Subtypes include `message.channels`, `message.groups`, `message.im`, `message.mpim`, and `message.app_home`.
-
-- Requires scopes like `channels:history`, `groups:history`, `im:history`, `mpim:history`.
-
-### Channel / Conversation Events
-
-Lifecycle events for channels and groups: creation, deletion, archiving, unarchiving, renaming, membership changes (`member_joined_channel`, `member_left_channel`), shared channel events, and channel ID changes.
-
-- Requires scopes like `channels:read`, `groups:read`.
-
-### Reaction Events
-
-When reactions (emoji) are added to or removed from messages, files, or comments (`reaction_added`, `reaction_removed`).
-
-- Requires `reactions:read` scope.
-
-### File Events
-
-File lifecycle events: `file_created`, `file_change`, `file_deleted`, `file_shared`, `file_unshared`, `file_public`.
-
-- Requires `files:read` scope.
-
-### User & Team Events
-
-User profile changes (`user_change`), new team members (`team_join`), user presence/status changes, huddle state changes, and Do Not Disturb updates (`dnd_updated`).
-
-- Requires scopes like `users:read`.
-
-### User Group Events
-
-User group (subteam) creation, updates, and membership changes (`subteam_created`, `subteam_updated`, `subteam_members_changed`).
-
-- Requires `usergroups:read` scope.
-
-### Pin Events
-
-When items are pinned or unpinned from a channel (`pin_added`, `pin_removed`).
-
-- Requires `pins:read` scope.
-
-### App Lifecycle Events
-
-With app events, you can track app uninstallation, token revocation, Enterprise org migration, and more. Includes `app_uninstalled`, `app_home_opened`, `app_mention`, `app_rate_limited`, `tokens_revoked`, and `app_requested`.
-
-### Link Shared Events
-
-When a URL domain registered by the app is shared in a message (`link_shared`), enabling URL unfurling.
-
-### Workspace Events
-
-Workspace-level changes such as `team_rename`, `team_domain_change`, `emoji_changed`, `email_domain_changed`, and workspace preference changes.
-
-### Slack Connect Events
-
-Shared channel invite lifecycle: `shared_channel_invite_received`, `shared_channel_invite_accepted`, `shared_channel_invite_approved`, `shared_channel_invite_declined`.
-
-### Invite Request Events
-
-When a user requests an invitation to a workspace (`invite_requested`). Relevant for workspaces with admin-approved invitations.
+- Tool input schemas serialize to top-level JSON Schema objects.
+- Slack API and validation failures are exposed as `ServiceError` instances.
+- File content and Slack List exports are returned as downloadable files rather than inline base64 output.
+- Real-time private search requires explicit consent and is limited to the connected user's visibility.
+- Canvas and Slack Lists can fail on unsupported plans or when workspace policy disables them.
+- `read_canvas`, attached Slack drafts, Stars/Later, Enterprise administration, custom emoji administration, Calls, RTM, raw API passthrough, and deprecated action aliases are outside this integration surface.

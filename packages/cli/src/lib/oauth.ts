@@ -4,6 +4,21 @@ import { createServer } from 'http';
 
 let DEFAULT_OAUTH_CALLBACK_PORT = 45873;
 
+let resolveAdvertisedRedirectUri = (localPort: number) => {
+  let override = process.env.OAUTH_CALLBACK_OVERRIDE;
+  if (!override) return `http://127.0.0.1:${localPort}/callback`;
+
+  let url: URL;
+  try {
+    url = new URL(override);
+  } catch {
+    throw new Error(`OAUTH_CALLBACK_OVERRIDE must be an absolute URL, received: ${override}`);
+  }
+
+  if (url.pathname === '' || url.pathname === '/') url.pathname = '/callback';
+  return url.toString();
+};
+
 export let chooseScopes = async (
   authMethod: any,
   initialScopes: string[]
@@ -153,7 +168,7 @@ export let createOAuthCallbackListener = async () => {
       }
 
       resolve({
-        redirectUri: `http://127.0.0.1:${address.port}/callback`,
+        redirectUri: resolveAdvertisedRedirectUri(address.port),
         state: expectedState,
         wait: () => waiter.promise
       });

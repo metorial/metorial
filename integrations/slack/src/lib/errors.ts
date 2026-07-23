@@ -1,5 +1,5 @@
 import { forbiddenError, ServiceError } from '@lowerdeck/error';
-import { createApiServiceError } from 'slates';
+import { buildApiServiceError, createApiServiceError, SlateError } from 'slates';
 
 type SlackServiceErrorOptions = {
   reason?: string;
@@ -15,6 +15,20 @@ export let slackApiError = (method: string, error?: string | null) =>
     reason: 'slack_api_error',
     upstreamCode: error || undefined
   });
+
+export let slackRequestError = (method: string, error: unknown) => {
+  // Transport errors (429/5xx/timeouts) arrive pre-classified with retry
+  // semantics; flattening them into a bad_request would make them terminal.
+  if (error instanceof SlateError) return error;
+
+  return buildApiServiceError(error, {
+    providerLabel: 'Slack',
+    operation: method,
+    reason: 'slack_api_request_error',
+    detailKeys: ['message', 'error', 'detail', 'code'],
+    nestedKeys: ['errors', 'details', 'error']
+  });
+};
 
 export let slackOAuthError = (error?: string | null) =>
   slackServiceError(`Slack OAuth error: ${error || 'Unknown error'}`, {
