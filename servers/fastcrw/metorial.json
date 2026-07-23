@@ -1,0 +1,4 @@
+{
+  "name": "fastCRW MCP Server",
+  "runtime": "typescript.deno"
+}
