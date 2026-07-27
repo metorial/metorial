@@ -10,7 +10,7 @@ AI-parsed structured JSON. It also extracts Google search results.
 
 ## Authentication
 
-API key. Get one at [scrapeunblocker.com](https://www.scrapeunblocker.com).
+API key. Get one at [scrapeunblocker.com](https://www.scrapeunblocker.com?utm_source=metorial&utm_medium=integration&utm_campaign=metorial-integration).
 
 ## Tools
 
@@ -21,5 +21,5 @@ API key. Get one at [scrapeunblocker.com](https://www.scrapeunblocker.com).
 
 ## Links
 
-- Website: https://www.scrapeunblocker.com
-- API documentation: https://developers.scrapeunblocker.com
+- Website: [scrapeunblocker.com](https://www.scrapeunblocker.com?utm_source=metorial&utm_medium=integration&utm_campaign=metorial-integration)
+- API documentation: [developers.scrapeunblocker.com](https://developers.scrapeunblocker.com?utm_source=metorial&utm_medium=integration&utm_campaign=metorial-integration)
