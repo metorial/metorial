@@ -177,7 +177,7 @@ export let runAdvancedCodeAnalysisTool = readOnlyTool({
   .input(
     z.object({
       ...projectInput,
-      branchName: z
+      branch: z
         .string()
         .describe(
           'The branch name used to retrieve the latest analysis context from SonarQube Cloud.'
@@ -229,8 +229,8 @@ export let runAdvancedCodeAnalysisTool = readOnlyTool({
       );
     }
 
-    if (!ctx.input.branchName.trim()) {
-      throw sonarqubeValidationError('branchName is required.');
+    if (!ctx.input.branch.trim()) {
+      throw sonarqubeValidationError('branch is required.');
     }
     if (!ctx.input.filePath.trim()) {
       throw sonarqubeValidationError('filePath is required.');
@@ -240,7 +240,7 @@ export let runAdvancedCodeAnalysisTool = readOnlyTool({
     let data = await client.runAdvancedCodeAnalysis({
       organizationKey,
       projectKey: projectKeyFromInput(ctx.config, ctx.input),
-      branchName: ctx.input.branchName,
+      branchName: ctx.input.branch,
       filePath: ctx.input.filePath,
       fileContent,
       fileScope: ctx.input.fileScope ?? 'MAIN'

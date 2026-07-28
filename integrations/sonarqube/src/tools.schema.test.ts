@@ -5,12 +5,22 @@ import { provider } from './index';
 
 describeMcpCompatibleToolSchemas('SonarQube tool input schemas', provider.actions);
 
+let inputJsonSchemaFor = (toolKey: string) => {
+  let tool = provider.actions.find(action => action.key === toolKey);
+
+  return z.toJSONSchema(tool?.inputSchema ?? z.object({})) as {
+    properties?: Record<string, unknown>;
+    required?: string[];
+  };
+};
+
 describe('SonarQube official MCP tool registration', () => {
   it('registers the requested official tool keys', () => {
     let keys = provider.actions.map(action => action.key);
 
     expect(keys).toEqual(
       expect.arrayContaining([
+        'ping_system',
         'search_my_sonarqube_projects',
         'list_branches',
         'list_pull_requests',
@@ -26,6 +36,51 @@ describe('SonarQube official MCP tool registration', () => {
         'search_dependency_risks'
       ])
     );
+  });
+});
+
+describe('SonarQube system ping schema', () => {
+  it('uses an exact empty object input schema', () => {
+    let schema = inputJsonSchemaFor('ping_system') as {
+      type?: string;
+      properties?: Record<string, unknown>;
+      required?: string[];
+    };
+
+    expect(schema.type).toBe('object');
+    expect(schema.properties).toEqual({});
+    expect(schema.required).toBeUndefined();
+  });
+});
+
+describe('SonarQube canonical pagination schemas', () => {
+  it('uses pageIndex for project search', () => {
+    let tool = provider.actions.find(action => action.key === 'search_my_sonarqube_projects');
+    let result = tool?.inputSchema.safeParse({
+      pageIndex: 2,
+      pageSize: 50,
+      q: 'app'
+    });
+    let schema = inputJsonSchemaFor('search_my_sonarqube_projects');
+
+    expect(result?.success).toBe(true);
+    expect(schema.properties).toHaveProperty('pageIndex');
+    expect(schema.properties).not.toHaveProperty('page');
+  });
+
+  it('uses pageIndex and pageSize for metric search', () => {
+    let tool = provider.actions.find(action => action.key === 'search_metrics');
+    let result = tool?.inputSchema.safeParse({
+      pageIndex: 2.5,
+      pageSize: 50.5
+    });
+    let schema = inputJsonSchemaFor('search_metrics');
+
+    expect(result?.success).toBe(true);
+    expect(schema.properties).toHaveProperty('pageIndex');
+    expect(schema.properties).toHaveProperty('pageSize');
+    expect(schema.properties).not.toHaveProperty('p');
+    expect(schema.properties).not.toHaveProperty('ps');
   });
 });
 
@@ -76,14 +131,23 @@ describe('SonarQube search issue schema', () => {
 
   it('accepts current issue status and software-quality filters', () => {
     let result = searchIssuesTool?.inputSchema.safeParse({
-      projects: ['app'],
+      projectKeys: ['app'],
       issueStatuses: ['OPEN'],
       impactSoftwareQualities: ['SECURITY'],
       severities: ['HIGH'],
-      files: ['app:src/main.ts']
+      files: ['app:src/main.ts'],
+      pageIndex: 2,
+      pageSize: 50
     });
+    let schema = inputJsonSchemaFor('search_sonar_issues_in_projects');
 
     expect(result?.success).toBe(true);
+    expect(schema.properties).toHaveProperty('projectKeys');
+    expect(schema.properties).toHaveProperty('pageIndex');
+    expect(schema.properties).toHaveProperty('pageSize');
+    expect(schema.properties).not.toHaveProperty('projects');
+    expect(schema.properties).not.toHaveProperty('p');
+    expect(schema.properties).not.toHaveProperty('ps');
   });
 });
 
@@ -121,10 +185,17 @@ describe('SonarQube security hotspot schema', () => {
 
   it('accepts hotspot-key-only search input', () => {
     let result = searchHotspotsTool?.inputSchema.safeParse({
-      hotspotKeys: ['HOTSPOT-1']
+      hotspotKeys: ['HOTSPOT-1'],
+      pageIndex: 2,
+      pageSize: 50
     });
+    let schema = inputJsonSchemaFor('search_security_hotspots');
 
     expect(result?.success).toBe(true);
+    expect(schema.properties).toHaveProperty('pageIndex');
+    expect(schema.properties).toHaveProperty('pageSize');
+    expect(schema.properties).not.toHaveProperty('p');
+    expect(schema.properties).not.toHaveProperty('ps');
   });
 
   it('accepts ACKNOWLEDGED hotspot resolution', () => {
@@ -162,12 +233,16 @@ describe('SonarQube advanced analysis schema', () => {
   it('accepts the official advanced analysis inputs', () => {
     let result = advancedAnalysisTool?.inputSchema.safeParse({
       projectKey: 'app',
-      branchName: 'main',
+      branch: 'main',
       filePath: 'src/main.ts',
       fileScope: 'MAIN'
     });
+    let schema = inputJsonSchemaFor('run_advanced_code_analysis');
 
     expect(result?.success).toBe(true);
+    expect(schema.required).toContain('branch');
+    expect(schema.properties).toHaveProperty('branch');
+    expect(schema.properties).not.toHaveProperty('branchName');
   });
 
   it('does not expose fileContent in the workspace-backed schema', () => {
@@ -181,7 +256,7 @@ describe('SonarQube advanced analysis schema', () => {
   it('rejects unsupported advanced analysis file scopes', () => {
     let result = advancedAnalysisTool?.inputSchema.safeParse({
       projectKey: 'app',
-      branchName: 'main',
+      branch: 'main',
       filePath: 'src/main.ts',
       fileScope: 'SOURCE'
     });
@@ -195,24 +270,14 @@ describe('SonarQube dependency risks schema', () => {
     action => action.key === 'search_dependency_risks'
   );
 
-  it('accepts official dependency risk filters and integer pagination', () => {
+  it('accepts the official dependency risk number schema', () => {
     let result = dependencyRisksTool?.inputSchema.safeParse({
       projectKey: 'app',
       branch: 'main',
-      pageIndex: 1,
-      pageSize: 100
+      pageIndex: 1.5,
+      pageSize: 100.5
     });
 
     expect(result?.success).toBe(true);
-  });
-
-  it('rejects non-integer dependency risk pagination', () => {
-    let result = dependencyRisksTool?.inputSchema.safeParse({
-      projectKey: 'app',
-      pageIndex: 1.5,
-      pageSize: 100
-    });
-
-    expect(result?.success).toBe(false);
   });
 });

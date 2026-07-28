@@ -730,11 +730,6 @@ let duplicationSummaryFromProjectMeasures = (
     : undefined;
 };
 
-let isBranchParameterType = (branch: Record<string, unknown>) => {
-  let type = optionalRecordString(branch, 'type');
-  return type === 'LONG' || type === 'BRANCH';
-};
-
 let truthyParams = (params: Record<string, unknown>) => params;
 
 export class SonarQubeClient {
@@ -801,6 +796,18 @@ export class SonarQubeClient {
       sonarqubeApiError
     );
     return response.data as T;
+  }
+
+  private async getAnonymousText(operation: string, path: string) {
+    return await requestAxiosData<string>(
+      operation,
+      () =>
+        this.httpAnonymous.get(path, {
+          responseType: 'text',
+          transformResponse: value => value
+        }),
+      sonarqubeApiError
+    );
   }
 
   private async getText(operation: string, path: string, params?: Record<string, unknown>) {
@@ -905,11 +912,7 @@ export class SonarQubeClient {
     let data = await this.get<unknown>('list project branches', '/project_branches/list', {
       project: projectKey
     });
-    let result = normalizeArray<Record<string, unknown>>(data, 'branches');
-    return {
-      items: result.items.filter(isBranchParameterType),
-      page: result.page
-    };
+    return normalizeArray<Record<string, unknown>>(data, 'branches');
   }
 
   async listProjectPullRequests(projectKey: string) {
@@ -1254,6 +1257,11 @@ export class SonarQubeClient {
       'get system status',
       '/system/status'
     );
+  }
+
+  async pingSystem() {
+    requireServerDeployment(this.config, 'ping system');
+    return await this.getAnonymousText('ping system', '/system/ping');
   }
 
   async getOrganizationUuidV4(organizationKey: string) {

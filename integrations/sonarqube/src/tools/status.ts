@@ -2,6 +2,31 @@ import { z } from 'zod';
 import { sonarqubeValidationError } from '../lib/errors';
 import { branchPullRequestInputs, createClient, readOnlyTool } from './shared';
 
+export let pingSystemTool = readOnlyTool({
+  name: 'Ping SonarQube Server System',
+  key: 'ping_system',
+  description:
+    "Ping the SonarQube Server system to check whether it is reachable. Returns the server's plain-text response."
+})
+  .input(z.object({}))
+  .output(
+    z.object({
+      response: z.string().describe('The ping response from the SonarQube Server')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = createClient(ctx);
+    let response = await client.pingSystem();
+
+    return {
+      output: {
+        response
+      },
+      message: `SonarQube Server responded with **${response}**.`
+    };
+  })
+  .build();
+
 export let getQualityGateStatusTool = readOnlyTool({
   name: 'Get SonarQube Project Quality Gate Status',
   key: 'get_project_quality_gate_status',

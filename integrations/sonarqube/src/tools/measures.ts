@@ -41,12 +41,9 @@ export let listMetricsTool = readOnlyTool({
 })
   .input(
     z.object({
-      p: z.number().int().positive().optional().describe('1-based page number (default: 1)'),
-      ps: z
+      pageIndex: z.number().optional().describe('1-based page number (default: 1)'),
+      pageSize: z
         .number()
-        .int()
-        .positive()
-        .max(500)
         .optional()
         .describe(
           'Page size. Must be greater than 0 and less than or equal to 500 (default: 100)'
@@ -76,7 +73,10 @@ export let listMetricsTool = readOnlyTool({
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    let result = await client.listMetrics({ page: ctx.input.p, pageSize: ctx.input.ps });
+    let result = await client.listMetrics({
+      page: ctx.input.pageIndex,
+      pageSize: ctx.input.pageSize
+    });
     let page = result.page;
 
     if (page?.total === undefined || page.page === undefined || page.pageSize === undefined) {

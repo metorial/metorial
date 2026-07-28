@@ -26,7 +26,7 @@ export let searchIssuesTool = readOnlyTool({
 })
   .input(
     z.object({
-      projects: z
+      projectKeys: z
         .array(z.string())
         .optional()
         .describe('An optional list of Sonar projects to look in'),
@@ -55,8 +55,8 @@ export let searchIssuesTool = readOnlyTool({
         .array(z.string())
         .optional()
         .describe('An optional list of issue keys to fetch specific issues'),
-      p: z.number().optional().describe('An optional page number. Defaults to 1.'),
-      ps: z
+      pageIndex: z.number().optional().describe('An optional page number. Defaults to 1.'),
+      pageSize: z
         .number()
         .optional()
         .describe(
@@ -104,7 +104,7 @@ export let searchIssuesTool = readOnlyTool({
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
     let result = await client.searchIssues({
-      projectKeys: ctx.input.projects,
+      projectKeys: ctx.input.projectKeys,
       files: ctx.input.files,
       branch: ctx.input.branch,
       pullRequest: ctx.input.pullRequest,
@@ -112,8 +112,8 @@ export let searchIssuesTool = readOnlyTool({
       impactSoftwareQualities: ctx.input.impactSoftwareQualities,
       issueStatuses: ctx.input.issueStatuses,
       issueKeys: ctx.input.issueKey,
-      page: ctx.input.p,
-      pageSize: ctx.input.ps
+      page: ctx.input.pageIndex,
+      pageSize: ctx.input.pageSize
     });
     let issues = result.items.map(issue => {
       let textRange =
@@ -148,8 +148,8 @@ export let searchIssuesTool = readOnlyTool({
       };
     });
     let paging = {
-      pageIndex: result.page?.page ?? ctx.input.p ?? 1,
-      pageSize: result.page?.pageSize ?? ctx.input.ps ?? 100,
+      pageIndex: result.page?.page ?? ctx.input.pageIndex ?? 1,
+      pageSize: result.page?.pageSize ?? ctx.input.pageSize ?? 100,
       total: result.page?.total ?? issues.length
     };
 

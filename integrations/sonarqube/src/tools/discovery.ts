@@ -2,6 +2,58 @@ import { z } from 'zod';
 import { sonarqubeValidationError } from '../lib/errors';
 import { createClient, projectInput, projectKeyFromInput, readOnlyTool } from './shared';
 
+const branchTypeFilterValues = ['ALL', 'LONG', 'SHORT'] as const;
+type BranchTypeFilter = (typeof branchTypeFilterValues)[number];
+
+const branchTypes = ['LONG', 'SHORT', 'BRANCH'] as const;
+const qualityGateStatuses = ['OK', 'ERROR', 'WARN', 'NONE'] as const;
+
+const isBranchType = (value: unknown): value is (typeof branchTypes)[number] =>
+  typeof value === 'string' && branchTypes.includes(value as (typeof branchTypes)[number]);
+
+const isQualityGateStatus = (value: unknown): value is (typeof qualityGateStatuses)[number] =>
+  typeof value === 'string' &&
+  qualityGateStatuses.includes(value as (typeof qualityGateStatuses)[number]);
+
+const matchesBranchTypesFilter = (
+  branch: Record<string, unknown>,
+  filter: BranchTypeFilter | undefined
+) => {
+  if (filter === undefined || filter === 'ALL') return true;
+  if (filter === 'LONG') return branch.type === 'LONG' || branch.type === 'BRANCH';
+  return branch.type === 'SHORT';
+};
+
+const branchTypesFilterFromInput = (
+  value: string | undefined
+): BranchTypeFilter | undefined => {
+  if (value === undefined) return undefined;
+  if (branchTypeFilterValues.includes(value as BranchTypeFilter)) {
+    return value as BranchTypeFilter;
+  }
+  throw sonarqubeValidationError('branchTypes must be one of ALL, LONG, or SHORT.');
+};
+
+const mapProjectBranch = (branch: Record<string, unknown>) => {
+  let type = isBranchType(branch.type) ? branch.type : undefined;
+  let status = branch.status;
+  let statusValue =
+    typeof status === 'object' && status !== null && 'qualityGateStatus' in status
+      ? status.qualityGateStatus
+      : undefined;
+  let qualityGateStatus = isQualityGateStatus(statusValue) ? statusValue : undefined;
+
+  return {
+    name: String(branch.name ?? ''),
+    isMain: branch.isMain === true,
+    type,
+    qualityGateStatus,
+    analysisDate: typeof branch.analysisDate === 'string' ? branch.analysisDate : undefined,
+    branchId: String(branch.branchId ?? ''),
+    mergeBranch: typeof branch.mergeBranch === 'string' ? branch.mergeBranch : undefined
+  };
+};
+
 export let searchProjectsTool = readOnlyTool({
   name: 'Search My SonarQube Projects',
   key: 'search_my_sonarqube_projects',
@@ -10,7 +62,7 @@ export let searchProjectsTool = readOnlyTool({
 })
   .input(
     z.object({
-      page: z.number().optional().describe('An optional page number. Defaults to 1.'),
+      pageIndex: z.number().optional().describe('An optional page number. Defaults to 1.'),
       pageSize: z
         .number()
         .optional()
@@ -58,14 +110,14 @@ export let searchProjectsTool = readOnlyTool({
     let client = createClient(ctx);
     let result = await client.searchProjects({
       query: ctx.input.q,
-      page: ctx.input.page,
+      page: ctx.input.pageIndex,
       pageSize: ctx.input.pageSize
     });
     let projects = result.items.map(project => ({
       key: String(project.key ?? ''),
       name: typeof project.name === 'string' ? project.name : String(project.name ?? '')
     }));
-    let pageIndex = result.page?.page ?? ctx.input.page ?? 1;
+    let pageIndex = result.page?.page ?? ctx.input.pageIndex ?? 1;
     let pageSize = result.page?.pageSize ?? ctx.input.pageSize ?? 500;
     let total = result.page?.total ?? projects.length;
     let hasNextPage = result.page?.hasNextPage ?? pageIndex * pageSize < total;
@@ -89,9 +141,19 @@ export let listProjectBranchesTool = readOnlyTool({
   name: 'List SonarQube Branches',
   key: 'list_branches',
   description:
-    'List long-lived branches for a project (e.g. main, develop, master). Use returned branch names as the branch parameter on other tools (e.g. get_project_quality_gate_status, get_component_measures). For pull requests, use list_pull_requests instead.'
+    'List analyzed branches for a SonarQube project. Returns long-lived branches such as main and develop plus short-lived SonarQube Cloud branches analyzed without a pull request. Use returned branch names as the branch parameter on other tools (e.g. get_project_quality_gate_status, get_component_measures). Use branchTypes to narrow Cloud results, or list_pull_requests for pull request analysis.'
 })
-  .input(z.object(projectInput))
+  .input(
+    z.object({
+      ...projectInput,
+      branchTypes: z
+        .string()
+        .optional()
+        .describe(
+          'Filter branches by type. ALL (default) returns all analyzed branches; LONG returns long-lived branches only; SHORT returns short-lived branches only.'
+        )
+    })
+  )
   .output(
     z.object({
       projectKey: z.string().describe('Project key'),
@@ -109,14 +171,18 @@ export let listProjectBranchesTool = readOnlyTool({
               .enum(['LONG', 'SHORT', 'BRANCH'])
               .optional()
               .describe(
-                'Branch type in SonarQube (LONG on SonarQube Cloud, BRANCH on SonarQube Server)'
+                'Branch type in SonarQube (LONG or SHORT on SonarQube Cloud, BRANCH on SonarQube Server)'
               ),
             qualityGateStatus: z
               .enum(['OK', 'ERROR', 'WARN', 'NONE'])
               .optional()
               .describe('Quality gate status for this branch'),
             analysisDate: z.string().optional().describe('Date of the last analysis'),
-            branchId: z.string().describe('Internal branch identifier')
+            branchId: z.string().describe('Internal branch identifier'),
+            mergeBranch: z
+              .string()
+              .optional()
+              .describe('Target branch for a short-lived branch, such as main or master')
           })
         )
         .describe('List of branches for this project')
@@ -124,36 +190,12 @@ export let listProjectBranchesTool = readOnlyTool({
   )
   .handleInvocation(async ctx => {
     let projectKey = projectKeyFromInput(ctx.config, ctx.input);
+    let branchTypesFilter = branchTypesFilterFromInput(ctx.input.branchTypes);
     let client = createClient(ctx);
     let result = await client.listProjectBranches(projectKey);
-    let branchTypes = ['LONG', 'SHORT', 'BRANCH'] as const;
-    let qualityGateStatuses = ['OK', 'ERROR', 'WARN', 'NONE'] as const;
-    let isBranchType = (value: unknown): value is (typeof branchTypes)[number] =>
-      typeof value === 'string' && branchTypes.includes(value as (typeof branchTypes)[number]);
-    let isQualityGateStatus = (
-      value: unknown
-    ): value is (typeof qualityGateStatuses)[number] =>
-      typeof value === 'string' &&
-      qualityGateStatuses.includes(value as (typeof qualityGateStatuses)[number]);
-    let branches = result.items.map(branch => {
-      let type = isBranchType(branch.type) ? branch.type : undefined;
-      let status = branch.status;
-      let statusValue =
-        typeof status === 'object' && status !== null && 'qualityGateStatus' in status
-          ? status.qualityGateStatus
-          : undefined;
-      let qualityGateStatus = isQualityGateStatus(statusValue) ? statusValue : undefined;
-
-      return {
-        name: String(branch.name ?? ''),
-        isMain: branch.isMain === true,
-        type,
-        qualityGateStatus,
-        analysisDate:
-          typeof branch.analysisDate === 'string' ? branch.analysisDate : undefined,
-        branchId: String(branch.branchId ?? '')
-      };
-    });
+    let branches = result.items
+      .filter(branch => matchesBranchTypesFilter(branch, branchTypesFilter))
+      .map(mapProjectBranch);
 
     return {
       output: {

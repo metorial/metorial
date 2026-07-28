@@ -729,7 +729,7 @@ describe('SonarQube client helpers', () => {
     expect(isVersionAtLeast('10.8.1', '2025.4')).toBe(false);
   });
 
-  it('filters project branches to branch-parameter-compatible entries', async () => {
+  it('returns every analyzed project branch while serializing only the project key', async () => {
     let client = new SonarQubeClient({
       auth: { token: 'token' },
       config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
@@ -763,6 +763,10 @@ describe('SonarQube client helpers', () => {
         {
           name: 'main',
           type: 'LONG'
+        },
+        {
+          name: 'feature',
+          type: 'SHORT'
         },
         {
           name: 'develop',
@@ -1509,6 +1513,43 @@ describe('SonarQube client helpers', () => {
     });
     expect(authenticatedGet).not.toHaveBeenCalled();
     expect(anonymousGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests the plain-text system ping anonymously for SonarQube Server', async () => {
+    let client = new SonarQubeClient({
+      auth: { token: 'token' },
+      config: { deployment: 'server', serverBaseUrl: 'https://sonarqube.example.com' }
+    });
+    let authenticatedHttp = (
+      client as unknown as {
+        http: { get: (path: string, config?: Record<string, unknown>) => Promise<unknown> };
+      }
+    ).http;
+    let anonymousHttp = (
+      client as unknown as {
+        httpAnonymous: {
+          get: (path: string, config?: Record<string, unknown>) => Promise<unknown>;
+        };
+      }
+    ).httpAnonymous;
+    let authenticatedGet = vi.spyOn(authenticatedHttp, 'get');
+    let anonymousGet = vi.spyOn(anonymousHttp, 'get').mockResolvedValue({
+      data: 'pong',
+      headers: {}
+    } as never);
+
+    await expect(client.pingSystem()).resolves.toBe('pong');
+    expect(authenticatedGet).not.toHaveBeenCalled();
+    expect(anonymousGet).toHaveBeenCalledTimes(1);
+    expect(anonymousGet).toHaveBeenCalledWith('/system/ping', {
+      responseType: 'text',
+      transformResponse: expect.any(Function)
+    });
+
+    let requestConfig = anonymousGet.mock.calls[0]?.[1];
+    let transformResponse = requestConfig?.transformResponse;
+    expect(typeof transformResponse).toBe('function');
+    expect((transformResponse as (value: string) => string)('pong')).toBe('pong');
   });
 
   it('serializes rule show params with organization only when configured', () => {

@@ -84,8 +84,8 @@ export let searchHotspotsTool = readOnlyTool({
           'If true, only Security Hotspots created since the leak period (new code period) are returned'
         ),
       ...branchPullRequestInputs,
-      p: z.number().optional().describe('An optional page number. Defaults to 1.'),
-      ps: z
+      pageIndex: z.number().optional().describe('An optional page number. Defaults to 1.'),
+      pageSize: z
         .number()
         .optional()
         .describe(
@@ -169,8 +169,8 @@ export let searchHotspotsTool = readOnlyTool({
       sinceLeakPeriod: ctx.input.sinceLeakPeriod,
       branch: ctx.input.branch,
       pullRequest: ctx.input.pullRequest,
-      page: ctx.input.p,
-      pageSize: ctx.input.ps
+      page: ctx.input.pageIndex,
+      pageSize: ctx.input.pageSize
     });
     let optionalString = (value: unknown) =>
       typeof value === 'string' && value.length > 0 ? value : undefined;
@@ -219,8 +219,8 @@ export let searchHotspotsTool = readOnlyTool({
       ruleKey: optionalString(hotspot.ruleKey)
     }));
     let paging = {
-      pageIndex: result.page?.page ?? ctx.input.p ?? 1,
-      pageSize: result.page?.pageSize ?? ctx.input.ps ?? 100,
+      pageIndex: result.page?.page ?? ctx.input.pageIndex ?? 1,
+      pageSize: result.page?.pageSize ?? ctx.input.pageSize ?? 100,
       total: result.page?.total ?? hotspots.length
     };
     let target = projectKey ? ` for project **${projectKey}**` : '';

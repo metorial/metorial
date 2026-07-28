@@ -108,12 +108,10 @@ export let searchDependencyRisksTool = readOnlyTool({
       ...branchPullRequestInputs,
       pageIndex: z
         .number()
-        .int()
         .optional()
         .describe('An optional page index (1-based). Defaults to 1.'),
       pageSize: z
         .number()
-        .int()
         .optional()
         .describe(
           'An optional page size. Must be greater than 0 and less than or equal to 500. Defaults to 100.'
