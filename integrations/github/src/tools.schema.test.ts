@@ -39,7 +39,32 @@ const addedToolKeys = [
   'update_pull_request_branch',
   'sub_issue_write',
   'get_global_security_advisory',
-  'list_global_security_advisories'
+  'list_global_security_advisories',
+  'get_code_scanning_alert',
+  'list_code_scanning_alerts',
+  'get_dependabot_alert',
+  'list_dependabot_alerts',
+  'get_secret_scanning_alert',
+  'list_secret_scanning_alerts',
+  'list_repository_security_advisories',
+  'list_org_repository_security_advisories',
+  'get_code_quality_finding',
+  'fork_repository',
+  'list_starred_repositories',
+  'get_notification_details',
+  'list_notifications',
+  'manage_notification_subscription',
+  'manage_repository_notification_subscription',
+  'mark_all_notifications_read',
+  'dismiss_notification',
+  'list_discussion_categories',
+  'list_discussions',
+  'get_discussion',
+  'get_discussion_comments',
+  'discussion_comment_write',
+  'projects_get',
+  'projects_list',
+  'projects_write'
 ] as const;
 
 describeMcpCompatibleToolSchemas('GitHub tool input schemas', provider.actions);

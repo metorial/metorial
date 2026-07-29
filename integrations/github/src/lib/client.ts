@@ -1,14 +1,106 @@
+import { Buffer } from 'node:buffer';
 import {
   buildApiServiceError,
   createApiServiceError,
   createAxios,
-  getResponseHeaderValue
+  getResponseHeaderValue,
+  requestAxios
 } from 'slates';
 
 export interface GitHubClientConfig {
   token: string;
   instanceUrl?: string;
 }
+
+export type GitHubRestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export interface GitHubRestRequestOptions<TBody = unknown> {
+  method: GitHubRestMethod;
+  path: string;
+  operation: string;
+  reason: string;
+  query?: Record<string, unknown>;
+  body?: TBody;
+  headers?: Record<string, string>;
+}
+
+export interface GitHubRestResult<T> {
+  data: T;
+  linkHeader?: string;
+}
+
+export interface GitHubCursorPageInfo {
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  nextCursor?: string;
+  prevCursor?: string;
+}
+
+let cursorFromLink = (
+  linkHeader: string | undefined,
+  relation: 'next' | 'prev',
+  parameter: 'after' | 'before'
+) => {
+  if (!linkHeader) {
+    return undefined;
+  }
+  for (let part of linkHeader.split(',')) {
+    let match = /^\s*<([^>]+)>;\s*rel="([^"]+)"\s*$/.exec(part);
+    if (match?.[2] === relation) {
+      try {
+        return new URL(match[1] as string).searchParams.get(parameter) ?? undefined;
+      } catch {
+        return undefined;
+      }
+    }
+  }
+  return undefined;
+};
+
+export let cursorPageInfoFromLink = (linkHeader: string | undefined): GitHubCursorPageInfo => {
+  let nextCursor = cursorFromLink(linkHeader, 'next', 'after');
+  let prevCursor = cursorFromLink(linkHeader, 'prev', 'before');
+  return {
+    hasNextPage: nextCursor !== undefined,
+    hasPreviousPage: prevCursor !== undefined,
+    ...(nextCursor ? { nextCursor } : {}),
+    ...(prevCursor ? { prevCursor } : {})
+  };
+};
+
+export type GitHubDownloadMode = 'text' | 'binary';
+
+export interface GitHubDownloadRequestOptions {
+  path: string;
+  operation: string;
+  reason: string;
+  mode?: GitHubDownloadMode;
+  query?: Record<string, unknown>;
+  headers?: Record<string, string>;
+}
+
+export interface GitHubDownloadResult {
+  bytes: Uint8Array;
+  byteLength: number;
+  text?: string;
+  contentType?: string;
+  contentDisposition?: string;
+}
+
+let toDownloadBytes = (value: unknown) => {
+  if (typeof value === 'string') {
+    return Uint8Array.from(Buffer.from(value, 'utf8'));
+  }
+  if (value instanceof ArrayBuffer) {
+    return Uint8Array.from(new Uint8Array(value));
+  }
+  if (ArrayBuffer.isView(value)) {
+    return Uint8Array.from(new Uint8Array(value.buffer, value.byteOffset, value.byteLength));
+  }
+  throw createApiServiceError('GitHub returned unsupported downloadable content.', {
+    reason: 'github_download_content_unsupported'
+  });
+};
 
 export class GitHubClient {
   private http: ReturnType<typeof createAxios>;
@@ -78,6 +170,81 @@ export class GitHubClient {
         nestedKeys: ['errors']
       });
     }
+  }
+
+  private async requestRestResponse<T, TBody = unknown>(
+    options: GitHubRestRequestOptions<TBody>
+  ) {
+    return await requestAxios<T>(
+      options.operation,
+      () =>
+        this.http.request<T>({
+          method: options.method,
+          url: options.path,
+          params: options.query,
+          data: options.body,
+          headers: options.headers
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'GitHub',
+          operation,
+          reason: options.reason,
+          nestedKeys: ['errors']
+        })
+    );
+  }
+
+  async requestRest<T, TBody = unknown>(options: GitHubRestRequestOptions<TBody>): Promise<T> {
+    let response = await this.requestRestResponse<T, TBody>(options);
+    return response.data;
+  }
+
+  async requestRestWithMetadata<T, TBody = unknown>(
+    options: GitHubRestRequestOptions<TBody>
+  ): Promise<GitHubRestResult<T>> {
+    let response = await this.requestRestResponse<T, TBody>(options);
+    return {
+      data: response.data,
+      linkHeader: getResponseHeaderValue(response.headers, 'link')
+    };
+  }
+
+  async downloadContent(options: GitHubDownloadRequestOptions): Promise<GitHubDownloadResult> {
+    let mode = options.mode ?? 'binary';
+    let response = await requestAxios<string | ArrayBuffer | Uint8Array>(
+      options.operation,
+      () =>
+        this.http.get(options.path, {
+          params: options.query,
+          headers: options.headers,
+          responseType: mode === 'text' ? 'text' : 'arraybuffer',
+          maxRedirects: 5
+        }),
+      (error, operation) =>
+        buildApiServiceError(error, {
+          providerLabel: 'GitHub',
+          operation,
+          reason: options.reason,
+          nestedKeys: ['errors']
+        })
+    );
+    let bytes = toDownloadBytes(response.data);
+
+    return {
+      bytes,
+      byteLength: bytes.byteLength,
+      ...(mode === 'text'
+        ? {
+            text:
+              typeof response.data === 'string'
+                ? response.data
+                : Buffer.from(bytes).toString('utf8')
+          }
+        : {}),
+      contentType: getResponseHeaderValue(response.headers, 'content-type'),
+      contentDisposition: getResponseHeaderValue(response.headers, 'content-disposition')
+    };
   }
 
   getRepositoryHtmlUrl(owner: string, repo: string) {
@@ -232,7 +399,7 @@ export class GitHubClient {
 
   // ─── Issues ────────────────────────────────────────────────────
 
-  private async queryGraphQL<T>(
+  async requestGraphQL<T>(
     query: string,
     variables: Record<string, unknown>,
     features: string[] = []
@@ -277,6 +444,14 @@ export class GitHubClient {
     }
 
     return response.data?.data as T;
+  }
+
+  private async queryGraphQL<T>(
+    query: string,
+    variables: Record<string, unknown>,
+    features: string[] = []
+  ): Promise<T> {
+    return await this.requestGraphQL<T>(query, variables, features);
   }
 
   async listIssues(
