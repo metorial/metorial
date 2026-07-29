@@ -6,11 +6,12 @@ import { spec } from '../spec';
 export let search = SlateTool.create(spec, {
   name: 'Search GitHub',
   key: 'search',
-  description: `Search across GitHub for repositories, code, issues/pull requests, or users using GitHub's search syntax.
+  description: `Search across GitHub for repositories, code, issues/pull requests, users, or organizations using GitHub's search syntax.
 Supports qualifiers for filtering (e.g., "language:python stars:>100" for repositories).`,
   instructions: [
     'Use GitHub search qualifiers in the query for precise results (e.g., "repo:owner/name", "language:go", "is:pr is:merged").',
-    'For issues vs PRs, use "is:issue" or "is:pr" qualifier in the query when searching type "issues".'
+    'For issues vs PRs, use "is:issue" or "is:pr" qualifier in the query when searching type "issues".',
+    'To search organizations, use type "users" and include the "type:org" qualifier in the query. Sort supports followers, repositories, or joined.'
   ],
   tags: {
     readOnly: true
@@ -20,8 +21,14 @@ Supports qualifiers for filtering (e.g., "language:python stars:>100" for reposi
     z.object({
       type: z
         .enum(['repositories', 'code', 'issues', 'users'])
-        .describe('Type of resource to search'),
-      query: z.string().describe('Search query with optional GitHub search qualifiers'),
+        .describe(
+          'Type of resource to search. Organization searches use "users" with query qualifier "type:org".'
+        ),
+      query: z
+        .string()
+        .describe(
+          'Search query with optional GitHub search qualifiers. Include "type:org" when searching organizations.'
+        ),
       sort: z
         .string()
         .optional()

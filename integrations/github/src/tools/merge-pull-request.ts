@@ -16,16 +16,12 @@ export let mergePullRequest = SlateTool.create(spec, {
       owner: z.string().describe('Repository owner (user or organization)'),
       repo: z.string().describe('Repository name'),
       pullNumber: z.number().describe('Pull request number'),
-      commitTitle: z.string().optional().describe('Title for the merge commit'),
-      commitMessage: z.string().optional().describe('Extra detail for the merge commit'),
-      mergeMethod: z
+      commit_title: z.string().optional().describe('Title for the merge commit'),
+      commit_message: z.string().optional().describe('Extra detail for the merge commit'),
+      merge_method: z
         .enum(['merge', 'squash', 'rebase'])
         .optional()
-        .describe('Merge method (default: merge)'),
-      sha: z
-        .string()
-        .optional()
-        .describe('SHA that head must match to allow merge (safety check)')
+        .describe('Merge method (default: merge)')
     })
   )
   .output(
@@ -45,10 +41,9 @@ export let mergePullRequest = SlateTool.create(spec, {
       ctx.input.repo,
       ctx.input.pullNumber,
       {
-        commitTitle: ctx.input.commitTitle,
-        commitMessage: ctx.input.commitMessage,
-        mergeMethod: ctx.input.mergeMethod,
-        sha: ctx.input.sha
+        commitTitle: ctx.input.commit_title,
+        commitMessage: ctx.input.commit_message,
+        mergeMethod: ctx.input.merge_method
       }
     );
 
@@ -58,7 +53,7 @@ export let mergePullRequest = SlateTool.create(spec, {
         sha: result.sha,
         message: result.message
       },
-      message: `Merged PR **#${ctx.input.pullNumber}** in **${ctx.input.owner}/${ctx.input.repo}** using ${ctx.input.mergeMethod ?? 'merge'} method.`
+      message: `Merged PR **#${ctx.input.pullNumber}** in **${ctx.input.owner}/${ctx.input.repo}** using ${ctx.input.merge_method ?? 'merge'} method.`
     };
   })
   .build();

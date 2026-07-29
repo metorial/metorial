@@ -15,13 +15,29 @@ export let listCommits = SlateTool.create(spec, {
     z.object({
       owner: z.string().describe('Repository owner'),
       repo: z.string().describe('Repository name'),
-      sha: z.string().optional().describe('Branch name or commit SHA to start listing from'),
+      sha: z
+        .string()
+        .optional()
+        .describe(
+          'Commit SHA, branch, or tag to list from. When omitted, uses the default branch.'
+        ),
       path: z.string().optional().describe('Only commits containing this file path'),
-      author: z.string().optional().describe('GitHub login or email to filter by'),
-      since: z.string().optional().describe('Only commits after this ISO 8601 date'),
-      until: z.string().optional().describe('Only commits before this ISO 8601 date'),
-      perPage: z.number().optional().describe('Results per page (max 100)'),
-      page: z.number().optional().describe('Page number')
+      author: z.string().optional().describe('GitHub username or email to filter by'),
+      since: z
+        .string()
+        .optional()
+        .describe('Only commits after this ISO 8601 date or timestamp'),
+      until: z
+        .string()
+        .optional()
+        .describe('Only commits before this ISO 8601 date or timestamp'),
+      perPage: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (minimum 1, maximum 100; default 30)'),
+      page: z.number().min(1).optional().describe('Page number (minimum 1)')
     })
   )
   .output(

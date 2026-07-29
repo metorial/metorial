@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let listBranches = SlateTool.create(spec, {
   name: 'List Branches',
   key: 'list_branches',
-  description: `List branches in a GitHub repository with optional filtering for protected branches.`,
+  description: 'List branches in a GitHub repository.',
   tags: {
     readOnly: true
   }
@@ -15,9 +15,13 @@ export let listBranches = SlateTool.create(spec, {
     z.object({
       owner: z.string().describe('Repository owner'),
       repo: z.string().describe('Repository name'),
-      protected: z.boolean().optional().describe('Filter by protection status'),
-      perPage: z.number().optional().describe('Results per page (max 100)'),
-      page: z.number().optional().describe('Page number')
+      perPage: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (minimum 1, maximum 100)'),
+      page: z.number().min(1).optional().describe('Page number (minimum 1)')
     })
   )
   .output(
@@ -39,8 +43,7 @@ export let listBranches = SlateTool.create(spec, {
     });
     let branches = await client.listBranches(ctx.input.owner, ctx.input.repo, {
       perPage: ctx.input.perPage,
-      page: ctx.input.page,
-      protected: ctx.input.protected
+      page: ctx.input.page
     });
 
     let mapped = branches.map((b: any) => ({

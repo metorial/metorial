@@ -6,7 +6,8 @@ import { spec } from '../spec';
 export let listPullRequests = SlateTool.create(spec, {
   name: 'List Pull Requests',
   key: 'list_pull_requests',
-  description: `List pull requests in a GitHub repository with filtering by state, head/base branch, and sorting options.`,
+  description:
+    'List pull requests in a GitHub repository with filtering by state, head/base branch, and sorting options. When filtering by author, use `search` with type `issues` and an `is:pr author:<login>` query instead.',
   tags: {
     readOnly: true
   }
@@ -26,8 +27,13 @@ export let listPullRequests = SlateTool.create(spec, {
         .optional()
         .describe('Sort field'),
       direction: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
-      perPage: z.number().optional().describe('Results per page (max 100)'),
-      page: z.number().optional().describe('Page number')
+      perPage: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (minimum 1, maximum 100)'),
+      page: z.number().min(1).optional().describe('Page number (minimum 1)')
     })
   )
   .output(

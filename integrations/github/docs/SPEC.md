@@ -1,10 +1,49 @@
-Now I have enough information to write the specification. Let me compile everything.
-
-# Slates Specification for GitHub
+# GitHub Integration Specification
 
 ## Overview
 
 GitHub is a cloud-based platform for version control and collaboration using Git. It provides hosting for software repositories along with features for issue tracking, code review, project management, CI/CD (GitHub Actions), and package hosting. GitHub offers both REST and GraphQL APIs for programmatic access to its platform resources.
+
+## Notable Tool Contracts
+
+- `create_repository` creates a repository in the authenticated user's account unless
+  `organization` is provided. `private` defaults to `true`; pass `false` explicitly to
+  create a public repository. `autoInit` initializes the repository with a README.
+- `merge_pull_request` accepts the optional snake-case fields `commit_title`,
+  `commit_message`, and `merge_method`. Supported merge methods are `merge`, `squash`,
+  and `rebase`.
+- `list_issues` uses GraphQL cursor pagination. Pass `pageInfo.endCursor` from one
+  response as `after` to fetch the next page. `state` accepts `OPEN` or `CLOSED` and
+  returns both states when omitted. Labels are supplied as an array. Custom issue
+  fields can be filtered with `field_filters` entries containing `field_name` and
+  `value`.
+- `issue_read` consolidates issue detail, comment, hierarchy, and label reads. Its
+  `get` method includes best-effort parent/child relationship signals and custom issue
+  field values.
+- `pull_request_read` consolidates pull request detail, diff, status, file, commit,
+  review-thread, review, conversation-comment, and check-run reads.
+- `list_pull_requests` is for repository filters such as state and branches. To filter
+  pull requests by author, use `search` with type `issues` and GitHub search qualifiers
+  such as `is:pr author:<login>`.
+- `star_repository` deliberately consolidates both star and unstar operations through
+  its required `action` field.
+- `search` covers organizations through GitHub's user-search endpoint: use type
+  `users` with the `type:org` qualifier.
+- `create_branch` creates a branch from `from_branch`, or from the repository's
+  default branch when the source is omitted.
+- `push_files` writes multiple plain-text files atomically in one commit through the
+  Git tree, commit, and ref APIs. If the requested branch is absent, it is created
+  from the default branch.
+- `get_repository_tree` reads a tree at an optional SHA, branch, or tag, supports
+  recursive traversal, and can filter returned entries by a path prefix.
+- `update_pull_request_branch` starts GitHub's base-branch update for a pull request;
+  `expectedHeadSha` provides optimistic concurrency protection.
+- `sub_issue_write` supports `add`, `remove`, and `reprioritize`. `sub_issue_id` is
+  the issue database ID rather than the issue number, and reprioritization requires
+  exactly one of `after_id` or `before_id`.
+- `get_global_security_advisory` and `list_global_security_advisories` expose the
+  public GitHub Advisory Database with GHSA, CVE, ecosystem, severity, CWE,
+  withdrawn-state, affected-package, and date filters.
 
 ## Authentication
 

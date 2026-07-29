@@ -6,8 +6,8 @@ import { spec } from '../spec';
 export let createRepository = SlateTool.create(spec, {
   name: 'Create Repository',
   key: 'create_repository',
-  description: `Create a new GitHub repository for the authenticated user or within an organization.
-Supports initializing with a README, gitignore template, and license.`,
+  description:
+    'Create a new GitHub repository for the authenticated user or within an organization. Repositories are private by default unless private is explicitly set to false.',
   tags: {
     destructive: false
   }
@@ -18,18 +18,11 @@ Supports initializing with a README, gitignore template, and license.`,
       description: z.string().optional().describe('Repository description'),
       private: z
         .boolean()
+        .default(true)
         .optional()
-        .describe('Whether the repository should be private (default: false)'),
+        .describe('Whether the repository should be private (default: true)'),
       autoInit: z.boolean().optional().describe('Initialize with a README'),
-      gitignoreTemplate: z
-        .string()
-        .optional()
-        .describe('Gitignore template name (e.g., "Node", "Python")'),
-      licenseTemplate: z
-        .string()
-        .optional()
-        .describe('License template (e.g., "mit", "apache-2.0")'),
-      org: z
+      organization: z
         .string()
         .optional()
         .describe(
@@ -54,7 +47,10 @@ Supports initializing with a README, gitignore template, and license.`,
       token: ctx.auth.token,
       instanceUrl: ctx.auth.instanceUrl
     });
-    let repo = await client.createRepository(ctx.input);
+    let repo = await client.createRepository({
+      ...ctx.input,
+      private: ctx.input.private ?? true
+    });
 
     return {
       output: {

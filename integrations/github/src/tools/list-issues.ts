@@ -6,8 +6,8 @@ import { spec } from '../spec';
 export let listIssues = SlateTool.create(spec, {
   name: 'List Issues',
   key: 'list_issues',
-  description: `List issues in a GitHub repository with filtering and sorting options.
-Filter by state, labels, assignee, milestone, and since date. Note: GitHub's API returns pull requests alongside issues — this tool filters them out.`,
+  description:
+    'List issues in a GitHub repository with cursor pagination, labels, custom issue fields, state, date, and ordering filters. Pass pageInfo.endCursor from one response as after to retrieve the next page.',
   tags: {
     readOnly: true
   }
@@ -17,22 +17,40 @@ Filter by state, labels, assignee, milestone, and since date. Note: GitHub's API
       owner: z.string().describe('Repository owner (user or organization)'),
       repo: z.string().describe('Repository name'),
       state: z
-        .enum(['open', 'closed', 'all'])
+        .enum(['OPEN', 'CLOSED'])
         .optional()
-        .describe('Filter by state (default: open)'),
-      labels: z.string().optional().describe('Comma-separated label names to filter by'),
-      assignee: z
-        .string()
+        .describe('Filter by state; omit to return both open and closed issues'),
+      labels: z.array(z.string()).optional().describe('Label names to filter by'),
+      orderBy: z
+        .enum(['CREATED_AT', 'UPDATED_AT', 'COMMENTS'])
         .optional()
-        .describe('Filter by assignee username, or "none" for unassigned'),
-      sort: z.enum(['created', 'updated', 'comments']).optional().describe('Sort field'),
-      direction: z.enum(['asc', 'desc']).optional().describe('Sort direction'),
+        .describe('Field used to order issues'),
+      direction: z.enum(['ASC', 'DESC']).optional().describe('Order direction'),
       since: z
         .string()
         .optional()
-        .describe('Only issues updated after this ISO 8601 timestamp'),
-      perPage: z.number().optional().describe('Results per page (max 100)'),
-      page: z.number().optional().describe('Page number')
+        .describe('Only issues updated after this ISO 8601 date or timestamp'),
+      field_filters: z
+        .array(
+          z.object({
+            field_name: z.string().describe('Case-insensitive custom issue field name'),
+            value: z
+              .string()
+              .describe('Field value: option name, text, numeric string, or YYYY-MM-DD date')
+          })
+        )
+        .optional()
+        .describe('Custom issue field values to filter by'),
+      perPage: z
+        .number()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Results per page (minimum 1, maximum 100)'),
+      after: z
+        .string()
+        .optional()
+        .describe('Cursor from the previous response pageInfo.endCursor')
     })
   )
   .output(
@@ -45,13 +63,27 @@ Filter by state, labels, assignee, milestone, and since date. Note: GitHub's API
           author: z.string().describe('Issue author login'),
           assignees: z.array(z.string()).describe('Assigned usernames'),
           labels: z.array(z.string()).describe('Label names'),
+          fieldValues: z
+            .array(
+              z.object({
+                field: z.string().describe('Custom issue field name'),
+                value: z.string().describe('Custom issue field value')
+              })
+            )
+            .describe('Custom issue field values'),
           commentsCount: z.number().describe('Number of comments'),
           createdAt: z.string().describe('Creation timestamp'),
           updatedAt: z.string().describe('Last update timestamp'),
           htmlUrl: z.string().describe('URL to the issue on GitHub')
         })
       ),
-      totalCount: z.number().describe('Number of issues returned')
+      totalCount: z.number().describe('Total number of matching issues'),
+      pageInfo: z.object({
+        hasNextPage: z.boolean().describe('Whether another page is available'),
+        hasPreviousPage: z.boolean().describe('Whether a previous page is available'),
+        startCursor: z.string().nullable().describe('Cursor for the first returned issue'),
+        endCursor: z.string().nullable().describe('Cursor for the last returned issue')
+      })
     })
   )
   .handleInvocation(async ctx => {
@@ -62,32 +94,34 @@ Filter by state, labels, assignee, milestone, and since date. Note: GitHub's API
     let items = await client.listIssues(ctx.input.owner, ctx.input.repo, {
       state: ctx.input.state,
       labels: ctx.input.labels,
-      assignee: ctx.input.assignee,
-      sort: ctx.input.sort,
+      orderBy: ctx.input.orderBy,
       direction: ctx.input.direction,
       since: ctx.input.since,
       perPage: ctx.input.perPage,
-      page: ctx.input.page
+      after: ctx.input.after,
+      fieldFilters: ctx.input.field_filters?.map(filter => ({
+        fieldName: filter.field_name,
+        value: filter.value
+      }))
     });
 
-    let issues = items
-      .filter((i: any) => !i.pull_request)
-      .map((i: any) => ({
-        issueNumber: i.number,
-        title: i.title,
-        state: i.state,
-        author: i.user.login,
-        assignees: (i.assignees ?? []).map((a: any) => a.login),
-        labels: (i.labels ?? []).map((l: any) => l.name),
-        commentsCount: i.comments,
-        createdAt: i.created_at,
-        updatedAt: i.updated_at,
-        htmlUrl: i.html_url
-      }));
+    let issues = items.nodes.map(issue => ({
+      issueNumber: issue.number,
+      title: issue.title,
+      state: issue.state,
+      author: issue.author?.login ?? '',
+      assignees: issue.assignees.nodes.map(assignee => assignee.login),
+      labels: issue.labels.nodes.map(label => label.name),
+      fieldValues: issue.fieldValues,
+      commentsCount: issue.comments.totalCount,
+      createdAt: issue.createdAt,
+      updatedAt: issue.updatedAt,
+      htmlUrl: issue.url
+    }));
 
     return {
-      output: { issues, totalCount: issues.length },
-      message: `Found **${issues.length}** issues in **${ctx.input.owner}/${ctx.input.repo}** (state: ${ctx.input.state ?? 'open'}).`
+      output: { issues, totalCount: items.totalCount, pageInfo: items.pageInfo },
+      message: `Found **${items.totalCount}** matching issues in **${ctx.input.owner}/${ctx.input.repo}**.`
     };
   })
   .build();
