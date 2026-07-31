@@ -1,6 +1,7 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { NotionClient } from '../lib/client';
+import { normalizeNotionRichTextAnnotations } from '../lib/rich-text';
 import { spec } from '../spec';
 
 export let createPage = SlateTool.create(spec, {
@@ -77,8 +78,13 @@ Optionally include initial content as block children, and set an icon or cover i
 
     let page = await client.createPage({
       parent,
-      properties: ctx.input.properties,
-      children: ctx.input.children,
+      properties: normalizeNotionRichTextAnnotations(ctx.input.properties) as Record<
+        string,
+        any
+      >,
+      children: normalizeNotionRichTextAnnotations(ctx.input.children) as
+        | Record<string, any>[]
+        | undefined,
       icon: ctx.input.icon,
       cover: ctx.input.cover
     });
