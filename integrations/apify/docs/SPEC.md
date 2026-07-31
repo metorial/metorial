@@ -30,7 +30,7 @@ Create, update, delete, and list Actors (serverless automation programs). Apify 
 
 ### Running Actors
 
-Start Actor runs synchronously or asynchronously, providing custom input and configuring runtime options. You can set optional timeout (in seconds) and memory limit (in megabytes, must be a power of 2 with a minimum of 128). Synchronous runs wait up to 5 minutes for the Actor to finish and return results directly. Asynchronous runs return immediately with a run ID that can be polled for status and results.
+Start Actor runs synchronously or asynchronously, providing custom input and configuring runtime options. You can set optional timeout (in seconds) and memory limit (in megabytes, must be a power of 2 with a minimum of 128). Synchronous mode waits up to 20 seconds, returning dataset items when the Actor finishes or run metadata that can be polled when it remains in progress. Asynchronous runs return immediately with a run ID that can be polled for status and results.
 
 ### Actor Tasks
 
