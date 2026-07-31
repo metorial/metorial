@@ -1,3 +1,4 @@
+import { badRequestError, ServiceError } from '@lowerdeck/error';
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
@@ -60,8 +61,27 @@ When creating a campaign, a campaign budget is automatically created if \`dailyB
         .describe(
           'Resource name of an existing campaign budget to use instead of creating one'
         ),
-      startDate: z.string().optional().describe('Campaign start date in YYYY-MM-DD format'),
-      endDate: z.string().optional().describe('Campaign end date in YYYY-MM-DD format'),
+      startDate: z
+        .string()
+        .optional()
+        .describe(
+          'Campaign start date in YYYY-MM-DD format. The campaign starts at 00:00:00 in the customer account timezone.'
+        ),
+      endDate: z
+        .string()
+        .optional()
+        .describe(
+          'Campaign end date in YYYY-MM-DD format. The campaign ends at 23:59:59 in the customer account timezone.'
+        ),
+      containsEuPoliticalAdvertising: z
+        .enum([
+          'CONTAINS_EU_POLITICAL_ADVERTISING',
+          'DOES_NOT_CONTAIN_EU_POLITICAL_ADVERTISING'
+        ])
+        .optional()
+        .describe(
+          'Required for create. Declare whether the campaign contains political advertising targeted toward the European Union.'
+        ),
       biddingStrategyType: z
         .string()
         .optional()
@@ -107,7 +127,9 @@ When creating a campaign, a campaign budget is automatically created if \`dailyB
 
     if (operation === 'remove') {
       if (!ctx.input.campaignId)
-        throw new Error('campaignId is required for remove operation');
+        throw new ServiceError(
+          badRequestError({ message: 'campaignId is required for remove operation' })
+        );
       let result = await client.mutateCampaigns(cid, [
         {
           remove: `customers/${cid}/campaigns/${ctx.input.campaignId}`
@@ -123,6 +145,14 @@ When creating a campaign, a campaign budget is automatically created if \`dailyB
     }
 
     if (operation === 'create') {
+      if (!ctx.input.containsEuPoliticalAdvertising) {
+        throw new ServiceError(
+          badRequestError({
+            message: 'containsEuPoliticalAdvertising is required for create operation.'
+          })
+        );
+      }
+
       let budgetResourceName = ctx.input.existingBudgetResourceName;
 
       if (!budgetResourceName && ctx.input.dailyBudgetMicros) {
@@ -141,12 +171,13 @@ When creating a campaign, a campaign budget is automatically created if \`dailyB
       let campaignData: Record<string, any> = {
         name: ctx.input.name,
         advertisingChannelType: ctx.input.advertisingChannelType,
+        containsEuPoliticalAdvertising: ctx.input.containsEuPoliticalAdvertising,
         status: ctx.input.status || 'PAUSED'
       };
 
       if (budgetResourceName) campaignData.campaignBudget = budgetResourceName;
-      if (ctx.input.startDate) campaignData.startDate = ctx.input.startDate;
-      if (ctx.input.endDate) campaignData.endDate = ctx.input.endDate;
+      if (ctx.input.startDate) campaignData.startDateTime = `${ctx.input.startDate} 00:00:00`;
+      if (ctx.input.endDate) campaignData.endDateTime = `${ctx.input.endDate} 23:59:59`;
       if (ctx.input.networkSettings) campaignData.networkSettings = ctx.input.networkSettings;
 
       if (ctx.input.biddingStrategyType) {
@@ -193,7 +224,10 @@ When creating a campaign, a campaign budget is automatically created if \`dailyB
     }
 
     // Update
-    if (!ctx.input.campaignId) throw new Error('campaignId is required for update operation');
+    if (!ctx.input.campaignId)
+      throw new ServiceError(
+        badRequestError({ message: 'campaignId is required for update operation' })
+      );
 
     let resourceName = `customers/${cid}/campaigns/${ctx.input.campaignId}`;
     let updateData: Record<string, any> = { resourceName };
@@ -208,12 +242,16 @@ When creating a campaign, a campaign budget is automatically created if \`dailyB
       updateMaskFields.push('status');
     }
     if (ctx.input.startDate !== undefined) {
-      updateData.startDate = ctx.input.startDate;
-      updateMaskFields.push('startDate');
+      updateData.startDateTime = `${ctx.input.startDate} 00:00:00`;
+      updateMaskFields.push('startDateTime');
     }
     if (ctx.input.endDate !== undefined) {
-      updateData.endDate = ctx.input.endDate;
-      updateMaskFields.push('endDate');
+      updateData.endDateTime = `${ctx.input.endDate} 23:59:59`;
+      updateMaskFields.push('endDateTime');
+    }
+    if (ctx.input.containsEuPoliticalAdvertising !== undefined) {
+      updateData.containsEuPoliticalAdvertising = ctx.input.containsEuPoliticalAdvertising;
+      updateMaskFields.push('containsEuPoliticalAdvertising');
     }
     if (ctx.input.networkSettings !== undefined) {
       updateData.networkSettings = ctx.input.networkSettings;

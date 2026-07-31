@@ -67,12 +67,18 @@ let statusLabelFor = (response?: ErrorResponse) =>
 export let jiraServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
-export let resolveJiraIssueIdOrKey = (input: { issueIdOrKey?: string; issueKey?: string }) => {
-  let issueIdOrKey = input.issueIdOrKey ?? input.issueKey;
+export let resolveJiraIssueIdOrKey = (input: {
+  issueIdOrKey?: string;
+  issueKeyOrId?: string;
+  issueKey?: string;
+  issue_key?: string;
+}) => {
+  let issueIdOrKey =
+    input.issueIdOrKey ?? input.issueKeyOrId ?? input.issueKey ?? input.issue_key;
 
   if (issueIdOrKey === undefined) {
     throw jiraServiceError(
-      'Provide the issue key or ID in issueIdOrKey. The legacy issueKey alias is also accepted.'
+      'Provide the issue key or ID in issueIdOrKey. The legacy issueKeyOrId, issueKey, and issue_key aliases are also accepted.'
     );
   }
 

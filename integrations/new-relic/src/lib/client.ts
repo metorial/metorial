@@ -260,7 +260,13 @@ export let requireEntitySearchQuery = (query?: string) => {
     throw createApiServiceError('query is required when entityGuid is not provided');
   }
 
-  return normalizedQuery;
+  let predicatePattern =
+    /(?:^|\b(?:AND|OR)\s+)\s*\(*\s*(?:[A-Za-z_][A-Za-z0-9_-]*|`[^`]+`)(?:\.(?:[A-Za-z_][A-Za-z0-9_-]*|`[^`]+`))*\s*(?:(?:LIKE|=|!=|<=|>=|<|>)\s*(?:'(?:\\.|[^'])*'|"(?:\\.|[^"])*"|[-+]?\d+(?:\.\d+)?|TRUE|FALSE|NULL)|IN\s*\(|IS\s+(?:NOT\s+)?(?:TRUE|FALSE|NULL))/i;
+  if (predicatePattern.test(normalizedQuery)) {
+    return normalizedQuery;
+  }
+
+  return `name LIKE '${normalizedQuery.replaceAll('\\', '\\\\').replaceAll("'", "\\'")}'`;
 };
 
 export class NerdGraphClient {
@@ -335,14 +341,16 @@ export class NerdGraphClient {
               entities {
                 guid
                 name
+                accountId
                 entityType
                 domain
                 type
                 reporting
-                alertSeverity
+                ... on AlertableEntityOutline {
+                  alertSeverity
+                }
                 permalink
                 tags { key values }
-                account { id name }
               }
               nextCursor
             }

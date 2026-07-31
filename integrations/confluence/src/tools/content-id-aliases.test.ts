@@ -32,7 +32,7 @@ describe('Confluence content ID input aliases', () => {
     expect(result.output.pageId).toBe('page-1');
   });
 
-  it.each(['page_id', 'content_id'] as const)('accepts %s for get_page', async alias => {
+  it.each(['page_id', 'content_id', 'id'] as const)('accepts %s for get_page', async alias => {
     let getPageById = vi.spyOn(ConfluenceClient.prototype, 'getPageById').mockResolvedValue({
       id: 'page-1',
       title: 'Release notes',
@@ -57,7 +57,8 @@ describe('Confluence content ID input aliases', () => {
       pageId: 'canonical-page',
       contentId: 'camel-alias',
       page_id: 'snake-page-alias',
-      content_id: 'snake-content-alias'
+      content_id: 'snake-content-alias',
+      id: 'generic-alias'
     });
     await getPage.handleInvocation(createCtx(input));
 

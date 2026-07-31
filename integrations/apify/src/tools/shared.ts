@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { apifyValidationError } from '../lib/errors';
 
+export let MAX_RUNTIME_WAIT_FOR_FINISH_SECONDS = 20;
+
 export let paginationInput = {
   limit: z.number().int().positive().max(1000).optional().default(25),
   offset: z.number().int().min(0).optional().default(0),
@@ -75,6 +77,11 @@ export let validateWaitForFinish = (waitForFinish: number | undefined) => {
     throw apifyValidationError('waitForFinish must be between 0 and 60 seconds.');
   }
 };
+
+export let runtimeSafeWaitForFinish = (waitForFinish: number | undefined) =>
+  waitForFinish === undefined
+    ? undefined
+    : Math.min(waitForFinish, MAX_RUNTIME_WAIT_FOR_FINISH_SECONDS);
 
 export let pickDefined = (fields: Record<string, unknown>) =>
   Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined));

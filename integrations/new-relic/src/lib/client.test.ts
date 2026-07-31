@@ -232,13 +232,32 @@ describe('New Relic client payload helpers', () => {
     });
   });
 
-  it('requires a non-empty query for entity search', () => {
+  it('requires a non-empty query and converts plain text to a name search', () => {
     expect(() => requireEntitySearchQuery()).toThrow(ServiceError);
     expect(() => requireEntitySearchQuery('   ')).toThrow(ServiceError);
+    expect(requireEntitySearchQuery('  tracker-gateway-ws  ')).toBe(
+      "name LIKE 'tracker-gateway-ws'"
+    );
+    expect(requireEntitySearchQuery('  built in Warsaw  ')).toBe(
+      "name LIKE 'built in Warsaw'"
+    );
+    expect(requireEntitySearchQuery('  this is prod  ')).toBe("name LIKE 'this is prod'");
+    expect(requireEntitySearchQuery('  service=checkout  ')).toBe(
+      "name LIKE 'service=checkout'"
+    );
     expect(requireEntitySearchQuery("  type = 'APPLICATION'  ")).toBe("type = 'APPLICATION'");
+    expect(
+      requireEntitySearchQuery("  (domain = 'INFRA') AND tags.environment = 'production'  ")
+    ).toBe("(domain = 'INFRA') AND tags.environment = 'production'");
+    expect(requireEntitySearchQuery('  indexedAt > 1700000000000  ')).toBe(
+      'indexedAt > 1700000000000'
+    );
+    expect(requireEntitySearchQuery("  tags.`aws.accountId` = '123'  ")).toBe(
+      "tags.`aws.accountId` = '123'"
+    );
   });
 
-  it('sends entity search as a required GraphQL variable', async () => {
+  it('sends entity search as a required GraphQL variable with alert fields in a fragment', async () => {
     let client = new NerdGraphClient({
       token: 'token',
       region: 'us',
@@ -254,12 +273,23 @@ describe('New Relic client payload helpers', () => {
     });
 
     expect(query).toHaveBeenCalledWith(
-      expect.stringContaining('query($query: String!, $cursor: String)'),
+      expect.stringMatching(
+        /query\(\$query: String!, \$cursor: String\)[\s\S]*accountId[\s\S]*\.\.\. on AlertableEntityOutline \{\s*alertSeverity\s*\}/
+      ),
       {
         query: "type = 'APPLICATION'",
         cursor: 'next-page'
       }
     );
+
+    await client.searchEntities({
+      query: 'tracker-gateway-ws'
+    });
+
+    expect(query).toHaveBeenLastCalledWith(expect.any(String), {
+      query: "name LIKE 'tracker-gateway-ws'",
+      cursor: undefined
+    });
   });
 
   it('opts alert issue queries into the AiIssues schema', async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildTestResultsResponse,
+  findMatchingLines,
   testResultsOutputBudgetBytes,
   testResultTextBudgetBytes,
   testResultTruncationSuffix,
@@ -9,6 +10,26 @@ import {
 
 let serializedUtf8Bytes = (value: unknown) =>
   Buffer.byteLength(JSON.stringify(value) ?? '', 'utf8');
+
+describe('Jenkins build log search', () => {
+  it('accepts Java-style leading inline ignore-case flags', () => {
+    let result = findMatchingLines({
+      text: 'Started\nERROR: deployment failed\nFinished\n',
+      pattern: '(?i)(error|fail)',
+      useRegex: true,
+      ignoreCase: false,
+      maxMatches: 10,
+      contextLines: 0
+    });
+
+    expect(result.matches).toEqual([
+      expect.objectContaining({
+        matchedLineNumber: 2,
+        matchedLine: 'ERROR: deployment failed'
+      })
+    ]);
+  });
+});
 
 describe('Jenkins test result output bounds', () => {
   it('truncates by UTF-8 bytes without splitting Unicode code points', () => {

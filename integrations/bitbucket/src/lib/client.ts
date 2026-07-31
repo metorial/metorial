@@ -60,7 +60,7 @@ export class Client {
   }
 
   async getRepository(repoSlug: string) {
-    let response = await this.api.get(`/repositories/${this.params.workspace}/${repoSlug}`);
+    let response = await this.api.get(this.getRepositoryPath(repoSlug));
     return response.data;
   }
 
@@ -103,16 +103,15 @@ export class Client {
     if (opts?.page) params.page = String(opts.page);
     if (opts?.pageLen) params.pagelen = String(opts.pageLen);
 
-    let response = await this.api.get(
-      `/repositories/${this.params.workspace}/${repoSlug}/pullrequests`,
-      { params }
-    );
+    let response = await this.api.get(`${this.getRepositoryPath(repoSlug)}/pullrequests`, {
+      params
+    });
     return response.data;
   }
 
   async getPullRequest(repoSlug: string, prId: number) {
     let response = await this.api.get(
-      `/repositories/${this.params.workspace}/${repoSlug}/pullrequests/${prId}`
+      `${this.getRepositoryPath(repoSlug)}/pullrequests/${prId}`
     );
     return response.data;
   }
@@ -186,7 +185,7 @@ export class Client {
     if (opts?.pageLen) params.pagelen = String(opts.pageLen);
 
     let response = await this.api.get(
-      `/repositories/${this.params.workspace}/${repoSlug}/pullrequests/${prId}/comments`,
+      `${this.getRepositoryPath(repoSlug)}/pullrequests/${prId}/comments`,
       { params }
     );
     return response.data;
@@ -214,14 +213,13 @@ export class Client {
     opts?: { branch?: string; page?: number; pageLen?: number }
   ) {
     let params: Record<string, string> = {};
+    if (opts?.branch) params.include = opts.branch;
     if (opts?.page) params.page = String(opts.page);
     if (opts?.pageLen) params.pagelen = String(opts.pageLen);
 
-    let path = opts?.branch
-      ? `/repositories/${this.params.workspace}/${repoSlug}/commits/${opts.branch}`
-      : `/repositories/${this.params.workspace}/${repoSlug}/commits`;
-
-    let response = await this.api.get(path, { params });
+    let response = await this.api.get(`${this.getRepositoryPath(repoSlug)}/commits`, {
+      params
+    });
     return response.data;
   }
 
@@ -546,7 +544,12 @@ export class Client {
   }
 
   private getRepositoryPath(repoSlug: string) {
-    return `/repositories/${encodePathSegment(this.params.workspace)}/${encodePathSegment(repoSlug)}`;
+    let workspacePrefix = `${this.params.workspace}/`;
+    let normalizedRepoSlug = repoSlug.startsWith(workspacePrefix)
+      ? repoSlug.slice(workspacePrefix.length)
+      : repoSlug;
+
+    return `/repositories/${encodePathSegment(this.params.workspace)}/${encodePathSegment(normalizedRepoSlug)}`;
   }
 
   private async buildSourcePath(repoSlug: string, opts: { revision: string; path: string }) {

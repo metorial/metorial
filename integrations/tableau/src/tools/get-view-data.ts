@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createTextAttachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -16,7 +16,15 @@ export let getViewData = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      csvData: z.string().describe('CSV content of the view data')
+      viewId: z.string(),
+      contentType: z.literal('text/csv'),
+      byteSize: z.number().int().nonnegative(),
+      csvData: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy inline CSV field; omitted because the export is returned as a downloadable file'
+        )
     })
   )
   .handleInvocation(async ctx => {
@@ -24,7 +32,12 @@ export let getViewData = SlateTool.create(spec, {
     let csvData = await client.getViewData(ctx.input.viewId);
 
     return {
-      output: { csvData },
+      output: {
+        viewId: ctx.input.viewId,
+        contentType: 'text/csv' as const,
+        byteSize: Buffer.byteLength(csvData, 'utf8')
+      },
+      attachments: [createTextAttachment(csvData, 'text/csv')],
       message: `Exported CSV data from view \`${ctx.input.viewId}\`.`
     };
   })

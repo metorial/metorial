@@ -164,10 +164,22 @@ export let listCommentsTool = SlateTool.create(spec, {
   .input(
     z.object({
       issueIdOrKey: z.string().optional().describe('The issue key or ID. Preferred field.'),
-      issueKey: z
+      issueKeyOrId: z
         .string()
         .optional()
         .describe('Legacy alias for issueIdOrKey, used only when issueIdOrKey is omitted.'),
+      issueKey: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy alias for issueIdOrKey, used only when issueIdOrKey and issueKeyOrId are omitted.'
+        ),
+      issue_key: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy alias for issueIdOrKey, used only when the camel-case identifier fields are omitted.'
+        ),
       startAt: z.number().optional().default(0).describe('Pagination start index.'),
       maxResults: z.number().optional().default(50).describe('Maximum comments to return.')
     })
