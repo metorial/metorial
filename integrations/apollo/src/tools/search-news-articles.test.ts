@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validatePublishedAtRange } from './search-news-articles';
+import { searchNewsArticles, validatePublishedAtRange } from './search-news-articles';
 
 let validationError = (run: () => unknown) => {
   try {
@@ -10,6 +10,19 @@ let validationError = (run: () => unknown) => {
 
   return undefined;
 };
+
+describe('searchNewsArticles input', () => {
+  it('accepts the maximum page size and rejects larger pages', () => {
+    let input = { organizationIds: ['5e66b6381e05b4008c8331b8'] };
+
+    expect(searchNewsArticles.inputSchema.safeParse({ ...input, perPage: 25 }).success).toBe(
+      true
+    );
+    expect(searchNewsArticles.inputSchema.safeParse({ ...input, perPage: 26 }).success).toBe(
+      false
+    );
+  });
+});
 
 describe('validatePublishedAtRange', () => {
   it('accepts a complete range or no range', () => {

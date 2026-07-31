@@ -142,8 +142,9 @@ export let searchNewsArticles = SlateTool.create(spec, {
         .number()
         .int()
         .positive()
+        .max(25)
         .optional()
-        .describe('Results per page (default: 10)')
+        .describe('Results per page (default: 10, max: 25)')
     })
   )
   .output(
