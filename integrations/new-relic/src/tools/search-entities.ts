@@ -29,9 +29,9 @@ export let searchEntities = SlateTool.create(spec, {
   name: 'Search Entities',
   key: 'search_entities',
   description: `Search and discover entities monitored by New Relic. Entities include applications, hosts, services, dashboards, and cloud integrations.
-Use a query string with New Relic entity search syntax. Supports filtering by type, domain, name, tags, and alert severity.`,
+Use a plain name fragment for simple name matching, or a New Relic entity search expression for advanced filtering by type, domain, name, tags, and alert severity.`,
   instructions: [
-    "Query syntax examples: `name LIKE 'my-app'`, `type = 'APPLICATION'`, `domain = 'APM'`, `tags.environment = 'production'`.",
+    "Query examples: `my-app` for a name search, or expressions such as `type = 'APPLICATION'`, `domain = 'APM'`, and `tags.environment = 'production'`.",
     'Combine conditions with `AND`/`OR`. A non-empty query is required unless `entityGuid` is provided.',
     'Use `entityGuid` to provide an exact entity GUID to get detailed information about a specific entity.'
   ],
@@ -45,7 +45,7 @@ Use a query string with New Relic entity search syntax. Supports filtering by ty
         .string()
         .optional()
         .describe(
-          'Non-empty entity search query using New Relic entity search syntax. Required when entityGuid is not provided.'
+          'Plain entity name fragment or New Relic entity search expression. Required when entityGuid is not provided.'
         ),
       entityGuid: z
         .string()
@@ -119,8 +119,7 @@ Use a query string with New Relic entity search syntax. Supports filtering by ty
       alertSeverity: e.alertSeverity ?? undefined,
       permalink: e.permalink ?? undefined,
       tags: e.tags ?? undefined,
-      accountId: e.account?.id?.toString(),
-      accountName: e.account?.name ?? undefined
+      accountId: e.accountId?.toString()
     }));
 
     return {
