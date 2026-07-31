@@ -903,7 +903,7 @@ let normalizeContextLines = (value: number | undefined) => {
   return Math.min(Math.floor(value), 10);
 };
 
-let findMatchingLines = (params: {
+export let findMatchingLines = (params: {
   text: string;
   pattern: string;
   useRegex: boolean;
@@ -925,9 +925,14 @@ let findMatchingLines = (params: {
 
   if (params.useRegex) {
     let flags = params.ignoreCase ? 'i' : '';
+    let source = params.pattern;
+    while (source.startsWith('(?i)')) {
+      source = source.slice(4);
+      flags = 'i';
+    }
     let pattern: RegExp;
     try {
-      pattern = new RegExp(params.pattern, flags);
+      pattern = new RegExp(source, flags);
     } catch {
       throw jenkinsValidationError('pattern must be a valid regular expression.');
     }
@@ -1443,9 +1448,10 @@ export let searchBuildLog = readOnlyTool({
         .number()
         .int()
         .positive()
-        .max(100000)
         .optional()
-        .describe('Maximum log lines to scan. Defaults to config.maxLogLines or 10000.'),
+        .describe(
+          'Maximum log lines to scan. Defaults to config.maxLogLines or 10000 and is capped at 100000.'
+        ),
       maxMatches: z
         .number()
         .int()
