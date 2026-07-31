@@ -73,7 +73,7 @@ describe('Jira issueKey input compatibility', () => {
   it.each([
     'get_issue',
     'list_comments'
-  ])('%s exposes both identifier fields in an MCP-compatible object schema', toolKey => {
+  ])('%s exposes identifier aliases in an MCP-compatible object schema', toolKey => {
     let schema = z.toJSONSchema(getTool(toolKey).inputSchema) as Record<string, unknown>;
     let properties = schema.properties as Record<string, { type?: string }>;
     let required = (schema.required as string[] | undefined) ?? [];
@@ -83,20 +83,28 @@ describe('Jira issueKey input compatibility', () => {
     expect('anyOf' in schema).toBe(false);
     expect('allOf' in schema).toBe(false);
     expect(properties.issueIdOrKey?.type).toBe('string');
+    expect(properties.issueKeyOrId?.type).toBe('string');
     expect(properties.issueKey?.type).toBe('string');
+    expect(properties.issue_key?.type).toBe('string');
     expect(required).not.toContain('issueIdOrKey');
+    expect(required).not.toContain('issueKeyOrId');
     expect(required).not.toContain('issueKey');
+    expect(required).not.toContain('issue_key');
   });
 
-  it('accepts issueKey as a legacy get_issue alias', async () => {
+  it.each([
+    ['issueKeyOrId', 'TF-4335'],
+    ['issueKey', 'TF-4335'],
+    ['issue_key', 'TF-4335']
+  ])('accepts %s as a legacy get_issue alias', async (field, issueIdOrKey) => {
     let client = createJiraToolTestClient();
 
     let result = await client.invokeTool('get_issue', {
-      issueKey: 'TF-4335',
+      [field]: issueIdOrKey,
       fields: ['summary']
     });
 
-    expect(jiraClientMocks.getIssue).toHaveBeenCalledWith('TF-4335', {
+    expect(jiraClientMocks.getIssue).toHaveBeenCalledWith(issueIdOrKey, {
       fields: ['summary'],
       expand: undefined
     });
@@ -107,15 +115,19 @@ describe('Jira issueKey input compatibility', () => {
     });
   });
 
-  it('accepts issueKey as a legacy list_comments alias', async () => {
+  it.each([
+    ['issueKeyOrId', 'TF-4335'],
+    ['issueKey', 'TF-4335'],
+    ['issue_key', 'TF-4335']
+  ])('accepts %s as a legacy list_comments alias', async (field, issueIdOrKey) => {
     let client = createJiraToolTestClient();
 
     let result = await client.invokeTool('list_comments', {
-      issueKey: 'TF-4335',
+      [field]: issueIdOrKey,
       maxResults: 5
     });
 
-    expect(jiraClientMocks.getComments).toHaveBeenCalledWith('TF-4335', {
+    expect(jiraClientMocks.getComments).toHaveBeenCalledWith(issueIdOrKey, {
       startAt: 0,
       maxResults: 5
     });
@@ -131,6 +143,7 @@ describe('Jira issueKey input compatibility', () => {
 
     await client.invokeTool(toolKey, {
       issueIdOrKey: 'TF-4335',
+      issueKeyOrId: 'TF-8888',
       issueKey: 'TF-9999'
     });
 
@@ -142,7 +155,7 @@ describe('Jira issueKey input compatibility', () => {
   it.each([
     'get_issue',
     'list_comments'
-  ])('rejects %s calls that omit both identifier fields', async toolKey => {
+  ])('rejects %s calls that omit all identifier fields', async toolKey => {
     let client = createJiraToolTestClient();
 
     await expect(client.invokeTool(toolKey, {})).rejects.toThrow(

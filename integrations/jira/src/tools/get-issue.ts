@@ -18,10 +18,22 @@ export let getIssueTool = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('The issue key (e.g., "PROJ-123") or numeric ID. Preferred field.'),
-      issueKey: z
+      issueKeyOrId: z
         .string()
         .optional()
         .describe('Legacy alias for issueIdOrKey, used only when issueIdOrKey is omitted.'),
+      issueKey: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy alias for issueIdOrKey, used only when issueIdOrKey and issueKeyOrId are omitted.'
+        ),
+      issue_key: z
+        .string()
+        .optional()
+        .describe(
+          'Legacy alias for issueIdOrKey, used only when the camel-case identifier fields are omitted.'
+        ),
       fields: z
         .array(z.string())
         .optional()
