@@ -1,4 +1,4 @@
-# Slates Specification for item
+# Item API Integration Specification
 
 ## Overview
 

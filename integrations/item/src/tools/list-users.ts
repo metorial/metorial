@@ -17,7 +17,7 @@ export let listUsers = SlateTool.create(spec, {
     z.object({
       users: z.array(
         z.object({
-          userId: z.string().describe('User ID'),
+          userId: z.string().uuid().describe('User auth UUID'),
           fullName: z.string().nullable().optional().describe('User full name when available'),
           accessLevel: z.enum(['admin', 'member']).describe('Organization access level')
         })
@@ -30,7 +30,7 @@ export let listUsers = SlateTool.create(spec, {
 
     return {
       output: {
-        users: users.map((user: any) => ({
+        users: users.map(user => ({
           userId: user.id,
           fullName: user.full_name ?? null,
           accessLevel: user.access_level

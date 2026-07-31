@@ -1,40 +1,35 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateObjectLocator, validateObjectUpdate } from '../lib/validation';
 import { spec } from '../spec';
 
-let inputSchema = z
-  .object({
-    objectType: z
-      .string()
-      .describe('Object type slug such as "contacts", "companies", or a custom object slug'),
-    objectId: z.number().int().optional().describe('Record ID to update'),
-    email: z
-      .string()
-      .email()
-      .optional()
-      .describe('Contact email to update instead of using an ID'),
-    name: z.string().optional().describe('New display name for the record'),
-    fields: z
-      .record(z.string(), z.any())
-      .optional()
-      .describe('System and custom fields to update'),
-    profileImageUrl: z.string().url().optional().describe('New avatar or logo URL')
-  })
-  .refine(value => value.objectId !== undefined || !!value.email, {
-    message: 'Provide either objectId or email.',
-    path: ['objectId']
-  })
-  .refine(
-    value =>
-      value.name !== undefined ||
-      value.fields !== undefined ||
-      value.profileImageUrl !== undefined,
-    {
-      message: 'Provide at least one field to update.',
-      path: ['fields']
-    }
-  );
+let inputSchema = z.object({
+  objectType: z
+    .string()
+    .trim()
+    .min(1)
+    .describe('Object type slug such as "contacts", "companies", or a custom object slug'),
+  objectId: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Record ID to update. Provide exactly one of objectId or email.'),
+  email: z
+    .string()
+    .email()
+    .optional()
+    .describe(
+      'Contact email to update. Supported only for contact or contacts; provide exactly one of objectId or email.'
+    ),
+  name: z.string().trim().min(1).optional().describe('New display name for the record'),
+  fields: z
+    .record(z.string(), z.any())
+    .optional()
+    .describe('Non-empty object of system and custom fields to update'),
+  profileImageUrl: z.string().url().optional().describe('New avatar or logo URL')
+});
 
 export let updateObject = SlateTool.create(spec, {
   name: 'Update Object',
@@ -49,6 +44,15 @@ export let updateObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateObjectLocator(ctx.input.objectType, {
+      objectId: ctx.input.objectId,
+      email: ctx.input.email
+    });
+    validateObjectUpdate({
+      name: ctx.input.name,
+      fields: ctx.input.fields,
+      profileImageUrl: ctx.input.profileImageUrl
+    });
     let client = new Client({ token: ctx.auth.token });
     let objectRecord = await client.updateObject(ctx.input.objectType, {
       objectId: ctx.input.objectId,

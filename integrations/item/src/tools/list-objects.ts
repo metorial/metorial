@@ -4,9 +4,9 @@ import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 let paginationSchema = z.object({
-  total: z.number().optional().describe('Total records matching the query'),
-  limit: z.number().optional().describe('Maximum records returned in this page'),
-  offset: z.number().optional().describe('Number of records skipped'),
+  total: z.number().int().min(0).optional().describe('Total records matching the query'),
+  limit: z.number().int().min(0).optional().describe('Maximum records returned in this page'),
+  offset: z.number().int().min(0).optional().describe('Number of records skipped'),
   hasMore: z.boolean().optional().describe('Whether additional records are available')
 });
 
@@ -23,6 +23,8 @@ export let listObjects = SlateTool.create(spec, {
     z.object({
       objectType: z
         .string()
+        .trim()
+        .min(1)
         .describe(
           'Object type slug such as "contacts", "companies", or a custom object slug like "deals"'
         ),
@@ -49,7 +51,7 @@ export let listObjects = SlateTool.create(spec, {
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
         .optional()
         .describe(
-          'Field-value filters keyed by actual item field names, not display labels. Values can be strings, numbers, or booleans, and you can combine multiple filters in the same object. Special case: "name" and "email" are routed to the API search parameter instead of filter[field]. Example: {"industry":"Technology","score":95,"is_customer":true}'
+          'Field-value filters keyed by actual item field names, not display labels. Every entry is sent as filter[field], including name and email. Search remains independent. Example: {"name":"Acme","industry":"Technology","score":95}'
         )
     })
   )

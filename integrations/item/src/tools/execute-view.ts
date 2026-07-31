@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateObjectType, validateUuid } from '../lib/validation';
 import { spec } from '../spec';
 
 let paginationSchema = z.object({
-  total: z.number().optional().describe('Total records matching the view'),
-  limit: z.number().optional().describe('Maximum records returned in this page'),
-  offset: z.number().optional().describe('Number of records skipped'),
+  total: z.number().int().min(0).optional().describe('Total records matching the view'),
+  limit: z.number().int().min(0).optional().describe('Maximum records returned in this page'),
+  offset: z.number().int().min(0).optional().describe('Number of records skipped'),
   hasMore: z.boolean().optional().describe('Whether additional records are available')
 });
 
@@ -23,8 +24,10 @@ export let executeView = SlateTool.create(spec, {
     z.object({
       objectType: z
         .string()
+        .trim()
+        .min(1)
         .describe('Object type slug such as "contacts", "companies", or a custom object slug'),
-      viewId: z.string().describe('Shared view ID to execute'),
+      viewId: z.string().uuid().describe('Shared view UUID to execute'),
       limit: z
         .number()
         .int()
@@ -42,7 +45,7 @@ export let executeView = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      viewId: z.string().optional().describe('Executed view ID'),
+      viewId: z.string().uuid().describe('Executed view UUID'),
       viewName: z.string().optional().describe('Executed view name'),
       objectRecords: z
         .array(z.record(z.string(), z.any()))
@@ -51,6 +54,8 @@ export let executeView = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateObjectType(ctx.input.objectType);
+    validateUuid(ctx.input.viewId, 'viewId');
     let client = new Client({ token: ctx.auth.token });
     let result = await client.executeView(ctx.input.objectType, ctx.input.viewId, {
       limit: ctx.input.limit,
@@ -59,7 +64,7 @@ export let executeView = SlateTool.create(spec, {
 
     return {
       output: {
-        viewId: result.view?.id,
+        viewId: result.view?.id ?? ctx.input.viewId,
         viewName: result.view?.name,
         objectRecords: result.data,
         pagination: result.pagination

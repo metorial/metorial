@@ -16,13 +16,17 @@ export let deleteObject = SlateTool.create(spec, {
     z.object({
       objectType: z
         .string()
+        .trim()
+        .min(1)
         .describe('Object type slug such as "contacts", "companies", or a custom object slug'),
-      objectId: z.number().int().describe('Record ID to delete')
+      objectId: z.number().int().positive().describe('Record ID to delete')
     })
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the delete request succeeded')
+      success: z.literal(true).describe('Confirms that item accepted the deletion'),
+      objectId: z.number().int().positive().describe('Deleted record ID'),
+      objectType: z.string().describe('Object type containing the deleted record')
     })
   )
   .handleInvocation(async ctx => {
@@ -31,9 +35,11 @@ export let deleteObject = SlateTool.create(spec, {
 
     return {
       output: {
-        success: !!result.success
+        success: result.success,
+        objectId: ctx.input.objectId,
+        objectType: ctx.input.objectType
       },
-      message: `Deleted record **${ctx.input.objectId}** from **${ctx.input.objectType}**.`
+      message: `Soft-deleted record **${ctx.input.objectId}** from **${ctx.input.objectType}**.`
     };
   })
   .build();

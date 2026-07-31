@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateObjectType } from '../lib/validation';
 import { spec } from '../spec';
 
 export let listViews = SlateTool.create(spec, {
@@ -16,6 +17,8 @@ export let listViews = SlateTool.create(spec, {
     z.object({
       objectType: z
         .string()
+        .trim()
+        .min(1)
         .describe('Object type slug such as "contacts", "companies", or a custom object slug')
     })
   )
@@ -23,25 +26,26 @@ export let listViews = SlateTool.create(spec, {
     z.object({
       views: z.array(
         z.object({
-          viewId: z.string().describe('Shared view ID'),
+          viewId: z.string().uuid().describe('Shared view UUID'),
           name: z.string().describe('View name'),
-          viewType: z.string().describe('View layout type such as table or kanban'),
+          viewType: z.enum(['table', 'kanban']).describe('Documented view layout type'),
           columns: z.array(z.string()).describe('Columns configured on the view')
         })
       )
     })
   )
   .handleInvocation(async ctx => {
+    validateObjectType(ctx.input.objectType);
     let client = new Client({ token: ctx.auth.token });
     let views = await client.listViews(ctx.input.objectType);
 
     return {
       output: {
-        views: views.map((view: any) => ({
+        views: views.map(view => ({
           viewId: view.id,
           name: view.name,
           viewType: view.view_type,
-          columns: view.columns ?? []
+          columns: view.columns
         }))
       },
       message: `Retrieved **${views.length}** shared view(s) for **${ctx.input.objectType}**.`

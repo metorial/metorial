@@ -1,30 +1,39 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateIncludeSummary, validateObjectLocator } from '../lib/validation';
 import { spec } from '../spec';
 
-let inputSchema = z
-  .object({
-    objectType: z
-      .string()
-      .describe('Object type slug such as "contacts", "companies", or a custom object slug'),
-    objectId: z.number().int().optional().describe('Record ID to fetch'),
-    email: z.string().email().optional().describe('Contact email to look up instead of an ID'),
-    includeAllFields: z
-      .boolean()
-      .optional()
-      .default(false)
-      .describe('Include all system fields in the response'),
-    includeSummary: z
-      .boolean()
-      .optional()
-      .default(false)
-      .describe('Include the AI summary for contacts or companies when available')
-  })
-  .refine(value => value.objectId !== undefined || !!value.email, {
-    message: 'Provide either objectId or email.',
-    path: ['objectId']
-  });
+let inputSchema = z.object({
+  objectType: z
+    .string()
+    .trim()
+    .min(1)
+    .describe('Object type slug such as "contacts", "companies", or a custom object slug'),
+  objectId: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe('Record ID to fetch. Provide exactly one of objectId or email.'),
+  email: z
+    .string()
+    .email()
+    .optional()
+    .describe(
+      'Contact email to look up. Supported only for contact or contacts; provide exactly one of objectId or email.'
+    ),
+  includeAllFields: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Include all system fields in the response'),
+  includeSummary: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe('Include the AI summary for contacts or companies when available')
+});
 
 export let getObject = SlateTool.create(spec, {
   name: 'Get Object',
@@ -42,6 +51,11 @@ export let getObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateObjectLocator(ctx.input.objectType, {
+      objectId: ctx.input.objectId,
+      email: ctx.input.email
+    });
+    validateIncludeSummary(ctx.input.objectType, ctx.input.includeSummary);
     let client = new Client({ token: ctx.auth.token });
     let objectRecord = await client.getObject(ctx.input.objectType, {
       objectId: ctx.input.objectId,

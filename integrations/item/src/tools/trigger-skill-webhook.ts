@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { validateUuid } from '../lib/validation';
 import { spec } from '../spec';
 
 export let triggerSkillWebhook = SlateTool.create(spec, {
@@ -13,28 +14,26 @@ export let triggerSkillWebhook = SlateTool.create(spec, {
     z.object({
       skillId: z
         .string()
-        .describe('ID of the item skill with a configured live webhook trigger'),
+        .uuid()
+        .describe('UUID of the item skill with a configured live webhook trigger'),
       payload: z
         .record(z.string(), z.any())
         .describe('JSON object to send as the skill input context'),
       signPayload: z
         .boolean()
         .optional()
-        .default(false)
         .describe('Whether to include the x-webhook-signature header')
     })
   )
   .output(
     z.object({
-      success: z.boolean().describe('Whether the webhook was accepted'),
-      skillRunId: z
-        .string()
-        .optional()
-        .describe('Created skill run ID when returned by the API'),
+      success: z.literal(true).describe('Confirms that item accepted the webhook'),
+      skillRunId: z.string().uuid().describe('Created skill run UUID'),
       message: z.string().optional().describe('API response message')
     })
   )
   .handleInvocation(async ctx => {
+    validateUuid(ctx.input.skillId, 'skillId');
     let client = new Client({ token: ctx.auth.token });
     let result = await client.triggerSkillWebhook(ctx.input.skillId, ctx.input.payload, {
       signPayload: ctx.input.signPayload
@@ -42,7 +41,7 @@ export let triggerSkillWebhook = SlateTool.create(spec, {
 
     return {
       output: {
-        success: !!result.success,
+        success: result.success,
         skillRunId: result.skillRunId,
         message: result.message
       },
