@@ -1,6 +1,6 @@
 import { createAxios } from 'slates';
 
-let API_VERSION = 'v19';
+let API_VERSION = 'v24';
 let BASE_URL = `https://googleads.googleapis.com/${API_VERSION}`;
 
 export interface GoogleAdsClientConfig {
