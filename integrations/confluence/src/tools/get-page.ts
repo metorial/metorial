@@ -30,6 +30,12 @@ export let getPage = SlateTool.create(spec, {
         .describe(
           'Compatibility alias for pageId, used only when other ID fields are omitted.'
         ),
+      id: z
+        .string()
+        .optional()
+        .describe(
+          'Compatibility alias for pageId, used only when the page-specific ID fields are omitted.'
+        ),
       includeBody: z
         .boolean()
         .optional()
@@ -59,7 +65,7 @@ export let getPage = SlateTool.create(spec, {
     let pageId = resolveContentIdAlias(ctx.input);
     if (!pageId) {
       throw confluenceServiceError(
-        'Provide a pageId, contentId, page_id, or content_id to retrieve a page.'
+        'Provide a pageId, contentId, page_id, content_id, or id to retrieve a page.'
       );
     }
 

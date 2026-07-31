@@ -19,8 +19,10 @@ export let resolveContentIdAlias = (input: {
   contentId?: string;
   page_id?: string;
   content_id?: string;
+  id?: string;
 }) => {
-  let selectedId = input.pageId ?? input.contentId ?? input.page_id ?? input.content_id;
+  let selectedId =
+    input.pageId ?? input.contentId ?? input.page_id ?? input.content_id ?? input.id;
   return selectedId?.trim() || undefined;
 };
 
