@@ -29,15 +29,36 @@ import { Client, MAX_WEBHOOK_PAYLOAD_BYTES } from './client';
 
 const runId = '123e4567-e89b-42d3-a456-426614174000';
 
-const renderErrorTree = (error: unknown): string => {
-  if (typeof error !== 'object' || error === null) return String(error);
-  let record = error as { message?: unknown; parent?: unknown; cause?: unknown };
-  return [
-    typeof record.message === 'string' ? record.message : '',
-    JSON.stringify(error),
-    record.parent ? renderErrorTree(record.parent) : '',
-    record.cause ? renderErrorTree(record.cause) : ''
-  ].join('\n');
+const renderErrorGraph = (root: unknown): string => {
+  let rendered: string[] = [];
+  let seen = new Set<object>();
+
+  let visit = (value: unknown) => {
+    if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
+      if (value !== undefined) rendered.push(String(value));
+      return;
+    }
+
+    if (seen.has(value)) return;
+    seen.add(value);
+
+    if (value instanceof Error) {
+      rendered.push(value.name, value.message, value.stack ?? '');
+    }
+
+    for (let key of Reflect.ownKeys(value)) {
+      rendered.push(String(key));
+      let descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (descriptor && 'value' in descriptor) visit(descriptor.value);
+    }
+
+    for (let key of ['parent', '_parent', 'cause']) {
+      if (key in value) visit((value as Record<string, unknown>)[key]);
+    }
+  };
+
+  visit(root);
+  return rendered.join('\n');
 };
 
 describe('Item client contracts', () => {
@@ -54,6 +75,17 @@ describe('Item client contracts', () => {
         name: 'x-api-key',
         value: 'item-key'
       }
+    });
+  });
+
+  it('omits optional get-object flags from the query when callers omit them', async () => {
+    http.get.mockResolvedValueOnce({ data: { data: { id: 42 } } });
+    let client = new Client({ token: 'item-key' });
+
+    await client.getObject('contacts', { objectId: 42 });
+
+    expect(http.get).toHaveBeenCalledWith('/api/objects/contacts', {
+      params: { id: 42 }
     });
   });
 
@@ -107,15 +139,14 @@ describe('Item client contracts', () => {
 
   it('maps upstream status and Item details to ServiceError without leaking the API key', async () => {
     let token = 'super-secret-key';
-    http.get.mockRejectedValueOnce(
-      Object.assign(new Error(`request failed for ${token}`), {
-        response: {
-          status: 422,
-          statusText: 'Unprocessable Entity',
-          data: { error: `Invalid request for ${token}`, code: 'invalid_input' }
-        }
-      })
-    );
+    let upstreamError = Object.assign(new Error(`request failed for ${token}`), {
+      response: {
+        status: 422,
+        statusText: `Unprocessable Entity for ${token}`,
+        data: { error: `Invalid request for ${token}`, code: 'invalid_input' }
+      }
+    });
+    http.get.mockRejectedValueOnce(upstreamError);
     let client = new Client({ token });
     let caught: unknown;
 
@@ -133,23 +164,23 @@ describe('Item client contracts', () => {
         })
       })
     );
-    let rendered = renderErrorTree(caught);
+    let rendered = renderErrorGraph(caught);
     expect(rendered).toContain('Invalid request');
     expect(rendered).toContain('HTTP 422');
     expect(rendered).not.toContain(token);
+    expect((caught as { parent?: unknown }).parent).not.toBe(upstreamError);
   });
 
   it('preserves Item details and status after the shared Axios interceptor maps the failure', async () => {
     let token = 'interceptor-secret';
-    http.get.mockRejectedValueOnce(
-      new SlateError({
-        code: 'upstream.invalid_request',
-        kind: 'upstream',
-        message: `Item rejected field priority for ${token}`,
-        upstream: { status: 400 },
-        baggage: { response: { error: `Item rejected field priority for ${token}` } }
-      })
-    );
+    let upstreamError = new SlateError({
+      code: 'upstream.invalid_request',
+      kind: 'upstream',
+      message: `Item rejected field priority for ${token}`,
+      upstream: { status: 400 },
+      baggage: { response: { error: `Item rejected field priority for ${token}` } }
+    });
+    http.get.mockRejectedValueOnce(upstreamError);
     let client = new Client({ token });
     let caught: unknown;
 
@@ -165,9 +196,10 @@ describe('Item client contracts', () => {
         upstreamStatus: 400
       })
     });
-    let rendered = renderErrorTree(caught);
+    let rendered = renderErrorGraph(caught);
     expect(rendered).toContain('Item rejected field priority');
     expect(rendered).not.toContain(token);
+    expect((caught as { parent?: unknown }).parent).not.toBe(upstreamError);
   });
 
   it('rejects false or missing delete success instead of claiming deletion', async () => {
@@ -227,6 +259,118 @@ describe('Item client contracts', () => {
     await expect(request()).rejects.toMatchObject({
       data: expect.objectContaining({ reason: 'item_malformed_success_response' })
     });
+  });
+
+  it.each([
+    ['a non-object entry', { data: ['contacts'] }],
+    ['a missing object type ID', { data: [{ slug: 'contacts', display_name: 'People' }] }],
+    ['a non-string slug', { data: [{ id: 1, slug: 7, display_name: 'People' }] }],
+    [
+      'a field missing its API name',
+      {
+        data: [
+          {
+            id: 1,
+            slug: 'contacts',
+            display_name: 'People',
+            fields: [{ display_name: 'Industry', field_type: 'select' }]
+          }
+        ]
+      }
+    ],
+    [
+      'an undocumented relationship type',
+      {
+        data: [
+          {
+            id: 1,
+            slug: 'contacts',
+            display_name: 'People',
+            fields: [
+              {
+                field_name: 'company',
+                display_name: 'Company',
+                field_type: 'relation',
+                relationship_type: 'many_to_many_v2'
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    [
+      'a select option missing its value',
+      {
+        data: [
+          {
+            id: 1,
+            slug: 'contacts',
+            display_name: 'People',
+            fields: [
+              {
+                field_name: 'industry',
+                display_name: 'Industry',
+                field_type: 'select',
+                select_options: [{ label: 'Technology' }]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  ])('reports a schema response with %s as malformed rather than casting it', async (_label, payload) => {
+    http.get.mockResolvedValueOnce({ data: payload });
+    let client = new Client({ token: 'item-key' });
+
+    await expect(client.getSchema()).rejects.toMatchObject({
+      data: expect.objectContaining({ reason: 'item_malformed_success_response' })
+    });
+  });
+
+  it('accepts a documented schema payload and preserves nullable field metadata', async () => {
+    http.get.mockResolvedValueOnce({
+      data: {
+        data: [
+          {
+            id: 1,
+            slug: 'contacts',
+            display_name: 'People',
+            plural_display_name: 'People',
+            description: null,
+            icon: null,
+            fields: [
+              {
+                field_name: 'industry',
+                display_name: 'Industry',
+                field_type: 'select',
+                select_options: [{ label: 'Technology', value: 'technology', color: null }],
+                relationship_type: null,
+                number_min: null
+              }
+            ]
+          }
+        ]
+      }
+    });
+    let client = new Client({ token: 'item-key' });
+
+    let result = await client.getSchema();
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 1,
+        slug: 'contacts',
+        display_name: 'People',
+        fields: [
+          expect.objectContaining({
+            field_name: 'industry',
+            field_type: 'select',
+            relationship_type: null,
+            select_options: [{ label: 'Technology', value: 'technology', color: null }]
+          })
+        ]
+      })
+    ]);
   });
 
   it('signs and sends the exact serialized UTF-8 webhook bytes', async () => {

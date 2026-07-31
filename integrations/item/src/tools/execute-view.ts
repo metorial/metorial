@@ -16,6 +16,13 @@ export let executeView = SlateTool.create(spec, {
   key: 'execute_view',
   description:
     'Run a shared item view and return its filtered, sorted records. This is the preferred way to pull structured item data on a schedule.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'Execute a view',
+      url: 'https://docs.item.app/api-reference/views/execute-a-view'
+    }
+  ],
   tags: {
     readOnly: true
   }

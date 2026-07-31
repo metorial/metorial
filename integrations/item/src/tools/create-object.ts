@@ -7,7 +7,14 @@ export let createObject = SlateTool.create(spec, {
   name: 'Create Object',
   key: 'create_object',
   description:
-    'Create a new contact, company, or custom object record in item. Contacts and companies may deduplicate automatically based on item matching rules.'
+    'Create a new contact, company, or custom object record in item. Contacts and companies may deduplicate automatically based on item matching rules.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'Create an object',
+      url: 'https://docs.item.app/api-reference/objects/create-an-object'
+    }
+  ]
 })
   .input(
     z.object({

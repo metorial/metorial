@@ -24,4 +24,25 @@ describe('Item API key auth contract', () => {
       })
     ).rejects.toThrow();
   });
+
+  it('publishes a profile capability so an unusable key fails at connect time', async () => {
+    let client = createLocalSlateTestClient({ slate: provider });
+
+    let result = await client.getAuthMethod('api_key');
+
+    expect(result.authenticationMethod.capabilities.getProfile?.enabled).toBe(true);
+  });
+
+  it('links the API key documentation on the auth method', async () => {
+    let client = createLocalSlateTestClient({ slate: provider });
+
+    let result = await client.getAuthMethod('api_key');
+
+    expect(result.authenticationMethod.docs).toEqual([
+      expect.objectContaining({
+        type: 'docs.auth.token',
+        url: 'https://docs.item.app/index#authentication'
+      })
+    ]);
+  });
 });

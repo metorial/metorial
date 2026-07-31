@@ -8,7 +8,14 @@ export let batchUpsertObjects = SlateTool.create(spec, {
   name: 'Batch Upsert Objects',
   key: 'batch_upsert_objects',
   description:
-    'Create or update up to 100 item records in one request. Each record is processed independently, so partial success is possible.'
+    'Create or update up to 100 item records in one request. Each record is processed independently, so partial success is possible.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'Batch create or update objects',
+      url: 'https://docs.item.app/api-reference/batch/batch-create-or-update-objects'
+    }
+  ]
 })
   .input(
     z.object({
@@ -28,7 +35,7 @@ export let batchUpsertObjects = SlateTool.create(spec, {
                 'How to match an existing record. Provide together with matchValue; email is supported only for contacts.'
               ),
             matchValue: z
-              .union([z.string(), z.number()])
+              .union([z.string(), z.number().int()])
               .optional()
               .describe(
                 'Value paired with matchBy: a positive integer for id, valid contact email for email, or non-empty string for name'

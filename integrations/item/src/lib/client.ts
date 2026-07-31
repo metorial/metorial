@@ -1,10 +1,8 @@
 import crypto from 'node:crypto';
-import {
-  buildApiServiceError,
-  createApiServiceError,
-  createAuthenticatedAxios,
-  requestAxiosData
-} from 'slates';
+import { createApiServiceError, createAuthenticatedAxios, requestAxiosData } from 'slates';
+import { itemApiError } from './errors';
+
+export { itemApiError } from './errors';
 
 const BASE_URL = 'https://app.useitem.io';
 export const MAX_WEBHOOK_PAYLOAD_BYTES = 1_000_000;
@@ -169,8 +167,89 @@ const parseUuid = (value: unknown, operation: string, label: string): string => 
   return value;
 };
 
-const sanitizeSecret = (value: string, apiKey: string) =>
-  apiKey ? value.split(apiKey).join('[REDACTED]') : value;
+const requireString = (value: unknown, operation: string, label: string): string => {
+  if (typeof value !== 'string') {
+    throw malformedResponse(operation, `${label} must be a string.`);
+  }
+  return value;
+};
+
+const requirePositiveInteger = (value: unknown, operation: string, label: string): number => {
+  if (!Number.isInteger(value) || (value as number) <= 0) {
+    throw malformedResponse(operation, `${label} must be a positive integer.`);
+  }
+  return value as number;
+};
+
+const RELATIONSHIP_TYPES = [
+  'one_to_one',
+  'one_to_many',
+  'many_to_one',
+  'many_to_many'
+] as const;
+
+const parseFieldDefinition = (
+  value: unknown,
+  operation: string,
+  label: string
+): ItemFieldDefinition => {
+  let field = requireRecord(value, operation, label);
+  let selectOptions = field.select_options;
+
+  if (selectOptions !== undefined && selectOptions !== null) {
+    if (!Array.isArray(selectOptions)) {
+      throw malformedResponse(operation, `${label}.select_options must be an array or null.`);
+    }
+
+    selectOptions.forEach((option, index) => {
+      let entry = requireRecord(option, operation, `${label}.select_options[${index}]`);
+      requireString(entry.label, operation, `${label}.select_options[${index}].label`);
+      requireString(entry.value, operation, `${label}.select_options[${index}].value`);
+    });
+  }
+
+  if (
+    field.relationship_type !== undefined &&
+    field.relationship_type !== null &&
+    !RELATIONSHIP_TYPES.includes(
+      field.relationship_type as (typeof RELATIONSHIP_TYPES)[number]
+    )
+  ) {
+    throw malformedResponse(operation, `${label}.relationship_type is invalid.`);
+  }
+
+  return {
+    ...field,
+    field_name: requireString(field.field_name, operation, `${label}.field_name`),
+    display_name: requireString(field.display_name, operation, `${label}.display_name`),
+    field_type: requireString(field.field_type, operation, `${label}.field_type`)
+  } as ItemFieldDefinition;
+};
+
+const parseObjectTypeSchema = (
+  value: unknown,
+  operation: string,
+  label: string
+): ItemObjectTypeSchema => {
+  let objectType = requireRecord(value, operation, label);
+  let fields = objectType.fields;
+
+  if (fields !== undefined && fields !== null && !Array.isArray(fields)) {
+    throw malformedResponse(operation, `${label}.fields must be an array.`);
+  }
+
+  let fieldList: unknown[] = Array.isArray(fields) ? fields : [];
+
+  return {
+    ...objectType,
+    id: requirePositiveInteger(objectType.id, operation, `${label}.id`),
+    slug: requireString(objectType.slug, operation, `${label}.slug`),
+    display_name: requireString(objectType.display_name, operation, `${label}.display_name`),
+    fields: fieldList.map((field, index) =>
+      parseFieldDefinition(field, operation, `${label}.fields[${index}]`)
+    )
+  } as ItemObjectTypeSchema;
+};
 
 const encodePathSegment = (value: string, label: string) => {
   if (!value.trim()) {
@@ -180,27 +259,6 @@ const encodePathSegment = (value: string, label: string) => {
   }
   return encodeURIComponent(value);
 };
-
-export const itemApiError = (error: unknown, operation: string, apiKey: string) =>
-  buildApiServiceError(error, {
-    providerLabel: 'Item',
-    operation,
-    reason: 'item_api_error',
-    parent: createApiServiceError('Item API request failed.', {
-      reason: 'item_api_error_parent'
-    }),
-    detailKeys: ['error', 'message', 'detail', 'code'],
-    nestedKeys: ['errors'],
-    extractMessage: (input, helpers) =>
-      sanitizeSecret(
-        helpers.extractMessage(input, {
-          detailKeys: ['error', 'message', 'detail', 'code'],
-          nestedKeys: ['errors'],
-          fallbackMessage: 'Unknown error'
-        }),
-        apiKey
-      )
-  });
 
 export const serializeWebhookPayload = (payload: Record<string, unknown>) => {
   let rawBody: string;
@@ -435,8 +493,8 @@ export class Client {
       this.http.get('/api/meta/schema')
     );
     return requireDataArray(response, operation).map((value, index) =>
-      requireRecord(value, operation, `data[${index}]`)
-    ) as ItemObjectTypeSchema[];
+      parseObjectTypeSchema(value, operation, `data[${index}]`)
+    );
   }
 
   async listUsers(): Promise<ItemOrganizationUser[]> {

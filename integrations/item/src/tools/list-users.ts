@@ -8,6 +8,13 @@ export let listUsers = SlateTool.create(spec, {
   key: 'list_users',
   description:
     'List organization users in item, including their IDs and access levels. Useful for mapping owner fields or assigning records.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'List organization users',
+      url: 'https://docs.item.app/api-reference/users/list-organization-users'
+    }
+  ],
   tags: {
     readOnly: true
   }

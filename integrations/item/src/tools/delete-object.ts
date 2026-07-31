@@ -8,6 +8,13 @@ export let deleteObject = SlateTool.create(spec, {
   key: 'delete_object',
   description:
     'Soft-delete an item record by ID. Relationships involving the record are also soft-deleted.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'Delete an object',
+      url: 'https://docs.item.app/api-reference/objects/delete-an-object'
+    }
+  ],
   tags: {
     destructive: true
   }

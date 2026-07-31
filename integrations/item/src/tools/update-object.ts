@@ -35,7 +35,14 @@ export let updateObject = SlateTool.create(spec, {
   name: 'Update Object',
   key: 'update_object',
   description:
-    'Update one or more fields on an existing item record. Supports both system fields and custom fields, leaving unspecified fields unchanged.'
+    'Update one or more fields on an existing item record. Supports both system fields and custom fields, leaving unspecified fields unchanged.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'Update multiple fields',
+      url: 'https://docs.item.app/api-reference/objects/update-multiple-fields'
+    }
+  ]
 })
   .input(inputSchema)
   .output(

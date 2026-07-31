@@ -8,7 +8,14 @@ export let triggerSkillWebhook = SlateTool.create(spec, {
   name: 'Trigger Skill Webhook',
   key: 'trigger_skill_webhook',
   description:
-    'Send a JSON payload to an item skill webhook to start a skill run. Optionally signs the payload with an HMAC-SHA256 signature using the API key as the shared secret.'
+    'Send a JSON payload to an item skill webhook to start a skill run. Optionally signs the payload with an HMAC-SHA256 signature using the API key as the shared secret.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'Trigger a skill via webhook',
+      url: 'https://docs.item.app/api-reference/webhooks/trigger-a-skill-via-webhook'
+    }
+  ]
 })
   .input(
     z.object({

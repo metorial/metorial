@@ -15,6 +15,13 @@ export let listObjects = SlateTool.create(spec, {
   key: 'list_objects',
   description:
     'List records for a specific item object type such as contacts, companies, or a custom object. Supports pagination, search, sorting, and field-based filters.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'List objects or fetch by ID',
+      url: 'https://docs.item.app/api-reference/objects/list-objects-or-fetch-by-id'
+    }
+  ],
   tags: {
     readOnly: true
   }
@@ -51,7 +58,7 @@ export let listObjects = SlateTool.create(spec, {
         .record(z.string(), z.union([z.string(), z.number(), z.boolean()]))
         .optional()
         .describe(
-          'Field-value filters keyed by actual item field names, not display labels. Every entry is sent as filter[field], including name and email. Search remains independent. Example: {"name":"Acme","industry":"Technology","score":95}'
+          'Field-value filters keyed by actual field names, not display labels. Works with system and custom fields. Every entry is sent as filter[field], including name and email, and matches as a case-insensitive partial match, so {"name":"Acme"} also matches "Acme Corporation". Search remains independent. Example: {"name":"Acme","industry":"Technology","score":95}'
         )
     })
   )

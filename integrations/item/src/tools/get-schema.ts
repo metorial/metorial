@@ -62,6 +62,13 @@ export let getSchema = SlateTool.create(spec, {
   key: 'get_schema',
   description:
     'Retrieve the item schema for all available object types, including field definitions and select options. Useful for discovering custom objects and valid field names before creating or updating records.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'Get object schema',
+      url: 'https://docs.item.app/api-reference/schema/get-object-schema'
+    }
+  ],
   tags: {
     readOnly: true
   }

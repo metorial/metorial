@@ -26,12 +26,10 @@ let inputSchema = z.object({
   includeAllFields: z
     .boolean()
     .optional()
-    .default(false)
     .describe('Include all system fields in the response'),
   includeSummary: z
     .boolean()
     .optional()
-    .default(false)
     .describe('Include the AI summary for contacts or companies when available')
 });
 
@@ -40,6 +38,13 @@ export let getObject = SlateTool.create(spec, {
   key: 'get_object',
   description:
     'Fetch a single item record by ID, or by email for contacts. Useful for retrieving the full flattened record with all available fields.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'List objects or fetch by ID',
+      url: 'https://docs.item.app/api-reference/objects/list-objects-or-fetch-by-id'
+    }
+  ],
   tags: {
     readOnly: true
   }

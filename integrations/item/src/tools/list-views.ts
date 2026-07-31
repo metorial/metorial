@@ -9,6 +9,13 @@ export let listViews = SlateTool.create(spec, {
   key: 'list_views',
   description:
     'List shared views configured for an item object type. Views capture saved filters, sorting, and visible columns from the item UI.',
+  docs: [
+    {
+      type: 'docs.action.general',
+      name: 'List available views',
+      url: 'https://docs.item.app/api-reference/views/list-available-views'
+    }
+  ],
   tags: {
     readOnly: true
   }
