@@ -1,120 +1,104 @@
-# Slates Specification for Odoo
+# Odoo Integration Specification
 
 ## Overview
 
-Odoo is an open-source ERP (Enterprise Resource Planning) platform offering a modular suite of business applications including CRM, Sales, Accounting, Inventory, HR, Manufacturing, eCommerce, Project Management, and more. It offers a complete suite of applications for CRM, accounting, inventory, HR, eCommerce, and more, with a modular design that allows businesses of all sizes to streamline operations from a single platform. All installed modules expose their data models through a unified external API, enabling full CRUD operations on any record in the system.
+Odoo is a modular ERP platform whose installed applications expose business data through technical models such as `res.partner`, `crm.lead`, `sale.order`, `purchase.order`, and `account.move`. This integration supports model discovery, generic record operations, common workflow transitions, attachment downloads, and Odoo-originated change notifications.
 
-## Authentication
+The connection automatically selects the API transport:
 
-Odoo supports multiple authentication methods, all requiring the **Odoo instance URL** (server hostname) and **database name** as connection parameters.
+- Odoo 19 and newer API-key connections use the JSON-2 endpoint at `/json/2/<model>/<method>` with named JSON arguments.
+- Older servers, legacy username/password connections, and stored legacy connections use JSON-RPC `execute_kw` calls.
 
-### 1. API Key Authentication (Recommended, v14+)
+Available models, fields, methods, and records always depend on the installed modules, edition, plan, connected user's permissions, record rules, and company context.
 
-From version 14 onwards, Odoo introduced API key authentication. A user can generate an API key from their profile settings and use it in place of the password when making XML-RPC or JSON-RPC calls. The way to use API Keys is to simply replace the password by the key. The login remains in-use.
+## Authentication and configuration
 
-To generate an API key: Go to your Preferences (or My Profile), open the Account Security tab, and click New API Key. Input a description for the key, click Generate Key, then copy the key provided. Store this key carefully: it is equivalent to your password, and the system will not be able to retrieve or show the key again later on.
+Every connection needs an absolute Odoo instance URL. The integration removes trailing slashes and rejects URLs containing credentials, query parameters, or fragments.
 
-**Required credentials:**
+### API key
 
-- Odoo instance URL (e.g., `https://mycompany.odoo.com`)
-- Database name
-- Username (login email)
-- API Key (used in place of password)
+API-key authentication is recommended. Supply:
 
-**For JSON-2 API (v19+):** The login/password authentication scheme is replaced by an API key via the `Authorization: bearer` HTTP header. The database must only be provided (via the `X-Odoo-Database` HTTP header) on systems where there are multiple databases available for the same domain.
+- the Odoo instance URL;
+- the user's login email;
+- an API key from the Odoo account security settings;
+- the database name when using a legacy server or a multi-database deployment.
 
-### 2. Username/Password Authentication (XML-RPC)
+The integration detects the Odoo server version. Odoo 19+ uses the API key as a bearer credential for JSON-2 and sends `X-Odoo-Database` only when a database is configured. Legacy servers authenticate the login and API key through JSON-RPC.
 
-XML-RPC is the traditional API method in Odoo, and it works in all versions. To log in, you provide the database name, a username (usually the login email), and a password. These credentials are sent to the `/xmlrpc/2/common` endpoint. If the login is successful, Odoo returns a user ID (uid). This uid is then used in requests sent to the `/xmlrpc/2/object` endpoint.
+### Legacy username and password
 
-**Required credentials:**
+The legacy username/password method is retained only for older JSON-RPC servers. It requires the instance URL, database name, login email, and password. Use API-key authentication for new connections wherever the Odoo account supports it.
 
-- Odoo instance URL
-- Database name
-- Username
-- Password
+### Access considerations
 
-### 3. Session-Based Authentication (JSON-RPC)
+- Odoo external API access is available only on plans that include it.
+- Odoo Online users commonly need an API key for external access.
+- Odoo access rights, record rules, installed modules, and allowed-company context govern every request.
+- Odoo 19 databases publish database-specific models, fields, and callable methods on their `/doc` page.
 
-Authentication happens through the `/web/session/authenticate` endpoint. When you send the database name, username, and password, Odoo creates a session if the login is successful. This session acts like a cookie and can be reused for future API calls.
+## Tools
 
-### Important Notes
+### Identity and discovery
 
-- Access to data via the external API is only available on Custom Odoo pricing plans. Access to the external API is not available on One App Free or Standard plans.
-- For Odoo Online instances (`<domain>.odoo.com`), users are created without a local password, so API keys are required for external API access on hosted instances.
-- API access is governed by the authenticated user's access rights and record rules—there are no separate API scopes.
+- `get_current_user` returns the authenticated user ID, identity fields, locale, default company, and accessible company IDs.
+- `list_models` searches visible model definitions with stable offset pagination and a separate count snapshot.
+- `list_model_fields` returns field names, types, labels, access metadata, related models, selection values, and optional additional field attributes.
 
-## Features
+### Record reads
 
-### Record Management (CRUD Operations)
+- `search_records` searches any accessible model with validated Odoo domain filters, selected fields, context, pagination, and stable ordering.
+- `count_records` counts matching records without returning record bodies. An optional limit provides an upper-bound count.
+- `read_records` reads up to 100 unique positive record IDs from one model and can restrict the returned fields.
 
-The API provides full create, read, update, and delete operations on any Odoo model the authenticated user has access to. This includes all installed module data such as contacts, leads, sales orders, invoices, products, inventory movements, employees, projects, tasks, and more. Odoo is built from modules. Each module adds a set of features (like Sales, HR, or Inventory). Modules also expose their models and fields through the API.
+Counts and record pages are independent requests. A count is not an atomic companion to a search result when the database changes concurrently.
 
-- Records can be searched using domain filters (a list of condition tuples).
-- Specific fields can be selected to limit returned data.
-- Records can be created, updated, and deleted individually or in bulk.
+### Record writes
 
-### Model Introspection
+- `create_record` creates one record from JSON-compatible field values and returns the positive record ID.
+- `update_records` writes the same field values to up to 100 records and verifies the updated IDs.
+- `delete_records` permanently deletes up to 100 records after Odoo accepts the `unlink` operation.
 
-The API provides information about Odoo models via its various fields: query the system for installed models, and get information about a specific model (generally by listing the fields associated with it). This is useful for dynamically discovering available data structures.
+Use `list_model_fields` before unfamiliar writes. Relationship values must use Odoo's expected command or identifier shapes. Deletion is permanent and can be rejected by permissions, record rules, or database constraints.
 
-- In Odoo 19+, a `/doc` endpoint dynamically generates documentation on the models, fields, and methods available for a specific database.
+### Files
 
-### CRM and Sales
+- `download_attachment` downloads one binary `ir.attachment` by positive record ID and returns a file plus its Odoo ID, file name, MIME type, byte size, checksum when available, and storage type.
 
-Manage leads, opportunities, and the full sales pipeline. Create and update quotations, confirm sales orders, and manage customer contacts. Sales orders can be linked to invoicing and inventory workflows.
+URL-only attachments have no stored binary content. Binary downloads are limited to 6 MiB after base64 decoding.
 
-### Accounting and Invoicing
+### Validated workflows
 
-Create and manage invoices, vendor bills, journal entries, payments, and tax records. Access financial reports data such as aged receivables/payables.
+- `confirm_sale_order` confirms one draft or sent `sale.order` and verifies the resulting `sale` or `done` state.
+- `post_invoice` posts one draft customer invoice, customer credit note, vendor bill, or vendor credit note and verifies the `posted` state.
+- `confirm_purchase_order` confirms one draft or sent `purchase.order` and verifies the resulting purchase state.
+- `mark_opportunity_won` marks one `crm.lead` opportunity as won and verifies its won-stage state.
+- `complete_activity` completes one `mail.activity`, optionally records feedback and existing Odoo attachment IDs, and verifies that the activity is no longer pending.
 
-### Inventory and Warehouse
+These tools perform mutating business actions. They can trigger Odoo automation, accounting entries, inventory operations, deliveries, projects, communications, or other module-specific side effects. Use exact record IDs and confirm the target state before invoking them.
 
-Manage products, stock levels, stock moves, warehouse transfers, and delivery orders. Track serial numbers and lots. Supports multi-warehouse operations.
+### Public-method fallback
 
-### Purchase Management
+- `execute_method` calls a public Odoo model or recordset method only when no dedicated tool covers the workflow.
 
-Create and manage purchase orders, track vendor relationships, and automate procurement workflows.
+Private method names beginning with `_` are rejected. JSON-2 accepts named parameters through `kwargs`; non-empty positional `args` are supported only for legacy JSON-RPC. The method can modify data or trigger arbitrary Odoo business side effects, so callers should prefer the dedicated record and workflow tools.
 
-### Human Resources
+## Triggers
 
-Manage employee records, contracts, attendance, time off, recruitment, and timesheets. Can be integrated with payroll.
+### Odoo Webhook Notification
 
-### Project Management
+`inbound_webhook` receives HTTP `POST` payloads sent by Odoo's **Send Webhook Notification** automation action. Configure the generated webhook URL as the destination in Odoo and choose the fields Odoo should send.
 
-Create and manage projects, tasks, and timesheets. Track progress and assign resources.
+Object payloads are passed through as record fields. When `_model` or `model` is present, the trigger exposes it as the model name; `_id` or `id` is exposed as the record ID. Non-object JSON is retained under `_value`, and non-JSON request bodies are returned as raw text for troubleshooting. Other HTTP methods receive `405 Method Not Allowed`.
 
-### eCommerce and Website
+Odoo automation and webhook availability depends on the edition and installed applications. Odoo does not expose a core external API for this integration to create or manage those automation rules.
 
-Manage products, orders, and customers from online stores built with Odoo's website/eCommerce modules.
+### Record Changes
 
-### Dynamic Model Creation
+`record_changes` polls `res.partner` contact records by `write_date` and emits `record.created` or `record.updated` events. The first poll establishes a baseline without replaying existing contacts. Later polls use a bounded timestamp-and-ID checkpoint, stable ordering, pagination, and deterministic event IDs to reduce gaps and duplicates at shared timestamp boundaries.
 
-You can create new models dynamically over RPC. Custom model names must start with `x_`. It is not possible to add new methods to a custom model, only fields.
+This trigger currently monitors contacts only. It does not subscribe to a universal Odoo event stream, and it does not replace an Odoo automation webhook when immediate or model-specific delivery is required.
 
-### Method Execution
+## Error behavior
 
-Beyond standard CRUD, the API allows calling any public method on a model, enabling access to business logic such as confirming orders, validating invoices, or triggering workflows.
-
-## Events
-
-Odoo does not have a built-in, native webhook system for subscribing to outgoing events as part of its core external API. However, there are two mechanisms worth noting:
-
-### Incoming Webhooks (via Automation Rules / Odoo Studio)
-
-Webhooks created in Odoo Studio allow you to automate an action in your Odoo database when a specific event occurs in another, external system. When the event occurs in the external system, a payload is sent to the Odoo webhook's URL via a POST API request, and a predefined action is performed in the database. Unlike scheduled actions, webhooks enable real-time, event-driven communication and automation.
-
-- Available from Odoo 17+ with Odoo Studio (Enterprise).
-- These are **incoming** webhooks—Odoo receives events from external systems and acts on them.
-- A unique URL is auto-generated per webhook and can be targeted at any model.
-- Actions triggered can include: updating records, creating records, executing custom Python code, sending emails, or sending an outgoing webhook notification.
-
-### Outgoing Webhook Notifications (via Automation Rules)
-
-It is also possible to create an automated action that sends data to an external webhook when a change occurs in your Odoo database. The "Send Webhook Notification" action makes a POST call to another system (webhook).
-
-- Using automation rules, Odoo can send outgoing HTTP POST requests to external URLs when specific events occur (record creation, field updates, stage changes, time conditions, etc.).
-- Triggers include: field value changes, record creation/update, stage transitions, email events, and time-based conditions.
-- The payload can include selected fields from the triggering record.
-- Requires Odoo Studio (Enterprise) for no-code setup, or custom server action code.
-- This is not a traditional webhook subscription API—there is no API endpoint to programmatically register/manage webhook subscriptions. Configuration is done through the Odoo UI or server action definitions.
+Validation, authentication, malformed provider responses, and upstream failures are returned as user-facing service errors with Odoo-specific operation context. The integration rejects invalid models, IDs, domains, JSON values, method names, incompatible JSON-2 arguments, unexpected workflow states, and missing downloadable content before reporting success.

@@ -4,7 +4,7 @@ import { z } from 'zod';
 export let config = SlateConfig.create(
   z.object({
     datacenter: z
-      .enum(['us', 'eu', 'in', 'au', 'jp', 'ca'])
+      .enum(['us', 'eu', 'in', 'au', 'jp', 'ca', 'sa', 'uk'])
       .default('us')
       .describe('Zoho data center region. Determines the API base URL and accounts URL.')
   })

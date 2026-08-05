@@ -518,9 +518,8 @@ export let sendInvoice = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx);
-    await client.update(
+    await client.updateAction(
       `/invoice/${ctx.input.invoiceId}/:send`,
-      {},
       {
         sendType: ctx.input.sendType,
         overrideEmailAddress: ctx.input.overrideEmailAddress

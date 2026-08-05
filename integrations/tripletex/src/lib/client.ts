@@ -212,16 +212,11 @@ export class TripletexClient {
     return response.value;
   }
 
-  async update(
-    path: string,
-    body: Record<string, unknown> = {},
-    params: Record<string, unknown> = {},
-    companyId?: string
-  ) {
+  async updateAction(path: string, params: Record<string, unknown> = {}, companyId?: string) {
     let http = await this.createAuthenticatedHttp(companyId);
     await requestAxios(
       `update ${path}`,
-      () => http.put(path, body, { params }),
+      () => http.put(path, undefined, { params }),
       tripletexApiError
     );
   }

@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "@metorial/integrations-root",
@@ -8817,14 +8818,16 @@
     },
     "integrations/odoo": {
       "name": "@slates-integrations/odoo",
-      "version": "0.2.0-rc.5",
+      "version": "0.2.0-rc.8",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.14",
         "zod": "^4.2",
       },
       "devDependencies": {
+        "@slates/test": "1.0.0-rc.9",
         "typescript": "^5",
+        "vitest": "^3.1.2",
       },
     },
     "integrations/oksign": {
@@ -12936,7 +12939,7 @@
     },
     "integrations/tripletex": {
       "name": "@slates-integrations/tripletex",
-      "version": "0.1.0-rc.7",
+      "version": "0.1.0-rc.8",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -14047,7 +14050,7 @@
     },
     "integrations/zoho": {
       "name": "@slates-integrations/zoho",
-      "version": "0.2.0-rc.8",
+      "version": "0.2.0-rc.9",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -14072,7 +14075,7 @@
     },
     "integrations/zoho-books": {
       "name": "@slates-integrations/zoho-books",
-      "version": "0.2.0-rc.5",
+      "version": "0.2.0-rc.6",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.14",
@@ -14084,7 +14087,7 @@
     },
     "integrations/zoho-crm": {
       "name": "@slates-integrations/zoho-crm",
-      "version": "0.2.0-rc.6",
+      "version": "0.2.0-rc.7",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -19764,6 +19767,8 @@
 
     "@slates-integrations/ocr-web-service/@slates/test": ["@slates/test@1.0.0-rc.9", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.12", "@slates/profiles": "1.0.0-rc.10" } }, "sha512-6HuwlDtVf3Pnms7PvoS8MkwREbG2xDiMIbN3AgN+TIkgPW9iPml7NTgBO0rSqqWa2ZpqNCvp1gFGdlot+Kc32w=="],
 
+    "@slates-integrations/odoo/@slates/test": ["@slates/test@1.0.0-rc.9", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.12", "@slates/profiles": "1.0.0-rc.10" } }, "sha512-6HuwlDtVf3Pnms7PvoS8MkwREbG2xDiMIbN3AgN+TIkgPW9iPml7NTgBO0rSqqWa2ZpqNCvp1gFGdlot+Kc32w=="],
+
     "@slates-integrations/odoo/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
 
     "@slates-integrations/oksign/slates": ["slates@1.0.0-rc.14", "", { "dependencies": { "@slates/provider": "1.0.0-rc.15" } }, "sha512-TDfy7f9eJPCS5IpTwBq0jDOt5azw283YTt7vLTUPKoF4Cx6D6I7EZkV73NoUsL3qWnCQ0KY+vpH+UFGdnXzDtw=="],
@@ -22264,6 +22269,10 @@
 
     "@slates-integrations/ocr-web-service/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.10", "", { "dependencies": { "@slates/client": "1.0.0-rc.12", "@slates/proto": "1.0.0-rc.11" } }, "sha512-/6ZxhIhUOsrYnbaF0Bd/I6xO5+6w93EcsHtVzKxLwMtaBqT5V4YurMkseQvnT3Y4V9bBh/W2L8nwImd4y2iWcg=="],
 
+    "@slates-integrations/odoo/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.12", "", { "dependencies": { "@slates/proto": "1.0.0-rc.11", "@slates/provider": "1.0.0-rc.15", "@slates/provider-handler": "1.0.0-rc.17" } }, "sha512-wMTBVWoUl0m9UFJeema27rB+9MQDrXPWZX0strrnwvQgZk3tCX+DL5LUK9y7QWZzBnVUhxTK+jnz+TyEEdr+9A=="],
+
+    "@slates-integrations/odoo/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.10", "", { "dependencies": { "@slates/client": "1.0.0-rc.12", "@slates/proto": "1.0.0-rc.11" } }, "sha512-/6ZxhIhUOsrYnbaF0Bd/I6xO5+6w93EcsHtVzKxLwMtaBqT5V4YurMkseQvnT3Y4V9bBh/W2L8nwImd4y2iWcg=="],
+
     "@slates-integrations/odoo/slates/@slates/provider": ["@slates/provider@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-l28Ut+NsRYZ5X7Ml+ERaTFvOJe0G72SGJiHV4DNgFdeETjjDDBOKcj/OwIBQN0l0s6AxxqiXQIyZeQsRaDnDlA=="],
 
     "@slates-integrations/oksign/slates/@slates/provider": ["@slates/provider@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-l28Ut+NsRYZ5X7Ml+ERaTFvOJe0G72SGJiHV4DNgFdeETjjDDBOKcj/OwIBQN0l0s6AxxqiXQIyZeQsRaDnDlA=="],
@@ -24059,6 +24068,14 @@
     "@slates-integrations/ocr-web-service/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.17", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.11", "@slates/provider": "1.0.0-rc.15", "zod": "^4.2.1" } }, "sha512-DrAHi9x83w5vmhgyPwt8OT2HU1lxDFMAQquvHy54f1h0IjSjjQnNgOcbf7eq4wy1sHgRkKXtVSbQ5d64fTIW3w=="],
 
     "@slates-integrations/ocr-web-service/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.11", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-g/MMRAciX5D0UmEiwBy9656qEaade2ZMysIRMYoL64PzwfLC2rorOuTfE+kfBhNfH1IeA9UgmfVT8+8vGbQv3Q=="],
+
+    "@slates-integrations/odoo/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.11", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-g/MMRAciX5D0UmEiwBy9656qEaade2ZMysIRMYoL64PzwfLC2rorOuTfE+kfBhNfH1IeA9UgmfVT8+8vGbQv3Q=="],
+
+    "@slates-integrations/odoo/@slates/test/@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.15", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-l28Ut+NsRYZ5X7Ml+ERaTFvOJe0G72SGJiHV4DNgFdeETjjDDBOKcj/OwIBQN0l0s6AxxqiXQIyZeQsRaDnDlA=="],
+
+    "@slates-integrations/odoo/@slates/test/@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.17", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.11", "@slates/provider": "1.0.0-rc.15", "zod": "^4.2.1" } }, "sha512-DrAHi9x83w5vmhgyPwt8OT2HU1lxDFMAQquvHy54f1h0IjSjjQnNgOcbf7eq4wy1sHgRkKXtVSbQ5d64fTIW3w=="],
+
+    "@slates-integrations/odoo/@slates/test/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.11", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-g/MMRAciX5D0UmEiwBy9656qEaade2ZMysIRMYoL64PzwfLC2rorOuTfE+kfBhNfH1IeA9UgmfVT8+8vGbQv3Q=="],
 
     "@slates-integrations/ollama/@slates/test/@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.11", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-g/MMRAciX5D0UmEiwBy9656qEaade2ZMysIRMYoL64PzwfLC2rorOuTfE+kfBhNfH1IeA9UgmfVT8+8vGbQv3Q=="],
 

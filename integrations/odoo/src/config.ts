@@ -6,6 +6,11 @@ export let config = SlateConfig.create(
     instanceUrl: z
       .string()
       .describe('The URL of the Odoo instance (e.g., https://mycompany.odoo.com)'),
-    database: z.string().describe('The name of the Odoo database to connect to')
+    database: z
+      .string()
+      .optional()
+      .describe(
+        'Database name. Required for legacy servers and multi-database deployments; otherwise optional for Odoo 19+ JSON-2.'
+      )
   })
 );

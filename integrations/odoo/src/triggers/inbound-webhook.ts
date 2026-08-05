@@ -2,34 +2,59 @@ import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { spec } from '../spec';
 
+let odooPayloadSchema = z.record(z.string(), z.unknown());
+let recordIdSchema = z.union([z.string(), z.number()]);
+
 /**
- * Generic inbound webhook for providers without a tailored webhook trigger yet.
- * POST JSON is parsed into `payload` (non-objects are wrapped as { _value }).
- * Refine in the workflow mapper or replace with a provider-specific trigger.
+ * Odoo's Send Webhook Notification automation action posts a configurable set
+ * of record fields. Non-object JSON values retain the legacy `{ _value }` shape.
  */
 export let inboundWebhook = SlateTrigger.create(spec, {
-  name: 'Inbound Webhook',
+  name: 'Odoo Webhook Notification',
   key: 'inbound_webhook',
   description:
-    'Receives HTTP POST at the Slates webhook URL. Parses JSON into payload (or stores raw body if not JSON). Configure your provider to POST here when supported.'
+    "Receives JSON payloads sent by Odoo's Send Webhook Notification automation action. Configure the generated webhook URL in Odoo and select the record fields to include. Non-JSON bodies are exposed as raw text for troubleshooting."
 })
   .input(
     z.object({
-      payload: z
-        .record(z.string(), z.any())
-        .describe('Parsed JSON object from the request body'),
-      rawBody: z.string().optional().describe('Raw body when JSON parsing failed'),
-      contentType: z.string().optional().describe('Content-Type header')
+      payload: odooPayloadSchema.describe('Record fields sent by Odoo'),
+      model: z.string().optional().describe('Odoo model name when included in the payload'),
+      recordId: recordIdSchema
+        .optional()
+        .describe('Odoo record ID when included in the payload'),
+      rawBody: z
+        .string()
+        .optional()
+        .describe('Original request body when it is not valid JSON'),
+      contentType: z.string().optional().describe('Content-Type header sent by Odoo')
     })
   )
   .output(
     z.object({
-      payload: z.record(z.string(), z.any()),
-      rawBody: z.string().optional()
+      payload: odooPayloadSchema.describe('Record fields sent by Odoo'),
+      model: z.string().optional().describe('Odoo model name when included in the payload'),
+      recordId: recordIdSchema
+        .optional()
+        .describe('Odoo record ID when included in the payload'),
+      rawBody: z
+        .string()
+        .optional()
+        .describe('Original request body when it is not valid JSON'),
+      contentType: z.string().optional().describe('Content-Type header sent by Odoo')
     })
   )
   .webhook({
     handleRequest: async ctx => {
+      if (ctx.request.method !== 'POST') {
+        return {
+          inputs: [],
+          response: new Response('Method Not Allowed', {
+            status: 405,
+            headers: { Allow: 'POST' }
+          })
+        };
+      }
+
       let contentType = ctx.request.headers.get('content-type') ?? '';
       let text = await ctx.request.text();
       if (!text?.trim()) {
@@ -43,8 +68,27 @@ export let inboundWebhook = SlateTrigger.create(spec, {
           parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
             ? parsed
             : { _value: parsed };
+        let modelCandidate =
+          typeof payload._model === 'string'
+            ? payload._model
+            : typeof payload.model === 'string'
+              ? payload.model
+              : undefined;
+        let recordIdCandidate =
+          typeof payload._id === 'string' || typeof payload._id === 'number'
+            ? payload._id
+            : typeof payload.id === 'string' || typeof payload.id === 'number'
+              ? payload.id
+              : undefined;
         return {
-          inputs: [{ payload, contentType }]
+          inputs: [
+            {
+              payload,
+              model: modelCandidate,
+              recordId: recordIdCandidate,
+              contentType
+            }
+          ]
         };
       } catch {
         return {
@@ -56,10 +100,13 @@ export let inboundWebhook = SlateTrigger.create(spec, {
     handleEvent: async ctx => {
       return {
         type: 'webhook.inbound',
-        id: `inbound-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+        id: `inbound-${crypto.randomUUID()}`,
         output: {
           payload: ctx.input.payload,
-          rawBody: ctx.input.rawBody
+          model: ctx.input.model,
+          recordId: ctx.input.recordId,
+          rawBody: ctx.input.rawBody,
+          contentType: ctx.input.contentType
         }
       };
     }

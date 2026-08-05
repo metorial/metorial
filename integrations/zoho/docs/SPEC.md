@@ -68,14 +68,16 @@ Data protection and privacy laws in multiple countries state that user data can 
 
 The authorization and API base URLs differ by data center:
 
-| Region    | Accounts URL           | API Domain            |
-| --------- | ---------------------- | --------------------- |
-| US        | `accounts.zoho.com`    | `www.zohoapis.com`    |
-| EU        | `accounts.zoho.eu`     | `www.zohoapis.eu`     |
-| India     | `accounts.zoho.in`     | `www.zohoapis.in`     |
-| Australia | `accounts.zoho.com.au` | `www.zohoapis.com.au` |
-| Japan     | `accounts.zoho.jp`     | `www.zohoapis.jp`     |
-| Canada    | `accounts.zoho.ca`     | `www.zohoapis.ca`     |
+| Region       | Accounts URL             | API Domain            |
+| ------------ | ------------------------ | --------------------- |
+| US           | `accounts.zoho.com`      | `www.zohoapis.com`    |
+| EU           | `accounts.zoho.eu`       | `www.zohoapis.eu`     |
+| India        | `accounts.zoho.in`       | `www.zohoapis.in`     |
+| Australia    | `accounts.zoho.com.au`   | `www.zohoapis.com.au` |
+| Japan        | `accounts.zoho.jp`       | `www.zohoapis.jp`     |
+| Canada       | `accounts.zohocloud.ca`  | `www.zohoapis.ca`     |
+| Saudi Arabia | `accounts.zoho.sa`       | `www.zohoapis.sa`     |
+| UK           | `accounts.zoho.uk`       | `www.zohoapis.uk`     |
 
 In the authorization request, you send calls to `https://accounts.zoho.com`. In the response, the location of the user's DC will be included as the parameter `location`. Once you have identified the user's data center, you need to make the access token request to the server URL corresponding to that location. For example, if location=eu, you will need to make access token request to `https://accounts.zoho.eu`.
 

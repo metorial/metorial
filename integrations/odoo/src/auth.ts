@@ -1,17 +1,28 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import {
+  authenticateOdooJson2,
+  authenticateOdooJsonRpc,
+  detectOdooVersion,
+  normalizeOdooInstanceUrl,
+  type OdooTransport
+} from './lib/client';
 
 type AuthOutput = {
   token: string;
   username: string;
   uid: number;
+  instanceUrl?: string;
+  database?: string;
+  transport?: OdooTransport;
+  serverVersion?: string;
 };
 
 type ApiKeyInput = {
   username: string;
   token: string;
   instanceUrl: string;
-  database: string;
+  database?: string;
 };
 
 type PasswordInput = {
@@ -21,14 +32,41 @@ type PasswordInput = {
   database: string;
 };
 
+let authOutputSchema = z.object({
+  token: z.string(),
+  username: z.string(),
+  uid: z.number(),
+  // Optional fields keep stored auth from versions before transport binding valid.
+  instanceUrl: z.string().optional(),
+  database: z.string().optional(),
+  transport: z.enum(['json2', 'jsonrpc']).optional(),
+  serverVersion: z.string().optional()
+});
+
+let normalizedDatabase = (database: string | undefined) => {
+  let normalized = database?.trim();
+  return normalized ? normalized : undefined;
+};
+
+let profileFor = (output: AuthOutput) => {
+  let profile = { id: String(output.uid) } as {
+    id: string;
+    email?: string;
+    name?: string;
+  };
+
+  // JSON-2 authenticates only the bearer key; its username input is not
+  // verified. Legacy authenticate does verify the supplied login.
+  if (output.transport !== 'json2') {
+    profile.email = output.username;
+    profile.name = output.username;
+  }
+
+  return { profile };
+};
+
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      username: z.string(),
-      uid: z.number()
-    })
-  )
+  .output(authOutputSchema)
   .addCustomAuth({
     type: 'auth.custom',
     name: 'API Key',
@@ -39,56 +77,56 @@ export let auth = SlateAuth.create()
       token: z
         .string()
         .describe(
-          'API Key generated from user profile settings (Odoo v14+). Used in place of password.'
+          'API key generated from the Odoo account security settings. Odoo 19 and newer use it as a bearer credential for JSON-2.'
         ),
       instanceUrl: z
         .string()
         .describe('The URL of the Odoo instance (e.g., https://mycompany.odoo.com)'),
-      database: z.string().describe('The Odoo database name')
+      database: z
+        .string()
+        .optional()
+        .describe(
+          'Database name. Required for legacy Odoo servers and multi-database Odoo 19+ deployments; otherwise optional.'
+        )
     }),
 
     getOutput: async (ctx: { input: ApiKeyInput }) => {
-      let axios = createAxios();
-      let response = await axios.post(`${ctx.input.instanceUrl.replace(/\/+$/, '')}/jsonrpc`, {
-        jsonrpc: '2.0',
-        method: 'call',
-        id: 1,
-        params: {
-          service: 'common',
-          method: 'authenticate',
-          args: [ctx.input.database, ctx.input.username, ctx.input.token, {}]
-        }
-      });
-
-      let uid = response.data?.result;
-      if (!uid || typeof uid !== 'number') {
-        throw new Error(
-          'Authentication failed. Please check your credentials, instance URL, and database name.'
-        );
-      }
+      let instanceUrl = normalizeOdooInstanceUrl(ctx.input.instanceUrl);
+      let database = normalizedDatabase(ctx.input.database);
+      let version = await detectOdooVersion(instanceUrl);
+      let uid =
+        version.transport === 'json2'
+          ? await authenticateOdooJson2({
+              instanceUrl,
+              database,
+              token: ctx.input.token
+            })
+          : await authenticateOdooJsonRpc({
+              instanceUrl,
+              database: database ?? '',
+              username: ctx.input.username,
+              token: ctx.input.token
+            });
 
       return {
         output: {
           token: ctx.input.token,
           username: ctx.input.username,
-          uid
+          uid,
+          instanceUrl,
+          database,
+          transport: version.transport,
+          serverVersion: version.version
         }
       };
     },
 
-    getProfile: async (ctx: { output: AuthOutput; input: ApiKeyInput }) => {
-      return {
-        profile: {
-          id: String(ctx.output.uid),
-          email: ctx.output.username,
-          name: ctx.output.username
-        }
-      };
-    }
+    getProfile: async (ctx: { output: AuthOutput; input: ApiKeyInput }) =>
+      profileFor(ctx.output)
   })
   .addCustomAuth({
     type: 'auth.custom',
-    name: 'Username & Password',
+    name: 'Legacy — Username & Password',
     key: 'username_password',
 
     inputSchema: z.object({
@@ -101,41 +139,29 @@ export let auth = SlateAuth.create()
     }),
 
     getOutput: async (ctx: { input: PasswordInput }) => {
-      let axios = createAxios();
-      let response = await axios.post(`${ctx.input.instanceUrl.replace(/\/+$/, '')}/jsonrpc`, {
-        jsonrpc: '2.0',
-        method: 'call',
-        id: 1,
-        params: {
-          service: 'common',
-          method: 'authenticate',
-          args: [ctx.input.database, ctx.input.username, ctx.input.password, {}]
-        }
+      let instanceUrl = normalizeOdooInstanceUrl(ctx.input.instanceUrl);
+      let database = ctx.input.database.trim();
+      let version = await detectOdooVersion(instanceUrl);
+      let uid = await authenticateOdooJsonRpc({
+        instanceUrl,
+        database,
+        username: ctx.input.username,
+        token: ctx.input.password
       });
-
-      let uid = response.data?.result;
-      if (!uid || typeof uid !== 'number') {
-        throw new Error(
-          'Authentication failed. Please check your credentials, instance URL, and database name.'
-        );
-      }
 
       return {
         output: {
           token: ctx.input.password,
           username: ctx.input.username,
-          uid
+          uid,
+          instanceUrl,
+          database,
+          transport: 'jsonrpc' as const,
+          serverVersion: version.version
         }
       };
     },
 
-    getProfile: async (ctx: { output: AuthOutput; input: PasswordInput }) => {
-      return {
-        profile: {
-          id: String(ctx.output.uid),
-          email: ctx.output.username,
-          name: ctx.output.username
-        }
-      };
-    }
+    getProfile: async (ctx: { output: AuthOutput; input: PasswordInput }) =>
+      profileFor(ctx.output)
   });

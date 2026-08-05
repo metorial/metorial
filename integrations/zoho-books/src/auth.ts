@@ -155,8 +155,8 @@ let scopes = [
   }
 ];
 
-function createBooksOauth(name: string, key: string, regionSuffix: string) {
-  let accountsUrl = `https://accounts.zoho${regionSuffix}`;
+function createBooksOauth(name: string, key: string, accountsHost: string) {
+  let accountsUrl = `https://${accountsHost}`;
 
   return {
     type: 'auth.oauth' as const,
@@ -246,11 +246,12 @@ export let auth = SlateAuth.create()
       accountsUrl: z.string()
     })
   )
-  .addOauth(createBooksOauth('United States (zoho.com)', 'oauth_us', '.com'))
-  .addOauth(createBooksOauth('Europe (zoho.eu)', 'oauth_eu', '.eu'))
-  .addOauth(createBooksOauth('India (zoho.in)', 'oauth_in', '.in'))
-  .addOauth(createBooksOauth('Australia (zoho.com.au)', 'oauth_au', '.com.au'))
-  .addOauth(createBooksOauth('Japan (zoho.jp)', 'oauth_jp', '.jp'))
-  .addOauth(createBooksOauth('Canada (zoho.ca)', 'oauth_ca', '.ca'))
-  .addOauth(createBooksOauth('Saudi Arabia (zoho.sa)', 'oauth_sa', '.sa'))
-  .addOauth(createBooksOauth('China (zoho.com.cn)', 'oauth_cn', '.com.cn'));
+  .addOauth(createBooksOauth('United States (zoho.com)', 'oauth_us', 'accounts.zoho.com'))
+  .addOauth(createBooksOauth('Europe (zoho.eu)', 'oauth_eu', 'accounts.zoho.eu'))
+  .addOauth(createBooksOauth('India (zoho.in)', 'oauth_in', 'accounts.zoho.in'))
+  .addOauth(createBooksOauth('Australia (zoho.com.au)', 'oauth_au', 'accounts.zoho.com.au'))
+  .addOauth(createBooksOauth('Japan (zoho.jp)', 'oauth_jp', 'accounts.zoho.jp'))
+  // Canada accounts live on zohocloud.ca; accounts.zoho.ca does not resolve.
+  .addOauth(createBooksOauth('Canada (zohocloud.ca)', 'oauth_ca', 'accounts.zohocloud.ca'))
+  .addOauth(createBooksOauth('Saudi Arabia (zoho.sa)', 'oauth_sa', 'accounts.zoho.sa'))
+  .addOauth(createBooksOauth('China (zoho.com.cn)', 'oauth_cn', 'accounts.zoho.com.cn'));

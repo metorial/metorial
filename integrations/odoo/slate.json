@@ -1,6 +1,6 @@
 {
   "name": "@metorial/odoo",
-  "description": "Interact with Odoo's modular ERP platform to perform full CRUD operations across all installed business modules. Manage CRM leads, opportunities, and sales pipelines. Create and update quotations, confirm sales orders, and handle customer contacts. Create and manage invoices, vendor bills, journal entries, payments, and tax records. Manage products, stock levels, warehouse transfers, delivery orders, and serial number tracking across multiple warehouses. Create and manage purchase orders and automate procurement workflows. Manage employee records, contracts, attendance, time off, recruitment, and timesheets. Create and manage projects, tasks, and track progress. Manage eCommerce products, orders, and online store customers. Search records using domain filters, introspect models and fields, call business logic methods such as confirming orders or validating invoices, and dynamically create custom models. Configure incoming webhooks to trigger actions from external events, and outgoing webhook notifications when records change in Odoo.",
+  "description": "Connect to Odoo business data and workflows across installed modules. Discover models and fields, verify the connected user, search and count records with Odoo domains, perform record CRUD, download binary attachments, and run validated Sales, Accounting, Purchase, CRM, and Activity workflows. Supports Odoo 19+ JSON-2 and legacy JSON-RPC. Receive Odoo automation webhook notifications or poll contact record changes.",
   "categories": [
     "crm-and-sales-tools",
     "e-commerce-and-retail",
@@ -9,13 +9,14 @@
   "skills": [
     "manage leads and opportunities",
     "create and confirm sales orders",
-    "manage invoices and payments",
-    "track inventory and stock moves",
-    "manage purchase orders",
-    "manage employee records",
-    "create projects and tasks",
+    "create and post invoices and vendor bills",
+    "create and confirm purchase orders",
+    "complete scheduled activities",
+    "download Odoo attachments",
     "search and filter records",
+    "count matching records",
     "introspect models and fields",
     "execute business logic methods"
-  ]
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/odoo.svg"
 }

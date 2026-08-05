@@ -8,8 +8,10 @@ let accountsBaseUrls: Record<string, string> = {
   in: 'https://accounts.zoho.in',
   au: 'https://accounts.zoho.com.au',
   jp: 'https://accounts.zoho.jp',
-  ca: 'https://accounts.zoho.ca',
+  // Canada accounts live on zohocloud.ca; accounts.zoho.ca does not resolve.
+  ca: 'https://accounts.zohocloud.ca',
   sa: 'https://accounts.zoho.sa',
+  uk: 'https://accounts.zoho.uk',
   cn: 'https://accounts.zoho.com.cn'
 };
 
@@ -21,6 +23,7 @@ let apiBaseUrls: Record<string, string> = {
   jp: 'https://www.zohoapis.jp',
   ca: 'https://www.zohoapis.ca',
   sa: 'https://www.zohoapis.sa',
+  uk: 'https://www.zohoapis.uk',
   cn: 'https://www.zohoapis.com.cn'
 };
 
@@ -328,4 +331,5 @@ export let auth = SlateAuth.create()
   .addOauth(createCrmOauth('Japan (zohoapis.jp)', 'oauth_jp', 'jp'))
   .addOauth(createCrmOauth('Canada (zohoapis.ca)', 'oauth_ca', 'ca'))
   .addOauth(createCrmOauth('Saudi Arabia (zohoapis.sa)', 'oauth_sa', 'sa'))
+  .addOauth(createCrmOauth('United Kingdom (zohoapis.uk)', 'oauth_uk', 'uk'))
   .addOauth(createCrmOauth('China (zohoapis.com.cn)', 'oauth_cn', 'cn'));

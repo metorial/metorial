@@ -336,4 +336,6 @@ export let auth = SlateAuth.create()
   .addOauth(createZohoOauth('India (zoho.in)', 'oauth_in', 'in'))
   .addOauth(createZohoOauth('Australia (zoho.com.au)', 'oauth_au', 'au'))
   .addOauth(createZohoOauth('Japan (zoho.jp)', 'oauth_jp', 'jp'))
-  .addOauth(createZohoOauth('Canada (zoho.ca)', 'oauth_ca', 'ca'));
+  .addOauth(createZohoOauth('Canada (zohocloud.ca)', 'oauth_ca', 'ca'))
+  .addOauth(createZohoOauth('Saudi Arabia (zoho.sa)', 'oauth_sa', 'sa'))
+  .addOauth(createZohoOauth('United Kingdom (zoho.uk)', 'oauth_uk', 'uk'));
