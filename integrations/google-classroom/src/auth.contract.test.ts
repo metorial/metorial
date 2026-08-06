@@ -128,7 +128,7 @@ describe('google-classroom auth contract', () => {
           clientSecret: 'client-secret',
           scopes: [googleClassroomScopes.classroomCourses]
         }),
-      { code: 'internal.unexpected', kind: 'internal', status: 500 }
+      { code: 'request.bad', kind: 'request', status: 400 }
     );
   });
 

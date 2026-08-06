@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
@@ -125,7 +125,7 @@ export let manageAnnouncements = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!announcementId) throw new Error('announcementId is required');
+      if (!announcementId) throw createApiServiceError('announcementId is required');
       let result = await client.getAnnouncement(courseId, announcementId);
       return {
         output: { announcement: mapAnnouncement(result), success: true },
@@ -134,7 +134,9 @@ export let manageAnnouncements = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.text) throw new Error('text is required for creating an announcement');
+      if (!ctx.input.text) {
+        throw createApiServiceError('text is required for creating an announcement');
+      }
       let body: Record<string, any> = { text: ctx.input.text };
       if (ctx.input.state) body.state = ctx.input.state;
       if (ctx.input.materials) body.materials = ctx.input.materials;
@@ -155,7 +157,7 @@ export let manageAnnouncements = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!announcementId) throw new Error('announcementId is required');
+      if (!announcementId) throw createApiServiceError('announcementId is required');
       let updateFields: Record<string, any> = {};
       let maskParts: string[] = [];
       if (ctx.input.text !== undefined) {
@@ -196,7 +198,7 @@ export let manageAnnouncements = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!announcementId) throw new Error('announcementId is required');
+      if (!announcementId) throw createApiServiceError('announcementId is required');
       await client.deleteAnnouncement(courseId, announcementId);
       return {
         output: { success: true },
@@ -204,6 +206,6 @@ export let manageAnnouncements = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

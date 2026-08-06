@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
@@ -67,9 +67,15 @@ export let manageInvitations = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!courseId) throw new Error('courseId is required for creating an invitation');
-      if (!userId) throw new Error('userId is required for creating an invitation');
-      if (!role) throw new Error('role is required for creating an invitation');
+      if (!courseId) {
+        throw createApiServiceError('courseId is required for creating an invitation');
+      }
+      if (!userId) {
+        throw createApiServiceError('userId is required for creating an invitation');
+      }
+      if (!role) {
+        throw createApiServiceError('role is required for creating an invitation');
+      }
       let invitation = await client.createInvitation(courseId, userId, role);
       return {
         output: { invitation, success: true },
@@ -79,7 +85,7 @@ export let manageInvitations = SlateTool.create(spec, {
 
     if (action === 'accept') {
       if (!invitationId)
-        throw new Error('invitationId is required for accepting an invitation');
+        throw createApiServiceError('invitationId is required for accepting an invitation');
       await client.acceptInvitation(invitationId);
       return {
         output: { success: true },
@@ -89,7 +95,7 @@ export let manageInvitations = SlateTool.create(spec, {
 
     if (action === 'delete') {
       if (!invitationId)
-        throw new Error('invitationId is required for deleting an invitation');
+        throw createApiServiceError('invitationId is required for deleting an invitation');
       await client.deleteInvitation(invitationId);
       return {
         output: { success: true },
@@ -97,6 +103,6 @@ export let manageInvitations = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

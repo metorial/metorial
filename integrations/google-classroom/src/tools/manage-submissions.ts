@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
@@ -108,7 +108,9 @@ export let manageSubmissions = SlateTool.create(spec, {
       };
     }
 
-    if (!submissionId) throw new Error('submissionId is required for this action');
+    if (!submissionId) {
+      throw createApiServiceError('submissionId is required for this action');
+    }
 
     if (action === 'grade') {
       let updateFields: Record<string, any> = {};
@@ -174,6 +176,6 @@ export let manageSubmissions = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

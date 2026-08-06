@@ -1,4 +1,5 @@
 import axios, { type AxiosInstance } from 'axios';
+import { buildApiServiceError } from 'slates';
 
 export class ClassroomClient {
   private http: AxiosInstance;
@@ -10,6 +11,14 @@ export class ClassroomClient {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json'
       }
+    });
+    this.http.interceptors.response.use(undefined, error => {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Classroom',
+        operation: 'request',
+        reason: 'google_classroom_api_error',
+        nestedKeys: ['error', 'errors']
+      });
     });
   }
 

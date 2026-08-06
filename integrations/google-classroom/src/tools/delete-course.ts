@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { buildApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
@@ -44,7 +44,12 @@ export let deleteCourse = SlateTool.create(spec, {
     } catch (error) {
       let message = classroomApiErrorMessage(error, 'Failed to delete course.');
       if (!message.includes('Precondition check failed')) {
-        throw new Error(message);
+        throw buildApiServiceError(error, {
+          providerLabel: 'Google Classroom',
+          operation: 'delete course',
+          reason: 'google_classroom_delete_course_api_error',
+          nestedKeys: ['error', 'errors']
+        });
       }
 
       try {
@@ -54,13 +59,23 @@ export let deleteCourse = SlateTool.create(spec, {
           'courseState'
         );
       } catch (archiveError) {
-        throw new Error(classroomApiErrorMessage(archiveError, message));
+        throw buildApiServiceError(archiveError, {
+          providerLabel: 'Google Classroom',
+          operation: 'archive course before deletion',
+          reason: 'google_classroom_archive_course_api_error',
+          nestedKeys: ['error', 'errors']
+        });
       }
 
       try {
         await client.deleteCourse(ctx.input.courseId);
       } catch (deleteError) {
-        throw new Error(classroomApiErrorMessage(deleteError, message));
+        throw buildApiServiceError(deleteError, {
+          providerLabel: 'Google Classroom',
+          operation: 'delete archived course',
+          reason: 'google_classroom_delete_course_api_error',
+          nestedKeys: ['error', 'errors']
+        });
       }
     }
 

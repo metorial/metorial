@@ -1,25 +1,26 @@
+import { ServiceError } from '@lowerdeck/error';
+import axios from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-let axiosMocks = vi.hoisted(() => ({
-  create: vi.fn(),
+let axiosMocks = {
   api: {
     delete: vi.fn(),
-    patch: vi.fn()
+    patch: vi.fn(),
+    interceptors: {
+      response: {
+        use: vi.fn()
+      }
+    }
   }
-}));
-
-vi.mock('axios', () => ({
-  default: {
-    create: axiosMocks.create
-  }
-}));
+};
 
 import { ClassroomClient } from './lib/client';
 
 describe('ClassroomClient coursework mutations', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     vi.clearAllMocks();
-    axiosMocks.create.mockReturnValue(axiosMocks.api);
+    vi.spyOn(axios, 'create').mockReturnValue(axiosMocks.api as any);
     axiosMocks.api.patch.mockResolvedValue({ data: { id: 'work-1' } });
     axiosMocks.api.delete.mockResolvedValue({ data: {} });
   });
@@ -46,5 +47,32 @@ describe('ClassroomClient coursework mutations', () => {
     await client.deleteCourseWork('course-1', 'work-1');
 
     expect(axiosMocks.api.delete).toHaveBeenCalledWith('/courses/course-1/courseWork/work-1');
+  });
+
+  it('maps upstream failures before raw Axios request details leave the client', () => {
+    let rejectResponse: ((error: unknown) => never) | undefined;
+    axiosMocks.api.interceptors.response.use.mockImplementation((_onFulfilled, onRejected) => {
+      rejectResponse = onRejected;
+    });
+    new ClassroomClient({ token: 'test-token' });
+
+    let thrown: unknown;
+    try {
+      rejectResponse?.({
+        response: {
+          status: 503,
+          statusText: 'Service Unavailable',
+          data: { error: { message: 'Retry later.' } }
+        },
+        config: {
+          headers: { Authorization: 'Bearer sentinel-secret' }
+        }
+      });
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(ServiceError);
+    expect(String(thrown)).not.toContain('sentinel-secret');
   });
 });

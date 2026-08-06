@@ -5580,7 +5580,7 @@
     },
     "integrations/google-classroom": {
       "name": "@slates-integrations/google-classroom",
-      "version": "0.2.0-rc.8",
+      "version": "0.2.0-rc.9",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.15",

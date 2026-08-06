@@ -1,4 +1,4 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { googleClassroomScopes } from './scopes';
 
@@ -218,7 +218,7 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError('No refresh token available');
       }
 
       let response = await googleAxios.post(

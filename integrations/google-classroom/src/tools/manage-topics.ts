@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { buildApiServiceError, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
@@ -44,62 +44,75 @@ export let manageTopics = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new ClassroomClient({ token: ctx.auth.token });
-    let { courseId, action, topicId, name } = ctx.input;
+    try {
+      let client = new ClassroomClient({ token: ctx.auth.token });
+      let { courseId, action, topicId, name } = ctx.input;
 
-    let mapTopic = (t: any) => ({
-      topicId: t.topicId,
-      courseId: t.courseId,
-      name: t.name,
-      updateTime: t.updateTime
-    });
+      let mapTopic = (t: any) => ({
+        topicId: t.topicId,
+        courseId: t.courseId,
+        name: t.name,
+        updateTime: t.updateTime
+      });
 
-    if (action === 'list') {
-      let result = await client.listTopics(courseId, ctx.input.pageSize, ctx.input.pageToken);
-      let topics = (result.topic || []).map(mapTopic);
-      return {
-        output: { topics, nextPageToken: result.nextPageToken, success: true },
-        message: `Found **${topics.length}** topic(s).`
-      };
+      if (action === 'list') {
+        let result = await client.listTopics(
+          courseId,
+          ctx.input.pageSize,
+          ctx.input.pageToken
+        );
+        let topics = (result.topic || []).map(mapTopic);
+        return {
+          output: { topics, nextPageToken: result.nextPageToken, success: true },
+          message: `Found **${topics.length}** topic(s).`
+        };
+      }
+
+      if (action === 'get') {
+        if (!topicId) throw createApiServiceError('topicId is required');
+        let result = await client.getTopic(courseId, topicId);
+        return {
+          output: { topic: mapTopic(result), success: true },
+          message: `Retrieved topic **${result.name}**.`
+        };
+      }
+
+      if (action === 'create') {
+        if (!name) throw createApiServiceError('name is required for creating a topic');
+        let result = await client.createTopic(courseId, name);
+        return {
+          output: { topic: mapTopic(result), success: true },
+          message: `Created topic **${result.name}**.`
+        };
+      }
+
+      if (action === 'update') {
+        if (!topicId) throw createApiServiceError('topicId is required');
+        if (!name) throw createApiServiceError('name is required for updating a topic');
+        let result = await client.updateTopic(courseId, topicId, name);
+        return {
+          output: { topic: mapTopic(result), success: true },
+          message: `Updated topic to **${result.name}**.`
+        };
+      }
+
+      if (action === 'delete') {
+        if (!topicId) throw createApiServiceError('topicId is required');
+        await client.deleteTopic(courseId, topicId);
+        return {
+          output: { success: true },
+          message: `Deleted topic \`${topicId}\`.`
+        };
+      }
+
+      throw createApiServiceError(`Unknown action: ${action}`);
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Classroom',
+        operation: 'manage topics',
+        reason: 'google_classroom_topics_api_error',
+        nestedKeys: ['error', 'errors']
+      });
     }
-
-    if (action === 'get') {
-      if (!topicId) throw new Error('topicId is required');
-      let result = await client.getTopic(courseId, topicId);
-      return {
-        output: { topic: mapTopic(result), success: true },
-        message: `Retrieved topic **${result.name}**.`
-      };
-    }
-
-    if (action === 'create') {
-      if (!name) throw new Error('name is required for creating a topic');
-      let result = await client.createTopic(courseId, name);
-      return {
-        output: { topic: mapTopic(result), success: true },
-        message: `Created topic **${result.name}**.`
-      };
-    }
-
-    if (action === 'update') {
-      if (!topicId) throw new Error('topicId is required');
-      if (!name) throw new Error('name is required for updating a topic');
-      let result = await client.updateTopic(courseId, topicId, name);
-      return {
-        output: { topic: mapTopic(result), success: true },
-        message: `Updated topic to **${result.name}**.`
-      };
-    }
-
-    if (action === 'delete') {
-      if (!topicId) throw new Error('topicId is required');
-      await client.deleteTopic(courseId, topicId);
-      return {
-        output: { success: true },
-        message: `Deleted topic \`${topicId}\`.`
-      };
-    }
-
-    throw new Error(`Unknown action: ${action}`);
   })
   .build();

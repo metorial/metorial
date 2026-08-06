@@ -1,22 +1,8 @@
-import { SlateTool } from 'slates';
+import { buildApiServiceError, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
 import { spec } from '../spec';
-
-let classroomApiErrorMessage = (error: unknown, fallback: string) => {
-  let message = (error as { response?: { data?: { error?: { message?: string } } } })?.response
-    ?.data?.error?.message;
-  if (typeof message === 'string' && message.length > 0) {
-    return message;
-  }
-
-  if (error instanceof Error && error.message.length > 0) {
-    return error.message;
-  }
-
-  return fallback;
-};
 
 let rubricLevelSchema = z.object({
   levelId: z.string().optional().describe('Level ID'),
@@ -123,7 +109,7 @@ export let manageRubrics = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!rubricId) throw new Error('rubricId is required');
+      if (!rubricId) throw createApiServiceError('rubricId is required');
       let result = await client.getRubric(courseId, courseWorkId, rubricId);
       return {
         output: { rubric: mapRubric(result), success: true },
@@ -132,14 +118,21 @@ export let manageRubrics = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.criteria) throw new Error('criteria is required for creating a rubric');
+      if (!ctx.input.criteria) {
+        throw createApiServiceError('criteria is required for creating a rubric');
+      }
       let result: any;
       try {
         result = await client.createRubric(courseId, courseWorkId, {
           criteria: ctx.input.criteria
         });
       } catch (error) {
-        throw new Error(classroomApiErrorMessage(error, 'Failed to create rubric.'));
+        throw buildApiServiceError(error, {
+          providerLabel: 'Google Classroom',
+          operation: 'create rubric',
+          reason: 'google_classroom_create_rubric_api_error',
+          nestedKeys: ['error', 'errors']
+        });
       }
       return {
         output: { rubric: mapRubric(result), success: true },
@@ -148,8 +141,10 @@ export let manageRubrics = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!rubricId) throw new Error('rubricId is required');
-      if (!ctx.input.criteria) throw new Error('criteria is required for updating a rubric');
+      if (!rubricId) throw createApiServiceError('rubricId is required');
+      if (!ctx.input.criteria) {
+        throw createApiServiceError('criteria is required for updating a rubric');
+      }
       let result = await client.updateRubric(
         courseId,
         courseWorkId,
@@ -164,7 +159,7 @@ export let manageRubrics = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!rubricId) throw new Error('rubricId is required');
+      if (!rubricId) throw createApiServiceError('rubricId is required');
       await client.deleteRubric(courseId, courseWorkId, rubricId);
       return {
         output: { success: true },
@@ -172,6 +167,6 @@ export let manageRubrics = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

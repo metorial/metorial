@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
@@ -117,7 +117,7 @@ export let manageCourseworkMaterials = SlateTool.create(spec, {
     }
 
     if (action === 'get') {
-      if (!materialId) throw new Error('materialId is required');
+      if (!materialId) throw createApiServiceError('materialId is required');
       let result = await client.getCourseWorkMaterial(courseId, materialId);
       return {
         output: { material: mapMaterial(result), success: true },
@@ -126,7 +126,9 @@ export let manageCourseworkMaterials = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.title) throw new Error('title is required for creating a material');
+      if (!ctx.input.title) {
+        throw createApiServiceError('title is required for creating a material');
+      }
       let body: Record<string, any> = { title: ctx.input.title };
       if (ctx.input.description) body.description = ctx.input.description;
       if (ctx.input.state) body.state = ctx.input.state;
@@ -149,7 +151,7 @@ export let manageCourseworkMaterials = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!materialId) throw new Error('materialId is required');
+      if (!materialId) throw createApiServiceError('materialId is required');
       let updateFields: Record<string, any> = {};
       let maskParts: string[] = [];
       if (ctx.input.title !== undefined) {
@@ -186,7 +188,7 @@ export let manageCourseworkMaterials = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!materialId) throw new Error('materialId is required');
+      if (!materialId) throw createApiServiceError('materialId is required');
       await client.deleteCourseWorkMaterial(courseId, materialId);
       return {
         output: { success: true },
@@ -194,6 +196,6 @@ export let manageCourseworkMaterials = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

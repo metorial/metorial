@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
@@ -70,7 +70,9 @@ export let manageRoster = SlateTool.create(spec, {
     let { courseId, action, userId, enrollmentCode } = ctx.input;
 
     if (action === 'add_teacher') {
-      if (!userId) throw new Error('userId is required when adding a teacher');
+      if (!userId) {
+        throw createApiServiceError('userId is required when adding a teacher');
+      }
       let result = await client.addTeacher(courseId, userId);
       return {
         output: { success: true, member: result },
@@ -79,7 +81,9 @@ export let manageRoster = SlateTool.create(spec, {
     }
 
     if (action === 'remove_teacher') {
-      if (!userId) throw new Error('userId is required when removing a teacher');
+      if (!userId) {
+        throw createApiServiceError('userId is required when removing a teacher');
+      }
       await client.removeTeacher(courseId, userId);
       return {
         output: { success: true },
@@ -96,7 +100,9 @@ export let manageRoster = SlateTool.create(spec, {
     }
 
     if (action === 'remove_student') {
-      if (!userId) throw new Error('userId is required when removing a student');
+      if (!userId) {
+        throw createApiServiceError('userId is required when removing a student');
+      }
       await client.removeStudent(courseId, userId);
       return {
         output: { success: true },
@@ -104,6 +110,6 @@ export let manageRoster = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

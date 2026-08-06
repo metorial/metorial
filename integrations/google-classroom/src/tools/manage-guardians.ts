@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClassroomClient } from '../lib/client';
 import { googleClassroomActionScopes } from '../scopes';
@@ -101,7 +101,9 @@ export let manageGuardians = SlateTool.create(spec, {
     }
 
     if (action === 'invite') {
-      if (!ctx.input.invitedEmailAddress) throw new Error('invitedEmailAddress is required');
+      if (!ctx.input.invitedEmailAddress) {
+        throw createApiServiceError('invitedEmailAddress is required');
+      }
       let result = await client.createGuardianInvitation(
         studentId,
         ctx.input.invitedEmailAddress
@@ -126,7 +128,9 @@ export let manageGuardians = SlateTool.create(spec, {
     }
 
     if (action === 'cancel_invitation') {
-      if (!ctx.input.invitationId) throw new Error('invitationId is required');
+      if (!ctx.input.invitationId) {
+        throw createApiServiceError('invitationId is required');
+      }
       let result = await client.patchGuardianInvitation(
         studentId,
         ctx.input.invitationId,
@@ -139,7 +143,7 @@ export let manageGuardians = SlateTool.create(spec, {
     }
 
     if (action === 'remove') {
-      if (!ctx.input.guardianId) throw new Error('guardianId is required');
+      if (!ctx.input.guardianId) throw createApiServiceError('guardianId is required');
       await client.deleteGuardian(studentId, ctx.input.guardianId);
       return {
         output: { success: true },
@@ -147,6 +151,6 @@ export let manageGuardians = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
