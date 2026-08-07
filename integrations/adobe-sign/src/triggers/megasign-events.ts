@@ -35,6 +35,10 @@ export let megaSignEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['GET', 'POST'],
+      sync: { mode: 'always' }
+    },
     autoRegisterWebhook: async ctx => {
       let client = new Client({
         token: ctx.auth.token,
@@ -43,7 +47,7 @@ export let megaSignEvents = SlateTrigger.create(spec, {
       });
 
       let result = await client.createWebhook({
-        name: 'Slates MegaSign Events',
+        name: 'Send in Bulk Event Notifications',
         scope: 'ACCOUNT',
         webhookSubscriptionEvents: ['MEGASIGN_ALL'],
         webhookUrlInfo: { url: ctx.input.webhookBaseUrl },

@@ -87,7 +87,7 @@ Search for places, pages, and other public objects within the Facebook social gr
 
 Facebook supports **Webhooks** for real-time event notifications. There are many types of objects in the Facebook Social Graph, such as User objects and Page objects, so whenever you configure a Webhook you must first choose an object type. Since different objects have different fields, you must then subscribe to specific fields for that object type.
 
-Webhook setup requires providing a **Callback URL** (HTTPS with valid TLS/SSL) and a **Verify Token**. Facebook verifies the endpoint by sending a GET request with a challenge that must be echoed back.
+Webhook setup requires providing a **Callback URL** (HTTPS with valid TLS/SSL) and a **Verify Token**. Set `webhookVerifyToken` to the same token configured in the customer-owned Facebook app. Facebook's verification GET then requires an exact token match and echoes the challenge synchronously, while ordinary POST notifications remain asynchronous. Leaving the field unset preserves legacy callbacks that did not validate the token.
 
 ### Page Events
 

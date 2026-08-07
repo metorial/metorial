@@ -24,6 +24,13 @@ export let timeEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      sync: {
+        mode: 'match',
+        match: [{ hasHeader: 'x-hook-secret' }]
+      }
+    },
     autoRegisterWebhook: async ctx => {
       let client = new EverhourClient(ctx.auth.token);
       let webhook = await client.createWebhook({

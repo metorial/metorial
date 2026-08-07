@@ -1,4 +1,4 @@
-import { SlateTrigger } from 'slates';
+import { getGraphWebhookValidationResponse, graphWebhookHttp, SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -35,6 +35,7 @@ export let driveItemChangesTrigger = SlateTrigger.create(spec, {
   )
   .output(changedItemSchema)
   .webhook({
+    http: graphWebhookHttp,
     autoRegisterWebhook: async ctx => {
       let client = new Client({ token: ctx.auth.token });
 
@@ -82,13 +83,8 @@ export let driveItemChangesTrigger = SlateTrigger.create(spec, {
     },
 
     handleRequest: async ctx => {
-      // Handle validation token (Microsoft Graph sends this during subscription creation)
-      let url = new URL(ctx.request.url);
-      let validationToken = url.searchParams.get('validationToken');
-      if (validationToken) {
-        // Return empty inputs; the platform handles the response
-        return { inputs: [] };
-      }
+      let validation = getGraphWebhookValidationResponse(ctx.request);
+      if (validation) return { inputs: [], response: validation };
 
       let body = (await ctx.request.json()) as {
         value?: Array<{ clientState?: string; resource?: string; subscriptionId?: string }>;

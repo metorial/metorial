@@ -15,6 +15,7 @@ import {
 import { getAction, getActionWithType, getAuthMethod, mapAction, mapAuthMethod } from './spec';
 import { State } from './state';
 import { toJsonSchema, validate } from './validation';
+import { serializeWebhookHttpResponse } from './webhook';
 
 let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -911,7 +912,11 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       let context = new SlateContext(
         ctx.config,
-        { request: req, state: params.state },
+        {
+          request: req,
+          state: params.state,
+          registrationDetails: params.registrationDetails ?? null
+        },
         ctx.auth?.output!,
         slate.spec,
         logger
@@ -934,15 +939,22 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           },
           onSuccess: result => ({
             inputCount: result.inputs.length,
-            hasUpdatedState: result.updatedState !== undefined
+            hasUpdatedState: result.updatedState !== undefined,
+            hasResponse: result.response !== undefined
           })
         },
         () => runWithContext(context, () => action.handleRequest!(context))
       );
 
+      let response =
+        res.response === undefined
+          ? undefined
+          : await serializeWebhookHttpResponse(res.response);
+
       return withRequestTraces(context, {
         inputs: res.inputs,
-        updatedState: res.updatedState
+        updatedState: res.updatedState,
+        response
       });
     });
 

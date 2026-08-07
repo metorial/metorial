@@ -12,6 +12,10 @@ File downloads and Slack List exports return downloadable files capped at 10 MiB
 
 Canvas and Slack List availability depends on the workspace plan and Slack permissions. Canvas section lookup is supported, but a full `read_canvas` tool is not implemented because the public API does not provide a confirmed full-content read route. Attached Slack drafts are also not implemented because Slack does not expose a supported public draft-writing API.
 
+## Event Subscriptions
+
+The New Message (Events API) trigger works with a customer-owned Slack app. Set the app's Events Request URL to the callback instance's `webhookUrl` and configure the app's Signing Secret to verify requests. Slack supports one Events Request URL per app, so each callback instance needs its own Slack app. URL verification challenges are answered synchronously; message events continue through the normal callback delivery flow.
+
 ## Tools
 
 ### Get Conversation History

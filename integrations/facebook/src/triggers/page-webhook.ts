@@ -1,4 +1,8 @@
-import { SlateTrigger } from '@slates/provider';
+import {
+  getMetaWebhookVerificationResponse,
+  metaWebhookHttp,
+  SlateTrigger
+} from '@slates/provider';
 import { z } from 'zod';
 import { spec } from '../spec';
 
@@ -44,21 +48,15 @@ export let pageWebhook = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: metaWebhookHttp,
     handleRequest: async ctx => {
       let request = ctx.request;
-
-      // Handle Facebook webhook verification challenge
-      if (request.method === 'GET') {
-        let url = new URL(request.url);
-        let mode = url.searchParams.get('hub.mode');
-        let challenge = url.searchParams.get('hub.challenge');
-
-        if (mode === 'subscribe' && challenge) {
-          // Return empty inputs but the platform will need to handle the challenge response
-          // The verification is handled by responding with the challenge
-          return { inputs: [] };
-        }
-        return { inputs: [] };
+      let verificationResponse = getMetaWebhookVerificationResponse(
+        request,
+        ctx.config.webhookVerifyToken
+      );
+      if (verificationResponse) {
+        return { inputs: [], response: verificationResponse };
       }
 
       let body = (await request.json()) as any;

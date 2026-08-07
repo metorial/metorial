@@ -1,13 +1,14 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { NotionClient } from '../lib/client';
+import { handleNotionWebhookRequest, notionWebhookHttp } from '../lib/webhook';
 import { spec } from '../spec';
 
 export let pageEvents = SlateTrigger.create(spec, {
   name: 'Page Events',
   key: 'page_events',
   description:
-    'Receives webhook notifications for page events including content updates, page creation, and lock/unlock changes. Configure the webhook URL in your Notion integration settings.'
+    'Receives webhook notifications for page events including content updates, page creation, and lock/unlock changes. Configure the webhook URL in your Notion integration settings; the one-time verification_token is captured automatically and verifies X-Notion-Signature on later deliveries.'
 })
   .input(
     z.object({
@@ -32,33 +33,12 @@ export let pageEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: notionWebhookHttp,
     handleRequest: async ctx => {
-      let body = (await ctx.request.json()) as any;
+      let parsed = await handleNotionWebhookRequest(ctx);
+      if (parsed.type === 'complete') return parsed.result;
 
-      // Handle Notion webhook verification challenge
-      if (body.type === 'url_verification' || body.challenge) {
-        return {
-          inputs: [],
-          response: new Response(JSON.stringify({ challenge: body.challenge }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          })
-        };
-      }
-
-      // Process page events from the webhook payload
-      let events: any[] = [];
-
-      if (body.type && body.entity) {
-        // Single event format
-        events.push(body);
-      } else if (Array.isArray(body.events)) {
-        events = body.events;
-      } else if (body.event) {
-        events.push(body.event);
-      }
-
-      let pageEvents = events.filter((e: any) => {
+      let pageEvents = parsed.events.filter((e: any) => {
         let type = e.type ?? '';
         return type.startsWith('page.');
       });

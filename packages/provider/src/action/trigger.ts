@@ -8,7 +8,8 @@ import {
   type SlateTriggerPollingHandler,
   type SlateTriggerWebhookAutoRegistrationHandler,
   type SlateTriggerWebhookAutoUnregistrationHandler,
-  type SlateTriggerWebhookRequestHandler
+  type SlateTriggerWebhookRequestHandler,
+  type SlateWebhookHttpOptions
 } from './action';
 import { SlateActionBuilder } from './builder';
 
@@ -27,6 +28,7 @@ export interface SlateTriggerParameters<
   polling?: SlatePollingOptions;
   handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
   handleRequest?: SlateTriggerWebhookRequestHandler<ConfigType, AuthType, InputType>;
+  http?: SlateWebhookHttpOptions;
   pollEvents?: SlateTriggerPollingHandler<ConfigType, AuthType, InputType>;
   autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
   autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
@@ -44,6 +46,7 @@ export class SlateTrigger<
   #polling: SlatePollingOptions;
   #handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
   #handleRequest?: SlateTriggerWebhookRequestHandler<ConfigType, AuthType, InputType>;
+  #http?: SlateWebhookHttpOptions;
   #pollEvents?: SlateTriggerPollingHandler<ConfigType, AuthType, InputType>;
   #autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
   #autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
@@ -62,6 +65,7 @@ export class SlateTrigger<
     };
     this.#handleEvent = params.handleEvent;
     this.#handleRequest = params.handleRequest;
+    this.#http = params.http;
     this.#pollEvents = params.pollEvents;
     this.#autoRegisterWebhook = params.autoRegisterWebhook;
     this.#autoUnregisterWebhook = params.autoUnregisterWebhook;
@@ -91,6 +95,10 @@ export class SlateTrigger<
 
   get handleRequest() {
     return this.#handleRequest;
+  }
+
+  get http() {
+    return this.#http;
   }
 
   get pollEvents() {

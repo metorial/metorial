@@ -337,6 +337,7 @@ export let handleSlateTriggerWebhook = async (d: {
   headers?: Record<string, string>;
   body?: string | Uint8Array | null;
   state?: any;
+  registrationDetails?: any;
 }) =>
   d.client.handleTriggerWebhook({
     actionId: d.triggerId,
@@ -344,7 +345,8 @@ export let handleSlateTriggerWebhook = async (d: {
     method: d.method ?? 'POST',
     headers: d.headers,
     body: d.body,
-    state: d.state
+    state: d.state,
+    registrationDetails: d.registrationDetails
   });
 
 export let unregisterSlateTriggerWebhook = async (d: {

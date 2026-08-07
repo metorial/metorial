@@ -34,12 +34,19 @@ export let sheetChanges = SlateTrigger.create(spec, {
   .input(eventInputSchema)
   .output(eventOutputSchema)
   .webhook({
+    http: {
+      methods: ['POST'],
+      sync: {
+        mode: 'match',
+        match: [{ jsonBodyField: { path: 'challenge' } }]
+      }
+    },
     autoRegisterWebhook: async ctx => {
       let client = new SmartsheetClient({ token: ctx.auth.token });
 
       // Create the webhook
       let result = await client.createWebhook({
-        name: `Slates Sheet Webhook`,
+        name: 'Sheet Change Notifications',
         callbackUrl: ctx.input.webhookBaseUrl,
         scope: 'sheet',
         scopeObjectId: 0, // Placeholder — will be set via state
@@ -77,11 +84,14 @@ export let sheetChanges = SlateTrigger.create(spec, {
     },
 
     handleRequest: async ctx => {
-      let _contentType = ctx.request.headers.get('content-type') || '';
-
       // Handle Smartsheet verification challenge
       // When enabling a webhook, Smartsheet sends a challenge that must be echoed back
-      let body = (await ctx.request.json()) as any;
+      let body: any;
+      try {
+        body = await ctx.request.json();
+      } catch {
+        return { inputs: [] };
+      }
 
       if (body.challenge) {
         // This is a verification request — respond with the challenge

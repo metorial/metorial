@@ -2,16 +2,12 @@ import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { spec } from '../spec';
 
-/**
- * Generic inbound webhook for providers without a tailored webhook trigger yet.
- * POST JSON is parsed into `payload` (non-objects are wrapped as { _value }).
- * Refine in the workflow mapper or replace with a provider-specific trigger.
- */
+/** Receives Dropbox webhook verification and notification requests. */
 export let inboundWebhook = SlateTrigger.create(spec, {
-  name: 'Inbound Webhook',
+  name: 'Account Changes (Webhook)',
   key: 'inbound_webhook',
   description:
-    'Receives HTTP POST at the Slates webhook URL. Parses JSON into payload (or stores raw body if not JSON). Configure your provider to POST here when supported.'
+    'Receives Dropbox account-change notifications. Completes endpoint verification and parses JSON deliveries into a payload, preserving non-JSON bodies as text.'
 })
   .input(
     z.object({
@@ -29,7 +25,39 @@ export let inboundWebhook = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['GET', 'POST'],
+      sync: {
+        mode: 'match',
+        match: [{ method: 'GET', hasQueryParam: 'challenge' }]
+      }
+    },
     handleRequest: async ctx => {
+      if (ctx.request.method === 'GET') {
+        let challenge = new URL(ctx.request.url).searchParams.get('challenge');
+        if (challenge === null) {
+          return {
+            inputs: [],
+            response: {
+              status: 400,
+              headers: { 'content-type': 'text/plain' },
+              body: 'missing challenge parameter'
+            }
+          };
+        }
+
+        return {
+          inputs: [],
+          response: new Response(challenge, {
+            status: 200,
+            headers: {
+              'Content-Type': 'text/plain',
+              'X-Content-Type-Options': 'nosniff'
+            }
+          })
+        };
+      }
+
       let contentType = ctx.request.headers.get('content-type') ?? '';
       let text = await ctx.request.text();
       if (!text?.trim()) {

@@ -45,16 +45,6 @@ export let inboundWebhook = SlateTrigger.create(spec, {
   )
   .webhook({
     handleRequest: async ctx => {
-      if (ctx.request.method !== 'POST') {
-        return {
-          inputs: [],
-          response: new Response('Method Not Allowed', {
-            status: 405,
-            headers: { Allow: 'POST' }
-          })
-        };
-      }
-
       let contentType = ctx.request.headers.get('content-type') ?? '';
       let text = await ctx.request.text();
       if (!text?.trim()) {

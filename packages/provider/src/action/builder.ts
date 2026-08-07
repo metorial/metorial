@@ -15,7 +15,8 @@ import type {
   SlateTriggerPollingHandler,
   SlateTriggerWebhookAutoRegistrationHandler,
   SlateTriggerWebhookAutoUnregistrationHandler,
-  SlateTriggerWebhookRequestHandler
+  SlateTriggerWebhookRequestHandler,
+  SlateWebhookHttpOptions
 } from './action';
 import { validateScopes } from './scopes';
 
@@ -115,6 +116,7 @@ export class SlateActionBuilder<
     handleRequest: SlateTriggerWebhookRequestHandler<ConfigType, AuthType, InputType>;
     autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
     autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
+    http?: SlateWebhookHttpOptions;
   }): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result> {
     if (this.type !== 'trigger') {
       throw new SlateDeclarationError('handleEvent can only be set for trigger actions');
@@ -126,7 +128,8 @@ export class SlateActionBuilder<
       handleEvent: props.handleEvent,
       handleRequest: props.handleRequest,
       autoRegisterWebhook: props.autoRegisterWebhook,
-      autoUnregisterWebhook: props.autoUnregisterWebhook
+      autoUnregisterWebhook: props.autoUnregisterWebhook,
+      http: props.http
     };
 
     return this;

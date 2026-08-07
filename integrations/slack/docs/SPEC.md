@@ -14,7 +14,9 @@ The release is additive. These 21 established tool keys remain registered with t
 - `search_messages`, `search_files`
 - `manage_reminders`, `manage_user_groups`, `manage_bookmarks`, `get_team_info`
 
-The existing `new_message`, message-webhook, channel-activity, reaction, file, and user-change triggers are unchanged.
+The existing `new_message`, channel-activity, reaction, file, and user-change triggers are unchanged. The message-webhook trigger now answers Slack URL verification challenges synchronously and optionally verifies signed requests.
+
+The message-webhook trigger targets customer-owned Slack apps. Configure each app's Events Request URL with the callback instance's `webhookUrl` and provide its Signing Secret to reject missing, stale, or invalid signatures. Slack supports one Events Request URL per app, so each callback instance needs a separate Slack app. Only URL verification requests use the synchronous response path; ordinary message events retain queued callback delivery.
 
 ## Added tools
 

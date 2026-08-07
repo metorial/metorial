@@ -312,7 +312,14 @@ let createTriggerTraceSlate = () => {
     )
     .webhook({
       handleRequest: async () => ({
-        inputs: [{ id: 'webhook-1' }, { id: 'webhook-2' }]
+        inputs: [{ id: 'webhook-1' }, { id: 'webhook-2' }],
+        response: {
+          status: 202,
+          headers: {
+            'x-trigger-result': 'accepted'
+          },
+          body: 'accepted'
+        }
       }),
       handleEvent: async ctx => ({
         id: ctx.input.id,
@@ -695,7 +702,7 @@ describe('@slates/client local transport', () => {
       state: null
     });
 
-    await client.request('slates/action.trigger.webhook_handle', {
+    let webhookResult = await client.request('slates/action.trigger.webhook_handle', {
       actionId: 'webhook_trigger',
       url: 'https://example.com/webhook',
       method: 'POST',
@@ -704,6 +711,16 @@ describe('@slates/client local transport', () => {
       },
       body: null,
       state: null
+    });
+    expect(webhookResult.response).toEqual({
+      status: 202,
+      headers: {
+        'x-trigger-result': 'accepted'
+      },
+      body: {
+        encoding: 'base64',
+        content: Buffer.from('accepted').toString('base64')
+      }
     });
 
     await waitForLogs();
@@ -728,6 +745,7 @@ describe('@slates/client local transport', () => {
             component: 'action',
             functionName: 'handleRequest',
             inputCount: 2,
+            hasResponse: true,
             actionId: 'webhook_trigger'
           })
         })

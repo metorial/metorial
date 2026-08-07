@@ -1,4 +1,4 @@
-import { SlateTrigger } from 'slates';
+import { SlateTrigger, type SlateWebhookHttpResponseInit } from 'slates';
 import { z } from 'zod';
 import { spec } from '../spec';
 
@@ -15,6 +15,12 @@ let eventDataSchema = z.object({
   blobType: z.string().describe('Type of the blob'),
   sequencer: z.string().describe('Opaque value for ordering events')
 });
+
+let webhookResponse = (
+  status: number,
+  headers: Record<string, string>,
+  body: string | null
+): SlateWebhookHttpResponseInit => ({ status, headers, body });
 
 export let blobEvents = SlateTrigger.create(spec, {
   name: 'Blob Events',
@@ -37,11 +43,55 @@ export let blobEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST', 'OPTIONS'],
+      sync: {
+        mode: 'match',
+        match: [
+          {
+            method: 'OPTIONS'
+          },
+          {
+            method: 'POST',
+            jsonBodyField: {
+              path: '0.eventType',
+              equals: 'Microsoft.EventGrid.SubscriptionValidationEvent'
+            }
+          }
+        ]
+      }
+    },
     handleRequest: async ctx => {
-      let _contentType = ctx.request.headers.get('content-type') ?? '';
+      let webhookOrigin = ctx.request.headers.get('webhook-request-origin');
+      if (ctx.request.method === 'OPTIONS') {
+        if (!webhookOrigin) {
+          return {
+            inputs: [],
+            response: webhookResponse(405, { allow: 'POST' }, null)
+          };
+        }
+
+        return {
+          inputs: [],
+          response: webhookResponse(
+            200,
+            {
+              allow: 'POST',
+              'webhook-allowed-origin': webhookOrigin,
+              'webhook-allowed-rate': '*'
+            },
+            null
+          )
+        };
+      }
 
       // Handle Event Grid subscription validation (CloudEvents or EventGrid schema)
-      let body = (await ctx.request.json()) as any;
+      let body: any;
+      try {
+        body = await ctx.request.json();
+      } catch {
+        return { inputs: [] };
+      }
 
       // Azure Event Grid sends an array of events (EventGrid schema)
       // or it may send a CloudEvents batch
@@ -52,34 +102,15 @@ export let blobEvents = SlateTrigger.create(spec, {
         events.length > 0 &&
         events[0]?.eventType === 'Microsoft.EventGrid.SubscriptionValidationEvent'
       ) {
-        // This is handled by the platform - return empty inputs
-        // The validation response needs to be returned as a response
         return {
           inputs: [],
-          response: new Response(
+          response: webhookResponse(
+            200,
+            { 'content-type': 'application/json' },
             JSON.stringify({
               validationResponse: events[0]?.data?.validationCode
-            }),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            }
+            })
           )
-        };
-      }
-
-      // CloudEvents validation: check for WebHook-Request-Origin header
-      let webhookOrigin = ctx.request.headers.get('webhook-request-origin');
-      if (ctx.request.method === 'OPTIONS' && webhookOrigin) {
-        return {
-          inputs: [],
-          response: new Response(null, {
-            status: 200,
-            headers: {
-              'WebHook-Allowed-Origin': webhookOrigin,
-              'WebHook-Allowed-Rate': '*'
-            }
-          })
         };
       }
 

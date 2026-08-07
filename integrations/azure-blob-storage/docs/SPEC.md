@@ -102,7 +102,8 @@ Azure Blob Storage supports event-driven notifications through **Azure Event Gri
 - Only storage accounts of kind StorageV2 (general purpose v2), BlockBlobStorage, and BlobStorage support event integration. Storage (general purpose v1) does not support integration with Event Grid.
 - Events can be filtered by event type, container name, or name of the object that was created/deleted.
 - Event subscriptions are created via the Azure Event Grid API, specifying a webhook endpoint URL and the event types to subscribe to.
-- When Azure Event Grid creates a webhook subscription, it sends a subscription validation event to verify the endpoint, and the endpoint needs to respond with a specific validation response.
+- With the Event Grid schema, subscription validation POST requests receive the required `validationResponse` synchronously.
+- With the CloudEvents schema, validation OPTIONS requests echo `WebHook-Request-Origin` as `WebHook-Allowed-Origin`, advertise POST in the `Allow` header, and return `WebHook-Allowed-Rate: *`. Ordinary event notifications remain asynchronous.
 
 ### Blob Lifecycle Events
 

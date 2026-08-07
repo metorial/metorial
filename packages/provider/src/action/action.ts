@@ -62,15 +62,58 @@ export type SlateTriggerPollingHandler<
   updatedState?: any;
 }>;
 
+export interface SlateWebhookHttpResponseInit {
+  status?: number;
+  headers?: Record<string, string>;
+  body?: string | Uint8Array | null;
+}
+
+export type SlateWebhookHttpMethod =
+  | 'GET'
+  | 'POST'
+  | 'PUT'
+  | 'PATCH'
+  | 'DELETE'
+  | 'HEAD'
+  | 'OPTIONS';
+
+export interface SlateWebhookRequestMatcher {
+  method?: string;
+  hasQueryParam?: string;
+  hasHeader?: string;
+  jsonBodyField?: {
+    path: string;
+    equals?: string;
+  };
+  formBodyField?: {
+    path: string;
+    equals?: string;
+  };
+}
+
+export interface SlateWebhookHttpOptions {
+  methods?: SlateWebhookHttpMethod[];
+  sync?: {
+    mode: 'never' | 'match' | 'always';
+    match?: SlateWebhookRequestMatcher[];
+    timeoutMs?: number;
+  };
+}
+
 export type SlateTriggerWebhookRequestHandler<
   ConfigType extends {},
   AuthType extends {},
   InputType extends {}
 > = (
-  context: SlateContext<ConfigType, AuthType, { request: Request; state: any | null }>
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    { request: Request; state: any | null; registrationDetails: any | null }
+  >
 ) => Promise<{
   inputs: InputType[];
   updatedState?: any;
+  response?: Response | SlateWebhookHttpResponseInit;
 }>;
 
 export type SlateTriggerWebhookAutoRegistrationHandler<
@@ -117,6 +160,7 @@ export interface SlateActionParametersTrigger<
   polling?: SlatePollingOptions;
   handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
   handleRequest?: SlateTriggerWebhookRequestHandler<ConfigType, AuthType, InputType>;
+  http?: SlateWebhookHttpOptions;
   pollEvents?: SlateTriggerPollingHandler<ConfigType, AuthType, InputType>;
   autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
   autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;

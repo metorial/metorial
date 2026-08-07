@@ -130,7 +130,8 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
         : {
             type: 'webhook',
             autoRegistration: !!a.autoRegisterWebhook,
-            autoUnregistration: !!a.autoUnregisterWebhook
+            autoUnregistration: !!a.autoUnregisterWebhook,
+            http: a.http
           }
   };
 };

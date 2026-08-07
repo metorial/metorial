@@ -48,6 +48,14 @@ export class SlateContext<ConfigType extends {}, AuthType extends {}, InputType 
       : never;
   }
 
+  get registrationDetails() {
+    return Object.freeze(
+      (this.#input as any).registrationDetails
+    ) as 'registrationDetails' extends keyof InputType
+      ? InputType['registrationDetails']
+      : never;
+  }
+
   get auth() {
     return Object.freeze(this.#auth);
   }

@@ -2,6 +2,19 @@ import z from 'zod';
 import { slatesAction } from '../types';
 import { withRequestTraces } from './tracing';
 
+export let slatesWebhookHttpResponse = z.object({
+  status: z.number().int().min(100).max(599),
+  headers: z.record(z.string(), z.string()),
+  body: z
+    .object({
+      encoding: z.literal('base64'),
+      content: z.string()
+    })
+    .nullable()
+});
+
+export type SlatesWebhookHttpResponse = z.infer<typeof slatesWebhookHttpResponse>;
+
 /**
  * List Actions
  */
@@ -177,7 +190,8 @@ export let slatesMessageActionTriggerWebhookHandleRequest = z.object({
         content: z.string()
       })
       .nullable(),
-    state: z.any().nullable()
+    state: z.any().nullable(),
+    registrationDetails: z.any().nullable().optional()
   })
 });
 
@@ -190,7 +204,8 @@ export let slatesMessageActionTriggerWebhookHandleResponse = z.object({
   id: z.string(),
   result: withRequestTraces({
     inputs: z.array(z.record(z.string(), z.any())),
-    updatedState: z.any().nullable().optional()
+    updatedState: z.any().nullable().optional(),
+    response: slatesWebhookHttpResponse.nullable().optional()
   })
 });
 

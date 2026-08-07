@@ -1,12 +1,13 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
+import { handleNotionWebhookRequest, notionWebhookHttp } from '../lib/webhook';
 import { spec } from '../spec';
 
 export let commentEvents = SlateTrigger.create(spec, {
   name: 'Comment Events',
   key: 'comment_events',
   description:
-    'Receives webhook notifications when new comments are added to pages or blocks the integration has access to. Configure the webhook URL in your Notion integration settings.'
+    'Receives webhook notifications when new comments are added to pages or blocks the integration has access to. Configure the webhook URL in your Notion integration settings; the one-time verification_token is captured automatically and verifies X-Notion-Signature on later deliveries.'
 })
   .input(
     z.object({
@@ -30,31 +31,12 @@ export let commentEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: notionWebhookHttp,
     handleRequest: async ctx => {
-      let body = (await ctx.request.json()) as any;
+      let parsed = await handleNotionWebhookRequest(ctx);
+      if (parsed.type === 'complete') return parsed.result;
 
-      // Handle Notion webhook verification challenge
-      if (body.type === 'url_verification' || body.challenge) {
-        return {
-          inputs: [],
-          response: new Response(JSON.stringify({ challenge: body.challenge }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          })
-        };
-      }
-
-      let events: any[] = [];
-
-      if (body.type && body.entity) {
-        events.push(body);
-      } else if (Array.isArray(body.events)) {
-        events = body.events;
-      } else if (body.event) {
-        events.push(body.event);
-      }
-
-      let commentEvents = events.filter((e: any) => {
+      let commentEvents = parsed.events.filter((e: any) => {
         let type = e.type ?? '';
         return type.startsWith('comment.');
       });

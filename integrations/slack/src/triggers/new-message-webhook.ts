@@ -1,7 +1,17 @@
-import { SlateTrigger } from 'slates';
+import { SlateTrigger, verifyHmacSignature } from 'slates';
 import { z } from 'zod';
 import { slackActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
+
+const SLACK_MAX_REQUEST_AGE_SECONDS = 300;
+
+let invalidSignatureResponse = () => ({
+  inputs: [],
+  response: {
+    status: 401,
+    body: 'invalid signature'
+  }
+});
 
 let slackEventBody = z.object({
   type: z.string(),
@@ -25,7 +35,7 @@ export let newMessageWebhook = SlateTrigger.create(spec, {
   name: 'New Message (Events API)',
   key: 'new_message_webhook',
   description:
-    'Triggers when Slack sends a `message` event to the Metorial Events URL. Use with Slack Event Subscriptions and hub route POST /slates-hub/slack/events. Complements the polling “New Message” trigger.'
+    "Triggers when Slack sends a `message` event through Event Subscriptions. Use a customer-owned Slack app and set its Events Request URL to this callback instance's `webhookUrl`. Slack supports one Events Request URL per app, so use a separate app for each callback instance. Complements the polling “New Message” trigger."
 })
   .scopes(slackActionScopes.messageEvents)
   .input(
@@ -52,8 +62,49 @@ export let newMessageWebhook = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      sync: {
+        mode: 'match',
+        match: [
+          {
+            jsonBodyField: {
+              path: 'type',
+              equals: 'url_verification'
+            }
+          }
+        ]
+      }
+    },
     handleRequest: async ctx => {
       let raw = await ctx.request.text();
+
+      if (ctx.config.signingSecret) {
+        let timestamp = ctx.request.headers.get('x-slack-request-timestamp');
+        let signature = ctx.request.headers.get('x-slack-signature');
+        let timestampSeconds = timestamp ? Number(timestamp) : Number.NaN;
+        let currentTimestampSeconds = Date.now() / 1_000;
+        let timestampIsFresh =
+          Number.isFinite(timestampSeconds) &&
+          Math.abs(currentTimestampSeconds - timestampSeconds) <=
+            SLACK_MAX_REQUEST_AGE_SECONDS;
+
+        if (
+          !timestamp ||
+          !signature ||
+          !timestampIsFresh ||
+          !verifyHmacSignature({
+            secret: ctx.config.signingSecret,
+            payload: `v0:${timestamp}:${raw}`,
+            signature,
+            digest: 'hex',
+            prefix: 'v0='
+          })
+        ) {
+          return invalidSignatureResponse();
+        }
+      }
+
       let parsed: unknown;
       try {
         parsed = JSON.parse(raw);
@@ -67,7 +118,16 @@ export let newMessageWebhook = SlateTrigger.create(spec, {
       }
 
       if (body.data.type === 'url_verification' && body.data.challenge) {
-        return { inputs: [] };
+        return {
+          inputs: [],
+          response: {
+            status: 200,
+            headers: {
+              'content-type': 'text/plain'
+            },
+            body: body.data.challenge
+          }
+        };
       }
 
       if (body.data.type !== 'event_callback' || !body.data.event) {

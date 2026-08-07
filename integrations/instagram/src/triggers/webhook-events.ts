@@ -1,4 +1,8 @@
-import { SlateTrigger } from '@slates/provider';
+import {
+  getMetaWebhookVerificationResponse,
+  metaWebhookHttp,
+  SlateTrigger
+} from '@slates/provider';
 import { z } from 'zod';
 import { spec } from '../spec';
 
@@ -60,22 +64,17 @@ export let webhookEventsTrigger = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: metaWebhookHttp,
     // No autoRegisterWebhook — Instagram webhooks must be configured manually in Meta Developer Dashboard
 
     handleRequest: async ctx => {
       let request = ctx.request;
-
-      // Handle Meta webhook verification challenge (GET request)
-      if (request.method === 'GET') {
-        let url = new URL(request.url);
-        let mode = url.searchParams.get('hub.mode');
-        let challenge = url.searchParams.get('hub.challenge');
-
-        if (mode === 'subscribe' && challenge) {
-          // Return empty inputs - the verification response is handled by the platform
-          return { inputs: [] };
-        }
-        return { inputs: [] };
+      let verificationResponse = getMetaWebhookVerificationResponse(
+        request,
+        ctx.config.webhookVerifyToken
+      );
+      if (verificationResponse) {
+        return { inputs: [], response: verificationResponse };
       }
 
       let body = (await request.json()) as any;

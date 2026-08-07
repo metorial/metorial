@@ -107,6 +107,6 @@ If you want to get the latest insights for a story before it expires, set up a W
 
 Subscribe to the `messages` field to receive real-time notifications when direct messages are sent to your Instagram account. This is part of the Messenger Platform's webhook infrastructure and requires the `instagram_manage_messages` permission and a linked Facebook Page.
 
-- Requires a callback URL (HTTPS) and a verify token for endpoint verification.
+- Requires a callback URL (HTTPS) and a verify token for endpoint verification. Set `webhookVerifyToken` to the same token configured in the customer-owned Meta app; verification GET requests then require an exact match and echo the challenge synchronously, while ordinary POST notifications remain asynchronous. Leaving it unset preserves legacy callbacks that did not validate the token.
 - Webhook subscriptions are managed via the `/{app-id}/subscriptions` endpoint or the Meta Developer dashboard.
 - Instagram does not officially provide a webhook specifically for monitoring "new posts."

@@ -1,10 +1,12 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { WebhookClient } from '../lib/webhooks';
+import { parseServiceM8WebhookRequest, WebhookClient } from '../lib/webhooks';
 import { spec } from '../spec';
 
 let EVENT_TYPES = ['company.created', 'company.updated'] as const;
+let EVENT_WEBHOOK_ID = 'client_event_notifications';
+let LEGACY_EVENT_WEBHOOK_ID = 'slates_client_events';
 
 export let clientEvents = SlateTrigger.create(spec, {
   name: 'Client Events',
@@ -33,6 +35,16 @@ export let clientEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      sync: {
+        mode: 'match',
+        match: [
+          { formBodyField: { path: 'mode', equals: 'subscribe' } },
+          { jsonBodyField: { path: 'mode', equals: 'subscribe' } }
+        ]
+      }
+    },
     autoRegisterWebhook: async ctx => {
       let webhookClient = new WebhookClient({ token: ctx.auth.token });
       let registeredEvents: string[] = [];
@@ -42,7 +54,7 @@ export let clientEvents = SlateTrigger.create(spec, {
           await webhookClient.subscribeEventWebhook({
             event,
             callbackUrl: ctx.input.webhookBaseUrl,
-            uniqueId: `slates_client_events`
+            uniqueId: EVENT_WEBHOOK_ID
           });
           registeredEvents.push(event);
         } catch {
@@ -51,7 +63,11 @@ export let clientEvents = SlateTrigger.create(spec, {
       }
 
       return {
-        registrationDetails: { registeredEvents, callbackUrl: ctx.input.webhookBaseUrl }
+        registrationDetails: {
+          registeredEvents,
+          callbackUrl: ctx.input.webhookBaseUrl,
+          uniqueId: EVENT_WEBHOOK_ID
+        }
       };
     },
 
@@ -60,6 +76,7 @@ export let clientEvents = SlateTrigger.create(spec, {
       let details = ctx.input.registrationDetails as {
         registeredEvents: string[];
         callbackUrl: string;
+        uniqueId?: string;
       };
 
       for (let event of details.registeredEvents) {
@@ -67,7 +84,7 @@ export let clientEvents = SlateTrigger.create(spec, {
           await webhookClient.unsubscribeEventWebhook({
             event,
             callbackUrl: details.callbackUrl,
-            uniqueId: `slates_client_events`
+            uniqueId: details.uniqueId ?? LEGACY_EVENT_WEBHOOK_ID
           });
         } catch {
           // Best effort cleanup
@@ -76,12 +93,8 @@ export let clientEvents = SlateTrigger.create(spec, {
     },
 
     handleRequest: async ctx => {
-      let body: any;
-      try {
-        body = await ctx.request.json();
-      } catch {
-        return { inputs: [] };
-      }
+      let body = await parseServiceM8WebhookRequest(ctx.request);
+      if (!body) return { inputs: [] };
 
       if (body?.mode === 'subscribe' && body?.challenge) {
         return {

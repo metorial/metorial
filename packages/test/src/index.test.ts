@@ -186,6 +186,25 @@ let createDemoSlate = () => {
       })
     )
     .webhook({
+      http: {
+        methods: ['POST', 'OPTIONS'],
+        sync: {
+          mode: 'match',
+          match: [
+            {
+              method: 'POST',
+              hasHeader: 'x-demo-event'
+            },
+            {
+              formBodyField: {
+                path: 'mode',
+                equals: 'subscribe'
+              }
+            }
+          ],
+          timeoutMs: 4_000
+        }
+      },
       autoRegisterWebhook: async ctx => ({
         registrationDetails: {
           webhookBaseUrl: ctx.input.webhookBaseUrl,
@@ -213,7 +232,14 @@ let createDemoSlate = () => {
           ],
           updatedState: {
             lastEvent: ctx.request.headers.get('x-demo-event') ?? 'unknown'
-          }
+          },
+          response: new Response(ctx.registrationDetails?.channelId ?? 'missing', {
+            status: 201,
+            headers: {
+              'content-type': 'text/plain',
+              'x-demo-response': 'accepted'
+            }
+          })
         };
       },
       handleEvent: async ctx => ({
@@ -404,6 +430,32 @@ describe('@slates/test', () => {
     });
 
     expect(contract.configSchema.properties.prefix.type).toBe('string');
+    expect(contract.triggers.find(action => action.id === 'webhook_echo')?.invocation).toEqual(
+      {
+        type: 'webhook',
+        autoRegistration: true,
+        autoUnregistration: true,
+        http: {
+          methods: ['POST', 'OPTIONS'],
+          sync: {
+            mode: 'match',
+            match: [
+              {
+                method: 'POST',
+                hasHeader: 'x-demo-event'
+              },
+              {
+                formBodyField: {
+                  path: 'mode',
+                  equals: 'subscribe'
+                }
+              }
+            ],
+            timeoutMs: 4_000
+          }
+        }
+      }
+    );
 
     await expectToolCall({
       client,
@@ -490,12 +542,24 @@ describe('@slates/test', () => {
       headers: {
         'x-demo-event': 'created'
       },
-      body: 'payload-value'
+      body: 'payload-value',
+      registrationDetails: registration.registrationDetails
     });
     expect(handled).toMatchObject({
       inputs: [{ value: 'payload-value' }],
       updatedState: {
         lastEvent: 'created'
+      },
+      response: {
+        status: 201,
+        headers: {
+          'content-type': 'text/plain',
+          'x-demo-response': 'accepted'
+        },
+        body: {
+          encoding: 'base64',
+          content: Buffer.from('channel-1').toString('base64')
+        }
       }
     });
 

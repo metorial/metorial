@@ -3,7 +3,11 @@ import { z } from 'zod';
 
 export let config = SlateConfig.create(
   z.object({
-    // No global configuration needed for Zoom
-    // Authentication tokens and credentials are handled via auth.ts
+    secretToken: z
+      .string()
+      .optional()
+      .describe(
+        'Zoom webhook Secret Token from the app Event Subscriptions settings; required for endpoint URL validation'
+      )
   })
 );

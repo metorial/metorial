@@ -1,4 +1,4 @@
-import { SlateTrigger } from 'slates';
+import { getGraphWebhookValidationResponse, graphWebhookHttp, SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { GraphClient } from '../lib/client';
 import { microsoftTeamsActionScopes } from '../scopes';
@@ -32,6 +32,7 @@ export let membershipChangeTrigger = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: graphWebhookHttp,
     autoRegisterWebhook: async ctx => {
       let client = new GraphClient({ token: ctx.auth.token });
 
@@ -59,18 +60,8 @@ export let membershipChangeTrigger = SlateTrigger.create(spec, {
     },
 
     handleRequest: async ctx => {
-      let url = new URL(ctx.request.url);
-      let validationToken = url.searchParams.get('validationToken');
-
-      if (validationToken) {
-        return {
-          inputs: [],
-          response: new Response(validationToken, {
-            status: 200,
-            headers: { 'Content-Type': 'text/plain' }
-          })
-        } as any;
-      }
+      let validation = getGraphWebhookValidationResponse(ctx.request);
+      if (validation) return { inputs: [], response: validation };
 
       let body = (await ctx.request.json()) as any;
       let notifications = body.value || [];

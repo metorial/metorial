@@ -1,13 +1,14 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { NotionClient } from '../lib/client';
+import { handleNotionWebhookRequest, notionWebhookHttp } from '../lib/webhook';
 import { spec } from '../spec';
 
 export let databaseEvents = SlateTrigger.create(spec, {
   name: 'Database Events',
   key: 'database_events',
   description:
-    'Receives webhook notifications when a database schema changes (properties added, renamed, or deleted). Configure the webhook URL in your Notion integration settings.'
+    'Receives webhook notifications when a database schema changes (properties added, renamed, or deleted). Configure the webhook URL in your Notion integration settings; the one-time verification_token is captured automatically and verifies X-Notion-Signature on later deliveries.'
 })
   .input(
     z.object({
@@ -31,31 +32,12 @@ export let databaseEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: notionWebhookHttp,
     handleRequest: async ctx => {
-      let body = (await ctx.request.json()) as any;
+      let parsed = await handleNotionWebhookRequest(ctx);
+      if (parsed.type === 'complete') return parsed.result;
 
-      // Handle Notion webhook verification challenge
-      if (body.type === 'url_verification' || body.challenge) {
-        return {
-          inputs: [],
-          response: new Response(JSON.stringify({ challenge: body.challenge }), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-          })
-        };
-      }
-
-      let events: any[] = [];
-
-      if (body.type && body.entity) {
-        events.push(body);
-      } else if (Array.isArray(body.events)) {
-        events = body.events;
-      } else if (body.event) {
-        events.push(body.event);
-      }
-
-      let dbEvents = events.filter((e: any) => {
+      let dbEvents = parsed.events.filter((e: any) => {
         let type = e.type ?? '';
         return type.startsWith('database.') || type.startsWith('data_source.');
       });

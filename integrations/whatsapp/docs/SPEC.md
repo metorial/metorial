@@ -87,7 +87,7 @@ Enable or disable two-step verification for your WhatsApp business phone number 
 
 WhatsApp Business Platform supports webhooks for real-time event notifications. WhatsApp organizes its webhook events into subscribable fields. You select which fields you want in the Meta App Dashboard under your app's WhatsApp configuration.
 
-Webhook setup requires registering a callback URL with a verify token. When you first register a webhook URL, WhatsApp sends a GET request containing `hub.mode`, `hub.verify_token`, and `hub.challenge`. Your endpoint must validate the mode and token, then respond with the challenge value. All subsequent event payloads are signed with HMAC-SHA256 using your app's App Secret.
+Webhook setup requires registering a callback URL with a verify token. Set `webhookVerifyToken` to the same token configured in the customer-owned Meta app. When WhatsApp sends a verification GET containing `hub.mode`, `hub.verify_token`, and `hub.challenge`, the callback requires an exact token match and echoes the challenge synchronously. Leaving the field unset preserves legacy callbacks that did not validate the token. Ordinary POST notifications remain asynchronous. Subsequent event payloads are signed with HMAC-SHA256 using your app's App Secret.
 
 ### Messages
 

@@ -57,6 +57,8 @@ export let provider = Slate.create({
     updateBulkSendState,
     getUser,
     listUsers
-  ] as any,
-  triggers: [agreementEvents, webFormEvents, megaSignEvents] as any
+  ].map(action => action.build()) as any,
+  triggers: [agreementEvents, webFormEvents, megaSignEvents].map(action =>
+    action.build()
+  ) as any
 });

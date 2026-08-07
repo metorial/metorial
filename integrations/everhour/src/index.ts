@@ -93,7 +93,7 @@ export let provider = Slate.create({
     updateSection,
     deleteSection,
     getReport
-  ] as any,
+  ].map(action => action.build()) as any,
   triggers: [
     projectEvents,
     taskEvents,
@@ -102,5 +102,5 @@ export let provider = Slate.create({
     sectionEvents,
     clientEvents,
     estimateEvents
-  ] as any
+  ].map(action => action.build()) as any
 });

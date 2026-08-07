@@ -40,6 +40,13 @@ export let presenceEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      sync: {
+        mode: 'match',
+        match: [{ hasHeader: 'validation-token' }]
+      }
+    },
     autoRegisterWebhook: async ctx => {
       let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
       let result = await client.createSubscription(
@@ -66,7 +73,10 @@ export let presenceEvents = SlateTrigger.create(spec, {
           inputs: [],
           response: new Response('', {
             status: 200,
-            headers: { 'Validation-Token': validationToken }
+            headers: {
+              'Content-Type': 'application/json',
+              'Validation-Token': validationToken
+            }
           })
         };
       }

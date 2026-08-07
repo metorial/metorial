@@ -35,6 +35,13 @@ export let itemEventsTrigger = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      sync: {
+        mode: 'match',
+        match: [{ jsonBodyField: { path: 'challenge' } }]
+      }
+    },
     autoRegisterWebhook: async ctx => {
       let client = new MondayClient({ token: ctx.auth.token });
 
@@ -98,7 +105,12 @@ export let itemEventsTrigger = SlateTrigger.create(spec, {
     },
 
     handleRequest: async ctx => {
-      let body = (await ctx.request.json()) as any;
+      let body: any;
+      try {
+        body = await ctx.request.json();
+      } catch {
+        return { inputs: [] };
+      }
 
       // Handle Monday.com challenge verification
       if (body.challenge) {

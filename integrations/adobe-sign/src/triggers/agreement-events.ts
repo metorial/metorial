@@ -50,6 +50,10 @@ export let agreementEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['GET', 'POST'],
+      sync: { mode: 'always' }
+    },
     autoRegisterWebhook: async ctx => {
       let client = new Client({
         token: ctx.auth.token,
@@ -58,7 +62,7 @@ export let agreementEvents = SlateTrigger.create(spec, {
       });
 
       let result = await client.createWebhook({
-        name: 'Slates Agreement Events',
+        name: 'Agreement Event Notifications',
         scope: 'ACCOUNT',
         webhookSubscriptionEvents: ['AGREEMENT_ALL'],
         webhookUrlInfo: { url: ctx.input.webhookBaseUrl },

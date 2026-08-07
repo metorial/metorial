@@ -33,6 +33,13 @@ export let messageEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      sync: {
+        mode: 'match',
+        match: [{ hasHeader: 'validation-token' }]
+      }
+    },
     autoRegisterWebhook: async ctx => {
       let client = new Client({ token: ctx.auth.token, baseUrl: ctx.config.baseUrl });
 
@@ -58,7 +65,16 @@ export let messageEvents = SlateTrigger.create(spec, {
       // Handle RingCentral Validation-Token header (sent during subscription creation)
       let validationToken = ctx.request.headers.get('Validation-Token');
       if (validationToken) {
-        return { inputs: [] };
+        return {
+          inputs: [],
+          response: new Response('', {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Validation-Token': validationToken
+            }
+          })
+        };
       }
 
       let body = (await ctx.request.json()) as any;

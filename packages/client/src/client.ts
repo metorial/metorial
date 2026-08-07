@@ -356,6 +356,7 @@ export class SlatesProtocolClient {
     headers?: Record<string, string>;
     body?: string | Uint8Array | null;
     state?: any;
+    registrationDetails?: any;
   }): Promise<SlatesMessageActionTriggerWebhookHandleResponse['result']> {
     this.ensureSession();
     let encodedBody =
@@ -376,7 +377,8 @@ export class SlatesProtocolClient {
             content: encodedBody
           }
         : null,
-      state: d.state ?? null
+      state: d.state ?? null,
+      registrationDetails: d.registrationDetails ?? null
     });
   }
 

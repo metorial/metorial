@@ -1,6 +1,7 @@
 import { SlateTrigger } from '@slates/provider';
 import { z } from 'zod';
 import { spec } from '../spec';
+import { createZoomUrlValidationResult, zoomWebhookHttp } from './webhook-validation';
 
 export let chatMessageEvents = SlateTrigger.create(spec, {
   name: 'Chat Message Events',
@@ -29,23 +30,12 @@ export let chatMessageEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: zoomWebhookHttp,
     handleRequest: async ctx => {
       let body = (await ctx.request.json()) as any;
 
       if (body.event === 'endpoint.url_validation') {
-        return {
-          inputs: [],
-          response: new Response(
-            JSON.stringify({
-              plainToken: body.payload?.plainToken,
-              encryptedToken: body.payload?.plainToken
-            }),
-            {
-              status: 200,
-              headers: { 'Content-Type': 'application/json' }
-            }
-          )
-        };
+        return createZoomUrlValidationResult(body.payload?.plainToken, ctx.config.secretToken);
       }
 
       let eventType = body.event as string;

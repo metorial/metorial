@@ -4,6 +4,24 @@ export interface WebhookClientConfig {
   token: string;
 }
 
+export let parseServiceM8WebhookRequest = async (
+  request: Request
+): Promise<Record<string, any> | null> => {
+  let contentType = request.headers.get('content-type')?.toLowerCase() ?? '';
+  let text = await request.text();
+  if (!text.trim()) return null;
+
+  if (contentType.includes('application/x-www-form-urlencoded')) {
+    return Object.fromEntries(new URLSearchParams(text));
+  }
+
+  try {
+    return JSON.parse(text) as Record<string, any>;
+  } catch {
+    return null;
+  }
+};
+
 export class WebhookClient {
   private http;
 

@@ -1,5 +1,4 @@
-import { createHmac, timingSafeEqual } from 'crypto';
-import { SlateTrigger } from 'slates';
+import { SlateTrigger, verifyHmacSignature } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { asanaServiceError } from '../lib/errors';
@@ -10,19 +9,22 @@ function verifyAsanaSignature(
   rawBody: string,
   signatureHeader: string | null
 ): boolean {
-  if (!signatureHeader || !secret) return true;
-  let expectedHex = createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
-  let a = Buffer.from(expectedHex, 'utf8');
-  let b = Buffer.from(signatureHeader.trim(), 'utf8');
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
+  // Asana signs every event delivery once the hook secret is established; a missing
+  // signature on a signed hook is a forged request, not a legacy one.
+  if (!signatureHeader) return false;
+  return verifyHmacSignature({
+    secret,
+    payload: rawBody,
+    signature: signatureHeader.trim(),
+    digest: 'hex'
+  });
 }
 
 export let taskChangesWebhook = SlateTrigger.create(spec, {
   name: 'Task Changes (Webhook)',
   key: 'task_changes_webhook',
   description:
-    'Receives Asana webhooks for task added/changed/removed events on a project. Auto-registers via API when `webhookProjectId` is set in config (Slates webhook URL). Handles the X-Hook-Secret handshake and verifies X-Hook-Signature when a secret is stored. Complements polling triggers.'
+    'Receives task added, changed, and removed events for the configured Asana project. Registers the callback automatically, completes X-Hook-Secret verification, and verifies X-Hook-Signature for signed deliveries. Complements polling triggers.'
 })
   .input(
     z.object({
@@ -48,6 +50,13 @@ export let taskChangesWebhook = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      sync: {
+        mode: 'match',
+        match: [{ hasHeader: 'x-hook-secret' }]
+      }
+    },
     autoRegisterWebhook: async ctx => {
       if (!ctx.config.webhookProjectId) {
         throw asanaServiceError(
@@ -78,7 +87,7 @@ export let taskChangesWebhook = SlateTrigger.create(spec, {
 
     autoUnregisterWebhook: async ctx => {
       let client = new Client({ token: ctx.auth.token });
-      let registrationDetails = (ctx.input as any).registrationDetails as
+      let registrationDetails = ctx.input.registrationDetails as
         | { webhookGid?: string }
         | undefined;
       if (!registrationDetails?.webhookGid) return;
@@ -99,9 +108,7 @@ export let taskChangesWebhook = SlateTrigger.create(spec, {
 
       let rawBody = await ctx.request.text();
       let sig = ctx.request.headers.get('x-hook-signature');
-      let registrationDetails = (ctx.input as any).registrationDetails as
-        | { hookSecret?: string }
-        | undefined;
+      let registrationDetails = ctx.registrationDetails as { hookSecret?: string } | null;
       let storedSecret = registrationDetails?.hookSecret;
       if (storedSecret && !verifyAsanaSignature(storedSecret, rawBody, sig)) {
         return {

@@ -1,4 +1,4 @@
-import { SlateTrigger } from 'slates';
+import { getMetaWebhookVerificationResponse, metaWebhookHttp, SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { MetaAdsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -42,25 +42,14 @@ export let leadSubmitted = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: metaWebhookHttp,
     handleRequest: async ctx => {
-      let method = ctx.request.method;
-
-      // Handle Meta webhook verification challenge
-      if (method === 'GET') {
-        let url = new URL(ctx.request.url);
-        let challenge = url.searchParams.get('hub.challenge');
-
-        if (challenge) {
-          return {
-            inputs: [],
-            response: new Response(challenge, {
-              status: 200,
-              headers: { 'Content-Type': 'text/plain' }
-            })
-          };
-        }
-
-        return { inputs: [] };
+      let verificationResponse = getMetaWebhookVerificationResponse(
+        ctx.request,
+        ctx.config.webhookVerifyToken
+      );
+      if (verificationResponse) {
+        return { inputs: [], response: verificationResponse };
       }
 
       let body = (await ctx.request.json()) as any;
