@@ -14292,7 +14292,7 @@
       "version": "1.0.0-rc.5",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.15",
+        "slates": "1.0.0-rc.16",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14306,7 +14306,7 @@
       "version": "1.0.0-rc.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.15",
+        "slates": "1.0.0-rc.16",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14335,7 +14335,7 @@
       "version": "1.0.0-rc.5",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.15",
+        "slates": "1.0.0-rc.16",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -20943,13 +20943,7 @@
 
     "@slates/cli/@slates/profiles": ["@slates/profiles@1.0.0-rc.11", "", { "dependencies": { "@slates/client": "1.0.0-rc.13", "@slates/proto": "1.0.0-rc.12" } }, "sha512-fonrIevm5jFsuYE5++u17WsMn9pX/BL8d8fjec8g9mPYKXxMNaz3aifz0pWL6Hjj65UOG6xOyrndhZJ5r/UspA=="],
 
-    "@slates/dynamics-commerce-recipes/slates": ["slates@1.0.0-rc.15", "", { "dependencies": { "@slates/provider": "1.0.0-rc.16" } }, "sha512-KfOFoWKEvmJzGkzAjz/SgpO/OoyCZuUOOYz21SkPNFM4/bMGG/fTF/CZnSwu2xjEC6RAQfyq2Bmy9DiDzSKH2A=="],
-
-    "@slates/dynamics-finops-recipes/slates": ["slates@1.0.0-rc.15", "", { "dependencies": { "@slates/provider": "1.0.0-rc.16" } }, "sha512-KfOFoWKEvmJzGkzAjz/SgpO/OoyCZuUOOYz21SkPNFM4/bMGG/fTF/CZnSwu2xjEC6RAQfyq2Bmy9DiDzSKH2A=="],
-
     "@slates/google-people-recipes/slates": ["slates@1.0.0-rc.15", "", { "dependencies": { "@slates/provider": "1.0.0-rc.16" } }, "sha512-KfOFoWKEvmJzGkzAjz/SgpO/OoyCZuUOOYz21SkPNFM4/bMGG/fTF/CZnSwu2xjEC6RAQfyq2Bmy9DiDzSKH2A=="],
-
-    "@slates/microsoft-dataverse-recipes/slates": ["slates@1.0.0-rc.15", "", { "dependencies": { "@slates/provider": "1.0.0-rc.16" } }, "sha512-KfOFoWKEvmJzGkzAjz/SgpO/OoyCZuUOOYz21SkPNFM4/bMGG/fTF/CZnSwu2xjEC6RAQfyq2Bmy9DiDzSKH2A=="],
 
     "@slates/oauth-microsoft/slates": ["slates@1.0.0-rc.15", "", { "dependencies": { "@slates/provider": "1.0.0-rc.16" } }, "sha512-KfOFoWKEvmJzGkzAjz/SgpO/OoyCZuUOOYz21SkPNFM4/bMGG/fTF/CZnSwu2xjEC6RAQfyq2Bmy9DiDzSKH2A=="],
 
@@ -23785,13 +23779,7 @@
 
     "@slates/cli/@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.12", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-VW8rgpIxRzEoDboqZL00ZylsbppuXj/UqxzVTSbeEMDZYGQtzwGFpgALbmX4Jxsjn4d/lWXJP2ZZUahsp5LlRA=="],
 
-    "@slates/dynamics-commerce-recipes/slates/@slates/provider": ["@slates/provider@1.0.0-rc.16", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-qw7w6IHoUsnW+xAkbB+QguylX4vSGIDFEbt0IG9EktjLPM5kn8PRCVsJDPHPEmEoOrDWyhsw5ugE0L+watIUCA=="],
-
-    "@slates/dynamics-finops-recipes/slates/@slates/provider": ["@slates/provider@1.0.0-rc.16", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-qw7w6IHoUsnW+xAkbB+QguylX4vSGIDFEbt0IG9EktjLPM5kn8PRCVsJDPHPEmEoOrDWyhsw5ugE0L+watIUCA=="],
-
     "@slates/google-people-recipes/slates/@slates/provider": ["@slates/provider@1.0.0-rc.16", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-qw7w6IHoUsnW+xAkbB+QguylX4vSGIDFEbt0IG9EktjLPM5kn8PRCVsJDPHPEmEoOrDWyhsw5ugE0L+watIUCA=="],
-
-    "@slates/microsoft-dataverse-recipes/slates/@slates/provider": ["@slates/provider@1.0.0-rc.16", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-qw7w6IHoUsnW+xAkbB+QguylX4vSGIDFEbt0IG9EktjLPM5kn8PRCVsJDPHPEmEoOrDWyhsw5ugE0L+watIUCA=="],
 
     "@slates/oauth-microsoft/slates/@slates/provider": ["@slates/provider@1.0.0-rc.16", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-qw7w6IHoUsnW+xAkbB+QguylX4vSGIDFEbt0IG9EktjLPM5kn8PRCVsJDPHPEmEoOrDWyhsw5ugE0L+watIUCA=="],
 
