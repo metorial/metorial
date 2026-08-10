@@ -10,3 +10,4 @@ export * from './manage-properties';
 export * from './manage-sequences';
 export * from './manage-tickets';
 export * from './search-crm';
+export * from './who-am-i';

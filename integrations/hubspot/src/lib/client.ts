@@ -1,6 +1,12 @@
 import { createAxios } from 'slates';
 import { hubSpotApiError } from './errors';
 
+export type HubSpotAccountDetails = {
+  portalId?: string | number;
+  accountType?: string;
+  [key: string]: unknown;
+};
+
 export class HubSpotClient {
   private http: ReturnType<typeof createAxios>;
 
@@ -17,6 +23,15 @@ export class HubSpotClient {
       response => response,
       error => Promise.reject(hubSpotApiError(error))
     );
+  }
+
+  async getAccountDetails(): Promise<HubSpotAccountDetails> {
+    try {
+      let response = await this.http.get('/account-info/v3/details');
+      return response.data as HubSpotAccountDetails;
+    } catch (error) {
+      throw hubSpotApiError(error, 'GET /account-info/v3/details');
+    }
   }
 
   // ── CRM Objects (generic) ──

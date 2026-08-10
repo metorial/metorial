@@ -1,6 +1,7 @@
 import { createAxios, SlateAuth, type SlateAuthDocsReference } from 'slates';
 import { z } from 'zod';
-import { hubSpotApiError, hubSpotOAuthError, hubSpotServiceError } from './lib/errors';
+import { HubSpotClient } from './lib/client';
+import { hubSpotOAuthError, hubSpotServiceError } from './lib/errors';
 import {
   hubSpotOptionalScopeValues,
   hubSpotRequiredScopeValues,
@@ -346,24 +347,17 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: any) => {
-      let httpClient = createAxios({ baseURL: 'https://api.hubapi.com' });
+      let client = new HubSpotClient(ctx.output.token);
+      let data = await client.getAccountDetails();
+      let hubId = data.portalId == null ? undefined : String(data.portalId);
+      let name = data.accountType || 'HubSpot Account';
 
-      try {
-        let response = await httpClient.get('/account-info/v3/details', {
-          headers: { Authorization: `Bearer ${ctx.output.token}` }
-        });
-
-        let data = response.data;
-
-        return {
-          profile: {
-            id: String(data.portalId),
-            name: data.accountType || 'HubSpot Account',
-            hubId: String(data.portalId)
-          }
-        };
-      } catch (error) {
-        throw hubSpotApiError(error, 'GET /account-info/v3/details');
-      }
+      return {
+        profile: {
+          id: hubId ?? name,
+          name,
+          ...(hubId === undefined ? {} : { hubId })
+        }
+      };
     }
   });

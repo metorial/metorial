@@ -45,13 +45,15 @@ import {
   updateDeal,
   updateEngagement,
   updateListMembership,
-  updateTicket
+  updateTicket,
+  whoAmI
 } from './tools';
 import { crmObjectChanges, crmObjectWebhook } from './triggers';
 
 export let provider = Slate.create({
   spec,
   tools: [
+    whoAmI,
     createContact,
     getContact,
     updateContact,
