@@ -1,6 +1,10 @@
-import { buildApiServiceError, createAxios, getCurrentContext } from 'slates';
+import { buildApiServiceError, createAxios } from 'slates';
 
-import { assertLookerAuthenticatedInstanceUrl, buildLookerApiBaseUrl } from './instance-url';
+import {
+  buildLookerApiBaseUrl,
+  normalizeLookerInstanceUrl,
+  resolveLookerInstanceUrl
+} from './instance-url';
 
 export type LookerDashboard = {
   id: string;
@@ -481,33 +485,30 @@ let attachmentResult = (content: Buffer, resultFormat: string, mimeType: string)
   }
 });
 
+// Prefer the instance the token was actually issued for; the legacy config
+// value only covers connections authenticated before the URL was pinned into
+// the auth output.
+export let createLookerClient = (
+  config: { instanceUrl?: unknown },
+  auth: { token: string; authenticatedInstanceUrl?: string }
+) =>
+  new LookerClient({
+    instanceUrl: resolveLookerInstanceUrl({
+      authenticatedInstanceUrl: auth.authenticatedInstanceUrl,
+      legacyConfigInstanceUrl: config.instanceUrl
+    }),
+    token: auth.token
+  });
+
 export class LookerClient {
   private axios: ReturnType<typeof createAxios>;
+  readonly instanceUrl: string;
 
-  constructor(config: {
-    instanceUrl: string;
-    token: string;
-    authenticatedInstanceUrl?: string;
-  }) {
-    let authenticatedInstanceUrl: unknown = config.authenticatedInstanceUrl;
-    if (authenticatedInstanceUrl === undefined) {
-      try {
-        let auth = getCurrentContext().auth as Record<string, unknown>;
-        if (Object.hasOwn(auth, 'authenticatedInstanceUrl')) {
-          authenticatedInstanceUrl = auth.authenticatedInstanceUrl;
-        }
-      } catch {
-        // Direct client construction outside an invocation has no Slate context.
-      }
-    }
-
-    let instanceUrl = assertLookerAuthenticatedInstanceUrl({
-      currentInstanceUrl: config.instanceUrl,
-      authenticatedInstanceUrl
-    });
+  constructor(config: { instanceUrl: string; token: string }) {
+    this.instanceUrl = normalizeLookerInstanceUrl(config.instanceUrl);
 
     this.axios = createAxios({
-      baseURL: buildLookerApiBaseUrl(instanceUrl),
+      baseURL: buildLookerApiBaseUrl(this.instanceUrl),
       headers: {
         Authorization: `token ${config.token}`,
         'Content-Type': 'application/json'

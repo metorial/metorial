@@ -1,7 +1,7 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import {
-  LookerClient,
+  createLookerClient,
   type LookerLookmlModel,
   type LookerLookmlModelExploreField,
   type LookerLookmlModelNavExplore
@@ -142,10 +142,7 @@ export let listModels = SlateTool.create(spec, {
       });
     }
 
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     if (ctx.input.modelName !== undefined && ctx.input.exploreName !== undefined) {
       let explore = await client.getLookmlModelExplore(

@@ -5,7 +5,7 @@ import { slackActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
 export let newMessage = SlateTrigger.create(spec, {
-  name: 'New Message',
+  name: 'New Message (Polling)',
   key: 'new_message',
   description:
     '[Polling fallback] Triggers when a new message is posted in one or more Slack channels. Polls conversation history for new messages.'

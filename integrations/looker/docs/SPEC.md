@@ -7,16 +7,19 @@ Looker is a Google Cloud business intelligence and data analytics platform that 
 ## Authentication
 
 The integration authenticates with Looker API3 client credentials. The
-instance URL is required in the authentication input — production
-authentication runs without access to provider configuration, so the auth
-input is the authoritative login URL. The `instanceUrl` in the provider
-settings is used by tool invocations and must point to the same instance; if
-both values are present during authentication, they must normalize to the same
-URL or authentication is rejected.
+instance URL is owned by the authentication input — production authentication
+runs without access to provider configuration, so the auth input is the
+authoritative login URL. The provider configuration declares no properties;
+tool invocations resolve the instance from the normalized binding stored in
+the auth output, reading a legacy configured `instanceUrl` only as a fallback
+for connections authenticated before the binding existed.
 
-Instance URLs are trimmed, required to use HTTPS, and normalized to avoid
-duplicating a trailing `/api/4.0` path. Explicit ports and proxy path prefixes
-are preserved. Credentials are sent as an `application/x-www-form-urlencoded`
+Instance URLs accept any pasted form: input is trimmed, a missing scheme
+defaults to HTTPS, query parameters and fragments are stripped, trailing
+`/api/4.0` suffixes are removed, and a full page URL on a Looker-hosted
+`*.cloud.looker.com` instance reduces to the instance root. Explicit ports and
+self-hosted proxy path prefixes are preserved. URLs embedding credentials and
+non-HTTPS schemes are rejected. Credentials are sent as an `application/x-www-form-urlencoded`
 body to `POST /api/4.0/login`, never in the URL.
 
 Each new login stores the access token, its expiry, and the normalized instance
@@ -24,14 +27,12 @@ binding. Expiring tokens are refreshed automatically by exchanging the stored
 API3 credentials again. The authenticated profile is loaded from
 `GET /api/4.0/user`.
 
-Before credentials, tokens, or tool requests are sent, the integration checks
-that the current instance still matches the stored normalized binding. Changing
-the host or other normalized URL components requires reauthentication. Token
-refresh and profile lookups fall back to the stored instance binding when
-neither provider configuration nor an auth-input URL is available. Older
-stored auth without an instance binding remains compatible; during
-authentication, when both provider configuration and auth input are available,
-strict normalized URL matching still applies.
+Token refresh, profile lookups, and tool requests target the instance the
+token was issued for: the stored normalized binding wins, then the stored
+auth-input URL, then a legacy configured value. Older stored auth without an
+instance binding remains compatible through those fallbacks, and the binding
+is re-pinned on every login and refresh. Moving a connection to a different
+instance requires reconnecting with the new URL.
 
 ## Features
 

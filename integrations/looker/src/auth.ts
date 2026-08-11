@@ -1,10 +1,9 @@
 import { buildApiServiceError, createApiServiceError, SlateAuth } from 'slates';
 import { z } from 'zod';
 import {
-  assertLookerAuthenticatedInstanceUrl,
   buildLookerApiBaseUrl,
   normalizeLookerInstanceUrl,
-  resolveLookerInstanceUrl
+  presentLookerInstanceUrl
 } from './lib/instance-url';
 
 type LookerAuthInput = {
@@ -57,26 +56,20 @@ let redactedUpstreamError = ({
     extractMessage: () => message
   });
 
-let resolveAuthenticatedInstanceUrl = (ctx: LookerAuthContext) => {
-  let hasStoredBinding = ctx.output?.authenticatedInstanceUrl !== undefined;
-  let currentInstanceUrl = !hasStoredBinding
-    ? resolveLookerInstanceUrl({
-        configInstanceUrl: ctx.config?.instanceUrl,
-        legacyAuthInstanceUrl: ctx.input.instanceUrl
-      })
-    : // Production auth stacks never receive provider config, so refresh and
-      // profile calls must fall back to the instance the token was issued for.
-      normalizeLookerInstanceUrl(
-        ctx.config?.instanceUrl ??
-          ctx.input.instanceUrl ??
-          ctx.output?.authenticatedInstanceUrl
-      );
+// The auth input owns the instance URL: production auth stacks never receive
+// provider config, and the integration config no longer declares the URL.
+let resolveLoginInstanceUrl = (ctx: LookerAuthContext) =>
+  normalizeLookerInstanceUrl(ctx.input.instanceUrl);
 
-  return assertLookerAuthenticatedInstanceUrl({
-    currentInstanceUrl,
-    authenticatedInstanceUrl: ctx.output?.authenticatedInstanceUrl
-  });
-};
+// Refresh and profile calls target the instance the token was issued for,
+// falling back to the stored input and then to a legacy config value for
+// connections created before the URL was pinned into the auth output.
+let resolveIssuedInstanceUrl = (ctx: LookerAuthContext) =>
+  normalizeLookerInstanceUrl(
+    presentLookerInstanceUrl(ctx.output?.authenticatedInstanceUrl) ??
+      presentLookerInstanceUrl(ctx.input.instanceUrl) ??
+      ctx.config?.instanceUrl
+  );
 
 let parseLoginResponse = (data: unknown): LookerAuthOutput => {
   if (typeof data !== 'object' || data === null || Array.isArray(data)) {
@@ -116,9 +109,9 @@ let parseLoginResponse = (data: unknown): LookerAuthOutput => {
 let exchangeCredentials = async (
   ctx: LookerAuthContext,
   operation: string,
-  reason: 'looker_login_failed' | 'looker_refresh_failed'
+  reason: 'looker_login_failed' | 'looker_refresh_failed',
+  instanceUrl: string
 ) => {
-  let instanceUrl = resolveAuthenticatedInstanceUrl(ctx);
   let response: Response;
 
   try {
@@ -205,20 +198,30 @@ export let auth = SlateAuth.create()
         .string()
         .refine(value => value.trim() !== '', 'Looker instance URL is required.')
         .describe(
-          'Looker instance URL (e.g., https://mycompany.cloud.looker.com). Must point to the same instance as the URL in the integration configuration.'
+          'Base URL of your Looker instance (e.g., https://mycompany.cloud.looker.com). Any pasted form works: a missing scheme, trailing slashes, query parameters, an /api/4.0 suffix, or a full Looker page URL are normalized automatically. Include any explicit port or proxy path prefix your self-hosted instance requires; do not include credentials.'
         )
     }),
 
     getOutput: async ctx => ({
-      output: await exchangeCredentials(ctx, 'login', 'looker_login_failed')
+      output: await exchangeCredentials(
+        ctx,
+        'login',
+        'looker_login_failed',
+        resolveLoginInstanceUrl(ctx)
+      )
     }),
 
     handleTokenRefresh: async (ctx: LookerAuthContext) => ({
-      output: await exchangeCredentials(ctx, 'token refresh', 'looker_refresh_failed')
+      output: await exchangeCredentials(
+        ctx,
+        'token refresh',
+        'looker_refresh_failed',
+        resolveIssuedInstanceUrl(ctx)
+      )
     }),
 
     getProfile: async (ctx: LookerProfileContext) => {
-      let instanceUrl = resolveAuthenticatedInstanceUrl(ctx);
+      let instanceUrl = resolveIssuedInstanceUrl(ctx);
       let response: Response;
 
       try {

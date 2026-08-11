@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let clientMocks = vi.hoisted(() => ({
-  createSsoEmbedUrl: vi.fn()
+  createSsoEmbedUrl: vi.fn(),
+  instanceUrl: 'https://example.looker.com'
 }));
 
 vi.mock('../lib/client', () => ({
-  LookerClient: vi.fn(() => clientMocks)
+  createLookerClient: vi.fn(() => clientMocks)
 }));
 
 import { createEmbedUrl } from './create-embed-url';

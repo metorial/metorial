@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-let { axiosMocks, createAxiosMock, getCurrentContextMock } = vi.hoisted(() => {
+let { axiosMocks, createAxiosMock } = vi.hoisted(() => {
   let axiosMocks = {
     delete: vi.fn(),
     get: vi.fn(),
@@ -11,8 +11,7 @@ let { axiosMocks, createAxiosMock, getCurrentContextMock } = vi.hoisted(() => {
 
   return {
     axiosMocks,
-    createAxiosMock: vi.fn(() => axiosMocks),
-    getCurrentContextMock: vi.fn()
+    createAxiosMock: vi.fn(() => axiosMocks)
   };
 });
 
@@ -20,16 +19,14 @@ vi.mock('slates', () => ({
   buildApiServiceError: (error: unknown, options: unknown) => ({ error, options }),
   createApiServiceError: (message: string, options: Record<string, unknown> = {}) =>
     Object.assign(new Error(message), { data: options }),
-  createAxios: createAxiosMock,
-  getCurrentContext: getCurrentContextMock
+  createAxios: createAxiosMock
 }));
 
-import { LookerClient } from './client';
+import { createLookerClient, LookerClient } from './client';
 
 describe('Looker client request and response behavior', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getCurrentContextMock.mockReturnValue({ auth: {} });
   });
 
   it.each([
@@ -61,75 +58,52 @@ describe('Looker client request and response behavior', () => {
     });
   });
 
-  it('rejects tool client construction when the invocation auth is bound to another host', () => {
-    let authenticatedInstanceUrl = 'https://bound-a.looker.example/proxy';
-    let currentInstanceUrl = 'https://bound-b.looker.example/proxy';
-    let token = 'bound-tool-token';
-    getCurrentContextMock.mockReturnValue({
-      auth: {
-        authenticatedInstanceUrl
+  it('prefers the authenticated instance binding over a legacy config URL', () => {
+    let client = createLookerClient(
+      { instanceUrl: 'https://legacy-config.looker.example' },
+      {
+        token: 'bound-tool-token',
+        authenticatedInstanceUrl: 'https://bound.looker.example/proxy/'
       }
-    });
-    let caught: unknown;
-
-    try {
-      new LookerClient({
-        instanceUrl: currentInstanceUrl,
-        token
-      });
-    } catch (error) {
-      caught = error;
-    }
-
-    expect(caught).toEqual(
-      expect.objectContaining({
-        data: expect.objectContaining({ reason: 'looker_reauthentication_required' })
-      })
     );
-    let rendered = `${caught instanceof Error ? caught.message : String(caught)}\n${JSON.stringify(caught)}`;
-    expect(rendered).not.toContain(authenticatedInstanceUrl);
-    expect(rendered).not.toContain(currentInstanceUrl);
-    expect(rendered).not.toContain(token);
-    expect(createAxiosMock).not.toHaveBeenCalled();
-  });
 
-  it('accepts normalized-equivalent invocation auth bindings', () => {
-    getCurrentContextMock.mockReturnValue({
-      auth: {
-        authenticatedInstanceUrl: 'https://equivalent.looker.example/proxy/'
-      }
-    });
-
-    new LookerClient({
-      instanceUrl: 'https://equivalent.looker.example/proxy/api/4.0/',
-      token: 'equivalent-tool-token'
-    });
-
+    expect(client.instanceUrl).toBe('https://bound.looker.example/proxy');
     expect(createAxiosMock).toHaveBeenCalledWith({
-      baseURL: 'https://equivalent.looker.example/proxy/api/4.0',
+      baseURL: 'https://bound.looker.example/proxy/api/4.0',
       headers: {
-        Authorization: 'token equivalent-tool-token',
+        Authorization: 'token bound-tool-token',
         'Content-Type': 'application/json'
       }
     });
   });
 
-  it('rejects an explicit null invocation auth binding before client construction', () => {
-    getCurrentContextMock.mockReturnValue({
-      auth: {
-        authenticatedInstanceUrl: null
+  it.each([
+    ['missing', undefined],
+    ['blank', '   '],
+    ['non-string', 42]
+  ])('falls back to the legacy config URL when the auth binding is %s', (_name, authenticatedInstanceUrl) => {
+    let client = createLookerClient(
+      { instanceUrl: 'https://legacy-config.looker.example/api/4.0/' },
+      {
+        token: 'legacy-tool-token',
+        authenticatedInstanceUrl: authenticatedInstanceUrl as string | undefined
+      }
+    );
+
+    expect(client.instanceUrl).toBe('https://legacy-config.looker.example');
+    expect(createAxiosMock).toHaveBeenCalledWith({
+      baseURL: 'https://legacy-config.looker.example/api/4.0',
+      headers: {
+        Authorization: 'token legacy-tool-token',
+        'Content-Type': 'application/json'
       }
     });
+  });
 
-    expect(
-      () =>
-        new LookerClient({
-          instanceUrl: 'https://null-binding.looker.example',
-          token: 'null-binding-tool-token'
-        })
-    ).toThrow(
+  it('requires reconnection when neither an auth binding nor a legacy config URL exists', () => {
+    expect(() => createLookerClient({}, { token: 'unbound-tool-token' })).toThrow(
       expect.objectContaining({
-        data: expect.objectContaining({ reason: 'looker_reauthentication_required' })
+        data: expect.objectContaining({ reason: 'looker_instance_url_required' })
       })
     );
     expect(createAxiosMock).not.toHaveBeenCalled();

@@ -1,6 +1,6 @@
 import { createApiServiceError, createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient } from '../lib/client';
+import { createLookerClient, type LookerClient } from '../lib/client';
 import { spec } from '../spec';
 
 let lookOutputSchema = z.object({
@@ -140,10 +140,7 @@ export let manageLook = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     let look: any;
     let results: any;

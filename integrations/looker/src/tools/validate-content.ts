@@ -1,7 +1,7 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import {
-  LookerClient,
+  createLookerClient,
   type LookerContentValidationError,
   type LookerContentValidatorError,
   type LookerProjectError
@@ -255,10 +255,7 @@ export let validateContent = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     let mode = ctx.input.mode ?? (ctx.input.projectId !== undefined ? 'project' : 'content');
 

@@ -1,6 +1,6 @@
 import { SlateDefaultPollingIntervalSeconds, SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { LookerClient } from '../lib/client';
+import { createLookerClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let lookActivity = SlateTrigger.create(spec, {
@@ -36,10 +36,7 @@ export let lookActivity = SlateTrigger.create(spec, {
     },
 
     pollEvents: async ctx => {
-      let client = new LookerClient({
-        instanceUrl: ctx.config.instanceUrl,
-        token: ctx.auth.token
-      });
+      let client = createLookerClient(ctx.config, ctx.auth);
 
       let state = ctx.state || {};
       let lastPolledAt = state.lastPolledAt as string | undefined;

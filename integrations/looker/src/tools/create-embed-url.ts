@@ -1,6 +1,6 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient } from '../lib/client';
+import { createLookerClient } from '../lib/client';
 import { spec } from '../spec';
 
 let normalizeTargetUrl = (targetUrl: string, instanceUrl: string) => {
@@ -112,10 +112,7 @@ export let createEmbedUrl = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     let hasGroups = (ctx.input.groupIds?.length ?? 0) > 0;
     let hasDirectGrants =
@@ -127,7 +124,7 @@ export let createEmbedUrl = SlateTool.create(spec, {
       );
     }
 
-    let targetUrl = normalizeTargetUrl(ctx.input.targetUrl, ctx.config.instanceUrl);
+    let targetUrl = normalizeTargetUrl(ctx.input.targetUrl, client.instanceUrl);
 
     let result = await client.createSsoEmbedUrl({
       target_url: targetUrl,

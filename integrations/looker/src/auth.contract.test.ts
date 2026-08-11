@@ -246,23 +246,25 @@ describe('looker auth contract', () => {
     expect(result.output.authenticatedInstanceUrl).toBe(expectedAuthenticatedUrl);
   });
 
-  it('rejects truly different configured and legacy instance URLs', async () => {
+  it('logs in against the auth input URL and ignores a different legacy config URL', async () => {
     let client = await loadProviderClient({
       instanceUrl: 'https://configured.looker.example'
     });
+    fetchMock.mockResolvedValueOnce(successfulLogin());
 
-    await expectLookerError(
-      () =>
-        client.getAuthOutput({
-          authenticationMethodId: 'api_key',
-          input: {
-            ...authInput,
-            instanceUrl: 'https://different.looker.example'
-          }
-        }),
-      'looker_instance_url_mismatch'
+    let result = await client.getAuthOutput({
+      authenticationMethodId: 'api_key',
+      input: {
+        ...authInput,
+        instanceUrl: 'https://different.looker.example'
+      }
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://different.looker.example/api/4.0/login',
+      expect.objectContaining({ method: 'POST' })
     );
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(result.output.authenticatedInstanceUrl).toBe('https://different.looker.example');
   });
 
   it('stores a future expiry and refreshes by repeating the credential exchange', async () => {
@@ -362,7 +364,7 @@ describe('looker auth contract', () => {
     expect(result).not.toHaveProperty('requestTraces');
   });
 
-  it('rejects refresh and profile requests after the configured instance drifts', async () => {
+  it('refreshes and loads the profile from the stored binding when legacy config drifts', async () => {
     let instanceA = 'https://bound-a.looker.example/proxy';
     let instanceB = 'https://bound-b.looker.example/proxy';
     let client = await loadProviderClient({ instanceUrl: instanceB });
@@ -370,153 +372,118 @@ describe('looker auth contract', () => {
       token: 'bound-instance-access-token',
       authenticatedInstanceUrl: instanceA
     };
-    let secrets = [...Object.values(authInput), output.token, instanceA, instanceB];
+    fetchMock
+      .mockResolvedValueOnce(successfulLogin('bound-refreshed-token'))
+      .mockResolvedValueOnce(jsonResponse({ id: 'bound-user', display_name: 'Bound User' }));
 
-    await expectLookerError(
-      () =>
-        client.refreshToken({
-          authenticationMethodId: 'api_key',
-          output,
-          input: authInput,
-          clientId: 'protocol-client-id',
-          clientSecret: 'protocol-client-secret',
-          scopes: []
-        }),
-      'looker_reauthentication_required',
-      { secrets }
+    let refreshed = await client.refreshToken({
+      authenticationMethodId: 'api_key',
+      output,
+      input: authInput,
+      clientId: 'protocol-client-id',
+      clientSecret: 'protocol-client-secret',
+      scopes: []
+    });
+    let profile = await client.getAuthProfile({
+      authenticationMethodId: 'api_key',
+      output,
+      input: authInput,
+      scopes: []
+    });
+
+    expect(refreshed.output.authenticatedInstanceUrl).toBe(instanceA);
+    expect(profile.profile.id).toBe('bound-user');
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${instanceA}/api/4.0/login`,
+      expect.objectContaining({ method: 'POST' })
     );
-
-    await expectLookerError(
-      () =>
-        client.getAuthProfile({
-          authenticationMethodId: 'api_key',
-          output,
-          input: authInput,
-          scopes: []
-        }),
-      'looker_reauthentication_required',
-      { secrets }
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${instanceA}/api/4.0/user`,
+      expect.any(Object)
     );
-
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('reports reauthentication when config drifts but legacy input still matches the binding', async () => {
-    let instanceA = 'https://retained-legacy-a.looker.example/proxy';
-    let instanceB = 'https://drifted-config-b.looker.example/proxy';
-    let token = 'retained-legacy-access-token';
-    let client = await loadProviderClient({ instanceUrl: instanceB });
-    let input = { ...authInput, instanceUrl: instanceA };
-    let output = { token, authenticatedInstanceUrl: instanceA };
-    let secrets = [...Object.values(input), token, instanceB];
-
-    await expectLookerError(
-      () =>
-        client.refreshToken({
-          authenticationMethodId: 'api_key',
-          output,
-          input,
-          clientId: 'protocol-client-id',
-          clientSecret: 'protocol-client-secret',
-          scopes: []
-        }),
-      'looker_reauthentication_required',
-      { secrets }
-    );
-    await expectLookerError(
-      () =>
-        client.getAuthProfile({
-          authenticationMethodId: 'api_key',
-          output,
-          input,
-          scopes: []
-        }),
-      'looker_reauthentication_required',
-      { secrets }
-    );
-
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(createAxiosMock).not.toHaveBeenCalled();
-  });
-
-  it('rejects config drift for unbound legacy refresh and profile output', async () => {
+  it('prefers the stored input URL over legacy config for unbound refresh and profile output', async () => {
     let instanceA = 'https://unbound-legacy-a.looker.example/proxy';
     let instanceB = 'https://unbound-config-b.looker.example/proxy';
-    let token = 'unbound-legacy-access-token';
     let client = await loadProviderClient({ instanceUrl: instanceB });
     let input = { ...authInput, instanceUrl: instanceA };
-    let output = { token };
-    let secrets = [...Object.values(input), token, instanceB];
+    let output = { token: 'unbound-legacy-access-token' };
+    fetchMock
+      .mockResolvedValueOnce(successfulLogin('unbound-refreshed-token'))
+      .mockResolvedValueOnce(
+        jsonResponse({ id: 'unbound-user', display_name: 'Unbound User' })
+      );
 
-    await expectLookerError(
-      () =>
-        client.refreshToken({
-          authenticationMethodId: 'api_key',
-          output,
-          input,
-          clientId: 'protocol-client-id',
-          clientSecret: 'protocol-client-secret',
-          scopes: []
-        }),
-      'looker_instance_url_mismatch',
-      { secrets }
-    );
-    await expectLookerError(
-      () =>
-        client.getAuthProfile({
-          authenticationMethodId: 'api_key',
-          output,
-          input,
-          scopes: []
-        }),
-      'looker_instance_url_mismatch',
-      { secrets }
-    );
+    let refreshed = await client.refreshToken({
+      authenticationMethodId: 'api_key',
+      output,
+      input,
+      clientId: 'protocol-client-id',
+      clientSecret: 'protocol-client-secret',
+      scopes: []
+    });
+    let profile = await client.getAuthProfile({
+      authenticationMethodId: 'api_key',
+      output,
+      input,
+      scopes: []
+    });
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(createAxiosMock).not.toHaveBeenCalled();
+    expect(refreshed.output.authenticatedInstanceUrl).toBe(instanceA);
+    expect(profile.profile.id).toBe('unbound-user');
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${instanceA}/api/4.0/login`,
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      `${instanceA}/api/4.0/user`,
+      expect.any(Object)
+    );
   });
 
-  it('rejects explicit null instance bindings for refresh and profile', async () => {
+  it('falls back past an explicit null instance binding for refresh and profile', async () => {
     let instanceUrl = 'https://null-binding.looker.example/proxy';
-    let token = 'null-binding-access-token';
     let client = await loadProviderClient({ instanceUrl });
     let output = {
-      token,
+      token: 'null-binding-access-token',
       authenticatedInstanceUrl: null
     } as unknown as { token: string; authenticatedInstanceUrl: string };
-    let secrets = [...Object.values(authInput), token, instanceUrl];
+    fetchMock
+      .mockResolvedValueOnce(successfulLogin('null-binding-refreshed-token'))
+      .mockResolvedValueOnce(
+        jsonResponse({ id: 'null-binding-user', display_name: 'Null Binding User' })
+      );
 
-    await expectLookerError(
-      () =>
-        client.refreshToken({
-          authenticationMethodId: 'api_key',
-          output,
-          input: authInput,
-          clientId: 'protocol-client-id',
-          clientSecret: 'protocol-client-secret',
-          scopes: []
-        }),
-      'looker_reauthentication_required',
-      { secrets }
-    );
-    await expectLookerError(
-      () =>
-        client.getAuthProfile({
-          authenticationMethodId: 'api_key',
-          output,
-          input: authInput,
-          scopes: []
-        }),
-      'looker_reauthentication_required',
-      { secrets }
-    );
+    let refreshed = await client.refreshToken({
+      authenticationMethodId: 'api_key',
+      output,
+      input: authInput,
+      clientId: 'protocol-client-id',
+      clientSecret: 'protocol-client-secret',
+      scopes: []
+    });
+    let profile = await client.getAuthProfile({
+      authenticationMethodId: 'api_key',
+      output,
+      input: authInput,
+      scopes: []
+    });
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(createAxiosMock).not.toHaveBeenCalled();
+    expect(refreshed.output.authenticatedInstanceUrl).toBe(instanceUrl);
+    expect(profile.profile.id).toBe('null-binding-user');
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      `${instanceUrl}/api/4.0/login`,
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 
-  it('rejects a real tool invocation before constructing a client after instance drift', async () => {
+  it('invokes tools against the stored instance binding when legacy config drifts', async () => {
     let instanceA = 'https://tool-bound-a.looker.example/proxy';
     let instanceB = 'https://tool-bound-b.looker.example/proxy';
     let token = 'tool-bound-access-token';
@@ -524,14 +491,15 @@ describe('looker auth contract', () => {
       { instanceUrl: instanceB },
       { token, authenticatedInstanceUrl: instanceA }
     );
+    createAxiosMock.mockReturnValue({
+      get: vi.fn().mockResolvedValue({ data: [] })
+    });
 
-    await expectLookerError(
-      () => client.invokeTool('search_dashboards', { title: 'Revenue' }),
-      'looker_reauthentication_required',
-      { secrets: [instanceA, instanceB, token] }
+    await client.invokeTool('search_dashboards', { title: 'Revenue' });
+
+    expect(createAxiosMock).toHaveBeenCalledWith(
+      expect.objectContaining({ baseURL: `${instanceA}/api/4.0` })
     );
-
-    expect(createAxiosMock).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -659,31 +627,35 @@ describe('looker auth contract', () => {
     );
   });
 
-  it.each([
-    {
-      name: 'invalid configured instance URL',
-      config: { instanceUrl: 'http://insecure.looker.example' },
-      input: { ...authInput, instanceUrl: 'https://secure.looker.example' },
-      reason: 'looker_instance_url_invalid'
-    },
-    {
-      name: 'invalid auth-input instance URL',
-      config: {},
-      input: { ...authInput, instanceUrl: 'not a URL' },
-      reason: 'looker_instance_url_invalid'
-    }
-  ])('rejects $name before making a login request', async ({ config, input, reason }) => {
-    let client = await loadProviderClient(config);
+  it('rejects an invalid auth-input instance URL before making a login request', async () => {
+    let client = await loadProviderClient();
 
     await expectLookerError(
       () =>
         client.getAuthOutput({
           authenticationMethodId: 'api_key',
-          input
+          input: { ...authInput, instanceUrl: 'not a URL' }
         }),
-      reason
+      'looker_instance_url_invalid'
     );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('ignores an invalid legacy config URL during login', async () => {
+    let client = await loadProviderClient({
+      instanceUrl: 'http://insecure.looker.example'
+    });
+    fetchMock.mockResolvedValueOnce(successfulLogin());
+
+    await client.getAuthOutput({
+      authenticationMethodId: 'api_key',
+      input: { ...authInput, instanceUrl: 'https://secure.looker.example' }
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://secure.looker.example/api/4.0/login',
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 
   it('rejects a malformed profile without exposing the stored token', async () => {

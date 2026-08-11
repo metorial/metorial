@@ -1,10 +1,10 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import {
+  createLookerClient,
   type LookerAlert,
   type LookerAlertDestination,
   type LookerAlertPatch,
-  LookerClient,
   type LookerFullUpdateAlert,
   type LookerWriteAlertAppliedDashboardFilter
 } from '../lib/client';
@@ -449,10 +449,7 @@ export let manageAlert = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     let mapAppliedDashboardFilters = ():
       | LookerWriteAlertAppliedDashboardFilter[]

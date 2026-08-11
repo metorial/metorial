@@ -1,6 +1,6 @@
 import { buildApiServiceError, createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient } from '../lib/client';
+import { createLookerClient } from '../lib/client';
 import { spec } from '../spec';
 
 let dashboardSchema = z.object({
@@ -78,10 +78,7 @@ export let searchDashboards = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     let usesLegacyPagination = ctx.input.page !== undefined || ctx.input.perPage !== undefined;
     let usesCurrentPagination =

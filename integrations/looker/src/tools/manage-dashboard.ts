@@ -1,6 +1,10 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient, type LookerDashboard, type LookerUpdateDashboard } from '../lib/client';
+import {
+  createLookerClient,
+  type LookerDashboard,
+  type LookerUpdateDashboard
+} from '../lib/client';
 import { spec } from '../spec';
 
 let dashboardOutputSchema = z.object({
@@ -64,10 +68,7 @@ export let manageDashboard = SlateTool.create(spec, {
   )
   .output(dashboardOutputSchema)
   .handleInvocation(async ctx => {
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     let dashboard: LookerDashboard;
     let actionMessage: string;

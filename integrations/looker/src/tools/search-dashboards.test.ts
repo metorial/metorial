@@ -5,7 +5,7 @@ let clientMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../lib/client', () => ({
-  LookerClient: vi.fn(() => clientMocks)
+  createLookerClient: vi.fn(() => clientMocks)
 }));
 
 import { searchDashboards } from './search-dashboards';

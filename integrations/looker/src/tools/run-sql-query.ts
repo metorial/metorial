@@ -1,6 +1,6 @@
 import { createApiServiceError, createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient } from '../lib/client';
+import { createLookerClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let runSqlQuery = SlateTool.create(spec, {
@@ -44,10 +44,7 @@ export let runSqlQuery = SlateTool.create(spec, {
       });
     }
 
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     let sqlQuery = await client.createSqlQuery({
       connection_name: ctx.input.connectionName,

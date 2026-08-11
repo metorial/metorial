@@ -1,6 +1,6 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient } from '../lib/client';
+import { createLookerClient } from '../lib/client';
 import { spec } from '../spec';
 
 function optionalString(value: unknown) {
@@ -152,10 +152,7 @@ export let manageConnection = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     switch (ctx.input.action) {
       case 'list': {

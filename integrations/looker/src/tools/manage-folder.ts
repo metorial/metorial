@@ -1,6 +1,6 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
-import { LookerClient, type LookerFolder, type LookerUpdateFolder } from '../lib/client';
+import { createLookerClient, type LookerFolder, type LookerUpdateFolder } from '../lib/client';
 import { spec } from '../spec';
 
 let folderOutputSchema = z.object({
@@ -98,10 +98,7 @@ export let manageFolder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LookerClient({
-      instanceUrl: ctx.config.instanceUrl,
-      token: ctx.auth.token
-    });
+    let client = createLookerClient(ctx.config, ctx.auth);
 
     let actionMessage: string;
 

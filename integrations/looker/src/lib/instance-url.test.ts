@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  assertLookerAuthenticatedInstanceUrl,
   buildLookerApiBaseUrl,
   normalizeLookerInstanceUrl,
   resolveLookerInstanceUrl
@@ -90,103 +89,100 @@ describe('Looker instance URL helpers', () => {
     expectLookerUrlError(() => normalizeLookerInstanceUrl(value), reason);
   });
 
-  it.each([
-    'https://url-user:url-password@analytics.looker.example',
-    'https://analytics.looker.example?access_token=query-secret',
-    'https://analytics.looker.example#fragment-secret'
-  ])('rejects URL credentials, query parameters, and fragments without leaking them', value => {
+  it('rejects URL credentials without leaking them', () => {
     expectLookerUrlError(
-      () => normalizeLookerInstanceUrl(value),
+      () =>
+        normalizeLookerInstanceUrl('https://url-user:url-password@analytics.looker.example'),
       'looker_instance_url_invalid',
-      ['url-user', 'url-password', 'query-secret', 'fragment-secret']
+      ['url-user', 'url-password']
     );
   });
 
-  it('requires at least one URL when resolving configuration and legacy auth', () => {
+  it.each([
+    [
+      'query parameters',
+      'https://analytics.looker.example/proxy?access_token=query-secret',
+      'https://analytics.looker.example/proxy'
+    ],
+    [
+      'a fragment',
+      'https://analytics.looker.example#fragment-secret',
+      'https://analytics.looker.example'
+    ],
+    [
+      'query and fragment noise',
+      'https://analytics.looker.example/proxy/?toggle=dat#/explore',
+      'https://analytics.looker.example/proxy'
+    ]
+  ])('strips %s instead of rejecting the URL', (_name, value, expected) => {
+    expect(normalizeLookerInstanceUrl(value)).toBe(expected);
+  });
+
+  it.each([
+    ['bare host', 'mycompany.cloud.looker.com', 'https://mycompany.cloud.looker.com'],
+    [
+      'host with port and path',
+      'analytics.looker.example:19999/looker/proxy/',
+      'https://analytics.looker.example:19999/looker/proxy'
+    ],
+    [
+      'host with an API suffix',
+      'analytics.looker.example/api/4.0/',
+      'https://analytics.looker.example'
+    ]
+  ])('defaults a missing scheme to HTTPS for a %s', (_name, value, expected) => {
+    expect(normalizeLookerInstanceUrl(value)).toBe(expected);
+  });
+
+  it('reduces pasted Looker-hosted page URLs to the instance root', () => {
+    expect(
+      normalizeLookerInstanceUrl('https://mycompany.cloud.looker.com/dashboards/42?filters=x')
+    ).toBe('https://mycompany.cloud.looker.com');
+    expect(normalizeLookerInstanceUrl('MyCompany.Cloud.Looker.Com/looks/7')).toBe(
+      'https://mycompany.cloud.looker.com'
+    );
+    // Self-hosted instances may legitimately sit behind a proxy path prefix.
+    expect(normalizeLookerInstanceUrl('https://analytics.example.com/looker/proxy')).toBe(
+      'https://analytics.example.com/looker/proxy'
+    );
+  });
+
+  it('requires at least one URL when resolving the connection instance', () => {
     expectLookerUrlError(() => resolveLookerInstanceUrl({}), 'looker_instance_url_required');
   });
 
-  it('resolves config-only and legacy-only inputs', () => {
+  it('resolves binding-only and legacy-config-only inputs', () => {
     expect(
       resolveLookerInstanceUrl({
-        configInstanceUrl: 'https://configured.looker.example/proxy/'
+        authenticatedInstanceUrl: 'https://bound.looker.example/proxy/'
       })
-    ).toBe('https://configured.looker.example/proxy');
+    ).toBe('https://bound.looker.example/proxy');
     expect(
       resolveLookerInstanceUrl({
-        legacyAuthInstanceUrl: 'https://legacy.looker.example/api/4.0/'
+        legacyConfigInstanceUrl: 'https://legacy.looker.example/api/4.0/'
       })
     ).toBe('https://legacy.looker.example');
   });
 
-  it('prefers config when both inputs normalize to the same URL', () => {
+  it('prefers the authenticated binding over a different legacy config URL', () => {
     expect(
       resolveLookerInstanceUrl({
-        configInstanceUrl: 'https://dual.looker.example/proxy/api/4.0/',
-        legacyAuthInstanceUrl: '  https://dual.looker.example/proxy/  '
-      })
-    ).toBe('https://dual.looker.example/proxy');
-  });
-
-  it('rejects a true mismatch without echoing either URL', () => {
-    let configUrl = 'https://configured-secret.looker.example';
-    let legacyUrl = 'https://legacy-secret.looker.example';
-
-    expectLookerUrlError(
-      () =>
-        resolveLookerInstanceUrl({
-          configInstanceUrl: configUrl,
-          legacyAuthInstanceUrl: legacyUrl
-        }),
-      'looker_instance_url_mismatch',
-      [configUrl, legacyUrl, 'configured-secret', 'legacy-secret']
-    );
-  });
-
-  it('accepts missing legacy bindings and normalized-equivalent authenticated URLs', () => {
-    expect(
-      assertLookerAuthenticatedInstanceUrl({
-        currentInstanceUrl: 'https://bound.looker.example/proxy/api/4.0/'
-      })
-    ).toBe('https://bound.looker.example/proxy');
-    expect(
-      assertLookerAuthenticatedInstanceUrl({
-        currentInstanceUrl: 'https://bound.looker.example/proxy/api/4.0/',
-        authenticatedInstanceUrl: 'https://bound.looker.example/proxy/'
+        authenticatedInstanceUrl: 'https://bound.looker.example/proxy/api/4.0/',
+        legacyConfigInstanceUrl: 'https://drifted-config.looker.example'
       })
     ).toBe('https://bound.looker.example/proxy');
   });
 
-  it('requires reauthentication for mismatched or invalid stored bindings without leaking URLs', () => {
-    let currentUrl = 'https://current-sensitive.looker.example/proxy';
-    let authenticatedUrl = 'https://authenticated-sensitive.looker.example/proxy';
-
-    expectLookerUrlError(
-      () =>
-        assertLookerAuthenticatedInstanceUrl({
-          currentInstanceUrl: currentUrl,
-          authenticatedInstanceUrl: authenticatedUrl
-        }),
-      'looker_reauthentication_required',
-      [currentUrl, authenticatedUrl, 'current-sensitive', 'authenticated-sensitive']
-    );
-    expectLookerUrlError(
-      () =>
-        assertLookerAuthenticatedInstanceUrl({
-          currentInstanceUrl: currentUrl,
-          authenticatedInstanceUrl: 'stored-binding-secret is not a URL'
-        }),
-      'looker_reauthentication_required',
-      [currentUrl, 'stored-binding-secret']
-    );
-    expectLookerUrlError(
-      () =>
-        assertLookerAuthenticatedInstanceUrl({
-          currentInstanceUrl: currentUrl,
-          authenticatedInstanceUrl: null
-        }),
-      'looker_reauthentication_required',
-      [currentUrl]
-    );
+  it.each([
+    ['blank', '   '],
+    ['non-string', 42],
+    ['null', null]
+  ])('falls back to the legacy config URL when the binding is %s', (_name, binding) => {
+    expect(
+      resolveLookerInstanceUrl({
+        authenticatedInstanceUrl: binding,
+        legacyConfigInstanceUrl: 'https://legacy.looker.example/'
+      })
+    ).toBe('https://legacy.looker.example');
   });
 });
