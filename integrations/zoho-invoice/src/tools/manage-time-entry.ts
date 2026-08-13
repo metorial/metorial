@@ -62,7 +62,7 @@ export let manageTimeEntry = SlateTool.create(spec, {
     let client = new Client({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId,
-      region: ctx.auth.region
+      apiDomain: ctx.auth.apiDomain
     });
 
     let payload: Record<string, any> = {};

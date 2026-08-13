@@ -32,7 +32,7 @@ Returns the full record with all fields, or optionally only specific fields.`,
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     let result = await client.getRecord(

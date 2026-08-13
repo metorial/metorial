@@ -1,4 +1,4 @@
-# Slates Specification for Zoho CRM
+# Zoho CRM Integration Specification
 
 ## Overview
 
@@ -6,36 +6,36 @@ Zoho CRM is a cloud-based customer relationship management platform that manages
 
 ## Authentication
 
-Zoho CRM uses OAuth 2.0 exclusively for authentication — it does not support static API keys. The implementation uses the authorization code grant type.
+Zoho CRM uses OAuth 2.0 exclusively for authentication. The integration exposes one OAuth method for a customer-owned regular regional or Multi-DC server application. `applicationType` is required. `region` is required for a regional application and optional for Multi-DC as an expected-region constraint.
 
 **Setup:**
 
-1. Register your application at the Zoho API Console (https://api-console.zoho.com). On successful registration, you will get a Client ID and Client Secret.
+1. Register a regular regional or Multi-DC server application at the Zoho API Console (https://api-console.zoho.com). Supply its Client ID and Client Secret when connecting; they are used unchanged.
 2. You must provide a Client Name, Homepage URL, and Authorized Redirect URI when registering.
 
 **Authorization Flow:**
 
-1. Redirect the user to the authorization endpoint to obtain a grant token (authorization code):
-   - **Authorization URL:** `https://accounts.zoho.com/oauth/v2/auth`
-   - Parameters: `client_id`, `redirect_uri`, `scope`, `response_type=code`, `access_type=offline`
-2. Exchange the authorization code for tokens at the token endpoint:
-   - **Token URL:** `https://accounts.zoho.com/oauth/v2/token`
-   - Parameters: `client_id`, `client_secret`, `code`, `redirect_uri`, `grant_type=authorization_code`
-3. Access tokens are passed in the Authorization header with the prefix `Zoho-oauthtoken`.
+1. Regional authorization starts at the selected regional Accounts origin. Multi-DC authorization starts at `https://accounts.zoho.com/oauth/v2/auth`.
+2. The callback must include matching `location` and `accounts-server` values. The authorization code is exchanged at that exact validated regional Accounts origin. The inferred region must match the regional selection or an optional Multi-DC expected-region constraint.
+3. Refresh requests continue to use the persisted regional Accounts origin and preserve the existing refresh token if Zoho omits a replacement.
+4. CRM requests use the allowlisted `api_domain` returned by the token response. Access tokens are sent with the `Zoho-oauthtoken` authorization scheme.
 
 **Token Lifecycle:**
 
 - Access tokens are valid for 1 hour. Refresh tokens can be used to obtain new access tokens and have an unlimited lifetime until revoked.
 
-**Data Center URLs:**
+**Supported Data Centers:**
 
-Your data center (DC) base URL for Zoho Accounts varies by region (US, EU, IN, AU, JP, CA, SA, CN); the same DC must be used for generating and refreshing tokens. Examples:
-
-- US: `https://accounts.zoho.com`
-- EU: `https://accounts.zoho.eu`
-- IN: `https://accounts.zoho.in`
-- AU: `https://accounts.zoho.com.au`
-
+| Region | Accounts origin | Allowed CRM API origin |
+| --- | --- | --- |
+| US | `https://accounts.zoho.com` | `https://www.zohoapis.com` |
+| EU | `https://accounts.zoho.eu` | `https://www.zohoapis.eu` |
+| IN | `https://accounts.zoho.in` | `https://www.zohoapis.in` |
+| AU | `https://accounts.zoho.com.au` | `https://www.zohoapis.com.au` |
+| JP | `https://accounts.zoho.jp` | `https://www.zohoapis.jp` |
+| CA | `https://accounts.zohocloud.ca` | `https://www.zohoapis.ca` |
+| SA | `https://accounts.zoho.sa` | `https://www.zohoapis.sa` |
+| UK | `https://accounts.zoho.uk` | `https://www.zohoapis.uk` |
 **Scopes:**
 
 Scopes contain three parameters — service name, scope name, and operation type. The format is `scope=service_name.scope_name.operation_type`.
@@ -44,11 +44,39 @@ Scopes contain three parameters — service name, scope name, and operation type
 - You can set specific permissions like READ, CREATE, UPDATE, DELETE, or ALL for each module.
 - Example: `ZohoCRM.modules.leads.READ` for read-only access to leads, or `ZohoCRM.modules.ALL` for full access to all modules.
 
+#### Declared Scope Contract
+
+```ts
+[
+  'ZohoCRM.modules.ALL',
+  'ZohoCRM.settings.ALL',
+  'ZohoCRM.notifications.ALL',
+  'ZohoCRM.users.READ',
+  'ZohoCRM.org.READ',
+  'ZohoCRM.coql.READ',
+  'ZohoSearch.securesearch.READ',
+  'ZohoCRM.send_mail.all.CREATE'
+]
+```
+
+| Capability group | Retained scope |
+| --- | --- |
+| Record, related-record, note, and attachment CRUD | `ZohoCRM.modules.ALL` |
+| Module, field, layout, custom-view, related-list, and tag metadata | `ZohoCRM.settings.ALL` |
+| Notification subscriptions | `ZohoCRM.notifications.ALL` |
+| User and organization discovery | `ZohoCRM.users.READ`, `ZohoCRM.org.READ` |
+| COQL and record search | `ZohoCRM.coql.READ`, `ZohoSearch.securesearch.READ` |
+| Record email sending | `ZohoCRM.send_mail.all.CREATE` |
+
+The [CRM scope catalog](https://www.zoho.com/crm/developer/docs/api/v8/scopes.html) documents module/settings/notification coverage and independent user, organization, COQL, and search namespaces. The [notes](https://www.zoho.com/crm/developer/docs/api/v8/get-notes.html) and [attachment](https://www.zoho.com/crm/developer/docs/api/v8/get-attachments.html) endpoint documentation accepts ZohoCRM.modules.ALL, so redundant notes and attachment scopes are omitted. The [send-mail endpoint](https://www.zoho.com/crm/developer/docs/api/v8/send-mail.html) retains its independent create scope.
+
 ## Features
 
 ### Record Management
 
 Access and work with almost all of Zoho CRM's components using the REST API. Fetch, create, update or delete any sort of information stored in your account. Supported modules include Leads, Contacts, Accounts, Deals, Tasks, Events, Calls, Campaigns, Products, Quotes, Sales Orders, Purchase Orders, Invoices, Vendors, Price Books, Cases, Solutions, and custom modules.
+
+Related-record reads always send the Zoho CRM V8 mandatory `fields` query parameter. Callers may select related-module field API names; otherwise the integration requests `id`.
 
 ### Search and Querying
 
@@ -64,11 +92,13 @@ Access metadata about modules, fields, layouts, custom views, and related lists.
 
 ### File Management
 
-List, upload, download, and delete attachments associated with CRM records. Downloaded file bytes must be returned through Slate attachments rather than inline output fields.
+List, upload, download, and delete attachments associated with CRM records. Downloaded file bytes are returned as downloadable files rather than inline output fields.
 
 ### Tags and Notes
 
 Organize records with tags and associate notes with records across modules. Notes can be listed, created, updated, and deleted.
+
+Tag operations follow the Zoho CRM V8 [Get Tags](https://www.zoho.com/crm/developer/docs/api/v8/get-tag-list.html), [Add Tags](https://www.zoho.com/crm/developer/docs/api/v8/add-tags.html), and [Remove Tags](https://www.zoho.com/crm/developer/docs/api/v8/remove-tags.html) contracts. Record tags are edition-gated by Zoho CRM and use edition-specific limits.
 
 ### Email and Communication
 

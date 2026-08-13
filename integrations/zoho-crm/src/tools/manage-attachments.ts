@@ -32,7 +32,7 @@ let mapMutationResults = (result: any) =>
 export let manageAttachments = SlateTool.create(spec, {
   name: 'Manage Attachments',
   key: 'manage_attachments',
-  description: `List, upload, download, or delete attachments on a Zoho CRM record. Downloaded file bytes are returned through Slate attachments, not inline output fields.`,
+  description: `List, upload, download, or delete attachments on a Zoho CRM record. Downloads return a file together with useful file metadata.`,
   instructions: [
     'Use action "list" to inspect attachment IDs for a record.',
     'Use action "upload_file" with fileContentBase64 and fileName, or action "upload_link" with attachmentUrl.',
@@ -90,15 +90,15 @@ export let manageAttachments = SlateTool.create(spec, {
         .optional()
         .describe('Attachment ID for download/delete actions.'),
       fileName: z.string().optional().describe('Downloaded file name, when available.'),
-      mimeType: z.string().optional().describe('MIME type of the returned Slate attachment.'),
+      mimeType: z.string().optional().describe('MIME type of the downloaded file.'),
       size: z.number().optional().describe('Downloaded attachment size in bytes.'),
-      attachmentCount: z.number().optional().describe('Number of Slate attachments returned.')
+      attachmentCount: z.number().optional().describe('Number of downloadable files returned.')
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     if (ctx.input.action === 'list') {
@@ -184,7 +184,7 @@ export let manageAttachments = SlateTool.create(spec, {
           attachmentCount: 1
         },
         attachments: [createBase64Attachment(result.contentBase64, mimeType)],
-        message: `Downloaded attachment **${attachmentId}** as a Slate attachment.`
+        message: `Downloaded attachment **${attachmentId}** as a file.`
       };
     }
 

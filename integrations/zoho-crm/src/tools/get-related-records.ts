@@ -19,6 +19,11 @@ For example, get all Contacts related to an Account, or all Tasks associated wit
       relatedModule: z
         .string()
         .describe('API name of the related module (e.g. "Contacts", "Tasks", "Notes")'),
+      fields: z
+        .array(z.string().min(1))
+        .min(1)
+        .optional()
+        .describe('Related-module field API names to return. Defaults to only "id".'),
       page: z.number().optional().describe('Page number for pagination'),
       perPage: z.number().optional().describe('Records per page (max 200)')
     })
@@ -35,13 +40,14 @@ For example, get all Contacts related to an Account, or all Tasks associated wit
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     let result = await client.getRelatedRecords(
       ctx.input.module,
       ctx.input.recordId,
       ctx.input.relatedModule,
+      ctx.input.fields ?? ['id'],
       ctx.input.page,
       ctx.input.perPage
     );

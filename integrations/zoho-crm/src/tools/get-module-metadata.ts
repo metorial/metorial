@@ -76,7 +76,7 @@ Useful for discovering field API names, data types, picklist values, and module 
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     if (!ctx.input.module) {

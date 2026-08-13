@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -59,7 +59,7 @@ export let manageTimeEntry = SlateTool.create(spec, {
       result = await client.createTimeEntry(ticketId, entryData);
       action = 'Created';
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Either timeEntryId (to update/retrieve) or ticketId (to create) must be provided'
       );
     }

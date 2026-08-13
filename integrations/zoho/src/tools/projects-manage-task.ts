@@ -2,8 +2,58 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZohoProjectsClient } from '../lib/client';
 import { zohoServiceError } from '../lib/errors';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
+
+let isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+let mapProjectsV3Record = (result: unknown, keys: string[]) => {
+  if (!isRecord(result)) return undefined;
+
+  for (let key of keys) {
+    let value = result[key];
+    if (isRecord(value)) return value;
+    if (Array.isArray(value) && isRecord(value[0])) return value[0];
+  }
+
+  return result;
+};
+
+export let projectsV3TaskDate = (value: string) => {
+  let match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  return match ? `${match[3]}-${match[1]}-${match[2]}T00:00:00.000Z` : value;
+};
+
+let buildTaskData = (input: {
+  name?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  priority?: string;
+  status?: string;
+  owners?: string;
+  percentComplete?: number;
+}) => {
+  let data: Record<string, any> = {};
+  if (input.name) data.name = input.name;
+  if (input.description) data.description = input.description;
+  if (input.startDate) data.start_date = projectsV3TaskDate(input.startDate);
+  if (input.endDate) data.end_date = projectsV3TaskDate(input.endDate);
+  if (input.priority) data.priority = input.priority.toLowerCase();
+  if (input.status) data.status = { id: input.status };
+  if (input.owners) {
+    let owners = input.owners
+      .split(',')
+      .map(zpuid => zpuid.trim())
+      .filter(Boolean)
+      .map(zpuid => ({ zpuid }));
+    if (owners.length > 0) data.owners_and_work = { owners };
+  }
+  if (input.percentComplete !== undefined) {
+    data.completion_percentage = input.percentComplete;
+  }
+  return data;
+};
 
 export let projectsManageTask = SlateTool.create(spec, {
   name: 'Projects Manage Task',
@@ -28,11 +78,13 @@ export let projectsManageTask = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Task priority (e.g., "None", "Low", "Medium", "High")'),
-      status: z.string().optional().describe('Task status'),
+      status: z.string().optional().describe('Zoho Projects V3 task status ID'),
       owners: z
         .string()
         .optional()
-        .describe('Comma-separated user IDs to assign as task owners'),
+        .describe(
+          'Comma-separated owner ZPUIDs; legacy Zoho user IDs or ZUIDs are not accepted by V3'
+        ),
       percentComplete: z.number().optional().describe('Completion percentage (0-100)')
     })
   )
@@ -43,41 +95,25 @@ export let projectsManageTask = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
     let client = new ZohoProjectsClient({
-      token: ctx.auth.token,
-      datacenter: dc,
+      ...ctx.auth,
       portalId: ctx.input.portalId
     });
 
     if (ctx.input.action === 'get') {
       if (!ctx.input.taskId) throw zohoServiceError('taskId is required for get');
       let result = await client.getTask(ctx.input.projectId, ctx.input.taskId);
-      let task = result?.tasks?.[0] || result;
+      let task = mapProjectsV3Record(result, ['task', 'tasks']);
       return {
         output: { task },
         message: `Fetched task **${task?.name || ctx.input.taskId}**.`
       };
     }
 
-    let buildData = () => {
-      let data: Record<string, any> = {};
-      if (ctx.input.name) data.name = ctx.input.name;
-      if (ctx.input.description) data.description = ctx.input.description;
-      if (ctx.input.startDate) data.start_date = ctx.input.startDate;
-      if (ctx.input.endDate) data.end_date = ctx.input.endDate;
-      if (ctx.input.priority) data.priority = ctx.input.priority;
-      if (ctx.input.status) data.status_name = ctx.input.status;
-      if (ctx.input.owners) data.persons = ctx.input.owners;
-      if (ctx.input.percentComplete !== undefined)
-        data.percent_complete = ctx.input.percentComplete;
-      return data;
-    };
-
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) throw zohoServiceError('name is required for create');
-      let result = await client.createTask(ctx.input.projectId, buildData());
-      let task = result?.tasks?.[0] || result;
+      let result = await client.createTask(ctx.input.projectId, buildTaskData(ctx.input));
+      let task = mapProjectsV3Record(result, ['task', 'tasks']);
       return {
         output: { task },
         message: `Created task **${task?.name}** in project **${ctx.input.projectId}**.`
@@ -86,8 +122,12 @@ export let projectsManageTask = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.taskId) throw zohoServiceError('taskId is required for update');
-      let result = await client.updateTask(ctx.input.projectId, ctx.input.taskId, buildData());
-      let task = result?.tasks?.[0] || result;
+      let result = await client.updateTask(
+        ctx.input.projectId,
+        ctx.input.taskId,
+        buildTaskData(ctx.input)
+      );
+      let task = mapProjectsV3Record(result, ['task', 'tasks']);
       return {
         output: { task },
         message: `Updated task **${ctx.input.taskId}**.`

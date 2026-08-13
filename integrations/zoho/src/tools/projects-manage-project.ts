@@ -2,8 +2,56 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZohoProjectsClient } from '../lib/client';
 import { zohoServiceError } from '../lib/errors';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
+
+let isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export let mapProjectsV3List = (result: unknown, keys: string[]) => {
+  if (Array.isArray(result)) return result.filter(isRecord);
+  if (!isRecord(result)) return [];
+
+  for (let key of keys) {
+    if (Array.isArray(result[key])) return result[key].filter(isRecord);
+  }
+
+  return [];
+};
+
+export let mapProjectsV3Record = (result: unknown, keys: string[]) => {
+  if (!isRecord(result)) return undefined;
+
+  for (let key of keys) {
+    let value = result[key];
+    if (isRecord(value)) return value;
+    if (Array.isArray(value) && isRecord(value[0])) return value[0];
+  }
+
+  return result;
+};
+
+export let projectsV3ProjectDate = (value: string) => {
+  let match = /^(\d{2})-(\d{2})-(\d{4})$/.exec(value);
+  return match ? `${match[3]}-${match[1]}-${match[2]}` : value;
+};
+
+let buildProjectData = (input: {
+  name?: string;
+  description?: string;
+  status?: string;
+  startDate?: string;
+  endDate?: string;
+  ownerId?: string;
+}) => {
+  let data: Record<string, any> = {};
+  if (input.name) data.name = input.name;
+  if (input.description) data.description = input.description;
+  if (input.status) data.status = { id: input.status };
+  if (input.startDate) data.start_date = projectsV3ProjectDate(input.startDate);
+  if (input.endDate) data.end_date = projectsV3ProjectDate(input.endDate);
+  if (input.ownerId) data.owner = { zpuid: input.ownerId };
+  return data;
+};
 
 export let projectsManageProject = SlateTool.create(spec, {
   name: 'Projects Manage Project',
@@ -31,10 +79,20 @@ export let projectsManageProject = SlateTool.create(spec, {
         ),
       name: z.string().optional().describe('Project name (required for create)'),
       description: z.string().optional().describe('Project description'),
-      status: z.string().optional().describe('Project status (e.g., "active", "archived")'),
+      status: z
+        .string()
+        .optional()
+        .describe(
+          'Status filter or mutation status ID. create/update require a V3 project status ID; list accepts "all", "active"/"open", "archived"/"closed", or a V3 project status ID (legacy "template" is unsupported); list_tasks accepts "all", "completed", "notcompleted", or a V3 task status ID; list_milestones accepts "all" or a V3 phase status ID (legacy "completed"/"notcompleted" is unsupported)'
+        ),
       startDate: z.string().optional().describe('Start date (MM-dd-yyyy)'),
       endDate: z.string().optional().describe('End date (MM-dd-yyyy)'),
-      ownerId: z.string().optional().describe('Project owner user ID'),
+      ownerId: z
+        .string()
+        .optional()
+        .describe(
+          'Project owner ZPUID for create/update; legacy Zoho user IDs or ZUIDs are not accepted by V3'
+        ),
       index: z.number().optional().describe('Start index for pagination'),
       range: z.number().optional().describe('Number of records to return')
     })
@@ -55,10 +113,8 @@ export let projectsManageProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
     let client = new ZohoProjectsClient({
-      token: ctx.auth.token,
-      datacenter: dc,
+      ...ctx.auth,
       portalId: ctx.input.portalId
     });
 
@@ -68,7 +124,7 @@ export let projectsManageProject = SlateTool.create(spec, {
         range: ctx.input.range,
         status: ctx.input.status
       });
-      let projects = result?.projects || [];
+      let projects = mapProjectsV3List(result, ['projects']);
       return {
         output: { projects },
         message: `Retrieved **${projects.length}** projects.`
@@ -78,7 +134,7 @@ export let projectsManageProject = SlateTool.create(spec, {
     if (ctx.input.action === 'get') {
       if (!ctx.input.projectId) throw zohoServiceError('projectId is required for get');
       let result = await client.getProject(ctx.input.projectId);
-      let project = result?.projects?.[0] || result;
+      let project = mapProjectsV3Record(result, ['project', 'projects']);
       return {
         output: { project },
         message: `Fetched project **${project?.name || ctx.input.projectId}**.`
@@ -87,16 +143,8 @@ export let projectsManageProject = SlateTool.create(spec, {
 
     if (ctx.input.action === 'create') {
       if (!ctx.input.name) throw zohoServiceError('name is required for create');
-      let data: Record<string, any> = {};
-      if (ctx.input.name) data.name = ctx.input.name;
-      if (ctx.input.description) data.description = ctx.input.description;
-      if (ctx.input.status) data.status = ctx.input.status;
-      if (ctx.input.startDate) data.start_date = ctx.input.startDate;
-      if (ctx.input.endDate) data.end_date = ctx.input.endDate;
-      if (ctx.input.ownerId) data.owner = ctx.input.ownerId;
-
-      let result = await client.createProject(data);
-      let project = result?.projects?.[0] || result;
+      let result = await client.createProject(buildProjectData(ctx.input));
+      let project = mapProjectsV3Record(result, ['project', 'projects']);
       return {
         output: { project },
         message: `Created project **${project?.name}**.`
@@ -105,16 +153,11 @@ export let projectsManageProject = SlateTool.create(spec, {
 
     if (ctx.input.action === 'update') {
       if (!ctx.input.projectId) throw zohoServiceError('projectId is required for update');
-      let data: Record<string, any> = {};
-      if (ctx.input.name) data.name = ctx.input.name;
-      if (ctx.input.description) data.description = ctx.input.description;
-      if (ctx.input.status) data.status = ctx.input.status;
-      if (ctx.input.startDate) data.start_date = ctx.input.startDate;
-      if (ctx.input.endDate) data.end_date = ctx.input.endDate;
-      if (ctx.input.ownerId) data.owner = ctx.input.ownerId;
-
-      let result = await client.updateProject(ctx.input.projectId, data);
-      let project = result?.projects?.[0] || result;
+      let result = await client.updateProject(
+        ctx.input.projectId,
+        buildProjectData(ctx.input)
+      );
+      let project = mapProjectsV3Record(result, ['project', 'projects']);
       return {
         output: { project },
         message: `Updated project **${ctx.input.projectId}**.`
@@ -137,7 +180,7 @@ export let projectsManageProject = SlateTool.create(spec, {
         range: ctx.input.range,
         status: ctx.input.status
       });
-      let tasks = result?.tasks || [];
+      let tasks = mapProjectsV3List(result, ['tasks']);
       return {
         output: { tasks },
         message: `Retrieved **${tasks.length}** tasks from project **${ctx.input.projectId}**.`
@@ -152,7 +195,7 @@ export let projectsManageProject = SlateTool.create(spec, {
         range: ctx.input.range,
         status: ctx.input.status
       });
-      let milestones = result?.milestones || [];
+      let milestones = mapProjectsV3List(result, ['milestones', 'phases']);
       return {
         output: { milestones },
         message: `Retrieved **${milestones.length}** milestones from project **${ctx.input.projectId}**.`

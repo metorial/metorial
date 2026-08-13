@@ -1,6 +1,4 @@
-Now let me get the full list of API scopes and more details on features:Now I have comprehensive information. Let me also check the webhook details more closely for Zoho Mail specifically:
-
-# Slates Specification for Zoho Mail
+# Zoho Mail Specification
 
 ## Overview
 
@@ -14,10 +12,10 @@ Zoho Mail REST API uses OAuth 2.0 for secure authentication and authorization. T
 
 1. **Register your application** at the [Zoho API Console](https://api-console.zoho.com/). You need to register your client application in the Zoho Developer Console, providing a unique client name, a homepage URL, and a redirect URI. Once registration is complete, a unique client ID and client secret will be generated.
 
-2. **Application types supported:** Client-based Applications (browser-only), Server-Based Applications (dedicated HTTP server), Mobile-based Applications, and Non-browser Mobile Applications (smart TVs, printers, etc.).
+2. **Select an application type:** The integration exposes one OAuth method for a customer-owned regular regional or Multi-DC server application. `applicationType` is required. `region` is required for a regional application and optional for Multi-DC as an expected-region constraint.
 
-3. **Authorization endpoint:** `https://accounts.zoho.com/oauth/v2/auth`
-4. **Token endpoint:** `https://accounts.zoho.com/oauth/v2/token`
+3. **Authorization endpoint:** Regional authorization begins at the selected regional Accounts origin. Multi-DC authorization begins at `https://accounts.zoho.com/oauth/v2/auth`.
+4. **Token endpoint:** The callback's `location` and `accounts-server` values must identify the same supported region. Code exchange and refresh use that exact validated regional Accounts origin. The inferred region must match the regional selection or an optional Multi-DC expected-region constraint.
 
 5. **Authorization request parameters:**
    - `client_id` — Your application's client ID
@@ -29,7 +27,7 @@ Zoho Mail REST API uses OAuth 2.0 for secure authentication and authorization. T
 6. Zoho's OAuth implementation uses Bearer authentication scheme; the access token must be passed in the Authorization header with the prefix `Zoho-oauthtoken`. Access tokens have a lifetime of 1 hour. A refresh token can be retrieved and stored to generate new access tokens as needed.
 
 **Data Center Domains:**
-APIs are available across multiple domains based on data center location. Ensure API requests are sent to the appropriate domain. Examples: `mail.zoho.com` (US), `mail.zoho.eu` (EU), `mail.zoho.in` (India), `mail.zoho.com.au` (Australia), `mail.zoho.jp` (Japan). The corresponding accounts domain also varies (e.g., `accounts.zoho.com`, `accounts.zoho.eu`).
+Mail APIs are routed through an explicit regional service map rather than the generic `api_domain` returned during OAuth: `mail.zoho.com` (US), `mail.zoho.eu` (EU), `mail.zoho.in` (India), `mail.zoho.com.au` (Australia), and `mail.zoho.jp` (Japan). The OAuth `api_domain` is still validated and persisted as part of the connection state, but it is not used as the Mail REST API base URL.
 
 **Scopes:**
 Scopes follow the format `ZohoMail.<scope_name>.<operation>`, where operation is `READ`, `CREATE`, `UPDATE`, `DELETE`, or `ALL`. Key scopes include:
@@ -53,6 +51,34 @@ Scopes follow the format `ZohoMail.<scope_name>.<operation>`, where operation is
 | `ZohoMail.organization.audit`         | Audit log access (admin)                    |
 
 Some APIs require Admin authentication, while others can be executed with user authentication. Certain APIs support both.
+
+#### Declared Scope Contract
+
+```ts
+[
+  'ZohoMail.messages.ALL',
+  'ZohoMail.accounts.READ',
+  'ZohoMail.folders.ALL',
+  'ZohoMail.tags.ALL',
+  'ZohoMail.tasks.ALL',
+  'ZohoMail.notes.ALL',
+  'ZohoMail.links.ALL',
+  'ZohoMail.organization.accounts.READ',
+  'ZohoMail.organization.domains.READ',
+  'ZohoMail.organization.groups.READ',
+  'ZohoMail.organization.subscriptions.READ',
+  'ZohoMail.partner.organization.READ'
+]
+```
+
+| Capability group | Retained scope |
+| --- | --- |
+| Message send/read/update/delete | `ZohoMail.messages.ALL` |
+| Account discovery | `ZohoMail.accounts.READ` |
+| Folder, label, task, note, and bookmark CRUD | `ZohoMail.folders.ALL`, `ZohoMail.tags.ALL`, `ZohoMail.tasks.ALL`, `ZohoMail.notes.ALL`, `ZohoMail.links.ALL` |
+| Organization user, domain, group, storage/subscription, and organization-detail reads | `ZohoMail.organization.accounts.READ`, `ZohoMail.organization.domains.READ`, `ZohoMail.organization.groups.READ`, `ZohoMail.organization.subscriptions.READ`, `ZohoMail.partner.organization.READ` |
+
+The [Zoho Mail API index](https://www.zoho.com/mail/help/api/) maps each endpoint to a namespace and operation. The [domain](https://www.zoho.com/mail/help/api/get-all-domains.html) and [group](https://www.zoho.com/mail/help/api/get-all-group-details.html) endpoints explicitly accept READ, so their legacy ALL scopes are narrowed. Policy, spam, audit, and partner-management scopes are omitted because no current tool calls them; the partner organization READ scope remains for organization-detail retrieval. Reauthorization and representative user/admin calls remain blocked on Task 0 credentials.
 
 ## Features
 

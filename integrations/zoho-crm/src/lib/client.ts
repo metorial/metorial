@@ -1,10 +1,38 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
 import { decodeZohoCrmBase64File, zohoCrmApiError } from './errors';
 
 export interface ZohoClientConfig {
   token: string;
-  apiBaseUrl: string;
+  apiDomain: string;
 }
+
+export let ZOHO_CRM_API_ORIGINS = {
+  us: 'https://www.zohoapis.com',
+  eu: 'https://www.zohoapis.eu',
+  in: 'https://www.zohoapis.in',
+  au: 'https://www.zohoapis.com.au',
+  jp: 'https://www.zohoapis.jp',
+  ca: 'https://www.zohoapis.ca',
+  sa: 'https://www.zohoapis.sa',
+  uk: 'https://www.zohoapis.uk'
+} as const;
+
+let zohoCrmApiOriginSet = new Set<string>(Object.values(ZOHO_CRM_API_ORIGINS));
+
+let requireZohoCrmClientConfig = (config: ZohoClientConfig) => {
+  if (typeof config?.token !== 'string' || !config.token) {
+    throw createApiServiceError(
+      'Zoho CRM authentication state is missing an access token. Reconnect the account.'
+    );
+  }
+  if (typeof config.apiDomain !== 'string' || !zohoCrmApiOriginSet.has(config.apiDomain)) {
+    throw createApiServiceError(
+      'Zoho CRM authentication state has an invalid API domain. Reconnect the account.'
+    );
+  }
+
+  return config;
+};
 
 export interface RecordData {
   [key: string]: any;
@@ -65,10 +93,11 @@ export class Client {
   private http: ReturnType<typeof createAxios>;
 
   constructor(config: ZohoClientConfig) {
+    let auth = requireZohoCrmClientConfig(config);
     this.http = createAxios({
-      baseURL: `${config.apiBaseUrl}/crm/v8`,
+      baseURL: `${auth.apiDomain}/crm/v8`,
       headers: {
-        Authorization: `Zoho-oauthtoken ${config.token}`
+        Authorization: `Zoho-oauthtoken ${auth.token}`
       }
     });
   }
@@ -372,10 +401,11 @@ export class Client {
     module: string,
     recordId: string,
     relatedModule: string,
+    fields: string[],
     page?: number,
     perPage?: number
   ): Promise<any> {
-    let params: Record<string, string> = {};
+    let params: Record<string, string> = { fields: fields.join(',') };
     if (page) params.page = String(page);
     if (perPage) params.per_page = String(perPage);
 

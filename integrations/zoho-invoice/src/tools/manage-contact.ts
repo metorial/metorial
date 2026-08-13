@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -83,7 +83,7 @@ Supports billing/shipping addresses and multiple contact persons.`,
     let client = new Client({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId,
-      region: ctx.auth.region
+      apiDomain: ctx.auth.apiDomain
     });
 
     let buildPayload = () => {
@@ -150,7 +150,7 @@ Supports billing/shipping addresses and multiple contact persons.`,
     }
 
     if (!ctx.input.contactName) {
-      throw new Error('contactName is required when creating a new contact');
+      throw createApiServiceError('contactName is required when creating a new contact');
     }
 
     let result = await client.createContact(buildPayload());

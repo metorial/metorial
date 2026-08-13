@@ -2,7 +2,6 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZohoBooksClient } from '../lib/client';
 import { zohoServiceError } from '../lib/errors';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
 
 export let booksGetInvoices = SlateTool.create(spec, {
@@ -61,10 +60,8 @@ export let booksGetInvoices = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
-
     if (ctx.input.listOrganizations) {
-      let result = await ZohoBooksClient.listOrganizations(ctx.auth.token, dc);
+      let result = await ZohoBooksClient.listOrganizations(ctx.auth);
       let orgs = (result?.organizations || []).map((o: any) => ({
         organizationId: o.organization_id,
         name: o.name,
@@ -79,8 +76,7 @@ export let booksGetInvoices = SlateTool.create(spec, {
 
     if (!ctx.input.organizationId) throw zohoServiceError('organizationId is required');
     let client = new ZohoBooksClient({
-      token: ctx.auth.token,
-      datacenter: dc,
+      ...ctx.auth,
       organizationId: ctx.input.organizationId
     });
 

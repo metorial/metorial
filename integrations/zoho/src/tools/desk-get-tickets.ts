@@ -2,7 +2,6 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZohoDeskClient } from '../lib/client';
 import { zohoServiceError } from '../lib/errors';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
 
 export let deskGetTickets = SlateTool.create(spec, {
@@ -71,10 +70,8 @@ export let deskGetTickets = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
-
     if (ctx.input.listOrganizations) {
-      let result = await ZohoDeskClient.listOrganizations(ctx.auth.token, dc);
+      let result = await ZohoDeskClient.listOrganizations(ctx.auth);
       let organizationRecords = result?.data || result?.organizations || result || [];
       if (!Array.isArray(organizationRecords)) organizationRecords = [];
       let organizations = organizationRecords.map((org: any) => ({
@@ -93,8 +90,7 @@ export let deskGetTickets = SlateTool.create(spec, {
     }
 
     let client = new ZohoDeskClient({
-      token: ctx.auth.token,
-      datacenter: dc,
+      ...ctx.auth,
       orgId: ctx.input.orgId
     });
 

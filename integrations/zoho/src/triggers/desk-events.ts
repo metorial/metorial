@@ -1,7 +1,6 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { zohoServiceError } from '../lib/errors';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
 
 export let deskEvents = SlateTrigger.create(spec, {
@@ -32,8 +31,7 @@ export let deskEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
-    autoRegisterWebhook: async ctx => {
-      let _dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
+    autoRegisterWebhook: async _ctx => {
       // We need an orgId - we'll try to extract from existing config or require it
       // For auto-registration, the orgId must be available; we'll use a default approach
       // The orgId should be provided as part of trigger configuration

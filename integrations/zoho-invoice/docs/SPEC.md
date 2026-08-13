@@ -1,6 +1,6 @@
 Now let me check the webhook event types available:Now I have a comprehensive understanding of Zoho Invoice. Let me note that Zoho Invoice uses workflow-based webhooks (configured through Settings > Automation > Webhooks) rather than a dedicated webhook API. The webhooks are tied to workflow rules rather than being a standalone webhook subscription API. Let me compile the specification.
 
-# Slates Specification for Zoho Invoice
+# Zoho Invoice Integration Specification
 
 ## Overview
 
@@ -8,32 +8,30 @@ Zoho Invoice is an online invoicing application that allows businesses to create
 
 ## Authentication
 
-Zoho Invoice uses the OAuth 2.0 protocol to authorize and authenticate API calls.
+Zoho Invoice uses OAuth 2.0. The integration exposes one OAuth method for a customer-owned regular regional or Multi-DC server application. `applicationType` is required. `region` is required for a regional application and optional for Multi-DC as an expected-region constraint.
 
 ### Setup
 
-1. Register your application at Zoho's Developer Console (https://accounts.zoho.com/developerconsole) to obtain a Client ID and Client Secret.
-
-2. **Authorization Endpoint:** `https://accounts.zoho.com/oauth/v2/auth` — Redirect the user here with the required parameters (`scope`, `client_id`, `response_type=code`, `redirect_uri`, and optionally `access_type=offline` for refresh tokens).
-
-3. **Token Endpoint:** `https://accounts.zoho.com/oauth/v2/token` — Exchange the authorization code for an access token and refresh token using `grant_type=authorization_code`.
-
-4. **Refresh Token Endpoint:** Same as token endpoint, using `grant_type=refresh_token` to obtain a new access token when the current one expires.
-
-5. **Revoke Endpoint:** `https://accounts.zoho.com/oauth/v2/token/revoke?token={token}`
+1. Register a regular regional or Multi-DC server application at [Zoho's Developer Console](https://accounts.zoho.com/developerconsole) and supply its Client ID and Client Secret when connecting.
+2. Regional authorization starts at the selected regional Accounts origin. Multi-DC authorization starts at `https://accounts.zoho.com/oauth/v2/auth`.
+3. The callback must contain matching `location` and `accounts-server` values. Exchange the authorization code only at that exact validated regional Accounts origin. The inferred region must match the regional selection or an optional Multi-DC expected-region constraint.
+4. Refresh requests use the persisted regional Accounts origin and preserve the existing refresh token when Zoho omits a replacement.
+5. Invoice API requests use the allowlisted `api_domain` returned by Zoho.
 
 ### Regional Data Centers
 
-There are 8 different domains for Zoho Invoice's APIs, and you must use the one applicable to your organization. The OAuth and API base URLs vary by region:
+The validated callback Accounts origin determines code exchange and refresh routing. Invoice requests use the matching allowlisted API origin returned in the token response:
 
-| Region               | OAuth Domain          | API Domain          |
-| -------------------- | --------------------- | ------------------- |
-| United States (.com) | accounts.zoho.com     | www.zohoapis.com    |
-| Europe (.eu)         | accounts.zoho.eu      | www.zohoapis.eu     |
-| India (.in)          | accounts.zoho.in      | www.zohoapis.in     |
-| Australia (.com.au)  | accounts.zoho.com.au  | www.zohoapis.com.au |
-| Japan (.jp)          | accounts.zoho.jp      | www.zohoapis.jp     |
-| Canada (.ca)         | accounts.zohocloud.ca | www.zohoapis.ca     |
+| Region | Accounts origin | Allowed Invoice API origin |
+| --- | --- | --- |
+| US | `https://accounts.zoho.com` | `https://www.zohoapis.com` |
+| EU | `https://accounts.zoho.eu` | `https://www.zohoapis.eu` |
+| IN | `https://accounts.zoho.in` | `https://www.zohoapis.in` |
+| AU | `https://accounts.zoho.com.au` | `https://www.zohoapis.com.au` |
+| JP | `https://accounts.zoho.jp` | `https://www.zohoapis.jp` |
+| CA | `https://accounts.zohocloud.ca` | `https://www.zohoapis.ca` |
+
+Connections created with the previous region-specific OAuth methods must reconnect with the unified `oauth` method and select their region.
 
 ### Request Headers
 
@@ -59,12 +57,46 @@ Scopes follow the pattern `ZohoInvoice.{module}.{action}` where action is CREATE
 
 Use `ZohoInvoice.fullaccess.all` for full access to all modules.
 
-### Token Notes
+#### Declared Scope Contract
 
-- The access token expires after a limited period (typically 1 hour).
-- The refresh token is permanent and is used to regenerate new access tokens.
-- The maximum limit is 20 refresh tokens per user. If this limit is crossed, the first refresh token is automatically deleted.
+```ts
+[
+  'ZohoInvoice.fullaccess.all',
+  'ZohoInvoice.contacts.CREATE',
+  'ZohoInvoice.contacts.READ',
+  'ZohoInvoice.contacts.UPDATE',
+  'ZohoInvoice.invoices.CREATE',
+  'ZohoInvoice.invoices.READ',
+  'ZohoInvoice.invoices.UPDATE',
+  'ZohoInvoice.estimates.CREATE',
+  'ZohoInvoice.estimates.READ',
+  'ZohoInvoice.estimates.UPDATE',
+  'ZohoInvoice.customerpayments.CREATE',
+  'ZohoInvoice.customerpayments.READ',
+  'ZohoInvoice.customerpayments.UPDATE',
+  'ZohoInvoice.creditnotes.CREATE',
+  'ZohoInvoice.creditnotes.READ',
+  'ZohoInvoice.creditnotes.UPDATE',
+  'ZohoInvoice.expenses.CREATE',
+  'ZohoInvoice.expenses.READ',
+  'ZohoInvoice.expenses.UPDATE',
+  'ZohoInvoice.projects.CREATE',
+  'ZohoInvoice.projects.READ',
+  'ZohoInvoice.projects.UPDATE',
+  'ZohoInvoice.settings.CREATE',
+  'ZohoInvoice.settings.READ',
+  'ZohoInvoice.settings.UPDATE'
+]
+```
 
+| Capability group | Requested scope |
+| --- | --- |
+| Contact, invoice/recurring-invoice, estimate, payment, credit-note, expense, project/time-entry, and item operations | The matching documented CREATE, READ, and UPDATE scopes listed above |
+| Product-wide resource access | `ZohoInvoice.fullaccess.all` |
+
+The [Zoho Invoice OAuth documentation](https://www.zoho.com/invoice/api/v3/oauth/) documents resource-level CREATE, READ, UPDATE, and DELETE operations, but not resource-level ALL. Current tools and polling triggers create, read, and update these resources and expose no delete operation, so DELETE variants are omitted.
+
+The integration requests the documented operation-specific scopes used by current tools and polling triggers, plus `ZohoInvoice.fullaccess.all` for product-wide resource access. Unused operation variants are omitted.
 ## Features
 
 ### Invoice Management

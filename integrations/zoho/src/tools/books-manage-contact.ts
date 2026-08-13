@@ -2,7 +2,6 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZohoBooksClient } from '../lib/client';
 import { zohoServiceError } from '../lib/errors';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
 
 let addressSchema = z.object({
@@ -71,10 +70,8 @@ export let booksManageContact = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
     let client = new ZohoBooksClient({
-      token: ctx.auth.token,
-      datacenter: dc,
+      ...ctx.auth,
       organizationId: ctx.input.organizationId
     });
 

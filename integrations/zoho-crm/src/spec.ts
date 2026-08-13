@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'zoho-crm',
   name: 'Zoho CRM',
   description:
-    'Zoho CRM integration for managing leads, contacts, accounts, deals, tasks, and other CRM modules.',
+    'Manage leads, contacts, accounts, deals, tasks, and other CRM modules across supported Zoho data centers.',
   metadata: {},
   config,
   auth

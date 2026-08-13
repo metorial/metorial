@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -85,7 +85,7 @@ Supports line items with pricing, taxes, and discounts.`,
     let client = new Client({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId,
-      region: ctx.auth.region
+      apiDomain: ctx.auth.apiDomain
     });
 
     let buildPayload = () => {
@@ -141,7 +141,7 @@ Supports line items with pricing, taxes, and discounts.`,
     }
 
     if (!ctx.input.customerId) {
-      throw new Error('customerId is required when creating a new estimate');
+      throw createApiServiceError('customerId is required when creating a new estimate');
     }
 
     let result = await client.createEstimate(buildPayload());

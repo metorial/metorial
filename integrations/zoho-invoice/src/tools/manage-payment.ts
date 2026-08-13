@@ -76,7 +76,7 @@ Optionally apply the payment to specific invoices via the **invoices** array.`,
     let client = new Client({
       token: ctx.auth.token,
       organizationId: ctx.config.organizationId,
-      region: ctx.auth.region
+      apiDomain: ctx.auth.apiDomain
     });
 
     let data: Record<string, any> = {};

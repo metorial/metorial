@@ -1,214 +1,103 @@
-import { axios, SlateAuth } from 'slates';
+import { createZohoOauth } from '@slates/oauth-zoho';
+import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
-import { getAccountsUrl, getApiDomain, type ZohoRegion } from './lib/regions';
+import { ZOHO_BIGIN_API_ORIGINS } from './lib/client';
 
 let scopes = [
   {
-    title: 'All Modules',
-    description:
-      'Full access to all module records (contacts, deals, companies, products, activities)',
+    title: 'Modules',
+    description: 'Create, read, update, and delete module records, related records, and notes',
     scope: 'ZohoBigin.modules.ALL'
   },
+
   {
-    title: 'All Settings',
-    description:
-      'Access to metadata: modules, fields, layouts, related lists, custom views, tags',
+    title: 'Settings',
+    description: 'Read metadata and manage tag definitions',
     scope: 'ZohoBigin.settings.ALL'
   },
+
   {
-    title: 'All Users',
-    description: 'Manage users in the organization',
-    scope: 'ZohoBigin.users.ALL'
+    title: 'Users',
+    description: 'Read organization users',
+    scope: 'ZohoBigin.users.READ'
   },
-  {
-    title: 'Organization',
-    description: 'View and manage organization details',
-    scope: 'ZohoBigin.org.ALL'
-  },
-  {
-    title: 'Bulk Operations',
-    description: 'Bulk read and write operations',
-    scope: 'ZohoBigin.bulk.ALL'
-  },
+
   {
     title: 'Notifications',
     description: 'Manage webhook notification subscriptions',
     scope: 'ZohoBigin.notifications.ALL'
   },
   {
-    title: 'Read Contacts',
-    description: 'Read-only access to contacts',
+    title: 'Secure Search',
+    description: 'Search Bigin records',
+    scope: 'ZohoSearch.securesearch.READ'
+  },
+  {
+    title: 'Search Contacts',
+    description: 'Read contacts returned by record search',
     scope: 'ZohoBigin.modules.contacts.READ'
   },
   {
-    title: 'Write Contacts',
-    description: 'Create and update contacts',
-    scope: 'ZohoBigin.modules.contacts.WRITE'
-  },
-  {
-    title: 'Read Pipelines',
-    description: 'Read-only access to pipelines (deals)',
-    scope: 'ZohoBigin.modules.pipelines.READ'
-  },
-  {
-    title: 'Write Pipelines',
-    description: 'Create and update pipelines (deals)',
-    scope: 'ZohoBigin.modules.pipelines.WRITE'
-  },
-  {
-    title: 'Read Companies',
-    description: 'Read-only access to companies (accounts)',
+    title: 'Search Accounts',
+    description: 'Read accounts returned by record search',
     scope: 'ZohoBigin.modules.accounts.READ'
   },
   {
-    title: 'Write Companies',
-    description: 'Create and update companies (accounts)',
-    scope: 'ZohoBigin.modules.accounts.WRITE'
+    title: 'Search Pipelines',
+    description: 'Read pipelines returned by record search',
+    scope: 'ZohoBigin.modules.pipelines.READ'
   },
   {
-    title: 'Read Products',
-    description: 'Read-only access to products',
+    title: 'Search Products',
+    description: 'Read products returned by record search',
     scope: 'ZohoBigin.modules.products.READ'
   },
   {
-    title: 'Write Products',
-    description: 'Create and update products',
-    scope: 'ZohoBigin.modules.products.WRITE'
-  },
-  {
-    title: 'Read Tasks',
-    description: 'Read-only access to tasks',
+    title: 'Search Tasks',
+    description: 'Read tasks returned by record search',
     scope: 'ZohoBigin.modules.tasks.READ'
   },
   {
-    title: 'Write Tasks',
-    description: 'Create and update tasks',
-    scope: 'ZohoBigin.modules.tasks.WRITE'
-  },
-  {
-    title: 'Read Events',
-    description: 'Read-only access to events',
+    title: 'Search Events',
+    description: 'Read events returned by record search',
     scope: 'ZohoBigin.modules.events.READ'
   },
   {
-    title: 'Write Events',
-    description: 'Create and update events',
-    scope: 'ZohoBigin.modules.events.WRITE'
-  },
-  {
-    title: 'Read Calls',
-    description: 'Read-only access to calls',
+    title: 'Search Calls',
+    description: 'Read calls returned by record search',
     scope: 'ZohoBigin.modules.calls.READ'
-  },
-  {
-    title: 'Write Calls',
-    description: 'Create and update calls',
-    scope: 'ZohoBigin.modules.calls.WRITE'
-  },
-  {
-    title: 'Read Notes',
-    description: 'Read-only access to notes',
-    scope: 'ZohoBigin.modules.notes.READ'
-  },
-  {
-    title: 'Write Notes',
-    description: 'Create, update, and delete notes',
-    scope: 'ZohoBigin.modules.notes.WRITE'
-  },
-  {
-    title: 'Tags Settings',
-    description: 'Create, update, and delete tags',
-    scope: 'ZohoBigin.settings.tags.ALL'
   }
 ];
 
-function createBiginOauth(name: string, key: string, region: ZohoRegion) {
-  return {
-    type: 'auth.oauth' as const,
-    name,
-    key,
-    scopes,
+let supportedRegions = ['us', 'eu', 'in', 'au', 'jp', 'ca', 'sa'] as const;
+type ZohoBiginProfileContext = { output: { token: string; apiDomain: string } };
 
-    getAuthorizationUrl: async (ctx: any) => {
-      let accountsUrl = getAccountsUrl(region);
-      let scopeString = ctx.scopes.join(',');
-      let url = `${accountsUrl}/oauth/v2/auth?scope=${encodeURIComponent(scopeString)}&client_id=${encodeURIComponent(ctx.clientId)}&response_type=code&access_type=offline&redirect_uri=${encodeURIComponent(ctx.redirectUri)}&state=${encodeURIComponent(ctx.state)}`;
-      return { url };
-    },
+let oauth = createZohoOauth({
+  supportedRegions,
+  scopes,
+  apiOrigins: {
+    us: [ZOHO_BIGIN_API_ORIGINS.us],
+    eu: [ZOHO_BIGIN_API_ORIGINS.eu],
+    in: [ZOHO_BIGIN_API_ORIGINS.in],
+    au: [ZOHO_BIGIN_API_ORIGINS.au],
+    jp: [ZOHO_BIGIN_API_ORIGINS.jp],
+    ca: [ZOHO_BIGIN_API_ORIGINS.ca],
+    sa: [ZOHO_BIGIN_API_ORIGINS.sa]
+  },
+  profile: async (ctx: ZohoBiginProfileContext) => {
+    let response = await createAxios({
+      baseURL: `${ctx.output.apiDomain}/bigin/v2`,
+      headers: { Authorization: `Zoho-oauthtoken ${ctx.output.token}` }
+    }).get('/users', { params: { type: 'CurrentUser' } });
+    let user = response.data?.users?.[0];
 
-    handleCallback: async (ctx: any) => {
-      let accountsUrl = getAccountsUrl(region);
-      let apiDomain = getApiDomain(region);
-
-      let response = await axios.post(`${accountsUrl}/oauth/v2/token`, null, {
-        params: {
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          code: ctx.code,
-          redirect_uri: ctx.redirectUri,
-          grant_type: 'authorization_code'
-        }
-      });
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
-          apiDomain
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let accountsUrl = getAccountsUrl(region);
-      let apiDomain = getApiDomain(region);
-
-      let response = await axios.post(`${accountsUrl}/oauth/v2/token`, null, {
-        params: {
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          refresh_token: ctx.output.refreshToken,
-          grant_type: 'refresh_token'
-        }
-      });
-
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: ctx.output.refreshToken,
-          expiresAt,
-          apiDomain
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let response = await axios.get(`${ctx.output.apiDomain}/bigin/v2/users`, {
-        params: { type: 'CurrentUser' },
-        headers: { Authorization: `Zoho-oauthtoken ${ctx.output.token}` }
-      });
-      let user = response.data.users?.[0];
-      return {
-        profile: {
-          id: user?.id,
-          email: user?.email,
-          name: user?.full_name
-        }
-      };
-    }
-  };
-}
+    return {
+      id: user?.id,
+      email: user?.email,
+      name: user?.full_name
+    };
+  }
+});
 
 export let auth = SlateAuth.create()
   .output(
@@ -216,14 +105,10 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
+      applicationType: z.enum(['multi_dc', 'regional']),
+      region: z.enum(supportedRegions),
+      accountsUrl: z.string(),
       apiDomain: z.string()
     })
   )
-  .addOauth(createBiginOauth('United States (zohoapis.com)', 'oauth_us', 'us'))
-  .addOauth(createBiginOauth('Europe (zohoapis.eu)', 'oauth_eu', 'eu'))
-  .addOauth(createBiginOauth('India (zohoapis.in)', 'oauth_in', 'in'))
-  .addOauth(createBiginOauth('Australia (zohoapis.com.au)', 'oauth_au', 'au'))
-  .addOauth(createBiginOauth('Japan (zohoapis.jp)', 'oauth_jp', 'jp'))
-  .addOauth(createBiginOauth('Canada (zohoapis.ca)', 'oauth_ca', 'ca'))
-  .addOauth(createBiginOauth('Saudi Arabia (zohoapis.sa)', 'oauth_sa', 'sa'))
-  .addOauth(createBiginOauth('China (zohoapis.com.cn)', 'oauth_cn', 'cn'));
+  .addOauth(oauth);

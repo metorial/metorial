@@ -39,7 +39,7 @@ export let newTask = SlateTrigger.create(spec, {
     pollEvents: async ctx => {
       let client = new Client({
         token: ctx.auth.token,
-        domain: ctx.auth.dataCenterDomain
+        region: ctx.auth.region
       });
 
       let state = ctx.input.state || {};

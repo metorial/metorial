@@ -1,7 +1,6 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { ZohoCrmClient } from '../lib/client';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
 
 export let crmRecordEvents = SlateTrigger.create(spec, {
@@ -33,8 +32,7 @@ export let crmRecordEvents = SlateTrigger.create(spec, {
   )
   .webhook({
     autoRegisterWebhook: async ctx => {
-      let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
-      let client = new ZohoCrmClient({ token: ctx.auth.token, datacenter: dc });
+      let client = new ZohoCrmClient(ctx.auth);
 
       let channelId = `${Date.now()}`;
 
@@ -65,8 +63,7 @@ export let crmRecordEvents = SlateTrigger.create(spec, {
     },
 
     autoUnregisterWebhook: async ctx => {
-      let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
-      let client = new ZohoCrmClient({ token: ctx.auth.token, datacenter: dc });
+      let client = new ZohoCrmClient(ctx.auth);
 
       let channelId = ctx.input.registrationDetails?.channelId;
       if (channelId) {

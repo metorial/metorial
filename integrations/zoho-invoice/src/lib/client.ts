@@ -1,21 +1,52 @@
-import { createAxios } from 'slates';
-import { regionToApiDomain } from './regions';
+import { createApiServiceError, createAxios } from 'slates';
+
+export let ZOHO_INVOICE_API_ORIGINS = {
+  us: 'https://www.zohoapis.com',
+  eu: 'https://www.zohoapis.eu',
+  in: 'https://www.zohoapis.in',
+  au: 'https://www.zohoapis.com.au',
+  jp: 'https://www.zohoapis.jp',
+  ca: 'https://www.zohoapis.ca'
+} as const;
+
+let zohoInvoiceApiOriginSet = new Set<string>(Object.values(ZOHO_INVOICE_API_ORIGINS));
+
+type ZohoInvoiceClientConfig = {
+  token: string;
+  organizationId: string;
+  apiDomain: string;
+};
+
+let requireZohoInvoiceClientConfig = (config: ZohoInvoiceClientConfig) => {
+  if (typeof config?.token !== 'string' || !config.token) {
+    throw createApiServiceError(
+      'Zoho Invoice authentication state is missing an access token. Reconnect the account.'
+    );
+  }
+  if (typeof config.apiDomain !== 'string' || !zohoInvoiceApiOriginSet.has(config.apiDomain)) {
+    throw createApiServiceError(
+      'Zoho Invoice authentication state has an invalid API domain. Reconnect the account.'
+    );
+  }
+
+  return config;
+};
 
 export class Client {
   private token: string;
   private organizationId: string;
-  private region: string;
+  private apiDomain: string;
 
-  constructor(config: { token: string; organizationId: string; region: string }) {
-    this.token = config.token;
-    this.organizationId = config.organizationId;
-    this.region = config.region;
+  constructor(config: ZohoInvoiceClientConfig) {
+    let auth = requireZohoInvoiceClientConfig(config);
+    this.token = auth.token;
+    this.organizationId = auth.organizationId;
+    this.apiDomain = auth.apiDomain;
   }
 
   private getAxios() {
-    let apiDomain = regionToApiDomain(this.region);
     return createAxios({
-      baseURL: `https://${apiDomain}/invoice/v3`,
+      baseURL: `${this.apiDomain}/invoice/v3`,
       headers: {
         Authorization: `Zoho-oauthtoken ${this.token}`,
         'X-com-zoho-invoice-organizationid': this.organizationId,

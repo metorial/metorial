@@ -1,6 +1,10 @@
-# <img src="https://provider-logos.metorial-cdn.com/zoho-crm.svg" height="20"> Zoho Crm
+# <img src="https://provider-logos.metorial-cdn.com/zoho-crm.svg" height="20"> Zoho CRM
 
 Manage Zoho CRM records across standard and custom modules. Create, read, update, delete, search, and query records with the current Zoho CRM V8 APIs; discover module fields, layouts, custom views, and related lists; manage notes, tags, and record attachments; send CRM emails; inspect users and organization metadata; and subscribe to record change notifications.
+
+## Authentication
+
+Connect with your own regular regional or Multi-DC OAuth application. Regional applications require their registered region; Multi-DC applications may optionally constrain the expected account region. The authorization callback determines and persists the regional Accounts server used for token exchange and refresh, while API requests use the validated API domain returned with the token.
 
 ## Tools
 
@@ -34,7 +38,7 @@ Retrieve records from any Zoho CRM module (Leads, Contacts, Accounts, Deals, Tas
 
 ### Get Related Records
 
-Retrieve records related to a specific CRM record through lookup or multi-select lookup fields. For example, get all Contacts related to an Account, or all Tasks associated with a Deal.
+Retrieve records related to a specific CRM record through lookup or multi-select lookup fields. For example, get all Contacts related to an Account, or all Tasks associated with a Deal. Optionally select related-module field API names; when omitted, the tool requests only the record ID required by Zoho CRM V8.
 
 ### Get Users
 
@@ -46,11 +50,11 @@ List, create, update, or delete notes associated with a CRM record. Set **action
 
 ### Manage Attachments
 
-List, upload, download, or delete attachments associated with a CRM record. File downloads are returned as Slate attachments, with structured output limited to metadata such as attachment ID, MIME type, size, and attachment count.
+List, upload, download, or delete attachments associated with a CRM record. File downloads are returned as downloadable files with useful file metadata.
 
 ### Manage Tags
 
-List, add, or remove tags on CRM records. Set **action** to "list" to view available tags for a module, "add" to tag records, or "remove" to untag records.
+List, add, or remove tags on CRM records. Set **action** to "list" to view available tags for a module, "add" to tag records, or "remove" to untag records. Zoho CRM makes record tags available only in supported editions and applies edition-specific limits.
 
 ### Search Records
 

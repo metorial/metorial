@@ -1,10 +1,61 @@
-import { createAxios } from 'slates';
-import { zohoApiError } from './errors';
-import type { Datacenter } from './urls';
-import { getApiBaseUrl, getDeskBaseUrl, getPeopleBaseUrl, getProjectsBaseUrl } from './urls';
+import { ZOHO_REGION_METADATA, type ZohoOauthOutput } from '@slates/oauth-zoho';
+import { createApiServiceError, createAxios } from 'slates';
+import { mapZohoAxiosError, zohoApiError } from './errors';
+import {
+  getDeskBaseUrl,
+  getPeopleBaseUrl,
+  getProjectsBaseUrl,
+  ZOHO_API_ORIGINS,
+  type ZohoSupportedRegion
+} from './urls';
 
-let createZohoAxios = (config: Parameters<typeof createAxios>[0], operation: string) => {
-  let http = createAxios(config);
+export type ZohoClientAuth = Pick<
+  ZohoOauthOutput<ZohoSupportedRegion>,
+  'token' | 'region' | 'accountsUrl' | 'apiDomain'
+>;
+
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+let requireZohoAuth = (value: unknown): ZohoClientAuth => {
+  if (!isRecord(value)) {
+    throw createApiServiceError(
+      'Zoho authentication state is missing. Reconnect the account.'
+    );
+  }
+  if (typeof value.token !== 'string' || !value.token) {
+    throw createApiServiceError('Zoho authentication state is missing an access token.');
+  }
+  if (typeof value.region !== 'string' || !(value.region in ZOHO_API_ORIGINS)) {
+    throw createApiServiceError('Zoho authentication state has an invalid region.');
+  }
+
+  let region = value.region as ZohoSupportedRegion;
+  if (value.apiDomain !== ZOHO_API_ORIGINS[region]) {
+    throw createApiServiceError(
+      'Zoho authentication state has an invalid API domain. Reconnect the account.'
+    );
+  }
+  if (value.accountsUrl !== ZOHO_REGION_METADATA[region].accountsOrigin) {
+    throw createApiServiceError(
+      'Zoho authentication state has an invalid Accounts URL. Reconnect the account.'
+    );
+  }
+
+  return value as ZohoClientAuth;
+};
+
+export let createZohoAxios = (
+  config: Parameters<typeof createAxios>[0],
+  operation: string
+) => {
+  let http = createAxios({
+    ...(config ?? {}),
+    errorMapping: {
+      ...config?.errorMapping,
+      mapAxiosError: mapZohoAxiosError
+    }
+  });
   let interceptors = (http as any).interceptors;
 
   interceptors?.response?.use(
@@ -15,26 +66,87 @@ let createZohoAxios = (config: Parameters<typeof createAxios>[0], operation: str
   return http;
 };
 
-let toFormData = (data: Record<string, any>) => {
-  let form = new URLSearchParams();
-  for (let [key, value] of Object.entries(data)) {
-    if (value !== undefined && value !== null) {
-      form.set(key, String(value));
-    }
+type ProjectsV3ListModule = 'projects' | 'tasks' | 'phases';
+
+let projectsV3Filter = (module: ProjectsV3ListModule, status?: string) => {
+  if (!status) return undefined;
+
+  let normalized = status.trim().toLowerCase();
+  if (!normalized || normalized === 'all') return undefined;
+
+  let criterion: Record<string, unknown>;
+  if (module === 'projects' && (normalized === 'active' || normalized === 'open')) {
+    criterion = { field_name: 'status', criteria_condition: 'all_open' };
+  } else if (module === 'projects' && (normalized === 'archived' || normalized === 'closed')) {
+    criterion = { field_name: 'status', criteria_condition: 'all_closed' };
+  } else if (module === 'projects' && normalized === 'template') {
+    throw createApiServiceError(
+      'The legacy Projects template filter has no verified V3 mapping. Use a V3 project status ID or omit status.'
+    );
+  } else if (module === 'tasks' && normalized === 'completed') {
+    criterion = {
+      field_name: 'is_completed',
+      criteria_condition: 'is',
+      value: ['true']
+    };
+  } else if (module === 'tasks' && normalized === 'notcompleted') {
+    criterion = {
+      field_name: 'is_completed',
+      criteria_condition: 'is',
+      value: ['false']
+    };
+  } else if (
+    module === 'phases' &&
+    (normalized === 'completed' || normalized === 'notcompleted')
+  ) {
+    throw createApiServiceError(
+      'The legacy milestone completed/notcompleted filter has no verified V3 phase mapping. Use a V3 phase status ID or omit status.'
+    );
+  } else {
+    criterion = {
+      field_name: 'status',
+      criteria_condition: 'is',
+      value: [status]
+    };
   }
-  return form;
+
+  return JSON.stringify({ criteria: [criterion], pattern: '1' });
+};
+
+let projectsV3ListParams = (
+  module: ProjectsV3ListModule,
+  params?: {
+    index?: number;
+    range?: number;
+    status?: string;
+  }
+) => {
+  let perPage = params?.range;
+  let pageSize = perPage && perPage > 0 ? perPage : 100;
+  let page =
+    params?.index === undefined
+      ? undefined
+      : Math.floor((Math.max(1, params.index) - 1) / pageSize) + 1;
+
+  return { page, per_page: perPage, filter: projectsV3Filter(module, params?.status) };
+};
+
+let projectsV3Sort = (sortBy?: string, sortOrder?: string) => {
+  if (!sortBy) return undefined;
+  let direction = sortOrder?.toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+  return `${direction}(${sortBy})`;
 };
 
 export class ZohoCrmClient {
   private http;
 
-  constructor(opts: { token: string; datacenter: Datacenter }) {
-    let baseUrl = getApiBaseUrl(opts.datacenter);
+  constructor(opts: ZohoClientAuth) {
+    let auth = requireZohoAuth(opts);
     this.http = createZohoAxios(
       {
-        baseURL: `${baseUrl}/crm/v7`,
+        baseURL: `${auth.apiDomain}/crm/v7`,
         headers: {
-          Authorization: `Zoho-oauthtoken ${opts.token}`
+          Authorization: `Zoho-oauthtoken ${auth.token}`
         }
       },
       'CRM request'
@@ -232,13 +344,14 @@ export class ZohoCrmClient {
 export class ZohoDeskClient {
   private http;
 
-  constructor(opts: { token: string; datacenter: Datacenter; orgId: string }) {
-    let baseUrl = getDeskBaseUrl(opts.datacenter);
+  constructor(opts: ZohoClientAuth & { orgId: string }) {
+    let auth = requireZohoAuth(opts);
+    let baseUrl = getDeskBaseUrl(auth.region);
     this.http = createZohoAxios(
       {
         baseURL: `${baseUrl}/api/v1`,
         headers: {
-          Authorization: `Zoho-oauthtoken ${opts.token}`,
+          Authorization: `Zoho-oauthtoken ${auth.token}`,
           orgId: opts.orgId
         }
       },
@@ -316,12 +429,13 @@ export class ZohoDeskClient {
     return response.data;
   }
 
-  static async listOrganizations(token: string, datacenter: Datacenter) {
-    let baseUrl = getDeskBaseUrl(datacenter);
+  static async listOrganizations(opts: ZohoClientAuth) {
+    let auth = requireZohoAuth(opts);
+    let baseUrl = getDeskBaseUrl(auth.region);
     let http = createZohoAxios(
       {
         baseURL: `${baseUrl}/api/v1`,
-        headers: { Authorization: `Zoho-oauthtoken ${token}` }
+        headers: { Authorization: `Zoho-oauthtoken ${auth.token}` }
       },
       'Desk organizations request'
     );
@@ -377,13 +491,13 @@ export class ZohoDeskClient {
 export class ZohoBooksClient {
   private http;
 
-  constructor(opts: { token: string; datacenter: Datacenter; organizationId: string }) {
-    let baseUrl = getApiBaseUrl(opts.datacenter);
+  constructor(opts: ZohoClientAuth & { organizationId: string }) {
+    let auth = requireZohoAuth(opts);
     this.http = createZohoAxios(
       {
-        baseURL: `${baseUrl}/books/v3`,
+        baseURL: `${auth.apiDomain}/books/v3`,
         headers: {
-          Authorization: `Zoho-oauthtoken ${opts.token}`
+          Authorization: `Zoho-oauthtoken ${auth.token}`
         },
         params: {
           organization_id: opts.organizationId
@@ -393,12 +507,12 @@ export class ZohoBooksClient {
     );
   }
 
-  static async listOrganizations(token: string, datacenter: Datacenter) {
-    let baseUrl = getApiBaseUrl(datacenter);
+  static async listOrganizations(opts: ZohoClientAuth) {
+    let auth = requireZohoAuth(opts);
     let http = createZohoAxios(
       {
-        baseURL: `${baseUrl}/books/v3`,
-        headers: { Authorization: `Zoho-oauthtoken ${token}` }
+        baseURL: `${auth.apiDomain}/books/v3`,
+        headers: { Authorization: `Zoho-oauthtoken ${auth.token}` }
       },
       'Books organizations request'
     );
@@ -534,13 +648,14 @@ export class ZohoBooksClient {
 export class ZohoPeopleClient {
   private http;
 
-  constructor(opts: { token: string; datacenter: Datacenter }) {
-    let baseUrl = getPeopleBaseUrl(opts.datacenter);
+  constructor(opts: ZohoClientAuth) {
+    let auth = requireZohoAuth(opts);
+    let baseUrl = getPeopleBaseUrl(auth.region);
     this.http = createZohoAxios(
       {
         baseURL: `${baseUrl}/people/api`,
         headers: {
-          Authorization: `Zoho-oauthtoken ${opts.token}`
+          Authorization: `Zoho-oauthtoken ${auth.token}`
         }
       },
       'People request'
@@ -607,29 +722,30 @@ export class ZohoPeopleClient {
 export class ZohoProjectsClient {
   private http;
 
-  constructor(opts: { token: string; datacenter: Datacenter; portalId: string }) {
-    let baseUrl = getProjectsBaseUrl(opts.datacenter);
+  constructor(opts: ZohoClientAuth & { portalId: string }) {
+    let auth = requireZohoAuth(opts);
     this.http = createZohoAxios(
       {
-        baseURL: `${baseUrl}/restapi/portal/${opts.portalId}`,
+        baseURL: `${getProjectsBaseUrl(auth.region)}/api/v3/portal/${encodeURIComponent(opts.portalId)}`,
         headers: {
-          Authorization: `Zoho-oauthtoken ${opts.token}`
+          Authorization: `Bearer ${auth.token}`,
+          'Content-Type': 'application/json'
         }
       },
       'Projects request'
     );
   }
 
-  static async listPortals(token: string, datacenter: Datacenter) {
-    let baseUrl = getProjectsBaseUrl(datacenter);
+  static async listPortals(opts: ZohoClientAuth) {
+    let auth = requireZohoAuth(opts);
     let http = createZohoAxios(
       {
-        baseURL: `${baseUrl}/restapi`,
-        headers: { Authorization: `Zoho-oauthtoken ${token}` }
+        baseURL: `${getProjectsBaseUrl(auth.region)}/api/v3`,
+        headers: { Authorization: `Bearer ${auth.token}` }
       },
       'Projects portals request'
     );
-    let response = await http.get('/portals/');
+    let response = await http.get('/portals');
     return response.data;
   }
 
@@ -640,35 +756,32 @@ export class ZohoProjectsClient {
     sortBy?: string;
     sortOrder?: string;
   }) {
-    let response = await this.http.get('/projects/', {
+    let response = await this.http.get('/projects', {
       params: {
-        index: params?.index,
-        range: params?.range,
-        status: params?.status,
-        sort_column: params?.sortBy,
-        sort_order: params?.sortOrder
+        ...projectsV3ListParams('projects', params),
+        sort_by: projectsV3Sort(params?.sortBy, params?.sortOrder)
       }
     });
     return response.data;
   }
 
   async getProject(projectId: string) {
-    let response = await this.http.get(`/projects/${projectId}/`);
+    let response = await this.http.get(`/projects/${encodeURIComponent(projectId)}`);
     return response.data;
   }
 
   async createProject(data: Record<string, any>) {
-    let response = await this.http.post('/projects/', toFormData(data));
+    let response = await this.http.post('/projects', data);
     return response.data;
   }
 
   async updateProject(projectId: string, data: Record<string, any>) {
-    let response = await this.http.post(`/projects/${projectId}/`, toFormData(data));
+    let response = await this.http.patch(`/projects/${encodeURIComponent(projectId)}`, data);
     return response.data;
   }
 
   async deleteProject(projectId: string) {
-    let response = await this.http.delete(`/projects/${projectId}/`);
+    let response = await this.http.delete(`/projects/${encodeURIComponent(projectId)}`);
     return response.data;
   }
 
@@ -680,36 +793,39 @@ export class ZohoProjectsClient {
       status?: string;
     }
   ) {
-    let response = await this.http.get(`/projects/${projectId}/tasks/`, {
-      params: {
-        index: params?.index,
-        range: params?.range,
-        status: params?.status
-      }
+    let response = await this.http.get(`/projects/${encodeURIComponent(projectId)}/tasks`, {
+      params: projectsV3ListParams('tasks', params)
     });
     return response.data;
   }
 
   async getTask(projectId: string, taskId: string) {
-    let response = await this.http.get(`/projects/${projectId}/tasks/${taskId}/`);
+    let response = await this.http.get(
+      `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`
+    );
     return response.data;
   }
 
   async createTask(projectId: string, data: Record<string, any>) {
-    let response = await this.http.post(`/projects/${projectId}/tasks/`, toFormData(data));
+    let response = await this.http.post(
+      `/projects/${encodeURIComponent(projectId)}/tasks`,
+      data
+    );
     return response.data;
   }
 
   async updateTask(projectId: string, taskId: string, data: Record<string, any>) {
-    let response = await this.http.post(
-      `/projects/${projectId}/tasks/${taskId}/`,
-      toFormData(data)
+    let response = await this.http.patch(
+      `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`,
+      data
     );
     return response.data;
   }
 
   async deleteTask(projectId: string, taskId: string) {
-    let response = await this.http.delete(`/projects/${projectId}/tasks/${taskId}/`);
+    let response = await this.http.delete(
+      `/projects/${encodeURIComponent(projectId)}/tasks/${encodeURIComponent(taskId)}`
+    );
     return response.data;
   }
 
@@ -721,12 +837,8 @@ export class ZohoProjectsClient {
       status?: string;
     }
   ) {
-    let response = await this.http.get(`/projects/${projectId}/milestones/`, {
-      params: {
-        index: params?.index,
-        range: params?.range,
-        status: params?.status
-      }
+    let response = await this.http.get(`/projects/${encodeURIComponent(projectId)}/phases`, {
+      params: projectsV3ListParams('phases', params)
     });
     return response.data;
   }

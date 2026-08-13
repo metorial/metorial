@@ -1,241 +1,117 @@
+import { createZohoOauth } from '@slates/oauth-zoho';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ZOHO_BOOKS_API_ORIGINS } from './lib/client';
 
 let scopes = [
   {
     title: 'Full Access',
-    description: 'Full access to all Zoho Books resources',
+    description: 'Access all Zoho Books resources',
     scope: 'ZohoBooks.fullaccess.all'
   },
   {
     title: 'Contacts',
-    description: 'Read and manage customers and vendors',
+    description: 'Access customers and vendors',
     scope: 'ZohoBooks.contacts.ALL'
   },
   {
-    title: 'Contacts (Read)',
-    description: 'Read-only access to customers and vendors',
-    scope: 'ZohoBooks.contacts.READ'
-  },
-  {
     title: 'Settings',
-    description: 'Read and manage items, taxes, currencies, users, and other settings',
+    description: 'Access items, taxes, currencies, users, and organization settings',
     scope: 'ZohoBooks.settings.ALL'
   },
   {
-    title: 'Settings (Read)',
-    description: 'Read-only access to items, taxes, currencies, users, and other settings',
-    scope: 'ZohoBooks.settings.READ'
-  },
-  {
     title: 'Invoices',
-    description: 'Read and manage invoices',
+    description: 'Access invoices',
     scope: 'ZohoBooks.invoices.ALL'
   },
   {
-    title: 'Invoices (Read)',
-    description: 'Read-only access to invoices',
-    scope: 'ZohoBooks.invoices.READ'
-  },
-  {
     title: 'Estimates',
-    description: 'Read and manage estimates/quotes',
+    description: 'Access estimates',
     scope: 'ZohoBooks.estimates.ALL'
   },
   {
-    title: 'Estimates (Read)',
-    description: 'Read-only access to estimates/quotes',
-    scope: 'ZohoBooks.estimates.READ'
-  },
-  {
     title: 'Customer Payments',
-    description: 'Read and manage payments received',
+    description: 'Access customer payments',
     scope: 'ZohoBooks.customerpayments.ALL'
   },
   {
-    title: 'Customer Payments (Read)',
-    description: 'Read-only access to payments received',
-    scope: 'ZohoBooks.customerpayments.READ'
-  },
-  {
     title: 'Credit Notes',
-    description: 'Read and manage credit notes',
+    description: 'Access credit notes',
     scope: 'ZohoBooks.creditnotes.ALL'
   },
   {
-    title: 'Credit Notes (Read)',
-    description: 'Read-only access to credit notes',
-    scope: 'ZohoBooks.creditnotes.READ'
-  },
-  {
     title: 'Projects',
-    description: 'Read and manage projects and time tracking',
+    description: 'Access projects and time entries',
     scope: 'ZohoBooks.projects.ALL'
   },
   {
-    title: 'Projects (Read)',
-    description: 'Read-only access to projects and time tracking',
-    scope: 'ZohoBooks.projects.READ'
-  },
-  {
     title: 'Expenses',
-    description: 'Read and manage expenses',
+    description: 'Access expenses',
     scope: 'ZohoBooks.expenses.ALL'
   },
   {
-    title: 'Expenses (Read)',
-    description: 'Read-only access to expenses',
-    scope: 'ZohoBooks.expenses.READ'
-  },
-  {
     title: 'Sales Orders',
-    description: 'Read and manage sales orders',
+    description: 'Access sales orders',
     scope: 'ZohoBooks.salesorders.ALL'
   },
   {
-    title: 'Sales Orders (Read)',
-    description: 'Read-only access to sales orders',
-    scope: 'ZohoBooks.salesorders.READ'
-  },
-  {
     title: 'Purchase Orders',
-    description: 'Read and manage purchase orders',
+    description: 'Access purchase orders',
     scope: 'ZohoBooks.purchaseorders.ALL'
   },
   {
-    title: 'Purchase Orders (Read)',
-    description: 'Read-only access to purchase orders',
-    scope: 'ZohoBooks.purchaseorders.READ'
-  },
-  { title: 'Bills', description: 'Read and manage bills', scope: 'ZohoBooks.bills.ALL' },
-  {
-    title: 'Bills (Read)',
-    description: 'Read-only access to bills',
-    scope: 'ZohoBooks.bills.READ'
-  },
-  {
-    title: 'Debit Notes',
-    description: 'Read and manage vendor credits',
-    scope: 'ZohoBooks.debitnotes.ALL'
-  },
-  {
-    title: 'Debit Notes (Read)',
-    description: 'Read-only access to vendor credits',
-    scope: 'ZohoBooks.debitnotes.READ'
+    title: 'Bills',
+    description: 'Access bills',
+    scope: 'ZohoBooks.bills.ALL'
   },
   {
     title: 'Vendor Payments',
-    description: 'Read and manage payments made',
+    description: 'Access vendor payments',
     scope: 'ZohoBooks.vendorpayments.ALL'
   },
   {
-    title: 'Vendor Payments (Read)',
-    description: 'Read-only access to payments made',
-    scope: 'ZohoBooks.vendorpayments.READ'
-  },
-  {
     title: 'Banking',
-    description: 'Read and manage banking transactions',
+    description: 'Access bank accounts and transactions',
     scope: 'ZohoBooks.banking.ALL'
   },
   {
-    title: 'Banking (Read)',
-    description: 'Read-only access to banking transactions',
-    scope: 'ZohoBooks.banking.READ'
-  },
-  {
     title: 'Accountants',
-    description: 'Read and manage accountant module',
+    description: 'Access chart of accounts and journals',
     scope: 'ZohoBooks.accountants.ALL'
-  },
-  {
-    title: 'Accountants (Read)',
-    description: 'Read-only access to accountant module',
-    scope: 'ZohoBooks.accountants.READ'
   }
 ];
 
-function createBooksOauth(name: string, key: string, accountsHost: string) {
-  let accountsUrl = `https://${accountsHost}`;
+let supportedRegions = ['us', 'eu', 'in', 'au', 'jp', 'ca', 'sa'] as const;
+type ZohoBooksProfileContext = {
+  output: { token: string; accountsUrl: string };
+};
 
-  return {
-    type: 'auth.oauth' as const,
-    name,
-    key,
-    scopes,
+let oauth = createZohoOauth({
+  supportedRegions,
+  scopes,
+  apiOrigins: {
+    us: [ZOHO_BOOKS_API_ORIGINS.us],
+    eu: [ZOHO_BOOKS_API_ORIGINS.eu],
+    in: [ZOHO_BOOKS_API_ORIGINS.in],
+    au: [ZOHO_BOOKS_API_ORIGINS.au],
+    jp: [ZOHO_BOOKS_API_ORIGINS.jp],
+    ca: [ZOHO_BOOKS_API_ORIGINS.ca],
+    sa: [ZOHO_BOOKS_API_ORIGINS.sa]
+  },
+  profile: async (ctx: ZohoBooksProfileContext) => {
+    let response = await createAxios({
+      baseURL: ctx.output.accountsUrl,
+      headers: { Authorization: `Zoho-oauthtoken ${ctx.output.token}` }
+    }).get('/oauth/user/info');
+    let user = response.data;
 
-    getAuthorizationUrl: async (ctx: any) => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        response_type: 'code',
-        scope: ctx.scopes.join(','),
-        redirect_uri: ctx.redirectUri,
-        state: ctx.state,
-        access_type: 'offline',
-        prompt: 'consent'
-      });
-      return { url: `${accountsUrl}/oauth/v2/auth?${params.toString()}` };
-    },
-
-    handleCallback: async (ctx: any) => {
-      let httpClient = createAxios({ baseURL: accountsUrl });
-      let response = await httpClient.post('/oauth/v2/token', null, {
-        params: {
-          grant_type: 'authorization_code',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          redirect_uri: ctx.redirectUri,
-          code: ctx.code
-        }
-      });
-      let data = response.data;
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString(),
-          accountsUrl
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let httpClient = createAxios({ baseURL: ctx.output.accountsUrl || accountsUrl });
-      let response = await httpClient.post('/oauth/v2/token', null, {
-        params: {
-          grant_type: 'refresh_token',
-          refresh_token: ctx.output.refreshToken,
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }
-      });
-      let data = response.data;
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: ctx.output.refreshToken,
-          expiresAt: new Date(Date.now() + (data.expires_in || 3600) * 1000).toISOString(),
-          accountsUrl: ctx.output.accountsUrl || accountsUrl
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let httpClient = createAxios({ baseURL: ctx.output.accountsUrl || accountsUrl });
-      let response = await httpClient.get('/oauth/user/info', {
-        headers: { Authorization: `Zoho-oauthtoken ${ctx.output.token}` }
-      });
-      let user = response.data;
-      return {
-        profile: {
-          id: user.ZUID?.toString(),
-          email: user.Email,
-          name: user.Display_Name || `${user.First_Name || ''} ${user.Last_Name || ''}`.trim()
-        }
-      };
-    }
-  };
-}
+    return {
+      id: user.ZUID?.toString(),
+      email: user.Email,
+      name: user.Display_Name || `${user.First_Name || ''} ${user.Last_Name || ''}`.trim()
+    };
+  }
+});
 
 export let auth = SlateAuth.create()
   .output(
@@ -243,15 +119,10 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      accountsUrl: z.string()
+      applicationType: z.enum(['multi_dc', 'regional']),
+      region: z.enum(supportedRegions),
+      accountsUrl: z.string(),
+      apiDomain: z.string()
     })
   )
-  .addOauth(createBooksOauth('United States (zoho.com)', 'oauth_us', 'accounts.zoho.com'))
-  .addOauth(createBooksOauth('Europe (zoho.eu)', 'oauth_eu', 'accounts.zoho.eu'))
-  .addOauth(createBooksOauth('India (zoho.in)', 'oauth_in', 'accounts.zoho.in'))
-  .addOauth(createBooksOauth('Australia (zoho.com.au)', 'oauth_au', 'accounts.zoho.com.au'))
-  .addOauth(createBooksOauth('Japan (zoho.jp)', 'oauth_jp', 'accounts.zoho.jp'))
-  // Canada accounts live on zohocloud.ca; accounts.zoho.ca does not resolve.
-  .addOauth(createBooksOauth('Canada (zohocloud.ca)', 'oauth_ca', 'accounts.zohocloud.ca'))
-  .addOauth(createBooksOauth('Saudi Arabia (zoho.sa)', 'oauth_sa', 'accounts.zoho.sa'))
-  .addOauth(createBooksOauth('China (zoho.com.cn)', 'oauth_cn', 'accounts.zoho.com.cn'));
+  .addOauth(oauth);

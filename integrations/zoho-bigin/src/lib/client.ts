@@ -1,15 +1,55 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
+
+export let ZOHO_BIGIN_API_ORIGINS = {
+  us: 'https://www.zohoapis.com',
+  eu: 'https://www.zohoapis.eu',
+  in: 'https://www.zohoapis.in',
+  au: 'https://www.zohoapis.com.au',
+  jp: 'https://www.zohoapis.jp',
+  ca: 'https://www.zohoapis.ca',
+  sa: 'https://www.zohoapis.sa'
+} as const;
+
+let zohoBiginApiOriginSet = new Set<string>(Object.values(ZOHO_BIGIN_API_ORIGINS));
+
+let requireBiginClientAuth = (params: { token: string; apiDomain: string }) => {
+  if (typeof params?.token !== 'string' || !params.token) {
+    throw createApiServiceError(
+      'Zoho Bigin authentication state is missing an access token. Reconnect the account.'
+    );
+  }
+  if (typeof params.apiDomain !== 'string' || !zohoBiginApiOriginSet.has(params.apiDomain)) {
+    throw createApiServiceError(
+      'Zoho Bigin authentication state has an invalid API domain. Reconnect the account.'
+    );
+  }
+
+  return params;
+};
 
 export class BiginClient {
   private axios;
 
   constructor(params: { token: string; apiDomain: string }) {
+    let auth = requireBiginClientAuth(params);
     this.axios = createAxios({
-      baseURL: `${params.apiDomain}/bigin/v2`,
+      baseURL: `${auth.apiDomain}/bigin/v2`,
       headers: {
-        Authorization: `Zoho-oauthtoken ${params.token}`
+        Authorization: `Zoho-oauthtoken ${auth.token}`
       }
     });
+
+    this.axios.interceptors?.response?.use(
+      response => response,
+      error =>
+        Promise.reject(
+          buildApiServiceError(error, {
+            providerLabel: 'Zoho Bigin',
+            operation: 'API request',
+            reason: 'zoho_bigin_api_error'
+          })
+        )
+    );
   }
 
   // ─── Records ───────────────────────────────────────────────

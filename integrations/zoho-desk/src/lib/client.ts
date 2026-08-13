@@ -1,19 +1,34 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
 
-let regionToDeskDomain: Record<string, string> = {
-  us: 'desk.zoho.com',
-  eu: 'desk.zoho.eu',
-  in: 'desk.zoho.in',
-  au: 'desk.zoho.com.au',
-  cn: 'desk.zoho.com.cn'
-};
+export let ZOHO_DESK_API_ORIGINS = {
+  us: 'https://desk.zoho.com',
+  eu: 'https://desk.zoho.eu',
+  in: 'https://desk.zoho.in',
+  au: 'https://desk.zoho.com.au'
+} as const;
+
+let zohoDeskApiOriginSet = new Set<string>(Object.values(ZOHO_DESK_API_ORIGINS));
 
 export interface ClientConfig {
   token: string;
   orgId: string;
-  region: string;
-  deskDomain?: string;
+  apiDomain: string;
 }
+
+let requireZohoDeskClientConfig = (config: ClientConfig) => {
+  if (typeof config?.token !== 'string' || !config.token) {
+    throw createApiServiceError(
+      'Zoho Desk authentication state is missing an access token. Reconnect the account.'
+    );
+  }
+  if (typeof config.apiDomain !== 'string' || !zohoDeskApiOriginSet.has(config.apiDomain)) {
+    throw createApiServiceError(
+      'Zoho Desk authentication state has an invalid API domain. Reconnect the account.'
+    );
+  }
+
+  return config;
+};
 
 export interface PaginationParams {
   from?: number;
@@ -24,13 +39,13 @@ export class Client {
   private http: ReturnType<typeof createAxios>;
 
   constructor(config: ClientConfig) {
-    let domain = config.deskDomain || regionToDeskDomain[config.region] || 'desk.zoho.com';
+    let auth = requireZohoDeskClientConfig(config);
 
     this.http = createAxios({
-      baseURL: `https://${domain}/api/v1`,
+      baseURL: `${auth.apiDomain}/api/v1`,
       headers: {
-        Authorization: `Zoho-oauthtoken ${config.token}`,
-        orgId: config.orgId
+        Authorization: `Zoho-oauthtoken ${auth.token}`,
+        orgId: auth.orgId
       }
     });
   }

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -49,13 +49,13 @@ export let manageNotes = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.auth.dataCenterDomain
+      region: ctx.auth.region
     });
 
     let { action, scope, groupId } = ctx.input;
 
     if (scope === 'group' && !groupId) {
-      throw new Error('groupId is required for group note operations');
+      throw createApiServiceError('groupId is required for group note operations');
     }
 
     let mapNote = (n: any) => ({
@@ -83,7 +83,9 @@ export let manageNotes = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.noteContent) throw new Error('noteContent is required for create action');
+      if (!ctx.input.noteContent) {
+        throw createApiServiceError('noteContent is required for create action');
+      }
       let noteData: any = {
         noteContent: ctx.input.noteContent,
         noteName: ctx.input.noteName,
@@ -100,7 +102,9 @@ export let manageNotes = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.noteId) throw new Error('noteId is required for update action');
+      if (!ctx.input.noteId) {
+        throw createApiServiceError('noteId is required for update action');
+      }
       let noteData: any = {};
       if (ctx.input.noteName) noteData.noteName = ctx.input.noteName;
       if (ctx.input.noteContent) noteData.noteContent = ctx.input.noteContent;
@@ -115,7 +119,9 @@ export let manageNotes = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.noteId) throw new Error('noteId is required for delete action');
+      if (!ctx.input.noteId) {
+        throw createApiServiceError('noteId is required for delete action');
+      }
       await client.deletePersonalNote(ctx.input.noteId);
       return {
         output: { success: true },
@@ -123,6 +129,6 @@ export let manageNotes = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();
