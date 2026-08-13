@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -59,7 +59,7 @@ export let manageArticle = SlateTool.create(spec, {
       result = await client.createArticle(categoryId, articleData);
       action = 'Created';
     } else {
-      throw new Error(
+      throw createApiServiceError(
         'Either articleId (to update/retrieve) or categoryId (to create) must be provided'
       );
     }

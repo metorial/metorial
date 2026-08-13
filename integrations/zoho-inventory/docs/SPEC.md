@@ -1,6 +1,6 @@
 Let me get more details on the API navigation/full list of resources and the OAuth scopes, as well as confirm webhook details specific to Zoho Inventory.Now let me get the full OAuth scopes list from the OAuth page:Now I have all the information I need. Let me compile the specification.
 
-# Slates Specification for Zoho Inventory
+# Zoho Inventory Integration Specification
 
 ## Overview
 
@@ -8,23 +8,15 @@ Zoho Inventory is a cloud-based inventory management application that is part of
 
 ## Authentication
 
-Zoho Inventory uses **OAuth 2.0** as its sole authentication method.
+Zoho Inventory uses OAuth 2.0 as its sole authentication method. The integration exposes one OAuth method for a customer-owned regular regional or Multi-DC server application. `applicationType` is required. `region` is required for a regional application and optional for Multi-DC as an expected-region constraint.
 
 ### Setup
 
-1. Register your application at [Zoho Developer Console](https://accounts.zoho.com/developerconsole) to obtain a **Client ID** and **Client Secret**.
-2. Redirect users to the authorization URL to obtain a grant code:
-   ```
-   https://accounts.zoho.com/oauth/v2/auth?scope={scopes}&client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&access_type=offline
-   ```
-3. Exchange the grant code for an access token and refresh token via POST to:
-   ```
-   https://accounts.zoho.com/oauth/v2/token?code={code}&client_id={client_id}&client_secret={client_secret}&redirect_uri={redirect_uri}&grant_type=authorization_code
-   ```
-4. Access tokens expire in approximately **one hour**. Use the refresh token (permanent) to obtain new access tokens:
-   ```
-   https://accounts.zoho.com/oauth/v2/token?refresh_token={refresh_token}&client_id={client_id}&client_secret={client_secret}&redirect_uri={redirect_uri}&grant_type=refresh_token
-   ```
+1. Register a regular regional or Multi-DC server application at the [Zoho Developer Console](https://accounts.zoho.com/developerconsole) and supply its Client ID and Client Secret when connecting.
+2. Regional authorization starts at the selected regional Accounts origin. Multi-DC authorization starts at `https://accounts.zoho.com/oauth/v2/auth`.
+3. The callback must contain matching `location` and `accounts-server` values. Exchange the authorization code only at that exact validated regional Accounts origin. The inferred region must match the regional selection or an optional Multi-DC expected-region constraint.
+4. Refresh requests use the persisted regional Accounts origin and preserve the existing refresh token when Zoho omits a replacement.
+5. Inventory requests and organization discovery use the allowlisted `api_domain` returned by Zoho.
 
 ### Passing Tokens
 
@@ -32,18 +24,18 @@ The access token must be passed in the `Authorization` header as: `Zoho-oauthtok
 
 ### Data Centers
 
-Zoho Inventory is hosted across multiple data centers. The OAuth and API base URLs must match the user's data center domain:
+The validated callback Accounts origin determines code exchange and refresh routing. Inventory requests use the matching allowlisted API origin returned in the token response:
 
-| Region              | Accounts URL                     | API Base URL                             |
-| ------------------- | -------------------------------- | ---------------------------------------- |
-| US (.com)           | `https://accounts.zoho.com/`     | `https://www.zohoapis.com/inventory/`    |
-| EU (.eu)            | `https://accounts.zoho.eu/`      | `https://www.zohoapis.eu/inventory/`     |
-| India (.in)         | `https://accounts.zoho.in/`      | `https://www.zohoapis.in/inventory/`     |
-| Australia (.com.au) | `https://accounts.zoho.com.au/`  | `https://www.zohoapis.com.au/inventory/` |
-| Canada (.ca)        | `https://accounts.zohocloud.ca/` | `https://www.zohoapis.ca/inventory/`     |
-| Japan (.jp)         | —                                | `https://www.zohoapis.jp/inventory/`     |
-| China (.com.cn)     | —                                | `https://www.zohoapis.com.cn/inventory/` |
-| Saudi Arabia (.sa)  | —                                | `https://www.zohoapis.sa/inventory/`     |
+| Region | Accounts origin | Allowed Inventory API origin |
+| --- | --- | --- |
+| US | `https://accounts.zoho.com` | `https://www.zohoapis.com` |
+| EU | `https://accounts.zoho.eu` | `https://www.zohoapis.eu` |
+| IN | `https://accounts.zoho.in` | `https://www.zohoapis.in` |
+| AU | `https://accounts.zoho.com.au` | `https://www.zohoapis.com.au` |
+| JP | `https://accounts.zoho.jp` | `https://www.zohoapis.jp` |
+| CA | `https://accounts.zohocloud.ca` | `https://www.zohoapis.ca` |
+| SA | `https://accounts.zoho.sa` | `https://www.zohoapis.sa` |
+Connections created with the previous region-specific OAuth methods must reconnect with the unified `oauth` method and select their region. The previous Inventory mapping sent Japan and Saudi Arabia authorizations to the US Accounts server, so existing JP and SA connections must be treated as mis-homed and reconnected explicitly.
 
 ### Organization ID
 
@@ -74,6 +66,67 @@ Available scope modules:
 
 Multiple scopes can be comma-separated, e.g., `ZohoInventory.items.READ,ZohoInventory.salesorders.CREATE`.
 
+#### Declared Scope Contract
+
+```ts
+[
+  'ZohoInventory.FullAccess.all',
+  'ZohoInventory.contacts.READ',
+  'ZohoInventory.contacts.CREATE',
+  'ZohoInventory.contacts.UPDATE',
+  'ZohoInventory.contacts.DELETE',
+  'ZohoInventory.items.READ',
+  'ZohoInventory.items.CREATE',
+  'ZohoInventory.items.UPDATE',
+  'ZohoInventory.items.DELETE',
+  'ZohoInventory.inventoryadjustments.CREATE',
+  'ZohoInventory.inventoryadjustments.DELETE',
+  'ZohoInventory.transferorders.READ',
+  'ZohoInventory.transferorders.CREATE',
+  'ZohoInventory.transferorders.UPDATE',
+  'ZohoInventory.transferorders.DELETE',
+  'ZohoInventory.salesorders.READ',
+  'ZohoInventory.salesorders.CREATE',
+  'ZohoInventory.salesorders.UPDATE',
+  'ZohoInventory.salesorders.DELETE',
+  'ZohoInventory.packages.CREATE',
+  'ZohoInventory.packages.DELETE',
+  'ZohoInventory.shipmentorders.READ',
+  'ZohoInventory.shipmentorders.CREATE',
+  'ZohoInventory.shipmentorders.UPDATE',
+  'ZohoInventory.shipmentorders.DELETE',
+  'ZohoInventory.invoices.READ',
+  'ZohoInventory.invoices.CREATE',
+  'ZohoInventory.invoices.UPDATE',
+  'ZohoInventory.invoices.DELETE',
+  'ZohoInventory.customerpayments.CREATE',
+  'ZohoInventory.customerpayments.DELETE',
+  'ZohoInventory.creditnotes.READ',
+  'ZohoInventory.creditnotes.CREATE',
+  'ZohoInventory.creditnotes.UPDATE',
+  'ZohoInventory.creditnotes.DELETE',
+  'ZohoInventory.purchaseorders.READ',
+  'ZohoInventory.purchaseorders.CREATE',
+  'ZohoInventory.purchaseorders.UPDATE',
+  'ZohoInventory.purchaseorders.DELETE',
+  'ZohoInventory.bills.READ',
+  'ZohoInventory.bills.CREATE',
+  'ZohoInventory.bills.UPDATE',
+  'ZohoInventory.bills.DELETE',
+  'ZohoInventory.settings.READ'
+]
+```
+
+| Capability group | Requested scope |
+| --- | --- |
+| Contact, item, transfer-order, sales-order, shipment-order, invoice, credit-note, purchase-order, and bill CRUD | The matching documented READ, CREATE, UPDATE, and DELETE scopes listed above |
+| Inventory-adjustment, package, and customer-payment creation/deletion | The matching documented CREATE and DELETE scopes listed above |
+| Warehouse and organization discovery | `ZohoInventory.settings.READ` |
+| Product-wide resource access | `ZohoInventory.FullAccess.all` |
+
+The [Zoho Inventory OAuth documentation](https://www.zoho.com/inventory/api/v1/oauth/) documents resource-level CREATE, READ, UPDATE, and DELETE operations, but not resource-level ALL. The exact operations above correspond to current tool and polling-trigger calls; unused composite-item, sales-return, and purchase-receive namespaces and unused operation variants are omitted.
+
+The integration requests the documented operation-specific scopes used by current tools and triggers, plus `ZohoInventory.FullAccess.all` for product-wide resource access. Unused namespace and operation variants are omitted.
 ## Features
 
 ### Item & Inventory Management

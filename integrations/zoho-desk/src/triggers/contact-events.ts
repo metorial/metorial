@@ -36,7 +36,7 @@ export let contactEvents = SlateTrigger.create(spec, {
       for (let eventType of contactEventTypes) {
         try {
           let webhookData: Record<string, any> = {
-            name: `Slates - ${eventType}`,
+            name: `Zoho Desk integration - ${eventType}`,
             url: ctx.input.webhookBaseUrl,
             eventType,
             isActive: true

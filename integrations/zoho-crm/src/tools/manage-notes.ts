@@ -67,7 +67,7 @@ Set **action** to "list" to get notes, "create" to add a new note, "update" to e
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     if (ctx.input.action === 'list') {

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -37,7 +37,7 @@ export let manageLabels = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.auth.dataCenterDomain
+      region: ctx.auth.region
     });
 
     let { action, accountId } = ctx.input;
@@ -58,7 +58,9 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.labelName) throw new Error('labelName is required for create action');
+      if (!ctx.input.labelName) {
+        throw createApiServiceError('labelName is required for create action');
+      }
       let result = await client.createLabel(accountId, ctx.input.labelName, ctx.input.color);
       return {
         output: { label: mapLabel(result || {}), success: true },
@@ -67,8 +69,12 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.labelId) throw new Error('labelId is required for update action');
-      if (!ctx.input.labelName) throw new Error('labelName is required for update action');
+      if (!ctx.input.labelId) {
+        throw createApiServiceError('labelId is required for update action');
+      }
+      if (!ctx.input.labelName) {
+        throw createApiServiceError('labelName is required for update action');
+      }
       let result = await client.updateLabel(
         accountId,
         ctx.input.labelId,
@@ -87,7 +93,9 @@ export let manageLabels = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.labelId) throw new Error('labelId is required for delete action');
+      if (!ctx.input.labelId) {
+        throw createApiServiceError('labelId is required for delete action');
+      }
       await client.deleteLabel(accountId, ctx.input.labelId);
       return {
         output: { success: true },
@@ -95,6 +103,6 @@ export let manageLabels = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

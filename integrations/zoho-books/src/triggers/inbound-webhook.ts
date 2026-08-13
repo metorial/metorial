@@ -11,7 +11,7 @@ export let inboundWebhook = SlateTrigger.create(spec, {
   name: 'Inbound Webhook',
   key: 'inbound_webhook',
   description:
-    'Receives HTTP POST at the Slates webhook URL. Parses JSON into payload (or stores raw body if not JSON). Configure your provider to POST here when supported.'
+    'Receives HTTP POST requests at the generated webhook URL. Parses JSON into payload (or stores raw body if not JSON). Configure the provider to POST here when supported.'
 })
   .input(
     z.object({

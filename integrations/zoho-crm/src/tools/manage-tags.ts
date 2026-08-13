@@ -50,7 +50,7 @@ Set **action** to "list" to view available tags for a module, "add" to tag recor
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     if (ctx.input.action === 'list') {

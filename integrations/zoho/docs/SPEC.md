@@ -1,4 +1,4 @@
-# Slates Specification for Zoho
+# Zoho Integration Specification
 
 ## Overview
 
@@ -12,7 +12,7 @@ Zoho uses **OAuth 2.0** as its authentication protocol across all products. OAut
 
 To access the resources of Zoho using the various Zoho APIs, you will need to register your application with Zoho first. On successful registration, you will get a Client ID and Client secret, which you can use to get the access token needed to make API calls.
 
-Register at the **Zoho API Console**: `https://api-console.zoho.com/`
+Register a server-based regular regional or Multi-DC application at the **Zoho API Console**: `https://api-console.zoho.com/`. Supply that application's Client ID and Client Secret when connecting; the integration uses them unchanged.
 
 Client types supported:
 
@@ -26,27 +26,34 @@ Client types supported:
 
 Zoho uses the **authorization code grant type**. The flow is:
 
-1. **Authorization Request**: Redirect user to:
+1. **Application Selection**: Require `applicationType` as either `regional` or `multi_dc`; there is no default. A regional application also requires the region where it is registered. A Multi-DC application may omit `region`, or provide one as an expected-region constraint.
+
+2. **Authorization Request**: Start a regional application at its selected regional Accounts origin. Start a Multi-DC application at the global Accounts origin:
 
    ```
    https://accounts.zoho.com/oauth/v2/auth?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&scope={scope}&access_type=offline
    ```
 
-2. **Exchange Code for Tokens**: POST to:
+3. **Validate Callback Routing**: Require `location` and `accounts-server`, ensure both identify the same supported region, and accept only an exact supported HTTPS Accounts origin. The callback region must match the required regional selection or an optional Multi-DC expected-region constraint; otherwise it is inferred for Multi-DC.
+
+4. **Exchange Code for Tokens**: POST to the validated regional Accounts origin from the callback, for example:
 
    ```
-   https://accounts.zoho.com/oauth/v2/token
+   https://accounts.zoho.eu/oauth/v2/token
    ```
 
    With parameters: `client_id`, `client_secret`, `grant_type=authorization_code`, `code`, `redirect_uri`.
 
-3. **Use Access Token**: Zoho's OAuth implementation uses Bearer authentication scheme; the access token must be passed in the Authorization header with the prefix `Zoho-oauthtoken`.
+   Validate the returned `api_domain` against the resolved callback region before saving it. Persist the application type, inferred/resolved region, Accounts origin, API domain, and token state. Generic APIs such as CRM and Books use this validated origin rather than reconstructing one from the region.
+
+5. **Use Access Token**: Most APIs in this combined package pass the access token with Zoho's `Zoho-oauthtoken` scheme. Zoho Projects V3 instead documents the standard `Bearer` scheme.
 
    ```
    Authorization: Zoho-oauthtoken {access_token}
+   Authorization: Bearer {access_token} // Projects V3
    ```
 
-4. **Refresh Token**: Access tokens are valid for only 1 hour. A refresh token can be retrieved and stored, and allows the app to generate a new access token whenever required. A refresh token does not expire. Set `access_type=offline` in the authorization request to receive a refresh token.
+6. **Refresh Token**: Access tokens are valid for only 1 hour. Refresh through the persisted regional Accounts origin and preserve the existing refresh token when Zoho omits a replacement. Set `access_type=offline` in the authorization request to receive the initial refresh token.
 
 ### Scopes
 
@@ -62,11 +69,54 @@ Examples: `ZohoCRM.modules.leads.READ`, `ZohoBooks.purchaseorders.UPDATE`, `Zoho
 
 Multiple scopes should be separated by commas.
 
-### Data Centers / Multi-DC
+#### Declared Scope Contract
+
+```ts
+[
+  'ZohoCRM.modules.ALL',
+  'ZohoCRM.settings.ALL',
+  'ZohoCRM.notifications.ALL',
+  'ZohoCRM.coql.READ',
+  'ZohoSearch.securesearch.READ',
+  'ZohoCRM.users.READ',
+  'Desk.tickets.ALL',
+  'Desk.contacts.ALL',
+  'Desk.basic.READ',
+  'Desk.search.READ',
+  'ZohoBooks.fullaccess.all',
+  'ZohoBooks.invoices.ALL',
+  'ZohoBooks.contacts.ALL',
+  'ZohoBooks.expenses.ALL',
+  'ZohoBooks.settings.READ',
+  'ZOHOPEOPLE.forms.ALL',
+  'ZOHOPEOPLE.attendance.READ',
+  'ZOHOPEOPLE.leave.READ',
+  'ZohoProjects.portals.READ',
+  'ZohoProjects.projects.ALL',
+  'ZohoProjects.tasks.ALL',
+  'ZohoProjects.milestones.READ',
+  'AaaServer.profile.READ'
+]
+```
+
+| Capability group | Retained scope |
+| --- | --- |
+| CRM record CRUD, metadata, notification subscriptions, COQL, secure search, and user discovery | `ZohoCRM.modules.ALL`, `ZohoCRM.settings.ALL`, `ZohoCRM.notifications.ALL`, `ZohoCRM.coql.READ`, `ZohoSearch.securesearch.READ`, `ZohoCRM.users.READ` |
+| Desk ticket/contact CRUD, department discovery, and search | `Desk.tickets.ALL`, `Desk.contacts.ALL`, `Desk.basic.READ`, `Desk.search.READ` |
+| Books organizations, invoices, contacts, and expenses | `ZohoBooks.settings.READ`, `ZohoBooks.invoices.ALL`, `ZohoBooks.contacts.ALL`, `ZohoBooks.expenses.ALL`; `ZohoBooks.fullaccess.all` retained pending coverage verification |
+| People form CRUD plus attendance and leave reads | `ZOHOPEOPLE.forms.ALL`, `ZOHOPEOPLE.attendance.READ`, `ZOHOPEOPLE.leave.READ` |
+| Projects portal/milestone reads plus project/task CRUD | `ZohoProjects.portals.READ`, `ZohoProjects.milestones.READ`, `ZohoProjects.projects.ALL`, `ZohoProjects.tasks.ALL` |
+| Authenticated-user profile | `AaaServer.profile.READ` |
+
+Coverage is based on the current [CRM scope catalog](https://www.zoho.com/crm/developer/docs/api/v8/scopes.html), [Desk API scope catalog](https://support.zoho.com/DeskAPIDocument), [Books OAuth catalog](https://www.zoho.com/books/api/v3/oauth/), [People scope catalog](https://www.zoho.com/people/api/scopes.html), and [Projects milestone scope documentation](https://www.zoho.com/projects/help/rest-api/milestones-api.html).
+
+Desk.contacts.ALL is retained pending live verification because current Desk documentation is inconsistent about the broad contact-scope spelling. The Books documentation does not prove that `ZohoBooks.fullaccess.all` supersedes the resource namespaces, so the granular scopes used by current tools remain and only the redundant invoices READ scope is removed. The full-access scope and the newly added Projects milestone read scope require reauthorization and representative endpoint checks. Those checks are blocked until Task 0 provides working credentials.
+
+### Data Centers
 
 Data protection and privacy laws in multiple countries state that user data can only be stored in data centers located on that country's soil. In compliance, Zoho has set up data centers in multiple countries. Each data center only holds the data of users who have registered at that domain.
 
-The authorization and API base URLs differ by data center:
+The integration advertises one `oauth` method for the exact subset below. Accounts origins are callback and refresh allowlist entries. API origins are the only accepted `api_domain` values for generic product calls:
 
 | Region       | Accounts URL             | API Domain            |
 | ------------ | ------------------------ | --------------------- |
@@ -79,7 +129,7 @@ The authorization and API base URLs differ by data center:
 | Saudi Arabia | `accounts.zoho.sa`       | `www.zohoapis.sa`     |
 | UK           | `accounts.zoho.uk`       | `www.zohoapis.uk`     |
 
-In the authorization request, you send calls to `https://accounts.zoho.com`. In the response, the location of the user's DC will be included as the parameter `location`. Once you have identified the user's data center, you need to make the access token request to the server URL corresponding to that location. For example, if location=eu, you will need to make access token request to `https://accounts.zoho.eu`.
+Regular regional authorization starts at the selected regional Accounts origin. Multi-DC authorization starts at `https://accounts.zoho.com`; its callback infers the actual region unless the user supplied an expected-region constraint. Code exchange and refresh use the exact validated callback Accounts origin. Desk and People use explicit regional service-origin maps because they do not share the generic API origin.
 
 ## Features
 
@@ -117,6 +167,7 @@ Zoho Projects provides REST APIs to manage projects, connect third party applica
 
 - Supports custom modules with configurable layouts.
 - Requires a Portal ID in API calls.
+- Projects calls use V3 through an explicit regional Projects host selected from the validated auth region. Published Projects V3 hosts cover US, EU, IN, AU, JP, and CA; Projects calls fail closed in SA and UK while the other Zoho APIs remain available there. Project and task status mutations require V3 status IDs. Owner inputs require ZPUIDs rather than V2 user IDs or ZUIDs. The legacy project `template` list filter and milestone `completed`/`notcompleted` filters are unsupported because no documented V3 mapping exists. See [Projects V3 Migration](./PROJECTS_V3_MIGRATION.md) for endpoint mappings, compatibility adapters, and the live release gate.
 
 ### Out Of Scope For This Generic Package
 

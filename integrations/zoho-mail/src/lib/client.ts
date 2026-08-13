@@ -1,13 +1,54 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+
+export let ZOHO_MAIL_API_ORIGINS = {
+  us: 'https://mail.zoho.com',
+  eu: 'https://mail.zoho.eu',
+  in: 'https://mail.zoho.in',
+  au: 'https://mail.zoho.com.au',
+  jp: 'https://mail.zoho.jp'
+} as const;
+
+export let ZOHO_MAIL_OAUTH_API_ORIGINS = {
+  us: 'https://www.zohoapis.com',
+  eu: 'https://www.zohoapis.eu',
+  in: 'https://www.zohoapis.in',
+  au: 'https://www.zohoapis.com.au',
+  jp: 'https://www.zohoapis.jp'
+} as const;
+
+type ZohoMailRegion = keyof typeof ZOHO_MAIL_API_ORIGINS;
+
+type ZohoMailClientConfig = {
+  token: string;
+  region: ZohoMailRegion;
+};
+
+let zohoMailRegionSet = new Set<string>(Object.keys(ZOHO_MAIL_API_ORIGINS));
+
+let requireZohoMailClientConfig = (config: ZohoMailClientConfig) => {
+  if (typeof config?.token !== 'string' || !config.token) {
+    throw createApiServiceError(
+      'Zoho Mail authentication state is missing an access token. Reconnect the account.'
+    );
+  }
+  if (typeof config.region !== 'string' || !zohoMailRegionSet.has(config.region)) {
+    throw createApiServiceError(
+      'Zoho Mail authentication state has an invalid region. Reconnect the account.'
+    );
+  }
+
+  return config;
+};
 
 export class Client {
   private axios: ReturnType<typeof createAxios>;
 
-  constructor(config: { token: string; domain: string }) {
+  constructor(config: ZohoMailClientConfig) {
+    let auth = requireZohoMailClientConfig(config);
     this.axios = createAxios({
-      baseURL: `https://mail.${config.domain}/api`,
+      baseURL: `${ZOHO_MAIL_API_ORIGINS[auth.region]}/api`,
       headers: {
-        Authorization: `Zoho-oauthtoken ${config.token}`,
+        Authorization: `Zoho-oauthtoken ${auth.token}`,
         'Content-Type': 'application/json',
         Accept: 'application/json'
       }

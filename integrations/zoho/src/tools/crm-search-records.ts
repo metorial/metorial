@@ -2,7 +2,6 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZohoCrmClient } from '../lib/client';
 import { zohoServiceError } from '../lib/errors';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
 
 export let crmSearchRecords = SlateTool.create(spec, {
@@ -65,8 +64,7 @@ export let crmSearchRecords = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
-    let client = new ZohoCrmClient({ token: ctx.auth.token, datacenter: dc });
+    let client = new ZohoCrmClient(ctx.auth);
 
     if (ctx.input.coqlQuery) {
       let result = await client.executeCoql(ctx.input.coqlQuery);

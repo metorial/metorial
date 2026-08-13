@@ -1,215 +1,125 @@
+import { createZohoOauth } from '@slates/oauth-zoho';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
+import { ZOHO_MAIL_API_ORIGINS, ZOHO_MAIL_OAUTH_API_ORIGINS } from './lib/client';
 
 let scopes = [
   {
-    title: 'Messages - Full Access',
-    description: 'Send, read, update, and delete emails',
+    title: 'Messages',
+    description: 'Send, read, update, and delete email messages',
     scope: 'ZohoMail.messages.ALL'
   },
+
   {
-    title: 'Messages - Read',
-    description: 'Read email messages',
-    scope: 'ZohoMail.messages.READ'
-  },
-  {
-    title: 'Accounts - Full Access',
-    description: 'Read and update user account settings',
-    scope: 'ZohoMail.accounts.ALL'
-  },
-  {
-    title: 'Accounts - Read',
-    description: 'Read user account settings',
+    title: 'Accounts',
+    description: 'Read user email accounts',
     scope: 'ZohoMail.accounts.READ'
   },
+
   {
-    title: 'Folders - Full Access',
+    title: 'Folders',
     description: 'Create, read, update, and delete email folders',
     scope: 'ZohoMail.folders.ALL'
   },
+
   {
-    title: 'Folders - Read',
-    description: 'Read email folders',
-    scope: 'ZohoMail.folders.READ'
-  },
-  {
-    title: 'Labels - Full Access',
+    title: 'Labels',
     description: 'Create, read, update, and delete email labels',
     scope: 'ZohoMail.tags.ALL'
   },
-  { title: 'Labels - Read', description: 'Read email labels', scope: 'ZohoMail.tags.READ' },
+
   {
-    title: 'Tasks - Full Access',
-    description: 'Create, read, update, and delete tasks',
+    title: 'Tasks',
+    description: 'Create, read, update, and delete personal and group tasks',
     scope: 'ZohoMail.tasks.ALL'
   },
-  { title: 'Tasks - Read', description: 'Read tasks', scope: 'ZohoMail.tasks.READ' },
+
   {
-    title: 'Notes - Full Access',
-    description: 'Create, read, update, and delete notes',
+    title: 'Notes',
+    description: 'Create, read, update, and delete personal and group notes',
     scope: 'ZohoMail.notes.ALL'
   },
-  { title: 'Notes - Read', description: 'Read notes', scope: 'ZohoMail.notes.READ' },
+
   {
-    title: 'Bookmarks - Full Access',
-    description: 'Create, read, update, and delete bookmarks',
+    title: 'Bookmarks',
+    description: 'Create, read, update, and delete personal and group bookmarks',
     scope: 'ZohoMail.links.ALL'
   },
-  { title: 'Bookmarks - Read', description: 'Read bookmarks', scope: 'ZohoMail.links.READ' },
+
   {
-    title: 'Organization Accounts - Full Access',
-    description: 'Manage organization user accounts (admin)',
-    scope: 'ZohoMail.organization.accounts.ALL'
-  },
-  {
-    title: 'Organization Accounts - Read',
-    description: 'Read organization user accounts (admin)',
+    title: 'Organization Accounts',
+    description: 'Read organization user accounts',
     scope: 'ZohoMail.organization.accounts.READ'
   },
+
   {
-    title: 'Organization Domains - Full Access',
-    description: 'Manage organization domains (admin)',
-    scope: 'ZohoMail.organization.domains.ALL'
+    title: 'Organization Domains',
+    description: 'Read organization domains',
+    scope: 'ZohoMail.organization.domains.READ'
   },
+
   {
-    title: 'Organization Groups - Full Access',
-    description: 'Manage organization groups (admin)',
-    scope: 'ZohoMail.organization.groups.ALL'
+    title: 'Organization Groups',
+    description: 'Read organization groups',
+    scope: 'ZohoMail.organization.groups.READ'
   },
+
   {
-    title: 'Organization Policy - Full Access',
-    description: 'Manage mail policies (admin)',
-    scope: 'ZohoMail.organization.policy.ALL'
-  },
-  {
-    title: 'Organization Spam - Full Access',
-    description: 'Manage anti-spam settings (admin)',
-    scope: 'ZohoMail.organization.spam.ALL'
-  },
-  {
-    title: 'Organization Subscriptions - Read',
-    description: 'Read storage and subscription details (admin)',
+    title: 'Organization Subscriptions',
+    description: 'Read organization storage and subscription details',
     scope: 'ZohoMail.organization.subscriptions.READ'
   },
+
   {
-    title: 'Organization Audit - Read',
-    description: 'Read audit logs (admin)',
-    scope: 'ZohoMail.organization.audit.READ'
-  },
-  {
-    title: 'Partner Organization - Full Access',
-    description: 'Manage partner/child organizations',
-    scope: 'ZohoMail.partner.organization.ALL'
+    title: 'Partner Organization',
+    description: 'Read organization details',
+    scope: 'ZohoMail.partner.organization.READ'
   }
 ];
 
-function createMailOauth(name: string, key: string, dataCenterDomain: string) {
-  return {
-    type: 'auth.oauth' as const,
-    name,
-    key,
-    scopes,
+let supportedRegions = ['us', 'eu', 'in', 'au', 'jp'] as const;
+type ZohoMailRegion = (typeof supportedRegions)[number];
+type ZohoMailHookContext = {
+  output: { token: string; region: ZohoMailRegion };
+};
 
-    getAuthorizationUrl: async (ctx: any) => {
-      let params = new URLSearchParams({
-        client_id: ctx.clientId,
-        response_type: 'code',
-        redirect_uri: ctx.redirectUri,
-        scope: ctx.scopes.join(','),
-        access_type: 'offline',
-        state: ctx.state,
-        prompt: 'consent'
-      });
-      return {
-        url: `https://accounts.${dataCenterDomain}/oauth/v2/auth?${params.toString()}`
-      };
-    },
+let getPrimaryMailAccount = async (ctx: ZohoMailHookContext) => {
+  let response = await createAxios({
+    baseURL: ZOHO_MAIL_API_ORIGINS[ctx.output.region],
+    headers: { Authorization: `Zoho-oauthtoken ${ctx.output.token}` }
+  }).get('/api/accounts');
 
-    handleCallback: async (ctx: any) => {
-      let accountsAxios = createAxios({ baseURL: `https://accounts.${dataCenterDomain}` });
-      let response = await accountsAxios.post('/oauth/v2/token', null, {
-        params: {
-          code: ctx.code,
-          grant_type: 'authorization_code',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret,
-          redirect_uri: ctx.redirectUri
-        }
-      });
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+  return response.data?.data?.[0];
+};
 
-      let accountId: string | undefined;
-      try {
-        let mailAxios = createAxios({
-          baseURL: `https://mail.${dataCenterDomain}`,
-          headers: { Authorization: `Zoho-oauthtoken ${data.access_token}` }
-        });
-        let accountsResponse = await mailAxios.get('/api/accounts');
-        if (accountsResponse.data?.data?.[0]?.accountId) {
-          accountId = String(accountsResponse.data.data[0].accountId);
-        }
-      } catch {
-        // optional
-      }
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
-          accountId,
-          dataCenterDomain
-        }
-      };
-    },
-
-    handleTokenRefresh: async (ctx: any) => {
-      let domain = ctx.output.dataCenterDomain || dataCenterDomain;
-      let accountsAxios = createAxios({ baseURL: `https://accounts.${domain}` });
-      let response = await accountsAxios.post('/oauth/v2/token', null, {
-        params: {
-          refresh_token: ctx.output.refreshToken,
-          grant_type: 'refresh_token',
-          client_id: ctx.clientId,
-          client_secret: ctx.clientSecret
-        }
-      });
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: ctx.output.refreshToken,
-          expiresAt,
-          accountId: ctx.output.accountId,
-          dataCenterDomain: domain
-        }
-      };
-    },
-
-    getProfile: async (ctx: any) => {
-      let domain = ctx.output.dataCenterDomain || dataCenterDomain;
-      let mailAxios = createAxios({
-        baseURL: `https://mail.${domain}`,
-        headers: { Authorization: `Zoho-oauthtoken ${ctx.output.token}` }
-      });
-      let response = await mailAxios.get('/api/accounts');
-      let account = response.data?.data?.[0];
-      return {
-        profile: {
-          id: account?.accountId ? String(account.accountId) : undefined,
-          email: account?.emailAddress?.[0]?.mailId || account?.primaryEmailAddress,
-          name: [account?.firstName, account?.lastName].filter(Boolean).join(' ') || undefined
-        }
-      };
+let oauth = createZohoOauth({
+  supportedRegions,
+  scopes,
+  apiOrigins: {
+    us: [ZOHO_MAIL_OAUTH_API_ORIGINS.us],
+    eu: [ZOHO_MAIL_OAUTH_API_ORIGINS.eu],
+    in: [ZOHO_MAIL_OAUTH_API_ORIGINS.in],
+    au: [ZOHO_MAIL_OAUTH_API_ORIGINS.au],
+    jp: [ZOHO_MAIL_OAUTH_API_ORIGINS.jp]
+  },
+  extendOutput: async (ctx: ZohoMailHookContext) => {
+    try {
+      let account = await getPrimaryMailAccount(ctx);
+      return account?.accountId ? { accountId: String(account.accountId) } : undefined;
+    } catch {
+      return undefined;
     }
-  };
-}
+  },
+  profile: async (ctx: ZohoMailHookContext) => {
+    let account = await getPrimaryMailAccount(ctx);
+
+    return {
+      id: account?.accountId ? String(account.accountId) : undefined,
+      email: account?.emailAddress?.[0]?.mailId || account?.primaryEmailAddress,
+      name: [account?.firstName, account?.lastName].filter(Boolean).join(' ') || undefined
+    };
+  }
+});
 
 export let auth = SlateAuth.create()
   .output(
@@ -217,13 +127,11 @@ export let auth = SlateAuth.create()
       token: z.string(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
-      accountId: z.string().optional().describe('Primary Zoho Mail account ID'),
-      dataCenterDomain: z.string()
+      applicationType: z.enum(['multi_dc', 'regional']),
+      region: z.enum(supportedRegions),
+      accountsUrl: z.string(),
+      apiDomain: z.string(),
+      accountId: z.string().optional().describe('Primary Zoho Mail account ID')
     })
   )
-  .addOauth(createMailOauth('United States (zoho.com)', 'oauth_us', 'zoho.com'))
-  .addOauth(createMailOauth('Europe (zoho.eu)', 'oauth_eu', 'zoho.eu'))
-  .addOauth(createMailOauth('India (zoho.in)', 'oauth_in', 'zoho.in'))
-  .addOauth(createMailOauth('Australia (zoho.com.au)', 'oauth_au', 'zoho.com.au'))
-  .addOauth(createMailOauth('Japan (zoho.jp)', 'oauth_jp', 'zoho.jp'))
-  .addOauth(createMailOauth('China (zoho.com.cn)', 'oauth_cn', 'zoho.com.cn'));
+  .addOauth(oauth);

@@ -35,7 +35,7 @@ Supports all standard and custom modules.`
     autoRegisterWebhook: async ctx => {
       let client = new Client({
         token: ctx.auth.token,
-        apiBaseUrl: ctx.auth.apiBaseUrl
+        apiDomain: ctx.auth.apiDomain
       });
 
       let channelId = `slates_${Date.now()}`;
@@ -71,7 +71,7 @@ Supports all standard and custom modules.`
     autoUnregisterWebhook: async ctx => {
       let client = new Client({
         token: ctx.auth.token,
-        apiBaseUrl: ctx.auth.apiBaseUrl
+        apiDomain: ctx.auth.apiDomain
       });
 
       let channelIds = ctx.input.registrationDetails?.channelIds || [];

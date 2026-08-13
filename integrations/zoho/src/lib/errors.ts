@@ -1,4 +1,4 @@
-import { badRequestError, ServiceError } from '@lowerdeck/error';
+import { buildApiServiceError, createApiServiceError, type SlateErrorResponse } from 'slates';
 
 type ErrorResponse = {
   status?: number;
@@ -19,16 +19,25 @@ let pushMessage = (messages: string[], value: unknown) => {
 };
 
 let collectZohoMessages = (value: unknown, messages: string[]) => {
+  if (Array.isArray(value)) {
+    for (let item of value) {
+      collectZohoMessages(item, messages);
+    }
+    return;
+  }
+
   if (!isRecord(value)) {
     pushMessage(messages, value);
     return;
   }
 
-  for (let key of ['message', 'error', 'error_description', 'code']) {
-    pushMessage(messages, value[key]);
+  if (isRecord(value.error)) {
+    collectZohoMessages(value.error, messages);
   }
 
-  if (isRecord(value.details)) {
+  if (Array.isArray(value.details)) {
+    collectZohoMessages(value.details, messages);
+  } else if (isRecord(value.details)) {
     for (let [key, detailValue] of Object.entries(value.details)) {
       if (typeof detailValue === 'string') {
         pushMessage(messages, `${key}: ${detailValue}`);
@@ -36,10 +45,12 @@ let collectZohoMessages = (value: unknown, messages: string[]) => {
     }
   }
 
-  if (Array.isArray(value.data)) {
-    for (let item of value.data) {
-      collectZohoMessages(item, messages);
-    }
+  for (let key of ['message', 'error', 'error_description', 'title', 'error_type', 'code']) {
+    pushMessage(messages, value[key]);
+  }
+
+  if (value.data !== undefined) {
+    collectZohoMessages(value.data, messages);
   }
 };
 
@@ -60,31 +71,17 @@ let extractZohoMessage = (error: unknown) => {
   return 'Unknown error';
 };
 
-export let zohoServiceError = (message: string) =>
-  new ServiceError(badRequestError({ message }));
+export let mapZohoAxiosError = (error: unknown, inferred: SlateErrorResponse) => ({
+  ...inferred,
+  message: extractZohoMessage(error)
+});
 
-export let zohoApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
+export let zohoServiceError = (message: string) => createApiServiceError(message);
 
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let status = response?.status;
-  let statusLabel =
-    status !== undefined
-      ? `HTTP ${status}${response?.statusText ? ` ${response.statusText}` : ''}: `
-      : '';
-
-  let serviceError = zohoServiceError(
-    `Zoho API ${operation} failed: ${statusLabel}${extractZohoMessage(error)}`
-  );
-
-  serviceError.data.reason = 'zoho_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+export let zohoApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Zoho',
+    operation,
+    reason: 'zoho_api_error',
+    extractMessage: extractZohoMessage
+  });

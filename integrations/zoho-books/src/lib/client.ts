@@ -1,20 +1,49 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+
+export let ZOHO_BOOKS_API_ORIGINS = {
+  us: 'https://www.zohoapis.com',
+  eu: 'https://www.zohoapis.eu',
+  in: 'https://www.zohoapis.in',
+  au: 'https://www.zohoapis.com.au',
+  jp: 'https://www.zohoapis.jp',
+  ca: 'https://www.zohoapis.ca',
+  sa: 'https://www.zohoapis.sa'
+} as const;
+
+let zohoBooksApiOriginSet = new Set<string>(Object.values(ZOHO_BOOKS_API_ORIGINS));
 
 export interface ZohoClientConfig {
   token: string;
   organizationId: string;
-  region: string;
+  apiDomain: string;
 }
+
+let requireZohoBooksClientConfig = (config: ZohoClientConfig) => {
+  if (typeof config?.token !== 'string' || !config.token) {
+    throw createApiServiceError(
+      'Zoho Books authentication state is missing an access token. Reconnect the account.'
+    );
+  }
+  if (typeof config.apiDomain !== 'string' || !zohoBooksApiOriginSet.has(config.apiDomain)) {
+    throw createApiServiceError(
+      'Zoho Books authentication state has an invalid API domain. Reconnect the account.'
+    );
+  }
+
+  return config;
+};
 
 export class Client {
   private http: ReturnType<typeof createAxios>;
   private organizationId: string;
 
   constructor(config: ZohoClientConfig) {
-    this.organizationId = config.organizationId;
-    let baseURL = `https://www.zohoapis${config.region}/books/v3`;
-    this.http = createAxios({ baseURL });
-    this.http.defaults.headers.common.Authorization = `Zoho-oauthtoken ${config.token}`;
+    let auth = requireZohoBooksClientConfig(config);
+    this.organizationId = auth.organizationId;
+    this.http = createAxios({
+      baseURL: `${auth.apiDomain}/books/v3`,
+      headers: { Authorization: `Zoho-oauthtoken ${auth.token}` }
+    });
   }
 
   private params(extra?: Record<string, any>) {

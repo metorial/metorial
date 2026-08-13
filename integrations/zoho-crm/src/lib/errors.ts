@@ -1,9 +1,6 @@
-import { badRequestError, ServiceError } from '@lowerdeck/error';
+import { buildApiServiceError, createApiServiceError } from 'slates';
 
 type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  headers?: Record<string, unknown>;
   data?: unknown;
 };
 
@@ -14,16 +11,12 @@ let addDetail = (details: string[], value: unknown) => {
   if (typeof value !== 'string' && typeof value !== 'number') return;
 
   let detail = String(value).trim();
-  if (detail && !details.includes(detail)) {
-    details.push(detail);
-  }
+  if (detail && !details.includes(detail)) details.push(detail);
 };
 
 let collectDetails = (value: unknown, details: string[]) => {
   if (Array.isArray(value)) {
-    for (let item of value) {
-      collectDetails(item, details);
-    }
+    for (let item of value) collectDetails(item, details);
     return;
   }
 
@@ -32,11 +25,9 @@ let collectDetails = (value: unknown, details: string[]) => {
     return;
   }
 
-  addDetail(details, value.code);
-  addDetail(details, value.message);
-  addDetail(details, value.status);
-  addDetail(details, value.error);
-  addDetail(details, value.error_description);
+  for (let key of ['code', 'message', 'status', 'error', 'error_description']) {
+    addDetail(details, value[key]);
+  }
 
   if (isRecord(value.details)) {
     addDetail(details, value.details.api_name);
@@ -48,65 +39,28 @@ let collectDetails = (value: unknown, details: string[]) => {
   collectDetails(value.errors, details);
 };
 
-let responseFor = (error: unknown) =>
-  isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-
-let extractZohoMessage = (error: unknown) => {
+let extractZohoCrmMessage = (error: unknown) => {
+  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
   let details: string[] = [];
-  collectDetails(responseFor(error)?.data, details);
+  collectDetails(response?.data, details);
 
-  if (details.length > 0) {
-    return details.join(' - ');
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
+  if (details.length > 0) return details.join(' - ');
+  if (error instanceof Error && error.message) return error.message;
   return 'Unknown error';
 };
 
-let statusLabelFor = (response?: ErrorResponse) =>
-  response?.status !== undefined
-    ? `HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}: `
-    : '';
+export let zohoCrmServiceError = (message: string) => createApiServiceError(message);
 
-let upstreamCodeFor = (response?: ErrorResponse) => {
-  let data = response?.data;
-  if (!isRecord(data)) return undefined;
-
-  if (typeof data.code === 'string') return data.code;
-  let first = Array.isArray(data.data) ? data.data[0] : undefined;
-  return isRecord(first) && typeof first.code === 'string' ? first.code : undefined;
-};
-
-export let zohoCrmServiceError = (message: string) =>
-  new ServiceError(badRequestError({ message }));
-
-export let zohoCrmApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
-
-  let response = responseFor(error);
-  let serviceError = zohoCrmServiceError(
-    `Zoho CRM API ${operation} failed: ${statusLabelFor(response)}${extractZohoMessage(error)}`
-  );
-  serviceError.data.reason = 'zoho_crm_api_error';
-  serviceError.data.upstreamStatus = response?.status;
-  serviceError.data.upstreamCode = upstreamCodeFor(response);
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+export let zohoCrmApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Zoho CRM',
+    operation,
+    reason: 'zoho_crm_api_error',
+    extractMessage: extractZohoCrmMessage
+  });
 
 export let requireZohoCrmString = (value: unknown, label: string, action?: string) => {
-  if (typeof value === 'string' && value.trim()) {
-    return value;
-  }
+  if (typeof value === 'string' && value.trim()) return value;
 
   throw zohoCrmServiceError(`${label} is required${action ? ` for "${action}"` : ''}.`);
 };
@@ -116,9 +70,7 @@ export let requireZohoCrmArray = <T>(
   label: string,
   action?: string
 ) => {
-  if (Array.isArray(value) && value.length > 0) {
-    return value;
-  }
+  if (Array.isArray(value) && value.length > 0) return value;
 
   throw zohoCrmServiceError(
     `${label} must contain at least one item${action ? ` for "${action}"` : ''}.`

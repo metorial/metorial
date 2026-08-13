@@ -44,7 +44,7 @@ Permanently removes the specified records. This action cannot be undone.`,
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     if (ctx.input.recordIds.length > 100) {

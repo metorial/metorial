@@ -1,20 +1,55 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
+
+export let ZOHO_INVENTORY_API_ORIGINS = {
+  us: 'https://www.zohoapis.com',
+  eu: 'https://www.zohoapis.eu',
+  in: 'https://www.zohoapis.in',
+  au: 'https://www.zohoapis.com.au',
+  jp: 'https://www.zohoapis.jp',
+  ca: 'https://www.zohoapis.ca',
+  sa: 'https://www.zohoapis.sa'
+} as const;
+
+let zohoInventoryApiOriginSet = new Set<string>(Object.values(ZOHO_INVENTORY_API_ORIGINS));
+
+type ZohoInventoryClientConfig = {
+  token: string;
+  organizationId: string;
+  apiDomain: string;
+};
+
+let requireZohoInventoryClientConfig = (config: ZohoInventoryClientConfig) => {
+  if (typeof config?.token !== 'string' || !config.token) {
+    throw createApiServiceError(
+      'Zoho Inventory authentication state is missing an access token. Reconnect the account.'
+    );
+  }
+  if (
+    typeof config.apiDomain !== 'string' ||
+    !zohoInventoryApiOriginSet.has(config.apiDomain)
+  ) {
+    throw createApiServiceError(
+      'Zoho Inventory authentication state has an invalid API domain. Reconnect the account.'
+    );
+  }
+
+  return config;
+};
 
 export class ZohoInventoryClient {
   private http: ReturnType<typeof createAxios>;
   private organizationId: string;
 
-  constructor(config: { token: string; organizationId: string; dataCenterDomain: string }) {
-    let baseURL = `https://www.zohoapis.${config.dataCenterDomain}/inventory/v1`;
-
-    this.organizationId = config.organizationId;
+  constructor(config: ZohoInventoryClientConfig) {
+    let auth = requireZohoInventoryClientConfig(config);
+    this.organizationId = auth.organizationId;
     this.http = createAxios({
-      baseURL,
+      baseURL: `${auth.apiDomain}/inventory/v1`,
       headers: {
-        Authorization: `Zoho-oauthtoken ${config.token}`
+        Authorization: `Zoho-oauthtoken ${auth.token}`
       },
       params: {
-        organization_id: config.organizationId
+        organization_id: auth.organizationId
       }
     });
   }

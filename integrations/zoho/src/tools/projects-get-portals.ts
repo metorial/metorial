@@ -1,8 +1,31 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ZohoProjectsClient } from '../lib/client';
-import type { Datacenter } from '../lib/urls';
 import { spec } from '../spec';
+
+let isRecord = (value: unknown): value is Record<string, any> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export let mapProjectsV3Portals = (result: unknown) => {
+  let records = Array.isArray(result)
+    ? result
+    : isRecord(result) && Array.isArray(result.portals)
+      ? result.portals
+      : [];
+
+  return records
+    .filter(isRecord)
+    .map(portal => ({
+      portalId: portal.id || portal.portal_id || portal.portalId,
+      name: portal.name || portal.portal_name,
+      role: portal.role || (isRecord(portal.profile) ? portal.profile.name : undefined)
+    }))
+    .filter((portal: { portalId?: unknown }) => portal.portalId)
+    .map((portal: { portalId: unknown; name?: string; role?: string }) => ({
+      ...portal,
+      portalId: String(portal.portalId)
+    }));
+};
 
 export let projectsGetPortals = SlateTool.create(spec, {
   name: 'Projects Get Portals',
@@ -28,19 +51,8 @@ export let projectsGetPortals = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let dc = (ctx.auth.datacenter || ctx.config.datacenter || 'us') as Datacenter;
-    let result = await ZohoProjectsClient.listPortals(ctx.auth.token, dc);
-    let portals = (result?.portals || [])
-      .map((portal: any) => ({
-        portalId: portal.id || portal.portal_id || portal.portalId,
-        name: portal.name || portal.portal_name,
-        role: portal.role
-      }))
-      .filter((portal: { portalId?: unknown }) => portal.portalId)
-      .map((portal: { portalId: unknown; name?: string; role?: string }) => ({
-        ...portal,
-        portalId: String(portal.portalId)
-      }));
+    let result = await ZohoProjectsClient.listPortals(ctx.auth);
+    let portals = mapProjectsV3Portals(result);
 
     return {
       output: { portals },

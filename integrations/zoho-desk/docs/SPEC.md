@@ -1,6 +1,4 @@
-Now let me get the full list of webhook events and scopes from the official documentation.Now I have all the information I need. Let me compile the specification.
-
-# Slates Specification for Zoho Desk
+# Zoho Desk Specification
 
 ## Overview
 
@@ -17,19 +15,16 @@ Zoho Desk exclusively uses **OAuth 2.0** for API authentication.
 
 ### Authorization Flow
 
-Zoho Desk uses the **Authorization Code Grant** type. The flow is:
+The integration uses one **Authorization Code Grant** method for a customer-owned regular regional or Multi-DC server application. `applicationType` is required. `region` is required for a regional application and optional for Multi-DC as an expected-region constraint. The flow is:
 
-1. **Obtain authorization code**: Redirect the user to Zoho's authorization endpoint:
+1. **Obtain authorization code**: Start a regional application at its selected regional Accounts origin. Start a Multi-DC application through Zoho's global authorization endpoint:
    ```
    https://accounts.zoho.com/oauth/v2/auth?scope=<SCOPES>&client_id=<CLIENT_ID>&response_type=code&access_type=offline&redirect_uri=<REDIRECT_URI>
    ```
-2. **Exchange for tokens**: POST the authorization code to:
-   ```
-   https://accounts.zoho.com/oauth/v2/token
-   ```
-   with `grant_type=authorization_code`, `client_id`, `client_secret`, `code`, and `redirect_uri`.
-3. You receive an **access token** (valid for 1 hour) and a **refresh token** (valid until revoked).
-4. Use the refresh token to obtain new access tokens via the same token endpoint with `grant_type=refresh_token`.
+2. **Validate callback routing**: Require Zoho's `location` and `accounts-server` callback values, verify that both identify the same supported region, enforce any selected/expected region, and reject any unrecognized origin.
+3. **Exchange for tokens**: POST the authorization code to the validated regional Accounts origin from the callback with `grant_type=authorization_code`, `client_id`, `client_secret`, `code`, and `redirect_uri`.
+4. **Validate the service origin**: Accept the Desk API origin only from Zoho's token response and only when it exactly matches the selected region's documented Desk origin.
+5. You receive an **access token** (valid for 1 hour) and a **refresh token** (valid until revoked). Refreshes use the persisted, validated regional Accounts origin.
 
 ### Self-Client Option
 
@@ -44,14 +39,12 @@ All API requests require two mandatory headers:
 
 ### Data Center Domains
 
-Zoho operates region-specific data centers. The accounts and API base URLs differ by region:
+Zoho operates region-specific data centers. The resolved callback region is persisted and any selected/expected region constrains callback validation, while API requests use the exact Desk origin returned by the token response:
 
-- **US** (default): `accounts.zoho.com` / `desk.zoho.com`
+- **US**: `accounts.zoho.com` / `desk.zoho.com`
 - **EU**: `accounts.zoho.eu` / `desk.zoho.eu`
 - **IN**: `accounts.zoho.in` / `desk.zoho.in`
 - **AU**: `accounts.zoho.com.au` / `desk.zoho.com.au`
-- **CN**: `accounts.zoho.com.cn` / `desk.zoho.com.cn`
-
 ### Scopes
 
 Scopes follow the format `Desk.<module>.<operation>`, where operation can be `ALL`, `CREATE`, `READ`, `UPDATE`, or `DELETE`. Multiple scopes are comma-separated. Common scopes include:
@@ -67,6 +60,34 @@ Scopes follow the format `Desk.<module>.<operation>`, where operation can be `AL
 - `Desk.search.READ`
 
 When using the Self Client flow, you should also include the `aaaserver.profile.read` scope.
+
+#### Declared Scope Contract
+
+```ts
+[
+  'Desk.tickets.ALL',
+  'Desk.contacts.ALL',
+  'Desk.tasks.ALL',
+  'Desk.events.ALL',
+  'Desk.articles.ALL',
+  'Desk.basic.READ',
+  'Desk.search.READ'
+]
+```
+
+| Capability group | Retained scope |
+| --- | --- |
+| Ticket, comment, thread, tag, and time-entry operations | `Desk.tickets.ALL` |
+| Contact and account CRUD | `Desk.contacts.ALL` |
+| Task CRUD | `Desk.tasks.ALL` |
+| Webhook subscription lifecycle | `Desk.events.ALL` |
+| Knowledge-base article CRUD | `Desk.articles.ALL` |
+| Profile, agent, department, and category reads | `Desk.basic.READ` |
+| Ticket/contact/account search | `Desk.search.READ` |
+
+The current [Zoho Desk API scope catalog](https://support.zoho.com/DeskAPIDocument) documents the independent tickets, contacts/accounts, tasks, events, articles, basic, and search capability groups. It describes contacts scope as covering accounts, so the separate legacy Desk.accounts.ALL request is omitted.
+
+The catalog is inconsistent about enumerating the broad Desk.contacts.ALL and Desk.articles.ALL spellings even though existing authorization uses them. They are retained as explicit ambiguities until reauthorization can verify contact/account deletion and article CRUD. Task 0 currently blocks those live checks.
 
 ## Features
 

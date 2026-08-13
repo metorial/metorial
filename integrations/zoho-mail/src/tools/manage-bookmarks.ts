@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -55,13 +55,13 @@ export let manageBookmarks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.auth.dataCenterDomain
+      region: ctx.auth.region
     });
 
     let { action, scope, groupId } = ctx.input;
 
     if (scope === 'group' && !groupId) {
-      throw new Error('groupId is required for group bookmark operations');
+      throw createApiServiceError('groupId is required for group bookmark operations');
     }
 
     let mapBookmark = (b: any) => ({
@@ -88,7 +88,9 @@ export let manageBookmarks = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.bookmarkUrl) throw new Error('bookmarkUrl is required for create action');
+      if (!ctx.input.bookmarkUrl) {
+        throw createApiServiceError('bookmarkUrl is required for create action');
+      }
       let data: any = {
         url: ctx.input.bookmarkUrl,
         name: ctx.input.bookmarkName,
@@ -106,7 +108,9 @@ export let manageBookmarks = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.bookmarkId) throw new Error('bookmarkId is required for delete action');
+      if (!ctx.input.bookmarkId) {
+        throw createApiServiceError('bookmarkId is required for delete action');
+      }
       await client.deletePersonalBookmark(ctx.input.bookmarkId);
       return {
         output: { success: true },
@@ -114,6 +118,6 @@ export let manageBookmarks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

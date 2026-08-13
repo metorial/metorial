@@ -37,7 +37,7 @@ Useful for complex, cross-field queries and precise data extraction.`,
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     let result = await client.executeCoql({ selectQuery: ctx.input.query });

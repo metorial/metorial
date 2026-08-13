@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -48,7 +48,7 @@ export let manageFolders = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.auth.dataCenterDomain
+      region: ctx.auth.region
     });
 
     let { action, accountId } = ctx.input;
@@ -72,7 +72,9 @@ export let manageFolders = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.folderName) throw new Error('folderName is required for create action');
+      if (!ctx.input.folderName) {
+        throw createApiServiceError('folderName is required for create action');
+      }
       let result = await client.createFolder(
         accountId,
         ctx.input.folderName,
@@ -85,8 +87,12 @@ export let manageFolders = SlateTool.create(spec, {
     }
 
     if (action === 'rename') {
-      if (!ctx.input.folderId) throw new Error('folderId is required for rename action');
-      if (!ctx.input.folderName) throw new Error('folderName is required for rename action');
+      if (!ctx.input.folderId) {
+        throw createApiServiceError('folderId is required for rename action');
+      }
+      if (!ctx.input.folderName) {
+        throw createApiServiceError('folderName is required for rename action');
+      }
       let result = await client.renameFolder(
         accountId,
         ctx.input.folderId,
@@ -104,7 +110,9 @@ export let manageFolders = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.folderId) throw new Error('folderId is required for delete action');
+      if (!ctx.input.folderId) {
+        throw createApiServiceError('folderId is required for delete action');
+      }
       await client.deleteFolder(accountId, ctx.input.folderId);
       return {
         output: { success: true },
@@ -113,7 +121,9 @@ export let manageFolders = SlateTool.create(spec, {
     }
 
     if (action === 'empty') {
-      if (!ctx.input.folderId) throw new Error('folderId is required for empty action');
+      if (!ctx.input.folderId) {
+        throw createApiServiceError('folderId is required for empty action');
+      }
       await client.emptyFolder(accountId, ctx.input.folderId);
       return {
         output: { success: true },
@@ -122,7 +132,9 @@ export let manageFolders = SlateTool.create(spec, {
     }
 
     if (action === 'markAsRead') {
-      if (!ctx.input.folderId) throw new Error('folderId is required for markAsRead action');
+      if (!ctx.input.folderId) {
+        throw createApiServiceError('folderId is required for markAsRead action');
+      }
       await client.markFolderAsRead(accountId, ctx.input.folderId);
       return {
         output: { success: true },
@@ -130,6 +142,6 @@ export let manageFolders = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,14 +56,14 @@ export let updateEmail = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.auth.dataCenterDomain
+      region: ctx.auth.region
     });
 
     let { action, messageIds, accountId } = ctx.input;
 
     if (action === 'delete') {
       if (!ctx.input.folderId) {
-        throw new Error('folderId is required for delete action');
+        throw createApiServiceError('folderId is required for delete action');
       }
       for (let msgId of messageIds) {
         await client.deleteMessage(accountId, ctx.input.folderId, msgId);
@@ -95,14 +95,14 @@ export let updateEmail = SlateTool.create(spec, {
 
     if (action === 'moveToFolder') {
       if (!ctx.input.destinationFolderId) {
-        throw new Error('destinationFolderId is required for moveToFolder action');
+        throw createApiServiceError('destinationFolderId is required for moveToFolder action');
       }
       params.destfolderId = ctx.input.destinationFolderId;
     }
 
     if (action === 'addLabel' || action === 'removeLabel') {
       if (!ctx.input.labelId) {
-        throw new Error('labelId is required for addLabel/removeLabel actions');
+        throw createApiServiceError('labelId is required for addLabel/removeLabel actions');
       }
       params.labelId = ctx.input.labelId;
     }

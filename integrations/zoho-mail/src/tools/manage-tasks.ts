@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -56,13 +56,13 @@ export let manageTasks = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      domain: ctx.auth.dataCenterDomain
+      region: ctx.auth.region
     });
 
     let { action, scope, groupId } = ctx.input;
 
     if (scope === 'group' && !groupId && action !== 'list') {
-      throw new Error('groupId is required for group task operations');
+      throw createApiServiceError('groupId is required for group task operations');
     }
 
     let mapTask = (t: any) => ({
@@ -97,7 +97,9 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.title) throw new Error('title is required for create action');
+      if (!ctx.input.title) {
+        throw createApiServiceError('title is required for create action');
+      }
       let taskData: any = {
         title: ctx.input.title,
         description: ctx.input.description,
@@ -116,7 +118,9 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.taskId) throw new Error('taskId is required for update action');
+      if (!ctx.input.taskId) {
+        throw createApiServiceError('taskId is required for update action');
+      }
       let taskData: any = {};
       if (ctx.input.title) taskData.title = ctx.input.title;
       if (ctx.input.description) taskData.description = ctx.input.description;
@@ -137,7 +141,9 @@ export let manageTasks = SlateTool.create(spec, {
     }
 
     if (action === 'delete') {
-      if (!ctx.input.taskId) throw new Error('taskId is required for delete action');
+      if (!ctx.input.taskId) {
+        throw createApiServiceError('taskId is required for delete action');
+      }
       if (scope === 'group' && groupId) {
         await client.deleteGroupTask(groupId, ctx.input.taskId);
       } else {
@@ -149,6 +155,6 @@ export let manageTasks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${action}`);
+    throw createApiServiceError(`Unknown action: ${action}`);
   })
   .build();

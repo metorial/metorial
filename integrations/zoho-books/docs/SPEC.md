@@ -1,6 +1,6 @@
 Now let me get the full list of API modules and scopes from the official docs.Now I have comprehensive information. Let me compile the specification.
 
-# Slates Specification for Zoho Books
+# Zoho Books Integration Specification
 
 ## Overview
 
@@ -8,27 +8,15 @@ Zoho Books is a cloud-based accounting software for small and medium businesses.
 
 ## Authentication
 
-Zoho Books uses the OAuth 2.0 protocol for authentication, enabling third-party applications to gain delegated access to protected resources via the API.
+Zoho Books uses OAuth 2.0. The integration exposes one OAuth method for a customer-owned regular regional or Multi-DC server application. `applicationType` is required. `region` is required for a regional application and optional for Multi-DC as an expected-region constraint.
 
 **OAuth 2.0 Authorization Code Flow:**
 
-1. **Register your application** at the [Zoho Developer Console](https://api-console.zoho.com/). You need to register your application with Zoho Books by going to the Zoho Developer Console and choosing a client type. Client types include: Server-based Applications, Client-based Applications, Mobile-based Applications, Non-browser Applications, and Self Client. After registration, you will receive a Client ID and Client Secret.
-
-2. **Authorization request:** Direct users to `{Accounts_URL}/oauth/v2/auth` with parameters:
-   - `client_id` — Your registered Client ID
-   - `response_type=code`
-   - `scope` — Comma-separated list of scopes (see below)
-   - `redirect_uri` — Must match the registered redirect URI
-   - `access_type` — `offline` (to receive a refresh token) or `online`
-   - `prompt=consent` (optional, to force re-consent)
-
-3. **Exchange code for tokens:** POST to `{Accounts_URL}/oauth/v2/token` with `grant_type=authorization_code`, `client_id`, `client_secret`, `redirect_uri`, and the authorization `code`.
-
-4. **Refresh tokens:** POST to `{Accounts_URL}/oauth/v2/token` with `grant_type=refresh_token`, `refresh_token`, `client_id`, and `client_secret`.
-
-5. **Using the token:** Pass the access token in the Authorization header: `Authorization: Zoho-oauthtoken {access_token}`.
-
-**Self Client flow:** For backend applications without a redirect URL, generate a grant token directly via the Zoho Developer Console by selecting the "Self Client" type, specifying scopes, and exchanging the code for tokens.
+1. Register a regular regional or Multi-DC server application at the [Zoho Developer Console](https://api-console.zoho.com/) and supply its Client ID and Client Secret when connecting.
+2. Regional authorization starts at the selected regional Accounts origin. Multi-DC authorization starts at `https://accounts.zoho.com/oauth/v2/auth`.
+3. The callback must contain matching `location` and `accounts-server` values. The authorization code is exchanged only at that exact validated regional Accounts origin. The inferred region must match the regional selection or an optional Multi-DC expected-region constraint.
+4. Refresh requests use the persisted regional Accounts origin and preserve the existing refresh token when Zoho omits a replacement.
+5. Books API requests use the allowlisted `api_domain` returned by Zoho. Access tokens are passed as `Authorization: Zoho-oauthtoken {access_token}`.
 
 **Token Validity:**
 
@@ -37,7 +25,18 @@ Zoho Books uses the OAuth 2.0 protocol for authentication, enabling third-party 
 
 **Organization ID:** Every request requires an `organization_id`, obtainable via `GET /organizations` (scope: `ZohoBooks.settings.READ`) or from the Zoho Books admin console.
 
-**Multi-Region Support:** There are 8 different domains for Zoho Books' APIs, and you must use the one applicable to your account. Domains include `.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.com.cn`, and `.sa`. The Accounts URL and API base URL must match the user's region (e.g., `https://accounts.zoho.eu` and `https://www.zohoapis.eu` for EU).
+**Supported Data Centers:**
+
+| Region | Accounts origin | Allowed Books API origin |
+| --- | --- | --- |
+| US | `https://accounts.zoho.com` | `https://www.zohoapis.com` |
+| EU | `https://accounts.zoho.eu` | `https://www.zohoapis.eu` |
+| IN | `https://accounts.zoho.in` | `https://www.zohoapis.in` |
+| AU | `https://accounts.zoho.com.au` | `https://www.zohoapis.com.au` |
+| JP | `https://accounts.zoho.jp` | `https://www.zohoapis.jp` |
+| CA | `https://accounts.zohocloud.ca` | `https://www.zohoapis.ca` |
+| SA | `https://accounts.zoho.sa` | `https://www.zohoapis.sa` |
+Connections created with the previous region-specific OAuth methods must reconnect with the unified `oauth` method and select their region.
 
 **Scopes:** Format is `ZohoBooks.{scope_name}.{operation}` where operation is `CREATE`, `READ`, `UPDATE`, `DELETE`, or `ALL`. Available scope names:
 
@@ -59,6 +58,35 @@ Zoho Books uses the OAuth 2.0 protocol for authentication, enabling third-party 
 | `banking`          | Banking                                                               |
 | `accountants`      | Accountant module                                                     |
 | `fullaccess`       | Full access to all resources (use `ZohoBooks.fullaccess.all`)         |
+
+#### Declared Scope Contract
+
+```ts
+[
+  'ZohoBooks.fullaccess.all',
+  'ZohoBooks.contacts.ALL',
+  'ZohoBooks.settings.ALL',
+  'ZohoBooks.invoices.ALL',
+  'ZohoBooks.estimates.ALL',
+  'ZohoBooks.customerpayments.ALL',
+  'ZohoBooks.creditnotes.ALL',
+  'ZohoBooks.projects.ALL',
+  'ZohoBooks.expenses.ALL',
+  'ZohoBooks.salesorders.ALL',
+  'ZohoBooks.purchaseorders.ALL',
+  'ZohoBooks.bills.ALL',
+  'ZohoBooks.vendorpayments.ALL',
+  'ZohoBooks.banking.ALL',
+  'ZohoBooks.accountants.ALL'
+]
+```
+
+| Capability group | Requested scope |
+| --- | --- |
+| Contacts, invoices, estimates, sales and purchase orders, bills, expenses, customer/vendor payments, credit notes, projects/time entries, banking, settings, and accountant operations | The matching `ZohoBooks.<resource>.ALL` scope listed above |
+| Product-wide resource access | `ZohoBooks.fullaccess.all` |
+
+The [Zoho Books OAuth documentation](https://www.zoho.com/books/api/v3/oauth/) documents the product-wide full-access scope and each resource namespace with its matching ALL operation. The integration requests the scopes used by current tools and omits redundant READ variants.
 
 ## Features
 

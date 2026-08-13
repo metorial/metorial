@@ -60,7 +60,7 @@ Optionally control which workflow triggers fire upon creation.`,
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      apiBaseUrl: ctx.auth.apiBaseUrl
+      apiDomain: ctx.auth.apiDomain
     });
 
     let result = await client.createRecords(ctx.input.module, ctx.input.records, {
