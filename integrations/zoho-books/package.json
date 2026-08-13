@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates/oauth-zoho": "1.0.0-rc.1",
+    "@slates/oauth-zoho": "1.0.0-rc.2",
     "@types/node": "^20",
     "slates": "1.0.0-rc.16",
     "zod": "^4.2"

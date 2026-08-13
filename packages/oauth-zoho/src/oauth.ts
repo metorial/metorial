@@ -300,8 +300,16 @@ export let createZohoOauth = <const Regions extends readonly ZohoRegion[]>({
 
   let regionSchema = createZohoRegionSchema(supportedRegions);
   let inputSchema = z.object({
-    applicationType: z.enum(['multi_dc', 'regional']),
-    region: regionSchema.optional()
+    applicationType: z
+      .enum(['multi_dc', 'regional'])
+      .describe(
+        'Type of Zoho OAuth application. Choose multi_dc for a Multi-DC application; no region selection is required. Choose regional for a regional application; region is required.'
+      ),
+    region: regionSchema
+      .optional()
+      .describe(
+        'Zoho data-center region. Required for a regional application and optional for a Multi-DC application.'
+      )
   });
 
   let oauth = {

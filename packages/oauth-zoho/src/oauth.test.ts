@@ -76,7 +76,7 @@ let expectServiceError = async (promise: Promise<unknown>) => {
     throw new Error('Expected promise to reject');
   } catch (error) {
     expect(error).toBeInstanceOf(ServiceError);
-    return error as ServiceError;
+    return error as ServiceError<any>;
   }
 };
 
@@ -98,12 +98,11 @@ describe('createZohoOauth', () => {
   });
 
   it('exposes one OAuth method with a closed top-level input object', () => {
-    let oauth = createZohoOauth(
-      oauthOptions({
-        supportedRegions: ['us', 'eu'],
-        apiOrigins: { us: apiOrigins.us, eu: apiOrigins.eu }
-      })
-    );
+    let oauth = createZohoOauth({
+      supportedRegions: ['us', 'eu'],
+      scopes,
+      apiOrigins: { us: apiOrigins.us, eu: apiOrigins.eu }
+    });
     let schema = z.toJSONSchema(oauth.inputSchema);
 
     expect(oauth.type).toBe('auth.oauth');
@@ -115,8 +114,16 @@ describe('createZohoOauth', () => {
       additionalProperties: false,
       required: ['applicationType'],
       properties: {
-        applicationType: { enum: ['multi_dc', 'regional'] },
-        region: { enum: ['us', 'eu'] }
+        applicationType: {
+          enum: ['multi_dc', 'regional'],
+          description:
+            'Type of Zoho OAuth application. Choose multi_dc for a Multi-DC application; no region selection is required. Choose regional for a regional application; region is required.'
+        },
+        region: {
+          enum: ['us', 'eu'],
+          description:
+            'Zoho data-center region. Required for a regional application and optional for a Multi-DC application.'
+        }
       }
     });
     expect(schema.properties?.applicationType).not.toHaveProperty('default');
@@ -246,22 +253,26 @@ describe('createZohoOauth', () => {
   });
 
   it('rejects a callback region outside the integration subset', async () => {
-    let oauth = createZohoOauth(
-      oauthOptions({
-        supportedRegions: ['us', 'eu'],
-        apiOrigins: { us: apiOrigins.us, eu: apiOrigins.eu }
-      })
-    );
+    let oauth = createZohoOauth({
+      supportedRegions: ['us', 'eu'],
+      scopes,
+      apiOrigins: { us: apiOrigins.us, eu: apiOrigins.eu }
+    });
 
     await expectServiceError(oauth.handleCallback(callbackContext('multi_dc', 'in') as never));
     expect(httpMocks.post).not.toHaveBeenCalled();
   });
 
-  it.each([
+  let missingCallbackCases: Array<{
+    label: string;
+    params?: Record<string, string>;
+  }> = [
     { label: 'location', params: { 'accounts-server': 'https://accounts.zoho.com' } },
     { label: 'accounts-server', params: { location: 'us' } },
     { label: 'callback params', params: undefined }
-  ])('rejects a callback missing $label', async ({ params }) => {
+  ];
+
+  it.each(missingCallbackCases)('rejects a callback missing $label', async ({ params }) => {
     let oauth = createZohoOauth(oauthOptions());
 
     await expectServiceError(
@@ -507,7 +518,7 @@ describe('createZohoOauth', () => {
   it('validates canonical output and canonicalizes inferred input before profile', async () => {
     let profile = vi.fn().mockResolvedValue({ id: 'user-123' });
     let oauth = createZohoOauth(oauthOptions({ profile }));
-    if (!oauth.getProfile) throw new Error('Expected getProfile hook');
+    if (!('getProfile' in oauth)) throw new Error('Expected getProfile hook');
 
     await expect(
       oauth.getProfile({
@@ -532,7 +543,7 @@ describe('createZohoOauth', () => {
   it('rejects inconsistent profile state before invoking the hook', async () => {
     let profile = vi.fn();
     let oauth = createZohoOauth(oauthOptions({ profile }));
-    if (!oauth.getProfile) throw new Error('Expected getProfile hook');
+    if (!('getProfile' in oauth)) throw new Error('Expected getProfile hook');
 
     await expectServiceError(
       oauth.getProfile({
@@ -553,7 +564,7 @@ describe('createZohoOauth', () => {
   it('enforces profile region constraints before invoking the hook', async () => {
     let profile = vi.fn();
     let oauth = createZohoOauth(oauthOptions({ profile }));
-    if (!oauth.getProfile) throw new Error('Expected getProfile hook');
+    if (!('getProfile' in oauth)) throw new Error('Expected getProfile hook');
 
     await expectServiceError(
       oauth.getProfile({
