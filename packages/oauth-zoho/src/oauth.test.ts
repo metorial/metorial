@@ -263,22 +263,129 @@ describe('createZohoOauth', () => {
     expect(httpMocks.post).not.toHaveBeenCalled();
   });
 
-  let missingCallbackCases: Array<{
-    label: string;
-    params?: Record<string, string>;
-  }> = [
-    { label: 'location', params: { 'accounts-server': 'https://accounts.zoho.com' } },
-    { label: 'accounts-server', params: { location: 'us' } },
-    { label: 'callback params', params: undefined }
-  ];
-
-  it.each(missingCallbackCases)('rejects a callback missing $label', async ({ params }) => {
+  it('infers the callback region from accounts-server when location is omitted', async () => {
+    httpMocks.post.mockResolvedValueOnce({ data: tokenResponse('eu') });
     let oauth = createZohoOauth(oauthOptions());
 
-    await expectServiceError(
-      oauth.handleCallback({ ...callbackContext('multi_dc', 'us'), callbackParams: params })
+    let result = await oauth.handleCallback({
+      ...callbackContext('multi_dc', 'eu'),
+      callbackParams: { 'accounts-server': 'https://accounts.zoho.eu' }
+    });
+
+    expect(createAxios).toHaveBeenCalledWith({ baseURL: 'https://accounts.zoho.eu' });
+    expect(result.output).toMatchObject({
+      region: 'eu',
+      accountsUrl: 'https://accounts.zoho.eu',
+      apiDomain: apiOrigins.eu[0]
+    });
+  });
+
+  it('infers the callback Accounts origin from location when accounts-server is omitted', async () => {
+    httpMocks.post.mockResolvedValueOnce({ data: tokenResponse('in') });
+    let oauth = createZohoOauth(oauthOptions());
+
+    let result = await oauth.handleCallback({
+      ...callbackContext('multi_dc', 'in'),
+      callbackParams: { location: 'in' }
+    });
+
+    expect(createAxios).toHaveBeenCalledWith({ baseURL: 'https://accounts.zoho.in' });
+    expect(result.output).toMatchObject({
+      region: 'in',
+      accountsUrl: 'https://accounts.zoho.in',
+      apiDomain: apiOrigins.in[0]
+    });
+  });
+
+  it('uses the selected regional Accounts origin when callback metadata is omitted', async () => {
+    httpMocks.post.mockResolvedValueOnce({ data: tokenResponse('eu') });
+    let oauth = createZohoOauth(oauthOptions());
+
+    let result = await oauth.handleCallback({
+      ...callbackContext('regional', 'eu', 'eu'),
+      callbackParams: undefined
+    });
+
+    expect(createAxios).toHaveBeenCalledWith({ baseURL: 'https://accounts.zoho.eu' });
+    expect(result.output).toMatchObject({
+      applicationType: 'regional',
+      region: 'eu',
+      accountsUrl: 'https://accounts.zoho.eu'
+    });
+  });
+
+  it('discovers a regionless multi-DC callback across supported Accounts origins', async () => {
+    httpMocks.post
+      .mockRejectedValueOnce({ response: { status: 400, data: { error: 'invalid_code' } } })
+      .mockRejectedValueOnce({ response: { status: 400, data: { error: 'invalid_code' } } })
+      .mockResolvedValueOnce({ data: tokenResponse('in') });
+    let oauth = createZohoOauth({
+      supportedRegions: ['us', 'eu', 'in'],
+      scopes,
+      apiOrigins: { us: apiOrigins.us, eu: apiOrigins.eu, in: apiOrigins.in }
+    });
+
+    let result = await oauth.handleCallback({
+      ...callbackContext('multi_dc', 'in'),
+      input: { applicationType: 'multi_dc' },
+      callbackParams: {}
+    });
+
+    expect(vi.mocked(createAxios).mock.calls).toEqual([
+      [{ baseURL: 'https://accounts.zoho.com' }],
+      [{ baseURL: 'https://accounts.zoho.eu' }],
+      [{ baseURL: 'https://accounts.zoho.in' }]
+    ]);
+    expect(result.output).toMatchObject({
+      applicationType: 'multi_dc',
+      region: 'in',
+      accountsUrl: 'https://accounts.zoho.in',
+      apiDomain: apiOrigins.in[0]
+    });
+  });
+
+  it('fails clearly when callback metadata is omitted and no supported exchange succeeds', async () => {
+    httpMocks.post.mockRejectedValue({
+      response: { status: 400, data: { error: 'invalid_code' } }
+    });
+    let oauth = createZohoOauth({
+      supportedRegions: ['us', 'eu'],
+      scopes,
+      apiOrigins: { us: apiOrigins.us, eu: apiOrigins.eu }
+    });
+
+    let error = await expectServiceError(
+      oauth.handleCallback({
+        ...callbackContext('multi_dc', 'us'),
+        input: { applicationType: 'multi_dc' },
+        callbackParams: undefined
+      })
     );
-    expect(httpMocks.post).not.toHaveBeenCalled();
+
+    expect(httpMocks.post).toHaveBeenCalledTimes(2);
+    expect(error.message).toContain('could not be exchanged in any supported data center');
+  });
+
+  it('does not retry region discovery after an upstream server failure', async () => {
+    httpMocks.post.mockRejectedValue({
+      response: { status: 503, data: { error: 'temporarily_unavailable' } }
+    });
+    let oauth = createZohoOauth({
+      supportedRegions: ['us', 'eu'],
+      scopes,
+      apiOrigins: { us: apiOrigins.us, eu: apiOrigins.eu }
+    });
+
+    let error = await expectServiceError(
+      oauth.handleCallback({
+        ...callbackContext('multi_dc', 'us'),
+        input: { applicationType: 'multi_dc' },
+        callbackParams: undefined
+      })
+    );
+
+    expect(httpMocks.post).toHaveBeenCalledTimes(1);
+    expect(error.data.upstreamStatus).toBe(503);
   });
 
   it.each([

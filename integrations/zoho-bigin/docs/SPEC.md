@@ -13,7 +13,7 @@ Zoho Bigin exclusively uses **OAuth 2.0** for API authentication. The integratio
 1. Register a regular regional or Multi-DC server application with Bigin's Authorization server at the Zoho API Console. Supply its Client ID and Client Secret when connecting; they are used unchanged.
 
 2. Regional authorization starts at the selected regional Accounts origin. Multi-DC authorization starts at `https://accounts.zoho.com/oauth/v2/auth`.
-3. The callback must include matching `location` and `accounts-server` values. Exchange the authorization code at `{accounts-server}/oauth/v2/token` only after validating that exact origin and its inferred region. Enforce the regional selection or optional Multi-DC expected-region constraint when supplied.
+3. Treat callback `location` and `accounts-server` as optional routing hints. Validate every supplied hint and require both to agree when present. Without either hint, use the selected regional origin, or try only the supported Accounts origins for a regionless Multi-DC application until Zoho accepts the code. Multi-DC discovery requires shared OAuth credentials across enabled data centers. Enforce any regional selection or optional Multi-DC expected-region constraint.
 4. Refresh at the persisted regional Accounts origin and preserve the existing refresh token if Zoho omits a replacement. Bigin API requests use the allowlisted `api_domain` returned by the token response.
 
 ### Data Center URLs

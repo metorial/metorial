@@ -21,8 +21,8 @@ The integration uses one **Authorization Code Grant** method for a customer-owne
    ```
    https://accounts.zoho.com/oauth/v2/auth?scope=<SCOPES>&client_id=<CLIENT_ID>&response_type=code&access_type=offline&redirect_uri=<REDIRECT_URI>
    ```
-2. **Validate callback routing**: Require Zoho's `location` and `accounts-server` callback values, verify that both identify the same supported region, enforce any selected/expected region, and reject any unrecognized origin.
-3. **Exchange for tokens**: POST the authorization code to the validated regional Accounts origin from the callback with `grant_type=authorization_code`, `client_id`, `client_secret`, `code`, and `redirect_uri`.
+2. **Validate callback routing**: Treat Zoho's `location` and `accounts-server` callback values as optional routing hints. Validate every supplied hint, require both to identify the same supported region when present, enforce any selected/expected region, and reject any unrecognized origin. Without either hint, use the selected regional origin, or try only the supported Accounts origins for a regionless Multi-DC application until Zoho accepts the code. Multi-DC discovery requires shared OAuth credentials across enabled data centers.
+3. **Exchange for tokens**: POST the authorization code to the resolved regional Accounts origin with `grant_type=authorization_code`, `client_id`, `client_secret`, `code`, and `redirect_uri`.
 4. **Validate the service origin**: Accept the Desk API origin only from Zoho's token response and only when it exactly matches the selected region's documented Desk origin.
 5. You receive an **access token** (valid for 1 hour) and a **refresh token** (valid until revoked). Refreshes use the persisted, validated regional Accounts origin.
 

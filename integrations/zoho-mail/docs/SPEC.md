@@ -15,7 +15,7 @@ Zoho Mail REST API uses OAuth 2.0 for secure authentication and authorization. T
 2. **Select an application type:** The integration exposes one OAuth method for a customer-owned regular regional or Multi-DC server application. `applicationType` is required. `region` is required for a regional application and optional for Multi-DC as an expected-region constraint.
 
 3. **Authorization endpoint:** Regional authorization begins at the selected regional Accounts origin. Multi-DC authorization begins at `https://accounts.zoho.com/oauth/v2/auth`.
-4. **Token endpoint:** The callback's `location` and `accounts-server` values must identify the same supported region. Code exchange and refresh use that exact validated regional Accounts origin. The inferred region must match the regional selection or an optional Multi-DC expected-region constraint.
+4. **Token endpoint:** Treat callback `location` and `accounts-server` as optional routing hints. Validate every supplied hint and require both to identify the same supported region when present. Without either hint, use the selected regional origin, or try only the supported Accounts origins for a regionless Multi-DC application until Zoho accepts the code. Multi-DC discovery requires shared OAuth credentials across enabled data centers. Code exchange and refresh use the resolved regional Accounts origin, which must match the regional selection or an optional Multi-DC expected-region constraint.
 
 5. **Authorization request parameters:**
    - `client_id` — Your application's client ID

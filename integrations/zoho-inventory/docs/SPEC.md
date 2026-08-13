@@ -14,7 +14,7 @@ Zoho Inventory uses OAuth 2.0 as its sole authentication method. The integration
 
 1. Register a regular regional or Multi-DC server application at the [Zoho Developer Console](https://accounts.zoho.com/developerconsole) and supply its Client ID and Client Secret when connecting.
 2. Regional authorization starts at the selected regional Accounts origin. Multi-DC authorization starts at `https://accounts.zoho.com/oauth/v2/auth`.
-3. The callback must contain matching `location` and `accounts-server` values. Exchange the authorization code only at that exact validated regional Accounts origin. The inferred region must match the regional selection or an optional Multi-DC expected-region constraint.
+3. Treat callback `location` and `accounts-server` as optional routing hints. Validate every supplied hint and require both to agree when present. Without either hint, use the selected regional origin, or try only the supported Accounts origins for a regionless Multi-DC application until Zoho accepts the code. Multi-DC discovery requires shared OAuth credentials across enabled data centers. The resolved region must match the regional selection or an optional Multi-DC expected-region constraint.
 4. Refresh requests use the persisted regional Accounts origin and preserve the existing refresh token when Zoho omits a replacement.
 5. Inventory requests and organization discovery use the allowlisted `api_domain` returned by Zoho.
 

@@ -34,9 +34,9 @@ Zoho uses the **authorization code grant type**. The flow is:
    https://accounts.zoho.com/oauth/v2/auth?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&scope={scope}&access_type=offline
    ```
 
-3. **Validate Callback Routing**: Require `location` and `accounts-server`, ensure both identify the same supported region, and accept only an exact supported HTTPS Accounts origin. The callback region must match the required regional selection or an optional Multi-DC expected-region constraint; otherwise it is inferred for Multi-DC.
+3. **Validate Callback Routing**: Treat `location` and `accounts-server` as optional routing hints. Validate every supplied value against the exact supported regions and Accounts origins, and require them to agree when both are present. Without either hint, use the selected region for a regional application; for a regionless Multi-DC application, try token exchange only at the integration's fixed supported Accounts origins until Zoho accepts the code. Multi-DC discovery requires shared OAuth credentials across the enabled data centers.
 
-4. **Exchange Code for Tokens**: POST to the validated regional Accounts origin from the callback, for example:
+4. **Exchange Code for Tokens**: POST to the resolved regional Accounts origin, for example:
 
    ```
    https://accounts.zoho.eu/oauth/v2/token

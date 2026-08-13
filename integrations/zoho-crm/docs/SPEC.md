@@ -16,7 +16,7 @@ Zoho CRM uses OAuth 2.0 exclusively for authentication. The integration exposes 
 **Authorization Flow:**
 
 1. Regional authorization starts at the selected regional Accounts origin. Multi-DC authorization starts at `https://accounts.zoho.com/oauth/v2/auth`.
-2. The callback must include matching `location` and `accounts-server` values. The authorization code is exchanged at that exact validated regional Accounts origin. The inferred region must match the regional selection or an optional Multi-DC expected-region constraint.
+2. Treat callback `location` and `accounts-server` as optional routing hints. Validate every supplied hint and require both to agree when present. Without either hint, use the selected regional origin, or try only the supported Accounts origins for a regionless Multi-DC application until Zoho accepts the code. Multi-DC discovery requires shared OAuth credentials across enabled data centers. The resolved region must match the regional selection or an optional Multi-DC expected-region constraint.
 3. Refresh requests continue to use the persisted regional Accounts origin and preserve the existing refresh token if Zoho omits a replacement.
 4. CRM requests use the allowlisted `api_domain` returned by the token response. Access tokens are sent with the `Zoho-oauthtoken` authorization scheme.
 

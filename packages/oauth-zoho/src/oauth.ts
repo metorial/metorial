@@ -2,6 +2,7 @@ import {
   buildApiServiceError,
   createApiServiceError,
   createAxios,
+  getApiErrorStatus,
   normalizeOAuthTokenResponse
 } from 'slates';
 import { z } from 'zod';
@@ -183,38 +184,53 @@ let resolveInput = <Regions extends readonly ZohoRegion[]>(
   return parsed.data;
 };
 
-let resolveCallbackAccountsOrigin = <Regions extends readonly ZohoRegion[]>(
+type ZohoCallbackRoute<Region extends ZohoRegion> = {
+  accountsUrl: string;
+  region: Region;
+};
+
+let resolveCallbackRoute = <Regions extends readonly ZohoRegion[]>(
   supportedRegions: Regions,
   expectedRegion: Regions[number] | undefined,
   callbackParams?: Record<string, string>
-) => {
+): ZohoCallbackRoute<Regions[number]> | undefined => {
   let location = callbackParams?.location;
   let accountsOrigin = callbackParams?.['accounts-server'];
 
-  if (!location) throw invalidCallback('the location parameter is required.');
-  if (!accountsOrigin) {
-    throw invalidCallback('the accounts-server parameter is required.');
+  let locationRegion =
+    location === undefined ? undefined : getZohoRegionForCallbackLocation(location);
+  if (location !== undefined && !locationRegion) {
+    throw invalidCallback('the location parameter is not recognized.');
   }
 
-  let locationRegion = getZohoRegionForCallbackLocation(location);
-  if (!locationRegion) throw invalidCallback('the location parameter is not recognized.');
-
-  let accountsRegion = getZohoRegionForAccountsOrigin(accountsOrigin);
-  if (!accountsRegion) {
+  let accountsRegion =
+    accountsOrigin === undefined ? undefined : getZohoRegionForAccountsOrigin(accountsOrigin);
+  if (accountsOrigin !== undefined && !accountsRegion) {
     throw invalidCallback('the accounts-server parameter is not an allowed Accounts origin.');
   }
 
-  if (locationRegion !== accountsRegion) {
+  if (
+    locationRegion !== undefined &&
+    accountsRegion !== undefined &&
+    locationRegion !== accountsRegion
+  ) {
     throw invalidCallback('location and accounts-server identify different regions.');
   }
-  if (!supportedRegions.includes(locationRegion)) {
+
+  let resolvedRegion = locationRegion ?? accountsRegion ?? expectedRegion;
+  if (resolvedRegion === undefined) return undefined;
+
+  if (!supportedRegions.includes(resolvedRegion)) {
     throw invalidCallback('the callback region is not supported by this integration.');
   }
-  if (expectedRegion !== undefined && locationRegion !== expectedRegion) {
+  if (expectedRegion !== undefined && resolvedRegion !== expectedRegion) {
     throw invalidCallback('the callback region does not match the expected region.');
   }
 
-  return { accountsUrl: accountsOrigin, region: locationRegion as Regions[number] };
+  return {
+    accountsUrl: accountsOrigin ?? ZOHO_REGION_METADATA[resolvedRegion].accountsOrigin,
+    region: resolvedRegion as Regions[number]
+  };
 };
 
 let getAllowedApiOrigins = <Regions extends readonly ZohoRegion[]>(
@@ -340,24 +356,64 @@ export let createZohoOauth = <const Regions extends readonly ZohoRegion[]>({
 
     handleCallback: async (ctx: ZohoCallbackContext<Regions[number]>) => {
       let input = resolveInput(inputSchema, ctx.input);
-      let { accountsUrl, region } = resolveCallbackAccountsOrigin(
+      let callbackRoute = resolveCallbackRoute(
         supportedRegions,
         input.region,
         ctx.callbackParams
       );
 
       try {
-        let response = await createAxios({ baseURL: accountsUrl }).post(
-          '/oauth/v2/token',
-          new URLSearchParams({
-            client_id: ctx.clientId,
-            client_secret: ctx.clientSecret,
-            code: ctx.code,
-            redirect_uri: ctx.redirectUri,
-            grant_type: 'authorization_code'
-          }).toString(),
-          formRequestConfig
-        );
+        let exchangeCode = (accountsUrl: string) =>
+          createAxios({ baseURL: accountsUrl }).post(
+            '/oauth/v2/token',
+            new URLSearchParams({
+              client_id: ctx.clientId,
+              client_secret: ctx.clientSecret,
+              code: ctx.code,
+              redirect_uri: ctx.redirectUri,
+              grant_type: 'authorization_code'
+            }).toString(),
+            formRequestConfig
+          );
+        let exchangeResult:
+          | {
+              accountsUrl: string;
+              region: Regions[number];
+              response: Awaited<ReturnType<typeof exchangeCode>>;
+            }
+          | undefined;
+
+        if (callbackRoute) {
+          exchangeResult = {
+            ...callbackRoute,
+            response: await exchangeCode(callbackRoute.accountsUrl)
+          };
+        } else {
+          for (let region of supportedRegions) {
+            let accountsUrl = ZOHO_REGION_METADATA[region].accountsOrigin;
+            try {
+              exchangeResult = {
+                accountsUrl,
+                region,
+                response: await exchangeCode(accountsUrl)
+              };
+              break;
+            } catch (error) {
+              let status = getApiErrorStatus(error);
+              if (status !== 400 && status !== '400' && status !== 401 && status !== '401') {
+                throw error;
+              }
+            }
+          }
+        }
+
+        if (!exchangeResult) {
+          throw invalidCallback(
+            'regional metadata was omitted, and the authorization code could not be exchanged in any supported data center. Confirm the app uses shared Multi-DC OAuth credentials and reconnect.'
+          );
+        }
+
+        let { accountsUrl, region, response } = exchangeResult;
         let token = normalizeOAuthTokenResponse(response.data, {
           providerLabel: 'Zoho',
           operation: 'token exchange',
