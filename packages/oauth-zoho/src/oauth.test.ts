@@ -316,8 +316,8 @@ describe('createZohoOauth', () => {
 
   it('discovers a regionless multi-DC callback across supported Accounts origins', async () => {
     httpMocks.post
-      .mockRejectedValueOnce({ response: { status: 400, data: { error: 'invalid_code' } } })
-      .mockRejectedValueOnce({ response: { status: 400, data: { error: 'invalid_code' } } })
+      .mockResolvedValueOnce({ data: { error: 'invalid_code' } })
+      .mockResolvedValueOnce({ data: { error: 'invalid_client' } })
       .mockResolvedValueOnce({ data: tokenResponse('in') });
     let oauth = createZohoOauth({
       supportedRegions: ['us', 'eu', 'in'],
@@ -345,9 +345,7 @@ describe('createZohoOauth', () => {
   });
 
   it('fails clearly when callback metadata is omitted and no supported exchange succeeds', async () => {
-    httpMocks.post.mockRejectedValue({
-      response: { status: 400, data: { error: 'invalid_code' } }
-    });
+    httpMocks.post.mockResolvedValue({ data: { error: 'invalid_code' } });
     let oauth = createZohoOauth({
       supportedRegions: ['us', 'eu'],
       scopes,

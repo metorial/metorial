@@ -14078,10 +14078,10 @@
     },
     "integrations/zoho": {
       "name": "@slates-integrations/zoho",
-      "version": "0.2.0-rc.11",
+      "version": "0.2.0-rc.12",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/oauth-zoho": "1.0.0-rc.3",
+        "@slates/oauth-zoho": "1.0.0-rc.4",
         "@types/node": "^20",
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",
@@ -14093,9 +14093,9 @@
     },
     "integrations/zoho-bigin": {
       "name": "@slates-integrations/zoho-bigin",
-      "version": "0.2.0-rc.7",
+      "version": "0.2.0-rc.8",
       "dependencies": {
-        "@slates/oauth-zoho": "1.0.0-rc.3",
+        "@slates/oauth-zoho": "1.0.0-rc.4",
         "@types/node": "^20",
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",
@@ -14107,9 +14107,9 @@
     },
     "integrations/zoho-books": {
       "name": "@slates-integrations/zoho-books",
-      "version": "0.2.0-rc.8",
+      "version": "0.2.0-rc.9",
       "dependencies": {
-        "@slates/oauth-zoho": "1.0.0-rc.3",
+        "@slates/oauth-zoho": "1.0.0-rc.4",
         "@types/node": "^20",
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",
@@ -14121,10 +14121,10 @@
     },
     "integrations/zoho-crm": {
       "name": "@slates-integrations/zoho-crm",
-      "version": "0.2.0-rc.10",
+      "version": "0.2.0-rc.11",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/oauth-zoho": "1.0.0-rc.3",
+        "@slates/oauth-zoho": "1.0.0-rc.4",
         "@types/node": "^20",
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",
@@ -14137,9 +14137,9 @@
     },
     "integrations/zoho-desk": {
       "name": "@slates-integrations/zoho-desk",
-      "version": "0.2.0-rc.7",
+      "version": "0.2.0-rc.8",
       "dependencies": {
-        "@slates/oauth-zoho": "1.0.0-rc.3",
+        "@slates/oauth-zoho": "1.0.0-rc.4",
         "@types/node": "^20",
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",
@@ -14151,9 +14151,9 @@
     },
     "integrations/zoho-inventory": {
       "name": "@slates-integrations/zoho-inventory",
-      "version": "0.2.0-rc.7",
+      "version": "0.2.0-rc.8",
       "dependencies": {
-        "@slates/oauth-zoho": "1.0.0-rc.3",
+        "@slates/oauth-zoho": "1.0.0-rc.4",
         "@types/node": "^20",
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",
@@ -14165,9 +14165,9 @@
     },
     "integrations/zoho-invoice": {
       "name": "@slates-integrations/zoho-invoice",
-      "version": "0.2.0-rc.7",
+      "version": "0.2.0-rc.8",
       "dependencies": {
-        "@slates/oauth-zoho": "1.0.0-rc.3",
+        "@slates/oauth-zoho": "1.0.0-rc.4",
         "@types/node": "^20",
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",
@@ -14179,9 +14179,9 @@
     },
     "integrations/zoho-mail": {
       "name": "@slates-integrations/zoho-mail",
-      "version": "0.2.0-rc.7",
+      "version": "0.2.0-rc.8",
       "dependencies": {
-        "@slates/oauth-zoho": "1.0.0-rc.3",
+        "@slates/oauth-zoho": "1.0.0-rc.4",
         "@types/node": "^20",
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",
@@ -14374,7 +14374,7 @@
     },
     "packages/oauth-zoho": {
       "name": "@slates/oauth-zoho",
-      "version": "1.0.0-rc.3",
+      "version": "1.0.0-rc.4",
       "dependencies": {
         "slates": "1.0.0-rc.16",
         "zod": "^4.2",

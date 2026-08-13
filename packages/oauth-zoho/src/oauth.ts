@@ -262,6 +262,19 @@ let getTokenResponseApiDomain = (data: unknown) =>
     ? (data as Record<string, unknown>).api_domain
     : undefined;
 
+let hasTokenResponseAccessToken = (data: unknown) =>
+  typeof data === 'object' &&
+  data !== null &&
+  !Array.isArray(data) &&
+  typeof (data as Record<string, unknown>).access_token === 'string' &&
+  Boolean((data as Record<string, unknown>).access_token);
+
+let isRetryableZohoDiscoveryResponse = (data: unknown) => {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return false;
+  let error = (data as Record<string, unknown>).error;
+  return error === 'invalid_code' || error === 'invalid_client';
+};
+
 let validateStoredOutput = <Regions extends readonly ZohoRegion[]>(
   supportedRegions: Regions,
   apiOrigins: ZohoApiOrigins<Regions>,
@@ -392,10 +405,16 @@ export let createZohoOauth = <const Regions extends readonly ZohoRegion[]>({
           for (let region of supportedRegions) {
             let accountsUrl = ZOHO_REGION_METADATA[region].accountsOrigin;
             try {
+              let response = await exchangeCode(accountsUrl);
+              if (!hasTokenResponseAccessToken(response.data)) {
+                if (isRetryableZohoDiscoveryResponse(response.data)) continue;
+                exchangeResult = { accountsUrl, region, response };
+                break;
+              }
               exchangeResult = {
                 accountsUrl,
                 region,
-                response: await exchangeCode(accountsUrl)
+                response
               };
               break;
             } catch (error) {
