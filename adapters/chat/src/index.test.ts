@@ -8,8 +8,32 @@ import {
   stubAllTriggers
 } from './test-helpers';
 
+let capabilityIds = (declared: boolean) =>
+  Object.entries(ChatAdapter.capabilityRules)
+    .filter(
+      ([, value]) =>
+        ((value.tools?.length ?? 0) === 0 && (value.triggers?.length ?? 0) === 0) === declared
+    )
+    .map(([id]) => id)
+    .sort();
+
+let derivedCapabilityIds = capabilityIds(false);
+let declaredCapabilityIds = capabilityIds(true);
+
+let enabledIds = (capabilities: { id: string; value: unknown }[]) =>
+  capabilities
+    .filter(capability => capability.value === true)
+    .map(capability => capability.id)
+    .sort();
+
+let disabledDeclaredIds = (capabilities: { id: string; value: unknown }[]) =>
+  capabilities
+    .filter(capability => capability.value === false)
+    .map(capability => capability.id)
+    .sort();
+
 describe('ChatAdapter', () => {
-  it('registers with no implementations and no capabilities', () => {
+  it('registers with no implementations and declared capabilities set to false', () => {
     let adapter = ChatAdapter.register({
       tools: [],
       triggers: []
@@ -17,7 +41,8 @@ describe('ChatAdapter', () => {
 
     expect(adapter.id).toBe('chat');
     expect(adapter.name).toBe('Chat');
-    expect(adapter.capabilities).toEqual([]);
+    expect(enabledIds(adapter.capabilities)).toEqual([]);
+    expect(disabledDeclaredIds(adapter.capabilities)).toEqual(declaredCapabilityIds);
     expect(adapter.tools).toEqual([]);
     expect(adapter.triggers).toEqual([]);
   });
@@ -29,37 +54,29 @@ describe('ChatAdapter', () => {
       triggers: stubAllTriggers(spec)
     });
 
-    let ids = adapter.capabilities.map(capability => capability.id).sort();
-    expect(ids).toEqual(
-      [
-        'cards',
-        'channels',
-        'delete',
-        'dms',
-        'edit',
-        'ephemeral',
-        'files',
-        'inbound',
-        'inbound_actions',
-        'inbound_reactions',
-        'markdown',
-        'mentions',
-        'modals',
-        'react',
-        'read',
-        'reply',
-        'schedule',
-        'search',
-        'send',
-        'threads',
-        'typing',
-        'users',
-        'workspaces'
-      ].sort()
-    );
+    expect(enabledIds(adapter.capabilities)).toEqual(derivedCapabilityIds);
+    expect(disabledDeclaredIds(adapter.capabilities)).toEqual(declaredCapabilityIds);
   });
 
-  it('derives only send/cards/markdown when only send is implemented', () => {
+  it('lets implementations enable declared capabilities', () => {
+    let spec = createTestSpec();
+    let adapter = ChatAdapter.register({
+      tools: stubAllTools(spec),
+      triggers: stubAllTriggers(spec),
+      capabilities: {
+        content_markdown: true,
+        content_cards: true,
+        attachment_image: true
+      }
+    });
+
+    expect(enabledIds(adapter.capabilities)).toEqual(
+      [...derivedCapabilityIds, 'attachment_image', 'content_cards', 'content_markdown'].sort()
+    );
+    expect(adapter.capabilities).toContainEqual({ id: 'content_tables', value: false });
+  });
+
+  it('derives only message_send when only send is implemented', () => {
     let spec = createTestSpec();
     let send = sendMessage
       .implement(spec)
@@ -88,11 +105,8 @@ describe('ChatAdapter', () => {
       triggers: []
     });
 
-    expect(adapter.capabilities).toEqual([
-      { id: 'send', value: true },
-      { id: 'cards', value: true },
-      { id: 'markdown', value: true }
-    ]);
+    expect(enabledIds(adapter.capabilities)).toEqual(['message_send']);
+    expect(disabledDeclaredIds(adapter.capabilities)).toEqual(declaredCapabilityIds);
   });
 
   it('rejects unknown implementations', () => {

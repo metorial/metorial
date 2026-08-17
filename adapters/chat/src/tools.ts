@@ -2,28 +2,21 @@ import { z } from 'zod';
 import { ChatAdapter } from './adapter';
 import { authorSchema } from './schema/channels/author';
 import { channelSchema, channelTypeSchema } from './schema/channels/channel';
-import { threadSchema } from './schema/channels/thread';
+import { threadSchema, threadTypeSchema } from './schema/channels/thread';
 import { workspaceSchema } from './schema/channels/workspace';
 import { attachmentRefSchema } from './schema/content/attachment';
 import { chatBodySchema } from './schema/content/body';
-import { messageSchema } from './schema/content/message';
+import { messageResultSchema, messageSchema, replyRefSchema } from './schema/content/message';
+import { commandSchema } from './schema/interactions/command';
 import { modalSchema } from './schema/interactions/modal';
 import { cursorPageResultSchema, cursorPageSchema } from './schema/shared/cursor';
 import { emojiInputSchema } from './schema/shared/emoji';
+import { rawSchema } from './schema/shared/raw';
 import { reactionCountSchema } from './schema/shared/reaction';
 
-let partsInstructions = [
-  'Provide a parts array: GFM markdown parts for prose, text parts for unparsed strings, card parts for structured UI.',
-  'Structured UI belongs in card/parts, not inside a markdown string.',
-  'Set altText for notifications and clients that cannot render parts. Attachments belong on the same body.'
-];
-
 let okSchema = z.object({
-  ok: z.boolean()
-});
-
-let messageOutputSchema = z.object({
-  message: messageSchema
+  ok: z.boolean(),
+  raw: rawSchema
 });
 
 export let sendMessage = ChatAdapter.defineTool({
@@ -31,30 +24,32 @@ export let sendMessage = ChatAdapter.defineTool({
   name: 'Send Message',
   description:
     'Send a message to a channel or thread as a parts document (markdown, text, cards, and attachments).',
-  instructions: partsInstructions,
   input: chatBodySchema.extend({
     channelId: z.string().describe('Channel to send the message to'),
     threadId: z.string().optional().describe('Thread id when posting a reply in a thread'),
-    replyToId: z.string().optional().describe('Message id to quote or reply to'),
+    reply: replyRefSchema
+      .optional()
+      .describe(
+        'Quote or reply target. If neither id nor reference is set, this is a normal message.'
+      ),
     ephemeral: z
       .boolean()
       .optional()
       .describe('If true, only targetUserId can see the message'),
     targetUserId: z.string().optional().describe('Required when ephemeral is true')
   }),
-  output: messageOutputSchema
+  output: messageResultSchema
 });
 
 export let editMessage = ChatAdapter.defineTool({
   key: 'chat.message.edit',
   name: 'Edit Message',
   description: 'Replace the body of an existing message.',
-  instructions: partsInstructions,
   input: chatBodySchema.extend({
     channelId: z.string(),
     messageId: z.string()
   }),
-  output: messageOutputSchema
+  output: messageResultSchema
 });
 
 export let deleteMessage = ChatAdapter.defineTool({
@@ -78,7 +73,7 @@ export let getMessage = ChatAdapter.defineTool({
     channelId: z.string(),
     messageId: z.string()
   }),
-  output: messageOutputSchema
+  output: messageResultSchema
 });
 
 export let listMessages = ChatAdapter.defineTool({
@@ -92,7 +87,10 @@ export let listMessages = ChatAdapter.defineTool({
     threadId: z.string().optional()
   }),
   output: cursorPageResultSchema.extend({
-    messages: z.array(messageSchema)
+    messages: z.array(messageSchema),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -106,7 +104,10 @@ export let searchMessages = ChatAdapter.defineTool({
     channelId: z.string().optional()
   }),
   output: cursorPageResultSchema.extend({
-    messages: z.array(messageSchema)
+    messages: z.array(messageSchema),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -114,57 +115,29 @@ export let replyMessage = ChatAdapter.defineTool({
   key: 'chat.message.reply',
   name: 'Reply to Message',
   description: 'Reply to an existing message, creating or continuing a thread when supported.',
-  instructions: partsInstructions,
   input: chatBodySchema.extend({
     channelId: z.string(),
-    messageId: z.string()
+    reply: replyRefSchema
+      .optional()
+      .describe(
+        'Quote or reply target. If neither id nor reference is set, this is a normal message.'
+      )
   }),
-  output: messageOutputSchema
+  output: messageResultSchema
 });
 
 export let sendEphemeralMessage = ChatAdapter.defineTool({
   key: 'chat.message.sendEphemeral',
   name: 'Send Ephemeral Message',
   description: 'Send a message visible only to one user. Providers may fall back to a DM.',
-  instructions: partsInstructions,
   input: chatBodySchema.extend({
     channelId: z.string(),
     userId: z.string(),
     threadId: z.string().optional()
   }),
-  output: z.object({
-    message: messageSchema,
+  output: messageResultSchema.extend({
     usedFallback: z.boolean()
   })
-});
-
-export let scheduleMessage = ChatAdapter.defineTool({
-  key: 'chat.message.schedule',
-  name: 'Schedule Message',
-  description: 'Schedule a message for future delivery.',
-  instructions: partsInstructions,
-  input: chatBodySchema.extend({
-    channelId: z.string(),
-    threadId: z.string().optional(),
-    postAt: z.string().describe('ISO-8601 timestamp')
-  }),
-  output: z.object({
-    scheduledMessageId: z.string(),
-    postAt: z.string(),
-    channelId: z.string()
-  })
-});
-
-export let cancelScheduledMessage = ChatAdapter.defineTool({
-  key: 'chat.message.cancelScheduled',
-  name: 'Cancel Scheduled Message',
-  description: 'Cancel a previously scheduled message.',
-  tags: { destructive: true },
-  input: z.object({
-    scheduledMessageId: z.string(),
-    channelId: z.string().optional()
-  }),
-  output: okSchema
 });
 
 export let markMessageRead = ChatAdapter.defineTool({
@@ -177,20 +150,6 @@ export let markMessageRead = ChatAdapter.defineTool({
     threadId: z.string().optional()
   }),
   output: okSchema
-});
-
-export let getMessagePermalink = ChatAdapter.defineTool({
-  key: 'chat.message.permalink',
-  name: 'Get Message Permalink',
-  description: 'Get a permalink URL for a message.',
-  tags: { readOnly: true },
-  input: z.object({
-    channelId: z.string(),
-    messageId: z.string()
-  }),
-  output: z.object({
-    url: z.string()
-  })
 });
 
 export let addReaction = ChatAdapter.defineTool({
@@ -229,7 +188,8 @@ export let listReactions = ChatAdapter.defineTool({
     messageId: z.string()
   }),
   output: z.object({
-    reactions: z.array(reactionCountSchema)
+    reactions: z.array(reactionCountSchema),
+    raw: rawSchema
   })
 });
 
@@ -244,7 +204,8 @@ export let listChannels = ChatAdapter.defineTool({
     query: z.string().optional()
   }),
   output: cursorPageResultSchema.extend({
-    channels: z.array(channelSchema)
+    channels: z.array(channelSchema),
+    raw: rawSchema
   })
 });
 
@@ -257,7 +218,8 @@ export let getChannel = ChatAdapter.defineTool({
     channelId: z.string()
   }),
   output: z.object({
-    channel: channelSchema
+    channel: channelSchema,
+    raw: rawSchema
   })
 });
 
@@ -270,7 +232,8 @@ export let listWorkspaces = ChatAdapter.defineTool({
     query: z.string().optional()
   }),
   output: cursorPageResultSchema.extend({
-    workspaces: z.array(workspaceSchema)
+    workspaces: z.array(workspaceSchema),
+    raw: rawSchema
   })
 });
 
@@ -283,7 +246,8 @@ export let getWorkspace = ChatAdapter.defineTool({
     workspaceId: z.string()
   }),
   output: z.object({
-    workspace: workspaceSchema
+    workspace: workspaceSchema,
+    raw: rawSchema
   })
 });
 
@@ -296,7 +260,9 @@ export let listChannelMembers = ChatAdapter.defineTool({
     channelId: z.string()
   }),
   output: cursorPageResultSchema.extend({
-    authors: z.array(authorSchema)
+    authors: z.array(authorSchema),
+    channel: channelSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -306,10 +272,13 @@ export let listThreads = ChatAdapter.defineTool({
   description: 'List threads in a channel.',
   tags: { readOnly: true },
   input: cursorPageSchema.extend({
-    channelId: z.string()
+    channelId: z.string(),
+    type: threadTypeSchema.optional()
   }),
   output: cursorPageResultSchema.extend({
-    threads: z.array(threadSchema)
+    threads: z.array(threadSchema),
+    channel: channelSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -323,21 +292,40 @@ export let getThread = ChatAdapter.defineTool({
     threadId: z.string()
   }),
   output: z.object({
-    thread: threadSchema
+    thread: threadSchema,
+    channel: channelSchema.optional(),
+    raw: rawSchema
   })
 });
 
-export let openDm = ChatAdapter.defineTool({
-  key: 'chat.dm.open',
+let dmResultSchema = z.object({
+  channel: channelSchema,
+  thread: threadSchema.optional(),
+  raw: rawSchema
+});
+
+export let openSingleDm = ChatAdapter.defineTool({
+  key: 'chat.dm.openSingle',
   name: 'Open Direct Message',
-  description: 'Open or fetch a direct message conversation with a user.',
+  description: 'Open or fetch a 1:1 direct message conversation with a user.',
   input: z.object({
-    userId: z.string()
+    userId: z.string().describe('User to open a DM with')
   }),
-  output: z.object({
-    channelId: z.string(),
-    threadId: z.string().optional()
-  })
+  output: dmResultSchema
+});
+
+export let openGroupDm = ChatAdapter.defineTool({
+  key: 'chat.dm.openGroup',
+  name: 'Open Group Direct Message',
+  description:
+    'Open or fetch a group direct message conversation with multiple users. Use chat.dm.openSingle for a 1:1 DM.',
+  input: z.object({
+    userIds: z
+      .array(z.string())
+      .min(2)
+      .describe('Users to include in the group DM. Must contain at least two user ids.')
+  }),
+  output: dmResultSchema
 });
 
 export let getUser = ChatAdapter.defineTool({
@@ -349,7 +337,8 @@ export let getUser = ChatAdapter.defineTool({
     userId: z.string()
   }),
   output: z.object({
-    author: authorSchema
+    author: authorSchema,
+    raw: rawSchema
   })
 });
 
@@ -362,7 +351,8 @@ export let searchUsers = ChatAdapter.defineTool({
     query: z.string()
   }),
   output: cursorPageResultSchema.extend({
-    authors: z.array(authorSchema)
+    authors: z.array(authorSchema),
+    raw: rawSchema
   })
 });
 
@@ -380,21 +370,90 @@ export let uploadFile = ChatAdapter.defineTool({
   }),
   output: z.object({
     attachment: attachmentRefSchema,
-    message: messageSchema.optional()
+    message: messageSchema.optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
+  })
+});
+
+export let downloadFile = ChatAdapter.defineTool({
+  key: 'chat.file.download',
+  name: 'Download File',
+  description:
+    'Download an attachment. Pass the attachment id/url/fetchMetadata from a message, plus channel and message ids when the platform requires them.',
+  tags: { readOnly: true },
+  input: z.object({
+    id: z.string().optional(),
+    url: z.string().optional(),
+    channelId: z.string().optional(),
+    messageId: z.string().optional(),
+    fetchMetadata: z.record(z.string(), z.string()).optional()
+  }),
+  output: z.object({
+    attachment: attachmentRefSchema,
+    raw: rawSchema
   })
 });
 
 export let openModal = ChatAdapter.defineTool({
   key: 'chat.modal.open',
   name: 'Open Modal',
-  description: 'Open a modal form. triggerId comes from an inbound action event.',
+  description:
+    'Open a modal form. triggerId comes from an inbound action or slash command event.',
   input: z.object({
     triggerId: z.string(),
     modal: modalSchema,
     contextId: z.string().optional()
   }),
   output: z.object({
-    viewId: z.string()
+    viewId: z.string(),
+    raw: rawSchema
+  })
+});
+
+export let respondToCommand = ChatAdapter.defineTool({
+  key: 'chat.command.respond',
+  name: 'Respond to Command',
+  description:
+    'Reply to a slash command invocation. Pass responseToken from chat.command.invoked so providers that require an interaction callback can respond correctly.',
+  input: chatBodySchema.extend({
+    responseToken: z
+      .string()
+      .describe('Opaque handle from chat.command.invoked for this invocation'),
+    channelId: z.string().optional(),
+    threadId: z.string().optional(),
+    ephemeral: z
+      .boolean()
+      .optional()
+      .describe('If true, only the invoking user can see the response')
+  }),
+  output: z.object({
+    message: messageSchema.optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
+  })
+});
+
+export let listCommands = ChatAdapter.defineTool({
+  key: 'chat.command.list',
+  name: 'List Commands',
+  description:
+    'List slash commands registered for this app. Omit this tool when the provider cannot introspect commands (Slack, Teams, Google Chat).',
+  tags: { readOnly: true },
+  input: cursorPageSchema.extend({
+    workspaceId: z
+      .string()
+      .optional()
+      .describe(
+        'Limit to workspace/guild commands when the platform supports per-workspace commands'
+      ),
+    query: z.string().optional()
+  }),
+  output: cursorPageResultSchema.extend({
+    commands: z.array(commandSchema),
+    raw: rawSchema
   })
 });
 

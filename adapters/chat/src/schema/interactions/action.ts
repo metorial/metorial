@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import { authorSchema } from '../channels/author';
+import { channelSchema } from '../channels/channel';
+import { threadSchema } from '../channels/thread';
+import { messageSchema } from '../content/message';
 import { emojiSchema } from '../shared/emoji';
+import { rawSchema } from '../shared/raw';
 
 export let actionInvokedSchema = z.object({
   actionId: z.string(),
@@ -9,7 +13,11 @@ export let actionInvokedSchema = z.object({
   channelId: z.string(),
   author: authorSchema,
   triggerId: z.string().optional(),
-  selectedValues: z.record(z.string(), z.string()).optional()
+  selectedValues: z.record(z.string(), z.string()).optional(),
+  message: messageSchema.optional(),
+  channel: channelSchema.optional(),
+  thread: threadSchema.optional(),
+  raw: rawSchema
 });
 
 export let modalSubmittedSchema = z.object({
@@ -18,26 +26,38 @@ export let modalSubmittedSchema = z.object({
   values: z.record(z.string(), z.unknown()),
   author: authorSchema,
   privateMetadata: z.string().optional(),
-  triggerId: z.string().optional()
+  triggerId: z.string().optional(),
+  channel: channelSchema.optional(),
+  thread: threadSchema.optional(),
+  message: messageSchema.optional(),
+  raw: rawSchema
 });
 
 export let modalClosedSchema = z.object({
   callbackId: z.string(),
   viewId: z.string().optional(),
-  author: authorSchema
+  author: authorSchema,
+  channel: channelSchema.optional(),
+  thread: threadSchema.optional(),
+  raw: rawSchema
 });
 
 export let optionsLoadSchema = z.object({
   actionId: z.string(),
   query: z.string(),
-  minQueryLength: z.number().int().optional()
+  minQueryLength: z.number().int().optional(),
+  raw: rawSchema
 });
 
 export let reactionEventSchema = z.object({
   messageId: z.string(),
   channelId: z.string(),
   emoji: emojiSchema,
-  author: authorSchema
+  author: authorSchema,
+  message: messageSchema.optional(),
+  channel: channelSchema.optional(),
+  thread: threadSchema.optional(),
+  raw: rawSchema
 });
 
 export type ActionInvoked = z.infer<typeof actionInvokedSchema>;

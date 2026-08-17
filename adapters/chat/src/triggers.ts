@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { ChatAdapter } from './adapter';
 import { authorSchema } from './schema/channels/author';
+import { channelSchema } from './schema/channels/channel';
+import { threadSchema } from './schema/channels/thread';
 import { messageSchema } from './schema/content/message';
 import {
   actionInvokedSchema,
@@ -9,6 +11,12 @@ import {
   optionsLoadSchema,
   reactionEventSchema
 } from './schema/interactions/action';
+import {
+  commandAutocompleteSchema,
+  commandInvokedSchema,
+  commandOptionValueSchema
+} from './schema/interactions/command';
+import { rawSchema } from './schema/shared/raw';
 
 export let messageReceived = ChatAdapter.defineTrigger({
   key: 'chat.message.received',
@@ -18,7 +26,10 @@ export let messageReceived = ChatAdapter.defineTrigger({
   output: z.object({
     type: z.literal('chat.message.received'),
     id: z.string(),
-    message: messageSchema
+    message: messageSchema,
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -30,7 +41,10 @@ export let messageUpdated = ChatAdapter.defineTrigger({
   output: z.object({
     type: z.literal('chat.message.updated'),
     id: z.string(),
-    message: messageSchema
+    message: messageSchema,
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -41,14 +55,20 @@ export let messageDeleted = ChatAdapter.defineTrigger({
   input: z.object({
     channelId: z.string(),
     messageId: z.string(),
-    threadId: z.string().optional()
+    threadId: z.string().optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   }),
   output: z.object({
     type: z.literal('chat.message.deleted'),
     id: z.string(),
     channelId: z.string(),
     messageId: z.string(),
-    threadId: z.string().optional()
+    threadId: z.string().optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -60,7 +80,10 @@ export let mentionReceived = ChatAdapter.defineTrigger({
   output: z.object({
     type: z.literal('chat.mention.received'),
     id: z.string(),
-    message: messageSchema
+    message: messageSchema,
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -75,7 +98,11 @@ export let reactionAdded = ChatAdapter.defineTrigger({
     messageId: z.string(),
     channelId: z.string(),
     emoji: reactionEventSchema.shape.emoji,
-    author: authorSchema
+    author: authorSchema,
+    message: messageSchema.optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -90,7 +117,11 @@ export let reactionRemoved = ChatAdapter.defineTrigger({
     messageId: z.string(),
     channelId: z.string(),
     emoji: reactionEventSchema.shape.emoji,
-    author: authorSchema
+    author: authorSchema,
+    message: messageSchema.optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -108,7 +139,11 @@ export let actionInvoked = ChatAdapter.defineTrigger({
     channelId: z.string(),
     author: authorSchema,
     triggerId: z.string().optional(),
-    selectedValues: z.record(z.string(), z.string()).optional()
+    selectedValues: z.record(z.string(), z.string()).optional(),
+    message: messageSchema.optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -125,7 +160,11 @@ export let modalSubmitted = ChatAdapter.defineTrigger({
     values: z.record(z.string(), z.unknown()),
     author: authorSchema,
     privateMetadata: z.string().optional(),
-    triggerId: z.string().optional()
+    triggerId: z.string().optional(),
+    message: messageSchema.optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -139,7 +178,10 @@ export let modalClosed = ChatAdapter.defineTrigger({
     id: z.string(),
     callbackId: z.string(),
     viewId: z.string().optional(),
-    author: authorSchema
+    author: authorSchema,
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -153,7 +195,57 @@ export let optionsLoad = ChatAdapter.defineTrigger({
     id: z.string(),
     actionId: z.string(),
     query: z.string(),
-    minQueryLength: z.number().int().optional()
+    minQueryLength: z.number().int().optional(),
+    raw: rawSchema
+  })
+});
+
+export let commandInvoked = ChatAdapter.defineTrigger({
+  key: 'chat.command.invoked',
+  name: 'Command Invoked',
+  description: 'Fires when a user runs a slash command.',
+  input: commandInvokedSchema,
+  output: z.object({
+    type: z.literal('chat.command.invoked'),
+    id: z.string(),
+    name: z.string(),
+    commandId: z.string().optional(),
+    text: z.string().optional(),
+    subcommand: z.string().optional(),
+    subcommandGroup: z.string().optional(),
+    options: z.array(commandOptionValueSchema).optional(),
+    author: authorSchema,
+    channelId: z.string(),
+    threadId: z.string().optional(),
+    triggerId: z.string().optional(),
+    responseToken: z.string().optional(),
+    message: messageSchema.optional(),
+    channel: channelSchema.optional(),
+    thread: threadSchema.optional(),
+    raw: rawSchema
+  })
+});
+
+export let commandAutocomplete = ChatAdapter.defineTrigger({
+  key: 'chat.command.autocomplete',
+  name: 'Command Autocomplete',
+  description:
+    'Fires when a user types into a slash command option that supports suggestions.',
+  input: commandAutocompleteSchema,
+  output: z.object({
+    type: z.literal('chat.command.autocomplete'),
+    id: z.string(),
+    name: z.string(),
+    commandId: z.string().optional(),
+    subcommand: z.string().optional(),
+    subcommandGroup: z.string().optional(),
+    optionName: z.string(),
+    query: z.string(),
+    options: z.array(commandOptionValueSchema).optional(),
+    author: authorSchema.optional(),
+    channelId: z.string().optional(),
+    responseToken: z.string().optional(),
+    raw: rawSchema
   })
 });
 
@@ -163,13 +255,17 @@ export let memberJoined = ChatAdapter.defineTrigger({
   description: 'Fires when a user joins a channel.',
   input: z.object({
     channelId: z.string(),
-    author: authorSchema
+    author: authorSchema,
+    channel: channelSchema.optional(),
+    raw: rawSchema
   }),
   output: z.object({
     type: z.literal('chat.member.joined'),
     id: z.string(),
     channelId: z.string(),
-    author: authorSchema
+    author: authorSchema,
+    channel: channelSchema.optional(),
+    raw: rawSchema
   })
 });
 
@@ -179,12 +275,16 @@ export let memberLeft = ChatAdapter.defineTrigger({
   description: 'Fires when a user leaves a channel.',
   input: z.object({
     channelId: z.string(),
-    author: authorSchema
+    author: authorSchema,
+    channel: channelSchema.optional(),
+    raw: rawSchema
   }),
   output: z.object({
     type: z.literal('chat.member.left'),
     id: z.string(),
     channelId: z.string(),
-    author: authorSchema
+    author: authorSchema,
+    channel: channelSchema.optional(),
+    raw: rawSchema
   })
 });

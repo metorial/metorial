@@ -7,12 +7,20 @@ import {
   channelSchema,
   chatBodySchema,
   chatPartSchema,
+  commandAutocompleteSchema,
+  commandInvokedSchema,
+  commandSchema,
   cursorPageResultSchema,
   cursorPageSchema,
   decodeCursor,
   encodeCursor,
   markdownPartSchema,
+  messageSchema,
+  readAttachmentContent,
+  replyRefSchema,
   tablePartSchema,
+  threadSchema,
+  toDownloadInput,
   workspaceSchema
 } from './schema';
 
@@ -155,6 +163,113 @@ describe('workspace and channel', () => {
       })
     ).toThrow();
   });
+
+  it('parses guest authors, provider types, and raw payloads', () => {
+    expect(
+      authorSchema.parse({
+        userId: 'U2',
+        userName: 'guest',
+        fullName: 'Guest',
+        type: 'user',
+        role: 'guest',
+        providerType: 'restricted',
+        isMe: false,
+        raw: { slack: true }
+      })
+    ).toMatchObject({ role: 'guest', providerType: 'restricted' });
+  });
+
+  it('parses channel and thread subject, context, and permalink', () => {
+    expect(
+      channelSchema.parse({
+        id: 'C1',
+        type: 'public',
+        subject: 'Deploy bot',
+        permalink: 'https://slack.com/archives/C1',
+        context: {
+          type: 'pull_request',
+          id: '42',
+          status: 'open',
+          url: 'https://github.com/acme/app/pull/42',
+          labels: ['chat']
+        }
+      })
+    ).toMatchObject({ subject: 'Deploy bot', context: { type: 'pull_request', id: '42' } });
+
+    expect(
+      threadSchema.parse({
+        id: 'T1',
+        channelId: 'C1',
+        type: 'post',
+        providerType: 'pull_request',
+        subject: 'Fix login',
+        permalink: 'https://github.com/acme/app/pull/42'
+      })
+    ).toMatchObject({ type: 'post', subject: 'Fix login' });
+
+    expect(() => threadSchema.parse({ id: 'T1', channelId: 'C1' })).toThrow();
+  });
+
+  it('treats an empty reply as a normal message and accepts snapshots', () => {
+    expect(replyRefSchema.parse({})).toEqual({});
+    expect(replyRefSchema.parse({ id: 'm0' }).id).toBe('m0');
+
+    let parsed = messageSchema.parse({
+      id: 'm2',
+      channelId: 'C1',
+      author: {
+        userId: 'U1',
+        userName: 'ada',
+        fullName: 'Ada',
+        type: 'user',
+        isMe: false
+      },
+      body: { parts: [{ type: 'markdown', markdown: 're: hi' }] },
+      reply: {
+        id: 'm1',
+        reference: {
+          id: 'm1',
+          channelId: 'C1',
+          author: {
+            userId: 'U1',
+            userName: 'ada',
+            fullName: 'Ada',
+            type: 'user',
+            isMe: false
+          },
+          body: { parts: [{ type: 'markdown', markdown: 'hi' }] },
+          metadata: { sentAt: '2026-01-01T00:00:00.000Z', edited: false }
+        }
+      },
+      unfurls: [{ url: 'https://github.com/acme/app/pull/42', title: 'Fix login' }],
+      metadata: { sentAt: '2026-01-01T00:00:01.000Z', edited: false }
+    });
+
+    expect(parsed.reply?.id).toBe('m1');
+    expect(parsed.reply?.reference?.id).toBe('m1');
+    expect(parsed.unfurls?.[0]?.title).toBe('Fix login');
+  });
+
+  it('builds attachment download helper input from a ref', () => {
+    let attachment = {
+      type: 'file' as const,
+      id: 'F1',
+      url: 'https://files.example/a.txt',
+      fetchMetadata: { mediaId: 'abc' },
+      content: 'aGk=',
+      encoding: 'base64' as const,
+      name: 'a.txt'
+    };
+
+    expect(toDownloadInput(attachment, { channelId: 'C1', messageId: 'm1' })).toEqual({
+      id: 'F1',
+      url: 'https://files.example/a.txt',
+      fetchMetadata: { mediaId: 'abc' },
+      channelId: 'C1',
+      messageId: 'm1'
+    });
+    expect(readAttachmentContent(attachment).content).toBe('aGk=');
+  });
 });
 
 describe('cursor encoding', () => {
@@ -193,5 +308,91 @@ describe('cursor encoding', () => {
   it('rejects invalid JSON and missing fields', () => {
     expect(() => decodeCursor('not-json')).toThrow('Chat cursor is not valid JSON');
     expect(() => decodeCursor('{"provider":"slack"}')).toThrow();
+  });
+});
+
+describe('slash commands', () => {
+  it('parses a command definition with nested options', () => {
+    expect(
+      commandSchema.parse({
+        name: 'weather',
+        description: 'Look up the weather',
+        usage: '[zip code]',
+        options: [
+          {
+            name: 'today',
+            type: 'subcommand',
+            options: [{ name: 'zip', type: 'string', required: true }]
+          }
+        ]
+      })
+    ).toMatchObject({
+      name: 'weather',
+      options: [{ name: 'today', options: [{ name: 'zip', required: true }] }]
+    });
+  });
+
+  it('parses a freeform invocation and a structured one', () => {
+    expect(
+      commandInvokedSchema.parse({
+        name: 'weather',
+        text: '94107',
+        author: {
+          userId: 'U1',
+          userName: 'ada',
+          fullName: 'Ada',
+          type: 'user',
+          isMe: false
+        },
+        channelId: 'C1',
+        triggerId: 'trig-1',
+        responseToken: 'https://hooks.slack.com/commands/xxx'
+      })
+    ).toMatchObject({ name: 'weather', text: '94107' });
+
+    expect(
+      commandInvokedSchema.parse({
+        name: 'weather',
+        subcommand: 'today',
+        options: [{ name: 'zip', value: '94107', type: 'string' }],
+        author: {
+          userId: 'U1',
+          userName: 'ada',
+          fullName: 'Ada',
+          type: 'user',
+          isMe: false
+        },
+        channelId: 'C1',
+        responseToken: 'interaction-token'
+      }).options?.[0]
+    ).toMatchObject({ name: 'zip', value: '94107' });
+  });
+
+  it('parses command autocomplete for a focused option', () => {
+    expect(
+      commandAutocompleteSchema.parse({
+        name: 'weather',
+        optionName: 'zip',
+        query: '94',
+        options: [{ name: 'zip', value: '94', type: 'string' }]
+      })
+    ).toMatchObject({ name: 'weather', optionName: 'zip', query: '94' });
+  });
+
+  it('requires a command name', () => {
+    expect(() => commandSchema.parse({ description: 'no name' })).toThrow();
+    expect(() =>
+      commandInvokedSchema.parse({
+        text: '94107',
+        author: {
+          userId: 'U1',
+          userName: 'ada',
+          fullName: 'Ada',
+          type: 'user',
+          isMe: false
+        },
+        channelId: 'C1'
+      })
+    ).toThrow();
   });
 });
