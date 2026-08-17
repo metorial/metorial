@@ -13,6 +13,7 @@ import { cursorPageResultSchema, cursorPageSchema } from './schema/shared/cursor
 import { emojiInputSchema } from './schema/shared/emoji';
 import { rawSchema } from './schema/shared/raw';
 import { reactionCountSchema } from './schema/shared/reaction';
+import { chatSetupInputSchema, chatSetupOutputSchema } from './schema/shared/setup';
 
 let okSchema = z.object({
   ok: z.boolean(),
@@ -20,7 +21,7 @@ let okSchema = z.object({
 });
 
 export let sendMessage = ChatAdapter.defineTool({
-  key: 'chat.message.send',
+  key: 'metorial_chat$message.send',
   name: 'Send Message',
   description:
     'Send a message to a channel or thread as a parts document (markdown, text, cards, and attachments).',
@@ -42,7 +43,7 @@ export let sendMessage = ChatAdapter.defineTool({
 });
 
 export let editMessage = ChatAdapter.defineTool({
-  key: 'chat.message.edit',
+  key: 'metorial_chat$message.edit',
   name: 'Edit Message',
   description: 'Replace the body of an existing message.',
   input: chatBodySchema.extend({
@@ -53,7 +54,7 @@ export let editMessage = ChatAdapter.defineTool({
 });
 
 export let deleteMessage = ChatAdapter.defineTool({
-  key: 'chat.message.delete',
+  key: 'metorial_chat$message.delete',
   name: 'Delete Message',
   description: 'Delete a message.',
   tags: { destructive: true },
@@ -65,7 +66,7 @@ export let deleteMessage = ChatAdapter.defineTool({
 });
 
 export let getMessage = ChatAdapter.defineTool({
-  key: 'chat.message.get',
+  key: 'metorial_chat$message.get',
   name: 'Get Message',
   description: 'Fetch a single message by id.',
   tags: { readOnly: true },
@@ -77,7 +78,7 @@ export let getMessage = ChatAdapter.defineTool({
 });
 
 export let listMessages = ChatAdapter.defineTool({
-  key: 'chat.message.list',
+  key: 'metorial_chat$message.list',
   name: 'List Messages',
   description:
     'List messages in a channel or thread. Each page is chronological (oldest first). Default direction is backward (older). nextCursor continues in that direction; prevCursor pages the other way when the platform supports it.',
@@ -95,7 +96,7 @@ export let listMessages = ChatAdapter.defineTool({
 });
 
 export let searchMessages = ChatAdapter.defineTool({
-  key: 'chat.message.search',
+  key: 'metorial_chat$message.search',
   name: 'Search Messages',
   description: 'Search messages by query, optionally scoped to a channel.',
   tags: { readOnly: true },
@@ -112,7 +113,7 @@ export let searchMessages = ChatAdapter.defineTool({
 });
 
 export let replyMessage = ChatAdapter.defineTool({
-  key: 'chat.message.reply',
+  key: 'metorial_chat$message.reply',
   name: 'Reply to Message',
   description: 'Reply to an existing message, creating or continuing a thread when supported.',
   input: chatBodySchema.extend({
@@ -127,7 +128,7 @@ export let replyMessage = ChatAdapter.defineTool({
 });
 
 export let sendEphemeralMessage = ChatAdapter.defineTool({
-  key: 'chat.message.sendEphemeral',
+  key: 'metorial_chat$message.sendEphemeral',
   name: 'Send Ephemeral Message',
   description: 'Send a message visible only to one user. Providers may fall back to a DM.',
   input: chatBodySchema.extend({
@@ -141,7 +142,7 @@ export let sendEphemeralMessage = ChatAdapter.defineTool({
 });
 
 export let markMessageRead = ChatAdapter.defineTool({
-  key: 'chat.message.markRead',
+  key: 'metorial_chat$message.markRead',
   name: 'Mark Message Read',
   description: 'Send a read receipt for a message.',
   input: z.object({
@@ -153,7 +154,7 @@ export let markMessageRead = ChatAdapter.defineTool({
 });
 
 export let addReaction = ChatAdapter.defineTool({
-  key: 'chat.reaction.add',
+  key: 'metorial_chat$reaction.add',
   name: 'Add Reaction',
   description:
     'Add a reaction to a message. Emoji may be Unicode (👍), a Slack shortcode (:+1:), or a custom emoji object.',
@@ -166,7 +167,7 @@ export let addReaction = ChatAdapter.defineTool({
 });
 
 export let removeReaction = ChatAdapter.defineTool({
-  key: 'chat.reaction.remove',
+  key: 'metorial_chat$reaction.remove',
   name: 'Remove Reaction',
   description: 'Remove a reaction from a message.',
   tags: { destructive: true },
@@ -179,7 +180,7 @@ export let removeReaction = ChatAdapter.defineTool({
 });
 
 export let listReactions = ChatAdapter.defineTool({
-  key: 'chat.reaction.list',
+  key: 'metorial_chat$reaction.list',
   name: 'List Reactions',
   description: 'List reactions on a message.',
   tags: { readOnly: true },
@@ -194,7 +195,7 @@ export let listReactions = ChatAdapter.defineTool({
 });
 
 export let listChannels = ChatAdapter.defineTool({
-  key: 'chat.channel.list',
+  key: 'metorial_chat$channel.list',
   name: 'List Channels',
   description: 'List channels the bot can see.',
   tags: { readOnly: true },
@@ -210,7 +211,7 @@ export let listChannels = ChatAdapter.defineTool({
 });
 
 export let getChannel = ChatAdapter.defineTool({
-  key: 'chat.channel.get',
+  key: 'metorial_chat$channel.get',
   name: 'Get Channel',
   description: 'Fetch channel metadata.',
   tags: { readOnly: true },
@@ -224,7 +225,7 @@ export let getChannel = ChatAdapter.defineTool({
 });
 
 export let listWorkspaces = ChatAdapter.defineTool({
-  key: 'chat.workspace.list',
+  key: 'metorial_chat$workspace.list',
   name: 'List Workspaces',
   description: 'List workspaces the bot can see.',
   tags: { readOnly: true },
@@ -238,7 +239,7 @@ export let listWorkspaces = ChatAdapter.defineTool({
 });
 
 export let getWorkspace = ChatAdapter.defineTool({
-  key: 'chat.workspace.get',
+  key: 'metorial_chat$workspace.get',
   name: 'Get Workspace',
   description: 'Fetch workspace metadata.',
   tags: { readOnly: true },
@@ -252,7 +253,7 @@ export let getWorkspace = ChatAdapter.defineTool({
 });
 
 export let listChannelMembers = ChatAdapter.defineTool({
-  key: 'chat.channel.members',
+  key: 'metorial_chat$channel.members',
   name: 'List Channel Members',
   description: 'List members of a channel.',
   tags: { readOnly: true },
@@ -267,7 +268,7 @@ export let listChannelMembers = ChatAdapter.defineTool({
 });
 
 export let listThreads = ChatAdapter.defineTool({
-  key: 'chat.thread.list',
+  key: 'metorial_chat$thread.list',
   name: 'List Threads',
   description: 'List threads in a channel.',
   tags: { readOnly: true },
@@ -283,7 +284,7 @@ export let listThreads = ChatAdapter.defineTool({
 });
 
 export let getThread = ChatAdapter.defineTool({
-  key: 'chat.thread.get',
+  key: 'metorial_chat$thread.get',
   name: 'Get Thread',
   description: 'Fetch thread metadata.',
   tags: { readOnly: true },
@@ -305,7 +306,7 @@ let dmResultSchema = z.object({
 });
 
 export let openSingleDm = ChatAdapter.defineTool({
-  key: 'chat.dm.openSingle',
+  key: 'metorial_chat$dm.openSingle',
   name: 'Open Direct Message',
   description: 'Open or fetch a 1:1 direct message conversation with a user.',
   input: z.object({
@@ -315,7 +316,7 @@ export let openSingleDm = ChatAdapter.defineTool({
 });
 
 export let openGroupDm = ChatAdapter.defineTool({
-  key: 'chat.dm.openGroup',
+  key: 'metorial_chat$dm.openGroup',
   name: 'Open Group Direct Message',
   description:
     'Open or fetch a group direct message conversation with multiple users. Use chat.dm.openSingle for a 1:1 DM.',
@@ -329,7 +330,7 @@ export let openGroupDm = ChatAdapter.defineTool({
 });
 
 export let getUser = ChatAdapter.defineTool({
-  key: 'chat.user.get',
+  key: 'metorial_chat$user.get',
   name: 'Get User',
   description: 'Look up a user by id.',
   tags: { readOnly: true },
@@ -343,7 +344,7 @@ export let getUser = ChatAdapter.defineTool({
 });
 
 export let searchUsers = ChatAdapter.defineTool({
-  key: 'chat.user.search',
+  key: 'metorial_chat$user.search',
   name: 'Search Users',
   description: 'Search users by name or handle.',
   tags: { readOnly: true },
@@ -357,7 +358,7 @@ export let searchUsers = ChatAdapter.defineTool({
 });
 
 export let uploadFile = ChatAdapter.defineTool({
-  key: 'chat.file.upload',
+  key: 'metorial_chat$file.upload',
   name: 'Upload File',
   description: 'Upload a file, optionally attaching it to a channel or thread.',
   input: z.object({
@@ -378,7 +379,7 @@ export let uploadFile = ChatAdapter.defineTool({
 });
 
 export let downloadFile = ChatAdapter.defineTool({
-  key: 'chat.file.download',
+  key: 'metorial_chat$file.download',
   name: 'Download File',
   description:
     'Download an attachment. Pass the attachment id/url/fetchMetadata from a message, plus channel and message ids when the platform requires them.',
@@ -397,7 +398,7 @@ export let downloadFile = ChatAdapter.defineTool({
 });
 
 export let openModal = ChatAdapter.defineTool({
-  key: 'chat.modal.open',
+  key: 'metorial_chat$modal.open',
   name: 'Open Modal',
   description:
     'Open a modal form. triggerId comes from an inbound action or slash command event.',
@@ -413,7 +414,7 @@ export let openModal = ChatAdapter.defineTool({
 });
 
 export let respondToCommand = ChatAdapter.defineTool({
-  key: 'chat.command.respond',
+  key: 'metorial_chat$command.respond',
   name: 'Respond to Command',
   description:
     'Reply to a slash command invocation. Pass responseToken from chat.command.invoked so providers that require an interaction callback can respond correctly.',
@@ -437,7 +438,7 @@ export let respondToCommand = ChatAdapter.defineTool({
 });
 
 export let listCommands = ChatAdapter.defineTool({
-  key: 'chat.command.list',
+  key: 'metorial_chat$command.list',
   name: 'List Commands',
   description:
     'List slash commands registered for this app. Omit this tool when the provider cannot introspect commands (Slack, Teams, Google Chat).',
@@ -458,7 +459,7 @@ export let listCommands = ChatAdapter.defineTool({
 });
 
 export let startTyping = ChatAdapter.defineTool({
-  key: 'chat.typing.start',
+  key: 'metorial_chat$typing.start',
   name: 'Start Typing',
   description: 'Show a typing indicator in a channel or thread.',
   input: z.object({
@@ -467,4 +468,14 @@ export let startTyping = ChatAdapter.defineTool({
     status: z.string().optional()
   }),
   output: okSchema
+});
+
+export let getSetup = ChatAdapter.definePublicTool({
+  key: 'metorial_chat$setup.get',
+  name: 'Get Setup Info',
+  description:
+    'Return provider-specific setup instructions for this chat app. Call before authentication. Pass the webhook URL, OAuth redirect URIs, and slash commands the host will serve so the provider can generate Markdown instructions and, when supported, an importable app manifest (for example a Slack app manifest).',
+  tags: { readOnly: true },
+  input: chatSetupInputSchema,
+  output: chatSetupOutputSchema
 });

@@ -19,7 +19,7 @@ import {
 import { rawSchema } from './schema/shared/raw';
 
 export let messageReceived = ChatAdapter.defineTrigger({
-  key: 'chat.message.received',
+  key: 'metorial_chat$message.received',
   name: 'Message Received',
   description: 'Fires when a new message is posted.',
   input: messageSchema,
@@ -34,7 +34,7 @@ export let messageReceived = ChatAdapter.defineTrigger({
 });
 
 export let messageUpdated = ChatAdapter.defineTrigger({
-  key: 'chat.message.updated',
+  key: 'metorial_chat$message.updated',
   name: 'Message Updated',
   description: 'Fires when a message is edited.',
   input: messageSchema,
@@ -49,7 +49,7 @@ export let messageUpdated = ChatAdapter.defineTrigger({
 });
 
 export let messageDeleted = ChatAdapter.defineTrigger({
-  key: 'chat.message.deleted',
+  key: 'metorial_chat$message.deleted',
   name: 'Message Deleted',
   description: 'Fires when a message is deleted.',
   input: z.object({
@@ -73,7 +73,7 @@ export let messageDeleted = ChatAdapter.defineTrigger({
 });
 
 export let mentionReceived = ChatAdapter.defineTrigger({
-  key: 'chat.mention.received',
+  key: 'metorial_chat$mention.received',
   name: 'Mention Received',
   description: 'Fires when the bot is mentioned.',
   input: messageSchema,
@@ -88,7 +88,7 @@ export let mentionReceived = ChatAdapter.defineTrigger({
 });
 
 export let reactionAdded = ChatAdapter.defineTrigger({
-  key: 'chat.reaction.added',
+  key: 'metorial_chat$reaction.added',
   name: 'Reaction Added',
   description: 'Fires when a user adds a reaction to a message.',
   input: reactionEventSchema,
@@ -107,7 +107,7 @@ export let reactionAdded = ChatAdapter.defineTrigger({
 });
 
 export let reactionRemoved = ChatAdapter.defineTrigger({
-  key: 'chat.reaction.removed',
+  key: 'metorial_chat$reaction.removed',
   name: 'Reaction Removed',
   description: 'Fires when a user removes a reaction from a message.',
   input: reactionEventSchema,
@@ -126,7 +126,7 @@ export let reactionRemoved = ChatAdapter.defineTrigger({
 });
 
 export let actionInvoked = ChatAdapter.defineTrigger({
-  key: 'chat.action.invoked',
+  key: 'metorial_chat$action.invoked',
   name: 'Action Invoked',
   description: 'Fires when a user clicks a button or submits a select on a card.',
   input: actionInvokedSchema,
@@ -148,7 +148,7 @@ export let actionInvoked = ChatAdapter.defineTrigger({
 });
 
 export let modalSubmitted = ChatAdapter.defineTrigger({
-  key: 'chat.modal.submitted',
+  key: 'metorial_chat$modal.submitted',
   name: 'Modal Submitted',
   description: 'Fires when a user submits a modal form.',
   input: modalSubmittedSchema,
@@ -169,7 +169,7 @@ export let modalSubmitted = ChatAdapter.defineTrigger({
 });
 
 export let modalClosed = ChatAdapter.defineTrigger({
-  key: 'chat.modal.closed',
+  key: 'metorial_chat$modal.closed',
   name: 'Modal Closed',
   description: 'Fires when a user closes a modal without submitting.',
   input: modalClosedSchema,
@@ -186,7 +186,7 @@ export let modalClosed = ChatAdapter.defineTrigger({
 });
 
 export let optionsLoad = ChatAdapter.defineTrigger({
-  key: 'chat.options.load',
+  key: 'metorial_chat$options.load',
   name: 'Options Load',
   description: 'Fires when a user types into an external select.',
   input: optionsLoadSchema,
@@ -201,7 +201,7 @@ export let optionsLoad = ChatAdapter.defineTrigger({
 });
 
 export let commandInvoked = ChatAdapter.defineTrigger({
-  key: 'chat.command.invoked',
+  key: 'metorial_chat$command.invoked',
   name: 'Command Invoked',
   description: 'Fires when a user runs a slash command.',
   input: commandInvokedSchema,
@@ -227,7 +227,7 @@ export let commandInvoked = ChatAdapter.defineTrigger({
 });
 
 export let commandAutocomplete = ChatAdapter.defineTrigger({
-  key: 'chat.command.autocomplete',
+  key: 'metorial_chat$command.autocomplete',
   name: 'Command Autocomplete',
   description:
     'Fires when a user types into a slash command option that supports suggestions.',
@@ -250,7 +250,7 @@ export let commandAutocomplete = ChatAdapter.defineTrigger({
 });
 
 export let memberJoined = ChatAdapter.defineTrigger({
-  key: 'chat.member.joined',
+  key: 'metorial_chat$member.joined',
   name: 'Member Joined',
   description: 'Fires when a user joins a channel.',
   input: z.object({
@@ -270,7 +270,7 @@ export let memberJoined = ChatAdapter.defineTrigger({
 });
 
 export let memberLeft = ChatAdapter.defineTrigger({
-  key: 'chat.member.left',
+  key: 'metorial_chat$member.left',
   name: 'Member Left',
   description: 'Fires when a user leaves a channel.',
   input: z.object({

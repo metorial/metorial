@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { ChatAdapter, sendMessage } from './index';
+import { ChatAdapter, getSetup, sendMessage } from './index';
 import {
   createTestSpec,
   listToolDefinitions,
@@ -10,10 +10,12 @@ import {
 
 let capabilityIds = (declared: boolean) =>
   Object.entries(ChatAdapter.capabilityRules)
-    .filter(
-      ([, value]) =>
-        ((value.tools?.length ?? 0) === 0 && (value.triggers?.length ?? 0) === 0) === declared
-    )
+    .filter(([, value]) => {
+      let rule = value as { tools?: string[]; triggers?: string[] };
+      return (
+        ((rule.tools?.length ?? 0) === 0 && (rule.triggers?.length ?? 0) === 0) === declared
+      );
+    })
     .map(([id]) => id)
     .sort();
 
@@ -130,5 +132,39 @@ describe('ChatAdapter', () => {
       expect(jsonSchema, tool.key).not.toHaveProperty('anyOf');
       expect(jsonSchema, tool.key).not.toHaveProperty('allOf');
     }
+  });
+
+  it('exposes setup as a public adapter tool', () => {
+    expect(getSetup.key).toBe('metorial_chat$setup.get');
+    expect(getSetup.isPublic).toBe(true);
+
+    let spec = createTestSpec();
+    let setupTool = getSetup
+      .implement(spec)
+      .handleInvocation(async ctx => {
+        expect(ctx).not.toHaveProperty('config');
+        expect(ctx).not.toHaveProperty('auth');
+        return {
+          output: {
+            setupMarkdown: `# ${ctx.input.appName ?? 'App'}\n\nWebhook: ${ctx.input.webhookUrl}`,
+            manifest: {
+              type: 'Slack App Manifest',
+              value: `display_information:\n  name: ${ctx.input.appName ?? 'App'}`
+            }
+          },
+          message: 'ok'
+        };
+      })
+      .build();
+
+    expect(setupTool.isPublic).toBe(true);
+    expect(setupTool.adapter).toBe('chat');
+
+    let adapter = ChatAdapter.register({
+      tools: [setupTool],
+      triggers: []
+    });
+
+    expect(enabledIds(adapter.capabilities)).toEqual(['provider_setup']);
   });
 });

@@ -54,6 +54,9 @@ export let dummyCommand: Command = {
   usage: '[zip code]'
 };
 
+let eventTypeForTrigger = (key: string) =>
+  key.startsWith('metorial_chat$') ? `chat.${key.slice('metorial_chat$'.length)}` : key;
+
 export let listToolDefinitions = () =>
   Object.values(chatTools).filter(
     (value): value is SlateAdapterToolDefinition<any, any> =>
@@ -82,25 +85,41 @@ export let stubAllTriggers = (spec: ReturnType<typeof createTestSpec>) =>
         .implement(spec)
         .webhook({
           handleRequest: async () => ({ inputs: [] }),
-          handleEvent: async () => ({
-            type: definition.key,
-            id: '1',
-            output: stubTriggerOutput(definition.key) as any
-          })
+          handleEvent: async () => {
+            let output = stubTriggerOutput(definition.key) as any;
+            return {
+              type: output.type ?? eventTypeForTrigger(definition.key),
+              id: '1',
+              output
+            };
+          }
         })
         .build()
     );
 
 let stubOutput = (key: string): any => {
+  if (key === 'metorial_chat$setup.get') {
+    return {
+      setupMarkdown: '# Setup\n\nCreate an app and paste the webhook URL.',
+      title: 'Chat app setup',
+      manifest: {
+        type: 'Slack App Manifest',
+        value: 'display_information:\n  name: Test Chat',
+        format: 'yaml',
+        filename: 'manifest.yaml'
+      },
+      links: [{ label: 'Slack API', url: 'https://api.slack.com/apps' }]
+    };
+  }
   if (
-    key === 'chat.message.send' ||
-    key === 'chat.message.edit' ||
-    key === 'chat.message.get' ||
-    key === 'chat.message.reply'
+    key === 'metorial_chat$message.send' ||
+    key === 'metorial_chat$message.edit' ||
+    key === 'metorial_chat$message.get' ||
+    key === 'metorial_chat$message.reply'
   ) {
     return { message: dummyMessage, channel: dummyChannel, thread: dummyThread };
   }
-  if (key === 'chat.message.sendEphemeral') {
+  if (key === 'metorial_chat$message.sendEphemeral') {
     return {
       message: dummyMessage,
       channel: dummyChannel,
@@ -108,52 +127,52 @@ let stubOutput = (key: string): any => {
       usedFallback: false
     };
   }
-  if (key === 'chat.message.list' || key === 'chat.message.search') {
+  if (key === 'metorial_chat$message.list' || key === 'metorial_chat$message.search') {
     return { messages: [dummyMessage], channel: dummyChannel, thread: dummyThread };
   }
-  if (key === 'chat.reaction.list') {
+  if (key === 'metorial_chat$reaction.list') {
     return { reactions: [] };
   }
-  if (key === 'chat.channel.list') {
+  if (key === 'metorial_chat$channel.list') {
     return { channels: [] };
   }
-  if (key === 'chat.channel.get') {
+  if (key === 'metorial_chat$channel.get') {
     return { channel: { ...dummyChannel, workspaceId: 'W1' } };
   }
-  if (key === 'chat.workspace.list') {
+  if (key === 'metorial_chat$workspace.list') {
     return { workspaces: [] };
   }
-  if (key === 'chat.workspace.get') {
+  if (key === 'metorial_chat$workspace.get') {
     return { workspace: { id: 'W1' } };
   }
-  if (key === 'chat.channel.members' || key === 'chat.user.search') {
+  if (key === 'metorial_chat$channel.members' || key === 'metorial_chat$user.search') {
     return { authors: [dummyAuthor] };
   }
-  if (key === 'chat.thread.list') {
+  if (key === 'metorial_chat$thread.list') {
     return { threads: [] };
   }
-  if (key === 'chat.thread.get') {
+  if (key === 'metorial_chat$thread.get') {
     return { thread: dummyThread, channel: dummyChannel };
   }
-  if (key === 'chat.dm.openSingle') {
+  if (key === 'metorial_chat$dm.openSingle') {
     return {
       channel: { id: 'D1', type: 'dm' },
       thread: { id: 'DT1', channelId: 'D1', type: 'dm' }
     };
   }
-  if (key === 'chat.dm.openGroup') {
+  if (key === 'metorial_chat$dm.openGroup') {
     return {
       channel: { id: 'G1', type: 'group_dm' },
       thread: { id: 'GT1', channelId: 'G1', type: 'dm' }
     };
   }
-  if (key === 'chat.user.get') {
+  if (key === 'metorial_chat$user.get') {
     return { author: dummyAuthor };
   }
-  if (key === 'chat.file.upload') {
+  if (key === 'metorial_chat$file.upload') {
     return { attachment: { type: 'file', name: 'a.txt' } };
   }
-  if (key === 'chat.file.download') {
+  if (key === 'metorial_chat$file.download') {
     return {
       attachment: {
         type: 'file',
@@ -163,35 +182,37 @@ let stubOutput = (key: string): any => {
       }
     };
   }
-  if (key === 'chat.modal.open') {
+  if (key === 'metorial_chat$modal.open') {
     return { viewId: 'V1' };
   }
-  if (key === 'chat.command.respond') {
+  if (key === 'metorial_chat$command.respond') {
     return { message: dummyMessage, channel: dummyChannel };
   }
-  if (key === 'chat.command.list') {
+  if (key === 'metorial_chat$command.list') {
     return { commands: [dummyCommand] };
   }
   return { ok: true };
 };
 
 let stubTriggerOutput = (key: string): any => {
+  let type = eventTypeForTrigger(key);
+
   if (
-    key === 'chat.message.received' ||
-    key === 'chat.message.updated' ||
-    key === 'chat.mention.received'
+    type === 'chat.message.received' ||
+    type === 'chat.message.updated' ||
+    type === 'chat.mention.received'
   ) {
     return {
-      type: key,
+      type,
       id: dummyMessage.id,
       message: dummyMessage,
       channel: dummyChannel,
       thread: dummyThread
     };
   }
-  if (key === 'chat.message.deleted') {
+  if (type === 'chat.message.deleted') {
     return {
-      type: key,
+      type,
       id: 'm1',
       channelId: 'C1',
       messageId: 'm1',
@@ -199,9 +220,9 @@ let stubTriggerOutput = (key: string): any => {
       thread: dummyThread
     };
   }
-  if (key === 'chat.reaction.added' || key === 'chat.reaction.removed') {
+  if (type === 'chat.reaction.added' || type === 'chat.reaction.removed') {
     return {
-      type: key,
+      type,
       id: 'm1',
       messageId: 'm1',
       channelId: 'C1',
@@ -212,9 +233,9 @@ let stubTriggerOutput = (key: string): any => {
       thread: dummyThread
     };
   }
-  if (key === 'chat.action.invoked') {
+  if (type === 'chat.action.invoked') {
     return {
-      type: key,
+      type,
       id: 'approve',
       actionId: 'approve',
       messageId: 'm1',
@@ -225,9 +246,9 @@ let stubTriggerOutput = (key: string): any => {
       thread: dummyThread
     };
   }
-  if (key === 'chat.modal.submitted') {
+  if (type === 'chat.modal.submitted') {
     return {
-      type: key,
+      type,
       id: 'cb',
       callbackId: 'cb',
       viewId: 'V1',
@@ -237,21 +258,21 @@ let stubTriggerOutput = (key: string): any => {
       thread: dummyThread
     };
   }
-  if (key === 'chat.modal.closed') {
+  if (type === 'chat.modal.closed') {
     return {
-      type: key,
+      type,
       id: 'cb',
       callbackId: 'cb',
       author: dummyAuthor,
       channel: dummyChannel
     };
   }
-  if (key === 'chat.options.load') {
-    return { type: key, id: 'sel', actionId: 'sel', query: 'a' };
+  if (type === 'chat.options.load') {
+    return { type, id: 'sel', actionId: 'sel', query: 'a' };
   }
-  if (key === 'chat.command.invoked') {
+  if (type === 'chat.command.invoked') {
     return {
-      type: key,
+      type,
       id: 'weather',
       name: 'weather',
       text: '94107',
@@ -264,9 +285,9 @@ let stubTriggerOutput = (key: string): any => {
       thread: dummyThread
     };
   }
-  if (key === 'chat.command.autocomplete') {
+  if (type === 'chat.command.autocomplete') {
     return {
-      type: key,
+      type,
       id: 'weather',
       name: 'weather',
       optionName: 'zip',
@@ -275,14 +296,14 @@ let stubTriggerOutput = (key: string): any => {
       channelId: 'C1'
     };
   }
-  if (key === 'chat.member.joined' || key === 'chat.member.left') {
+  if (type === 'chat.member.joined' || type === 'chat.member.left') {
     return {
-      type: key,
+      type,
       id: dummyAuthor.userId,
       channelId: 'C1',
       author: dummyAuthor,
       channel: dummyChannel
     };
   }
-  return { type: key, id: '1' };
+  return { type, id: '1' };
 };
