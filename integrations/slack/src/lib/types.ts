@@ -16,6 +16,9 @@ export interface SlackMessage {
   text?: string;
   user?: string;
   bot_id?: string;
+  username?: string;
+  app_id?: string;
+  parent_user_id?: string;
   team?: string;
   channel?: string;
   thread_ts?: string;
@@ -50,6 +53,7 @@ export interface SlackConversation {
   is_archived?: boolean;
   is_general?: boolean;
   is_shared?: boolean;
+  is_ext_shared?: boolean;
   is_org_shared?: boolean;
   is_member?: boolean;
   creator?: string;
@@ -119,6 +123,8 @@ export interface SlackFile {
   pretty_type?: string;
   user?: string;
   size?: number;
+  original_w?: number;
+  original_h?: number;
   mode?: string;
   is_external?: boolean;
   is_public?: boolean;

@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
+    "@slates/adapter-chat": "1.0.0-rc.1",
     "@slates/slack-tools": "1.0.0-rc.8",
     "@types/node": "^20",
     "slates": "1.0.0-rc.16",

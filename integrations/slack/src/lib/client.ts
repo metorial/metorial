@@ -174,6 +174,84 @@ export class SlackClient {
     return data.message_ts;
   }
 
+  async respondToUrl(
+    responseUrl: string,
+    params: {
+      text?: string;
+      blocks?: any[];
+      responseType?: 'ephemeral' | 'in_channel';
+      replaceOriginal?: boolean;
+      deleteOriginal?: boolean;
+      threadTs?: string;
+    }
+  ): Promise<Record<string, unknown>> {
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(responseUrl);
+    } catch {
+      throw slackServiceError('Slack response URL is invalid');
+    }
+    if (
+      parsedUrl.protocol !== 'https:' ||
+      !['hooks.slack.com', 'hooks.slack-gov.com'].includes(parsedUrl.hostname)
+    ) {
+      throw slackServiceError('Slack response URL must use an official HTTPS Slack host');
+    }
+
+    let body: Record<string, unknown> = {};
+    if (params.text !== undefined) body.text = params.text;
+    if (params.blocks !== undefined) body.blocks = params.blocks;
+    if (params.responseType !== undefined) body.response_type = params.responseType;
+    if (params.replaceOriginal !== undefined) body.replace_original = params.replaceOriginal;
+    if (params.deleteOriginal !== undefined) body.delete_original = params.deleteOriginal;
+    if (params.threadTs !== undefined) body.thread_ts = params.threadTs;
+
+    try {
+      let response = await fetch(parsedUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) {
+        throw slackServiceError(`Slack response URL failed: HTTP ${response.status}`);
+      }
+      let text = await response.text();
+      if (!text) return {};
+      try {
+        return JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        return { text };
+      }
+    } catch (error) {
+      if (error instanceof ServiceError) throw error;
+      throw slackRequestError('response_url', error);
+    }
+  }
+
+  async openView(params: {
+    triggerId: string;
+    view: Record<string, unknown>;
+  }): Promise<{ view: Record<string, any> }> {
+    let data = await this.call<SlackResponse & { view: Record<string, any> }>('views.open', {
+      trigger_id: params.triggerId,
+      view: params.view
+    });
+    return { view: data.view };
+  }
+
+  async setAssistantThreadStatus(params: {
+    channelId: string;
+    threadTs: string;
+    status: string;
+  }): Promise<void> {
+    await this.call('assistant.threads.setStatus', {
+      channel_id: params.channelId,
+      thread_ts: params.threadTs,
+      status: params.status,
+      loading_messages: [params.status]
+    });
+  }
+
   async updateMessage(params: {
     channel: string;
     ts: string;
