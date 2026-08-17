@@ -31,7 +31,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "@slates/adapter": "1.0.0-rc.1",
+    "@slates/adapter": "1.0.0-rc.2",
     "mdast-util-to-string": "^4.0.0",
     "remark-gfm": "^4.0.0",
     "remark-parse": "^11.0.0",
@@ -40,7 +40,7 @@
     "zod": "^4.2.1"
   },
   "devDependencies": {
-    "@slates/provider": "1.0.0-rc.17",
+    "@slates/provider": "1.0.0-rc.18",
     "@slates/tsconfig": "1.0.0-rc.1",
     "@types/mdast": "^4.0.4",
     "typescript": "5.8.2",
