@@ -12,7 +12,15 @@ import {
   SlateLogger,
   type SlateLogListener
 } from '@slates/provider';
-import { getAction, getActionWithType, getAuthMethod, mapAction, mapAuthMethod } from './spec';
+import {
+  getAction,
+  getActionWithType,
+  getAdapter,
+  getAuthMethod,
+  mapAction,
+  mapAdapter,
+  mapAuthMethod
+} from './spec';
 import { State } from './state';
 import { toJsonSchema, validate } from './validation';
 import { serializeWebhookHttpResponse } from './webhook';
@@ -746,11 +754,32 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       );
     });
 
-    manager.onRequest('slates/actions.list', async () => {
+    manager.onRequest('slates/actions.list', async ({ params }) => {
+      getContextBasic();
+
+      let actions = params.includeAdapterActions
+        ? slate.actions
+        : slate.actions.filter(action => !action.adapter);
+
+      return {
+        actions: actions.map(a => mapAction(slate, a))
+      };
+    });
+
+    manager.onRequest('slates/adapters.list', async () => {
       getContextBasic();
 
       return {
-        actions: slate.actions.map(a => mapAction(slate, a))
+        adapters: slate.adapters.map(mapAdapter)
+      };
+    });
+
+    manager.onRequest('slates/adapter.get', async ({ params }) => {
+      getContextBasic();
+      let adapter = getAdapter(slate, params.adapterId);
+
+      return {
+        adapter: mapAdapter(adapter)
       };
     });
 

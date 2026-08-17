@@ -29,6 +29,7 @@ export interface SlateActionParameters {
   scopes?: SlateActionScopes;
   authMethods?: string[];
   docs?: SlateActionDocsReference[];
+  adapter?: string | null;
 }
 
 export type SlateToolInvocationHandler<
@@ -257,5 +258,9 @@ export abstract class SlateAction<
 
   get docs() {
     return this._params.docs;
+  }
+
+  get adapter() {
+    return this._params.adapter ?? null;
   }
 }

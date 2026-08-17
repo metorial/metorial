@@ -43,6 +43,7 @@ export class SlateActionBuilder<
     InputType,
     OutputType
   > | null = null;
+  #interfaceLocked = false;
 
   constructor(
     private readonly type: Type,
@@ -59,6 +60,10 @@ export class SlateActionBuilder<
   input<NewInputType extends {}>(
     schema: z.ZodType<NewInputType>
   ): SlateActionBuilder<Type, ConfigType, AuthType, NewInputType, OutputType, Result> {
+    if (this.#interfaceLocked) {
+      throw new SlateDeclarationError('Adapter contract input schema cannot be changed');
+    }
+
     this.#inputSchema = schema as any;
     return this as any;
   }
@@ -66,8 +71,24 @@ export class SlateActionBuilder<
   output<NewOutputType extends {}>(
     schema: z.ZodType<NewOutputType>
   ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, NewOutputType, Result> {
+    if (this.#interfaceLocked) {
+      throw new SlateDeclarationError('Adapter contract output schema cannot be changed');
+    }
+
     this.#outputSchema = schema as any;
     return this as any;
+  }
+
+  lockInterface(): SlateActionBuilder<
+    Type,
+    ConfigType,
+    AuthType,
+    InputType,
+    OutputType,
+    Result
+  > {
+    this.#interfaceLocked = true;
+    return this;
   }
 
   scopes(
