@@ -8,7 +8,7 @@
     "local-deps:clean": "bun scripts/check-package-local-node-modules.ts --fix",
     "package-local": "bun scripts/package-local.ts",
     "packages:sync-versions": "bun scripts/update-integration-package-versions.ts",
-    "packages:build": "turbo run build --filter=./packages/*",
+    "packages:build": "turbo run build --filter=./packages/* --filter=./adapters/*",
     "integrations:build:inner": "turbo run build --concurrency=1 --ui=stream --filter=./integrations/* --filter=./test-integrations/*",
     "build:integrations": "bun run packages:build && bun run integrations:build:inner"
   },
@@ -25,6 +25,7 @@
   "packageManager": "bun@1.2.15",
   "workspaces": [
     "packages/*",
+    "adapters/*",
     "integrations/*",
     "test-integrations/*"
   ],

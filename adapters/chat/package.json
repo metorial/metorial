@@ -1,0 +1,49 @@
+{
+  "name": "@slates/adapter-chat",
+  "version": "1.0.0-rc.1",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src/**",
+    "dist/**",
+    "README.md",
+    "package.json"
+  ],
+  "author": "Tobias Herber",
+  "license": "FSL 1.1",
+  "type": "module",
+  "source": "src/index.ts",
+  "exports": {
+    "types": "./dist/index.d.ts",
+    "require": "./dist/index.cjs",
+    "import": "./dist/index.module.js",
+    "default": "./dist/index.module.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.module.js",
+  "types": "dist/index.d.ts",
+  "unpkg": "./dist/index.module.js",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "build": "tsup --config ../../tsup.packages.config.ts",
+    "typecheck": "tsc --noEmit",
+    "biome:check": "biome check --write src"
+  },
+  "dependencies": {
+    "@slates/adapter": "1.0.0-rc.1",
+    "mdast-util-to-string": "^4.0.0",
+    "remark-gfm": "^4.0.0",
+    "remark-parse": "^11.0.0",
+    "remark-stringify": "^11.0.0",
+    "unified": "^11.0.5",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@slates/provider": "1.0.0-rc.17",
+    "@slates/tsconfig": "1.0.0-rc.1",
+    "@types/mdast": "^4.0.4",
+    "typescript": "5.8.2",
+    "vitest": "^3.1.2"
+  }
+}
