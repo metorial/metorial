@@ -4,6 +4,7 @@ import {
   SlateAuth,
   SlateConfig,
   type SlateLogEntry,
+  SlatePublicTool,
   SlateSpecification,
   SlateTool,
   SlateTrigger
@@ -547,6 +548,7 @@ describe('@slates/client local transport', () => {
       ]
     });
     expect(actions[0]!.authMethods).toEqual(['token_auth']);
+    expect(actions[0]!.isPublic).toBe(false);
 
     let configSchema = await client.getConfigSchema();
     expect(configSchema.schema.properties.prefix.type).toBe('string');
@@ -1038,5 +1040,115 @@ describe('@slates/client local transport', () => {
         server.close(error => (error ? reject(error) : resolve()));
       });
     }
+  });
+
+  it('lists, gets, and invokes public tools without config or auth', async () => {
+    let config = SlateConfig.create(
+      z.object({
+        prefix: z.string()
+      })
+    );
+    let auth = SlateAuth.create<{ token: string }>()
+      .output(
+        z.object({
+          token: z.string()
+        })
+      )
+      .addTokenAuth({
+        type: 'auth.token',
+        key: 'token_auth',
+        name: 'Token Auth',
+        inputSchema: z.object({
+          token: z.string()
+        }),
+        getOutput: async ctx => ({
+          output: {
+            token: ctx.input.token
+          }
+        })
+      });
+
+    let spec = SlateSpecification.create({
+      key: 'public-tool-slate',
+      name: 'Public Tool Slate',
+      config,
+      auth
+    });
+
+    let echoTool = SlateTool.create(spec, {
+      key: 'echo',
+      name: 'Echo'
+    })
+      .input(
+        z.object({
+          name: z.string()
+        })
+      )
+      .output(
+        z.object({
+          greeting: z.string()
+        })
+      )
+      .handleInvocation(async ctx => ({
+        output: {
+          greeting: `${ctx.config.prefix} ${ctx.input.name}`
+        },
+        message: 'done'
+      }))
+      .build();
+
+    let setupTool = SlatePublicTool.create(spec, {
+      key: 'setup',
+      name: 'Setup'
+    })
+      .input(z.object({}))
+      .output(
+        z.object({
+          docsUrl: z.string()
+        })
+      )
+      .handleInvocation(async ctx => {
+        expect(ctx).not.toHaveProperty('config');
+        expect(ctx).not.toHaveProperty('auth');
+
+        return {
+          output: {
+            docsUrl: 'https://example.com/setup'
+          },
+          message: 'ok'
+        };
+      })
+      .build();
+
+    let client = createSlatesClient({
+      transport: createLocalSlateTransport({
+        slate: Slate.create({
+          spec,
+          tools: [echoTool, setupTool],
+          triggers: []
+        })
+      })
+    });
+
+    let tools = await client.listTools();
+    expect(tools.map(tool => ({ id: tool.id, isPublic: tool.isPublic }))).toEqual([
+      { id: 'echo', isPublic: false },
+      { id: 'setup', isPublic: true }
+    ]);
+
+    let setup = await client.getTool('setup');
+    expect(setup.isPublic).toBe(true);
+
+    let echo = await client.getTool('echo');
+    expect(echo.isPublic).toBe(false);
+
+    let result = await client.invokeTool('setup', {});
+    expect(result.output).toEqual({
+      docsUrl: 'https://example.com/setup'
+    });
+
+    await expect(client.invokeTool('echo', { name: 'Ada' })).rejects.toMatchObject({
+      message: 'Session context has not been initialized'
+    });
   });
 });

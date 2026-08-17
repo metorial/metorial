@@ -194,7 +194,7 @@ describe('SlateAdapterSpec', () => {
         triggers: []
       })
     ).toThrow(
-      'Action "send_email" must be created with this adapter\'s tool() or trigger() helpers'
+      'Action "send_email" must be created with this adapter\'s tool(), publicTool(), or trigger() helpers'
     );
   });
 
@@ -274,5 +274,49 @@ describe('SlateAdapterSpec', () => {
         ]
       })
     ).toThrow('Adapter capability "send_email" is defined more than once');
+  });
+
+  it('creates public adapter tools that remain linked and public', () => {
+    let spec = createTestSpec();
+    let gmailAdapterSpec = SlateAdapterSpec.create({
+      id: 'gmail',
+      name: 'Gmail'
+    });
+
+    let setupTool = gmailAdapterSpec
+      .publicTool(spec, {
+        key: 'setup',
+        name: 'Setup'
+      })
+      .input(z.object({}))
+      .output(z.object({ ok: z.boolean() }))
+      .handleInvocation(async ctx => {
+        expect(ctx).not.toHaveProperty('config');
+        expect(ctx).not.toHaveProperty('auth');
+        return {
+          output: { ok: true },
+          message: 'ok'
+        };
+      })
+      .build();
+
+    expect(setupTool.adapter).toBe('gmail');
+    expect(setupTool.isPublic).toBe(true);
+
+    let gmailAdapter = gmailAdapterSpec.register({
+      tools: [setupTool],
+      triggers: []
+    });
+
+    let slate = Slate.create({
+      spec,
+      tools: [setupTool],
+      triggers: [],
+      adapters: [gmailAdapter]
+    });
+
+    expect(slate.actions.map(action => action.key)).toEqual(['setup']);
+    expect(slate.actions[0]!.isPublic).toBe(true);
+    expect(slate.actions[0]!.adapter).toBe('gmail');
   });
 });

@@ -10,7 +10,8 @@ import {
   type SlateAttachment,
   SlateContext,
   SlateLogger,
-  type SlateLogListener
+  type SlateLogListener,
+  SlatePublicContext
 } from '@slates/provider';
 import {
   getAction,
@@ -240,7 +241,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     let getAuthContext = () =>
       new SlateContext(getAuthConfig(), {}, {}, slate.spec as any, logger);
     let withRequestTraces = <Result extends Record<string, any>>(
-      context: SlateContext<any, any, any>,
+      context: SlatePublicContext<any>,
       result: Result
     ) => {
       let requestTraces = context.getHttpTraces();
@@ -793,7 +794,6 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     });
 
     manager.onRequest('slates/action.tool.invoke', async ({ params }) => {
-      let ctx = getContextFull();
       let action = getActionWithType(slate, 'tool', params.actionId);
 
       let input = validate(
@@ -803,35 +803,47 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         `Invalid input for tool ID: ${params.actionId}`
       );
 
-      let context = new SlateContext(ctx.config, input, ctx.auth?.output!, slate.spec, logger);
-      let res = await traceProviderCall(
-        {
-          component: 'action',
-          functionName: 'handleInvocation',
-          message: `Starting tool ${formatEntityLabel(action.name, action.key)}`,
-          successMessage: `Completed tool ${formatEntityLabel(action.name, action.key)}`,
-          errorMessage: `Tool ${formatEntityLabel(action.name, action.key)} failed`,
-          metadata: {
-            actionId: action.key,
-            actionName: action.name,
-            actionType: action.type,
-            inputKeyCount: getObjectKeyCount(input)
+      let invoke = async (context: SlatePublicContext<any>) => {
+        let res = await traceProviderCall(
+          {
+            component: 'action',
+            functionName: 'handleInvocation',
+            message: `Starting tool ${formatEntityLabel(action.name, action.key)}`,
+            successMessage: `Completed tool ${formatEntityLabel(action.name, action.key)}`,
+            errorMessage: `Tool ${formatEntityLabel(action.name, action.key)} failed`,
+            metadata: {
+              actionId: action.key,
+              actionName: action.name,
+              actionType: action.type,
+              isPublic: action.isPublic,
+              inputKeyCount: getObjectKeyCount(input)
+            },
+            onSuccess: result => ({
+              hasMessage: !!result.message,
+              actionResultMessage: result.message,
+              outputKeyCount: getObjectKeyCount(result.output),
+              attachmentCount: result.attachments?.length
+            })
           },
-          onSuccess: result => ({
-            hasMessage: !!result.message,
-            actionResultMessage: result.message,
-            outputKeyCount: getObjectKeyCount(result.output),
-            attachmentCount: result.attachments?.length
-          })
-        },
-        () => runWithContext(context, () => action.handleInvocation(context))
-      );
+          () => runWithContext(context, () => action.handleInvocation(context as any))
+        );
 
-      return withRequestTraces(context, {
-        output: res.output,
-        message: res.message,
-        attachments: mergeAttachments(res.attachments, res.output)
-      });
+        return withRequestTraces(context, {
+          output: res.output,
+          message: res.message,
+          attachments: mergeAttachments(res.attachments, res.output)
+        });
+      };
+
+      if (action.isPublic) {
+        getContextBasic();
+        return invoke(new SlatePublicContext(input, slate.spec, logger));
+      }
+
+      let ctx = getContextFull();
+      return invoke(
+        new SlateContext(ctx.config, input, ctx.auth?.output!, slate.spec, logger)
+      );
     });
 
     manager.onRequest('slates/action.trigger.map_event', async ({ params }) => {

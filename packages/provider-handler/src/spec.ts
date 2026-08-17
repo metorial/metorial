@@ -141,7 +141,8 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
     return {
       ...base,
       type: 'action.tool',
-      capabilities: {}
+      capabilities: {},
+      isPublic: a.isPublic
     };
   }
 

@@ -325,4 +325,59 @@ describe('defineAdapter', () => {
       })
     ).toThrow('Capability "send" references unknown tool "email.send" on adapter "email"');
   });
+
+  it('defines, implements, and registers public adapter tools', () => {
+    let spec = createTestSpec();
+
+    let EmailAdapter = defineAdapter({
+      id: 'email',
+      name: 'Email',
+      capabilities: {
+        setup: { tools: ['email.setup'] }
+      }
+    });
+
+    let setupEmail = EmailAdapter.definePublicTool({
+      key: 'email.setup',
+      name: 'Setup Email',
+      input: z.object({}),
+      output: z.object({
+        docsUrl: z.string()
+      })
+    });
+
+    expect(setupEmail.isPublic).toBe(true);
+
+    let setupEmailTool = setupEmail
+      .implement(spec)
+      .handleInvocation(async ctx => {
+        expect(ctx).not.toHaveProperty('config');
+        expect(ctx).not.toHaveProperty('auth');
+        return {
+          output: { docsUrl: 'https://example.com/email/setup' },
+          message: 'ok'
+        };
+      })
+      .build();
+
+    expect(setupEmailTool.adapter).toBe('email');
+    expect(setupEmailTool.isPublic).toBe(true);
+
+    let emailAdapter = EmailAdapter.register({
+      tools: [setupEmailTool],
+      triggers: []
+    });
+
+    expect(emailAdapter.capabilities).toEqual([{ id: 'setup', value: true }]);
+
+    let slate = Slate.create({
+      spec,
+      tools: [setupEmailTool],
+      triggers: [],
+      adapters: [emailAdapter]
+    });
+
+    expect(slate.actions.map(action => action.key)).toEqual(['email.setup']);
+    expect(slate.actions[0]!.isPublic).toBe(true);
+  });
 });

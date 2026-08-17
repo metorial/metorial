@@ -10,6 +10,7 @@ import type {
   SlateActionScopes,
   SlateActionType,
   SlatePollingOptions,
+  SlatePublicToolInvocationHandler,
   SlateToolInvocationHandler,
   SlateTriggerMappingHandler,
   SlateTriggerPollingHandler,
@@ -26,7 +27,8 @@ export class SlateActionBuilder<
   AuthType extends {},
   InputType extends {},
   OutputType extends {},
-  Result extends SlateAction<Type, ConfigType, AuthType, any, any>
+  Result extends SlateAction<Type, ConfigType, AuthType, any, any>,
+  IsPublic extends boolean = false
 > {
   #configSchema: z.ZodType<ConfigType>;
   #authSchema: z.ZodType<AuthType>;
@@ -51,7 +53,8 @@ export class SlateActionBuilder<
     private readonly params: SlateActionParameters,
     private readonly factory: (
       params: SlateActionCreateParameters<any, any, any, any>
-    ) => Result
+    ) => Result,
+    private readonly isPublicTool: IsPublic = false as IsPublic
   ) {
     this.#configSchema = spec.configSchema;
     this.#authSchema = spec.authSchema;
@@ -59,7 +62,15 @@ export class SlateActionBuilder<
 
   input<NewInputType extends {}>(
     schema: z.ZodType<NewInputType>
-  ): SlateActionBuilder<Type, ConfigType, AuthType, NewInputType, OutputType, Result> {
+  ): SlateActionBuilder<
+    Type,
+    ConfigType,
+    AuthType,
+    NewInputType,
+    OutputType,
+    Result,
+    IsPublic
+  > {
     if (this.#interfaceLocked) {
       throw new SlateDeclarationError('Adapter contract input schema cannot be changed');
     }
@@ -70,7 +81,15 @@ export class SlateActionBuilder<
 
   output<NewOutputType extends {}>(
     schema: z.ZodType<NewOutputType>
-  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, NewOutputType, Result> {
+  ): SlateActionBuilder<
+    Type,
+    ConfigType,
+    AuthType,
+    InputType,
+    NewOutputType,
+    Result,
+    IsPublic
+  > {
     if (this.#interfaceLocked) {
       throw new SlateDeclarationError('Adapter contract output schema cannot be changed');
     }
@@ -85,7 +104,8 @@ export class SlateActionBuilder<
     AuthType,
     InputType,
     OutputType,
-    Result
+    Result,
+    IsPublic
   > {
     this.#interfaceLocked = true;
     return this;
@@ -93,7 +113,7 @@ export class SlateActionBuilder<
 
   scopes(
     scopes: SlateActionScopes
-  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result> {
+  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
     validateScopes(scopes);
     this.#scopes = scopes;
     return this;
@@ -101,7 +121,11 @@ export class SlateActionBuilder<
 
   authMethods(
     authMethods: string[]
-  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result> {
+  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
+    if (this.isPublicTool) {
+      throw new SlateDeclarationError('Public tools cannot require authentication methods');
+    }
+
     this.#authMethods = this.validateAuthMethods(authMethods);
     return this;
   }
@@ -118,15 +142,22 @@ export class SlateActionBuilder<
   }
 
   handleInvocation(
-    handler: SlateToolInvocationHandler<ConfigType, AuthType, InputType, OutputType>
-  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result> {
+    handler: IsPublic extends true
+      ? SlatePublicToolInvocationHandler<InputType, OutputType>
+      : SlateToolInvocationHandler<ConfigType, AuthType, InputType, OutputType>
+  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
     if (this.type !== 'tool') {
       throw new SlateDeclarationError('handleInvocation can only be set for tool actions');
     }
 
     this.#toolParams = {
       type: 'tool',
-      handleInvocation: handler
+      handleInvocation: handler as SlateToolInvocationHandler<
+        ConfigType,
+        AuthType,
+        InputType,
+        OutputType
+      >
     };
 
     return this;
@@ -138,7 +169,7 @@ export class SlateActionBuilder<
     autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
     autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
     http?: SlateWebhookHttpOptions;
-  }): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result> {
+  }): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
     if (this.type !== 'trigger') {
       throw new SlateDeclarationError('handleEvent can only be set for trigger actions');
     }
@@ -160,7 +191,7 @@ export class SlateActionBuilder<
     options?: SlatePollingOptions;
     pollEvents?: SlateTriggerPollingHandler<ConfigType, AuthType, InputType>;
     handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
-  }): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result> {
+  }): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
     if (this.type !== 'trigger') {
       throw new SlateDeclarationError('handleEvent can only be set for trigger actions');
     }
@@ -183,6 +214,10 @@ export class SlateActionBuilder<
     }
     let authMethods = this.validateAuthMethods(this.#authMethods ?? this.params.authMethods);
 
+    if (this.isPublicTool && authMethods) {
+      throw new SlateDeclarationError('Public tools cannot require authentication methods');
+    }
+
     if (!this.#inputSchema) {
       throw new SlateDeclarationError('Input schema is not defined');
     }
@@ -200,6 +235,7 @@ export class SlateActionBuilder<
       ...this.params,
       scopes,
       authMethods,
+      isPublic: this.isPublicTool === true,
       configSchema: this.#configSchema,
       authSchema: this.#authSchema,
       inputSchema: this.#inputSchema,

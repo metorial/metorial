@@ -1,4 +1,9 @@
-import { type SlateActionParameters, SlateTool, SlateTrigger } from '../action';
+import {
+  type SlateActionParameters,
+  SlatePublicTool,
+  SlateTool,
+  SlateTrigger
+} from '../action';
 import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from '../specification/specification';
 import { SlateAdapter } from './adapter';
@@ -64,6 +69,13 @@ export class SlateAdapterSpec {
     return SlateTool.create(spec, this.linkAction(params));
   }
 
+  publicTool<ConfigType extends {}, AuthType extends {}>(
+    spec: SlateSpecification<ConfigType, AuthType>,
+    params: SlateActionParameters
+  ) {
+    return SlatePublicTool.create(spec, this.linkAction(params));
+  }
+
   trigger<ConfigType extends {}, AuthType extends {}>(
     spec: SlateSpecification<ConfigType, AuthType>,
     params: SlateActionParameters
@@ -87,7 +99,7 @@ export class SlateAdapterSpec {
 
       if (!action.adapter) {
         throw new SlateDeclarationError(
-          `Action "${action.key}" must be created with this adapter's tool() or trigger() helpers`
+          `Action "${action.key}" must be created with this adapter's tool(), publicTool(), or trigger() helpers`
         );
       }
 

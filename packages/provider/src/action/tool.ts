@@ -24,7 +24,7 @@ export class SlateTool<
 > extends SlateAction<'tool', ConfigType, AuthType, InputType, OutputType> {
   #handleInvocation: SlateToolInvocationHandler<ConfigType, AuthType, InputType, OutputType>;
 
-  private constructor(
+  protected constructor(
     spec: SlateSpecification<ConfigType, AuthType>,
     inputSchema: z.ZodType<InputType>,
     outputSchema: z.ZodType<OutputType>,
@@ -40,9 +40,21 @@ export class SlateTool<
     params: SlateActionParameters
   ) {
     return new SlateActionBuilder('tool', spec, params, params => {
-      if (params.type !== 'tool') throw new Error('Invalid action type for tool');
-      return new SlateTool(spec, params.inputSchema, params.outputSchema, params);
+      return SlateTool.fromCreateParameters(spec, params);
     });
+  }
+
+  static fromCreateParameters<ConfigType extends {}, AuthType extends {}>(
+    spec: SlateSpecification<ConfigType, AuthType>,
+    params: {
+      type: string;
+      inputSchema: z.ZodType<any>;
+      outputSchema: z.ZodType<any>;
+      handleInvocation?: SlateToolInvocationHandler<ConfigType, AuthType, any, any>;
+    } & SlateActionParameters
+  ) {
+    if (params.type !== 'tool') throw new Error('Invalid action type for tool');
+    return new SlateTool(spec, params.inputSchema, params.outputSchema, params as any);
   }
 
   get handleInvocation() {

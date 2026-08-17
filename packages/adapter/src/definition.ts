@@ -43,7 +43,7 @@ export class SlateAdapterDefinition<
     SlateAdapterCapabilityRule
   >
 > {
-  #tools = new Map<string, SlateAdapterToolDefinition<any, any>>();
+  #tools = new Map<string, SlateAdapterToolDefinition<any, any, boolean>>();
   #triggers = new Map<string, SlateAdapterTriggerDefinition<any, any>>();
   #actionKeys = new Set<string>();
   #linkingSpec: SlateAdapterSpec;
@@ -109,6 +109,25 @@ export class SlateAdapterDefinition<
     return definition;
   }
 
+  definePublicTool<InputType extends {}, OutputType extends {}>(
+    params: Omit<SlateActionParameters, 'adapter'> & {
+      input: z.ZodType<InputType>;
+      output: z.ZodType<OutputType>;
+    }
+  ): SlateAdapterToolDefinition<InputType, OutputType, true> {
+    let key = this.registerActionKey(params.key, 'tool');
+    let definition = new SlateAdapterToolDefinition(
+      this,
+      {
+        ...params,
+        key
+      },
+      true
+    );
+    this.#tools.set(key, definition);
+    return definition;
+  }
+
   defineTrigger<InputType extends {}, OutputType extends {}>(
     params: Omit<SlateActionParameters, 'adapter'> & {
       input: z.ZodType<InputType>;
@@ -129,6 +148,13 @@ export class SlateAdapterDefinition<
     params: Omit<SlateActionParameters, 'adapter'>
   ) {
     return this.#linkingSpec.tool(spec, params);
+  }
+
+  createPublicToolBuilder<ConfigType extends {}, AuthType extends {}>(
+    spec: SlateSpecification<ConfigType, AuthType>,
+    params: Omit<SlateActionParameters, 'adapter'>
+  ) {
+    return this.#linkingSpec.publicTool(spec, params);
   }
 
   createTriggerBuilder<ConfigType extends {}, AuthType extends {}>(

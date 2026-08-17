@@ -1,5 +1,6 @@
 export * from './action';
-export type * from './builder';
+export * from './builder';
+export * from './publicTool';
 export * from './scopes';
 export * from './tool';
 export * from './trigger';
