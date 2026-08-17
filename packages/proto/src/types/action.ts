@@ -34,7 +34,9 @@ export let slatesActionBase = z.object({
       name: z.string(),
       url: z.string()
     })
-  )
+  ),
+
+  adapter: z.optional(z.nullable(z.string()))
 });
 
 export let slatesActionTool = slatesActionBase.extend({

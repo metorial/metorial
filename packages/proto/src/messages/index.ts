@@ -1,4 +1,5 @@
 export * from './action';
+export * from './adapter';
 export * from './auth';
 export * from './config';
 export * from './controlFlow';
@@ -12,6 +13,12 @@ import {
   slatesActionRequestsByMethod,
   slatesActionResponsesByMethod
 } from './action';
+import {
+  type SlatesAdapterRequests,
+  type SlatesAdapterResponses,
+  slatesAdapterRequestsByMethod,
+  slatesAdapterResponsesByMethod
+} from './adapter';
 import {
   type SlatesAuthNotifications,
   type SlatesAuthRequests,
@@ -46,18 +53,21 @@ export type SlatesNotifications =
 
 export type SlatesRequests =
   | SlatesActionRequests
+  | SlatesAdapterRequests
   | SlatesAuthRequests
   | SlatesConfigRequests
   | SlatesIdentifyRequests;
 
 export type SlatesResponses =
   | SlatesActionResponses
+  | SlatesAdapterResponses
   | SlatesAuthResponses
   | SlatesConfigResponses
   | SlatesIdentifyResponses;
 
 export let slatesResponsesByMethod = {
   ...slatesActionResponsesByMethod,
+  ...slatesAdapterResponsesByMethod,
   ...slatesAuthResponsesByMethod,
   ...slatesConfigResponsesByMethod,
   ...slatesIdentifyResponsesByMethod
@@ -65,6 +75,7 @@ export let slatesResponsesByMethod = {
 
 export let slatesRequestsByMethod = {
   ...slatesActionRequestsByMethod,
+  ...slatesAdapterRequestsByMethod,
   ...slatesAuthRequestsByMethod,
   ...slatesConfigRequestsByMethod,
   ...slatesIdentifyRequestsByMethod
