@@ -16,14 +16,18 @@ export type ChatCursor<Data = unknown> = {
   data: Data;
 };
 
-export let encodeCursor = <Data>(cursor: ChatCursor<Data>): string =>
+export let encodeCursor = <Data>(
+  provider: string,
+  cursor: Omit<ChatCursor<Data>, 'provider'>
+): string =>
   JSON.stringify({
-    provider: cursor.provider,
+    provider,
     direction: cursor.direction,
     data: cursor.data
   });
 
 export let decodeCursor = <Data = unknown>(
+  provider: string,
   cursor: string,
   dataSchema?: z.ZodType<Data>
 ): ChatCursor<Data> => {
@@ -35,6 +39,9 @@ export let decodeCursor = <Data = unknown>(
   }
 
   let value = chatCursorSchema.parse(parsed);
+  if (value.provider !== provider)
+    throw new Error(`Chat cursor belongs to ${value.provider}, not ${provider}`);
+
   return {
     provider: value.provider,
     direction: value.direction,

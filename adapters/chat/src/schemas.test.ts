@@ -274,8 +274,7 @@ describe('workspace and channel', () => {
 
 describe('cursor encoding', () => {
   it('round-trips provider, direction, and custom data as JSON', () => {
-    let encoded = encodeCursor({
-      provider: 'slack',
+    let encoded = encodeCursor('slack', {
       direction: 'backward',
       data: { ts: '123.456', channelId: 'C1' }
     });
@@ -286,7 +285,7 @@ describe('cursor encoding', () => {
       data: { ts: '123.456', channelId: 'C1' }
     });
 
-    expect(decodeCursor(encoded)).toEqual({
+    expect(decodeCursor('slack', encoded)).toEqual({
       provider: 'slack',
       direction: 'backward',
       data: { ts: '123.456', channelId: 'C1' }
@@ -294,20 +293,32 @@ describe('cursor encoding', () => {
   });
 
   it('validates custom data when a schema is provided', () => {
-    let encoded = encodeCursor({
-      provider: 'discord',
+    let encoded = encodeCursor('discord', {
       direction: 'forward',
       data: { id: '99' }
     });
 
-    expect(decodeCursor(encoded, z.object({ id: z.string() })).data).toEqual({ id: '99' });
+    expect(decodeCursor('discord', encoded, z.object({ id: z.string() })).data).toEqual({
+      id: '99'
+    });
 
-    expect(() => decodeCursor(encoded, z.object({ id: z.number() }))).toThrow();
+    expect(() => decodeCursor('discord', encoded, z.object({ id: z.number() }))).toThrow();
+  });
+
+  it('rejects cursors from a different provider', () => {
+    let encoded = encodeCursor('discord', {
+      direction: 'forward',
+      data: { id: '99' }
+    });
+
+    expect(() => decodeCursor('slack', encoded)).toThrow(
+      'Chat cursor belongs to discord, not slack'
+    );
   });
 
   it('rejects invalid JSON and missing fields', () => {
-    expect(() => decodeCursor('not-json')).toThrow('Chat cursor is not valid JSON');
-    expect(() => decodeCursor('{"provider":"slack"}')).toThrow();
+    expect(() => decodeCursor('slack', 'not-json')).toThrow('Chat cursor is not valid JSON');
+    expect(() => decodeCursor('slack', '{"provider":"slack"}')).toThrow();
   });
 });
 
