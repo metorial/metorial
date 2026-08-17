@@ -4,7 +4,7 @@ import type { SlateAdapterDefinition } from './definition';
 
 export class SlateAdapterToolDefinition<InputType extends {}, OutputType extends {}> {
   constructor(
-    private readonly adapter: SlateAdapterDefinition,
+    private readonly adapter: SlateAdapterDefinition<any>,
     private readonly params: Omit<SlateActionParameters, 'adapter'> & {
       input: z.ZodType<InputType>;
       output: z.ZodType<OutputType>;

@@ -203,7 +203,76 @@ describe('defineAdapter', () => {
     expect(emailAdapter.capabilities).toEqual([{ id: 'send', value: true }]);
   });
 
-  it('rejects unknown implementations and incomplete capability rules', () => {
+  it('lets implementations set declared capabilities, defaulting unset ones to false', () => {
+    let spec = createTestSpec();
+    let EmailAdapter = defineAdapter({
+      id: 'email',
+      name: 'Email',
+      capabilities: {
+        send: { tools: ['email.send'] },
+        markdown: {},
+        cards: {}
+      }
+    });
+
+    let sendEmail = EmailAdapter.defineTool({
+      key: 'email.send',
+      name: 'Send Email',
+      input: z.object({}),
+      output: z.object({})
+    });
+
+    let sendEmailTool = sendEmail
+      .implement(spec)
+      .handleInvocation(async () => ({
+        output: {},
+        message: 'ok'
+      }))
+      .build();
+
+    expect(
+      EmailAdapter.register({
+        tools: [sendEmailTool],
+        triggers: []
+      }).capabilities
+    ).toEqual([
+      { id: 'send', value: true },
+      { id: 'markdown', value: false },
+      { id: 'cards', value: false }
+    ]);
+
+    expect(
+      EmailAdapter.register({
+        tools: [sendEmailTool],
+        triggers: [],
+        capabilities: { markdown: true }
+      }).capabilities
+    ).toEqual([
+      { id: 'send', value: true },
+      { id: 'markdown', value: true },
+      { id: 'cards', value: false }
+    ]);
+
+    expect(() =>
+      EmailAdapter.register({
+        tools: [sendEmailTool],
+        triggers: [],
+        capabilities: { send: true } as any
+      })
+    ).toThrow(
+      'Capability "send" is derived from tools or triggers and cannot be set by the implementation'
+    );
+
+    expect(() =>
+      EmailAdapter.register({
+        tools: [sendEmailTool],
+        triggers: [],
+        capabilities: { unknown: true } as any
+      })
+    ).toThrow('Capability "unknown" is not defined on adapter "email"');
+  });
+
+  it('rejects unknown implementations', () => {
     let spec = createTestSpec();
     let EmailAdapter = defineAdapter({
       id: 'email',
@@ -212,16 +281,6 @@ describe('defineAdapter', () => {
         send: { tools: ['email.send'] }
       }
     });
-
-    expect(() =>
-      defineAdapter({
-        id: 'email',
-        name: 'Email',
-        capabilities: {
-          send: {}
-        }
-      })
-    ).toThrow('Adapter capability "send" must reference at least one tool or trigger');
 
     EmailAdapter.defineTool({
       key: 'email.send',

@@ -1,5 +1,6 @@
 import {
   type SlateActionParameters,
+  type SlateAdapterCapability,
   SlateAdapterSpec,
   SlateDeclarationError,
   type SlateSpecification,
@@ -15,13 +16,33 @@ export interface SlateAdapterCapabilityRule {
   triggers?: string[];
 }
 
-export interface SlateAdapterDefinitionParameters {
+export type ImplementationCapabilityKeys<
+  Caps extends Record<string, SlateAdapterCapabilityRule>
+> = {
+  [K in keyof Caps]: Caps[K] extends { tools: string[] }
+    ? never
+    : Caps[K] extends { triggers: string[] }
+      ? never
+      : K & string;
+}[keyof Caps];
+
+export interface SlateAdapterDefinitionParameters<
+  Caps extends Record<string, SlateAdapterCapabilityRule> = Record<
+    string,
+    SlateAdapterCapabilityRule
+  >
+> {
   id: string;
   name: string;
-  capabilities?: Record<string, SlateAdapterCapabilityRule>;
+  capabilities?: Caps;
 }
 
-export class SlateAdapterDefinition {
+export class SlateAdapterDefinition<
+  Caps extends Record<string, SlateAdapterCapabilityRule> = Record<
+    string,
+    SlateAdapterCapabilityRule
+  >
+> {
   #tools = new Map<string, SlateAdapterToolDefinition<any, any>>();
   #triggers = new Map<string, SlateAdapterTriggerDefinition<any, any>>();
   #actionKeys = new Set<string>();
@@ -31,7 +52,7 @@ export class SlateAdapterDefinition {
     private readonly _params: {
       id: string;
       name: string;
-      capabilities: Record<string, SlateAdapterCapabilityRule>;
+      capabilities: Caps;
     }
   ) {
     this.#linkingSpec = SlateAdapterSpec.create({
@@ -41,7 +62,9 @@ export class SlateAdapterDefinition {
     });
   }
 
-  static create(params: SlateAdapterDefinitionParameters): SlateAdapterDefinition {
+  static create<Caps extends Record<string, SlateAdapterCapabilityRule>>(
+    params: SlateAdapterDefinitionParameters<Caps>
+  ): SlateAdapterDefinition<Caps> {
     let id = params.id?.trim();
     let name = params.name?.trim();
 
@@ -55,7 +78,7 @@ export class SlateAdapterDefinition {
     return new SlateAdapterDefinition({
       id,
       name,
-      capabilities: validateCapabilityRules(params.capabilities ?? {})
+      capabilities: validateCapabilityRules(params.capabilities ?? ({} as Caps))
     });
   }
 
@@ -118,6 +141,7 @@ export class SlateAdapterDefinition {
   register<ConfigType extends {}, AuthType extends {}>(params: {
     tools: SlateTool<ConfigType, AuthType, any, any>[];
     triggers: SlateTrigger<ConfigType, AuthType, any, any>[];
+    capabilities?: Partial<Record<ImplementationCapabilityKeys<Caps>, boolean>>;
   }) {
     let implementedToolKeys = new Set<string>();
     let implementedTriggerKeys = new Set<string>();
@@ -143,7 +167,11 @@ export class SlateAdapterDefinition {
     return SlateAdapterSpec.create({
       id: this.id,
       name: this.name,
-      capabilities: this.deriveCapabilities(implementedToolKeys, implementedTriggerKeys)
+      capabilities: this.deriveCapabilities(
+        implementedToolKeys,
+        implementedTriggerKeys,
+        params.capabilities ?? {}
+      )
     }).register(params);
   }
 
@@ -164,9 +192,29 @@ export class SlateAdapterDefinition {
 
   private deriveCapabilities(
     implementedToolKeys: Set<string>,
-    implementedTriggerKeys: Set<string>
+    implementedTriggerKeys: Set<string>,
+    implementedCapabilities: Partial<Record<string, boolean>>
   ) {
-    let capabilities: { id: string; value: true }[] = [];
+    let capabilities: SlateAdapterCapability[] = [];
+
+    for (let [id, value] of Object.entries(implementedCapabilities)) {
+      let rule = this._params.capabilities[id];
+      if (!rule) {
+        throw new SlateDeclarationError(
+          `Capability "${id}" is not defined on adapter "${this.id}"`
+        );
+      }
+      if (!isImplementationCapability(rule)) {
+        throw new SlateDeclarationError(
+          `Capability "${id}" is derived from tools or triggers and cannot be set by the implementation`
+        );
+      }
+      if (typeof value !== 'boolean') {
+        throw new SlateDeclarationError(
+          `Capability "${id}" on adapter "${this.id}" must be a boolean`
+        );
+      }
+    }
 
     for (let [id, rule] of Object.entries(this._params.capabilities)) {
       let toolKeys = rule.tools ?? [];
@@ -188,6 +236,14 @@ export class SlateAdapterDefinition {
         }
       }
 
+      if (isImplementationCapability(rule)) {
+        capabilities.push({
+          id,
+          value: implementedCapabilities[id] === true
+        });
+        continue;
+      }
+
       let enabled =
         toolKeys.every(key => implementedToolKeys.has(key)) &&
         triggerKeys.every(key => implementedTriggerKeys.has(key));
@@ -201,11 +257,17 @@ export class SlateAdapterDefinition {
   }
 }
 
-export let defineAdapter = (params: SlateAdapterDefinitionParameters) =>
-  SlateAdapterDefinition.create(params);
+export let defineAdapter = <Caps extends Record<string, SlateAdapterCapabilityRule>>(
+  params: SlateAdapterDefinitionParameters<Caps>
+) => SlateAdapterDefinition.create(params);
 
-let validateCapabilityRules = (capabilities: Record<string, SlateAdapterCapabilityRule>) => {
-  let normalized: Record<string, SlateAdapterCapabilityRule> = {};
+let isImplementationCapability = (rule: SlateAdapterCapabilityRule) =>
+  (rule.tools?.length ?? 0) === 0 && (rule.triggers?.length ?? 0) === 0;
+
+let validateCapabilityRules = <Caps extends Record<string, SlateAdapterCapabilityRule>>(
+  capabilities: Caps
+) => {
+  let normalized = {} as Caps;
 
   for (let [rawId, rule] of Object.entries(capabilities)) {
     let id = rawId?.trim();
@@ -219,13 +281,7 @@ let validateCapabilityRules = (capabilities: Record<string, SlateAdapterCapabili
     let tools = uniqueKeys(rule.tools ?? [], `Capability "${id}" tool`);
     let triggers = uniqueKeys(rule.triggers ?? [], `Capability "${id}" trigger`);
 
-    if (tools.length === 0 && triggers.length === 0) {
-      throw new SlateDeclarationError(
-        `Adapter capability "${id}" must reference at least one tool or trigger`
-      );
-    }
-
-    normalized[id] = { tools, triggers };
+    (normalized as Record<string, SlateAdapterCapabilityRule>)[id] = { tools, triggers };
   }
 
   return normalized;
