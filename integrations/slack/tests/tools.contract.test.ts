@@ -84,6 +84,7 @@ const CHAT_ADAPTER_TOOL_KEYS = [
   'metorial_chat$dm.openSingle',
   'metorial_chat$dm.openGroup',
   'metorial_chat$user.get',
+  'metorial_chat$user.getAuthenticated',
   'metorial_chat$user.search',
   'metorial_chat$file.upload',
   'metorial_chat$file.download',
@@ -109,7 +110,7 @@ describe('Slack expanded tool contract', () => {
     .map(action => action.key);
 
   it('keeps all established tools and exposes all normalized additions', () => {
-    expect(new Set(EXPECTED_TOOL_KEYS).size).toBe(77);
+    expect(new Set(EXPECTED_TOOL_KEYS).size).toBe(78);
     expect(toolKeys).toHaveLength(EXPECTED_TOOL_KEYS.length);
     expect([...toolKeys].sort()).toEqual([...EXPECTED_TOOL_KEYS].sort());
   });
@@ -376,6 +377,10 @@ const EXPECTED_TOOL_AUTHORIZATION: Record<string, ExpectedToolAuthorization> = {
     authMethods: null
   },
   'metorial_chat$user.get': {
+    scopes: [['users:read'], ['users:read.email']],
+    authMethods: null
+  },
+  'metorial_chat$user.getAuthenticated': {
     scopes: [['users:read'], ['users:read.email']],
     authMethods: null
   },

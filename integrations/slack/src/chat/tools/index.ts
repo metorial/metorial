@@ -2,6 +2,7 @@ export * from './add-reaction';
 export * from './delete-message';
 export * from './download-file';
 export * from './edit-message';
+export * from './get-authenticated-user';
 export * from './get-channel';
 export * from './get-message';
 export * from './get-setup';
