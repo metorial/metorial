@@ -2,16 +2,21 @@ import type { SlateActionParameters, SlateSpecification } from '@slates/provider
 import type z from 'zod';
 import type { SlateAdapterDefinition } from './definition';
 
-export class SlateAdapterTriggerDefinition<InputType extends {}, OutputType extends {}> {
+export class SlateAdapterTriggerDefinition<
+  InputType extends {},
+  OutputType extends {},
+  Key extends string = string
+> {
   constructor(
     private readonly adapter: SlateAdapterDefinition<any>,
-    private readonly params: Omit<SlateActionParameters, 'adapter'> & {
+    private readonly params: Omit<SlateActionParameters, 'adapter' | 'key'> & {
+      key: Key;
       input: z.ZodType<InputType>;
       output: z.ZodType<OutputType>;
     }
   ) {}
 
-  get key() {
+  get key(): Key {
     return this.params.key;
   }
 

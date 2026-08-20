@@ -1,4 +1,3 @@
-import type { SlateAdapterToolDefinition } from '@slates/adapter';
 import { SlateAuth, SlateConfig, SlateSpecification } from '@slates/provider';
 import { z } from 'zod';
 import type { Author } from './schema/channels/author';
@@ -6,8 +5,8 @@ import type { Channel } from './schema/channels/channel';
 import type { Thread } from './schema/channels/thread';
 import type { Message } from './schema/content/message';
 import type { Command } from './schema/interactions/command';
-import * as chatTools from './tools';
-import * as chatTriggers from './triggers';
+import { chatTools } from './tools';
+import { chatTriggers } from './triggers';
 
 export let createTestSpec = () => {
   let config = SlateConfig.create(z.object({}));
@@ -57,16 +56,12 @@ export let dummyCommand: Command = {
 let eventTypeForTrigger = (key: string) =>
   key.startsWith('metorial_chat$') ? `chat.${key.slice('metorial_chat$'.length)}` : key;
 
-export let listToolDefinitions = () =>
-  Object.values(chatTools).filter(
-    (value): value is SlateAdapterToolDefinition<any, any> =>
-      typeof value === 'object' && value !== null && 'input' in value && 'key' in value
-  );
+export let listToolDefinitions = () => Object.values(chatTools);
 
 export let stubAllTools = (spec: ReturnType<typeof createTestSpec>) =>
   listToolDefinitions().map(definition =>
     definition
-      .implement(spec)
+      .implement(spec as any)
       .handleInvocation(async () => ({
         output: stubOutput(definition.key),
         message: 'ok'
@@ -75,27 +70,22 @@ export let stubAllTools = (spec: ReturnType<typeof createTestSpec>) =>
   );
 
 export let stubAllTriggers = (spec: ReturnType<typeof createTestSpec>) =>
-  Object.values(chatTriggers)
-    .filter(
-      (value): value is (typeof chatTriggers)[keyof typeof chatTriggers] =>
-        typeof value === 'object' && value !== null && 'input' in value && 'key' in value
-    )
-    .map(definition =>
-      definition
-        .implement(spec)
-        .webhook({
-          handleRequest: async () => ({ inputs: [] }),
-          handleEvent: async () => {
-            let output = stubTriggerOutput(definition.key) as any;
-            return {
-              type: output.type ?? eventTypeForTrigger(definition.key),
-              id: '1',
-              output
-            };
-          }
-        })
-        .build()
-    );
+  Object.values(chatTriggers).map(definition =>
+    definition
+      .implement(spec as any)
+      .webhook({
+        handleRequest: async () => ({ inputs: [] }),
+        handleEvent: async () => {
+          let output = stubTriggerOutput(definition.key) as any;
+          return {
+            type: output.type ?? eventTypeForTrigger(definition.key),
+            id: '1',
+            output
+          };
+        }
+      })
+      .build()
+  );
 
 let stubOutput = (key: string): any => {
   if (key === 'metorial_chat$setup.get') {

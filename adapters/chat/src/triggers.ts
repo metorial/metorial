@@ -288,3 +288,20 @@ export let memberLeft = ChatAdapter.defineTrigger({
     raw: rawSchema
   })
 });
+
+export let chatTriggers = {
+  messageReceived,
+  messageUpdated,
+  messageDeleted,
+  mentionReceived,
+  reactionAdded,
+  reactionRemoved,
+  actionInvoked,
+  modalSubmitted,
+  modalClosed,
+  optionsLoad,
+  commandInvoked,
+  commandAutocomplete,
+  memberJoined,
+  memberLeft
+} as const;

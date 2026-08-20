@@ -12,18 +12,27 @@ import { SlateAdapterToolDefinition } from './tool';
 import { SlateAdapterTriggerDefinition } from './trigger';
 
 export interface SlateAdapterCapabilityRule {
-  tools?: string[];
-  triggers?: string[];
+  tools?: readonly string[];
+  triggers?: readonly string[];
 }
+
+type IsNonEmptyActionList<T> = T extends readonly [string, ...string[]] ? true : false;
+
+type CapabilityRuleIsDerived<Rule> = Rule extends {
+  tools?: infer Tools;
+  triggers?: infer Triggers;
+}
+  ? IsNonEmptyActionList<Tools> extends true
+    ? true
+    : IsNonEmptyActionList<Triggers> extends true
+      ? true
+      : false
+  : false;
 
 export type ImplementationCapabilityKeys<
   Caps extends Record<string, SlateAdapterCapabilityRule>
 > = {
-  [K in keyof Caps]: Caps[K] extends { tools: string[] }
-    ? never
-    : Caps[K] extends { triggers: string[] }
-      ? never
-      : K & string;
+  [K in keyof Caps]: CapabilityRuleIsDerived<Caps[K]> extends true ? never : K & string;
 }[keyof Caps];
 
 export interface SlateAdapterDefinitionParameters<
@@ -41,11 +50,15 @@ export class SlateAdapterDefinition<
   Caps extends Record<string, SlateAdapterCapabilityRule> = Record<
     string,
     SlateAdapterCapabilityRule
-  >
+  >,
+  Tools extends Record<string, SlateAdapterToolDefinition<any, any, any, any>> = {},
+  Triggers extends Record<string, SlateAdapterTriggerDefinition<any, any, any>> = {}
 > {
-  #tools = new Map<string, SlateAdapterToolDefinition<any, any, boolean>>();
-  #triggers = new Map<string, SlateAdapterTriggerDefinition<any, any>>();
+  #toolDefinitions = new Map<string, SlateAdapterToolDefinition<any, any, boolean, any>>();
+  #triggerDefinitions = new Map<string, SlateAdapterTriggerDefinition<any, any, any>>();
   #actionKeys = new Set<string>();
+  #linkedTools: Tools = {} as Tools;
+  #linkedTriggers: Triggers = {} as Triggers;
   #linkingSpec: SlateAdapterSpec;
 
   private constructor(
@@ -62,7 +75,7 @@ export class SlateAdapterDefinition<
     });
   }
 
-  static create<Caps extends Record<string, SlateAdapterCapabilityRule>>(
+  static create<const Caps extends Record<string, SlateAdapterCapabilityRule>>(
     params: SlateAdapterDefinitionParameters<Caps>
   ): SlateAdapterDefinition<Caps> {
     let id = params.id?.trim();
@@ -94,29 +107,39 @@ export class SlateAdapterDefinition<
     return this._params.capabilities;
   }
 
-  defineTool<InputType extends {}, OutputType extends {}>(
-    params: Omit<SlateActionParameters, 'adapter'> & {
+  get tools() {
+    return this.#linkedTools;
+  }
+
+  get triggers() {
+    return this.#linkedTriggers;
+  }
+
+  defineTool<Key extends string, InputType extends {}, OutputType extends {}>(
+    params: Omit<SlateActionParameters, 'adapter' | 'key'> & {
+      key: Key;
       input: z.ZodType<InputType>;
       output: z.ZodType<OutputType>;
     }
-  ): SlateAdapterToolDefinition<InputType, OutputType> {
-    let key = this.registerActionKey(params.key, 'tool');
-    let definition = new SlateAdapterToolDefinition(this, {
+  ): SlateAdapterToolDefinition<InputType, OutputType, false, Key> {
+    let key = this.registerActionKey(params.key, 'tool') as Key;
+    let definition = new SlateAdapterToolDefinition<InputType, OutputType, false, Key>(this, {
       ...params,
       key
     });
-    this.#tools.set(key, definition);
+    this.#toolDefinitions.set(key, definition);
     return definition;
   }
 
-  definePublicTool<InputType extends {}, OutputType extends {}>(
-    params: Omit<SlateActionParameters, 'adapter'> & {
+  definePublicTool<Key extends string, InputType extends {}, OutputType extends {}>(
+    params: Omit<SlateActionParameters, 'adapter' | 'key'> & {
+      key: Key;
       input: z.ZodType<InputType>;
       output: z.ZodType<OutputType>;
     }
-  ): SlateAdapterToolDefinition<InputType, OutputType, true> {
-    let key = this.registerActionKey(params.key, 'tool');
-    let definition = new SlateAdapterToolDefinition(
+  ): SlateAdapterToolDefinition<InputType, OutputType, true, Key> {
+    let key = this.registerActionKey(params.key, 'tool') as Key;
+    let definition = new SlateAdapterToolDefinition<InputType, OutputType, true, Key>(
       this,
       {
         ...params,
@@ -124,23 +147,38 @@ export class SlateAdapterDefinition<
       },
       true
     );
-    this.#tools.set(key, definition);
+    this.#toolDefinitions.set(key, definition);
     return definition;
   }
 
-  defineTrigger<InputType extends {}, OutputType extends {}>(
-    params: Omit<SlateActionParameters, 'adapter'> & {
+  defineTrigger<Key extends string, InputType extends {}, OutputType extends {}>(
+    params: Omit<SlateActionParameters, 'adapter' | 'key'> & {
+      key: Key;
       input: z.ZodType<InputType>;
       output: z.ZodType<OutputType>;
     }
-  ): SlateAdapterTriggerDefinition<InputType, OutputType> {
-    let key = this.registerActionKey(params.key, 'trigger');
-    let definition = new SlateAdapterTriggerDefinition(this, {
+  ): SlateAdapterTriggerDefinition<InputType, OutputType, Key> {
+    let key = this.registerActionKey(params.key, 'trigger') as Key;
+    let definition = new SlateAdapterTriggerDefinition<InputType, OutputType, Key>(this, {
       ...params,
       key
     });
-    this.#triggers.set(key, definition);
+    this.#triggerDefinitions.set(key, definition);
     return definition;
+  }
+
+  link<
+    TTools extends Record<string, SlateAdapterToolDefinition<any, any, any, any>>,
+    TTriggers extends Record<string, SlateAdapterTriggerDefinition<any, any, any>>
+  >(catalog: {
+    tools: TTools;
+    triggers: TTriggers;
+  }): SlateAdapterDefinition<Caps, TTools, TTriggers> {
+    this.assertCompleteCatalog('tool', this.#toolDefinitions, catalog.tools);
+    this.assertCompleteCatalog('trigger', this.#triggerDefinitions, catalog.triggers);
+    this.#linkedTools = catalog.tools as any;
+    this.#linkedTriggers = catalog.triggers as any;
+    return this as any;
   }
 
   createToolBuilder<ConfigType extends {}, AuthType extends {}>(
@@ -173,7 +211,7 @@ export class SlateAdapterDefinition<
     let implementedTriggerKeys = new Set<string>();
 
     for (let tool of params.tools) {
-      if (!this.#tools.has(tool.key)) {
+      if (!this.#toolDefinitions.has(tool.key)) {
         throw new SlateDeclarationError(
           `Tool "${tool.key}" is not defined on adapter "${this.id}"`
         );
@@ -182,7 +220,7 @@ export class SlateAdapterDefinition<
     }
 
     for (let trigger of params.triggers) {
-      if (!this.#triggers.has(trigger.key)) {
+      if (!this.#triggerDefinitions.has(trigger.key)) {
         throw new SlateDeclarationError(
           `Trigger "${trigger.key}" is not defined on adapter "${this.id}"`
         );
@@ -199,6 +237,32 @@ export class SlateAdapterDefinition<
         params.capabilities ?? {}
       )
     }).register(params);
+  }
+
+  private assertCompleteCatalog(
+    type: 'tool' | 'trigger',
+    defined: Map<string, { key: string }>,
+    catalog: Record<string, { key: string }>
+  ) {
+    let catalogKeys = new Set<string>();
+    let label = type === 'tool' ? 'Tool' : 'Trigger';
+
+    for (let definition of Object.values(catalog)) {
+      if (!defined.has(definition.key) || defined.get(definition.key) !== definition) {
+        throw new SlateDeclarationError(
+          `${label} "${definition.key}" is not defined on adapter "${this.id}"`
+        );
+      }
+      catalogKeys.add(definition.key);
+    }
+
+    for (let key of defined.keys()) {
+      if (!catalogKeys.has(key)) {
+        throw new SlateDeclarationError(
+          `${label} "${key}" is defined on adapter "${this.id}" but was not linked`
+        );
+      }
+    }
   }
 
   private registerActionKey(key: string, type: 'tool' | 'trigger') {
@@ -247,7 +311,7 @@ export class SlateAdapterDefinition<
       let triggerKeys = rule.triggers ?? [];
 
       for (let key of toolKeys) {
-        if (!this.#tools.has(key)) {
+        if (!this.#toolDefinitions.has(key)) {
           throw new SlateDeclarationError(
             `Capability "${id}" references unknown tool "${key}" on adapter "${this.id}"`
           );
@@ -255,7 +319,7 @@ export class SlateAdapterDefinition<
       }
 
       for (let key of triggerKeys) {
-        if (!this.#triggers.has(key)) {
+        if (!this.#triggerDefinitions.has(key)) {
           throw new SlateDeclarationError(
             `Capability "${id}" references unknown trigger "${key}" on adapter "${this.id}"`
           );
@@ -283,7 +347,7 @@ export class SlateAdapterDefinition<
   }
 }
 
-export let defineAdapter = <Caps extends Record<string, SlateAdapterCapabilityRule>>(
+export let defineAdapter = <const Caps extends Record<string, SlateAdapterCapabilityRule>>(
   params: SlateAdapterDefinitionParameters<Caps>
 ) => SlateAdapterDefinition.create(params);
 
@@ -313,7 +377,7 @@ let validateCapabilityRules = <Caps extends Record<string, SlateAdapterCapabilit
   return normalized;
 };
 
-let uniqueKeys = (keys: string[], label: string) => {
+let uniqueKeys = (keys: readonly string[], label: string) => {
   let seen = new Set<string>();
 
   return keys.map(key => {

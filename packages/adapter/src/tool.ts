@@ -10,18 +10,20 @@ import type { SlateAdapterDefinition } from './definition';
 export class SlateAdapterToolDefinition<
   InputType extends {},
   OutputType extends {},
-  IsPublic extends boolean = false
+  IsPublic extends boolean = false,
+  Key extends string = string
 > {
   constructor(
     private readonly adapter: SlateAdapterDefinition<any>,
-    private readonly params: Omit<SlateActionParameters, 'adapter'> & {
+    private readonly params: Omit<SlateActionParameters, 'adapter' | 'key'> & {
+      key: Key;
       input: z.ZodType<InputType>;
       output: z.ZodType<OutputType>;
     },
     private readonly isPublicTool: IsPublic = false as IsPublic
   ) {}
 
-  get key() {
+  get key(): Key {
     return this.params.key;
   }
 

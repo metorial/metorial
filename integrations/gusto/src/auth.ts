@@ -194,12 +194,12 @@ function createGustoOauth(name: string, key: string, environment: 'production' |
     key,
     docs: [
       {
-        type: 'docs.auth.oauth',
+        type: 'docs.auth.oauth' as const,
         name: 'OAuth documentation',
         url: 'https://docs.gusto.com/app-integrations/docs/oauth2'
       },
       {
-        type: 'docs.auth.oauth_scopes',
+        type: 'docs.auth.oauth_scopes' as const,
         name: 'OAuth scopes',
         url: 'https://docs.gusto.com/app-integrations/docs/scopes'
       }

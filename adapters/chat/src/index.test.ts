@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
-import { ChatAdapter, getSetup, sendMessage } from './index';
+import { ChatAdapter, type ChatAdapterClient, getSetup, sendMessage } from './index';
 import {
   createTestSpec,
   listToolDefinitions,
@@ -81,7 +81,7 @@ describe('ChatAdapter', () => {
   it('derives only message_send when only send is implemented', () => {
     let spec = createTestSpec();
     let send = sendMessage
-      .implement(spec)
+      .implement(spec as any)
       .handleInvocation(async () => ({
         output: {
           message: {
@@ -140,7 +140,7 @@ describe('ChatAdapter', () => {
 
     let spec = createTestSpec();
     let setupTool = getSetup
-      .implement(spec)
+      .implement(spec as any)
       .handleInvocation(async ctx => {
         expect(ctx).not.toHaveProperty('config');
         expect(ctx).not.toHaveProperty('auth');
@@ -166,5 +166,21 @@ describe('ChatAdapter', () => {
     });
 
     expect(enabledIds(adapter.capabilities)).toEqual(['provider_setup']);
+  });
+
+  it('exposes a typed client for tools, triggers, and capabilities', () => {
+    expect(ChatAdapter.tools.sendMessage).toBe(sendMessage);
+
+    expectTypeOf<ChatAdapterClient['tools']>().toHaveProperty('metorial_chat$message.send');
+    expectTypeOf<
+      ChatAdapterClient['tools']['metorial_chat$message.send']['input']['channelId']
+    >().toEqualTypeOf<string>();
+    expectTypeOf<ChatAdapterClient['triggers']>().toHaveProperty(
+      'metorial_chat$message.received'
+    );
+    expectTypeOf<ChatAdapterClient['capabilities']['message_send']>().toEqualTypeOf<{
+      readonly tools: readonly ['metorial_chat$message.send'];
+    }>();
+    expectTypeOf<ChatAdapterClient['capabilities']['content_markdown']>().toEqualTypeOf<{}>();
   });
 });

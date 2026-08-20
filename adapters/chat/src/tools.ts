@@ -479,3 +479,36 @@ export let getSetup = ChatAdapter.definePublicTool({
   input: chatSetupInputSchema,
   output: chatSetupOutputSchema
 });
+
+export let chatTools = {
+  sendMessage,
+  editMessage,
+  deleteMessage,
+  getMessage,
+  listMessages,
+  searchMessages,
+  replyMessage,
+  sendEphemeralMessage,
+  markMessageRead,
+  addReaction,
+  removeReaction,
+  listReactions,
+  listChannels,
+  getChannel,
+  listWorkspaces,
+  getWorkspace,
+  listChannelMembers,
+  listThreads,
+  getThread,
+  openSingleDm,
+  openGroupDm,
+  getUser,
+  searchUsers,
+  uploadFile,
+  downloadFile,
+  openModal,
+  respondToCommand,
+  listCommands,
+  startTyping,
+  getSetup
+} as const;
