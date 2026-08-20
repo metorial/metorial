@@ -1,6 +1,6 @@
 {
   "name": "@slates/adapter-chat",
-  "version": "1.0.0-rc.1",
+  "version": "1.0.0-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -31,7 +31,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "@slates/adapter": "1.0.0-rc.2",
+    "@slates/adapter": "1.0.0-rc.3",
     "mdast-util-to-string": "^4.0.0",
     "remark-gfm": "^4.0.0",
     "remark-parse": "^11.0.0",
