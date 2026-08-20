@@ -1,14 +1,21 @@
 import {
+  computeWebhookActionSpecHashV1,
+  parseWebhookWireRequest,
+  parseWebhookWireResponse,
   SLATES_PROTOCOL_VERSION,
   type SlateAuthenticationMethod,
+  type SlateConfigSchemaWireV2,
   type SlatesAction,
   type SlatesMessageActionGetResponse,
   type SlatesMessageActionInvokeResponse,
   type SlatesMessageActionsListResponse,
   type SlatesMessageActionTriggerEventMapResponse,
+  type SlatesMessageActionTriggerWebhookHandleScopedRequest,
+  type SlatesMessageActionTriggerWebhookBootstrapCaptureResponse,
   type SlatesMessageActionTriggerWebhookHandleResponse,
   type SlatesMessageActionTriggerWebhookRegisterResponse,
   type SlatesMessageActionTriggerWebhookUnregisterResponse,
+  type SlatesMessageActionTriggerWebhookVerifyResponse,
   type SlatesMessageAuthAuthorizationUrlGetResponse,
   type SlatesMessageAuthDefaultInputGetResponse,
   type SlatesMessageAuthInputChangedResponse,
@@ -22,11 +29,23 @@ import {
   type SlatesMessageProviderIdentifyResponse,
   type SlatesParticipant,
   type SlatesRequests,
-  type SlatesResponsesByMethod
+  type SlatesResponsesByMethod,
+  type SlatesScopedInvocationGrantEnvelope,
+  type WebhookBootstrapCaptureInput,
+  type WebhookVerifyInput,
+  type WebhookWireRequest,
+  type WebhookWireResponse
 } from '@slates/proto';
 import { randomUUID } from 'crypto';
 import { SlateProtocolError } from './error';
-import type { SlatesClientState, SlatesProtocolClientOptions } from './types';
+import { sendScopedWithTermination } from './transport';
+import type {
+  SlatesClientState,
+  SlatesConfigCapabilityDecision,
+  SlatesProtocolClientOptions,
+  SlatesWebhookCapability,
+  SlatesWebhookCapabilityNegotiation
+} from './types';
 
 let createDefaultParticipants = (): SlatesParticipant[] => [
   {
@@ -46,6 +65,7 @@ export class SlatesProtocolClient {
       protocol: SLATES_PROTOCOL_VERSION,
       participants: opts.participants ?? createDefaultParticipants(),
       config: opts.state?.config ?? null,
+      configSchema: opts.state?.configSchema ?? null,
       auth: opts.state?.auth ?? null,
       session: opts.state?.session ?? null
     };
@@ -56,8 +76,55 @@ export class SlatesProtocolClient {
     return this;
   }
 
+  normalizeWebhookWireRequest(request: unknown): WebhookWireRequest {
+    return parseWebhookWireRequest(request);
+  }
+
+  normalizeWebhookWireResponse(response: unknown): WebhookWireResponse {
+    return parseWebhookWireResponse(response);
+  }
+
+  verifyWebhookActionSpecHash(action: SlatesAction) {
+    if (action.type !== 'action.trigger' || action.invocation.type !== 'webhook')
+      return action;
+
+    if (!action.specHash) {
+      throw new Error(`Webhook action ${action.id} is missing its v1 spec hash.`);
+    }
+    let expectedSpecHash = computeWebhookActionSpecHashV1({
+      id: action.id,
+      type: action.type,
+      capabilities: action.capabilities,
+      invocation: action.invocation
+    });
+    if (action.specHash !== expectedSpecHash) {
+      throw new Error(`Webhook action ${action.id} has an invalid v1 spec hash.`);
+    }
+
+    return action;
+  }
+
   setConfig(config: Record<string, any> | null) {
-    this.state.config = config;
+    if (!config || this.state.configSchema?.version !== 2) {
+      this.state.config = config;
+      return this;
+    }
+    let schema = this.state.configSchema;
+    this.state.config = Object.fromEntries(
+      schema.fieldOrder.flatMap(key => {
+        let descriptor = schema.fields[key]!;
+        if (descriptor.visibility === 'plain') {
+          return key in config ? [[key, config[key]]] : [];
+        }
+        return [[key, { configured: config[key] !== undefined }]];
+      })
+    );
+    return this;
+  }
+
+  setConfigSchema(schema: SlatesClientState['configSchema']) {
+    this.state.configSchema = schema;
+    if (this.state.config) this.setConfig(this.state.config);
     return this;
   }
 
@@ -165,12 +232,117 @@ export class SlatesProtocolClient {
     return response.result;
   }
 
+  private async requestWithScopedInvocationGrant<
+    Key extends
+      | 'slates/action.tool.invoke'
+      | 'slates/action.trigger.webhook_verify'
+      | 'slates/action.trigger.webhook_bootstrap_capture'
+      | 'slates/action.trigger.webhook_handle'
+  >(
+    method: Key,
+    params: Extract<SlatesRequests, { method: Key }>['params'],
+    invocation: SlatesScopedInvocationGrantEnvelope
+  ): Promise<SlatesResponsesByMethod[Key]['result']> {
+    if (invocation.version !== 'scoped_invocation_grant_v1') {
+      throw new Error('The scoped invocation grant version is invalid.');
+    }
+    if (
+      method !== 'slates/action.tool.invoke' &&
+      method !== 'slates/action.trigger.webhook_handle' &&
+      invocation.requestId !== (params as { requestId: string }).requestId
+    ) {
+      throw new Error('The scoped invocation grant must bind the webhook request ID.');
+    }
+
+    let responses = await sendScopedWithTermination({
+      transport: this.transport,
+      requestId: invocation.requestId,
+      messages: [
+        ...this.buildStateMessages().filter(
+          message =>
+            message.method === 'slates/hello' || message.method === 'slates/participant.set'
+        ),
+        {
+          jsonrpc: '2.0',
+          id: invocation.requestId,
+          method,
+          invocation,
+          params
+        } as Extract<SlatesRequests, { method: Key }>
+      ]
+    });
+    let response = responses.find(
+      message => 'id' in message && message.id === invocation.requestId
+    ) as { result?: any; error?: any } | undefined;
+    if (!response) throw new Error(`No response was returned for method ${method}.`);
+    if (response.error) throw SlateProtocolError.fromResponse(response.error);
+    return response.result;
+  }
+
   async identify(): Promise<SlatesMessageProviderIdentifyResponse['result']> {
     return this.request('slates/provider.identify', {});
   }
 
+  async supportsWebhookCapability(capability: SlatesWebhookCapability) {
+    let provider = await this.identify();
+    return provider.capabilities?.[capability] === true;
+  }
+
+  async negotiateWebhookCapabilities(
+    actionId: string
+  ): Promise<SlatesWebhookCapabilityNegotiation> {
+    let [provider, { action }] = await Promise.all([
+      this.identify(),
+      this.getAction(actionId)
+    ]);
+    let providerCapabilities = provider.capabilities;
+    let actionCapabilities = action.type === 'action.trigger' ? action.capabilities : {};
+    let scoped = providerCapabilities?.scopedInvocationGrantV1 === true;
+    let providerRegistration = providerCapabilities?.webhookSecretNegotiationV1 === true;
+    let actionRegistration = actionCapabilities.webhookSecretNegotiationV1 === true;
+    let providerVerification = providerCapabilities?.webhookInboundVerificationV1 === true;
+    let actionVerification = actionCapabilities.webhookInboundVerificationV1 === true;
+    let providerBootstrap = providerCapabilities?.webhookInboundBootstrapCaptureV1 === true;
+    let actionBootstrap = actionCapabilities.webhookInboundBootstrapCaptureV1 === true;
+    return {
+      registration:
+        !providerRegistration && !actionRegistration
+          ? ({ status: 'legacy', code: 'capability_absent' } as const)
+          : providerRegistration && actionRegistration && scoped
+            ? ({ status: 'v1' } as const)
+            : ({
+                status: 'fail_closed',
+                code: 'webhook_registration_capabilities_inconsistent'
+              } as const),
+      verification:
+        !providerVerification && !actionVerification
+          ? ({ status: 'legacy', code: 'capability_absent' } as const)
+          : providerVerification && actionVerification && scoped
+            ? ({ status: 'v1' } as const)
+            : ({
+                status: 'fail_closed',
+                code: 'webhook_verification_capabilities_inconsistent'
+              } as const),
+      bootstrapCapture:
+        !providerBootstrap && !actionBootstrap
+          ? ({ status: 'unavailable', code: 'capability_absent' } as const)
+          : providerBootstrap &&
+              actionBootstrap &&
+              scoped &&
+              providerVerification &&
+              actionVerification
+            ? ({ status: 'v1' } as const)
+            : ({
+                status: 'fail_closed',
+                code: 'webhook_bootstrap_capabilities_inconsistent'
+              } as const)
+    };
+  }
+
   async listActions(): Promise<SlatesMessageActionsListResponse['result']> {
-    return this.request('slates/actions.list', {});
+    let result = await this.request('slates/actions.list', {});
+    result.actions.forEach(action => this.verifyWebhookActionSpecHash(action));
+    return result;
   }
 
   async listTools(): Promise<SlatesAction[]> {
@@ -184,7 +356,9 @@ export class SlatesProtocolClient {
   }
 
   async getAction(actionId: string): Promise<SlatesMessageActionGetResponse['result']> {
-    return this.request('slates/action.get', { actionId });
+    let result = await this.request('slates/action.get', { actionId });
+    this.verifyWebhookActionSpecHash(result.action);
+    return result;
   }
 
   async getTool(actionId: string) {
@@ -205,8 +379,75 @@ export class SlatesProtocolClient {
     return result.action;
   }
 
+  async getTriggerWebhookIngress(actionId: string) {
+    let trigger = await this.getTrigger(actionId);
+    if (trigger.invocation.type !== 'webhook') return null;
+    return trigger.invocation.http?.ingress ?? null;
+  }
+
   async getConfigSchema(): Promise<SlatesMessageConfigSchemaGetResponse['result']> {
-    return this.request('slates/config.schema.get', {});
+    let [provider, result] = await Promise.all([
+      this.identify(),
+      this.request('slates/config.schema.get', {})
+    ]);
+    let decision = this.negotiateConfigSchemaCapability({
+      providerCapabilities: provider.capabilities,
+      schema: result.schema
+    });
+    if (decision.status === 'fail_closed') {
+      throw new Error(`Provider config schema negotiation failed: ${decision.code}`);
+    }
+    this.setConfigSchema(result.schema);
+    return result;
+  }
+
+  negotiateConfigSchemaCapability(d: {
+    providerCapabilities?: { configSchemaV2?: boolean; scopedInvocationGrantV1?: boolean };
+    schema: SlatesMessageConfigSchemaGetResponse['result']['schema'];
+    now?: Date;
+  }): SlatesConfigCapabilityDecision {
+    if (d.schema.version === 2) {
+      if (d.providerCapabilities?.configSchemaV2 !== true) {
+        return { status: 'fail_closed', code: 'config_schema_capability_mismatch' };
+      }
+      let hasSecrets = Object.values(d.schema.fields).some(
+        field => field.visibility === 'secret'
+      );
+      if (hasSecrets && d.providerCapabilities?.scopedInvocationGrantV1 !== true) {
+        return { status: 'fail_closed', code: 'config_secret_scope_unavailable' };
+      }
+      return { status: 'v2' };
+    }
+    if (!['looker', 'tableau'].includes(d.schema.compatibility.integrationId)) {
+      return { status: 'fail_closed', code: 'config_v1_not_allowlisted' };
+    }
+    let now = d.now ?? new Date();
+    if (
+      now.getTime() >= new Date(d.schema.compatibility.cutoffAt).getTime() ||
+      now.getTime() >= new Date(d.schema.compatibility.expiresAt).getTime()
+    ) {
+      return { status: 'fail_closed', code: 'config_v1_cutoff_expired' };
+    }
+    return {
+      status: 'v1_compatibility',
+      integrationId: d.schema.compatibility.integrationId,
+      cutoffAt: d.schema.compatibility.cutoffAt,
+      expiresAt: d.schema.compatibility.expiresAt
+    };
+  }
+
+  async assertConfigInvocationCapability(schema: SlateConfigSchemaWireV2) {
+    let hasSecrets = Object.values(schema.fields).some(field => field.visibility === 'secret');
+    if (!hasSecrets) return;
+    let provider = await this.identify();
+    if (
+      provider.capabilities?.configSchemaV2 !== true ||
+      provider.capabilities?.scopedInvocationGrantV1 !== true
+    ) {
+      throw new Error(
+        'Secret-bearing config requires configSchemaV2 and scopedInvocationGrantV1'
+      );
+    }
   }
 
   async getDefaultConfig(): Promise<SlatesMessageConfigDefaultGetResponse['result']> {
@@ -327,6 +568,29 @@ export class SlatesProtocolClient {
     });
   }
 
+  async invokeReceiverBoundTool(
+    actionId: string,
+    input: Record<string, any>,
+    invocation: SlatesScopedInvocationGrantEnvelope
+  ): Promise<SlatesMessageActionInvokeResponse['result']> {
+    this.ensureSession();
+    let provider = await this.identify();
+    let { action } = await this.getAction(actionId);
+    if (
+      provider.capabilities?.scopedInvocationGrantV1 !== true ||
+      provider.capabilities?.receiverBoundToolContextV1 !== true ||
+      action.type !== 'action.tool' ||
+      !action.capabilities.receiverBoundToolContextV1
+    ) {
+      throw new Error('Receiver-bound tool context is not supported by this action.');
+    }
+    return this.requestWithScopedInvocationGrant(
+      'slates/action.tool.invoke',
+      { actionId, input },
+      invocation
+    );
+  }
+
   async mapTriggerEvent(
     actionId: string,
     input: Record<string, any>
@@ -340,13 +604,61 @@ export class SlatesProtocolClient {
 
   async registerTriggerWebhook(
     actionId: string,
-    webhookBaseUrl: string
+    webhookBaseUrl: string,
+    capturedSecretVersions: Readonly<Record<string, number>> = {},
+    registrationDetails?: unknown
   ): Promise<SlatesMessageActionTriggerWebhookRegisterResponse['result']> {
     this.ensureSession();
+    // Registration deliberately retains the reviewed legacy RPC when v1 is not advertised.
+    // Both paths carry the same public input; only the v1 response may negotiate captures.
+    let capabilities = await this.negotiateWebhookCapabilities(actionId);
+    if (capabilities.registration.status === 'fail_closed') {
+      throw new Error(capabilities.registration.code);
+    }
     return this.request('slates/action.trigger.webhook_register', {
       actionId,
-      webhookBaseUrl
+      webhookBaseUrl,
+      capturedSecretVersions,
+      registrationDetails
     });
+  }
+
+  async verifyTriggerWebhook(
+    input: WebhookVerifyInput,
+    invocation: SlatesScopedInvocationGrantEnvelope
+  ): Promise<SlatesMessageActionTriggerWebhookVerifyResponse['result']> {
+    let capabilities = await this.negotiateWebhookCapabilities(input.actionId);
+    if (capabilities.verification.status === 'fail_closed') {
+      throw new Error(capabilities.verification.code);
+    }
+    if (capabilities.verification.status !== 'v1') {
+      throw new Error(
+        'Provider does not advertise scoped inbound webhook verification; use the explicit legacy Hub fallback.'
+      );
+    }
+    return this.requestWithScopedInvocationGrant(
+      'slates/action.trigger.webhook_verify',
+      input,
+      invocation
+    );
+  }
+
+  async captureTriggerWebhookBootstrap(
+    input: WebhookBootstrapCaptureInput,
+    invocation: SlatesScopedInvocationGrantEnvelope
+  ): Promise<SlatesMessageActionTriggerWebhookBootstrapCaptureResponse['result']> {
+    let capabilities = await this.negotiateWebhookCapabilities(input.actionId);
+    if (capabilities.bootstrapCapture.status === 'fail_closed') {
+      throw new Error(capabilities.bootstrapCapture.code);
+    }
+    if (capabilities.bootstrapCapture.status !== 'v1') {
+      throw new Error('Provider does not advertise scoped inbound webhook bootstrap capture.');
+    }
+    return this.requestWithScopedInvocationGrant(
+      'slates/action.trigger.webhook_bootstrap_capture',
+      input,
+      invocation
+    );
   }
 
   async handleTriggerWebhook(d: {
@@ -380,6 +692,17 @@ export class SlatesProtocolClient {
       state: d.state ?? null,
       registrationDetails: d.registrationDetails ?? null
     });
+  }
+
+  async handleVerifiedTriggerWebhook(
+    params: SlatesMessageActionTriggerWebhookHandleScopedRequest['params'],
+    invocation: SlatesScopedInvocationGrantEnvelope
+  ): Promise<SlatesMessageActionTriggerWebhookHandleResponse['result']> {
+    return this.requestWithScopedInvocationGrant(
+      'slates/action.trigger.webhook_handle',
+      params,
+      invocation
+    );
   }
 
   async unregisterTriggerWebhook(d: {

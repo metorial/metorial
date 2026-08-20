@@ -1,13 +1,17 @@
-import { SlateConfig } from 'slates';
+import { configV2 } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    environment: z
-      .enum(['sandbox', 'production'])
-      .default('production')
-      .describe(
-        'Flutterwave environment to use. Sandbox for testing, production for live transactions.'
-      )
-  })
-);
+export let config = configV2({
+  fields: {
+    environment: {
+      schema: z
+        .enum(['sandbox', 'production'])
+        .default('production')
+        .describe(
+          'Flutterwave environment to use. Sandbox for testing, production for live transactions.'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
+});

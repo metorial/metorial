@@ -55,7 +55,7 @@ describe('google-calendar provider contract', () => {
     });
 
     expect(contract.actions).toHaveLength(16);
-    expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
+    expect(Object.keys(contract.configSchema.jsonSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
       create_event: googleCalendarActionScopes.createEvent,

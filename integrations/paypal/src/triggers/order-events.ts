@@ -1,6 +1,11 @@
 import { SlateTrigger } from '@slates/provider';
 import { z } from 'zod';
 import { PayPalClient } from '../lib/client';
+import {
+  paypalRegistrationResult,
+  paypalWebhookHttp,
+  verifyPayPalWebhook
+} from '../lib/webhook';
 import { spec } from '../spec';
 
 let ORDER_EVENT_TYPES = [
@@ -38,6 +43,8 @@ export let orderEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: paypalWebhookHttp,
+    verifyWebhook: verifyPayPalWebhook,
     autoRegisterWebhook: async ctx => {
       let client = new PayPalClient({
         token: ctx.auth.token,
@@ -51,9 +58,7 @@ export let orderEvents = SlateTrigger.create(spec, {
         eventTypes: ORDER_EVENT_TYPES
       });
 
-      return {
-        registrationDetails: { webhookId: webhook.id }
-      };
+      return paypalRegistrationResult(webhook.id, ctx.input.capturedSecretVersions);
     },
 
     autoUnregisterWebhook: async ctx => {

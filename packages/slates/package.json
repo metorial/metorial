@@ -1,6 +1,6 @@
 {
   "name": "slates",
-  "version": "1.0.0-rc.16",
+  "version": "1.0.0-rc.19",
   "publishConfig": {
     "access": "public"
   },
@@ -26,13 +26,13 @@
   "types": "dist/index.d.ts",
   "unpkg": "./dist/index.module.js",
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --config vitest.config.ts",
     "build": "tsup --config ../../tsup.packages.config.ts",
     "typecheck": "tsc --noEmit",
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "@slates/provider": "1.0.0-rc.17"
+    "@slates/provider": "1.0.0-rc.20"
   },
   "devDependencies": {
     "microbundle": "^0.15.1",

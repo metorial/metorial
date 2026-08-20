@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { GoogleCalendarClient } from '../lib/client';
 import { googleCalendarActionScopes } from '../scopes';
 import { spec } from '../spec';
+import {
+  googleCalendarWebhookHttp,
+  registerGoogleCalendarWebhook,
+  unregisterGoogleCalendarWebhook,
+  verifyGoogleCalendarWebhook
+} from './webhook';
 
 export let calendarListChanges = SlateTrigger.create(spec, {
   name: 'Calendar List Changes',
@@ -44,38 +50,10 @@ export let calendarListChanges = SlateTrigger.create(spec, {
     })
   )
   .webhook({
-    autoRegisterWebhook: async ctx => {
-      let client = new GoogleCalendarClient(ctx.auth.token);
-
-      let channelId = `slates-callist-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-      // Initial sync to get a sync token
-      let syncResult = await client.listCalendarList({ maxResults: 1 });
-
-      let watchResponse = await client.watchCalendarList({
-        id: channelId,
-        type: 'web_hook',
-        address: ctx.input.webhookBaseUrl
-      });
-
-      return {
-        registrationDetails: {
-          channelId: watchResponse.id || channelId,
-          resourceId: watchResponse.resourceId,
-          expiration: watchResponse.expiration,
-          syncToken: syncResult.nextSyncToken
-        }
-      };
-    },
-
-    autoUnregisterWebhook: async ctx => {
-      let client = new GoogleCalendarClient(ctx.auth.token);
-      let details = ctx.input.registrationDetails;
-
-      if (details?.channelId && details?.resourceId) {
-        await client.stopChannel(details.channelId, details.resourceId);
-      }
-    },
+    http: googleCalendarWebhookHttp,
+    verifyWebhook: verifyGoogleCalendarWebhook,
+    autoRegisterWebhook: ctx => registerGoogleCalendarWebhook(ctx, 'calendar_list'),
+    autoUnregisterWebhook: unregisterGoogleCalendarWebhook,
 
     handleRequest: async ctx => {
       let resourceState = ctx.request.headers.get('x-goog-resource-state');

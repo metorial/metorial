@@ -1,4 +1,4 @@
-import { SlateConfig } from 'slates';
+import { configV2 } from 'slates';
 import { z } from 'zod';
 import { salesforceServiceError } from './lib/errors';
 
@@ -73,33 +73,35 @@ export let normalizeSalesforceConfig = (
   return config;
 };
 
-let salesforceConfigSchema = z
-  .object({
-    environment: salesforceEnvironmentSchema
-      .default('production')
-      .describe('Salesforce OAuth environment to use for authorization and token refresh'),
-    customDomain: z
-      .string()
-      .optional()
-      .describe(
-        'Custom Salesforce My Domain for custom OAuth environments. Accepts a bare prefix, *.my value, full host, or URL.'
-      ),
-    apiVersion: z
-      .string()
-      .default('v62.0')
-      .describe('Salesforce REST API version to use (e.g., v62.0)')
-  })
-  .superRefine((value, ctx) => {
-    if (value.environment === 'custom' && !value.customDomain?.trim()) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['customDomain'],
-        message: 'Salesforce customDomain is required when environment is custom.'
-      });
+export let config = configV2({
+  fields: {
+    environment: {
+      schema: salesforceEnvironmentSchema
+        .default('production')
+        .describe('Salesforce OAuth environment to use for authorization and token refresh'),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    customDomain: {
+      schema: z
+        .string()
+        .optional()
+        .describe(
+          'Custom Salesforce My Domain for custom OAuth environments. Accepts a bare prefix, *.my value, full host, or URL.'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    apiVersion: {
+      schema: z
+        .string()
+        .default('v62.0')
+        .describe('Salesforce REST API version to use (e.g., v62.0)'),
+      visibility: 'plain',
+      lifecycle: 'none'
     }
-  });
-
-export let config = SlateConfig.create(salesforceConfigSchema)
+  }
+})
   .getDefaultConfig(() => normalizeSalesforceConfig({}))
   .onConfigChanged(({ newConfig }) => ({
     config: normalizeSalesforceConfig(newConfig)

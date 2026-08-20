@@ -4,17 +4,19 @@
   "type": "module",
   "scripts": {
     "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --configLoader runner --config vitest.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@types/node": "^20",
-    "slates": "1.0.0-rc.16",
+    "slates": "1.0.0-rc.19",
     "zod": "^4.2"
   },
   "devDependencies": {
+    "@slates/provider-handler": "1.0.0-rc.22",
+    "@slates/proto": "1.0.0-rc.17",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.1.0-rc.8"
+  "version": "0.1.0-rc.19"
 }

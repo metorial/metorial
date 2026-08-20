@@ -94,7 +94,6 @@ describe('HubSpot sequence tools', () => {
           sequenceId: 'seq-1',
           name: 'Intro sequence',
           folderId: 'folder-1',
-          userId: 'auth-user',
           createdAt: '2026-06-01T10:00:00.000Z',
           updatedAt: '2026-06-02T10:00:00.000Z'
         }

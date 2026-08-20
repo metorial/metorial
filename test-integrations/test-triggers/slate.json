@@ -1,11 +1,14 @@
 {
   "name": "@__test__/triggers",
-  "description": "Internal test slate for exercising polling and webhook trigger flows.",
+  "description": "Internal test slate for polling, legacy callbacks, and the comprehensive core, preset, and provider-boundary webhook verification matrix.",
   "categories": ["utilities"],
   "skills": [
     "receive webhook payloads and emit processed trigger events",
     "emit the current time during polling runs",
-    "test callback trigger delivery",
-    "run trigger integration smoke tests"
+    "test legacy asynchronous and synchronous callback trigger delivery",
+    "verify static-token, raw HMAC, and Ed25519 callback authentication",
+    "verify canonical webhook presets, replay controls, and bootstrap flows",
+    "exercise scoped synthetic provider-verification boundaries",
+    "run valid, invalid, and dry-run webhook verification observations"
   ]
 }

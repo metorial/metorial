@@ -1,5 +1,10 @@
 import {
+  SLATE_WEBHOOK_ACTION_SPEC_HASH_FIXTURE_V1,
+  SLATE_WEBHOOK_WIRE_CONFORMANCE_FIXTURES_V1
+} from '@slates/proto';
+import {
   axios,
+  configV2,
   Slate,
   SlateAuth,
   SlateConfig,
@@ -26,11 +31,15 @@ afterEach(async () => {
 });
 
 let createDemoSlate = () => {
-  let demoConfig = SlateConfig.create(
-    z.object({
-      prefix: z.string()
-    })
-  )
+  let demoConfig = configV2({
+    fields: {
+      prefix: {
+        schema: z.string(),
+        visibility: 'plain',
+        lifecycle: 'none'
+      }
+    }
+  })
     .getDefaultConfig(() => ({
       prefix: 'Hello'
     }))
@@ -42,12 +51,8 @@ let createDemoSlate = () => {
       }
     ]);
 
-  let demoAuth = SlateAuth.create<{ token: string }>()
-    .output(
-      z.object({
-        token: z.string()
-      })
-    )
+  let demoAuth = SlateAuth.create<{}>()
+    .output(z.object({}))
     .addTokenAuth({
       type: 'auth.token',
       key: 'token_auth',
@@ -71,14 +76,12 @@ let createDemoSlate = () => {
         }
       }),
       getOutput: async (ctx: { input: { token: string } }) => ({
-        output: {
-          token: ctx.input.token
-        },
+        output: {},
         scopes: [`scope:${ctx.input.token}`]
       }),
-      getProfile: async (ctx: { output: { token: string } }) => ({
+      getProfile: async () => ({
         profile: {
-          tokenPreview: ctx.output.token.slice(0, 3)
+          configured: true
         }
       })
     });
@@ -115,8 +118,7 @@ let createDemoSlate = () => {
     )
     .output(
       z.object({
-        greeting: z.string(),
-        token: z.string()
+        greeting: z.string()
       })
     )
     .scopes({
@@ -129,8 +131,7 @@ let createDemoSlate = () => {
     .authMethods(['token_auth'])
     .handleInvocation(async ctx => ({
       output: {
-        greeting: `${ctx.config.prefix} ${ctx.input.name}`,
-        token: ctx.auth.token
+        greeting: `${ctx.config.prefix} ${ctx.input.name}`
       },
       message: 'done'
     }))
@@ -311,6 +312,36 @@ let createTriggerTraceSlate = () => {
       })
     )
     .webhook({
+      http: {
+        methods: ['POST'],
+        ingress: {
+          kind: 'receiver_route',
+          baseline: 'receiver_path_secret',
+          verification: {
+            mechanism: 'hub',
+            baseline: 'receiver_path_secret',
+            allowedSecretRefs: [],
+            rules: [
+              {
+                id: 'stripe.delivery.v1',
+                phase: 'delivery',
+                when: { methods: ['POST'] },
+                verify: { type: 'preset', preset: 'stripe.v1' },
+                result: { type: 'dispatch', scope: 'receiver_trigger' },
+                replay: {
+                  kind: 'enforced',
+                  deduplicate: {
+                    source: 'preset',
+                    presetField: 'event_id',
+                    ttlSeconds: 86_400,
+                    scope: 'request'
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
       handleRequest: async () => ({
         inputs: [{ id: 'webhook-1' }, { id: 'webhook-2' }],
         response: {
@@ -514,6 +545,85 @@ let createTokenConfigSlate = (seenConfig: SeenTokenConfig) => {
 };
 
 describe('@slates/client local transport', () => {
+  it('fails closed when v2 secret capabilities or v1 compatibility bounds do not match', () => {
+    let client = createSlatesClient({ transport: { send: async () => [] } });
+    let secretSchema = configV2({
+      fields: {
+        token: {
+          schema: z.string(),
+          visibility: 'secret',
+          lifecycle: 'reregister'
+        }
+      }
+    }).wireSchema;
+    if (!secretSchema || secretSchema.version !== 2) throw new Error('Expected config v2');
+
+    expect(
+      client.negotiateConfigSchemaCapability({
+        providerCapabilities: { configSchemaV2: false, scopedInvocationGrantV1: true },
+        schema: secretSchema
+      })
+    ).toEqual({ status: 'fail_closed', code: 'config_schema_capability_mismatch' });
+    expect(
+      client.negotiateConfigSchemaCapability({
+        providerCapabilities: { configSchemaV2: true, scopedInvocationGrantV1: false },
+        schema: secretSchema
+      })
+    ).toEqual({ status: 'fail_closed', code: 'config_secret_scope_unavailable' });
+
+    let compatibility = {
+      version: 1 as const,
+      jsonSchema: { type: 'object' },
+      compatibility: {
+        integrationId: 'looker' as const,
+        owner: 'integrations',
+        expiresAt: '2027-01-02T00:00:00.000Z',
+        cutoffAt: '2027-01-01T00:00:00.000Z'
+      }
+    };
+    expect(
+      client.negotiateConfigSchemaCapability({
+        schema: compatibility,
+        now: new Date('2026-12-31T00:00:00.000Z')
+      })
+    ).toMatchObject({ status: 'v1_compatibility', integrationId: 'looker' });
+    expect(
+      client.negotiateConfigSchemaCapability({
+        schema: compatibility,
+        now: new Date('2027-01-01T00:00:00.000Z')
+      })
+    ).toEqual({ status: 'fail_closed', code: 'config_v1_cutoff_expired' });
+    expect(
+      client.negotiateConfigSchemaCapability({
+        schema: {
+          ...compatibility,
+          compatibility: { ...compatibility.compatibility, integrationId: 'other' }
+        } as never
+      })
+    ).toEqual({ status: 'fail_closed', code: 'config_v1_not_allowlisted' });
+  });
+
+  it('independently validates the shared webhook specHash v1 fixture', () => {
+    let client = createSlatesClient({
+      transport: { send: async () => [] }
+    });
+    let action = {
+      ...SLATE_WEBHOOK_ACTION_SPEC_HASH_FIXTURE_V1.action,
+      name: 'Fixture',
+      inputSchema: {},
+      outputSchema: {},
+      docs: [],
+      specHash: SLATE_WEBHOOK_ACTION_SPEC_HASH_FIXTURE_V1.expectedHash
+    };
+    expect(client.verifyWebhookActionSpecHash(action as never)).toBe(action);
+    expect(() =>
+      client.verifyWebhookActionSpecHash({ ...action, specHash: undefined } as never)
+    ).toThrow('missing its v1 spec hash');
+    expect(() =>
+      client.verifyWebhookActionSpecHash({ ...action, specHash: '0'.repeat(64) } as never)
+    ).toThrow('invalid v1 spec hash');
+  });
+
   it('discovers auth/config and invokes tools with session state', async () => {
     let slate = createDemoSlate();
     let client = createSlatesClient({
@@ -522,6 +632,17 @@ describe('@slates/client local transport', () => {
 
     let provider = await client.identify();
     expect(provider.provider.id).toBe('demo-slate');
+    expect(provider.capabilities).toEqual({
+      configSchemaV2: true,
+      receiverBoundToolContextV1: true,
+      scopedInvocationGrantV1: true,
+      webhookActionSpecHashV1: true,
+      webhookInboundBootstrapCaptureV1: true,
+      webhookInboundVerificationV1: true,
+      webhookSecretNegotiationV1: true,
+      webhookVerificationRulesV1: true,
+      webhookWireV1: true
+    });
     expect(provider.docs).toEqual([
       {
         name: 'Demo provider docs',
@@ -547,9 +668,52 @@ describe('@slates/client local transport', () => {
       ]
     });
     expect(actions[0]!.authMethods).toEqual(['token_auth']);
+    await expect(
+      client.invokeReceiverBoundTool(
+        'echo',
+        { name: 'world' },
+        {
+          version: 'scoped_invocation_grant_v1',
+          grantId: 'unusable-grant',
+          token: 'unusable-token',
+          requestId: 'receiver-bound-request'
+        }
+      )
+    ).rejects.toThrow('Receiver-bound tool context is not supported by this action');
+
+    let wireRequest = {
+      url: 'https://example.com/callback',
+      method: 'POST' as const,
+      headers: [
+        ['X-Signature', 'first'],
+        ['x-signature', 'second']
+      ] as [string, string][],
+      body: { present: true as const, base64: '' }
+    };
+    expect(client.normalizeWebhookWireRequest(wireRequest)).toEqual(wireRequest);
+    expect(() =>
+      client.normalizeWebhookWireRequest({
+        ...wireRequest,
+        headers: { 'x-signature': 'value' }
+      })
+    ).toThrow();
+    let wireResponse = {
+      status: 202,
+      headers: [
+        ['Set-Cookie', 'first=1'],
+        ['Set-Cookie', 'second=2']
+      ] as [string, string][],
+      body: { present: true as const, base64: Buffer.from([0, 255]).toString('base64') }
+    };
+    expect(client.normalizeWebhookWireResponse(wireResponse)).toEqual(wireResponse);
+
+    for (let fixture of SLATE_WEBHOOK_WIRE_CONFORMANCE_FIXTURES_V1) {
+      expect(client.normalizeWebhookWireRequest(fixture.request)).toEqual(fixture.request);
+    }
 
     let configSchema = await client.getConfigSchema();
-    expect(configSchema.schema.properties.prefix.type).toBe('string');
+    expect(configSchema.schema.version).toBe(2);
+    expect(configSchema.schema.jsonSchema.properties.prefix.type).toBe('string');
     expect(configSchema.docs).toEqual([
       {
         type: 'docs.config.general',
@@ -586,7 +750,7 @@ describe('@slates/client local transport', () => {
       authenticationMethodId: 'token_auth',
       input: changedInput.input ?? { token: '' }
     });
-    expect(authOutput.output).toEqual({ token: 'trimmed-token' });
+    expect(authOutput.output).toEqual({});
     expect(authOutput.scopes).toEqual(['scope:trimmed-token']);
 
     client.setConfig({ prefix: 'Hi' });
@@ -597,9 +761,9 @@ describe('@slates/client local transport', () => {
 
     let result = await client.invokeTool('echo', { name: 'Tobias' });
     expect(result.output).toEqual({
-      greeting: 'Hi Tobias',
-      token: 'trimmed-token'
+      greeting: 'Hi Tobias'
     });
+    expect(JSON.stringify(client.state)).not.toContain('trimmed-token');
     expect(client.state.session?.id).toBeTruthy();
   });
 
@@ -696,6 +860,34 @@ describe('@slates/client local transport', () => {
     });
 
     client.ensureSession();
+
+    await expect(client.getTriggerWebhookIngress('webhook_trigger')).resolves.toEqual({
+      kind: 'receiver_route',
+      baseline: 'receiver_path_secret',
+      verification: {
+        mechanism: 'hub',
+        baseline: 'receiver_path_secret',
+        allowedSecretRefs: [],
+        rules: [
+          {
+            id: 'stripe.delivery.v1',
+            phase: 'delivery',
+            when: { methods: ['POST'] },
+            verify: { type: 'preset', preset: 'stripe.v1' },
+            result: { type: 'dispatch', scope: 'receiver_trigger' },
+            replay: {
+              kind: 'enforced',
+              deduplicate: {
+                source: 'preset',
+                presetField: 'event_id',
+                ttlSeconds: 86_400,
+                scope: 'request'
+              }
+            }
+          }
+        ]
+      }
+    });
 
     await client.request('slates/action.trigger.poll_events', {
       actionId: 'poll_trigger',

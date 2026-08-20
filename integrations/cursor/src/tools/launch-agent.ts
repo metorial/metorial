@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { CloudAgentsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -58,15 +58,7 @@ export let launchAgent = SlateTool.create(spec, {
       skipReviewerRequest: z
         .boolean()
         .optional()
-        .describe('Skip requesting reviewers on the PR'),
-      webhookUrl: z
-        .string()
-        .optional()
-        .describe('URL to receive webhook notifications on agent completion'),
-      webhookSecret: z
-        .string()
-        .optional()
-        .describe('Secret for signing webhook payloads (min 32 characters)')
+        .describe('Skip requesting reviewers on the PR')
     })
   )
   .output(
@@ -78,7 +70,15 @@ export let launchAgent = SlateTool.create(spec, {
       createdAt: z.string().describe('ISO 8601 timestamp of agent creation')
     })
   )
+  .receiverBoundToolContextV1(['cursor_webhook_secret'])
   .handleInvocation(async ctx => {
+    let receiverCallback = ctx.receiverCallback;
+    let webhookSecret = receiverCallback?.secrets.cursor_webhook_secret;
+    if (!receiverCallback || !webhookSecret) {
+      throw createApiServiceError(
+        'Launch Agent requires exactly one registered Agent Status Change callback.'
+      );
+    }
     let client = new CloudAgentsClient({ token: ctx.auth.token });
 
     let result = await client.launchAgent({
@@ -99,12 +99,10 @@ export let launchAgent = SlateTool.create(spec, {
         openAsCursorGithubApp: ctx.input.openAsCursorGithubApp,
         skipReviewerRequest: ctx.input.skipReviewerRequest
       },
-      webhook: ctx.input.webhookUrl
-        ? {
-            url: ctx.input.webhookUrl,
-            secret: ctx.input.webhookSecret
-          }
-        : undefined
+      webhook: {
+        url: receiverCallback.url,
+        secret: webhookSecret.value
+      }
     });
 
     return {

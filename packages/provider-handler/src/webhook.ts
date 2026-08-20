@@ -1,8 +1,37 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
-import type { SlatesWebhookHttpResponse } from '@slates/proto';
+import {
+  computeWebhookActionSpecHashV1,
+  parseWebhookWireRequest,
+  parseWebhookWireResponse,
+  type SlatesWebhookHttpResponse,
+  type WebhookWireRequest,
+  type WebhookWireResponse
+} from '@slates/proto';
 import type { SlateWebhookHttpResponseInit } from '@slates/provider';
 
 export let SLATE_WEBHOOK_RESPONSE_MAX_BODY_BYTES = 1024 * 1024;
+
+/**
+ * Secure webhook boundaries accept only the ordered tuple/base64 wire contract. Fetch
+ * Request/Response, Headers, and record-shaped substitutes fail strict schema validation.
+ */
+export let serializeWebhookWireRequest = (request: WebhookWireRequest) => {
+  let parsed = parseWebhookWireRequest(request);
+  return JSON.stringify(parsed);
+};
+
+export let deserializeWebhookWireRequest = (serialized: string): WebhookWireRequest =>
+  parseWebhookWireRequest(JSON.parse(serialized));
+
+export let serializeWebhookWireResponse = (response: WebhookWireResponse) => {
+  let parsed = parseWebhookWireResponse(response);
+  return JSON.stringify(parsed);
+};
+
+export let deserializeWebhookWireResponse = (serialized: string): WebhookWireResponse =>
+  parseWebhookWireResponse(JSON.parse(serialized));
+
+export let recomputeWebhookActionSpecHashV1 = computeWebhookActionSpecHashV1;
 
 let serializeBody = (body: Uint8Array | null): SlatesWebhookHttpResponse['body'] => {
   if (body === null) return null;

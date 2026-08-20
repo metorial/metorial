@@ -1,22 +1,36 @@
-import { SlateConfig } from 'slates';
+import { configV2 } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    spaceId: z
-      .string()
-      .describe(
-        'The Contentful Space ID. Found in Settings > General in the Contentful web app.'
-      ),
-    environmentId: z
-      .string()
-      .default('master')
-      .describe('The environment ID within the space (e.g. "master"). Defaults to "master".'),
-    region: z
-      .enum(['us', 'eu'])
-      .default('us')
-      .describe(
-        'Data residency region. Use "eu" for European data residency (graphql.eu.contentful.com).'
-      )
-  })
-);
+export let config = configV2({
+  fields: {
+    spaceId: {
+      schema: z
+        .string()
+        .describe(
+          'The Contentful Space ID. Found in Settings > General in the Contentful web app.'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    environmentId: {
+      schema: z
+        .string()
+        .default('master')
+        .describe(
+          'The environment ID within the space (e.g. "master"). Defaults to "master".'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    region: {
+      schema: z
+        .enum(['us', 'eu'])
+        .default('us')
+        .describe(
+          'Data residency region. Use "eu" for European data residency (graphql.eu.contentful.com).'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
+});

@@ -1,6 +1,11 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { handleNotionWebhookRequest, notionWebhookHttp } from '../lib/webhook';
+import {
+  captureNotionWebhookBootstrap,
+  handleNotionWebhookRequest,
+  notionWebhookHttp,
+  verifyNotionWebhook
+} from '../lib/webhook';
 import { spec } from '../spec';
 
 export let commentEvents = SlateTrigger.create(spec, {
@@ -32,6 +37,8 @@ export let commentEvents = SlateTrigger.create(spec, {
   )
   .webhook({
     http: notionWebhookHttp,
+    verifyWebhook: verifyNotionWebhook,
+    captureWebhookBootstrap: captureNotionWebhookBootstrap,
     handleRequest: async ctx => {
       let parsed = await handleNotionWebhookRequest(ctx);
       if (parsed.type === 'complete') return parsed.result;

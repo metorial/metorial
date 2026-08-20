@@ -44,12 +44,12 @@ function createDialpadOauth(name: string, key: string, environment: 'production'
     key,
     docs: [
       {
-        type: 'docs.auth.oauth',
+        type: 'docs.auth.oauth' as const,
         name: 'OAuth documentation',
         url: 'https://developers.dialpad.com/docs/oauth'
       },
       {
-        type: 'docs.auth.oauth_scopes',
+        type: 'docs.auth.oauth_scopes' as const,
         name: 'OAuth scopes',
         url: 'https://developers.dialpad.com/docs/oauth#supported-scopes'
       }

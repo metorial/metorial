@@ -34,7 +34,16 @@ describe('google-calendar event_changes trigger', () => {
     let registration = await registerSlateTriggerWebhook({
       client,
       triggerId: 'event_changes',
-      webhookBaseUrl: 'https://example.com/hooks/events'
+      webhookBaseUrl: 'https://example.com/hooks/events',
+      capturedSecretVersions: {
+        google_channel_id: 1,
+        google_resource_id: 1,
+        google_channel_token: 1,
+        google_retiring_channel_id: 1,
+        google_retiring_resource_id: 1,
+        google_retiring_channel_token: 1,
+        google_retiring_valid_until: 1
+      }
     });
 
     expect(googleClientMocks.tokens).toContain('test-token');
@@ -56,8 +65,9 @@ describe('google-calendar event_changes trigger', () => {
         resourceId: 'resource-1',
         calendarId: 'primary',
         expiration: '1700000000000',
-        syncToken: 'event-sync-1'
-      }
+        channelToken: expect.stringMatching(/^[A-Za-z0-9_-]+$/)
+      },
+      state: { syncToken: 'event-sync-1', calendarId: 'primary' }
     });
 
     await unregisterSlateTriggerWebhook({
@@ -133,8 +143,7 @@ describe('google-calendar event_changes trigger', () => {
     });
     expect(handled.updatedState).toMatchObject({
       syncToken: 'event-sync-2',
-      calendarId: 'team-calendar',
-      channelId: 'event-channel-2'
+      calendarId: 'team-calendar'
     });
     expect(
       handled.inputs.map((input: Record<string, any>) => input.changeType as string)
@@ -183,8 +192,7 @@ describe('google-calendar event_changes trigger', () => {
     expect(handled.inputs).toEqual([]);
     expect(handled.updatedState).toMatchObject({
       syncToken: 'event-sync-reset',
-      calendarId: 'team-calendar',
-      channelId: 'event-channel-3'
+      calendarId: 'team-calendar'
     });
     expect(googleClientMocks.listEvents).toHaveBeenNthCalledWith(2, {
       calendarId: 'team-calendar',

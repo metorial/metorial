@@ -1,11 +1,19 @@
-import { SlateConfig } from 'slates';
+import { configV2 } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    organization: z
-      .string()
-      .describe('Azure DevOps organization name (e.g., "myorg" for dev.azure.com/myorg)'),
-    project: z.string().describe('Azure DevOps team project name or ID')
-  })
-);
+export let config = configV2({
+  fields: {
+    organization: {
+      schema: z
+        .string()
+        .describe('Azure DevOps organization name (e.g., "myorg" for dev.azure.com/myorg)'),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    project: {
+      schema: z.string().describe('Azure DevOps team project name or ID'),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
+});

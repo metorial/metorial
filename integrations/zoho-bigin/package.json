@@ -8,14 +8,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates/oauth-zoho": "1.0.0-rc.4",
+    "@slates/oauth-zoho": "1.0.0-rc.6",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.16",
+    "slates": "1.0.0-rc.19",
     "zod": "^4.2"
   },
   "devDependencies": {
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.0-rc.8"
+  "version": "0.2.0-rc.10"
 }

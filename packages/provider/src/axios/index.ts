@@ -42,6 +42,7 @@ let applySlateInterceptors = (
 
       request.headers.set('User-Agent', `slates.dev/1.0.0 ${providerToken || 'unknown'}`);
       request.headers.set('X-Slates-Provider', spec.key);
+      if (ctx.abortSignal && !request.signal) request.signal = ctx.abortSignal;
 
       let tracedRequest = attachHttpTraceDraft(request, ctx) as InternalAxiosRequestConfig & {
         __slatesTraceAdapterWrapped?: boolean;

@@ -1,24 +1,75 @@
-import { SlateTrigger, verifyHmacSignature } from 'slates';
+import { createHash } from 'node:crypto';
+import {
+  decodeWebhookWireBody,
+  getWebhookHeaderValues,
+  SlateTrigger,
+  verifyHmacSignature,
+  type WebhookWireRequest
+} from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { asanaServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
-function verifyAsanaSignature(
-  secret: string,
-  rawBody: string,
-  signatureHeader: string | null
-): boolean {
-  // Asana signs every event delivery once the hook secret is established; a missing
-  // signature on a signed hook is a forged request, not a legacy one.
-  if (!signatureHeader) return false;
-  return verifyHmacSignature({
-    secret,
-    payload: rawBody,
-    signature: signatureHeader.trim(),
-    digest: 'hex'
-  });
-}
+export let verifyAsanaWebhook = async (ctx: {
+  input: { ruleId: string; originalRequest: WebhookWireRequest };
+  secrets: Record<string, { value: string } | undefined>;
+}) => {
+  let request = ctx.input.originalRequest;
+  let hookSecrets = getWebhookHeaderValues(request, 'x-hook-secret');
+  if (ctx.input.ruleId === 'asana.bootstrap.v1') {
+    return hookSecrets.length === 1 && hookSecrets[0]!.length > 0
+      ? { status: 'accepted' as const, selection: { scope: 'receiver_trigger' as const } }
+      : { status: 'rejected' as const, code: 'credential_missing' as const };
+  }
+  let storedSecret = ctx.secrets.asana_hook_secret?.value;
+  let signatures = getWebhookHeaderValues(request, 'x-hook-signature');
+  let body = decodeWebhookWireBody(request.body);
+  if (!storedSecret || signatures.length !== 1 || body === null) {
+    return { status: 'rejected' as const, code: 'credential_missing' as const };
+  }
+  if (
+    !verifyHmacSignature({
+      secret: storedSecret,
+      payload: body,
+      signature: signatures[0]!.trim(),
+      digest: 'hex'
+    })
+  ) {
+    return { status: 'rejected' as const, code: 'credential_invalid' as const };
+  }
+  return {
+    status: 'accepted' as const,
+    selection: { scope: 'receiver_trigger' as const },
+    authenticatedFields: {
+      event_id: createHash('sha256').update(body).digest('hex')
+    }
+  };
+};
+
+export let captureAsanaWebhookBootstrap = async (ctx: {
+  input: { registrationVersion: number; originalRequest: WebhookWireRequest };
+}) => {
+  let hookSecrets = getWebhookHeaderValues(ctx.input.originalRequest, 'x-hook-secret');
+  if (hookSecrets.length !== 1 || hookSecrets[0]!.length === 0) {
+    return { status: 'rejected' as const, code: 'credential_missing' as const };
+  }
+  let hookSecret = hookSecrets[0]!;
+  return {
+    status: 'accepted' as const,
+    capturedSecrets: {
+      asana_hook_secret: {
+        value: hookSecret,
+        version: ctx.input.registrationVersion
+      }
+    },
+    response: {
+      status: 200,
+      headers: [['X-Hook-Secret', hookSecret]] as [string, string][],
+      body: { present: true as const, base64: '' }
+    }
+  };
+};
 
 export let taskChangesWebhook = SlateTrigger.create(spec, {
   name: 'Task Changes (Webhook)',
@@ -55,8 +106,70 @@ export let taskChangesWebhook = SlateTrigger.create(spec, {
       sync: {
         mode: 'match',
         match: [{ hasHeader: 'x-hook-secret' }]
+      },
+      ingress: {
+        kind: 'receiver_route',
+        baseline: 'receiver_path_secret',
+        verification: {
+          mechanism: 'provider',
+          baseline: 'receiver_path_secret',
+          reason: 'Asana negotiates a generation-bound secret before signed deliveries.',
+          allowedSecretRefs: [
+            {
+              source: 'registration',
+              name: 'asana_hook_secret',
+              registrationKey: 'hookSecret',
+              encoding: 'utf8'
+            }
+          ],
+          rules: [
+            {
+              id: 'asana.bootstrap.v1',
+              phase: 'bootstrap',
+              when: {
+                methods: ['POST'],
+                registrationStatuses: ['registering'],
+                matcher: { hasHeader: 'x-hook-secret' }
+              },
+              verify: {
+                type: 'provider',
+                verifierId: 'asana.delivery.v1',
+                allowedSecretRefs: [],
+                allowedBootstrapCaptureRefs: ['asana_hook_secret']
+              },
+              result: { type: 'sync_only' },
+              replay: { kind: 'not_applicable', reason: 'bootstrap_sync_only' }
+            },
+            {
+              id: 'asana.delivery.v1',
+              phase: 'delivery',
+              when: {
+                methods: ['POST'],
+                registrationStatuses: ['registered', 'renewing']
+              },
+              verify: {
+                type: 'provider',
+                verifierId: 'asana.delivery.v1',
+                allowedSecretRefs: ['asana_hook_secret'],
+                allowedBootstrapCaptureRefs: []
+              },
+              result: { type: 'dispatch', scope: 'receiver_trigger' },
+              replay: {
+                kind: 'enforced',
+                deduplicate: {
+                  source: 'preset',
+                  presetField: 'event_id',
+                  ttlSeconds: 604_800,
+                  scope: 'request'
+                }
+              }
+            }
+          ]
+        }
       }
     },
+    verifyWebhook: verifyAsanaWebhook,
+    captureWebhookBootstrap: captureAsanaWebhookBootstrap,
     autoRegisterWebhook: async ctx => {
       if (!ctx.config.webhookProjectId) {
         throw asanaServiceError(
@@ -65,7 +178,7 @@ export let taskChangesWebhook = SlateTrigger.create(spec, {
       }
 
       let client = new Client({ token: ctx.auth.token });
-      let { webhook, hookSecret } = await client.createWebhook(
+      let { webhook } = await client.createWebhook(
         ctx.config.webhookProjectId,
         ctx.input.webhookBaseUrl,
         [
@@ -79,8 +192,7 @@ export let taskChangesWebhook = SlateTrigger.create(spec, {
 
       return {
         registrationDetails: {
-          webhookGid: webhook.gid,
-          hookSecret: hookSecret ?? ''
+          webhookGid: webhook.gid
         }
       };
     },
@@ -95,27 +207,7 @@ export let taskChangesWebhook = SlateTrigger.create(spec, {
     },
 
     handleRequest: async ctx => {
-      let hookSecretHeader = ctx.request.headers.get('x-hook-secret');
-      if (hookSecretHeader) {
-        return {
-          inputs: [],
-          response: new Response('', {
-            status: 200,
-            headers: { 'X-Hook-Secret': hookSecretHeader }
-          })
-        };
-      }
-
       let rawBody = await ctx.request.text();
-      let sig = ctx.request.headers.get('x-hook-signature');
-      let registrationDetails = ctx.registrationDetails as { hookSecret?: string } | null;
-      let storedSecret = registrationDetails?.hookSecret;
-      if (storedSecret && !verifyAsanaSignature(storedSecret, rawBody, sig)) {
-        return {
-          inputs: [],
-          response: new Response('Invalid signature', { status: 401 })
-        };
-      }
 
       let data: any;
       try {

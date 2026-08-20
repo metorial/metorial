@@ -1,4 +1,4 @@
-import { SlateConfig } from '@slates/provider';
+import { configV2 } from '@slates/provider';
 import { z } from 'zod';
 import { metorialValidationError } from './lib/errors';
 
@@ -60,7 +60,30 @@ export let metorialConfigSchema = z.object({
     .describe('Metorial API version used for introspection and authenticated API calls.')
 });
 
-export let config = SlateConfig.create(metorialConfigSchema)
+export let config = configV2({
+  fields: {
+    apiUrl: {
+      schema: z
+        .string()
+        .optional()
+        .default(DEFAULT_API_URL)
+        .describe(
+          'Metorial API base URL. Defaults to https://api.metorial.com. Trailing slashes are normalized.'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    apiVersion: {
+      schema: z
+        .string()
+        .optional()
+        .default(DEFAULT_API_VERSION)
+        .describe('Metorial API version used for introspection and authenticated API calls.'),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
+})
   .getDefaultConfig(() => normalizeMetorialConfig({}))
   .onConfigChanged(({ newConfig }) => ({
     config: normalizeMetorialConfig(newConfig)

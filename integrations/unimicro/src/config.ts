@@ -1,4 +1,4 @@
-import { SlateConfig } from 'slates';
+import { configV2 } from 'slates';
 import { z } from 'zod';
 
 export let unimicroEnvironmentSchema = z
@@ -47,4 +47,60 @@ export let configSchema = z.object({
 
 export type UnimicroConfig = z.infer<typeof configSchema>;
 
-export let config = SlateConfig.create(configSchema);
+export let config = configV2({
+  fields: {
+    environment: { schema: unimicroEnvironmentSchema, visibility: 'plain', lifecycle: 'none' },
+    companyKey: {
+      schema: z
+        .string()
+        .optional()
+        .describe(
+          'Default UniMicro CompanyKey for business API calls. Use list_companies to discover available company keys.'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    customAppFrameworkUrl: {
+      schema: z
+        .string()
+        .url()
+        .optional()
+        .describe(
+          'Custom AppFramework/base URL, for example https://system.eikaregnskap.no/. Required when environment is custom unless the OAuth token contains an AppFramework claim.'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    customIdentityUrl: {
+      schema: z
+        .string()
+        .url()
+        .optional()
+        .describe(
+          'Custom identity/login URL for OAuth when environment is custom, for example https://login.regnskap.sparebank1.no/.'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    customFilesUrl: {
+      schema: z
+        .string()
+        .url()
+        .optional()
+        .describe('Custom file server URL when environment is custom.'),
+      visibility: 'plain',
+      lifecycle: 'none'
+    },
+    defaultTop: {
+      schema: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Default page size for UniMicro list tools. Defaults to 50.'),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
+});

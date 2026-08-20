@@ -1,4 +1,4 @@
-import { SlateConfig } from 'slates';
+import { configV2 } from 'slates';
 import { z } from 'zod';
 
 export let configSchema = z.object({
@@ -12,4 +12,17 @@ export let configSchema = z.object({
 
 export type TripletexConfig = z.infer<typeof configSchema>;
 
-export let config = SlateConfig.create(configSchema);
+export let config = configV2({
+  fields: {
+    companyId: {
+      schema: z
+        .string()
+        .optional()
+        .describe(
+          'Default Tripletex target company id for API calls. Use 0 or omit for the employee token owner company; accountant proxy users can provide a client company id.'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
+});

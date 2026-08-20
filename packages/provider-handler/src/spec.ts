@@ -1,5 +1,10 @@
 import { badRequestError, notFoundError, ServiceError } from '@lowerdeck/error';
-import type { SlateAuthenticationMethod, SlatesAction } from '@slates/proto';
+import {
+  computeWebhookActionSpecHashV1,
+  type SlateAuthenticationMethod,
+  type SlatesAction,
+  slatesWebhookIngress
+} from '@slates/proto';
 import { type Slate, SlateDefaultPollingIntervalSeconds } from '@slates/provider';
 import z from 'zod';
 import { toJsonSchema } from './validation';
@@ -99,7 +104,13 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
     instructions: a.instructions,
     constraints: a.constraints,
     tags: a.tags,
-    metadata: a.metadata,
+    metadata:
+      a.type === 'trigger'
+        ? {
+            ...a.metadata,
+            eventTypes: [...a.eventTypes]
+          }
+        : a.metadata,
     scopes: a.scopes,
     authMethods: a.authMethods,
     docs: a.docs ?? [],
@@ -109,29 +120,72 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
   };
 
   if (a.type === 'tool') {
+    let receiverBoundToolContextV1 = (
+      a.parameters as typeof a.parameters & {
+        receiverBoundToolContextV1?: { secretNames: readonly string[] };
+      }
+    ).receiverBoundToolContextV1;
     return {
       ...base,
       type: 'action.tool',
-      capabilities: {}
+      capabilities: receiverBoundToolContextV1
+        ? {
+            receiverBoundToolContextV1: {
+              secretNames: [...receiverBoundToolContextV1.secretNames]
+            }
+          }
+        : {}
     };
   }
 
-  return {
+  let webhookHttp =
+    a.source === 'webhook' && a.http
+      ? {
+          ...a.http,
+          ingress: a.http.ingress ? slatesWebhookIngress.parse(a.http.ingress) : undefined
+        }
+      : undefined;
+  let webhookHandlers = a.parameters as typeof a.parameters & {
+    verifyWebhook?: unknown;
+    captureWebhookBootstrap?: unknown;
+  };
+  let webhookCapabilities =
+    a.source === 'webhook'
+      ? {
+          webhookSecretNegotiationV1: Boolean(a.autoRegisterWebhook),
+          webhookInboundVerificationV1: Boolean(webhookHandlers.verifyWebhook),
+          webhookInboundBootstrapCaptureV1: Boolean(webhookHandlers.captureWebhookBootstrap)
+        }
+      : {};
+
+  let action = {
     ...base,
-    type: 'action.trigger',
-    capabilities: {},
+    type: 'action.trigger' as const,
+    capabilities: webhookCapabilities,
 
     invocation:
       a.source === 'polling'
         ? {
-            type: 'polling',
+            type: 'polling' as const,
             intervalSeconds: a.polling.intervalInSeconds ?? SlateDefaultPollingIntervalSeconds
           }
         : {
-            type: 'webhook',
+            type: 'webhook' as const,
             autoRegistration: !!a.autoRegisterWebhook,
             autoUnregistration: !!a.autoUnregisterWebhook,
-            http: a.http
+            http: webhookHttp
           }
+  };
+
+  if (action.invocation.type === 'polling') return action;
+
+  return {
+    ...action,
+    specHash: computeWebhookActionSpecHashV1({
+      id: action.id,
+      type: action.type,
+      capabilities: action.capabilities,
+      invocation: action.invocation
+    })
   };
 };

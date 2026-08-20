@@ -1,6 +1,6 @@
 {
   "name": "@slates/slack-tools",
-  "version": "1.0.0-rc.8",
+  "version": "1.0.0-rc.10",
   "publishConfig": {
     "access": "public"
   },
@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "slates": "1.0.0-rc.15",
+    "slates": "1.0.0-rc.19",
     "zod": "^4.2"
   },
   "devDependencies": {

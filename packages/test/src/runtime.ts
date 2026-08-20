@@ -1,5 +1,6 @@
-import type { SlatesProtocolClientOptions } from '@slates/client';
+import type { SlatesProtocolClientOptions, WebhookWireRequest } from '@slates/client';
 import {
+  computeOriginalWebhookRequestHash,
   createLocalSlateTransport,
   createSlatesClient,
   SlateProtocolError
@@ -9,6 +10,7 @@ import {
   openSlatesCliStore,
   type SlatesProfileRecord
 } from '@slates/profiles';
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'fs/promises';
 
 export interface SlatesRuntimeContext {
@@ -194,7 +196,13 @@ export let createLocalSlateTestClient = (opts: {
   participants?: SlatesProtocolClientOptions['participants'];
 }) =>
   createSlatesClient({
-    transport: createLocalSlateTransport({ slate: opts.slate as LocalSlate }),
+    transport: createLocalSlateTransport({
+      slate: opts.slate as LocalSlate,
+      scopedState: {
+        config: opts.state?.config ?? {},
+        auth: opts.state?.auth?.output ?? {}
+      }
+    }),
     state: opts.state,
     participants: opts.participants
   });
@@ -315,7 +323,13 @@ export let registerSlateTriggerWebhook = async (d: {
   client: SlatesTestClient;
   triggerId: string;
   webhookBaseUrl: string;
-}) => d.client.registerTriggerWebhook(d.triggerId, d.webhookBaseUrl);
+  capturedSecretVersions?: Readonly<Record<string, number>>;
+}) =>
+  d.client.registerTriggerWebhook(
+    d.triggerId,
+    d.webhookBaseUrl,
+    d.capturedSecretVersions ?? {}
+  );
 
 export let pollSlateTriggerEvents = async (d: {
   client: SlatesTestClient;
@@ -348,6 +362,107 @@ export let handleSlateTriggerWebhook = async (d: {
     state: d.state,
     registrationDetails: d.registrationDetails
   });
+
+export let handleScopedSlateTriggerWebhook = async (d: {
+  client: SlatesTestClient;
+  triggerId: string;
+  ruleId: string;
+  phase: 'bootstrap' | 'delivery';
+  url: string;
+  method?: WebhookWireRequest['method'];
+  headers?: Record<string, string> | [string, string][];
+  body?: string | Uint8Array | null;
+  receiverTriggerId?: string;
+  registrationVersion?: number;
+}) => {
+  let { action } = await d.client.getAction(d.triggerId);
+  if (
+    action.type !== 'action.trigger' ||
+    action.invocation.type !== 'webhook' ||
+    !action.specHash
+  ) {
+    throw new Error(`Scoped webhook action ${d.triggerId} has no published spec hash`);
+  }
+  let body =
+    d.body === undefined || d.body === null
+      ? ({ present: false } as const)
+      : ({
+          present: true,
+          base64: Buffer.from(d.body).toString('base64')
+        } as const);
+  let request: WebhookWireRequest = {
+    url: d.url,
+    method: d.method ?? 'POST',
+    headers: Array.isArray(d.headers)
+      ? d.headers
+      : Object.entries(d.headers ?? {}),
+    body
+  };
+  let originalRequestHash = computeOriginalWebhookRequestHash(request);
+  let verifyRequestId = randomUUID();
+  let verification = await d.client.verifyTriggerWebhook(
+    {
+      actionId: d.triggerId,
+      specHash: action.specHash,
+      ruleId: d.ruleId,
+      requestId: verifyRequestId,
+      originalRequest: request,
+      originalRequestHash
+    },
+    {
+      version: 'scoped_invocation_grant_v1',
+      grantId: `local-verify-${verifyRequestId}`,
+      token: 'local-only',
+      requestId: verifyRequestId
+    }
+  );
+  if (verification.status === 'rejected') {
+    return { verification, capture: null, delivery: null };
+  }
+  if (d.phase === 'bootstrap') {
+    let captureRequestId = randomUUID();
+    let capture = await d.client.captureTriggerWebhookBootstrap(
+      {
+        actionId: d.triggerId,
+        specHash: action.specHash,
+        ruleId: d.ruleId,
+        requestId: captureRequestId,
+        originalRequest: request,
+        originalRequestHash,
+        phase: 'bootstrap',
+        receiverTriggerId: d.receiverTriggerId ?? 'local-receiver-trigger',
+        registrationVersion: d.registrationVersion ?? 1,
+        acceptedCandidateIds: []
+      },
+      {
+        version: 'scoped_invocation_grant_v1',
+        grantId: `local-capture-${captureRequestId}`,
+        token: 'local-only',
+        requestId: captureRequestId
+      }
+    );
+    return { verification, capture, delivery: null };
+  }
+  let deliveryRequestId = randomUUID();
+  let delivery = await d.client.handleVerifiedTriggerWebhook(
+    {
+      actionId: d.triggerId,
+      request,
+      specHash: action.specHash,
+      ruleId: d.ruleId,
+      triggerId: d.receiverTriggerId ?? 'local-receiver-trigger',
+      originalRequestHash,
+      dispatchRequestHash: originalRequestHash
+    },
+    {
+      version: 'scoped_invocation_grant_v1',
+      grantId: `local-handle-${deliveryRequestId}`,
+      token: 'local-only',
+      requestId: deliveryRequestId
+    }
+  );
+  return { verification, capture: null, delivery };
+};
 
 export let unregisterSlateTriggerWebhook = async (d: {
   client: SlatesTestClient;

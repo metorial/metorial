@@ -1,13 +1,17 @@
-import { SlateConfig } from 'slates';
+import { configV2, type InferSlateConfig } from 'slates';
 import { z } from 'zod';
 
-export let configSchema = z.object({
-  defaultCompanySlug: z
-    .string()
-    .optional()
-    .describe('Default Fiken company slug for company-scoped tools.')
+export let config = configV2({
+  fields: {
+    defaultCompanySlug: {
+      schema: z
+        .string()
+        .optional()
+        .describe('Default Fiken company slug for company-scoped tools.'),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
 });
 
-export type FikenConfig = z.infer<typeof configSchema>;
-
-export let config = SlateConfig.create(configSchema);
+export type FikenConfig = InferSlateConfig<typeof config>;

@@ -5,7 +5,8 @@ import { spec } from '../spec';
 export let pollTime = SlateTrigger.create(spec, {
   key: 'poll_time',
   name: 'Poll Time',
-  description: 'Emits the current time as an event on each polling run.'
+  description: 'Emits the current time as an event on each polling run.',
+  eventTypes: ['test.poll.time']
 })
   .input(
     z.object({

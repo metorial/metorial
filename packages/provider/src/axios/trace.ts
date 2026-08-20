@@ -755,6 +755,38 @@ export let recordHttpTraceFromError = (error: AxiosError) => {
   });
 };
 
+/**
+ * Applies the authoritative named-secret projection after heuristic HTTP sanitization. This
+ * catches a declared secret even when it appears under an innocuous provider-specific key.
+ */
+export let redactHttpTraceSecretRefs = (
+  trace: SlateHttpTrace,
+  secretRefs: Readonly<Record<string, { value: string }>>
+): SlateHttpTrace => {
+  let values = Object.values(secretRefs)
+    .map(secret => secret.value)
+    .filter(value => value.length > 0);
+  if (values.length === 0) return trace;
+
+  let redact = (value: unknown): unknown => {
+    if (typeof value === 'string') {
+      return values.reduce(
+        (current, secret) => current.split(secret).join(REDACTED_VALUE),
+        value
+      );
+    }
+    if (Array.isArray(value)) return value.map(redact);
+    if (isRecord(value)) {
+      return Object.fromEntries(
+        Object.entries(value).map(([key, nested]) => [key, redact(nested)])
+      );
+    }
+    return value;
+  };
+
+  return redact(trace) as SlateHttpTrace;
+};
+
 // Exposed for unit tests. Not part of the public API.
 export let __traceInternals = {
   sanitizeFreeText,

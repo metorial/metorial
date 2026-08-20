@@ -4,20 +4,20 @@
   "type": "module",
   "scripts": {
     "build": "ncc build src/index.ts -o dist -m -s",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates/oauth-microsoft": "1.0.0-rc.5",
+    "@slates/oauth-microsoft": "1.0.0-rc.7",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.16",
+    "slates": "1.0.0-rc.19",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.11",
+    "@slates/test": "1.0.0-rc.13",
     "@vercel/ncc": "^0.38.4",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.0-rc.7"
+  "version": "0.2.0-rc.11"
 }

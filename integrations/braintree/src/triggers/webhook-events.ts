@@ -1,4 +1,10 @@
-import { SlateTrigger } from 'slates';
+import { createHash } from 'node:crypto';
+import {
+  createApiServiceError,
+  decodeWebhookWireBody,
+  SlateTrigger,
+  type WebhookWireRequest
+} from 'slates';
 import { z } from 'zod';
 import { generateChallengeResponse, verifyAndParseWebhook } from '../lib/webhook';
 import { spec } from '../spec';
@@ -56,6 +62,123 @@ let WEBHOOK_KIND_MAP: Record<string, string> = {
   transaction_reviewed: 'transaction.reviewed',
   // Test
   check: 'webhook.check'
+};
+
+let parseBraintreeForm = (body: string) => {
+  let params = new URLSearchParams(body);
+  let btSignature = params.get('bt_signature');
+  let btPayload = params.get('bt_payload');
+  if (!btSignature || !btPayload) return null;
+  return { btSignature, btPayload };
+};
+
+let hasValidWireShape = (value: { btSignature: string; btPayload: string }) => {
+  let normalizedPayload = value.btPayload.replaceAll('\n', '');
+  if (
+    !value.btSignature.split('&').every(pair => /^[^|&]+\|[a-f0-9]+$/i.test(pair)) ||
+    normalizedPayload.length % 4 !== 0 ||
+    !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(normalizedPayload)
+  ) {
+    return false;
+  }
+  try {
+    return Buffer.from(normalizedPayload, 'base64').toString('base64') === normalizedPayload;
+  } catch {
+    return false;
+  }
+};
+
+let braintreeCredentials = (values: Record<string, { value: string } | undefined>) => {
+  let environment = values.braintree_environment?.value;
+  let merchantId = values.braintree_merchant_id?.value;
+  let publicKey = values.braintree_public_key?.value;
+  let privateKey = values.braintree_private_key?.value;
+  return environment && merchantId && publicKey && privateKey
+    ? { environment, merchantId, publicKey, privateKey }
+    : null;
+};
+
+export let verifyBraintreeWebhook = async (ctx: {
+  input: { originalRequest: WebhookWireRequest };
+  secrets: Record<string, { value: string } | undefined>;
+}) => {
+  let credentials = braintreeCredentials(ctx.secrets);
+  if (!credentials) {
+    return { status: 'rejected' as const, code: 'credential_missing' as const };
+  }
+  let request = ctx.input.originalRequest;
+  if (request.method === 'GET') {
+    let challenge = new URL(request.url).searchParams.get('bt_challenge');
+    if (!challenge) {
+      return { status: 'rejected' as const, code: 'wire_input_malformed' as const };
+    }
+    try {
+      generateChallengeResponse(credentials, challenge);
+      return {
+        status: 'accepted' as const,
+        selection: { scope: 'receiver_trigger' as const }
+      };
+    } catch {
+      return { status: 'rejected' as const, code: 'credential_invalid' as const };
+    }
+  }
+  let bytes = decodeWebhookWireBody(request.body);
+  if (bytes === null) {
+    return { status: 'rejected' as const, code: 'wire_input_malformed' as const };
+  }
+  let form = parseBraintreeForm(Buffer.from(bytes).toString('utf8'));
+  if (!form || !hasValidWireShape(form)) {
+    return { status: 'rejected' as const, code: 'wire_input_malformed' as const };
+  }
+  try {
+    await verifyAndParseWebhook(credentials, form.btSignature, form.btPayload);
+    return {
+      status: 'accepted' as const,
+      selection: { scope: 'receiver_trigger' as const },
+      authenticatedFields: {
+        delivery_id: createHash('sha256')
+          .update(form.btSignature)
+          .update('\0')
+          .update(form.btPayload)
+          .digest('hex')
+      }
+    };
+  } catch (error) {
+    return {
+      status: 'rejected' as const,
+      code: /signature/i.test(error instanceof Error ? error.message : '')
+        ? ('credential_invalid' as const)
+        : ('wire_input_malformed' as const)
+    };
+  }
+};
+
+export let captureBraintreeWebhookBootstrap = async (ctx: {
+  input: { originalRequest: WebhookWireRequest };
+  secrets: Record<string, { value: string } | undefined>;
+}) => {
+  let credentials = braintreeCredentials(ctx.secrets);
+  if (!credentials) {
+    return { status: 'rejected' as const, code: 'credential_missing' as const };
+  }
+  let challenge = new URL(ctx.input.originalRequest.url).searchParams.get('bt_challenge');
+  if (!challenge) {
+    return { status: 'rejected' as const, code: 'wire_input_malformed' as const };
+  }
+  try {
+    let response = generateChallengeResponse(credentials, challenge);
+    return {
+      status: 'accepted' as const,
+      capturedSecrets: {},
+      response: {
+        status: 200,
+        headers: [['content-type', 'text/plain; charset=utf-8']] as [string, string][],
+        body: { present: true as const, base64: Buffer.from(response).toString('base64') }
+      }
+    };
+  } catch {
+    return { status: 'rejected' as const, code: 'credential_invalid' as const };
+  }
 };
 
 let extractResourceInfo = (
@@ -167,6 +290,100 @@ export let webhookEvents = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['GET', 'POST'],
+      sync: {
+        mode: 'match',
+        match: [{ method: 'GET', hasQueryParam: 'bt_challenge' }]
+      },
+      ingress: {
+        kind: 'receiver_route',
+        baseline: 'receiver_path_secret',
+        verification: {
+          mechanism: 'provider',
+          baseline: 'receiver_path_secret',
+          reason:
+            'Braintree requires its SDK verifier for challenges and signed XML payloads.',
+          allowedSecretRefs: [
+            {
+              source: 'config',
+              name: 'braintree_environment',
+              configKey: 'environment',
+              encoding: 'utf8'
+            },
+            {
+              source: 'platform',
+              name: 'braintree_merchant_id',
+              credentialKey: 'auth.merchantId',
+              encoding: 'utf8'
+            },
+            {
+              source: 'platform',
+              name: 'braintree_public_key',
+              credentialKey: 'auth.publicKey',
+              encoding: 'utf8'
+            },
+            {
+              source: 'platform',
+              name: 'braintree_private_key',
+              credentialKey: 'auth.privateKey',
+              encoding: 'utf8'
+            }
+          ],
+          rules: [
+            {
+              id: 'braintree.challenge.v1',
+              phase: 'bootstrap',
+              when: {
+                methods: ['GET'],
+                matcher: { hasQueryParam: 'bt_challenge' }
+              },
+              verify: {
+                type: 'provider',
+                verifierId: 'braintree.delivery.v1',
+                allowedSecretRefs: [
+                  'braintree_environment',
+                  'braintree_merchant_id',
+                  'braintree_public_key',
+                  'braintree_private_key'
+                ],
+                allowedBootstrapCaptureRefs: []
+              },
+              result: { type: 'sync_only' },
+              replay: { kind: 'not_applicable', reason: 'bootstrap_sync_only' }
+            },
+            {
+              id: 'braintree.delivery.v1',
+              phase: 'delivery',
+              when: { methods: ['POST'] },
+              verify: {
+                type: 'provider',
+                verifierId: 'braintree.delivery.v1',
+                allowedSecretRefs: [
+                  'braintree_environment',
+                  'braintree_merchant_id',
+                  'braintree_public_key',
+                  'braintree_private_key'
+                ],
+                allowedBootstrapCaptureRefs: []
+              },
+              result: { type: 'dispatch', scope: 'receiver_trigger' },
+              replay: {
+                kind: 'enforced',
+                deduplicate: {
+                  source: 'preset',
+                  presetField: 'delivery_id',
+                  ttlSeconds: 604_800,
+                  scope: 'request'
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    verifyWebhook: verifyBraintreeWebhook,
+    captureWebhookBootstrap: captureBraintreeWebhookBootstrap,
     handleRequest: async ctx => {
       let request = ctx.request;
 
@@ -175,14 +392,22 @@ export let webhookEvents = SlateTrigger.create(spec, {
         let url = new URL(request.url);
         let challenge = url.searchParams.get('bt_challenge');
         if (challenge) {
-          let response = generateChallengeResponse({
-            challenge,
-            publicKey: ctx.auth.publicKey,
-            privateKey: ctx.auth.privateKey
-          });
+          let response = generateChallengeResponse(
+            {
+              environment: ctx.config.environment,
+              merchantId: ctx.auth.merchantId,
+              publicKey: ctx.auth.publicKey,
+              privateKey: ctx.auth.privateKey
+            },
+            challenge
+          );
           return {
             inputs: [],
-            updatedState: { challengeResponse: response }
+            response: {
+              status: 200,
+              headers: { 'content-type': 'text/plain; charset=utf-8' },
+              body: response
+            }
           };
         }
         return { inputs: [] };
@@ -192,20 +417,18 @@ export let webhookEvents = SlateTrigger.create(spec, {
       let body = await request.text();
 
       // Parse form-encoded body (bt_signature=...&bt_payload=...)
-      let params = new URLSearchParams(body);
-      let btSignature = params.get('bt_signature') || '';
-      let btPayload = params.get('bt_payload') || '';
-
-      if (!btSignature || !btPayload) {
-        return { inputs: [] };
-      }
-
-      let notification = verifyAndParseWebhook({
-        btSignature,
-        btPayload,
-        publicKey: ctx.auth.publicKey,
-        privateKey: ctx.auth.privateKey
-      });
+      let form = parseBraintreeForm(body);
+      if (!form) throw createApiServiceError('Malformed Braintree webhook form body');
+      let notification = await verifyAndParseWebhook(
+        {
+          environment: ctx.config.environment,
+          merchantId: ctx.auth.merchantId,
+          publicKey: ctx.auth.publicKey,
+          privateKey: ctx.auth.privateKey
+        },
+        form.btSignature,
+        form.btPayload
+      );
 
       return {
         inputs: [

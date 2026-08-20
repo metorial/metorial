@@ -1,7 +1,8 @@
 import {
-  getMetaWebhookVerificationResponse,
+  captureMetaWebhookBootstrap,
   metaWebhookHttp,
-  SlateTrigger
+  SlateTrigger,
+  verifyMetaWebhook
 } from '@slates/provider';
 import { z } from 'zod';
 import { spec } from '../spec';
@@ -65,18 +66,12 @@ export let webhookEventsTrigger = SlateTrigger.create(spec, {
   )
   .webhook({
     http: metaWebhookHttp,
+    verifyWebhook: verifyMetaWebhook,
+    captureWebhookBootstrap: captureMetaWebhookBootstrap,
     // No autoRegisterWebhook — Instagram webhooks must be configured manually in Meta Developer Dashboard
 
     handleRequest: async ctx => {
       let request = ctx.request;
-      let verificationResponse = getMetaWebhookVerificationResponse(
-        request,
-        ctx.config.webhookVerifyToken
-      );
-      if (verificationResponse) {
-        return { inputs: [], response: verificationResponse };
-      }
-
       let body = (await request.json()) as any;
       let inputs: Array<{
         eventType: 'comment' | 'mention' | 'story_insights' | 'message';

@@ -1,9 +1,9 @@
 import { openSlatesCliStore } from '@slates/profiles';
 import {
+  configV2,
   createTextAttachment,
   Slate,
   SlateAuth,
-  SlateConfig,
   SlateSpecification,
   SlateTool,
   SlateTrigger
@@ -46,11 +46,15 @@ afterEach(async () => {
 });
 
 let createDemoSlate = () => {
-  let config = SlateConfig.create(
-    z.object({
-      prefix: z.string()
-    })
-  ).getDefaultConfig(() => ({
+  let config = configV2({
+    fields: {
+      prefix: {
+        schema: z.string(),
+        visibility: 'plain',
+        lifecycle: 'none'
+      }
+    }
+  }).getDefaultConfig(() => ({
     prefix: 'Hello'
   }));
 
@@ -96,14 +100,12 @@ let createDemoSlate = () => {
     )
     .output(
       z.object({
-        greeting: z.string(),
-        token: z.string()
+        greeting: z.string()
       })
     )
     .handleInvocation(async ctx => ({
       output: {
-        greeting: `${ctx.config.prefix} ${ctx.input.name}`,
-        token: ctx.auth.token
+        greeting: `${ctx.config.prefix} ${ctx.input.name}`
       },
       message: 'done'
     }))
@@ -429,7 +431,18 @@ describe('@slates/test', () => {
       ]
     });
 
-    expect(contract.configSchema.properties.prefix.type).toBe('string');
+    expect(contract.configSchema).toMatchObject({
+      version: 2,
+      fieldOrder: ['prefix'],
+      fields: {
+        prefix: { visibility: 'plain', lifecycle: 'none' }
+      },
+      jsonSchema: {
+        properties: {
+          prefix: { type: 'string' }
+        }
+      }
+    });
     expect(contract.triggers.find(action => action.id === 'webhook_echo')?.invocation).toEqual(
       {
         type: 'webhook',
@@ -464,8 +477,7 @@ describe('@slates/test', () => {
         name: 'Tobias'
       },
       output: {
-        greeting: 'Hi Tobias',
-        token: 'secret-token'
+        greeting: 'Hi Tobias'
       }
     });
 

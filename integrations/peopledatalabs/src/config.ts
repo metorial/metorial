@@ -1,11 +1,15 @@
-import { SlateConfig } from 'slates';
+import { configV2 } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    sandbox: z
-      .boolean()
-      .default(false)
-      .describe('Enable sandbox mode to use fictitious data without consuming credits')
-  })
-);
+export let config = configV2({
+  fields: {
+    sandbox: {
+      schema: z
+        .boolean()
+        .default(false)
+        .describe('Enable sandbox mode to use fictitious data without consuming credits'),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
+});

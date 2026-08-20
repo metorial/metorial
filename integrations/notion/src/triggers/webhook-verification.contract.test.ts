@@ -1,127 +1,119 @@
+import { createHmac } from 'node:crypto';
 import {
   createLocalSlateTestClient,
   getSlateContract,
   handleSlateTriggerWebhook
 } from '@slates/test';
-import { createHmac } from 'crypto';
+import { encodeWebhookWireBody } from 'slates';
 import { describe, expect, it } from 'vitest';
 import { provider } from '../index';
+import { captureNotionWebhookBootstrap, verifyNotionWebhook } from '../lib/webhook';
 
-const TRIGGER_IDS = ['page_events', 'comment_events', 'database_events'];
-const VERIFICATION_TOKEN = 'secret_notion-verification-token';
-
-let createTestClient = () =>
+let triggerIds = ['page_events', 'comment_events', 'database_events'];
+let client = () =>
   createLocalSlateTestClient({
     slate: provider,
     state: {
       config: {},
-      auth: {
-        authenticationMethodId: 'oauth',
-        output: { token: 'test-token' }
-      }
+      auth: { authenticationMethodId: 'oauth', output: { token: 'test-token' } }
     }
   });
-
-let signNotionRequest = (body: string, token = VERIFICATION_TOKEN) => ({
-  'x-notion-signature': `sha256=${createHmac('sha256', token).update(body).digest('hex')}`
+let wire = (body: string, signature?: string) => ({
+  headers: signature ? ([['x-notion-signature', signature]] as [string, string][]) : [],
+  body: encodeWebhookWireBody(Buffer.from(body))
 });
 
-let pageEventBody = () =>
-  JSON.stringify({
-    type: 'page.created',
-    id: 'event-1',
-    timestamp: '2026-08-06T00:00:00.000Z',
-    entity: { id: 'page-1', type: 'page' }
-  });
-
-describe('Notion webhook verification contract', () => {
-  it('advertises synchronous verification-token requests for every webhook', async () => {
-    let contract = await getSlateContract(createTestClient());
-
-    for (let triggerId of TRIGGER_IDS) {
+describe('Notion generation-bound webhook contract', () => {
+  it('limits bootstrap capture to pending/registering and signed delivery to registered/renewing', async () => {
+    let contract = await getSlateContract(client());
+    for (let triggerId of triggerIds) {
       let trigger = contract.triggers.find(action => action.id === triggerId);
       expect(trigger?.invocation).toMatchObject({
         type: 'webhook',
         http: {
-          methods: ['POST'],
-          sync: {
-            mode: 'match',
-            match: [{ jsonBodyField: { path: 'verification_token' } }]
+          ingress: {
+            verification: {
+              mechanism: 'provider',
+              rules: [
+                {
+                  id: 'notion.bootstrap.v1',
+                  when: { registrationStatuses: ['pending', 'registering'] },
+                  result: { type: 'sync_only' }
+                },
+                {
+                  id: 'notion.delivery.v1',
+                  when: { registrationStatuses: ['registered', 'renewing'] },
+                  result: { type: 'dispatch' }
+                }
+              ]
+            }
           }
         }
       });
     }
   });
 
-  it.each(
-    TRIGGER_IDS
-  )('stores the verification token and acknowledges the request for %s', async triggerId => {
-    let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
-      triggerId,
-      url: 'https://example.com/webhooks/notion',
-      body: JSON.stringify({ verification_token: VERIFICATION_TOKEN })
+  it('captures the bootstrap token at the authoritative registration version', async () => {
+    let body = JSON.stringify({ verification_token: 'notion-token' });
+    await expect(
+      verifyNotionWebhook({
+        input: { ruleId: 'notion.bootstrap.v1', originalRequest: wire(body) },
+        secrets: {}
+      })
+    ).resolves.toMatchObject({ status: 'accepted' });
+    await expect(
+      captureNotionWebhookBootstrap({
+        input: { registrationVersion: 7, originalRequest: wire(body) }
+      })
+    ).resolves.toMatchObject({
+      status: 'accepted',
+      capturedSecrets: {
+        notion_verification_token: { value: 'notion-token', version: 7 }
+      },
+      response: { status: 200 }
     });
-
-    expect(result.inputs).toEqual([]);
-    expect(result.response).toMatchObject({ status: 200, body: null });
-    expect(result.updatedState).toMatchObject({ verificationToken: VERIFICATION_TOKEN });
   });
 
-  it('accepts a correctly signed delivery once the token is stored', async () => {
-    let body = pageEventBody();
-    let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
-      triggerId: 'page_events',
-      url: 'https://example.com/webhooks/notion',
-      headers: signNotionRequest(body),
-      body,
-      state: { verificationToken: VERIFICATION_TOKEN }
-    });
-
-    expect(result.inputs).toMatchObject([{ eventType: 'page.created', pageId: 'page-1' }]);
-    expect(result.response).toBeUndefined();
-  });
-
-  it('rejects missing or invalid signatures once the token is stored', async () => {
-    let body = pageEventBody();
-
-    for (let headers of [undefined, signNotionRequest(body, 'wrong-token')]) {
-      let result = await handleSlateTriggerWebhook({
-        client: createTestClient(),
-        triggerId: 'page_events',
-        url: 'https://example.com/webhooks/notion',
-        headers,
-        body,
-        state: { verificationToken: VERIFICATION_TOKEN }
+  it('rejects malformed bootstrap attempts without a capturable token', async () => {
+    for (let body of ['{', '{}', JSON.stringify({ verification_token: '' })]) {
+      let result = await verifyNotionWebhook({
+        input: { ruleId: 'notion.bootstrap.v1', originalRequest: wire(body) },
+        secrets: {}
       });
-
-      expect(result.inputs).toEqual([]);
-      expect(result.response).toMatchObject({ status: 401 });
+      expect(result.status).toBe('rejected');
     }
   });
 
-  it('keeps unsigned deliveries working when no token has been stored', async () => {
-    let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
-      triggerId: 'page_events',
-      url: 'https://example.com/webhooks/notion',
-      body: pageEventBody()
-    });
-
-    expect(result.inputs).toMatchObject([{ eventType: 'page.created', pageId: 'page-1' }]);
-    expect(result.response).toBeUndefined();
+  it('requires the captured token and exact raw-body signature for delivery', async () => {
+    let body = JSON.stringify({ id: 'event-1', type: 'page.created', entity: {} });
+    let signature = `sha256=${createHmac('sha256', 'notion-token').update(body).digest('hex')}`;
+    await expect(
+      verifyNotionWebhook({
+        input: { ruleId: 'notion.delivery.v1', originalRequest: wire(body, signature) },
+        secrets: { notion_verification_token: { value: 'notion-token' } }
+      })
+    ).resolves.toMatchObject({ status: 'accepted' });
+    for (let secrets of [{}, { notion_verification_token: { value: 'wrong-token' } }]) {
+      let result = await verifyNotionWebhook({
+        input: { ruleId: 'notion.delivery.v1', originalRequest: wire(body, signature) },
+        secrets
+      });
+      expect(result.status).toBe('rejected');
+    }
   });
 
-  it('ignores malformed JSON bodies without failing', async () => {
+  it('parses a verified page event only after acceptance', async () => {
     let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
+      client: client(),
       triggerId: 'page_events',
-      url: 'https://example.com/webhooks/notion',
-      body: 'not-json'
+      url: 'https://example.com/notion',
+      body: JSON.stringify({
+        id: 'event-1',
+        type: 'page.created',
+        timestamp: '2026-08-15T00:00:00.000Z',
+        entity: { id: 'page-1', type: 'page' }
+      })
     });
-
-    expect(result.inputs).toEqual([]);
-    expect(result.response).toBeUndefined();
+    expect(result.inputs).toMatchObject([{ eventType: 'page.created', pageId: 'page-1' }]);
   });
 });

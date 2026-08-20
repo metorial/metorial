@@ -1,7 +1,35 @@
 import crypto from 'crypto';
-import { SlateTrigger } from 'slates';
+import {
+  decodeWebhookWireBody,
+  getWebhookHeaderValues,
+  SlateTrigger,
+  type WebhookWireRequest
+} from 'slates';
 import { z } from 'zod';
 import { spec } from '../spec';
+
+export let verifyCursorWebhook = async (ctx: {
+  input: { originalRequest: WebhookWireRequest };
+  secrets: Record<string, { value: string } | undefined>;
+}) => {
+  let secret = ctx.secrets.cursor_webhook_secret?.value;
+  let signatures = getWebhookHeaderValues(ctx.input.originalRequest, 'x-webhook-signature');
+  let body = decodeWebhookWireBody(ctx.input.originalRequest.body);
+  if (!secret || signatures.length !== 1 || body === null) {
+    return { status: 'rejected' as const, code: 'credential_missing' as const };
+  }
+  let supplied = signatures[0]!;
+  let expected = `sha256=${crypto.createHmac('sha256', secret).update(body).digest('hex')}`;
+  let suppliedBytes = Buffer.from(supplied, 'utf8');
+  let expectedBytes = Buffer.from(expected, 'utf8');
+  if (
+    suppliedBytes.length !== expectedBytes.length ||
+    !crypto.timingSafeEqual(suppliedBytes, expectedBytes)
+  ) {
+    return { status: 'rejected' as const, code: 'credential_invalid' as const };
+  }
+  return { status: 'accepted' as const, selection: { scope: 'receiver_trigger' as const } };
+};
 
 export let agentStatusChange = SlateTrigger.create(spec, {
   name: 'Agent Status Change',
@@ -37,25 +65,59 @@ export let agentStatusChange = SlateTrigger.create(spec, {
     })
   )
   .webhook({
-    handleRequest: async ctx => {
-      let signature = ctx.request.headers.get('x-webhook-signature');
-      let _webhookId = ctx.request.headers.get('x-webhook-id');
-      let body = await ctx.request.text();
-
-      // Verify signature if a secret is configured and signature header is present
-      if (signature && ctx.state?.webhookSecret) {
-        let expectedSig =
-          'sha256=' +
-          crypto
-            .createHmac('sha256', ctx.state.webhookSecret as string)
-            .update(body)
-            .digest('hex');
-
-        if (signature !== expectedSig) {
-          return { inputs: [] };
+    http: {
+      methods: ['POST'],
+      ingress: {
+        kind: 'receiver_route',
+        baseline: 'receiver_path_secret',
+        verification: {
+          mechanism: 'provider',
+          baseline: 'receiver_path_secret',
+          reason: 'Cursor signs the exact callback body with a receiver-bound secret.',
+          allowedSecretRefs: [
+            {
+              source: 'generated',
+              name: 'cursor_webhook_secret',
+              binding: 'receiver_trigger',
+              encoding: 'utf8'
+            }
+          ],
+          rules: [
+            {
+              id: 'cursor.delivery.v1',
+              phase: 'delivery',
+              when: { methods: ['POST'], registrationStatuses: ['registered'] },
+              verify: {
+                type: 'provider',
+                verifierId: 'cursor.delivery.v1',
+                allowedSecretRefs: ['cursor_webhook_secret'],
+                allowedBootstrapCaptureRefs: []
+              },
+              result: { type: 'dispatch', scope: 'receiver_trigger' },
+              replay: {
+                kind: 'enforced',
+                freshness: {
+                  source: 'json_pointer',
+                  pointer: '/timestamp',
+                  format: 'rfc3339',
+                  maxAgeSeconds: 600,
+                  maxFutureSkewSeconds: 60
+                },
+                deduplicate: {
+                  source: 'json_pointer',
+                  pointer: '/id',
+                  ttlSeconds: 86_400,
+                  scope: 'request'
+                }
+              }
+            }
+          ]
         }
       }
-
+    },
+    verifyWebhook: verifyCursorWebhook,
+    handleRequest: async ctx => {
+      let body = await ctx.request.text();
       let data = JSON.parse(body);
 
       return {

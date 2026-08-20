@@ -130,7 +130,12 @@ export let listSequences = SlateTool.create(spec, {
     let userId = resolveSequenceUserId(ctx.input.userId, ctx.auth.userId);
     let client = new HubSpotClient(ctx.auth.token);
     let result = await client.listSequences(userId, ctx.input.limit || 10, ctx.input.after);
-    let sequences = (result.results || []).map(mapSequenceSummary);
+    let sequences = (result.results || []).map((result: any) => {
+      let sequence = mapSequenceSummary(result);
+      // The authenticated OAuth output is transported as classified invocation data.
+      // Do not echo its user ID back through ordinary provider output.
+      return sequence.userId === userId ? { ...sequence, userId: undefined } : sequence;
+    });
 
     return {
       output: {

@@ -1,6 +1,13 @@
-import { SlateTrigger } from 'slates';
+import { timingSafeEqual } from 'node:crypto';
+import {
+  createApiServiceError,
+  decodeWebhookWireBody,
+  getWebhookHeaderValues,
+  SlateTrigger,
+  type WebhookWireRequest
+} from 'slates';
 import { z } from 'zod';
-import { parseWebhookPayload, verifyWebhookToken } from '../lib/client';
+import { parseWebhookPayload } from '../lib/client';
 import { spec } from '../spec';
 
 let shopItemSchema = z.object({
@@ -25,6 +32,61 @@ let shippingSchema = z.object({
 });
 
 let paymentEventType = z.enum(['Donation', 'Subscription', 'Shop Order', 'Commission']);
+
+let parseKofiWireData = (
+  request: Parameters<typeof decodeWebhookWireBody>[0],
+  contentType: string
+) => {
+  let bytes = decodeWebhookWireBody(request);
+  if (bytes === null) return null;
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+  try {
+    if (contentType.includes('application/json')) {
+      let parsed = JSON.parse(text);
+      return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : null;
+    }
+    let data = new URLSearchParams(text).get('data');
+    if (!data) return null;
+    let parsed = JSON.parse(data);
+    return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+};
+
+export let verifyKofiWebhook = async (ctx: {
+  input: { originalRequest: WebhookWireRequest };
+  secrets: Record<string, { value: string } | undefined>;
+}) => {
+  let expected = ctx.secrets.kofi_verification_token?.value;
+  let contentTypes = getWebhookHeaderValues(ctx.input.originalRequest, 'content-type');
+  let data = parseKofiWireData(
+    ctx.input.originalRequest.body,
+    contentTypes.length === 1 ? contentTypes[0]! : ''
+  );
+  let supplied = data?.verification_token;
+  if (!expected || typeof supplied !== 'string' || supplied.length === 0) {
+    return { status: 'rejected' as const, code: 'credential_missing' as const };
+  }
+  let expectedBytes = Buffer.from(expected, 'utf8');
+  let suppliedBytes = Buffer.from(supplied, 'utf8');
+  if (
+    expectedBytes.length !== suppliedBytes.length ||
+    !timingSafeEqual(expectedBytes, suppliedBytes)
+  ) {
+    return { status: 'rejected' as const, code: 'credential_invalid' as const };
+  }
+  return { status: 'accepted' as const, selection: { scope: 'receiver_trigger' as const } };
+};
 
 export let paymentTrigger = SlateTrigger.create(spec, {
   name: 'Payment Received',
@@ -98,6 +160,57 @@ export let paymentTrigger = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      ingress: {
+        kind: 'receiver_route',
+        baseline: 'receiver_path_secret',
+        verification: {
+          mechanism: 'provider',
+          baseline: 'receiver_path_secret',
+          reason: 'Ko-fi embeds the tenant verification token in each delivery payload.',
+          allowedSecretRefs: [
+            {
+              source: 'platform',
+              name: 'kofi_verification_token',
+              credentialKey: 'auth.token',
+              encoding: 'utf8'
+            }
+          ],
+          rules: [
+            {
+              id: 'kofi.delivery.v1',
+              phase: 'delivery',
+              when: { methods: ['POST'] },
+              verify: {
+                type: 'provider',
+                verifierId: 'kofi.delivery.v1',
+                allowedSecretRefs: ['kofi_verification_token'],
+                allowedBootstrapCaptureRefs: []
+              },
+              result: { type: 'dispatch', scope: 'receiver_trigger' },
+              replay: {
+                kind: 'enforced',
+                freshness: {
+                  source: 'json_pointer',
+                  pointer: '/timestamp',
+                  format: 'rfc3339',
+                  maxAgeSeconds: 86_400,
+                  maxFutureSkewSeconds: 300
+                },
+                deduplicate: {
+                  source: 'json_pointer',
+                  pointer: '/message_id',
+                  ttlSeconds: 604_800,
+                  scope: 'request'
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    verifyWebhook: verifyKofiWebhook,
     handleRequest: async ctx => {
       let contentType = ctx.request.headers.get('content-type') || '';
       let data: Record<string, unknown>;
@@ -107,7 +220,9 @@ export let paymentTrigger = SlateTrigger.create(spec, {
         let params = new URLSearchParams(text);
         let rawData = params.get('data');
         if (!rawData) {
-          throw new Error('Missing "data" field in form-urlencoded webhook payload');
+          throw createApiServiceError(
+            'Missing "data" field in form-urlencoded webhook payload'
+          );
         }
         data = JSON.parse(rawData);
       } else if (contentType.includes('application/json')) {
@@ -129,10 +244,6 @@ export let paymentTrigger = SlateTrigger.create(spec, {
       }
 
       let payload = parseWebhookPayload(data);
-
-      if (!verifyWebhookToken(payload, ctx.auth.token)) {
-        throw new Error('Webhook verification failed: invalid verification token');
-      }
 
       let shopItems = payload.shop_items
         ? payload.shop_items.map(item => ({

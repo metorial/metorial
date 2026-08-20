@@ -3,6 +3,12 @@ import { z } from 'zod';
 import { GoogleCalendarClient } from '../lib/client';
 import { googleCalendarActionScopes } from '../scopes';
 import { spec } from '../spec';
+import {
+  googleCalendarWebhookHttp,
+  registerGoogleCalendarWebhook,
+  unregisterGoogleCalendarWebhook,
+  verifyGoogleCalendarWebhook
+} from './webhook';
 
 export let eventChanges = SlateTrigger.create(spec, {
   name: 'Event Changes',
@@ -53,46 +59,12 @@ export let eventChanges = SlateTrigger.create(spec, {
     })
   )
   .webhook({
-    autoRegisterWebhook: async ctx => {
-      let client = new GoogleCalendarClient(ctx.auth.token);
-
-      let channelId = `slates-events-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-      // Initial sync to get a sync token - we need to do a full list first
-      let syncResult = await client.listEvents({
-        calendarId: 'primary',
-        maxResults: 1,
-        showDeleted: true
-      });
-
-      let watchResponse = await client.watchEvents('primary', {
-        id: channelId,
-        type: 'web_hook',
-        address: ctx.input.webhookBaseUrl
-      });
-
-      return {
-        registrationDetails: {
-          channelId: watchResponse.id || channelId,
-          resourceId: watchResponse.resourceId,
-          calendarId: 'primary',
-          expiration: watchResponse.expiration,
-          syncToken: syncResult.nextSyncToken
-        }
-      };
-    },
-
-    autoUnregisterWebhook: async ctx => {
-      let client = new GoogleCalendarClient(ctx.auth.token);
-      let details = ctx.input.registrationDetails;
-
-      if (details?.channelId && details?.resourceId) {
-        await client.stopChannel(details.channelId, details.resourceId);
-      }
-    },
+    http: googleCalendarWebhookHttp,
+    verifyWebhook: verifyGoogleCalendarWebhook,
+    autoRegisterWebhook: ctx => registerGoogleCalendarWebhook(ctx, 'events'),
+    autoUnregisterWebhook: unregisterGoogleCalendarWebhook,
 
     handleRequest: async ctx => {
-      let channelId = ctx.request.headers.get('x-goog-channel-id');
       let resourceState = ctx.request.headers.get('x-goog-resource-state');
 
       // Google sends a "sync" message on channel creation - ignore it
@@ -176,8 +148,7 @@ export let eventChanges = SlateTrigger.create(spec, {
           inputs,
           updatedState: {
             syncToken: newSyncToken || syncToken,
-            calendarId,
-            channelId
+            calendarId
           }
         };
       } catch (err: any) {
@@ -192,8 +163,7 @@ export let eventChanges = SlateTrigger.create(spec, {
             inputs: [],
             updatedState: {
               syncToken: result.nextSyncToken,
-              calendarId,
-              channelId
+              calendarId
             }
           };
         }

@@ -1,4 +1,9 @@
-import { getMetaWebhookVerificationResponse, metaWebhookHttp, SlateTrigger } from 'slates';
+import {
+  captureMetaWebhookBootstrap,
+  metaWebhookHttp,
+  SlateTrigger,
+  verifyMetaWebhook
+} from 'slates';
 import { z } from 'zod';
 import { spec } from '../spec';
 
@@ -47,15 +52,9 @@ export let messageStatus = SlateTrigger.create(spec, {
   )
   .webhook({
     http: metaWebhookHttp,
+    verifyWebhook: verifyMetaWebhook,
+    captureWebhookBootstrap: captureMetaWebhookBootstrap,
     handleRequest: async ctx => {
-      let verificationResponse = getMetaWebhookVerificationResponse(
-        ctx.request,
-        ctx.config.webhookVerifyToken
-      );
-      if (verificationResponse) {
-        return { inputs: [], response: verificationResponse };
-      }
-
       let body = (await ctx.request.json()) as any;
 
       if (body.object !== 'whatsapp_business_account') {

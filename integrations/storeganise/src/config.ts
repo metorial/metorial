@@ -1,12 +1,16 @@
-import { SlateConfig } from 'slates';
+import { configV2 } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(
-  z.object({
-    subdomain: z
-      .string()
-      .describe(
-        'Your Storeganise business code (subdomain). For example, if your portal URL is https://spaceup.storeganise.com, enter "spaceup".'
-      )
-  })
-);
+export let config = configV2({
+  fields: {
+    subdomain: {
+      schema: z
+        .string()
+        .describe(
+          'Your Storeganise business code (subdomain). For example, if your portal URL is https://spaceup.storeganise.com, enter "spaceup".'
+        ),
+      visibility: 'plain',
+      lifecycle: 'none'
+    }
+  }
+});
