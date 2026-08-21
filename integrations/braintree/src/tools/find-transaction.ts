@@ -56,7 +56,7 @@ export let findTransaction = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let xml = await rest.get(`/transactions/${ctx.input.transactionId}`);

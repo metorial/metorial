@@ -1,6 +1,6 @@
 {
   "name": "@slates/provider-handler",
-  "version": "1.0.0-rc.21",
+  "version": "1.0.0-rc.22",
   "publishConfig": {
     "access": "public"
   },
@@ -25,15 +25,15 @@
   "types": "dist/index.d.ts",
   "unpkg": "./dist/index.module.js",
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "build": "tsup --config ../../tsup.packages.config.ts",
     "typecheck": "tsc --noEmit",
     "biome:check": "biome check --write src"
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/proto": "1.0.0-rc.14",
-    "@slates/provider": "1.0.0-rc.18",
+    "@slates/proto": "1.0.0-rc.17",
+    "@slates/provider": "1.0.0-rc.20",
     "zod": "^4.2.1"
   },
   "devDependencies": {

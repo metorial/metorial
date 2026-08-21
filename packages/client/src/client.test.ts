@@ -1,4 +1,8 @@
 import {
+  SLATE_WEBHOOK_ACTION_SPEC_HASH_FIXTURE_V1,
+  SLATE_WEBHOOK_WIRE_CONFORMANCE_FIXTURES_V1
+} from '@slates/proto';
+import {
   axios,
   Slate,
   SlateAuth,
@@ -312,6 +316,36 @@ let createTriggerTraceSlate = () => {
       })
     )
     .webhook({
+      http: {
+        methods: ['POST'],
+        ingress: {
+          kind: 'receiver_route',
+          baseline: 'receiver_path_secret',
+          verification: {
+            mechanism: 'hub',
+            baseline: 'receiver_path_secret',
+            allowedSecretRefs: [],
+            rules: [
+              {
+                id: 'stripe.delivery.v1',
+                phase: 'delivery',
+                when: { methods: ['POST'] },
+                verify: { type: 'preset', preset: 'stripe.v1' },
+                result: { type: 'dispatch', scope: 'receiver_trigger' },
+                replay: {
+                  kind: 'enforced',
+                  deduplicate: {
+                    source: 'preset',
+                    presetField: 'event_id',
+                    ttlSeconds: 86_400,
+                    scope: 'request'
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
       handleRequest: async () => ({
         inputs: [{ id: 'webhook-1' }, { id: 'webhook-2' }],
         response: {
@@ -515,6 +549,27 @@ let createTokenConfigSlate = (seenConfig: SeenTokenConfig) => {
 };
 
 describe('@slates/client local transport', () => {
+  it('independently validates the shared webhook specHash v1 fixture', () => {
+    let client = createSlatesClient({
+      transport: { send: async () => [] }
+    });
+    let action = {
+      ...SLATE_WEBHOOK_ACTION_SPEC_HASH_FIXTURE_V1.action,
+      name: 'Fixture',
+      inputSchema: {},
+      outputSchema: {},
+      docs: [],
+      specHash: SLATE_WEBHOOK_ACTION_SPEC_HASH_FIXTURE_V1.expectedHash
+    };
+    expect(client.verifyWebhookActionSpecHash(action as never)).toBe(action);
+    expect(() =>
+      client.verifyWebhookActionSpecHash({ ...action, specHash: undefined } as never)
+    ).toThrow('missing its v1 spec hash');
+    expect(() =>
+      client.verifyWebhookActionSpecHash({ ...action, specHash: '0'.repeat(64) } as never)
+    ).toThrow('invalid v1 spec hash');
+  });
+
   it('discovers auth/config and invokes tools with session state', async () => {
     let slate = createDemoSlate();
     let client = createSlatesClient({
@@ -523,6 +578,16 @@ describe('@slates/client local transport', () => {
 
     let provider = await client.identify();
     expect(provider.provider.id).toBe('demo-slate');
+    expect(provider.capabilities).toEqual({
+      receiverBoundToolContextV1: true,
+      scopedInvocationGrantV1: true,
+      webhookActionSpecHashV1: true,
+      webhookInboundBootstrapCaptureV1: true,
+      webhookInboundVerificationV1: true,
+      webhookSecretNegotiationV1: true,
+      webhookVerificationRulesV1: true,
+      webhookWireV1: true
+    });
     expect(provider.docs).toEqual([
       {
         name: 'Demo provider docs',
@@ -549,6 +614,48 @@ describe('@slates/client local transport', () => {
     });
     expect(actions[0]!.authMethods).toEqual(['token_auth']);
     expect(actions[0]!.isPublic).toBe(false);
+    await expect(
+      client.invokeReceiverBoundTool(
+        'echo',
+        { name: 'world' },
+        {
+          version: 'scoped_invocation_grant_v1',
+          grantId: 'unusable-grant',
+          token: 'unusable-token',
+          requestId: 'receiver-bound-request'
+        }
+      )
+    ).rejects.toThrow('Receiver-bound tool context is not supported by this action');
+
+    let wireRequest = {
+      url: 'https://example.com/callback',
+      method: 'POST' as const,
+      headers: [
+        ['X-Signature', 'first'],
+        ['x-signature', 'second']
+      ] as [string, string][],
+      body: { present: true as const, base64: '' }
+    };
+    expect(client.normalizeWebhookWireRequest(wireRequest)).toEqual(wireRequest);
+    expect(() =>
+      client.normalizeWebhookWireRequest({
+        ...wireRequest,
+        headers: { 'x-signature': 'value' }
+      })
+    ).toThrow();
+    let wireResponse = {
+      status: 202,
+      headers: [
+        ['Set-Cookie', 'first=1'],
+        ['Set-Cookie', 'second=2']
+      ] as [string, string][],
+      body: { present: true as const, base64: Buffer.from([0, 255]).toString('base64') }
+    };
+    expect(client.normalizeWebhookWireResponse(wireResponse)).toEqual(wireResponse);
+
+    for (let fixture of SLATE_WEBHOOK_WIRE_CONFORMANCE_FIXTURES_V1) {
+      expect(client.normalizeWebhookWireRequest(fixture.request)).toEqual(fixture.request);
+    }
 
     let configSchema = await client.getConfigSchema();
     expect(configSchema.schema.properties.prefix.type).toBe('string');
@@ -698,6 +805,34 @@ describe('@slates/client local transport', () => {
     });
 
     client.ensureSession();
+
+    await expect(client.getTriggerWebhookIngress('webhook_trigger')).resolves.toEqual({
+      kind: 'receiver_route',
+      baseline: 'receiver_path_secret',
+      verification: {
+        mechanism: 'hub',
+        baseline: 'receiver_path_secret',
+        allowedSecretRefs: [],
+        rules: [
+          {
+            id: 'stripe.delivery.v1',
+            phase: 'delivery',
+            when: { methods: ['POST'] },
+            verify: { type: 'preset', preset: 'stripe.v1' },
+            result: { type: 'dispatch', scope: 'receiver_trigger' },
+            replay: {
+              kind: 'enforced',
+              deduplicate: {
+                source: 'preset',
+                presetField: 'event_id',
+                ttlSeconds: 86_400,
+                scope: 'request'
+              }
+            }
+          }
+        ]
+      }
+    });
 
     await client.request('slates/action.trigger.poll_events', {
       actionId: 'poll_trigger',

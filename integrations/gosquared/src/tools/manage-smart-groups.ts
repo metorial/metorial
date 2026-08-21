@@ -23,7 +23,7 @@ export let listSmartGroups = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     let result = await client.getSmartGroups();
@@ -75,7 +75,7 @@ export let getSmartGroupMembers = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     let result = await client.getSmartGroupPeople(ctx.input.groupId, {
@@ -120,7 +120,7 @@ export let createSmartGroup = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     let result = await client.createSmartGroup(ctx.input.name, ctx.input.filters);

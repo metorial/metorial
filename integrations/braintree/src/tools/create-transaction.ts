@@ -84,7 +84,7 @@ Requires a payment method ID (from the Braintree vault or a single-use nonce) an
 
     let client = new BraintreeGraphQLClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let transactionInput: Record<string, any> = {

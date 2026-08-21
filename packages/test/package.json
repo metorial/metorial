@@ -1,6 +1,6 @@
 {
   "name": "@slates/test",
-  "version": "1.0.0-rc.13",
+  "version": "1.0.0-rc.14",
   "publishConfig": {
     "access": "public"
   },
@@ -33,18 +33,18 @@
   "types": "dist/index.d.ts",
   "unpkg": "./dist/index.module.js",
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --config vitest.config.ts",
     "build": "tsup --config tsup.config.ts",
     "typecheck": "tsc --noEmit",
     "biome:check": "biome check --write src"
   },
   "dependencies": {
     "@lowerdeck/testing-tools": "latest",
-    "@slates/client": "1.0.0-rc.16",
+    "@slates/client": "1.0.0-rc.18",
     "@slates/profiles": "1.0.0-rc.14"
   },
   "devDependencies": {
-    "@slates/provider": "1.0.0-rc.18",
+    "@slates/provider": "1.0.0-rc.20",
     "@slates/tsconfig": "1.0.0-rc.1",
     "typescript": "5.8.2",
     "vitest": "^3.1.2",

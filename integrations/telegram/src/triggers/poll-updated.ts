@@ -1,7 +1,10 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { TelegramClient } from '../lib/client';
-import { generateSecretToken, verifySecretToken } from '../lib/webhook-utils';
+import {
+  registerTelegramWebhook,
+  telegramWebhookHttp,
+  unregisterTelegramWebhook
+} from '../lib/webhook-utils';
 import { spec } from '../spec';
 
 let pollOptionSchema = z.object({
@@ -57,34 +60,11 @@ export let pollUpdatedTrigger = SlateTrigger.create(spec, {
     })
   )
   .webhook({
-    autoRegisterWebhook: async ctx => {
-      let client = new TelegramClient(ctx.auth.token);
-      let secretToken = generateSecretToken();
-
-      await client.setWebhook({
-        url: ctx.input.webhookBaseUrl,
-        allowedUpdates: ['poll', 'poll_answer'],
-        secretToken
-      });
-
-      return {
-        registrationDetails: { secretToken }
-      };
-    },
-
-    autoUnregisterWebhook: async ctx => {
-      let client = new TelegramClient(ctx.auth.token);
-      await client.deleteWebhook();
-    },
+    http: telegramWebhookHttp,
+    autoRegisterWebhook: ctx => registerTelegramWebhook(ctx, ['poll', 'poll_answer']),
+    autoUnregisterWebhook: unregisterTelegramWebhook,
 
     handleRequest: async ctx => {
-      let registrationDetails = ctx.state?.registrationDetails;
-      if (registrationDetails?.secretToken) {
-        if (!verifySecretToken(ctx.request, registrationDetails.secretToken)) {
-          return { inputs: [] };
-        }
-      }
-
       let data = (await ctx.request.json()) as any;
       let inputs: Array<{ updateId: number; eventType: string; pollData: any }> = [];
 

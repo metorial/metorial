@@ -70,7 +70,7 @@ export let searchSubscriptions = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new BraintreeGraphQLClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let input: Record<string, any> = {};

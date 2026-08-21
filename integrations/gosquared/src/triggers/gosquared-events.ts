@@ -72,7 +72,7 @@ export let gosquaredEvents = SlateTrigger.create(spec, {
     autoRegisterWebhook: async ctx => {
       let client = new GoSquaredClient({
         token: ctx.auth.token,
-        siteToken: ctx.config.siteToken
+        siteToken: ctx.auth.siteToken
       });
 
       let result = await client.createWebhook(ctx.input.webhookBaseUrl, {
@@ -105,7 +105,7 @@ export let gosquaredEvents = SlateTrigger.create(spec, {
     autoUnregisterWebhook: async ctx => {
       let client = new GoSquaredClient({
         token: ctx.auth.token,
-        siteToken: ctx.config.siteToken
+        siteToken: ctx.auth.siteToken
       });
 
       let webhookId = (ctx.input.registrationDetails as any)?.webhookId;

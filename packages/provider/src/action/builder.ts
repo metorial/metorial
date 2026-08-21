@@ -1,6 +1,7 @@
 import type z from 'zod';
 import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from '../specification/specification';
+import { slatesWebhookHttp } from '../webhook/verification';
 import type {
   SlateAction,
   SlateActionCreateParameters,
@@ -16,7 +17,9 @@ import type {
   SlateTriggerPollingHandler,
   SlateTriggerWebhookAutoRegistrationHandler,
   SlateTriggerWebhookAutoUnregistrationHandler,
+  SlateTriggerWebhookBootstrapCaptureHandler,
   SlateTriggerWebhookRequestHandler,
+  SlateTriggerWebhookVerifyHandler,
   SlateWebhookHttpOptions
 } from './action';
 import { validateScopes } from './scopes';
@@ -39,6 +42,7 @@ export class SlateActionBuilder<
 
   #toolParams: SlateActionParametersTool<ConfigType, AuthType, InputType, OutputType> | null =
     null;
+  #receiverBoundToolContextV1: Readonly<{ secretNames: readonly string[] }> | undefined;
   #triggerParams: SlateActionParametersTrigger<
     ConfigType,
     AuthType,
@@ -163,11 +167,35 @@ export class SlateActionBuilder<
     return this;
   }
 
+  receiverBoundToolContextV1(secretNames: readonly string[]) {
+    if (this.type !== 'tool') {
+      throw new SlateDeclarationError(
+        'receiverBoundToolContextV1 can only be set for tool actions'
+      );
+    }
+    let normalized = [...new Set(secretNames.map(name => name.trim()))];
+    if (
+      normalized.length === 0 ||
+      normalized.length !== secretNames.length ||
+      normalized.some(name => !/^[A-Za-z0-9](?:[A-Za-z0-9._:-]*[A-Za-z0-9])?$/.test(name))
+    ) {
+      throw new SlateDeclarationError(
+        'Receiver-bound tool secret names must be unique, non-empty identifiers'
+      );
+    }
+    this.#receiverBoundToolContextV1 = Object.freeze({
+      secretNames: Object.freeze(normalized)
+    });
+    return this;
+  }
+
   webhook(props: {
     handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
     handleRequest: SlateTriggerWebhookRequestHandler<ConfigType, AuthType, InputType>;
     autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
     autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
+    verifyWebhook?: SlateTriggerWebhookVerifyHandler;
+    captureWebhookBootstrap?: SlateTriggerWebhookBootstrapCaptureHandler;
     http?: SlateWebhookHttpOptions;
   }): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
     if (this.type !== 'trigger') {
@@ -181,7 +209,11 @@ export class SlateActionBuilder<
       handleRequest: props.handleRequest,
       autoRegisterWebhook: props.autoRegisterWebhook,
       autoUnregisterWebhook: props.autoUnregisterWebhook,
-      http: props.http
+      verifyWebhook: props.verifyWebhook,
+      captureWebhookBootstrap: props.captureWebhookBootstrap,
+      // Parse and clone the complete declaration at build time. The provider handler parses it
+      // again at the trust boundary before hashing and publishing the serialized contract.
+      http: props.http ? slatesWebhookHttp.parse(props.http) : undefined
     };
 
     return this;
@@ -242,6 +274,9 @@ export class SlateActionBuilder<
       outputSchema: this.#outputSchema,
 
       ...this.#toolParams!,
+      ...(this.type === 'tool' && this.#receiverBoundToolContextV1
+        ? { receiverBoundToolContextV1: this.#receiverBoundToolContextV1 }
+        : {}),
       ...this.#triggerParams!
     }) as Result;
   }

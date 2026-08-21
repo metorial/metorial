@@ -78,7 +78,7 @@ Supports filtering by status, amount range, date range, customer, and payment me
   .handleInvocation(async ctx => {
     let client = new BraintreeGraphQLClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let searchInput: Record<string, any> = {};

@@ -41,7 +41,7 @@ export let findDispute = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let xml = await rest.get(`/disputes/${ctx.input.disputeId}`);
@@ -75,7 +75,7 @@ export let acceptDispute = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let xml = await rest.put(`/disputes/${ctx.input.disputeId}/accept`, '');
@@ -144,7 +144,7 @@ export let addDisputeEvidence = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let data: Record<string, any> = {
@@ -192,7 +192,7 @@ export let finalizeDispute = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     await rest.put(`/disputes/${ctx.input.disputeId}/finalize`, '');

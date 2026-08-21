@@ -38,7 +38,7 @@ export let getPerson = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     let person = await client.getPerson(ctx.input.personId);

@@ -42,7 +42,7 @@ export let searchPeople = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     let result = await client.searchPeople({

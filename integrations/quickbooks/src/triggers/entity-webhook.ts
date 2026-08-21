@@ -1,5 +1,10 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { SlateTrigger } from '@slates/provider';
+import {
+  decodeWebhookWireBody,
+  getWebhookHeaderValues,
+  SlateTrigger,
+  type WebhookWireRequest
+} from '@slates/provider';
 import { z } from 'zod';
 import { quickBooksServiceError } from '../lib/errors';
 import { createClientFromContext } from '../lib/helpers';
@@ -49,27 +54,26 @@ let parseCloudEventType = (type: unknown) => {
   };
 };
 
-let verifyWebhookSignature = (d: {
-  body: string;
-  signature: string | null;
-  verifierToken?: string;
+export let verifyQuickBooksWebhook = async (ctx: {
+  input: { originalRequest: WebhookWireRequest };
+  secrets: Record<string, { value: string } | undefined>;
 }) => {
-  if (!d.verifierToken) return;
-
-  if (!d.signature) {
-    throw quickBooksServiceError('QuickBooks webhook signature header is missing.');
+  let token = ctx.secrets.quickbooks_webhook_verifier_token?.value;
+  let signatures = getWebhookHeaderValues(ctx.input.originalRequest, 'intuit-signature');
+  let body = decodeWebhookWireBody(ctx.input.originalRequest.body);
+  if (!token || signatures.length !== 1 || body === null) {
+    return { status: 'rejected' as const, code: 'credential_missing' as const };
   }
-
-  let expected = createHmac('sha256', d.verifierToken).update(d.body).digest('base64');
-  let expectedBuffer = Buffer.from(expected);
-  let actualBuffer = Buffer.from(d.signature);
-
+  let expected = createHmac('sha256', token).update(body).digest('base64');
+  let expectedBytes = Buffer.from(expected, 'utf8');
+  let actualBytes = Buffer.from(signatures[0]!, 'utf8');
   if (
-    expectedBuffer.length !== actualBuffer.length ||
-    !timingSafeEqual(expectedBuffer, actualBuffer)
+    expectedBytes.length !== actualBytes.length ||
+    !timingSafeEqual(expectedBytes, actualBytes)
   ) {
-    throw quickBooksServiceError('QuickBooks webhook signature is invalid.');
+    return { status: 'rejected' as const, code: 'credential_invalid' as const };
   }
+  return { status: 'accepted' as const, selection: { scope: 'receiver_trigger' as const } };
 };
 
 export let entityWebhook = SlateTrigger.create(spec, {
@@ -103,14 +107,52 @@ export let entityWebhook = SlateTrigger.create(spec, {
     })
   )
   .webhook({
+    http: {
+      methods: ['POST'],
+      ingress: {
+        kind: 'receiver_route',
+        baseline: 'receiver_path_secret',
+        verification: {
+          mechanism: 'provider',
+          baseline: 'receiver_path_secret',
+          reason: 'Intuit requires an exact-raw-body HMAC using the verifier token.',
+          allowedSecretRefs: [
+            {
+              source: 'auth_config',
+              name: 'quickbooks_webhook_verifier_token',
+              credentialKey: 'webhookVerifierToken',
+              encoding: 'utf8'
+            }
+          ],
+          rules: [
+            {
+              id: 'quickbooks.delivery.v1',
+              phase: 'delivery',
+              when: { methods: ['POST'] },
+              verify: {
+                type: 'provider',
+                verifierId: 'quickbooks.delivery.v1',
+                allowedSecretRefs: ['quickbooks_webhook_verifier_token'],
+                allowedBootstrapCaptureRefs: []
+              },
+              result: { type: 'dispatch', scope: 'receiver_trigger' },
+              replay: {
+                kind: 'enforced',
+                deduplicate: {
+                  source: 'json_pointer',
+                  pointer: '/eventNotifications/0/dataChangeEvent/entities/0/id',
+                  ttlSeconds: 86_400,
+                  scope: 'request'
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    verifyWebhook: verifyQuickBooksWebhook,
     handleRequest: async ctx => {
       let rawBody = await ctx.request.text();
-      verifyWebhookSignature({
-        body: rawBody,
-        signature: ctx.request.headers.get('intuit-signature'),
-        verifierToken: ctx.config.webhookVerifierToken
-      });
-
       let body: any;
       try {
         body = JSON.parse(rawBody);

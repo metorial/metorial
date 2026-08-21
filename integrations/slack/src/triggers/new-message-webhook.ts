@@ -1,17 +1,7 @@
-import { SlateTrigger, verifyHmacSignature } from 'slates';
+import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { slackActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
-
-const SLACK_MAX_REQUEST_AGE_SECONDS = 300;
-
-let invalidSignatureResponse = () => ({
-  inputs: [],
-  response: {
-    status: 401,
-    body: 'invalid signature'
-  }
-});
 
 let slackEventBody = z.object({
   type: z.string(),
@@ -66,6 +56,7 @@ export let newMessageWebhook = SlateTrigger.create(spec, {
       methods: ['POST'],
       sync: {
         mode: 'match',
+        timeoutMs: 1500,
         match: [
           {
             jsonBodyField: {
@@ -74,36 +65,66 @@ export let newMessageWebhook = SlateTrigger.create(spec, {
             }
           }
         ]
+      },
+      ingress: {
+        kind: 'receiver_route',
+        baseline: 'receiver_path_secret',
+        verification: {
+          mechanism: 'hub',
+          baseline: 'receiver_path_secret',
+          allowedSecretRefs: [
+            {
+              source: 'auth_config',
+              name: 'slack_signing_secret',
+              credentialKey: 'signingSecret',
+              encoding: 'utf8'
+            }
+          ],
+          rules: [
+            {
+              id: 'slack.bootstrap.v1',
+              phase: 'bootstrap',
+              when: {
+                methods: ['POST'],
+                matcher: {
+                  jsonBodyField: { path: '/type', equals: 'url_verification' }
+                }
+              },
+              verify: { type: 'preset', preset: 'slack.v0' },
+              result: { type: 'dispatch', scope: 'receiver_trigger' }
+            },
+            {
+              id: 'slack.delivery.v1',
+              phase: 'delivery',
+              when: {
+                methods: ['POST'],
+                matcher: { jsonBodyField: { path: '/type', equals: 'event_callback' } }
+              },
+              verify: { type: 'preset', preset: 'slack.v0' },
+              result: { type: 'dispatch', scope: 'receiver_trigger' },
+              replay: {
+                kind: 'enforced',
+                freshness: {
+                  source: 'preset',
+                  presetField: 'timestamp',
+                  format: 'unix_seconds',
+                  maxAgeSeconds: 300,
+                  maxFutureSkewSeconds: 300
+                },
+                deduplicate: {
+                  source: 'json_pointer',
+                  pointer: '/event_id',
+                  ttlSeconds: 604_800,
+                  scope: 'request'
+                }
+              }
+            }
+          ]
+        }
       }
     },
     handleRequest: async ctx => {
       let raw = await ctx.request.text();
-
-      if (ctx.config.signingSecret) {
-        let timestamp = ctx.request.headers.get('x-slack-request-timestamp');
-        let signature = ctx.request.headers.get('x-slack-signature');
-        let timestampSeconds = timestamp ? Number(timestamp) : Number.NaN;
-        let currentTimestampSeconds = Date.now() / 1_000;
-        let timestampIsFresh =
-          Number.isFinite(timestampSeconds) &&
-          Math.abs(currentTimestampSeconds - timestampSeconds) <=
-            SLACK_MAX_REQUEST_AGE_SECONDS;
-
-        if (
-          !timestamp ||
-          !signature ||
-          !timestampIsFresh ||
-          !verifyHmacSignature({
-            secret: ctx.config.signingSecret,
-            payload: `v0:${timestamp}:${raw}`,
-            signature,
-            digest: 'hex',
-            prefix: 'v0='
-          })
-        ) {
-          return invalidSignatureResponse();
-        }
-      }
 
       let parsed: unknown;
       try {
@@ -122,10 +143,8 @@ export let newMessageWebhook = SlateTrigger.create(spec, {
           inputs: [],
           response: {
             status: 200,
-            headers: {
-              'content-type': 'text/plain'
-            },
-            body: body.data.challenge
+            headers: { 'content-type': 'application/json; charset=utf-8' },
+            body: JSON.stringify({ challenge: body.data.challenge })
           }
         };
       }

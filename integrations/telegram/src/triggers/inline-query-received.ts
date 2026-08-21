@@ -1,7 +1,10 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { TelegramClient } from '../lib/client';
-import { generateSecretToken, verifySecretToken } from '../lib/webhook-utils';
+import {
+  registerTelegramWebhook,
+  telegramWebhookHttp,
+  unregisterTelegramWebhook
+} from '../lib/webhook-utils';
 import { spec } from '../spec';
 
 export let inlineQueryReceivedTrigger = SlateTrigger.create(spec, {
@@ -40,34 +43,12 @@ export let inlineQueryReceivedTrigger = SlateTrigger.create(spec, {
     })
   )
   .webhook({
-    autoRegisterWebhook: async ctx => {
-      let client = new TelegramClient(ctx.auth.token);
-      let secretToken = generateSecretToken();
-
-      await client.setWebhook({
-        url: ctx.input.webhookBaseUrl,
-        allowedUpdates: ['inline_query', 'chosen_inline_result'],
-        secretToken
-      });
-
-      return {
-        registrationDetails: { secretToken }
-      };
-    },
-
-    autoUnregisterWebhook: async ctx => {
-      let client = new TelegramClient(ctx.auth.token);
-      await client.deleteWebhook();
-    },
+    http: telegramWebhookHttp,
+    autoRegisterWebhook: ctx =>
+      registerTelegramWebhook(ctx, ['inline_query', 'chosen_inline_result']),
+    autoUnregisterWebhook: unregisterTelegramWebhook,
 
     handleRequest: async ctx => {
-      let registrationDetails = ctx.state?.registrationDetails;
-      if (registrationDetails?.secretToken) {
-        if (!verifySecretToken(ctx.request, registrationDetails.secretToken)) {
-          return { inputs: [] };
-        }
-      }
-
       let data = (await ctx.request.json()) as any;
       let inputs: Array<{ updateId: number; eventType: string; inlineData: any }> = [];
 

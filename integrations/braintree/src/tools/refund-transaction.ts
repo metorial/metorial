@@ -57,7 +57,7 @@ Use "refund" for settled transactions and "reverse" to automatically void or ref
 
     let client = new BraintreeGraphQLClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     if (ctx.input.mode === 'reverse') {

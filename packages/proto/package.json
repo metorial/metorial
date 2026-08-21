@@ -1,6 +1,6 @@
 {
   "name": "@slates/proto",
-  "version": "1.0.0-rc.14",
+  "version": "1.0.0-rc.17",
   "publishConfig": {
     "access": "public"
   },
@@ -25,7 +25,7 @@
   "types": "dist/index.d.ts",
   "unpkg": "./dist/index.module.js",
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "build": "tsup --config ../../tsup.packages.config.ts",
     "typecheck": "tsc --noEmit",
     "biome:check": "biome check --write src"

@@ -1,118 +1,173 @@
-import {
-  createLocalSlateTestClient,
-  getSlateContract,
-  handleSlateTriggerWebhook
-} from '@slates/test';
+import { createLocalSlateTransport, createSlatesClient } from '@slates/client';
+import { createHmacSignature } from '@slates/provider';
+import { getSlateContract, handleScopedSlateTriggerWebhook } from '@slates/test';
 import { describe, expect, it } from 'vitest';
 import { provider } from '../index';
 
-let createInstagramTriggerTestClient = (webhookVerifyToken?: string) =>
-  createLocalSlateTestClient({
-    slate: provider,
-    state: {
-      config: {
-        apiVersion: 'v21.0',
-        ...(webhookVerifyToken ? { webhookVerifyToken } : {})
-      },
-      auth: {
-        authenticationMethodId: 'instagram_login',
-        output: { token: 'instagram-test-token' }
+let VERIFY_TOKEN = 'instagram-verify-token';
+let APP_SECRET = 'instagram-app-secret-value';
+
+let createInstagramTriggerTestClient = (
+  d: {
+    authMethodId?: 'instagram_login' | 'facebook_login';
+    verifyToken?: string;
+    appSecret?: string;
+  } = {}
+) => {
+  let authMethodId = d.authMethodId ?? 'instagram_login';
+  let auth = {
+    token: 'instagram-test-token',
+    userId: 'ig-user',
+    ...(d.appSecret ? { clientSecret: d.appSecret } : {})
+  };
+  let config = { apiVersion: 'v21.0' };
+
+  return createSlatesClient({
+    transport: createLocalSlateTransport({
+      slate: provider,
+      scopedState: {
+        config,
+        authenticationMethodId: authMethodId,
+        auth,
+        secrets: d.verifyToken ? { meta_verify_token: d.verifyToken } : {}
       }
+    }),
+    state: {
+      config,
+      auth: { authenticationMethodId: authMethodId, output: auth }
     }
   });
+};
 
-let decodeBody = (response: { body?: { content: string } | null }) =>
-  Buffer.from(response.body?.content ?? '', 'base64').toString();
+let decodeWireBody = (body: { present: boolean; base64?: string } | undefined) =>
+  body?.present ? Buffer.from(body.base64 ?? '', 'base64').toString('utf8') : '';
 
 let verificationUrl = (verifyToken: string) =>
   `https://example.com/callbacks/instagram?hub.mode=subscribe&hub.verify_token=${verifyToken}&hub.challenge=challenge-value`;
 
 describe('Instagram webhook verification contract', () => {
-  it('advertises GET verification without making POST events synchronous', async () => {
+  it('publishes one OAuth app-secret ref covering both OAuth methods', async () => {
     let contract = await getSlateContract(createInstagramTriggerTestClient());
     let trigger = contract.triggers.find(action => action.id === 'webhook_events');
 
+    expect(contract.configSchema).not.toHaveProperty('properties.webhookVerifyToken');
+    expect(contract.configSchema).not.toHaveProperty('properties.webhookAppSecret');
     expect(trigger?.invocation).toMatchObject({
       type: 'webhook',
       http: {
-        methods: ['GET', 'POST'],
-        sync: {
-          mode: 'match',
-          match: [{ method: 'GET', hasQueryParam: 'hub.mode' }]
+        registration: { mode: 'manual_bootstrap' },
+        ingress: {
+          verification: {
+            allowedSecretRefs: [
+              {
+                source: 'generated',
+                name: 'meta_verify_token',
+                binding: 'receiver_trigger'
+              },
+              {
+                source: 'oauth_credentials',
+                name: 'meta_app_secret',
+                credentialKey: 'clientSecret',
+                authMethods: ['instagram_login', 'facebook_login']
+              }
+            ]
+          }
         }
       }
     });
   });
 
-  it('echoes a matching challenge and rejects a mismatched Verify Token', async () => {
-    let client = createInstagramTriggerTestClient('expected-token');
-    let accepted = await handleSlateTriggerWebhook({
-      client,
-      triggerId: 'webhook_events',
-      method: 'GET',
-      url: verificationUrl('expected-token')
+  it('verifies and captures bootstrap requests with the generated token', async () => {
+    let client = createInstagramTriggerTestClient({
+      verifyToken: VERIFY_TOKEN,
+      appSecret: APP_SECRET
     });
-    let rejected = await handleSlateTriggerWebhook({
+    let accepted = await handleScopedSlateTriggerWebhook({
       client,
       triggerId: 'webhook_events',
+      ruleId: 'meta.bootstrap.v1',
+      phase: 'bootstrap',
+      method: 'GET',
+      url: verificationUrl(VERIFY_TOKEN)
+    });
+    let rejected = await handleScopedSlateTriggerWebhook({
+      client,
+      triggerId: 'webhook_events',
+      ruleId: 'meta.bootstrap.v1',
+      phase: 'bootstrap',
       method: 'GET',
       url: verificationUrl('wrong-token')
     });
 
-    expect(accepted.response).toMatchObject({
-      status: 200,
-      headers: { 'content-type': 'text/plain' }
+    expect(accepted.verification).toMatchObject({ status: 'accepted' });
+    expect(accepted.capture?.status).toBe('accepted');
+    if (accepted.capture?.status !== 'accepted') throw new Error('Expected accepted capture');
+    expect(decodeWireBody(accepted.capture.response.body)).toBe('challenge-value');
+    expect(rejected).toMatchObject({
+      verification: { status: 'rejected', code: 'credential_invalid' },
+      capture: null,
+      delivery: null
     });
-    expect(decodeBody(accepted.response!)).toBe('challenge-value');
-    expect(rejected.inputs).toEqual([]);
-    expect(rejected.response).toMatchObject({ status: 403 });
   });
 
-  it('preserves legacy challenge handling when no Verify Token is configured', async () => {
-    let result = await handleSlateTriggerWebhook({
-      client: createInstagramTriggerTestClient(),
-      triggerId: 'webhook_events',
-      method: 'GET',
-      url: verificationUrl('legacy-token')
+  it.each([
+    'instagram_login',
+    'facebook_login'
+  ] as const)('dispatches signed deliveries for the %s OAuth method', async authMethodId => {
+    let body = JSON.stringify({
+      entry: [
+        {
+          id: 'ig-user',
+          time: 1700000000,
+          changes: [
+            {
+              field: 'comments',
+              value: { id: 'comment-1', media: { id: 'media-1' }, text: 'hello' }
+            }
+          ]
+        }
+      ]
     });
-
-    expect(result.response).toMatchObject({ status: 200 });
-    expect(decodeBody(result.response!)).toBe('challenge-value');
-  });
-
-  it('preserves normal POST event inputs', async () => {
-    let result = await handleSlateTriggerWebhook({
-      client: createInstagramTriggerTestClient('expected-token'),
+    let signature = createHmacSignature({ secret: APP_SECRET, payload: body, digest: 'hex' });
+    let result = await handleScopedSlateTriggerWebhook({
+      client: createInstagramTriggerTestClient({
+        authMethodId,
+        verifyToken: VERIFY_TOKEN,
+        appSecret: APP_SECRET
+      }),
       triggerId: 'webhook_events',
+      ruleId: 'meta.delivery.v1',
+      phase: 'delivery',
       url: 'https://example.com/callbacks/instagram',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        object: 'instagram',
-        entry: [
-          {
-            id: 'ig-user-1',
-            time: 1700000000,
-            changes: [
-              {
-                field: 'comments',
-                value: { id: 'comment-1', media: { id: 'media-1' }, text: 'Nice reel!' }
-              }
-            ]
-          }
-        ]
-      })
+      headers: { 'x-hub-signature-256': `sha256=${signature}` },
+      body
     });
 
-    expect(result.inputs).toEqual([
+    expect(result.verification).toMatchObject({ status: 'accepted' });
+    expect(result.delivery?.inputs).toEqual([
       {
         eventType: 'comment',
         eventId: 'comment-1',
         commentId: 'comment-1',
         mediaId: 'media-1',
-        commentText: 'Nice reel!',
-        timestamp: new Date(1700000000 * 1000).toISOString()
+        commentText: 'hello',
+        timestamp: '2023-11-14T22:13:20.000Z'
       }
     ]);
-    expect(result.response).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain(APP_SECRET);
+    expect(JSON.stringify(result)).not.toContain(VERIFY_TOKEN);
+  });
+
+  it('fails closed when the OAuth client secret is absent', async () => {
+    await expect(
+      handleScopedSlateTriggerWebhook({
+        client: createInstagramTriggerTestClient({ verifyToken: VERIFY_TOKEN }),
+        triggerId: 'webhook_events',
+        ruleId: 'meta.delivery.v1',
+        phase: 'delivery',
+        url: 'https://example.com/callbacks/instagram',
+        body: JSON.stringify({ entry: [] })
+      })
+    ).rejects.toThrow();
   });
 });

@@ -30,7 +30,7 @@ export let listChats = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     let result = await client.getChats({
@@ -73,7 +73,7 @@ export let getChatMessages = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     let result = await client.getChatMessages(ctx.input.chatId, {
@@ -112,7 +112,7 @@ export let sendChatMessage = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     await client.sendChatMessage(ctx.input.chatId, {
@@ -149,7 +149,7 @@ export let addChatNote = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     await client.addChatNote(ctx.input.chatId, ctx.input.content);
@@ -184,7 +184,7 @@ export let archiveChatConversation = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new GoSquaredClient({
       token: ctx.auth.token,
-      siteToken: ctx.config.siteToken
+      siteToken: ctx.auth.siteToken
     });
 
     if (ctx.input.archive) {

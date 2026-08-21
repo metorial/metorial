@@ -1,13 +1,13 @@
 import { SlateSpecification } from 'slates';
 import { auth } from './auth';
-import { config } from './config';
+import { configuration } from './config';
 
 export let spec = SlateSpecification.create({
   key: 'test-triggers',
   name: 'Test Triggers',
   description:
-    'Internal test slate with polling and webhook triggers for callback and trigger smoke testing.',
+    'Internal test slate with polling and callback controls plus a comprehensive core, canonical-preset, and scoped provider-boundary webhook verification matrix.',
   metadata: {},
-  config,
+  config: configuration,
   auth
 });

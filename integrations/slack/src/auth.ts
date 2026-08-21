@@ -17,6 +17,7 @@ type SlackProfile = {
 
 type SlackAuthOutput = {
   token: string;
+  signingSecret?: string;
   refreshToken?: string;
   expiresAt?: string;
   actorType?: 'bot' | 'user';
@@ -239,10 +240,19 @@ let getAuthorizationUrl =
     };
   };
 
+let signingSecretSchema = z
+  .string()
+  .min(1)
+  .optional()
+  .describe(
+    'Signing Secret for a customer-owned Slack app; required only when attaching Events API callbacks'
+  );
+
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      signingSecret: z.string().min(1).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
       actorType: z.enum(['bot', 'user']).optional(),
@@ -269,6 +279,7 @@ export let auth = SlateAuth.create()
       }
     ],
     scopes: slackBotOAuthScopes,
+    inputSchema: z.object({ signingSecret: signingSecretSchema }),
     getAuthorizationUrl: getAuthorizationUrl('scope'),
 
     handleCallback: async ctx => {
@@ -287,7 +298,7 @@ export let auth = SlateAuth.create()
       let scopes = parseSlackGrantedScopes(data.scope);
 
       return {
-        output: mergeBotOAuthOutput({}, data),
+        output: mergeBotOAuthOutput({ signingSecret: ctx.input.signingSecret }, data),
         scopes: scopes.length > 0 ? scopes : undefined
       };
     },
@@ -336,6 +347,7 @@ export let auth = SlateAuth.create()
       }
     ],
     scopes: slackUserOAuthScopes,
+    inputSchema: z.object({ signingSecret: signingSecretSchema }),
     getAuthorizationUrl: getAuthorizationUrl('user_scope'),
 
     handleCallback: async ctx => {
@@ -354,7 +366,7 @@ export let auth = SlateAuth.create()
       let scopes = parseSlackGrantedScopes(data.authed_user?.scope ?? data.scope);
 
       return {
-        output: mergeUserOAuthOutput({}, data),
+        output: mergeUserOAuthOutput({ signingSecret: ctx.input.signingSecret }, data),
         scopes: scopes.length > 0 ? scopes : undefined
       };
     },
@@ -392,7 +404,8 @@ export let auth = SlateAuth.create()
     key: 'bot_token',
 
     inputSchema: z.object({
-      token: z.string().describe('Slack Bot Token (starts with xoxb-)')
+      token: z.string().describe('Slack Bot Token (starts with xoxb-)'),
+      signingSecret: signingSecretSchema
     }),
 
     getOutput: async ctx => {
@@ -402,6 +415,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: ctx.input.token,
+          signingSecret: ctx.input.signingSecret,
           actorType: 'bot' as const,
           teamId: data.team_id,
           teamName: data.team,
@@ -421,7 +435,8 @@ export let auth = SlateAuth.create()
     key: 'user_token',
 
     inputSchema: z.object({
-      token: z.string().describe('Slack User Token (starts with xoxp-)')
+      token: z.string().describe('Slack User Token (starts with xoxp-)'),
+      signingSecret: signingSecretSchema
     }),
 
     getOutput: async ctx => {
@@ -431,6 +446,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: ctx.input.token,
+          signingSecret: ctx.input.signingSecret,
           actorType: 'user' as const,
           teamId: data.team_id,
           teamName: data.team,

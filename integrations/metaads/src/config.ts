@@ -14,12 +14,6 @@ export let config = SlateConfig.create(
       .describe(
         'Optional Meta Business ID used by product catalog tools. You can also pass businessId directly to those tools.'
       ),
-    apiVersion: z.string().default('v25.0').describe('Graph API version to use (e.g., v25.0)'),
-    webhookVerifyToken: z
-      .string()
-      .optional()
-      .describe(
-        'Verify Token from the customer-owned Meta app Webhooks settings; when set, webhook URL verification requires an exact match. Leave unset only for legacy unverified callbacks.'
-      )
+    apiVersion: z.string().default('v25.0').describe('Graph API version to use (e.g., v25.0)')
   })
 );

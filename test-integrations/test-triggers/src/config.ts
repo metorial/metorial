@@ -1,4 +1,4 @@
-import { SlateConfig } from 'slates';
+import { config } from 'slates';
 import { z } from 'zod';
 
-export let config = SlateConfig.create(z.object({}));
+export let configuration = config(z.object({}));

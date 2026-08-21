@@ -27,7 +27,8 @@ export let webhookEcho = SlateTrigger.create(spec, {
   key: 'webhook_echo',
   name: 'Webhook Echo',
   description:
-    'Receives a webhook request and emits the received payload with a processed message.'
+    'Receives a webhook request and emits the received payload with a processed message.',
+  eventTypes: ['test.webhook.received']
 })
   .input(
     z.object({

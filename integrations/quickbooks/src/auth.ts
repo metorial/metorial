@@ -55,6 +55,14 @@ let scopes = [
   }
 ];
 
+let webhookVerifierTokenSchema = z
+  .string()
+  .min(1)
+  .optional()
+  .describe(
+    'Intuit webhook verifier token; required only when attaching QuickBooks callbacks'
+  );
+
 let createQuickBooksOauth = (
   name: string,
   key: string,
@@ -65,6 +73,7 @@ let createQuickBooksOauth = (
   key,
   docs,
   scopes,
+  inputSchema: z.object({ webhookVerifierToken: webhookVerifierTokenSchema }),
 
   getAuthorizationUrl: async (ctx: any) => {
     let params = new URLSearchParams({
@@ -118,6 +127,7 @@ let createQuickBooksOauth = (
           expiresAt: token.expiresAt,
           refreshTokenExpiresAt,
           realmId: ctx.callbackParams?.realmId,
+          webhookVerifierToken: ctx.input.webhookVerifierToken,
           // Only dedicated environment-pinned auth methods persist the
           // environment. The generic method leaves it unset so tools keep
           // following the live config value.
@@ -175,6 +185,7 @@ let createQuickBooksOauth = (
           expiresAt: token.expiresAt,
           refreshTokenExpiresAt,
           realmId: ctx.output.realmId,
+          webhookVerifierToken: ctx.output.webhookVerifierToken,
           ...(resolvedEnvironment ? { environment: resolvedEnvironment } : {})
         }
       };
@@ -191,8 +202,9 @@ let createQuickBooksOauth = (
       refreshTokenExpiresAt?: string;
       realmId?: string;
       environment?: QuickBooksEnvironment;
+      webhookVerifierToken?: string;
     };
-    input: {};
+    input: { webhookVerifierToken?: string };
     scopes: string[];
     config?: {
       environment?: QuickBooksEnvironment;
@@ -237,7 +249,8 @@ export let auth = SlateAuth.create()
       expiresAt: z.string().optional(),
       refreshTokenExpiresAt: z.string().optional(),
       realmId: z.string().optional(),
-      environment: z.enum(['sandbox', 'production']).optional()
+      environment: z.enum(['sandbox', 'production']).optional(),
+      webhookVerifierToken: z.string().min(1).optional()
     })
   )
   .addOauth(createQuickBooksOauth('QuickBooks OAuth', 'quickbooks_oauth'))

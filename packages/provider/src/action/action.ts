@@ -1,8 +1,37 @@
+import type {
+  WebhookBootstrapCaptureInput,
+  WebhookBootstrapCaptureOutput,
+  WebhookVerifyInput,
+  WebhookVerifyOutput
+} from '@slates/proto';
 import type { z } from 'zod';
 import type { SlateContext, SlatePublicContext } from '../context';
 import type { SlateActionDocsReference } from '../docs';
+import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from '../specification/specification';
+import type { SlateWebhookHttpMethod, SlateWebhookIngress } from '../webhook/verification';
 import type { SlateAttachment } from './attachment';
+
+export type {
+  SafeWebhookRejectionCode,
+  SlateWebhookDeduplicate,
+  SlateWebhookFreshness,
+  SlateWebhookHttpMethod,
+  SlateWebhookIngress,
+  SlateWebhookItemAdapterId,
+  SlateWebhookProviderRule,
+  SlateWebhookReplayPolicy,
+  SlateWebhookRuleRequestMatcher as SlateWebhookVerificationRequestMatcher,
+  SlateWebhookSecretEncoding,
+  SlateWebhookSecretRef,
+  SlateWebhookSelector,
+  SlateWebhookVerification,
+  SlateWebhookVerificationRule,
+  SlateWebhookVerifier,
+  WebhookWireBody,
+  WebhookWireRequest,
+  WebhookWireResponse
+} from '../webhook/verification';
 
 export type SlateActionType = 'tool' | 'trigger';
 
@@ -18,6 +47,7 @@ export interface SlateActionParameters {
   key: string;
   name: string;
   description?: string;
+  eventTypes?: readonly string[];
   instructions?: string[];
   constraints?: string[];
   tags?: {
@@ -78,18 +108,10 @@ export interface SlateWebhookHttpResponseInit {
   body?: string | Uint8Array | null;
 }
 
-export type SlateWebhookHttpMethod =
-  | 'GET'
-  | 'POST'
-  | 'PUT'
-  | 'PATCH'
-  | 'DELETE'
-  | 'HEAD'
-  | 'OPTIONS';
-
 export interface SlateWebhookRequestMatcher {
-  method?: string;
+  method?: SlateWebhookHttpMethod;
   hasQueryParam?: string;
+  lacksQueryParam?: string;
   hasHeader?: string;
   jsonBodyField?: {
     path: string;
@@ -102,12 +124,15 @@ export interface SlateWebhookRequestMatcher {
 }
 
 export interface SlateWebhookHttpOptions {
+  registration?: { mode: 'automatic' | 'manual_bootstrap' };
   methods?: SlateWebhookHttpMethod[];
   sync?: {
     mode: 'never' | 'match' | 'always';
     match?: SlateWebhookRequestMatcher[];
     timeoutMs?: number;
   };
+  /** The versioned inbound-authenticity declaration. */
+  ingress?: SlateWebhookIngress;
 }
 
 export type SlateTriggerWebhookRequestHandler<
@@ -129,10 +154,32 @@ export type SlateTriggerWebhookRequestHandler<
 export type SlateTriggerWebhookAutoRegistrationHandler<
   ConfigType extends {},
   AuthType extends {}
-> = (context: SlateContext<ConfigType, AuthType, { webhookBaseUrl: string }>) => Promise<{
+> = (
+  context: SlateContext<
+    ConfigType,
+    AuthType,
+    {
+      webhookBaseUrl: string;
+      registrationDetails?: any | null;
+    }
+  >
+) => Promise<{
   registrationDetails: any;
   state?: any;
+  capturedSecrets?: Record<string, string>;
 }>;
+
+export type SlateTriggerWebhookVerifyHandler = (
+  context: SlateContext<Record<string, never>, Record<string, never>, WebhookVerifyInput>
+) => Promise<WebhookVerifyOutput>;
+
+export type SlateTriggerWebhookBootstrapCaptureHandler = (
+  context: SlateContext<
+    Record<string, never>,
+    Record<string, never>,
+    WebhookBootstrapCaptureInput
+  >
+) => Promise<WebhookBootstrapCaptureOutput>;
 
 export type SlateTriggerWebhookAutoUnregistrationHandler<
   ConfigType extends {},
@@ -153,6 +200,9 @@ export interface SlateActionParametersTool<
 > {
   type: 'tool';
   handleInvocation: SlateToolInvocationHandler<ConfigType, AuthType, InputType, OutputType>;
+  receiverBoundToolContextV1?: Readonly<{
+    secretNames: readonly string[];
+  }>;
 }
 
 export interface SlatePollingOptions {
@@ -174,6 +224,8 @@ export interface SlateActionParametersTrigger<
   pollEvents?: SlateTriggerPollingHandler<ConfigType, AuthType, InputType>;
   autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
   autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
+  verifyWebhook?: SlateTriggerWebhookVerifyHandler;
+  captureWebhookBootstrap?: SlateTriggerWebhookBootstrapCaptureHandler;
 }
 
 export type SlateActionParametersAny<
@@ -211,7 +263,21 @@ export abstract class SlateAction<
     protected readonly _inputSchema: z.ZodType<InputType>,
     protected readonly _outputSchema: z.ZodType<OutputType>,
     protected readonly _params: SlateActionParameters
-  ) {}
+  ) {
+    if (type === 'tool' && _params.eventTypes !== undefined) {
+      throw new SlateDeclarationError('eventTypes can only be declared for trigger actions');
+    }
+
+    if (
+      _params.eventTypes &&
+      (_params.eventTypes.some(eventType => !eventType || eventType !== eventType.trim()) ||
+        new Set(_params.eventTypes).size !== _params.eventTypes.length)
+    ) {
+      throw new SlateDeclarationError(
+        'Trigger event types must be unique, non-empty strings without surrounding whitespace'
+      );
+    }
+  }
 
   get configSchema() {
     return this._spec.configSchema;
@@ -239,6 +305,10 @@ export abstract class SlateAction<
 
   get description() {
     return this._params.description;
+  }
+
+  get eventTypes() {
+    return this._params.eventTypes ?? [];
   }
 
   get tags() {

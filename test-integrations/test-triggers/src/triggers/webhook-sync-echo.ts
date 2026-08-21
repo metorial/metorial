@@ -6,7 +6,8 @@ export let webhookSyncEcho = SlateTrigger.create(spec, {
   key: 'webhook_sync_echo',
   name: 'Webhook Sync Echo',
   description:
-    'Returns an immediate HTTP response while also emitting the received payload as a trigger event.'
+    'Returns an immediate HTTP response while also emitting the received payload as a trigger event.',
+  eventTypes: ['test.webhook.sync_echo']
 })
   .input(
     z.object({
@@ -21,6 +22,15 @@ export let webhookSyncEcho = SlateTrigger.create(spec, {
   .webhook({
     http: {
       methods: ['POST'],
+      ingress: {
+        kind: 'receiver_route',
+        baseline: 'receiver_path_secret',
+        verification: {
+          mechanism: 'path_secret_only',
+          baseline: 'receiver_path_secret',
+          reason: 'Internal smoke-test fixture relies on receiver path secrecy.'
+        }
+      },
       sync: {
         mode: 'match',
         match: [

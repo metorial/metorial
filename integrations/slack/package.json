@@ -4,20 +4,20 @@
   "type": "module",
   "scripts": {
     "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc -p tsconfig.typecheck.json --noEmit"
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
     "@slates/slack-tools": "1.0.0-rc.9",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.17",
+    "slates": "1.0.0-rc.18",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.13",
+    "@slates/test": "1.0.0-rc.14",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.3.4"
+  "version": "0.3.7"
 }

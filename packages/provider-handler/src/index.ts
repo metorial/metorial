@@ -1,8 +1,24 @@
-import { badRequestError, preconditionFailedError, ServiceError } from '@lowerdeck/error';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import {
+  badRequestError,
+  createError,
+  preconditionFailedError,
+  ServiceError
+} from '@lowerdeck/error';
+import {
+  computeOriginalWebhookRequestHash,
   createSlatesProviderProtoHandler,
+  SLATE_WEBHOOK_PROVIDER_VERIFIER_DEFINITIONS,
   SLATES_PROTOCOL_VERSION,
-  type SlatesParticipant
+  type SlatesParticipant,
+  type SlatesScopedInvocationGrantEnvelope,
+  slatesWebhookBootstrapCaptureOutput,
+  slatesWebhookVerifyOutput,
+  type WebhookBootstrapCaptureInput,
+  type WebhookBootstrapCaptureOutput,
+  type WebhookVerifyInput,
+  type WebhookVerifyOutput,
+  type WebhookWireRequest
 } from '@slates/proto';
 import {
   runWithContext,
@@ -22,7 +38,7 @@ import {
   mapAdapter,
   mapAuthMethod
 } from './spec';
-import { State } from './state';
+import { EphemeralRequestState, State } from './state';
 import { toJsonSchema, validate } from './validation';
 import { serializeWebhookHttpResponse } from './webhook';
 
@@ -31,6 +47,20 @@ let isRecord = (value: unknown): value is Record<string, unknown> =>
 
 let getObjectKeyCount = (value: unknown) =>
   isRecord(value) ? Object.keys(value).length : undefined;
+
+let toFetchWebhookRequest = (request: WebhookWireRequest) =>
+  new Request(request.url, {
+    method: request.method,
+    headers: request.headers,
+    body: request.body.present ? Buffer.from(request.body.base64, 'base64') : null
+  });
+
+let collectSecretStrings = (value: unknown): string[] => {
+  if (typeof value === 'string') return value.length > 0 ? [value] : [];
+  if (Array.isArray(value)) return value.flatMap(collectSecretStrings);
+  if (isRecord(value)) return Object.values(value).flatMap(collectSecretStrings);
+  return [];
+};
 
 let DOWNLOAD_ATTACHMENT_URL_KEYS = new Set([
   'downloadUrl',
@@ -116,9 +146,375 @@ let resolveTraceMessage = <ResultType>(
   result: ResultType
 ) => (typeof message === 'function' ? message(result) : message);
 
+export type ScopedInvocationGrantOperation =
+  | 'webhook_verify'
+  | 'webhook_bootstrap_capture'
+  | 'webhook_handle'
+  | 'tool_invoke';
+
+interface ScopedReceiverWebhookInvocationGrantBindingBase {
+  grantId: string;
+  tenantId: string;
+  slateInstanceId: string;
+  hubInvocationId: string;
+  requestId: string;
+  actionId: string;
+  specHash: string;
+  ruleId: string;
+  originalRequestHash: string;
+  dispatchRequestHash: string;
+  issuedAtMs: number;
+  expiresAtMs: number;
+  receiverId: string;
+  receiverTriggerId: string;
+  registrationStatus: string;
+  registrationGeneration: number;
+  registrationVersion: number;
+  authConfigId: string | null;
+  callbackSecretIds: Readonly<Record<string, string>>;
+  candidateBindings: readonly Readonly<{
+    candidateId: string;
+    index: number;
+    bindingHash: string;
+    deliveryIds: readonly string[];
+  }>[];
+}
+
+export type ScopedInvocationGrantBindings =
+  | (ScopedReceiverWebhookInvocationGrantBindingBase &
+      (
+        | { operation: 'webhook_verify' }
+        | { operation: 'webhook_bootstrap_capture' }
+        | { operation: 'webhook_handle' }
+      ))
+  | {
+      grantId: string;
+      deploymentId: string;
+      runtimeIdentityId: string;
+      runtimeIdentityGeneration: number;
+      tenantId: string;
+      slateInstanceId: string;
+      hubInvocationId: string;
+      requestId: string;
+      actionId: string;
+      operation: 'tool_invoke';
+      issuedAtMs: number;
+      expiresAtMs: number;
+      authConfigId: string | null;
+      receiverCallback?: Readonly<{
+        receiverId: string;
+        receiverTriggerId: string;
+        triggerActionId: string;
+        specHash: string;
+        registrationGeneration: number;
+        registrationVersion: number;
+        callbackSecretIds: Readonly<Record<string, string>>;
+      }>;
+    };
+
+export interface RedeemedScopedInvocationGrant<
+  Operation extends ScopedInvocationGrantOperation = ScopedInvocationGrantOperation
+> {
+  bindings: Extract<ScopedInvocationGrantBindings, { operation: Operation }>;
+  secrets: Record<string, { value: string }>;
+  /** Mandatory, idempotent terminal cleanup of redeemed material. */
+  clear(): void;
+}
+
+export interface ProviderHandlerSecurityOptions {
+  redeemScopedInvocationGrant?: (d: {
+    envelope: SlatesScopedInvocationGrantEnvelope;
+    expected: {
+      requestId: string;
+      operation: ScopedInvocationGrantOperation;
+      actionId: string;
+      secretNames: readonly string[];
+      callbackSecretNames: readonly string[];
+      requiresAuthConfig: boolean;
+    };
+  }) => Promise<RedeemedScopedInvocationGrant>;
+  now?: () => number;
+  operationTimeoutMs?: number;
+  getOperationSignal?: (d: {
+    requestId: string;
+    operation: ScopedInvocationGrantOperation;
+    actionId: string;
+  }) => AbortSignal | undefined;
+}
+
+let sameStringSet = (first: readonly string[], second: readonly string[]) =>
+  first.length === second.length &&
+  new Set(first).size === first.length &&
+  first.every(value => second.includes(value));
+
+let containsSecretValue = (value: unknown, secretValues: readonly string[]) => {
+  let serialized = JSON.stringify(value);
+  return secretValues.some(secret => secret.length > 0 && serialized.includes(secret));
+};
+
+let sanitizeExactSecretValues = <Value>(
+  value: Value,
+  secretValues: readonly string[]
+): Value => {
+  let redact = (value: string) =>
+    secretValues
+      .filter(secret => secret.length > 0)
+      .reduce((result, secret) => result.split(secret).join('[redacted]'), value);
+  let seen = new WeakMap<object, unknown>();
+  let getOwnDataValue = (source: object, key: PropertyKey) => {
+    try {
+      let descriptor = Object.getOwnPropertyDescriptor(source, key);
+      return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  let copyEnumerableData = (
+    source: object,
+    target: object,
+    visit: (entry: unknown) => unknown,
+    skipped = new Set<PropertyKey>()
+  ) => {
+    let keys: (string | symbol)[];
+    try {
+      keys = Reflect.ownKeys(source);
+    } catch {
+      return;
+    }
+    for (let key of keys) {
+      if (skipped.has(key)) continue;
+      let descriptor: PropertyDescriptor | undefined;
+      try {
+        descriptor = Object.getOwnPropertyDescriptor(source, key);
+      } catch {
+        continue;
+      }
+      if (!descriptor?.enumerable || !('value' in descriptor)) continue;
+      let safeKey =
+        typeof key === 'string' ? redact(key) : Symbol(redact(key.description ?? ''));
+      Object.defineProperty(target, safeKey, {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: visit(descriptor.value)
+      });
+    }
+  };
+  let visit = (entry: unknown): unknown => {
+    if (typeof entry === 'string') return redact(entry);
+    if (entry === null || (typeof entry !== 'object' && typeof entry !== 'function')) {
+      return entry;
+    }
+    let source = entry as object;
+    let existing = seen.get(source);
+    if (existing !== undefined) return existing;
+    if (entry instanceof Error) {
+      let rawMessage = getOwnDataValue(source, 'message');
+      let safeMessage = typeof rawMessage === 'string' ? redact(rawMessage) : 'Error';
+      let placeholder = new Error(safeMessage);
+      seen.set(source, placeholder);
+
+      if (entry instanceof ServiceError) {
+        let errorRecord = getOwnDataValue(source, 'error');
+        let rawData =
+          (typeof errorRecord === 'object' && errorRecord !== null) ||
+          typeof errorRecord === 'function'
+            ? getOwnDataValue(errorRecord as object, 'data')
+            : undefined;
+        let safeData = visit(rawData);
+        if (
+          isRecord(safeData) &&
+          typeof safeData.status === 'number' &&
+          typeof safeData.code === 'string' &&
+          typeof safeData.message === 'string'
+        ) {
+          let sanitized = new ServiceError(createError(safeData as any));
+          seen.set(source, sanitized);
+          return sanitized;
+        }
+      }
+
+      let sanitized = placeholder as Error & Record<string, unknown> & { cause?: unknown };
+      let rawName = getOwnDataValue(source, 'name');
+      if (typeof rawName === 'string') sanitized.name = redact(rawName);
+      copyEnumerableData(
+        source,
+        sanitized,
+        visit,
+        new Set(['message', 'name', 'stack', 'cause'])
+      );
+      let cause = getOwnDataValue(source, 'cause');
+      if (cause !== undefined) sanitized.cause = visit(cause);
+      return sanitized;
+    }
+    if (Array.isArray(entry)) {
+      let result: unknown[] = [];
+      seen.set(source, result);
+      copyEnumerableData(source, result, visit);
+      return result;
+    }
+    let result: Record<PropertyKey, unknown> = Object.create(null);
+    seen.set(source, result);
+    copyEnumerableData(source, result, visit);
+    return result;
+  };
+  return visit(value) as Value;
+};
+
+let SCOPED_CONSOLE_METHODS = [
+  'assert',
+  'clear',
+  'count',
+  'countReset',
+  'debug',
+  'dir',
+  'dirxml',
+  'error',
+  'group',
+  'groupCollapsed',
+  'groupEnd',
+  'info',
+  'log',
+  'profile',
+  'profileEnd',
+  'table',
+  'time',
+  'timeEnd',
+  'timeLog',
+  'timeStamp',
+  'trace',
+  'warn'
+] as const;
+
+let scopedConsoleRedaction = new AsyncLocalStorage<readonly string[]>();
+let scopedConsoleLeaseCount = 0;
+let originalConsoleDescriptors = new Map<string, PropertyDescriptor | undefined>();
+
+let restoreScopedConsole = () => {
+  for (let [name, descriptor] of originalConsoleDescriptors) {
+    if (descriptor) Object.defineProperty(console, name, descriptor);
+    else delete (console as unknown as Record<string, unknown>)[name];
+  }
+  originalConsoleDescriptors.clear();
+};
+
+let acquireScopedConsoleRedaction = (values: readonly string[]) => {
+  let sentinels = [...new Set(values.filter(value => value.length > 0))];
+  let released = false;
+
+  if (scopedConsoleLeaseCount++ === 0) {
+    try {
+      for (let name of SCOPED_CONSOLE_METHODS) {
+        let method = (console as unknown as Record<string, unknown>)[name];
+        if (typeof method !== 'function') continue;
+        originalConsoleDescriptors.set(name, Object.getOwnPropertyDescriptor(console, name));
+        Object.defineProperty(console, name, {
+          configurable: true,
+          enumerable: Object.prototype.propertyIsEnumerable.call(console, name),
+          writable: true,
+          value: (...args: unknown[]) =>
+            Reflect.apply(
+              method,
+              console,
+              args.map(arg =>
+                sanitizeExactSecretValues(arg, scopedConsoleRedaction.getStore() ?? [])
+              )
+            )
+        });
+      }
+    } catch (error) {
+      scopedConsoleLeaseCount--;
+      restoreScopedConsole();
+      throw error;
+    }
+  }
+
+  return {
+    run: <Result>(handler: () => Promise<Result>) =>
+      scopedConsoleRedaction.run(sentinels, handler),
+    add: (values: readonly string[]) => {
+      for (let value of values) {
+        if (value.length > 0 && !sentinels.includes(value)) sentinels.push(value);
+      }
+    },
+    release: () => {
+      if (released) return;
+      released = true;
+      sentinels.fill('');
+      sentinels.length = 0;
+      scopedConsoleLeaseCount--;
+      if (scopedConsoleLeaseCount !== 0) return;
+      restoreScopedConsole();
+    }
+  };
+};
+
+let redactExactSecretValues = (error: unknown, secretValues: readonly string[]) => {
+  let sanitized = sanitizeExactSecretValues(error, secretValues);
+  if (sanitized instanceof Error) return sanitized;
+  if (typeof sanitized === 'string') return new Error(sanitized);
+  return new Error('Provider execution failed');
+};
+
+let withOperationCancellation = async <Result>(
+  handler: (signal: AbortSignal) => Promise<Result>,
+  timeoutMs: number,
+  externalSignal?: AbortSignal
+) => {
+  let controller = new AbortController();
+  let terminalReason: 'timeout' | 'cancelled' | undefined;
+  let cancel = () => {
+    terminalReason = 'cancelled';
+    controller.abort(new Error('Scoped webhook operation was cancelled'));
+  };
+  if (externalSignal?.aborted) cancel();
+  else externalSignal?.addEventListener('abort', cancel, { once: true });
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    timeout = setTimeout(() => {
+      terminalReason = 'timeout';
+      controller.abort(new Error('Scoped webhook operation timed out'));
+    }, timeoutMs);
+    let result: Result;
+    try {
+      // Deliberately await provider settlement after abort: no timeout/cancel response can be
+      // emitted while provider code is still executing with scoped material.
+      result = await handler(controller.signal);
+    } catch (error) {
+      if (terminalReason === 'timeout') throw new Error('Scoped webhook operation timed out');
+      if (terminalReason === 'cancelled')
+        throw new Error('Scoped webhook operation was cancelled');
+      throw error;
+    }
+    if (terminalReason === 'timeout') throw new Error('Scoped webhook operation timed out');
+    if (terminalReason === 'cancelled')
+      throw new Error('Scoped webhook operation was cancelled');
+    return result;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', cancel);
+  }
+};
+
+let sameCandidateBindings = (
+  first: readonly {
+    candidateId: string;
+    index: number;
+    bindingHash: string;
+    deliveryIds: readonly string[];
+  }[],
+  second: readonly {
+    candidateId: string;
+    index: number;
+    bindingHash: string;
+    deliveryIds: readonly string[];
+  }[]
+) => JSON.stringify(first) === JSON.stringify(second);
+
 export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
-  listeners: SlateLogListener[]
+  listeners: SlateLogListener[],
+  security: ProviderHandlerSecurityOptions = {}
 ) =>
   createSlatesProviderProtoHandler(async manager => {
     let protocol = new State<string | null>(null);
@@ -127,6 +523,11 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     let auth = new State<{ authenticationMethodId: string; output: AuthType } | null>(null);
     let config = new State<{ value: ConfigType } | null>(null);
     let session = new State<{ id: string; state: any } | null>(null);
+    let scopedToolState = new EphemeralRequestState<{
+      config: ConfigType;
+      auth: AuthType;
+      secrets: Record<string, { value: string }>;
+    }>();
 
     let logger = new SlateLogger(listeners);
     let providerTrace = {
@@ -143,6 +544,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         errorMessage?: string;
         metadata?: Record<string, unknown>;
         onSuccess?: (result: ResultType) => Record<string, unknown> | undefined;
+        sensitiveValues?: readonly string[];
       },
       handler: () => Promise<ResultType>
     ): Promise<ResultType> => {
@@ -159,12 +561,13 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       try {
         let result = await handler();
-        let successMessage = resolveTraceMessage(trace.successMessage, result);
+        let sanitizedResult = sanitizeExactSecretValues(result, trace.sensitiveValues ?? []);
+        let successMessage = resolveTraceMessage(trace.successMessage, sanitizedResult);
 
         logger.info({
           ...providerTrace,
           ...trace.metadata,
-          ...(trace.onSuccess?.(result) ?? {}),
+          ...(trace.onSuccess?.(sanitizedResult) ?? {}),
           component: trace.component,
           functionName: trace.functionName,
           phase: 'success',
@@ -174,10 +577,11 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
         return result;
       } catch (error) {
+        let sanitizedError = sanitizeExactSecretValues(error, trace.sensitiveValues ?? []);
         logger.error({
           ...providerTrace,
           ...trace.metadata,
-          ...toErrorMetadata(error),
+          ...toErrorMetadata(sanitizedError),
           component: trace.component,
           functionName: trace.functionName,
           phase: 'error',
@@ -186,7 +590,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
             trace.errorMessage ??
             `${typeof trace.successMessage === 'string' ? trace.successMessage : trace.message} failed`
         });
-        throw error;
+        throw sanitizedError;
       }
     };
 
@@ -240,6 +644,97 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     let getEmptyContext = () => new SlateContext({}, {}, {}, slate.spec as any, logger);
     let getAuthContext = () =>
       new SlateContext(getAuthConfig(), {}, {}, slate.spec as any, logger);
+
+    let redeemScopedGrant = async <Operation extends ScopedInvocationGrantOperation>(d: {
+      envelope: SlatesScopedInvocationGrantEnvelope;
+      requestId: string;
+      operation: Operation;
+      actionId: string;
+      secretNames: readonly string[];
+      callbackSecretNames?: readonly string[];
+      requiresAuthConfig?: boolean;
+    }) => {
+      if (!security.redeemScopedInvocationGrant) {
+        throw new ServiceError(
+          preconditionFailedError({
+            code: 'scoped_invocation_grant_unavailable',
+            message: 'Authenticated scoped invocation grant redemption is unavailable'
+          })
+        );
+      }
+
+      let redeemed = await security.redeemScopedInvocationGrant({
+        envelope: d.envelope,
+        expected: {
+          requestId: d.requestId,
+          operation: d.operation,
+          actionId: d.actionId,
+          secretNames: d.secretNames,
+          callbackSecretNames: d.callbackSecretNames ?? [],
+          requiresAuthConfig: d.requiresAuthConfig ?? false
+        }
+      });
+      let now = security.now?.() ?? Date.now();
+      let bindings = redeemed.bindings;
+      let secretNames = Object.keys(redeemed.secrets);
+      let callbackSecretIds =
+        bindings.operation === 'tool_invoke'
+          ? (bindings.receiverCallback?.callbackSecretIds ?? {})
+          : bindings.callbackSecretIds;
+      let valid =
+        bindings.grantId === d.envelope.grantId &&
+        bindings.requestId === d.requestId &&
+        d.envelope.requestId === d.requestId &&
+        bindings.operation === d.operation &&
+        bindings.actionId === d.actionId &&
+        bindings.hubInvocationId.length > 0 &&
+        bindings.tenantId.length > 0 &&
+        bindings.slateInstanceId.length > 0 &&
+        bindings.issuedAtMs <= now &&
+        bindings.expiresAtMs > now &&
+        sameStringSet(d.secretNames, secretNames) &&
+        sameStringSet(d.callbackSecretNames ?? [], Object.keys(callbackSecretIds)) &&
+        (!(d.requiresAuthConfig ?? false) || Boolean(bindings.authConfigId)) &&
+        (bindings.authConfigId === null || bindings.authConfigId.length > 0) &&
+        Object.entries(callbackSecretIds).every(
+          ([name, secretId]) =>
+            secretNames.includes(
+              bindings.operation === 'tool_invoke' ? `receiver_callback:${name}` : name
+            ) && secretId.length > 0
+        ) &&
+        (bindings.operation === 'tool_invoke' ||
+          (typeof bindings.specHash === 'string' &&
+            /^[a-f0-9]{64}$/.test(bindings.specHash) &&
+            typeof bindings.ruleId === 'string' &&
+            bindings.ruleId.length > 0 &&
+            typeof bindings.originalRequestHash === 'string' &&
+            /^[a-f0-9]{64}$/.test(bindings.originalRequestHash) &&
+            typeof bindings.dispatchRequestHash === 'string' &&
+            /^[a-f0-9]{64}$/.test(bindings.dispatchRequestHash) &&
+            typeof bindings.receiverId === 'string' &&
+            bindings.receiverId.length > 0 &&
+            typeof bindings.receiverTriggerId === 'string' &&
+            bindings.receiverTriggerId.length > 0 &&
+            typeof bindings.registrationStatus === 'string' &&
+            bindings.registrationStatus.length > 0 &&
+            Number.isInteger(bindings.registrationGeneration) &&
+            bindings.registrationGeneration > 0 &&
+            Number.isInteger(bindings.registrationVersion) &&
+            bindings.registrationVersion > 0 &&
+            Array.isArray(bindings.candidateBindings)));
+
+      if (!valid) {
+        redeemed.clear();
+        throw new ServiceError(
+          preconditionFailedError({
+            code: 'scoped_invocation_grant_invalid',
+            message: 'Scoped invocation grant bindings are invalid or stale'
+          })
+        );
+      }
+
+      return redeemed as unknown as RedeemedScopedInvocationGrant<Operation>;
+    };
     let withRequestTraces = <Result extends Record<string, any>>(
       context: SlatePublicContext<any>,
       result: Result
@@ -275,7 +770,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       auth.set({
         authenticationMethodId: params.authenticationMethodId,
-        output: valRes
+        output: valRes as AuthType
       });
     });
 
@@ -283,13 +778,13 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       getContextBasic();
 
       let value = validate(
-        slate.spec.configSchema,
+        slate.spec.config.configSchema,
         params.config,
         'config',
         'Invalid configuration'
       );
 
-      config.set({ value });
+      config.set({ value: value as ConfigType });
     });
 
     manager.onNotification('slates/session.start', async ({ params }) => {
@@ -313,7 +808,10 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       let configChanged = slate.spec.config.handlers.configChanged;
       if (!configChanged) {
-        return { success: true, config: newConfig };
+        return {
+          success: true,
+          config: newConfig as Record<string, any>
+        };
       }
 
       let context = getEmptyContext();
@@ -335,14 +833,24 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           runWithContext(context, async () =>
             configChanged({
               previousConfig: params.previousConfig as ConfigType | null,
-              newConfig
+              newConfig: newConfig as ConfigType
             })
           )
       );
 
+      let mergedConfig = validate(
+        slate.spec.config.configSchema,
+        {
+          ...(newConfig as Record<string, unknown>),
+          ...((updatedConfig?.config ?? {}) as Record<string, unknown>)
+        },
+        'config',
+        'Invalid provider config change output'
+      );
+
       return withRequestTraces(context, {
         success: true,
-        config: (updatedConfig?.config ?? newConfig) as Record<string, any>
+        config: mergedConfig as Record<string, any>
       });
     });
 
@@ -367,8 +875,14 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         },
         () => runWithContext(context, async () => getDefaultConfig())
       );
+      let validatedDefault = validate(
+        slate.spec.config.configSchema,
+        defaultConfig,
+        'config',
+        'Invalid default configuration'
+      );
       return withRequestTraces(context, {
-        config: (defaultConfig ?? null) as Record<string, any> | null
+        config: validatedDefault as Record<string, unknown>
       });
     });
 
@@ -376,7 +890,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       getContextBasic();
 
       return {
-        schema: toJsonSchema(slate.spec.configSchema),
+        schema: toJsonSchema(slate.spec.config.configSchema),
         docs: slate.spec.config.docsReferences ?? []
       };
     });
@@ -392,6 +906,16 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           name: slate.spec.name,
           description: slate.spec.description,
           metadata: slate.spec.parameters.metadata
+        },
+        capabilities: {
+          webhookVerificationRulesV1: true,
+          webhookWireV1: true,
+          webhookActionSpecHashV1: true,
+          scopedInvocationGrantV1: true,
+          receiverBoundToolContextV1: true,
+          webhookSecretNegotiationV1: true,
+          webhookInboundVerificationV1: true,
+          webhookInboundBootstrapCaptureV1: true
         },
         docs: slate.spec.docs ?? []
       };
@@ -793,7 +1317,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       };
     });
 
-    manager.onRequest('slates/action.tool.invoke', async ({ params }) => {
+    manager.onRequest('slates/action.tool.invoke', async ({ params, invocation, id }) => {
+      getContextBasic();
       let action = getActionWithType(slate, 'tool', params.actionId);
 
       let input = validate(
@@ -803,8 +1328,15 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         `Invalid input for tool ID: ${params.actionId}`
       );
 
-      let invoke = async (context: SlatePublicContext<any>) => {
-        let res = await traceProviderCall(
+      if (!invocation) {
+        let context: SlatePublicContext<any>;
+        if (action.isPublic) {
+          context = new SlatePublicContext(input, slate.spec, logger);
+        } else {
+          let ctx = getContextFull();
+          context = new SlateContext(ctx.config, input, ctx.auth?.output!, slate.spec, logger);
+        }
+        let result = await traceProviderCall(
           {
             component: 'action',
             functionName: 'handleInvocation',
@@ -827,23 +1359,253 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           },
           () => runWithContext(context, () => action.handleInvocation(context as any))
         );
-
+        let output = validate(
+          action.outputSchema,
+          result.output,
+          'output',
+          `Invalid output for tool ID: ${params.actionId}`
+        );
         return withRequestTraces(context, {
-          output: res.output,
-          message: res.message,
-          attachments: mergeAttachments(res.attachments, res.output)
+          output,
+          message: result.message,
+          attachments: mergeAttachments(result.attachments, result.output)
         });
-      };
-
-      if (action.isPublic) {
-        getContextBasic();
-        return invoke(new SlatePublicContext(input, slate.spec, logger));
       }
 
-      let ctx = getContextFull();
-      return invoke(
-        new SlateContext(ctx.config, input, ctx.auth?.output!, slate.spec, logger)
-      );
+      if (action.isPublic) {
+        throw new ServiceError(
+          preconditionFailedError({
+            code: 'scoped_invocation_grant_unexpected',
+            message: 'Public tools do not accept scoped invocation grants'
+          })
+        );
+      }
+
+      let authSecretNames = slate.spec.auth.authStack.length > 0 ? ['auth:$output'] : [];
+      let receiverCapability = (
+        action.parameters as typeof action.parameters & {
+          receiverBoundToolContextV1?: { secretNames: readonly string[] };
+        }
+      ).receiverBoundToolContextV1;
+      let receiverSecretNames = receiverCapability
+        ? [
+            'receiver_callback:$url',
+            ...receiverCapability.secretNames.map(name => `receiver_callback:${name}`)
+          ]
+        : [];
+      let secretNames = [...authSecretNames, ...receiverSecretNames].sort();
+      let redeemed = await redeemScopedGrant({
+        envelope: invocation,
+        requestId: id,
+        operation: 'tool_invoke',
+        actionId: action.key,
+        secretNames,
+        callbackSecretNames: receiverCapability?.secretNames ?? [],
+        requiresAuthConfig: authSecretNames.length > 0
+      });
+      if (authSecretNames.length > 0 && !redeemed.bindings.authConfigId) {
+        redeemed.clear();
+        throw new ServiceError(
+          preconditionFailedError({
+            code: 'scoped_invocation_grant_invalid',
+            message: 'The scoped tool grant is not bound to an authentication config'
+          })
+        );
+      }
+      if (receiverCapability && !redeemed?.bindings.receiverCallback) {
+        redeemed?.clear();
+        throw new ServiceError(
+          preconditionFailedError({
+            code: 'receiver_bound_tool_context_unavailable',
+            message: 'The receiver-bound tool grant is missing its authoritative binding'
+          })
+        );
+      }
+      if (!receiverCapability && redeemed?.bindings.receiverCallback) {
+        redeemed.clear();
+        throw new ServiceError(
+          preconditionFailedError({
+            code: 'receiver_bound_tool_context_unexpected',
+            message: 'The action does not declare receiver-bound tool context'
+          })
+        );
+      }
+      let consoleRedaction: ReturnType<typeof acquireScopedConsoleRedaction> | undefined;
+      let classifiedSecretValues = Object.values(redeemed.secrets)
+        .map(secret => secret.value)
+        .filter(value => value.length > 0);
+      try {
+        consoleRedaction = acquireScopedConsoleRedaction(classifiedSecretValues);
+        let execute = async () => {
+          let classified = Object.fromEntries(
+            Object.entries(redeemed.secrets).map(([name, secret]) => {
+              let value = name.startsWith('receiver_callback:')
+                ? secret.value
+                : (JSON.parse(secret.value) as unknown);
+              let parsedSentinels = collectSecretStrings(value);
+              for (let sentinel of parsedSentinels) {
+                if (!classifiedSecretValues.includes(sentinel)) {
+                  classifiedSecretValues.push(sentinel);
+                }
+              }
+              consoleRedaction?.add(parsedSentinels);
+              return [name, { ...secret, value }];
+            })
+          );
+          let invocationConfig = (config.get()?.value ?? {}) as ConfigType;
+          let scopedAuthOutput = classified['auth:$output']?.value;
+          if (scopedAuthOutput !== undefined && !isRecord(scopedAuthOutput)) {
+            throw new ServiceError(
+              preconditionFailedError({
+                code: 'scoped_invocation_grant_invalid',
+                message: 'Scoped authentication output is invalid'
+              })
+            );
+          }
+          let invocationAuth = validate(
+            slate.spec.authSchema,
+            scopedAuthOutput ?? {},
+            'auth',
+            'Invalid scoped authentication output'
+          ) as AuthType;
+          let redactionSecrets = Object.fromEntries(
+            Object.entries(classified)
+              .filter(([name]) => !name.startsWith('receiver_callback:'))
+              .map(([name, secret]) => [
+                name,
+                {
+                  value:
+                    typeof secret.value === 'string'
+                      ? secret.value
+                      : JSON.stringify(secret.value)
+                }
+              ])
+          );
+          let receiverCallback = receiverCapability
+            ? (() => {
+                let url = classified['receiver_callback:$url'];
+                if (!url || typeof url.value !== 'string') {
+                  throw new ServiceError(
+                    preconditionFailedError({
+                      code: 'receiver_bound_tool_context_unavailable',
+                      message: 'The receiver-bound callback URL is unavailable'
+                    })
+                  );
+                }
+                let secrets = Object.fromEntries(
+                  receiverCapability.secretNames.map(name => {
+                    let secret = classified[`receiver_callback:${name}`];
+                    if (!secret || typeof secret.value !== 'string') {
+                      throw new ServiceError(
+                        preconditionFailedError({
+                          code: 'receiver_bound_tool_context_unavailable',
+                          message: 'A receiver-bound callback secret is unavailable'
+                        })
+                      );
+                    }
+                    return [name, { value: secret.value }];
+                  })
+                );
+                return { url: url.value, secrets };
+              })()
+            : undefined;
+          return await scopedToolState.run(
+            id,
+            {
+              config: invocationConfig,
+              auth: invocationAuth,
+              secrets: redactionSecrets
+            },
+            async scoped => {
+              let context: SlateContext<any, any, any> | undefined;
+              try {
+                let res = await traceProviderCall(
+                  {
+                    component: 'action',
+                    functionName: 'handleInvocation',
+                    message: `Starting tool ${formatEntityLabel(action.name, action.key)}`,
+                    successMessage: `Completed tool ${formatEntityLabel(action.name, action.key)}`,
+                    errorMessage: `Tool ${formatEntityLabel(action.name, action.key)} failed`,
+                    metadata: {
+                      actionId: action.key,
+                      actionName: action.name,
+                      actionType: action.type,
+                      inputKeyCount: getObjectKeyCount(input)
+                    },
+                    onSuccess: result => ({
+                      hasMessage: !!result.message,
+                      actionResultMessage: result.message,
+                      outputKeyCount: getObjectKeyCount(result.output),
+                      attachmentCount: result.attachments?.length
+                    }),
+                    sensitiveValues: classifiedSecretValues
+                  },
+                  () =>
+                    withOperationCancellation(
+                      signal => {
+                        context = new SlateContext(
+                          scoped.config,
+                          input,
+                          scoped.auth,
+                          slate.spec,
+                          logger,
+                          {
+                            secrets: scoped.secrets,
+                            redactionSentinels: classifiedSecretValues,
+                            receiverCallback,
+                            abortSignal: signal
+                          }
+                        );
+                        return runWithContext(context, () =>
+                          action.handleInvocation(context!)
+                        );
+                      },
+                      security.operationTimeoutMs ?? 30_000,
+                      security.getOperationSignal?.({
+                        requestId: id,
+                        operation: 'tool_invoke',
+                        actionId: action.key
+                      })
+                    )
+                );
+
+                if (containsSecretValue(res, classifiedSecretValues)) {
+                  throw new ServiceError(
+                    preconditionFailedError({
+                      code: 'classified_provider_output_rejected',
+                      message: 'Provider output attempted to return classified invocation data'
+                    })
+                  );
+                }
+                let output = validate(
+                  action.outputSchema,
+                  res.output,
+                  'output',
+                  `Invalid output for tool ID: ${params.actionId}`
+                );
+                return sanitizeExactSecretValues(
+                  withRequestTraces(context!, {
+                    output,
+                    message: res.message,
+                    attachments: mergeAttachments(res.attachments, res.output)
+                  }),
+                  classifiedSecretValues
+                );
+              } finally {
+                context?.clearScopedInvocation();
+              }
+            }
+          );
+        };
+        return await (consoleRedaction ? consoleRedaction.run(execute) : execute());
+      } catch (error) {
+        throw redactExactSecretValues(error, classifiedSecretValues);
+      } finally {
+        consoleRedaction?.release();
+        classifiedSecretValues.fill('');
+        classifiedSecretValues.length = 0;
+        redeemed?.clear();
+      }
     });
 
     manager.onRequest('slates/action.trigger.map_event', async ({ params }) => {
@@ -931,7 +1693,485 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       });
     });
 
-    manager.onRequest('slates/action.trigger.webhook_handle', async ({ params }) => {
+    let getProviderWebhookRule = (actionId: string, ruleId: string) => {
+      let action = getActionWithType(slate, 'trigger', actionId);
+      let verification = action.http?.ingress?.verification;
+      if (!verification || verification.mechanism !== 'provider') {
+        throw new ServiceError(
+          badRequestError({
+            message: `Trigger action does not declare provider webhook verification: ${actionId}`
+          })
+        );
+      }
+      let rule = verification.rules.find(candidate => candidate.id === ruleId);
+      if (!rule) {
+        throw new ServiceError(
+          badRequestError({ message: `Unknown provider webhook rule: ${ruleId}` })
+        );
+      }
+      let refs = verification.allowedSecretRefs.filter(secretRef =>
+        rule.verify.allowedSecretRefs.includes(secretRef.name)
+      );
+      return {
+        action,
+        rule,
+        callbackSecretNames: [
+          ...new Set(
+            refs
+              .filter(secretRef =>
+                ['callback_secret', 'registration', 'generated'].includes(secretRef.source)
+              )
+              .map(secretRef => secretRef.name)
+          )
+        ],
+        requiresAuthConfig: refs.some(secretRef =>
+          ['auth_config', 'oauth_credentials'].includes(secretRef.source)
+        )
+      };
+    };
+
+    manager.onRequest(
+      'slates/action.trigger.webhook_verify',
+      async ({ params, invocation, id }) => {
+        getContextBasic();
+        let { action, rule, callbackSecretNames, requiresAuthConfig } = getProviderWebhookRule(
+          params.actionId,
+          params.ruleId
+        );
+        let handlers = action.parameters as typeof action.parameters & {
+          verifyWebhook?: (
+            context: SlateContext<any, any, WebhookVerifyInput>
+          ) => Promise<WebhookVerifyOutput>;
+        };
+        if (!handlers.verifyWebhook) {
+          throw new ServiceError(
+            preconditionFailedError({
+              message: `Trigger action does not advertise inbound verification: ${params.actionId}`
+            })
+          );
+        }
+        let publishedAction = mapAction(slate, action);
+        if (
+          publishedAction.type !== 'action.trigger' ||
+          publishedAction.invocation.type !== 'webhook' ||
+          params.specHash !== publishedAction.specHash
+        ) {
+          throw new ServiceError(
+            badRequestError({ message: 'Webhook action spec hash binding is invalid' })
+          );
+        }
+        if (
+          computeOriginalWebhookRequestHash(params.originalRequest) !==
+          params.originalRequestHash
+        ) {
+          throw new ServiceError(
+            badRequestError({ message: 'Original webhook request hash binding is invalid' })
+          );
+        }
+
+        let expectedScope =
+          rule.result.type === 'dispatch' ? rule.result.scope : 'receiver_trigger';
+        if (
+          expectedScope === 'verified_items' &&
+          params.itemAdapter?.id !== 'graph.body_value.v1'
+        ) {
+          throw new ServiceError(
+            badRequestError({ message: 'The declared verified-items adapter is required' })
+          );
+        }
+        if (
+          params.itemAdapter &&
+          new Set(params.itemAdapter.candidates.map(candidate => candidate.candidateId))
+            .size !== params.itemAdapter.candidates.length
+        ) {
+          throw new ServiceError(
+            badRequestError({ message: 'Webhook item candidates must have unique IDs' })
+          );
+        }
+
+        let redeemed = await redeemScopedGrant({
+          envelope: invocation,
+          requestId: id,
+          operation: 'webhook_verify',
+          actionId: params.actionId,
+          secretNames: rule.verify.allowedSecretRefs,
+          callbackSecretNames,
+          requiresAuthConfig
+        });
+        let context: SlateContext<any, any, WebhookVerifyInput> | undefined;
+        let secretValues = Object.values(redeemed.secrets).map(secret => secret.value);
+        let consoleRedaction: ReturnType<typeof acquireScopedConsoleRedaction> | undefined;
+        try {
+          consoleRedaction = acquireScopedConsoleRedaction(secretValues);
+          if (
+            redeemed.bindings.specHash !== params.specHash ||
+            redeemed.bindings.ruleId !== params.ruleId ||
+            redeemed.bindings.originalRequestHash !== params.originalRequestHash ||
+            redeemed.bindings.dispatchRequestHash !== params.originalRequestHash ||
+            !redeemed.bindings.receiverId ||
+            !redeemed.bindings.receiverTriggerId ||
+            redeemed.bindings.registrationGeneration <= 0 ||
+            redeemed.bindings.registrationVersion <= 0 ||
+            !sameCandidateBindings(
+              redeemed.bindings.candidateBindings,
+              params.itemAdapter?.candidates ?? []
+            )
+          ) {
+            throw new ServiceError(
+              preconditionFailedError({
+                code: 'scoped_invocation_grant_invalid',
+                message: 'Scoped verification bindings are invalid or stale'
+              })
+            );
+          }
+          let result = await consoleRedaction.run(() =>
+            withOperationCancellation(
+              signal => {
+                context = new SlateContext({}, params, {}, slate.spec as any, logger, {
+                  secrets: redeemed.secrets,
+                  redactionSentinels: secretValues,
+                  networkEgress: 'deny_all',
+                  sideEffects: 'deny_all',
+                  abortSignal: signal
+                });
+                return runWithContext(context, () => handlers.verifyWebhook!(context!));
+              },
+              security.operationTimeoutMs ?? 15_000,
+              security.getOperationSignal?.({
+                requestId: id,
+                operation: 'webhook_verify',
+                actionId: params.actionId
+              })
+            )
+          );
+          let parsed = slatesWebhookVerifyOutput.parse(result);
+          if (parsed.status === 'accepted') {
+            let allowedAuthenticatedFields = new Set(
+              SLATE_WEBHOOK_PROVIDER_VERIFIER_DEFINITIONS[rule.verify.verifierId].presetFields
+            );
+            if (
+              Object.keys(parsed.authenticatedFields ?? {}).some(
+                field => !allowedAuthenticatedFields.has(field as never)
+              )
+            ) {
+              throw new ServiceError(
+                badRequestError({
+                  message: 'Provider verification returned an undeclared authenticated field'
+                })
+              );
+            }
+            if (parsed.selection.scope !== expectedScope) {
+              throw new ServiceError(
+                badRequestError({
+                  message: 'Provider verification returned a contradictory scope'
+                })
+              );
+            }
+            if (parsed.selection.scope === 'verified_items') {
+              let candidates = new Set(
+                params.itemAdapter?.candidates.map(candidate => candidate.candidateId) ?? []
+              );
+              if (
+                parsed.selection.itemAdapterId !== params.itemAdapter?.id ||
+                parsed.selection.acceptedCandidateIds.some(
+                  candidateId => !candidates.has(candidateId)
+                )
+              ) {
+                throw new ServiceError(
+                  badRequestError({
+                    message: 'Provider verification selected an unknown item candidate'
+                  })
+                );
+              }
+            }
+          }
+          if (containsSecretValue(parsed, secretValues)) {
+            throw new ServiceError(
+              badRequestError({
+                message: 'Provider verification output contains a scoped secret'
+              })
+            );
+          }
+          return parsed;
+        } catch (error) {
+          throw redactExactSecretValues(error, secretValues);
+        } finally {
+          context?.clearScopedInvocation();
+          consoleRedaction?.release();
+          secretValues.fill('');
+          secretValues.length = 0;
+          redeemed.clear();
+        }
+      }
+    );
+
+    manager.onRequest(
+      'slates/action.trigger.webhook_bootstrap_capture',
+      async ({ params, invocation, id }) => {
+        getContextBasic();
+        let { action, rule, callbackSecretNames, requiresAuthConfig } = getProviderWebhookRule(
+          params.actionId,
+          params.ruleId
+        );
+        let handlers = action.parameters as typeof action.parameters & {
+          captureWebhookBootstrap?: (
+            context: SlateContext<any, any, WebhookBootstrapCaptureInput>
+          ) => Promise<WebhookBootstrapCaptureOutput>;
+        };
+        if (
+          !handlers.captureWebhookBootstrap ||
+          rule.phase !== 'bootstrap' ||
+          rule.result.type !== 'sync_only'
+        ) {
+          throw new ServiceError(
+            preconditionFailedError({
+              message: 'Bootstrap capture is not advertised for the selected bootstrap rule'
+            })
+          );
+        }
+        let publishedAction = mapAction(slate, action);
+        if (
+          publishedAction.type !== 'action.trigger' ||
+          publishedAction.invocation.type !== 'webhook' ||
+          params.specHash !== publishedAction.specHash
+        ) {
+          throw new ServiceError(
+            badRequestError({ message: 'Webhook action spec hash binding is invalid' })
+          );
+        }
+        if (
+          computeOriginalWebhookRequestHash(params.originalRequest) !==
+          params.originalRequestHash
+        ) {
+          throw new ServiceError(
+            badRequestError({ message: 'Original webhook request hash binding is invalid' })
+          );
+        }
+        let candidateIds = new Set(
+          params.itemAdapter?.candidates.map(candidate => candidate.candidateId) ?? []
+        );
+        if (params.acceptedCandidateIds.some(candidateId => !candidateIds.has(candidateId))) {
+          throw new ServiceError(
+            badRequestError({ message: 'Bootstrap capture contains an unknown accepted item' })
+          );
+        }
+
+        let redeemed = await redeemScopedGrant({
+          envelope: invocation,
+          requestId: id,
+          operation: 'webhook_bootstrap_capture',
+          actionId: params.actionId,
+          secretNames: rule.verify.allowedSecretRefs,
+          callbackSecretNames,
+          requiresAuthConfig
+        });
+        let context: SlateContext<any, any, WebhookBootstrapCaptureInput> | undefined;
+        let secretValues = Object.values(redeemed.secrets).map(secret => secret.value);
+        let consoleRedaction: ReturnType<typeof acquireScopedConsoleRedaction> | undefined;
+        try {
+          consoleRedaction = acquireScopedConsoleRedaction(secretValues);
+          if (
+            redeemed.bindings.specHash !== params.specHash ||
+            redeemed.bindings.ruleId !== params.ruleId ||
+            redeemed.bindings.originalRequestHash !== params.originalRequestHash ||
+            redeemed.bindings.receiverTriggerId !== params.receiverTriggerId ||
+            !['pending', 'registering'].includes(redeemed.bindings.registrationStatus ?? '') ||
+            redeemed.bindings.registrationGeneration === undefined ||
+            redeemed.bindings.registrationVersion !== params.registrationVersion ||
+            redeemed.bindings.dispatchRequestHash !== params.originalRequestHash ||
+            !sameCandidateBindings(
+              redeemed.bindings.candidateBindings,
+              (params.itemAdapter?.candidates ?? []).filter(candidate =>
+                params.acceptedCandidateIds.includes(candidate.candidateId)
+              )
+            )
+          ) {
+            throw new ServiceError(
+              preconditionFailedError({
+                code: 'scoped_invocation_grant_invalid',
+                message: 'Scoped bootstrap bindings are invalid or stale'
+              })
+            );
+          }
+          let result = await consoleRedaction.run(() =>
+            withOperationCancellation(
+              signal => {
+                context = new SlateContext({}, params, {}, slate.spec as any, logger, {
+                  secrets: redeemed.secrets,
+                  redactionSentinels: secretValues,
+                  networkEgress: 'deny_all',
+                  sideEffects: 'deny_all',
+                  abortSignal: signal
+                });
+                return runWithContext(context, () =>
+                  handlers.captureWebhookBootstrap!(context!)
+                );
+              },
+              security.operationTimeoutMs ?? 15_000,
+              security.getOperationSignal?.({
+                requestId: id,
+                operation: 'webhook_bootstrap_capture',
+                actionId: params.actionId
+              })
+            )
+          );
+          let parsed = slatesWebhookBootstrapCaptureOutput.parse(result);
+          if (parsed.status === 'accepted') {
+            let allowedCaptureNames = [...rule.verify.allowedBootstrapCaptureRefs].sort();
+            let returnedCaptureNames = Object.keys(parsed.capturedSecrets).sort();
+            if (
+              allowedCaptureNames.length !== returnedCaptureNames.length ||
+              allowedCaptureNames.some(
+                (secretName, index) => secretName !== returnedCaptureNames[index]
+              )
+            ) {
+              throw new ServiceError(
+                badRequestError({
+                  message: 'Bootstrap capture must return every declared secret exactly once'
+                })
+              );
+            }
+          }
+          let nonCaptureOutput =
+            parsed.status === 'accepted'
+              ? { ...parsed, capturedSecrets: Object.keys(parsed.capturedSecrets) }
+              : parsed;
+          if (containsSecretValue(nonCaptureOutput, secretValues)) {
+            throw new ServiceError(
+              badRequestError({ message: 'Bootstrap output leaked a scoped input secret' })
+            );
+          }
+          return parsed;
+        } catch (error) {
+          throw redactExactSecretValues(error, secretValues);
+        } finally {
+          context?.clearScopedInvocation();
+          consoleRedaction?.release();
+          secretValues.fill('');
+          secretValues.length = 0;
+          redeemed.clear();
+        }
+      }
+    );
+
+    manager.onRequest('slates/action.trigger.webhook_handle', async message => {
+      if ('invocation' in message) {
+        let { params, invocation, id } = message;
+        getContextBasic();
+        let action = getActionWithType(slate, 'trigger', params.actionId);
+        if (!action.handleRequest) {
+          throw new ServiceError(
+            badRequestError({
+              message: `Trigger action does not support webhook mapping: ${params.actionId}`
+            })
+          );
+        }
+        let publishedAction = mapAction(slate, action);
+        if (
+          publishedAction.type !== 'action.trigger' ||
+          publishedAction.invocation.type !== 'webhook' ||
+          publishedAction.specHash !== params.specHash ||
+          computeOriginalWebhookRequestHash(params.request) !== params.dispatchRequestHash
+        ) {
+          throw new ServiceError(
+            badRequestError({ message: 'Scoped webhook mapping request bindings are invalid' })
+          );
+        }
+        let redeemed = await redeemScopedGrant({
+          envelope: invocation,
+          requestId: id,
+          operation: 'webhook_handle',
+          actionId: params.actionId,
+          secretNames: [],
+          callbackSecretNames: [],
+          requiresAuthConfig: false
+        });
+        let context: SlateContext<any, any, any> | undefined;
+        try {
+          if (
+            redeemed.bindings.specHash !== params.specHash ||
+            redeemed.bindings.ruleId !== params.ruleId ||
+            redeemed.bindings.originalRequestHash !== params.originalRequestHash ||
+            redeemed.bindings.dispatchRequestHash !== params.dispatchRequestHash ||
+            redeemed.bindings.receiverTriggerId !== params.triggerId ||
+            !sameCandidateBindings(
+              redeemed.bindings.candidateBindings,
+              params.selectedItems ?? []
+            )
+          ) {
+            throw new ServiceError(
+              preconditionFailedError({
+                code: 'scoped_invocation_grant_invalid',
+                message: 'Scoped mapping bindings are invalid or stale'
+              })
+            );
+          }
+          let result = await withOperationCancellation(
+            signal => {
+              context = new SlateContext(
+                {},
+                {
+                  request: toFetchWebhookRequest(params.request),
+                  itemAdapterId: params.itemAdapterId,
+                  selectedItems: params.selectedItems
+                },
+                {},
+                slate.spec as any,
+                logger,
+                {
+                  secrets: {},
+                  networkEgress: 'deny_all',
+                  sideEffects: 'deny_all',
+                  abortSignal: signal
+                }
+              );
+              return runWithContext(context, () => action.handleRequest!(context as any));
+            },
+            security.operationTimeoutMs ?? 15_000,
+            security.getOperationSignal?.({
+              requestId: id,
+              operation: 'webhook_handle',
+              actionId: params.actionId
+            })
+          );
+          if (!isRecord(result) || !Array.isArray(result.inputs)) {
+            throw new ServiceError(
+              badRequestError({ message: 'Scoped webhook mapping output is invalid' })
+            );
+          }
+          if (params.selectedItems) {
+            let expectedIds = params.selectedItems.map(item => item.candidateId);
+            let actualIds = result.inputs.map(input =>
+              isRecord(input) && typeof input.candidateId === 'string'
+                ? input.candidateId
+                : undefined
+            );
+            if (
+              actualIds.some(idValue => idValue === undefined) ||
+              new Set(actualIds).size !== actualIds.length ||
+              actualIds.length !== expectedIds.length ||
+              expectedIds.some(candidateId => !actualIds.includes(candidateId))
+            ) {
+              throw new ServiceError(
+                badRequestError({ message: 'Scoped webhook mapping output is not exhaustive' })
+              );
+            }
+          }
+          return {
+            inputs: result.inputs,
+            updatedState: result.updatedState,
+            response:
+              result.response === undefined
+                ? undefined
+                : await serializeWebhookHttpResponse(result.response)
+          };
+        } finally {
+          context?.clearScopedInvocation();
+          redeemed.clear();
+        }
+      }
+
+      let { params } = message;
       let ctx = getContextFull();
       let action = getActionWithType(slate, 'trigger', params.actionId);
 
@@ -1011,9 +2251,35 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         );
       }
 
+      let verification = action.http?.ingress?.verification;
+      let bootstrapCaptureSecrets = new Set(
+        verification && 'rules' in verification
+          ? verification.rules.flatMap(rule =>
+              rule.verify.type === 'provider'
+                ? (rule.verify.allowedBootstrapCaptureRefs ?? [])
+                : []
+            )
+          : []
+      );
+      let declaredSecretNames = [
+        ...new Set(
+          verification && 'allowedSecretRefs' in verification
+            ? verification.allowedSecretRefs
+                .filter(secretRef => secretRef.source === 'registration')
+                .filter(secretRef => !bootstrapCaptureSecrets.has(secretRef.name))
+                .map(secretRef => secretRef.name)
+            : []
+        )
+      ].sort();
+      let exactNames = (first: string[], second: string[]) =>
+        first.length === second.length && first.every((name, index) => name === second[index]);
+
       let context = new SlateContext(
         ctx.config,
-        { webhookBaseUrl: params.webhookBaseUrl },
+        {
+          webhookBaseUrl: params.webhookBaseUrl,
+          registrationDetails: params.registrationDetails
+        },
         ctx.auth?.output!,
         slate.spec,
         logger
@@ -1038,9 +2304,32 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         () => runWithContext(context, () => action.autoRegisterWebhook!(context))
       );
 
+      {
+        let returnedSecretNames = Object.keys(res.capturedSecrets ?? {}).sort();
+        if (!exactNames(returnedSecretNames, declaredSecretNames)) {
+          throw new ServiceError(
+            badRequestError({
+              message:
+                'Webhook registration must return every declared registration secret exactly once'
+            })
+          );
+        }
+        for (let name of declaredSecretNames) {
+          let secret = res.capturedSecrets?.[name];
+          if (typeof secret !== 'string' || secret.length === 0) {
+            throw new ServiceError(
+              badRequestError({
+                message: 'Webhook registration returned an invalid secret'
+              })
+            );
+          }
+        }
+      }
+
       return withRequestTraces(context, {
         registrationDetails: res.registrationDetails,
-        state: res.state
+        state: res.state,
+        capturedSecrets: res.capturedSecrets
       });
     });
 
@@ -1088,3 +2377,11 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       return withRequestTraces(context, {});
     });
   });
+
+export {
+  deserializeWebhookWireRequest,
+  deserializeWebhookWireResponse,
+  recomputeWebhookActionSpecHashV1,
+  serializeWebhookWireRequest,
+  serializeWebhookWireResponse
+} from './webhook';

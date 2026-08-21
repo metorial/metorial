@@ -1,9 +1,9 @@
 import { openSlatesCliStore } from '@slates/profiles';
 import {
+  config,
   createTextAttachment,
   Slate,
   SlateAuth,
-  SlateConfig,
   SlateSpecification,
   SlateTool,
   SlateTrigger
@@ -18,6 +18,7 @@ import {
   expectSlateContract,
   expectSlateError,
   expectToolCall,
+  handleScopedSlateTriggerWebhook,
   handleSlateTriggerWebhook,
   loadSlatesRuntimeContext,
   mapSlateTriggerEvent,
@@ -46,7 +47,7 @@ afterEach(async () => {
 });
 
 let createDemoSlate = () => {
-  let config = SlateConfig.create(
+  let configuration = config(
     z.object({
       prefix: z.string()
     })
@@ -78,7 +79,7 @@ let createDemoSlate = () => {
     key: 'demo-slate',
     name: 'Demo Slate',
     description: 'A tiny test slate',
-    config,
+    config: configuration,
     auth
   });
 
@@ -96,14 +97,12 @@ let createDemoSlate = () => {
     )
     .output(
       z.object({
-        greeting: z.string(),
-        token: z.string()
+        greeting: z.string()
       })
     )
     .handleInvocation(async ctx => ({
       output: {
-        greeting: `${ctx.config.prefix} ${ctx.input.name}`,
-        token: ctx.auth.token
+        greeting: `${ctx.config.prefix} ${ctx.input.name}`
       },
       message: 'done'
     }))
@@ -290,6 +289,95 @@ let createDemoSlate = () => {
   });
 };
 
+let createScopedWebhookSlate = () => {
+  let configuration = config(z.object({}));
+  let auth = SlateAuth.create<{}>().output(z.object({})).addNone();
+  let spec = SlateSpecification.create({
+    key: 'scoped-webhook-slate',
+    name: 'Scoped webhook slate',
+    config: configuration,
+    auth
+  });
+  let delivery = SlateTrigger.create(spec, {
+    key: 'delivery',
+    name: 'Delivery'
+  })
+    .input(z.object({ payload: z.string() }))
+    .output(z.object({ type: z.string(), payload: z.string() }))
+    .webhook({
+      http: {
+        methods: ['POST'],
+        sync: { mode: 'always' },
+        ingress: {
+          kind: 'receiver_route',
+          baseline: 'receiver_path_secret',
+          verification: {
+            mechanism: 'provider',
+            baseline: 'receiver_path_secret',
+            reason: 'Exercises local generated and callback secret projection.',
+            allowedSecretRefs: [
+              {
+                source: 'generated',
+                name: 'verify_token',
+                binding: 'receiver_trigger',
+                encoding: 'utf8'
+              },
+              {
+                source: 'callback_secret',
+                name: 'signing_secret',
+                callbackSecretKey: 'signingSecret',
+                encoding: 'utf8'
+              }
+            ],
+            rules: [
+              {
+                id: 'delivery.v1',
+                phase: 'delivery',
+                when: { methods: ['POST'] },
+                verify: {
+                  type: 'provider',
+                  verifierId: 'notion.delivery.v1',
+                  allowedSecretRefs: ['verify_token', 'signing_secret'],
+                  allowedBootstrapCaptureRefs: []
+                },
+                result: { type: 'dispatch', scope: 'receiver_trigger' },
+                replay: {
+                  kind: 'enforced',
+                  deduplicate: {
+                    source: 'header',
+                    headerName: 'x-delivery-id',
+                    ttlSeconds: 60,
+                    scope: 'request'
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      verifyWebhook: async context =>
+        context.secrets.verify_token?.value === 'generated-token' &&
+        context.secrets.signing_secret?.value === 'callback-secret'
+          ? { status: 'accepted', selection: { scope: 'receiver_trigger' } }
+          : { status: 'rejected', code: 'credential_invalid' },
+      handleRequest: async context => ({
+        inputs: [{ payload: await context.request.text() }],
+        response: new Response('synchronous acknowledgement', {
+          status: 202,
+          headers: { 'x-scoped-response': 'accepted' }
+        })
+      }),
+      handleEvent: async context => ({
+        type: 'delivery',
+        id: 'delivery',
+        output: { type: 'delivery', payload: context.input.payload }
+      })
+    })
+    .build();
+
+  return Slate.create({ spec, tools: [], triggers: [delivery] });
+};
+
 describe('@slates/test', () => {
   it('loads runtime context from the CLI handoff file', async () => {
     let cwd = await createTempDir();
@@ -429,7 +517,11 @@ describe('@slates/test', () => {
       ]
     });
 
-    expect(contract.configSchema.properties.prefix.type).toBe('string');
+    expect(contract.configSchema).toMatchObject({
+      properties: {
+        prefix: { type: 'string' }
+      }
+    });
     expect(contract.triggers.find(action => action.id === 'webhook_echo')?.invocation).toEqual(
       {
         type: 'webhook',
@@ -464,8 +556,7 @@ describe('@slates/test', () => {
         name: 'Tobias'
       },
       output: {
-        greeting: 'Hi Tobias',
-        token: 'secret-token'
+        greeting: 'Hi Tobias'
       }
     });
 
@@ -590,6 +681,43 @@ describe('@slates/test', () => {
         }),
       { code: 'internal.unexpected', kind: 'internal', status: 500 }
     );
+  });
+
+  it('forwards generated and callback secrets through scoped synchronous webhook handling', async () => {
+    let client = createLocalSlateTestClient({
+      slate: createScopedWebhookSlate(),
+      state: { config: {} },
+      secrets: {
+        verify_token: 'generated-token',
+        signingSecret: 'callback-secret'
+      }
+    });
+
+    let result = await handleScopedSlateTriggerWebhook({
+      client,
+      triggerId: 'delivery',
+      ruleId: 'delivery.v1',
+      phase: 'delivery',
+      url: 'https://callbacks.example.test/receiver-secret',
+      headers: { 'x-delivery-id': 'delivery-1' },
+      body: 'callback payload'
+    });
+
+    expect(result.verification).toEqual({
+      status: 'accepted',
+      selection: { scope: 'receiver_trigger' }
+    });
+    expect(result.delivery).toMatchObject({
+      inputs: [{ payload: 'callback payload' }],
+      response: {
+        status: 202,
+        headers: { 'x-scoped-response': 'accepted' },
+        body: {
+          encoding: 'base64',
+          content: Buffer.from('synchronous acknowledgement').toString('base64')
+        }
+      }
+    });
   });
 
   it('wraps trigger polling flows', async () => {

@@ -4,6 +4,7 @@ import { z } from 'zod';
 export let auth = SlateAuth.create()
   .output(
     z.object({
+      environment: z.enum(['sandbox', 'production']).describe('Braintree environment'),
       merchantId: z.string().describe('Braintree merchant ID'),
       publicKey: z.string().describe('Braintree public key'),
       privateKey: z.string().describe('Braintree private key'),
@@ -18,6 +19,10 @@ export let auth = SlateAuth.create()
     key: 'api_keys',
 
     inputSchema: z.object({
+      environment: z
+        .enum(['sandbox', 'production'])
+        .default('production')
+        .describe('Braintree environment to use'),
       merchantId: z.string().describe('Your Braintree merchant ID'),
       publicKey: z.string().describe('Your Braintree public key'),
       privateKey: z.string().describe('Your Braintree private key')
@@ -27,6 +32,7 @@ export let auth = SlateAuth.create()
       let token = btoa(`${ctx.input.publicKey}:${ctx.input.privateKey}`);
       return {
         output: {
+          environment: ctx.input.environment,
           merchantId: ctx.input.merchantId,
           publicKey: ctx.input.publicKey,
           privateKey: ctx.input.privateKey,

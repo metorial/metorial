@@ -1,7 +1,11 @@
 import { SlateTrigger } from '@slates/provider';
 import { z } from 'zod';
 import { spec } from '../spec';
-import { createZoomUrlValidationResult, zoomWebhookHttp } from './webhook-validation';
+import {
+  captureZoomWebhookBootstrap,
+  verifyZoomWebhook,
+  zoomWebhookHttp
+} from './webhook-validation';
 
 export let recordingEvents = SlateTrigger.create(spec, {
   name: 'Recording Events',
@@ -48,12 +52,10 @@ export let recordingEvents = SlateTrigger.create(spec, {
   )
   .webhook({
     http: zoomWebhookHttp,
+    verifyWebhook: verifyZoomWebhook,
+    captureWebhookBootstrap: captureZoomWebhookBootstrap,
     handleRequest: async ctx => {
       let body = (await ctx.request.json()) as any;
-
-      if (body.event === 'endpoint.url_validation') {
-        return createZoomUrlValidationResult(body.payload?.plainToken, ctx.config.secretToken);
-      }
 
       let eventType = body.event as string;
 

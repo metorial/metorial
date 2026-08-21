@@ -1,6 +1,6 @@
 {
   "name": "@slates/provider",
-  "version": "1.0.0-rc.18",
+  "version": "1.0.0-rc.20",
   "publishConfig": {
     "access": "public"
   },
@@ -25,13 +25,14 @@
   "types": "dist/index.d.ts",
   "unpkg": "./dist/index.module.js",
   "scripts": {
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "build": "tsup --config ../../tsup.packages.config.ts --external async_hooks",
     "typecheck": "tsc --noEmit",
     "biome:check": "biome check --write src"
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
+    "@slates/proto": "1.0.0-rc.17",
     "@toon-format/toon": "^2.1.0",
     "axios": "^1.13.2",
     "zod": "^4.2.1"

@@ -50,7 +50,7 @@ export let getSettlementReport = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let data: Record<string, any> = {

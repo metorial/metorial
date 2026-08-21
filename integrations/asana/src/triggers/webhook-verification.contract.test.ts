@@ -1,134 +1,118 @@
-import {
-  createLocalSlateTestClient,
-  getSlateContract,
-  handleSlateTriggerWebhook
-} from '@slates/test';
-import { createHmac } from 'crypto';
+import { createHmac } from 'node:crypto';
+import { createLocalSlateTestClient, getSlateContract } from '@slates/test';
+import { encodeWebhookWireBody } from 'slates';
 import { describe, expect, it } from 'vitest';
 import { provider } from '../index';
+import { captureAsanaWebhookBootstrap, verifyAsanaWebhook } from './task-changes-webhook';
 
-const TRIGGER_ID = 'task_changes_webhook';
+let request = (body: string | null, headers: [string, string][] = []) => ({
+  url: 'https://example.com/asana',
+  method: 'POST' as const,
+  headers,
+  body: encodeWebhookWireBody(body === null ? null : Buffer.from(body))
+});
 
-let createTestClient = () =>
-  createLocalSlateTestClient({
-    slate: provider,
-    state: {
-      config: {},
-      auth: {
-        authenticationMethodId: 'oauth',
-        output: { token: 'test-token' }
-      }
-    }
-  });
-
-let decodeResponseBody = (response: {
-  body?: { encoding: 'base64'; content: string } | null;
-}) => Buffer.from(response.body?.content ?? '', 'base64').toString();
-
-describe('Asana webhook verification contract', () => {
-  it('advertises synchronous X-Hook-Secret handshakes', async () => {
-    let contract = await getSlateContract(createTestClient());
-    let trigger = contract.triggers.find(action => action.id === TRIGGER_ID);
-
+describe('Asana generation-bound webhook contract', () => {
+  it('allows challenge capture only while registering and signed delivery thereafter', async () => {
+    let contract = await getSlateContract(
+      createLocalSlateTestClient({
+        slate: provider,
+        state: {
+          config: {},
+          auth: { authenticationMethodId: 'oauth', output: { token: 'test-token' } }
+        }
+      })
+    );
+    let trigger = contract.triggers.find(action => action.id === 'task_changes_webhook');
     expect(trigger?.invocation).toMatchObject({
       type: 'webhook',
       http: {
-        methods: ['POST'],
-        sync: {
-          mode: 'match',
-          match: [{ hasHeader: 'x-hook-secret' }]
+        ingress: {
+          verification: {
+            mechanism: 'provider',
+            rules: [
+              {
+                id: 'asana.bootstrap.v1',
+                when: { registrationStatuses: ['registering'] },
+                result: { type: 'sync_only' }
+              },
+              {
+                id: 'asana.delivery.v1',
+                when: { registrationStatuses: ['registered'] },
+                result: { type: 'dispatch' }
+              }
+            ]
+          }
         }
       }
     });
   });
 
-  it('echoes the handshake secret in the response header', async () => {
-    let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
-      triggerId: TRIGGER_ID,
-      url: 'https://example.com/webhooks/asana',
-      headers: { 'x-hook-secret': 'asana-hook-secret' }
-    });
-
-    expect(result.inputs).toEqual([]);
-    expect(result.response).toMatchObject({
-      status: 200,
-      headers: { 'x-hook-secret': 'asana-hook-secret' }
-    });
-  });
-
-  it('uses registration details to reject an invalid event signature', async () => {
-    let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
-      triggerId: TRIGGER_ID,
-      url: 'https://example.com/webhooks/asana',
-      headers: { 'x-hook-signature': 'invalid' },
-      body: JSON.stringify({ events: [] }),
-      registrationDetails: { hookSecret: 'stored-secret' }
-    });
-
-    expect(result.inputs).toEqual([]);
-    expect(result.response).toMatchObject({ status: 401 });
-    expect(decodeResponseBody(result.response!)).toBe('Invalid signature');
-  });
-
-  it('rejects an unsigned event when a hook secret is stored', async () => {
-    let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
-      triggerId: TRIGGER_ID,
-      url: 'https://example.com/webhooks/asana',
-      body: JSON.stringify({ events: [] }),
-      registrationDetails: { hookSecret: 'stored-secret' }
-    });
-
-    expect(result.inputs).toEqual([]);
-    expect(result.response).toMatchObject({ status: 401 });
-  });
-
-  it('passes unsigned events through when no registration details exist', async () => {
-    let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
-      triggerId: TRIGGER_ID,
-      url: 'https://example.com/webhooks/asana',
-      body: JSON.stringify({
-        events: [
-          {
-            action: 'added',
-            created_at: '2026-08-06T00:00:00.000Z',
-            resource: { resource_type: 'task', gid: '67890' }
-          }
-        ]
+  it('echoes and captures exactly one versionless hook secret', async () => {
+    let originalRequest = request(null, [['x-hook-secret', 'hook-secret']]);
+    await expect(
+      verifyAsanaWebhook({
+        input: { ruleId: 'asana.bootstrap.v1', originalRequest },
+        secrets: {}
       })
+    ).resolves.toMatchObject({ status: 'accepted' });
+    await expect(
+      captureAsanaWebhookBootstrap({
+        input: { originalRequest }
+      })
+    ).resolves.toMatchObject({
+      status: 'accepted',
+      capturedSecrets: { asana_hook_secret: 'hook-secret' },
+      response: { status: 200, headers: [['X-Hook-Secret', 'hook-secret']] }
     });
-
-    expect(result.inputs).toMatchObject([{ taskId: '67890', action: 'added' }]);
-    expect(result.response).toBeUndefined();
   });
 
-  it('accepts a correctly signed event delivery', async () => {
-    let body = JSON.stringify({
-      events: [
-        {
-          action: 'changed',
-          created_at: '2026-08-06T00:00:00.000Z',
-          resource: { resource_type: 'task', gid: '12345' }
-        }
-      ]
+  it.each([
+    { headers: [] as [string, string][] },
+    {
+      headers: [
+        ['x-hook-secret', 'one'],
+        ['x-hook-secret', 'two']
+      ] as [string, string][]
+    }
+  ])('rejects absent or ambiguous bootstrap authority', async ({ headers }) => {
+    let result = await verifyAsanaWebhook({
+      input: { ruleId: 'asana.bootstrap.v1', originalRequest: request(null, headers) },
+      secrets: {}
     });
-    let result = await handleSlateTriggerWebhook({
-      client: createTestClient(),
-      triggerId: TRIGGER_ID,
-      url: 'https://example.com/webhooks/asana',
-      headers: {
-        'x-hook-signature': createHmac('sha256', 'stored-secret').update(body).digest('hex')
-      },
-      body,
-      registrationDetails: { hookSecret: 'stored-secret' }
-    });
+    expect(result).toMatchObject({ status: 'rejected', code: 'credential_missing' });
+  });
 
-    expect(result.inputs).toEqual([
-      { taskId: '12345', action: 'changed', eventCreatedAt: '2026-08-06T00:00:00.000Z' }
-    ]);
-    expect(result.response).toBeUndefined();
+  it('requires the captured secret and exact raw-body delivery HMAC', async () => {
+    let body = JSON.stringify({ events: [{ resource: { resource_type: 'task', gid: '1' } }] });
+    let signature = createHmac('sha256', 'hook-secret').update(body).digest('hex');
+    let originalRequest = request(body, [['x-hook-signature', signature]]);
+    await expect(
+      verifyAsanaWebhook({
+        input: { ruleId: 'asana.delivery.v1', originalRequest },
+        secrets: { asana_hook_secret: { value: 'hook-secret' } }
+      })
+    ).resolves.toMatchObject({
+      status: 'accepted',
+      authenticatedFields: { event_id: expect.stringMatching(/^[a-f0-9]{64}$/) }
+    });
+    for (let secret of [undefined, 'wrong-secret']) {
+      let result = await verifyAsanaWebhook({
+        input: { ruleId: 'asana.delivery.v1', originalRequest },
+        secrets: { asana_hook_secret: secret ? { value: secret } : undefined }
+      });
+      expect(result.status).toBe('rejected');
+    }
+  });
+
+  it('does not accept a post-registration challenge as delivery', async () => {
+    let result = await verifyAsanaWebhook({
+      input: {
+        ruleId: 'asana.delivery.v1',
+        originalRequest: request(null, [['x-hook-secret', 'late-secret']])
+      },
+      secrets: { asana_hook_secret: { value: 'stored-secret' } }
+    });
+    expect(result).toMatchObject({ status: 'rejected', code: 'credential_missing' });
   });
 });

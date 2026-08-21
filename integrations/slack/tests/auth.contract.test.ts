@@ -33,7 +33,7 @@ let callbackParams = {
   code: 'auth-code',
   state: 'state-123',
   redirectUri: 'https://example.com/callback',
-  input: {},
+  input: { signingSecret: 'slack-signing-secret' },
   clientId: 'client-id',
   clientSecret: 'client-secret',
   scopes: ['channels:read']
@@ -45,10 +45,11 @@ let refreshParams = {
     token: 'stale-user-token',
     refreshToken: 'stored-refresh-token',
     actorType: 'user' as const,
+    signingSecret: 'slack-signing-secret',
     teamId: 'T-prev',
     userId: 'U-prev'
   },
-  input: {},
+  input: { signingSecret: 'slack-signing-secret' },
   clientId: 'client-id',
   clientSecret: 'client-secret',
   scopes: ['channels:read']
@@ -60,6 +61,20 @@ afterEach(() => {
 });
 
 describe('slack user oauth contract', () => {
+  it('exposes an optional signing secret on every auth method', async () => {
+    let client = await loadProviderClient();
+
+    for (let methodId of ['oauth', 'user_oauth', 'bot_token', 'user_token']) {
+      let method = await client.getAuthMethod(methodId);
+      expect(method.authenticationMethod.inputSchema.properties).toHaveProperty(
+        'signingSecret'
+      );
+      expect(method.authenticationMethod.inputSchema.required ?? []).not.toContain(
+        'signingSecret'
+      );
+    }
+  });
+
   it('builds the user OAuth authorization URL with user_scope', async () => {
     let client = await loadProviderClient();
     let result = await client.getAuthorizationUrl({
@@ -113,6 +128,7 @@ describe('slack user oauth contract', () => {
     expect(result.scopes).toEqual(['channels:read', 'groups:read']);
     expect(result.output).toMatchObject({
       token: 'xoxp-user-token',
+      signingSecret: 'slack-signing-secret',
       refreshToken: 'user-refresh-token',
       actorType: 'user',
       teamId: 'T-team',
@@ -178,6 +194,7 @@ describe('slack user oauth contract', () => {
     });
     expect(result.output).toMatchObject({
       token: 'xoxp-refreshed-user-token',
+      signingSecret: 'slack-signing-secret',
       refreshToken: 'stored-refresh-token',
       actorType: 'user',
       teamId: 'T-refreshed',

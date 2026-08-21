@@ -13,10 +13,6 @@ export let config = SlateConfig.create(
       .optional()
       .describe(
         'QuickBooks Company ID (Realm ID) for the target company. Optional when OAuth captured a realmId.'
-      ),
-    webhookVerifierToken: z
-      .string()
-      .optional()
-      .describe('Optional Intuit webhook verifier token for signature validation')
+      )
   })
 );

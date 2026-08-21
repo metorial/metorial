@@ -43,7 +43,7 @@ export let createCustomer = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let data: Record<string, any> = {};
@@ -101,7 +101,7 @@ export let updateCustomer = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let data: Record<string, any> = {};
@@ -178,7 +178,7 @@ export let findCustomer = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let xml = await rest.get(`/customers/${ctx.input.customerId}`);
@@ -255,7 +255,7 @@ This action is irreversible.`,
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     await rest.delete(`/customers/${ctx.input.customerId}`);

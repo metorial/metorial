@@ -18,7 +18,8 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      webhookAppSecret: z.string().optional()
     })
   )
   .addOauth({
@@ -171,20 +172,30 @@ export let auth = SlateAuth.create()
         .string()
         .describe(
           'System User access token generated from Business Manager. These tokens do not expire.'
-        )
+        ),
+      webhookAppSecret: z
+        .string()
+        .min(1)
+        .describe('Meta App Secret used to authenticate webhook deliveries')
     }),
 
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiToken
+          token: ctx.input.apiToken,
+          webhookAppSecret: ctx.input.webhookAppSecret
         }
       };
     },
 
     getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
-      input: { apiToken: string };
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        webhookAppSecret?: string;
+      };
+      input: { apiToken: string; webhookAppSecret: string };
     }) => {
       let axios = createGraphAxios();
 

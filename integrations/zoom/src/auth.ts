@@ -10,10 +10,19 @@ let apiAxios = createAxios({
   baseURL: 'https://api.zoom.us/v2'
 });
 
+let secretTokenSchema = z
+  .string()
+  .min(1)
+  .optional()
+  .describe(
+    'Zoom webhook Secret Token; required only when attaching Event Subscriptions callbacks'
+  );
+
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      secretToken: z.string().min(1).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
       accountId: z.string().optional()
@@ -360,6 +369,7 @@ export let auth = SlateAuth.create()
         scope: 'report:read:list_meeting_participants:admin'
       }
     ],
+    inputSchema: z.object({ secretToken: secretTokenSchema }),
 
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
@@ -407,6 +417,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
+          secretToken: ctx.input.secretToken,
           refreshToken: data.refresh_token,
           expiresAt
         }
@@ -445,15 +456,23 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt
+          secretToken: ctx.output.secretToken,
+          refreshToken: data.refresh_token ?? ctx.output.refreshToken,
+          expiresAt,
+          accountId: ctx.output.accountId
         }
       };
     },
 
     getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string; accountId?: string };
-      input: Record<string, never>;
+      output: {
+        token: string;
+        secretToken?: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        accountId?: string;
+      };
+      input: { secretToken?: string };
       scopes: string[];
     }) => {
       let response: any;
@@ -489,11 +508,17 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       accountId: z.string().describe('Zoom Account ID'),
       clientId: z.string().describe('Client ID from Zoom App Marketplace'),
-      clientSecret: z.string().describe('Client Secret from Zoom App Marketplace')
+      clientSecret: z.string().describe('Client Secret from Zoom App Marketplace'),
+      secretToken: secretTokenSchema
     }),
 
     getOutput: async (ctx: {
-      input: { accountId: string; clientId: string; clientSecret: string };
+      input: {
+        accountId: string;
+        clientId: string;
+        clientSecret: string;
+        secretToken?: string;
+      };
     }) => {
       let credentials = btoa(`${ctx.input.clientId}:${ctx.input.clientSecret}`);
 
@@ -522,6 +547,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
+          secretToken: ctx.input.secretToken,
           expiresAt,
           accountId: ctx.input.accountId
         }
@@ -529,8 +555,19 @@ export let auth = SlateAuth.create()
     },
 
     getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string; accountId?: string };
-      input: { accountId: string; clientId: string; clientSecret: string };
+      output: {
+        token: string;
+        secretToken?: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        accountId?: string;
+      };
+      input: {
+        accountId: string;
+        clientId: string;
+        clientSecret: string;
+        secretToken?: string;
+      };
     }) => {
       let response: any;
       try {

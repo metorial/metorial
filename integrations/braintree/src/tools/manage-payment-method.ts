@@ -68,7 +68,7 @@ By default, credit cards are verified before vaulting.`,
   .handleInvocation(async ctx => {
     let client = new BraintreeGraphQLClient({
       token: ctx.auth.token,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let input: Record<string, any> = {
@@ -130,7 +130,7 @@ export let findPaymentMethod = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let xml = await rest.get(`/payment_methods/any/${ctx.input.paymentMethodToken}`);
@@ -195,7 +195,7 @@ export let deletePaymentMethod = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     await rest.delete(`/payment_methods/any/${ctx.input.paymentMethodToken}`);

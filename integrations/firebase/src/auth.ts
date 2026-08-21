@@ -13,10 +13,19 @@ let googleUserInfoAxios = createAxios({
   baseURL: 'https://www.googleapis.com'
 });
 
+let webApiKeySchema = z
+  .string()
+  .min(1)
+  .optional()
+  .describe(
+    'Firebase Web API key; required only for Authentication REST operations such as creating users'
+  );
+
 export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      webApiKey: z.string().min(1).optional(),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -61,6 +70,7 @@ export let auth = SlateAuth.create()
         scope: firebaseScopes.userInfoProfile
       }
     ],
+    inputSchema: z.object({ webApiKey: webApiKeySchema }),
 
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
@@ -110,6 +120,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
+          webApiKey: ctx.input.webApiKey,
           refreshToken: data.refresh_token,
           expiresAt
         },
@@ -150,13 +161,18 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
+          webApiKey: ctx.output.webApiKey,
           refreshToken: ctx.output.refreshToken,
           expiresAt
         }
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: {}; scopes: string[] }) => {
+    getProfile: async (ctx: {
+      output: { token: string; webApiKey?: string };
+      input: { webApiKey?: string };
+      scopes: string[];
+    }) => {
       let response: any;
       try {
         response = await googleUserInfoAxios.get('/oauth2/v2/userinfo', {
@@ -186,10 +202,11 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       serviceAccountJson: z
         .string()
-        .describe('Full JSON content of the Firebase service account key file')
+        .describe('Full JSON content of the Firebase service account key file'),
+      webApiKey: webApiKeySchema
     }),
 
-    getOutput: async (ctx: { input: { serviceAccountJson: string } }) => {
+    getOutput: async (ctx: { input: { serviceAccountJson: string; webApiKey?: string } }) => {
       let serviceAccount: { client_email: string; private_key: string };
       try {
         serviceAccount = JSON.parse(ctx.input.serviceAccountJson);
@@ -229,14 +246,15 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: result.accessToken,
+          webApiKey: ctx.input.webApiKey,
           expiresAt: result.expiresAt
         }
       };
     },
 
     getProfile: async (ctx: {
-      output: { token: string };
-      input: { serviceAccountJson: string };
+      output: { token: string; webApiKey?: string };
+      input: { serviceAccountJson: string; webApiKey?: string };
     }) => {
       let response: any;
       try {

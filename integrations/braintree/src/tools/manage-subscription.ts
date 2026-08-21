@@ -63,7 +63,7 @@ export let createSubscription = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let data: Record<string, any> = {
@@ -111,7 +111,7 @@ export let findSubscription = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let xml = await rest.get(`/subscriptions/${ctx.input.subscriptionId}`);
@@ -149,7 +149,7 @@ export let updateSubscription = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let data: Record<string, any> = {};
@@ -196,7 +196,7 @@ export let cancelSubscription = SlateTool.create(spec, {
     let rest = new BraintreeRestClient({
       token: ctx.auth.token,
       merchantId: ctx.auth.merchantId,
-      environment: ctx.config.environment
+      environment: ctx.auth.environment
     });
 
     let xml = await rest.put(`/subscriptions/${ctx.input.subscriptionId}/cancel`, '');

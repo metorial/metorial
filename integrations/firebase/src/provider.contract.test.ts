@@ -61,8 +61,7 @@ describe('firebase provider contract', () => {
     expect(Object.keys(contract.configSchema.properties ?? {}).sort()).toEqual([
       'databaseUrl',
       'projectId',
-      'storageBucket',
-      'webApiKey'
+      'storageBucket'
     ]);
 
     let expectedScopes = {

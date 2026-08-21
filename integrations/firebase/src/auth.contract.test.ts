@@ -43,13 +43,25 @@ afterEach(() => {
 });
 
 describe('firebase auth contract', () => {
+  it('exposes an optional web API key on every auth method', async () => {
+    let client = await loadProviderClient();
+
+    for (let methodId of ['google_oauth', 'service_account']) {
+      let method = await client.getAuthMethod(methodId);
+      expect(method.authenticationMethod.inputSchema.properties).toHaveProperty('webApiKey');
+      expect(method.authenticationMethod.inputSchema.required ?? []).not.toContain(
+        'webApiKey'
+      );
+    }
+  });
+
   it('builds the expected OAuth authorization URL', async () => {
     let client = await loadProviderClient();
     let result = await client.getAuthorizationUrl({
       authenticationMethodId: 'google_oauth',
       redirectUri: 'https://example.com/callback',
       state: 'state-123',
-      input: {},
+      input: { webApiKey: 'firebase-web-api-key' },
       clientId: 'client-id',
       clientSecret: 'client-secret',
       scopes: [firebaseScopes.cloudPlatform, firebaseScopes.userInfoEmail]
@@ -81,7 +93,7 @@ describe('firebase auth contract', () => {
       code: 'auth-code',
       state: 'state-123',
       redirectUri: 'https://example.com/callback',
-      input: {},
+      input: { webApiKey: 'firebase-web-api-key' },
       clientId: 'client-id',
       clientSecret: 'client-secret',
       scopes: [firebaseScopes.cloudPlatform]
@@ -93,6 +105,7 @@ describe('firebase auth contract', () => {
     ]);
     expect(callbackResult.output).toMatchObject({
       token: 'access-token',
+      webApiKey: 'firebase-web-api-key',
       refreshToken: 'refresh-token'
     });
     expect(Date.parse(String(callbackResult.output.expiresAt))).toBeGreaterThan(Date.now());
@@ -108,15 +121,17 @@ describe('firebase auth contract', () => {
       authenticationMethodId: 'google_oauth',
       output: {
         token: 'stale-token',
+        webApiKey: 'firebase-web-api-key',
         refreshToken: 'refresh-token'
       },
-      input: {},
+      input: { webApiKey: 'firebase-web-api-key' },
       clientId: 'client-id',
       clientSecret: 'client-secret',
       scopes: [firebaseScopes.cloudPlatform]
     });
 
     expect(refreshResult.output.token).toBe('refreshed-token');
+    expect(refreshResult.output.webApiKey).toBe('firebase-web-api-key');
   });
 
   it('fails refreshes cleanly when no refresh token is stored', async () => {

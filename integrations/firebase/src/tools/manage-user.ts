@@ -75,7 +75,7 @@ export let manageUser = SlateTool.create(spec, {
     let client = new AuthClient({
       token: ctx.auth.token,
       projectId: ctx.config.projectId,
-      apiKey: ctx.config.webApiKey
+      apiKey: ctx.auth.webApiKey
     });
 
     let { operation, userId } = ctx.input;

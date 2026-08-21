@@ -1,9 +1,36 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-import { pollTime, webhookEcho, webhookSyncEcho } from './triggers';
+import {
+  pollTime,
+  presetVerificationActions,
+  providerBoundaryVerificationActions,
+  supplementarySlackVerificationActions,
+  verifyEd25519,
+  verifyRawHmac,
+  verifyStaticHeader,
+  verifyStaticJson,
+  verifyStaticQuery,
+  webhookEcho,
+  webhookSyncEcho
+} from './triggers';
+
+export { SlatesProviderProtoHandlerManager } from '@slates/proto';
+export { createProviderHandler } from '@slates/provider-handler';
 
 export let provider = Slate.create({
   spec,
   tools: [],
-  triggers: [webhookEcho, webhookSyncEcho, pollTime]
+  triggers: [
+    webhookEcho,
+    webhookSyncEcho,
+    pollTime,
+    verifyStaticHeader,
+    verifyStaticQuery,
+    verifyStaticJson,
+    verifyRawHmac,
+    verifyEd25519,
+    ...presetVerificationActions,
+    ...supplementarySlackVerificationActions,
+    ...providerBoundaryVerificationActions
+  ]
 });

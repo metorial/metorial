@@ -24,6 +24,18 @@ export let slatesMessageProviderIdentifyResponse = z.object({
       description: z.string().optional(),
       metadata: z.record(z.string(), z.any()).optional()
     }),
+    capabilities: z
+      .strictObject({
+        webhookVerificationRulesV1: z.boolean(),
+        webhookWireV1: z.boolean(),
+        webhookActionSpecHashV1: z.boolean(),
+        scopedInvocationGrantV1: z.boolean(),
+        receiverBoundToolContextV1: z.boolean(),
+        webhookSecretNegotiationV1: z.boolean(),
+        webhookInboundVerificationV1: z.boolean(),
+        webhookInboundBootstrapCaptureV1: z.boolean()
+      })
+      .optional(),
     docs: z.array(
       z.object({
         name: z.string(),

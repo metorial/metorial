@@ -4,125 +4,100 @@ import {
   handleSlateTriggerWebhook,
   mapSlateTriggerEvent
 } from '@slates/test';
-import { createHmac } from 'crypto';
 import { describe, expect, it } from 'vitest';
 import { provider } from '../index';
 
-const SIGNING_SECRET = 'slack-signing-secret';
-const WEBHOOK_URL = 'https://example.com/callbacks/slack/messages';
-
-let createSlackTriggerTestClient = (signingSecret?: string) =>
+let client = () =>
   createLocalSlateTestClient({
     slate: provider,
     state: {
-      config: signingSecret ? { signingSecret } : {},
+      config: {},
       auth: {
         authenticationMethodId: 'oauth',
         output: {
           token: 'xoxb-test-token',
-          actorType: 'bot'
+          actorType: 'bot',
+          signingSecret: 'slack-signing-secret'
         }
       }
     }
   });
 
-let signSlackRequest = (body: string, timestamp = Math.floor(Date.now() / 1_000)) => ({
-  'x-slack-request-timestamp': String(timestamp),
-  'x-slack-signature': `v0=${createHmac('sha256', SIGNING_SECRET)
-    .update(`v0:${timestamp}:${body}`)
-    .digest('hex')}`
-});
-
-let decodeResponseBody = (response: {
-  body?: { encoding: 'base64'; content: string } | null;
-}) => Buffer.from(response.body?.content ?? '', 'base64').toString();
-
-let signatureRejectionCases: { name: string; headers: Record<string, string> }[] = [
-  {
-    name: 'missing signature headers',
-    headers: {}
-  },
-  {
-    name: 'an invalid signature',
-    headers: {
-      'x-slack-request-timestamp': String(Math.floor(Date.now() / 1_000)),
-      'x-slack-signature': 'v0=invalid'
-    }
-  },
-  {
-    name: 'a stale timestamp',
-    headers: signSlackRequest(
-      JSON.stringify({ type: 'event_callback' }),
-      Math.floor(Date.now() / 1_000) - 301
-    )
-  }
-];
-
-describe('Slack new_message_webhook contract', () => {
-  it('advertises synchronous handling only for URL verification requests', async () => {
-    let contract = await getSlateContract(createSlackTriggerTestClient());
+describe('Slack new_message_webhook fail-closed contract', () => {
+  it('requires the named signing secret before bootstrap or delivery', async () => {
+    let contract = await getSlateContract(client());
     let trigger = contract.triggers.find(action => action.id === 'new_message_webhook');
-
+    expect(JSON.stringify(contract.configSchema)).not.toContain('signingSecret');
     expect(trigger?.invocation).toMatchObject({
       type: 'webhook',
       http: {
         methods: ['POST'],
-        sync: {
-          mode: 'match',
-          match: [
-            {
-              jsonBodyField: {
-                path: 'type',
-                equals: 'url_verification'
+        ingress: {
+          verification: {
+            mechanism: 'hub',
+            allowedSecretRefs: [
+              {
+                source: 'auth_config',
+                name: 'slack_signing_secret',
+                credentialKey: 'signingSecret'
               }
-            }
-          ]
+            ],
+            rules: [
+              {
+                phase: 'bootstrap',
+                verify: { type: 'preset', preset: 'slack.v0' },
+                result: { type: 'dispatch', scope: 'receiver_trigger' }
+              },
+              {
+                phase: 'delivery',
+                verify: { type: 'preset', preset: 'slack.v0' },
+                replay: {
+                  freshness: { source: 'preset', presetField: 'timestamp' },
+                  deduplicate: { source: 'json_pointer', pointer: '/event_id' }
+                }
+              }
+            ]
+          }
         }
       }
     });
   });
 
-  it('returns the exact URL verification challenge as synchronous text', async () => {
-    let client = createSlackTriggerTestClient(SIGNING_SECRET);
-    let body = JSON.stringify({ type: 'url_verification', challenge: 'challenge-value' });
+  it('returns a synchronous URL verification challenge only after signature verification', async () => {
+    let body = JSON.stringify({
+      type: 'url_verification',
+      challenge: 'challenge-value'
+    });
     let result = await handleSlateTriggerWebhook({
-      client,
+      client: client(),
       triggerId: 'new_message_webhook',
-      url: WEBHOOK_URL,
-      headers: signSlackRequest(body),
+      url: 'https://example.com/slack',
       body
     });
-
     expect(result.inputs).toEqual([]);
-    expect(result.response).toMatchObject({
-      status: 200,
-      headers: {
-        'content-type': 'text/plain'
-      }
-    });
-    expect(decodeResponseBody(result.response!)).toBe('challenge-value');
+    expect(result.response).toMatchObject({ status: 200 });
+    expect(Buffer.from(result.response?.body?.content ?? '', 'base64').toString('utf8')).toBe(
+      JSON.stringify({ challenge: 'challenge-value' })
+    );
   });
 
-  it('accepts a valid signed message event', async () => {
-    let client = createSlackTriggerTestClient(SIGNING_SECRET);
-    let body = JSON.stringify({
-      type: 'event_callback',
-      event: {
-        type: 'message',
-        channel: 'C123',
-        user: 'U123',
-        text: 'hello',
-        ts: '1710000000.000100'
-      }
-    });
+  it('maps only a valid message event and gives retries a stable event id', async () => {
     let result = await handleSlateTriggerWebhook({
-      client,
+      client: client(),
       triggerId: 'new_message_webhook',
-      url: WEBHOOK_URL,
-      headers: signSlackRequest(body),
-      body
+      url: 'https://example.com/slack',
+      body: JSON.stringify({
+        type: 'event_callback',
+        event_id: 'event-1',
+        event: {
+          type: 'message',
+          channel: 'C123',
+          user: 'U123',
+          text: 'hello',
+          ts: '1710000000.000100'
+        }
+      })
     });
-
     expect(result.inputs).toEqual([
       {
         messageTs: '1710000000.000100',
@@ -131,94 +106,26 @@ describe('Slack new_message_webhook contract', () => {
         userId: 'U123'
       }
     ]);
-    expect(result.response).toBeUndefined();
+    let event = await mapSlateTriggerEvent({
+      client: client(),
+      triggerId: 'new_message_webhook',
+      input: result.inputs[0]!
+    });
+    expect(event.id).toBe('C123-1710000000.000100');
   });
 
-  it.each(signatureRejectionCases)('rejects $name without producing inputs', async ({
-    headers
-  }) => {
-    let client = createSlackTriggerTestClient(SIGNING_SECRET);
-    let body = JSON.stringify({ type: 'event_callback' });
-    let result = await handleSlateTriggerWebhook({
-      client,
-      triggerId: 'new_message_webhook',
-      url: WEBHOOK_URL,
-      headers,
-      body
-    });
-
-    expect(result.inputs).toEqual([]);
-    expect(result.response).toMatchObject({ status: 401 });
-    expect(decodeResponseBody(result.response!)).toBe('invalid signature');
-  });
-
-  it('keeps unsigned event delivery backward compatible when no secret is configured', async () => {
-    let client = createSlackTriggerTestClient();
-    let body = JSON.stringify({
-      type: 'event_callback',
-      event: {
-        type: 'message',
-        channel: 'C456',
-        text: 'unsigned event',
-        ts: '1710000001.000200'
-      }
-    });
-    let result = await handleSlateTriggerWebhook({
-      client,
-      triggerId: 'new_message_webhook',
-      url: WEBHOOK_URL,
-      body
-    });
-
-    expect(result.inputs).toEqual([
-      {
-        messageTs: '1710000001.000200',
-        channelId: 'C456',
-        text: 'unsigned event'
-      }
-    ]);
-  });
-
-  it('maps Slack retries for the same message to one stable event id', async () => {
-    let client = createSlackTriggerTestClient();
-    let body = JSON.stringify({
-      type: 'event_callback',
-      event: {
-        type: 'message',
-        channel: 'C789',
-        text: 'retry me',
-        ts: '1710000002.000300'
-      }
-    });
-    let first = await handleSlateTriggerWebhook({
-      client,
-      triggerId: 'new_message_webhook',
-      url: WEBHOOK_URL,
-      body
-    });
-    let retry = await handleSlateTriggerWebhook({
-      client,
-      triggerId: 'new_message_webhook',
-      url: WEBHOOK_URL,
-      headers: {
-        'x-slack-retry-num': '1',
-        'x-slack-retry-reason': 'http_timeout'
-      },
-      body
-    });
-
-    let firstEvent = await mapSlateTriggerEvent({
-      client,
-      triggerId: 'new_message_webhook',
-      input: first.inputs[0]!
-    });
-    let retriedEvent = await mapSlateTriggerEvent({
-      client,
-      triggerId: 'new_message_webhook',
-      input: retry.inputs[0]!
-    });
-
-    expect(firstEvent.id).toBe('C789-1710000002.000300');
-    expect(retriedEvent.id).toBe(firstEvent.id);
+  it('does not parse malformed or non-message events into inputs', async () => {
+    for (let body of [
+      'not-json',
+      JSON.stringify({ type: 'event_callback', event: { type: 'reaction_added' } })
+    ]) {
+      let result = await handleSlateTriggerWebhook({
+        client: client(),
+        triggerId: 'new_message_webhook',
+        url: 'https://example.com/slack',
+        body
+      });
+      expect(result.inputs).toEqual([]);
+    }
   });
 });

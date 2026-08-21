@@ -81,7 +81,7 @@ Lead Ads are part of the Marketing API and provide a way to capture leads throug
 
 ## Events
 
-Meta supports webhooks for ad-related events through its Graph API Webhooks infrastructure. Webhooks are configured by adding the Webhooks product to your Meta Developer App and subscribing to specific object types and fields. Set `webhookVerifyToken` to the same Verify Token configured in the customer-owned Meta app; verification GET requests then require an exact match and echo `hub.challenge` synchronously. Leaving the field unset preserves legacy callbacks that did not validate the token. Ordinary POST notifications remain asynchronous. Meta signs webhook payloads using HMAC-SHA256 with your App Secret.
+Meta supports webhooks for ad-related events through its Graph API Webhooks infrastructure. Webhooks are configured by adding the Webhooks product to your Meta Developer App and subscribing to specific object types and fields. Enter the generated callback URL and verify token in the Meta app; the callback lifecycle owns that token and requires an exact match before echoing `hub.challenge` synchronously. Ordinary POST notifications remain asynchronous and must carry Meta's HMAC-SHA256 signature. OAuth connections use the linked OAuth App Secret; System User Token connections store the App Secret with their authentication configuration.
 
 ### Ad Account Events
 

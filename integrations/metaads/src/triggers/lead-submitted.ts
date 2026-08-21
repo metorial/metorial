@@ -1,4 +1,9 @@
-import { getMetaWebhookVerificationResponse, metaWebhookHttp, SlateTrigger } from 'slates';
+import {
+  captureMetaWebhookBootstrap,
+  metaWebhookHttp,
+  SlateTrigger,
+  verifyMetaWebhook
+} from '@slates/provider';
 import { z } from 'zod';
 import { MetaAdsClient } from '../lib/client';
 import { spec } from '../spec';
@@ -42,16 +47,13 @@ export let leadSubmitted = SlateTrigger.create(spec, {
     })
   )
   .webhook({
-    http: metaWebhookHttp,
+    http: metaWebhookHttp({
+      oauthAuthMethods: ['oauth'],
+      authConfigAuthMethods: ['system_user_token']
+    }),
+    verifyWebhook: verifyMetaWebhook,
+    captureWebhookBootstrap: captureMetaWebhookBootstrap,
     handleRequest: async ctx => {
-      let verificationResponse = getMetaWebhookVerificationResponse(
-        ctx.request,
-        ctx.config.webhookVerifyToken
-      );
-      if (verificationResponse) {
-        return { inputs: [], response: verificationResponse };
-      }
-
       let body = (await ctx.request.json()) as any;
 
       if (body.object !== 'page') {

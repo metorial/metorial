@@ -49,8 +49,9 @@ describe('google-calendar calendar_list_changes trigger', () => {
         channelId: 'calendar-channel-1',
         resourceId: 'calendar-resource-1',
         expiration: '1700000000001',
-        syncToken: 'calendar-sync-1'
-      }
+        channelToken: expect.stringMatching(/^[A-Za-z0-9_-]+$/)
+      },
+      state: { syncToken: 'calendar-sync-1' }
     });
 
     await unregisterSlateTriggerWebhook({
