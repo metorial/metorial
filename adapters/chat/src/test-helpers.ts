@@ -159,6 +159,12 @@ let stubOutput = (key: string): any => {
   if (key === 'metorial_chat$user.get') {
     return { author: dummyAuthor };
   }
+  if (key === 'metorial_chat$user.getAuthenticated') {
+    return {
+      author: { ...dummyAuthor, isMe: true },
+      workspace: { id: 'W1', name: 'Test Workspace' }
+    };
+  }
   if (key === 'metorial_chat$file.upload') {
     return { attachment: { type: 'file', name: 'a.txt' } };
   }

@@ -343,6 +343,20 @@ export let getUser = ChatAdapter.defineTool({
   })
 });
 
+export let getAuthenticatedUser = ChatAdapter.defineTool({
+  key: 'metorial_chat$user.getAuthenticated',
+  name: 'Get Authenticated User',
+  description:
+    'Return the user or app connected to this chat integration. Includes the workspace when the provider exposes it.',
+  tags: { readOnly: true },
+  input: z.object({}),
+  output: z.object({
+    author: authorSchema,
+    workspace: workspaceSchema.optional(),
+    raw: rawSchema
+  })
+});
+
 export let searchUsers = ChatAdapter.defineTool({
   key: 'metorial_chat$user.search',
   name: 'Search Users',
@@ -503,6 +517,7 @@ export let chatTools = {
   openSingleDm,
   openGroupDm,
   getUser,
+  getAuthenticatedUser,
   searchUsers,
   uploadFile,
   downloadFile,

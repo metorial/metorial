@@ -34,6 +34,7 @@ export let ChatAdapter = defineAdapter({
     dm_open_group: { tools: ['metorial_chat$dm.openGroup'] },
 
     user_read: { tools: ['metorial_chat$user.get'] },
+    user_self_read: { tools: ['metorial_chat$user.getAuthenticated'] },
     user_search: { tools: ['metorial_chat$user.search'] },
     file_upload: { tools: ['metorial_chat$file.upload'] },
     file_download: { tools: ['metorial_chat$file.download'] },
