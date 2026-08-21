@@ -1,9 +1,9 @@
 import { searchMessages as contract } from '@slates/adapter-chat';
 import { slackUserAuthMethods } from '../../lib/auth-methods';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import type { SlackMessage } from '../../lib/types';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { decodeSlackCursor, encodeSlackCursor } from '../lib/cursors';
 import { getSlackIdentity, mapSlackMessage } from '../lib/mappers';
 
@@ -12,7 +12,7 @@ export let chatSearchMessages = contract
   .scopes(slackActionScopes.search)
   .authMethods(slackUserAuthMethods)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'backward');
     let page = cursor.data.page ?? 1;
     let query = ctx.input.channelId

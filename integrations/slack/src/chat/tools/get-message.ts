@@ -1,14 +1,14 @@
-import { getMessage as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
+import { ChatErrors, getMessage as contract } from '@slates/adapter-chat';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { getSlackIdentity, hydrateSlackMessageResult } from '../lib/mappers';
 
 export let chatGetMessage = contract
   .implement(spec)
   .scopes(slackActionScopes.conversationHistory)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     let result = await client.getConversationHistory({
       channel: ctx.input.channelId,
       oldest: ctx.input.messageId,
@@ -17,7 +17,11 @@ export let chatGetMessage = contract
       limit: 1
     });
     let message = result.messages.find(item => item.ts === ctx.input.messageId);
-    if (!message) throw new Error(`Slack message ${ctx.input.messageId} was not found`);
+    if (!message)
+      throw ChatErrors.messageNotFound({
+        action: contract.key,
+        messageId: ctx.input.messageId
+      });
     return {
       output: await hydrateSlackMessageResult(client, ctx.input.channelId, message, {
         identity: await getSlackIdentity(client)

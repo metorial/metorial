@@ -1,13 +1,13 @@
 import { removeReaction as contract, toSlackShortcode } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 
 export let chatRemoveReaction = contract
   .implement(spec)
   .scopes(slackActionScopes.reactionsWrite)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     let name = toSlackShortcode(ctx.input.emoji);
     await client.removeReaction({
       channel: ctx.input.channelId,

@@ -1,13 +1,13 @@
 import { deleteMessage as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 
 export let chatDeleteMessage = contract
   .implement(spec)
   .scopes(slackActionScopes.chatWrite)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     await client.deleteMessage({ channel: ctx.input.channelId, ts: ctx.input.messageId });
     return {
       output: { ok: true, raw: { channel: ctx.input.channelId, ts: ctx.input.messageId } },

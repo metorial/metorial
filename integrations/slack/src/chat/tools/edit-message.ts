@@ -1,7 +1,7 @@
 import { editMessage as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { getSlackIdentity, hydrateSlackMessageResult } from '../lib/mappers';
 import { renderChatBody } from '../lib/render';
 
@@ -9,7 +9,7 @@ export let chatEditMessage = contract
   .implement(spec)
   .scopes(slackActionScopes.chatWrite)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     let rendered = renderChatBody(ctx.input);
     let message = await client.updateMessage({
       channel: ctx.input.channelId,

@@ -88,7 +88,7 @@ export class SlackClient {
       let response = await this.axios.post(`/${method}`, params || {});
       let data = response.data as T;
       if (!data.ok) {
-        throw slackApiError(method, data.error);
+        throw slackApiError(method, data.error, data);
       }
       return data;
     } catch (error) {
@@ -104,7 +104,7 @@ export class SlackClient {
       let response = await this.axios.get(`/${method}`, { params });
       let data = response.data as T;
       if (!data.ok) {
-        throw slackApiError(method, data.error);
+        throw slackApiError(method, data.error, data);
       }
       return data;
     } catch (error) {

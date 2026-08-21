@@ -1,14 +1,18 @@
 import { getThread as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { getSlackIdentity, mapSlackChannel, mapSlackThread } from '../lib/mappers';
 
 export let chatGetThread = contract
   .implement(spec)
   .scopes(slackActionScopes.conversationHistory)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, {
+      action: contract.key,
+      context: { threadId: ctx.input.threadId },
+      ambiguous: { thread_not_found: 'chat.thread.not_found' }
+    });
     let [replies, rawChannel, identity, permalink] = await Promise.all([
       client.getConversationReplies({
         channel: ctx.input.channelId,

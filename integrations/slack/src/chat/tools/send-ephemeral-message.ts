@@ -1,7 +1,7 @@
 import { sendEphemeralMessage as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { getSlackIdentity, hydrateSlackMessageResult } from '../lib/mappers';
 import { sendSlackBody } from '../lib/outgoing';
 
@@ -9,7 +9,7 @@ export let chatSendEphemeralMessage = contract
   .implement(spec)
   .scopes(slackActionScopes.chatWrite)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     let message = await sendSlackBody(client, ctx.input, {
       channelId: ctx.input.channelId,
       threadTs: ctx.input.threadId,

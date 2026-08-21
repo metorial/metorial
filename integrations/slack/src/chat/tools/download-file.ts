@@ -1,18 +1,27 @@
-import { downloadFile as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
+import { ChatErrors, downloadFile as contract } from '@slates/adapter-chat';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { mapSlackFile } from '../lib/mappers';
 
 export let chatDownloadFile = contract
   .implement(spec)
   .scopes(slackActionScopes.filesRead)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, {
+      action: contract.key,
+      context: { attachmentId: ctx.input.id },
+      ambiguous: { not_found: 'chat.attachment.not_found' }
+    });
     let id = ctx.input.id ?? ctx.input.fetchMetadata?.fileId;
     let file = id ? await client.getFileInfo(id) : undefined;
     let url = ctx.input.url ?? file?.url_private_download ?? file?.url_private;
-    if (!url) throw new Error('A Slack file id or private download URL is required');
+    if (!url) {
+      throw ChatErrors.missingTarget({
+        action: contract.key,
+        message: 'A Slack file id or private download URL is required'
+      });
+    }
     let parsedUrl = new URL(url);
     if (
       parsedUrl.protocol !== 'https:' ||
@@ -23,7 +32,14 @@ export let chatDownloadFile = contract
         parsedUrl.hostname.endsWith('.slack-files.com')
       )
     ) {
-      throw new Error('Slack file downloads require an official HTTPS Slack file URL');
+      throw ChatErrors.attachmentDownloadFailed({
+        action: contract.key,
+        attachmentId: id,
+        message: 'Slack file downloads require an official HTTPS Slack file URL',
+        // A non-Slack host is a bad request, not a transient upstream failure.
+        retryable: false,
+        slate: { code: 'input.invalid' }
+      });
     }
     let download = await client.downloadFile(url);
     let attachment = {

@@ -1,16 +1,21 @@
-import { startTyping as contract } from '@slates/adapter-chat';
+import { ChatErrors, startTyping as contract } from '@slates/adapter-chat';
 import { slackBotAuthMethods } from '../../lib/auth-methods';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 
 export let chatStartTyping = contract
   .implement(spec)
   .scopes(slackActionScopes.chatTyping)
   .authMethods(slackBotAuthMethods)
   .handleInvocation(async ctx => {
-    if (!ctx.input.threadId) throw new Error('Slack typing status requires a threadId');
-    let client = new SlackClient(ctx.auth.token);
+    if (!ctx.input.threadId)
+      throw ChatErrors.capabilityUnsupported({
+        action: contract.key,
+        capability: 'typing',
+        message: 'Slack only supports typing status inside a thread, so threadId is required'
+      });
+    let client = createSlackChatClient(ctx, { action: contract.key });
     await client.setAssistantThreadStatus({
       channelId: ctx.input.channelId,
       threadTs: ctx.input.threadId,

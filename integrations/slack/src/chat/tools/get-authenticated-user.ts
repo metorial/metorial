@@ -1,14 +1,14 @@
 import { getAuthenticatedUser as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { mapSlackAuthor, mapSlackWorkspace } from '../lib/mappers';
 
 export let chatGetAuthenticatedUser = contract
   .implement(spec)
   .scopes(slackActionScopes.userInfo)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     let identity = await client.authTest();
     let actorType = ctx.auth.actorType ?? (identity.bot_id ? 'bot' : 'user');
     let actorUserId =

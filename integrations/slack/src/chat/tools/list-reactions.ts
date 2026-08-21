@@ -1,14 +1,14 @@
 import { listReactions as contract, parseEmoji } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { getSlackIdentity, mapSlackAuthor } from '../lib/mappers';
 
 export let chatListReactions = contract
   .implement(spec)
   .scopes(slackActionScopes.reactionsRead)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     let message = await client.getReactions({
       channel: ctx.input.channelId,
       timestamp: ctx.input.messageId

@@ -1,8 +1,8 @@
-// Slack API response types
-
 export interface SlackResponse {
   ok: boolean;
   error?: string;
+  needed?: string;
+  provided?: string;
   response_metadata?: {
     next_cursor?: string;
     scopes?: string[];

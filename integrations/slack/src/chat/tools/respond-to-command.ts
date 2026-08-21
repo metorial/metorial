@@ -1,14 +1,22 @@
 import { respondToCommand as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { renderChatBody } from '../lib/render';
 
 export let chatRespondToCommand = contract
   .implement(spec)
   .scopes(slackActionScopes.chatWrite)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, {
+      action: contract.key,
+      // A dead response_url is an expired interaction window, not a bad request.
+      ambiguous: {
+        expired_url: 'chat.interaction.response_expired',
+        invalid_response_url: 'chat.interaction.response_expired',
+        not_found: 'chat.command.not_found'
+      }
+    });
     let rendered = renderChatBody(ctx.input);
     let raw = await client.respondToUrl(ctx.input.responseToken, {
       text: rendered.text,

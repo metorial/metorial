@@ -1,7 +1,8 @@
 import { listMessages as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
+import type { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { decodeSlackCursor, encodeSlackCursor } from '../lib/cursors';
 import {
   getSlackIdentity,
@@ -14,7 +15,7 @@ export let chatListMessages = contract
   .implement(spec)
   .scopes(slackActionScopes.conversationHistory)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'backward');
     let limit = ctx.input.limit ?? 100;
     let [identity, rawChannel] = await Promise.all([

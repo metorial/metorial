@@ -1,7 +1,7 @@
-import { sendMessage as contract } from '@slates/adapter-chat';
-import { SlackClient } from '../../lib/client';
+import { ChatErrors, sendMessage as contract } from '@slates/adapter-chat';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
+import { createSlackChatClient } from '../lib/client';
 import { getSlackIdentity, hydrateSlackMessageResult } from '../lib/mappers';
 import { sendSlackBody } from '../lib/outgoing';
 
@@ -9,9 +9,19 @@ export let chatSendMessage = contract
   .implement(spec)
   .scopes(slackActionScopes.chatWrite)
   .handleInvocation(async ctx => {
-    let client = new SlackClient(ctx.auth.token);
+    let client = createSlackChatClient(ctx, { action: contract.key });
     if (ctx.input.ephemeral && !ctx.input.targetUserId) {
-      throw new Error('targetUserId is required when ephemeral is true');
+      throw ChatErrors.inputInvalid({
+        action: contract.key,
+        message: 'targetUserId is required when ephemeral is true',
+        issues: [
+          {
+            path: ['targetUserId'],
+            code: 'required',
+            message: 'Required when ephemeral is true'
+          }
+        ]
+      });
     }
     let threadTs =
       ctx.input.threadId ??
