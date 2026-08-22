@@ -10,11 +10,40 @@ type SlackServiceErrorOptions = {
 export let slackServiceError = (message: string, options: SlackServiceErrorOptions = {}) =>
   createApiServiceError(message, options);
 
-export let slackApiError = (method: string, error?: string | null) =>
-  slackServiceError(`Slack API error (${method}): ${error || 'Unknown error'}`, {
-    reason: 'slack_api_error',
-    upstreamCode: error || undefined
-  });
+export type SlackApiErrorDetails = {
+  needed?: string | null;
+  provided?: string | null;
+};
+
+export let slackApiError = (
+  method: string,
+  error?: string | null,
+  details: SlackApiErrorDetails = {}
+) => {
+  let serviceError = slackServiceError(
+    `Slack API error (${method}): ${error || 'Unknown error'}`,
+    {
+      reason: 'slack_api_error',
+      upstreamCode: error || undefined
+    }
+  );
+
+  if (details.needed) serviceError.data.upstreamNeededScopes = details.needed;
+  if (details.provided) serviceError.data.upstreamProvidedScopes = details.provided;
+
+  return serviceError;
+};
+
+export let getSlackNeededScopes = (error: unknown): string[] => {
+  if (!(error instanceof ServiceError)) return [];
+  let needed = error.data.upstreamNeededScopes;
+  if (typeof needed !== 'string') return [];
+
+  return needed
+    .split(/[,\s]+/)
+    .map(scope => scope.trim())
+    .filter(Boolean);
+};
 
 export let slackRequestError = (method: string, error: unknown) => {
   // Transport errors (429/5xx/timeouts) arrive pre-classified with retry

@@ -61,7 +61,44 @@ const ADDED_TOOL_KEYS = [
   'manage_presence'
 ] as const;
 
-const EXPECTED_TOOL_KEYS = [...ESTABLISHED_TOOL_KEYS, ...ADDED_TOOL_KEYS] as const;
+const CHAT_ADAPTER_TOOL_KEYS = [
+  'metorial_chat$message.send',
+  'metorial_chat$message.edit',
+  'metorial_chat$message.delete',
+  'metorial_chat$message.get',
+  'metorial_chat$message.list',
+  'metorial_chat$message.search',
+  'metorial_chat$message.reply',
+  'metorial_chat$message.sendEphemeral',
+  'metorial_chat$message.markRead',
+  'metorial_chat$reaction.add',
+  'metorial_chat$reaction.remove',
+  'metorial_chat$reaction.list',
+  'metorial_chat$channel.list',
+  'metorial_chat$channel.get',
+  'metorial_chat$workspace.list',
+  'metorial_chat$workspace.get',
+  'metorial_chat$channel.members',
+  'metorial_chat$thread.list',
+  'metorial_chat$thread.get',
+  'metorial_chat$dm.openSingle',
+  'metorial_chat$dm.openGroup',
+  'metorial_chat$user.get',
+  'metorial_chat$user.getAuthenticated',
+  'metorial_chat$user.search',
+  'metorial_chat$file.upload',
+  'metorial_chat$file.download',
+  'metorial_chat$modal.open',
+  'metorial_chat$command.respond',
+  'metorial_chat$typing.start',
+  'metorial_chat$setup.get'
+] as const;
+
+const EXPECTED_TOOL_KEYS = [
+  ...ESTABLISHED_TOOL_KEYS,
+  ...ADDED_TOOL_KEYS,
+  ...CHAT_ADAPTER_TOOL_KEYS
+] as const;
 const PUBLIC_COPY_LEAK_PATTERN =
   /\bslates?\b|create(?:base64|text)attachment|\battachmentcount\b|\bfile[- ]delivery\b|\battachment transport\b/i;
 
@@ -73,7 +110,7 @@ describe('Slack expanded tool contract', () => {
     .map(action => action.key);
 
   it('keeps all established tools and exposes all normalized additions', () => {
-    expect(new Set(EXPECTED_TOOL_KEYS).size).toBe(48);
+    expect(new Set(EXPECTED_TOOL_KEYS).size).toBe(78);
     expect(toolKeys).toHaveLength(EXPECTED_TOOL_KEYS.length);
     expect([...toolKeys].sort()).toEqual([...EXPECTED_TOOL_KEYS].sort());
   });
@@ -105,6 +142,8 @@ describe('Slack expanded tool contract', () => {
 
 const BOT_OAUTH_SCOPE_MANIFEST = [
   'chat:write',
+  'app_mentions:read',
+  'assistant:write',
   'chat:write.public',
   'channels:read',
   'channels:manage',
@@ -294,7 +333,70 @@ const EXPECTED_TOOL_AUTHORIZATION: Record<string, ExpectedToolAuthorization> = {
     authMethods: USER_AUTH_METHODS
   },
   manage_dnd: { scopes: [['dnd:read', 'dnd:write']], authMethods: USER_AUTH_METHODS },
-  manage_presence: { scopes: [['users:read', 'users:write']], authMethods: null }
+  manage_presence: { scopes: [['users:read', 'users:write']], authMethods: null },
+  'metorial_chat$message.send': { scopes: [['chat:write']], authMethods: null },
+  'metorial_chat$message.edit': { scopes: [['chat:write']], authMethods: null },
+  'metorial_chat$message.delete': { scopes: [['chat:write']], authMethods: null },
+  'metorial_chat$message.get': { scopes: CONVERSATION_HISTORY_GATE, authMethods: null },
+  'metorial_chat$message.list': { scopes: CONVERSATION_HISTORY_GATE, authMethods: null },
+  'metorial_chat$message.search': {
+    scopes: [['search:read']],
+    authMethods: USER_AUTH_METHODS
+  },
+  'metorial_chat$message.reply': { scopes: [['chat:write']], authMethods: null },
+  'metorial_chat$message.sendEphemeral': { scopes: [['chat:write']], authMethods: null },
+  'metorial_chat$message.markRead': {
+    scopes: [['channels:write', 'groups:write', 'im:write', 'mpim:write']],
+    authMethods: USER_AUTH_METHODS
+  },
+  'metorial_chat$reaction.add': {
+    scopes: [['reactions:write']],
+    authMethods: null
+  },
+  'metorial_chat$reaction.remove': {
+    scopes: [['reactions:write']],
+    authMethods: null
+  },
+  'metorial_chat$reaction.list': {
+    scopes: [['reactions:read']],
+    authMethods: null
+  },
+  'metorial_chat$channel.list': { scopes: CONVERSATION_READ_GATE, authMethods: null },
+  'metorial_chat$channel.get': { scopes: CONVERSATION_READ_GATE, authMethods: null },
+  'metorial_chat$channel.members': { scopes: CONVERSATION_READ_GATE, authMethods: null },
+  'metorial_chat$workspace.list': { scopes: [['team:read']], authMethods: null },
+  'metorial_chat$workspace.get': { scopes: [['team:read']], authMethods: null },
+  'metorial_chat$thread.list': { scopes: CONVERSATION_HISTORY_GATE, authMethods: null },
+  'metorial_chat$thread.get': { scopes: CONVERSATION_HISTORY_GATE, authMethods: null },
+  'metorial_chat$dm.openSingle': {
+    scopes: [['im:write'], ['mpim:write']],
+    authMethods: null
+  },
+  'metorial_chat$dm.openGroup': {
+    scopes: [['im:write'], ['mpim:write']],
+    authMethods: null
+  },
+  'metorial_chat$user.get': {
+    scopes: [['users:read'], ['users:read.email']],
+    authMethods: null
+  },
+  'metorial_chat$user.getAuthenticated': {
+    scopes: [['users:read'], ['users:read.email']],
+    authMethods: null
+  },
+  'metorial_chat$user.search': {
+    scopes: [['users:read'], ['users:read.email']],
+    authMethods: null
+  },
+  'metorial_chat$file.upload': { scopes: [['files:write']], authMethods: null },
+  'metorial_chat$file.download': { scopes: [['files:read']], authMethods: null },
+  'metorial_chat$modal.open': { scopes: [['chat:write']], authMethods: null },
+  'metorial_chat$command.respond': { scopes: [['chat:write']], authMethods: null },
+  'metorial_chat$typing.start': {
+    scopes: [['assistant:write']],
+    authMethods: ['oauth', 'bot_token']
+  },
+  'metorial_chat$setup.get': { scopes: null, authMethods: null }
 };
 
 let normalizeScopeGate = (scopes: { AND: { OR: string[] }[] } | undefined) =>

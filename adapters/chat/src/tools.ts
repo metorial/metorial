@@ -112,21 +112,6 @@ export let searchMessages = ChatAdapter.defineTool({
   })
 });
 
-export let replyMessage = ChatAdapter.defineTool({
-  key: 'metorial_chat$message.reply',
-  name: 'Reply to Message',
-  description: 'Reply to an existing message, creating or continuing a thread when supported.',
-  input: chatBodySchema.extend({
-    channelId: z.string(),
-    reply: replyRefSchema
-      .optional()
-      .describe(
-        'Quote or reply target. If neither id nor reference is set, this is a normal message.'
-      )
-  }),
-  output: messageResultSchema
-});
-
 export let sendEphemeralMessage = ChatAdapter.defineTool({
   key: 'metorial_chat$message.sendEphemeral',
   name: 'Send Ephemeral Message',
@@ -301,7 +286,6 @@ export let getThread = ChatAdapter.defineTool({
 
 let dmResultSchema = z.object({
   channel: channelSchema,
-  thread: threadSchema.optional(),
   raw: rawSchema
 });
 
@@ -371,6 +355,11 @@ export let searchUsers = ChatAdapter.defineTool({
   })
 });
 
+// `message` is meaningfully used: for providers where uploading a file IS
+// itself a full message-send (e.g. Telegram's sendDocument/sendPhoto), this
+// field carries that newly-created message; for providers with a real
+// separate upload step (Slack) or a no-op upload (Discord -- see
+// docs/file-uploads.md), it stays undefined.
 export let uploadFile = ChatAdapter.defineTool({
   key: 'metorial_chat$file.upload',
   name: 'Upload File',
@@ -380,8 +369,12 @@ export let uploadFile = ChatAdapter.defineTool({
     threadId: z.string().optional(),
     filename: z.string(),
     mimeType: z.string().optional(),
-    content: z.string(),
-    encoding: z.enum(['base64', 'utf-8'])
+    fileUrl: z.string().url().describe('Short-lived signed URL to fetch the file bytes from'),
+    fileSize: z.number().optional(),
+    clientReferenceId: z
+      .string()
+      .optional()
+      .describe('Passed through to the resulting attachment.clientReferenceId')
   }),
   output: z.object({
     attachment: attachmentRefSchema,
@@ -396,14 +389,10 @@ export let downloadFile = ChatAdapter.defineTool({
   key: 'metorial_chat$file.download',
   name: 'Download File',
   description:
-    'Download an attachment. Pass the attachment id/url/fetchMetadata from a message, plus channel and message ids when the platform requires them.',
+    'Download an attachment. Pass the providerFileReference from a message attachment.',
   tags: { readOnly: true },
   input: z.object({
-    id: z.string().optional(),
-    url: z.string().optional(),
-    channelId: z.string().optional(),
-    messageId: z.string().optional(),
-    fetchMetadata: z.record(z.string(), z.string()).optional()
+    providerFileReference: z.unknown()
   }),
   output: z.object({
     attachment: attachmentRefSchema,
@@ -501,7 +490,6 @@ export let chatTools = {
   getMessage,
   listMessages,
   searchMessages,
-  replyMessage,
   sendEphemeralMessage,
   markMessageRead,
   addReaction,

@@ -9,6 +9,16 @@ export let parseSlackGrantedScopes = (value?: string | null) =>
 export let slackBotOAuthScopes = [
   { title: 'Send Messages', description: 'Send messages as the app', scope: 'chat:write' },
   {
+    title: 'Read Mentions',
+    description: 'Receive events when the app is mentioned',
+    scope: 'app_mentions:read'
+  },
+  {
+    title: 'Assistant Features',
+    description: 'Show status text in Slack assistant threads',
+    scope: 'assistant:write'
+  },
+  {
     title: 'Send Public Messages',
     description: 'Send messages to channels the app is not a member of',
     scope: 'chat:write.public'
@@ -388,6 +398,8 @@ let slackUserInfoScopes = allOf('users:read', 'users:read.email');
 
 export let slackActionScopes = {
   chatWrite: anyOf('chat:write'),
+  chatTyping: anyOf('assistant:write'),
+  appMentions: anyOf('app_mentions:read'),
   conversationRead: slackConversationReadScopes,
   conversationHistory: slackConversationHistoryScopes,
   channelManagement: allOf(['channels:manage', 'channels:write'], 'groups:write'),
@@ -405,6 +417,8 @@ export let slackActionScopes = {
   openConversation: allOf('im:write', 'mpim:write'),
   userInfo: slackUserInfoScopes,
   reactions: allOf('reactions:read', 'reactions:write'),
+  reactionsRead: anyOf('reactions:read'),
+  reactionsWrite: anyOf('reactions:write'),
   pins: allOf('pins:read', 'pins:write'),
   files: allOf('files:read', 'files:write'),
   filesRead: anyOf('files:read'),

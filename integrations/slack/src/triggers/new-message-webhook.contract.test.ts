@@ -61,7 +61,9 @@ let signatureRejectionCases: { name: string; headers: Record<string, string> }[]
 describe('Slack new_message_webhook contract', () => {
   it('advertises synchronous handling only for URL verification requests', async () => {
     let contract = await getSlateContract(createSlackTriggerTestClient());
-    let trigger = contract.triggers.find(action => action.id === 'new_message_webhook');
+    let trigger = contract.triggers.find(
+      (action: { id: string; invocation?: unknown }) => action.id === 'new_message_webhook'
+    );
 
     expect(trigger?.invocation).toMatchObject({
       type: 'webhook',

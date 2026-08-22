@@ -21,7 +21,19 @@ export let linkUnfurlSchema = z.object({
   messageId: z.string().optional()
 });
 
-let messageFields = {
+export let replyRefSchema = z.object({
+  id: z.string().optional(),
+  reference: z
+    .object({
+      id: z.string().optional(),
+      channelId: z.string().optional(),
+      threadId: z.string().optional(),
+      body: chatBodySchema
+    })
+    .optional()
+});
+
+export let messageSchema = z.object({
   id: z.string(),
   channelId: z.string(),
   threadId: z.string().optional(),
@@ -33,26 +45,16 @@ let messageFields = {
   unfurls: z.array(linkUnfurlSchema).optional(),
   providerType: z.string().optional(),
   metadata: messageMetadataSchema,
-  raw: rawSchema
-};
-
-export let messageSnapshotSchema = z.object({
-  ...messageFields,
-  reply: z
-    .object({
-      id: z.string().optional()
-    })
-    .optional()
-});
-
-export let replyRefSchema = z.object({
-  id: z.string().optional(),
-  reference: messageSnapshotSchema.optional()
-});
-
-export let messageSchema = z.object({
-  ...messageFields,
-  reply: replyRefSchema.optional()
+  raw: rawSchema,
+  reply: replyRefSchema.optional(),
+  /**
+   * The provider's raw grouping key for cases where a provider delivers
+   * what a user perceives as one message as several separate provider
+   * messages (e.g. Telegram's `media_group_id` for photo/media albums).
+   * Purely for inbound correlation; providers that don't have this concept
+   * simply omit it.
+   */
+  groupId: z.string().optional()
 });
 
 export let messageResultSchema = z.object({
@@ -64,7 +66,6 @@ export let messageResultSchema = z.object({
 
 export type MessageMetadata = z.infer<typeof messageMetadataSchema>;
 export type LinkUnfurl = z.infer<typeof linkUnfurlSchema>;
-export type MessageSnapshot = z.infer<typeof messageSnapshotSchema>;
 export type ReplyRef = z.infer<typeof replyRefSchema>;
 export type Message = z.infer<typeof messageSchema>;
 export type MessageResult = z.infer<typeof messageResultSchema>;
