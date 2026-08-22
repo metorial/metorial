@@ -11,19 +11,30 @@ export interface SlateAttachmentInlineContent {
 
 export interface SlateAttachment {
   mimeType?: string;
+  attachmentHash?: string;
   content: SlateAttachmentUrlContent | SlateAttachmentInlineContent;
 }
 
-export let createUrlAttachment = (url: string, mimeType?: string): SlateAttachment => ({
+export let createUrlAttachment = (
+  url: string,
+  mimeType?: string,
+  attachmentHash?: string
+): SlateAttachment => ({
   mimeType,
+  attachmentHash,
   content: {
     type: 'url',
     url
   }
 });
 
-export let createBase64Attachment = (content: string, mimeType?: string): SlateAttachment => ({
+export let createBase64Attachment = (
+  content: string,
+  mimeType?: string,
+  attachmentHash?: string
+): SlateAttachment => ({
   mimeType,
+  attachmentHash,
   content: {
     type: 'content',
     encoding: 'base64',
@@ -31,8 +42,13 @@ export let createBase64Attachment = (content: string, mimeType?: string): SlateA
   }
 });
 
-export let createTextAttachment = (content: string, mimeType?: string): SlateAttachment => ({
+export let createTextAttachment = (
+  content: string,
+  mimeType?: string,
+  attachmentHash?: string
+): SlateAttachment => ({
   mimeType,
+  attachmentHash,
   content: {
     type: 'content',
     encoding: 'utf-8',
