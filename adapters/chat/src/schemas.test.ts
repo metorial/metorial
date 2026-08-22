@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
   actionsPartSchema,
+  attachmentRefSchema,
   authorSchema,
   cardPartSchema,
   channelSchema,
@@ -16,13 +17,13 @@ import {
   encodeCursor,
   markdownPartSchema,
   messageSchema,
-  readAttachmentContent,
   replyRefSchema,
   tablePartSchema,
   threadSchema,
   toDownloadInput,
   workspaceSchema
 } from './schema';
+import { uploadFile } from './tools';
 
 describe('chat part schemas', () => {
   it('parses markdown, table, and nested card/section parts', () => {
@@ -254,21 +255,76 @@ describe('workspace and channel', () => {
     let attachment = {
       type: 'file' as const,
       id: 'F1',
-      url: 'https://files.example/a.txt',
-      fetchMetadata: { mediaId: 'abc' },
-      content: 'aGk=',
-      encoding: 'base64' as const,
+      providerFileReference: { fileId: 'F1' },
       name: 'a.txt'
     };
 
-    expect(toDownloadInput(attachment, { channelId: 'C1', messageId: 'm1' })).toEqual({
-      id: 'F1',
-      url: 'https://files.example/a.txt',
-      fetchMetadata: { mediaId: 'abc' },
-      channelId: 'C1',
-      messageId: 'm1'
+    expect(toDownloadInput(attachment)).toEqual({
+      providerFileReference: { fileId: 'F1' }
     });
-    expect(readAttachmentContent(attachment).content).toBe('aGk=');
+  });
+
+  it('parses a pending attachment with a source url', () => {
+    let parsed = attachmentRefSchema.parse({
+      type: 'file',
+      name: 'report.pdf',
+      status: 'pending',
+      sourceUrl: 'https://uploads.example.com/report.pdf?sig=abc',
+      clientReferenceId: 'client-ref-1'
+    });
+
+    expect(parsed).toMatchObject({
+      status: 'pending',
+      sourceUrl: 'https://uploads.example.com/report.pdf?sig=abc',
+      clientReferenceId: 'client-ref-1'
+    });
+  });
+
+  it('accepts a message with a provider grouping id', () => {
+    let parsed = messageSchema.parse({
+      id: 'm3',
+      channelId: 'C1',
+      author: {
+        userId: 'U1',
+        userName: 'ada',
+        fullName: 'Ada',
+        type: 'user',
+        isMe: false
+      },
+      body: { parts: [{ type: 'markdown', markdown: 'album' }] },
+      metadata: { sentAt: '2026-01-01T00:00:00.000Z', edited: false },
+      groupId: 'media-group-123'
+    });
+
+    expect(parsed.groupId).toBe('media-group-123');
+  });
+
+  it('validates the file.upload tool input using fileUrl instead of content/encoding', () => {
+    let parsed = uploadFile.input.parse({
+      channelId: 'C1',
+      filename: 'report.pdf',
+      mimeType: 'application/pdf',
+      fileUrl: 'https://uploads.example.com/report.pdf?sig=abc',
+      fileSize: 1024,
+      clientReferenceId: 'client-ref-1'
+    });
+
+    expect(parsed).toMatchObject({
+      channelId: 'C1',
+      filename: 'report.pdf',
+      fileUrl: 'https://uploads.example.com/report.pdf?sig=abc',
+      fileSize: 1024,
+      clientReferenceId: 'client-ref-1'
+    });
+
+    expect(() =>
+      uploadFile.input.parse({
+        channelId: 'C1',
+        filename: 'report.pdf',
+        content: 'aGk=',
+        encoding: 'base64'
+      })
+    ).toThrow();
   });
 });
 
