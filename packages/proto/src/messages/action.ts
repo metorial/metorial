@@ -92,6 +92,7 @@ export let slatesMessageActionInvokeResponse = z.object({
       .array(
         z.object({
           mimeType: z.string().optional(),
+          attachmentHash: z.string().optional(),
           content: z.union([
             z.object({
               type: z.literal('url'),

@@ -23,7 +23,7 @@ export let ChatAdapter = defineAdapter({
     message_read: { tools: ['metorial_chat$message.get', 'metorial_chat$message.list'] },
     message_mark_read: { tools: ['metorial_chat$message.markRead'] },
     message_search: { tools: ['metorial_chat$message.search'] },
-    message_reply: { tools: ['metorial_chat$message.reply'] },
+    message_reply: {},
 
     channel_read: { tools: ['metorial_chat$channel.list', 'metorial_chat$channel.get'] },
     channel_members_read: { tools: ['metorial_chat$channel.members'] },
@@ -96,12 +96,16 @@ export let ChatAdapter = defineAdapter({
     channel_forum: {},
     thread_posts: {},
     thread_subject: {},
+    typing_without_thread: {},
     resource_context: {},
 
     command_freeform: {},
     command_structured_options: {},
     command_subcommands: {},
 
-    provider_setup: { tools: ['metorial_chat$setup.get'] }
+    provider_setup: { tools: ['metorial_chat$setup.get'] },
+
+    user_id_is_email: {},
+    user_id_is_phone_number: {}
   }
 });
