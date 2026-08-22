@@ -347,24 +347,6 @@ let partBlocks = (part: ChatPart, state: { table: boolean; charts: number }): Sl
 export let renderChatBody = (body: ChatBody) => {
   let state = { table: false, charts: 0 };
   let blocks = body.parts.flatMap(part => partBlocks(part, state));
-  for (let attachment of body.attachments ?? []) {
-    if (!attachment.url || attachment.content !== undefined) continue;
-    blocks.push(
-      attachment.type === 'image'
-        ? {
-            type: 'image',
-            image_url: attachment.url,
-            alt_text: attachment.name ?? 'Image attachment'
-          }
-        : {
-            type: 'section',
-            text: {
-              type: 'mrkdwn',
-              text: `<${attachment.url}|${slackText(attachment.name ?? 'Attachment')}>`
-            }
-          }
-    );
-  }
   blocks = blocks.slice(0, 50);
   return { text: body.altText ?? bodyToAltText(body), blocks };
 };

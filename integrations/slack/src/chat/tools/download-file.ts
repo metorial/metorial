@@ -1,21 +1,37 @@
 import { ChatErrors, downloadFile as contract } from '@slates/adapter-chat';
+import { z } from 'zod';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';
 import { mapSlackFile } from '../lib/mappers';
 
+let providerFileReferenceSchema = z.object({
+  fileId: z.string().optional(),
+  url: z.string().optional()
+});
+
 export let chatDownloadFile = contract
   .implement(spec)
   .scopes(slackActionScopes.filesRead)
   .handleInvocation(async ctx => {
+    let parsedReference = providerFileReferenceSchema.safeParse(
+      ctx.input.providerFileReference
+    );
+    if (!parsedReference.success) {
+      throw ChatErrors.inputInvalid({
+        action: contract.key,
+        message: 'providerFileReference must include a Slack file id or private download URL'
+      });
+    }
+    let { fileId, url: referenceUrl } = parsedReference.data;
+
     let client = createSlackChatClient(ctx, {
       action: contract.key,
-      context: { attachmentId: ctx.input.id },
+      context: { attachmentId: fileId },
       ambiguous: { not_found: 'chat.attachment.not_found' }
     });
-    let id = ctx.input.id ?? ctx.input.fetchMetadata?.fileId;
-    let file = id ? await client.getFileInfo(id) : undefined;
-    let url = ctx.input.url ?? file?.url_private_download ?? file?.url_private;
+    let file = fileId ? await client.getFileInfo(fileId) : undefined;
+    let url = referenceUrl ?? file?.url_private_download ?? file?.url_private;
     if (!url) {
       throw ChatErrors.missingTarget({
         action: contract.key,
@@ -34,24 +50,39 @@ export let chatDownloadFile = contract
     ) {
       throw ChatErrors.attachmentDownloadFailed({
         action: contract.key,
-        attachmentId: id,
+        attachmentId: fileId,
         message: 'Slack file downloads require an official HTTPS Slack file URL',
-        // A non-Slack host is a bad request, not a transient upstream failure.
         retryable: false,
         slate: { code: 'input.invalid' }
       });
     }
+
     let download = await client.downloadFile(url);
+    let mimeType = download.contentType ?? file?.mimetype;
     let attachment = {
-      ...(file ? mapSlackFile(file) : { type: 'file' as const, url }),
-      content: download.content.toString('base64'),
-      encoding: 'base64' as const,
-      mimeType: download.contentType ?? file?.mimetype,
-      size: download.contentLength,
-      raw: file ?? { url }
+      ...(file
+        ? mapSlackFile(file)
+        : {
+            type: 'file' as const,
+            providerFileReference: { fileId, url }
+          }),
+      mimeType,
+      size: download.contentLength
     };
+
     return {
       output: { attachment, raw: file ?? { url, contentLength: download.contentLength } },
+      attachments: [
+        {
+          content: {
+            type: 'content' as const,
+            encoding: 'base64' as const,
+            content: download.content.toString('base64')
+          },
+          mimeType,
+          attachmentHash: fileId ? `slack:file:${fileId}` : undefined
+        }
+      ],
       message: `Downloaded ${download.contentLength} byte(s) from Slack.`
     };
   })

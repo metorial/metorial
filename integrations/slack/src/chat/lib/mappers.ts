@@ -124,11 +124,10 @@ export let mapSlackFile = (file: SlackFile): AttachmentRef => ({
   id: file.id,
   name: file.name ?? file.title,
   mimeType: file.mimetype,
-  url: file.url_private_download ?? file.url_private ?? file.permalink,
   size: file.size,
   width: file.original_w,
   height: file.original_h,
-  fetchMetadata: file.id ? { fileId: file.id } : undefined,
+  providerFileReference: file.id ? { fileId: file.id } : undefined,
   raw: file
 });
 

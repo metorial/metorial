@@ -20,7 +20,6 @@ export * from './open-group-dm';
 export * from './open-modal';
 export * from './open-single-dm';
 export * from './remove-reaction';
-export * from './reply-message';
 export * from './respond-to-command';
 export * from './search-messages';
 export * from './search-users';
