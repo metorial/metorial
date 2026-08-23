@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let listEnvironments = SlateTool.create(spec, {
@@ -15,7 +16,15 @@ export let listEnvironments = SlateTool.create(spec, {
     z.object({
       projectKey: z.string().optional().describe('Project key. Falls back to config default.'),
       limit: z.number().optional().describe('Maximum number of environments to return'),
-      offset: z.number().optional().describe('Offset for pagination')
+      offset: z.number().optional().describe('Offset for pagination'),
+      filter: z
+        .string()
+        .optional()
+        .describe('Filter by query or tags, for example "query:prod,tags:critical"'),
+      sort: z
+        .string()
+        .optional()
+        .describe('Sort by createdOn, critical, or name; prefix with - for descending')
     })
   )
   .output(
@@ -34,17 +43,14 @@ export let listEnvironments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error(
-        'projectKey is required. Provide it in the input or set a default in config.'
-      );
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let result = await client.listEnvironments(projectKey, {
       limit: ctx.input.limit,
-      offset: ctx.input.offset
+      offset: ctx.input.offset,
+      filter: ctx.input.filter,
+      sort: ctx.input.sort
     });
 
     let items = result.items ?? [];

@@ -16,13 +16,15 @@ import {
   manageSchedules,
   manageWebhooks,
   manageWorkflow,
-  triggerPipeline
+  triggerPipeline,
+  triggerPipelineRun
 } from './tools';
 import { buildEvent } from './triggers';
 
 export let provider = Slate.create({
   spec,
   tools: [
+    triggerPipelineRun,
     triggerPipeline,
     getPipeline,
     listPipelines,

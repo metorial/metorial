@@ -1,4 +1,4 @@
-# Slates Specification for Metabase
+# Metabase Integration Specification
 
 ## Overview
 
@@ -6,7 +6,7 @@ Metabase is an open-source business intelligence and analytics platform. You can
 
 ## Authentication
 
-Metabase supports two primary methods for API authentication. The Metabase instance URL (e.g., `https://your-metabase.com`) is required for all methods.
+Metabase supports two primary methods for API authentication. The Metabase instance URL (for example, `https://metabase.example.com`) is stored with the selected authentication method and is not duplicated in integration config.
 
 ### API Key (Recommended)
 
@@ -30,14 +30,14 @@ To get a session token, submit a request to the `/api/session` endpoint with you
 
 ### Questions (Cards)
 
-Create, update, retrieve, and delete saved questions (called "cards" in the API). Programmatically create, modify, and manage questions and dashboards, and execute queries. Questions can be built using Metabase's JSON-based query language (MBQL) or native SQL. Results can be exported in JSON, CSV, or XLSX formats.
+Create, update, retrieve, and archive saved questions (called "cards" in the API). Programmatically create, modify, and manage questions and dashboards, and execute queries. Questions can be built using Metabase's JSON-based query language (MBQL) or native SQL. Results can be exported in JSON, CSV, or XLSX formats.
 
 - Questions can be favorited, archived, and shared via public links.
 - Questions can be organized into collections.
 
 ### Dashboards
 
-Create, update, copy, and delete dashboards. Add or remove cards (questions) from dashboards. Dashboards can be favorited, archived, reverted to prior revisions, and shared via public links.
+Create, update, copy, and archive dashboards. Add or remove cards (questions) from dashboards, and share dashboards through public links.
 
 - Dashboard parameters and filters can be configured programmatically.
 
@@ -47,7 +47,7 @@ Organize questions, dashboards, and other items into collections (similar to fol
 
 ### Database Management
 
-Add a new database using the API, and validate that database's connection details. List connected databases, retrieve metadata (tables, fields, schemas), trigger syncs, and rescan databases.
+List connected databases, retrieve metadata (tables, fields, schemas), trigger schema syncs, and rescan field values.
 
 - Supports a wide range of databases including PostgreSQL, MySQL, MongoDB, BigQuery, Snowflake, and many more.
 
@@ -57,35 +57,39 @@ Execute ad-hoc queries against connected databases, either using MBQL or native 
 
 ### User and Group Management
 
-Automate tasks like configuring instances, creating users, and setting up database connections. Create, update, deactivate users. Manage permission groups and assign users to groups.
+Create, update, deactivate, and reactivate users. Manage permission groups and assign users to groups.
 
 ### Permissions
 
-Manage data permissions and collection permissions programmatically. Do a batch update of permissions by passing in a modified graph. This modified graph must correspond to the PermissionsGraph schema. If successful, this endpoint returns the updated permissions graph.
+Manage data permissions programmatically. Do a batch update of permissions by passing in a modified graph. This modified graph must correspond to the PermissionsGraph schema. If successful, this endpoint returns the updated permissions graph.
 
-- Permissions control access to databases, tables, and collections.
+- The exposed data graph controls access to databases and tables.
 
 ### Embedding
 
-Generate public links for questions and dashboards. Manage embedding settings for cards and dashboards using signed JWTs.
+Generate and revoke public links for questions and dashboards, and enable or disable dashboard embedding.
 
-- Supports both public link sharing and secure embedding with signed tokens.
+- Signed JWT generation and embedding-secret management are outside this integration's tool surface.
 
 ### Notifications and Alerts
 
-Set up alerts on questions that trigger when specific conditions are met (e.g., results exist, a goal line is crossed). Select when you want Metabase to check the results: by the minute, hourly, daily, weekly, monthly, or on a custom schedule. Alerts can be sent to email, Slack, or webhooks.
+Question alerts use the current `/api/notification` API. Alerts watch one saved question, use `has_result`, `goal_above`, or `goal_below` conditions, schedule runs with Quartz cron expressions, and deliver through email, Slack, or HTTP handlers. Archiving deactivates an alert and removes its scheduled subscription.
 
 ### Search
 
 Search across all Metabase objects (questions, dashboards, collections, etc.) by providing a search term and optionally filtering by item type.
 
-### Instance Configuration
+### Result Export
 
-Configure settings using the `/api/settings` endpoint, set up email using the `/api/email` endpoint. Automate initial setup including creating the first admin user via the `/api/setup` endpoint.
+Saved question results can be downloaded in CSV, JSON, or XLSX format. Parameters and formatting options are sent in the JSON request body, and file bytes are returned as a downloadable file rather than embedded in structured output.
 
-### Data Upload
+## Official API references
 
-Upload CSV files to create new tables or append to existing ones within connected databases.
+- [Metabase API documentation](https://www.metabase.com/docs/latest/api-documentation)
+- [Working with the Metabase API](https://www.metabase.com/learn/metabase-basics/administration/administration-and-operation/metabase-api)
+- [API keys](https://www.metabase.com/docs/latest/people-and-groups/api-keys)
+- [API changelog](https://www.metabase.com/docs/latest/developers-guide/api-changelog)
+- [Public sharing](https://www.metabase.com/docs/latest/embedding/public-links)
 
 ## Events
 

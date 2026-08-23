@@ -1,18 +1,17 @@
 {
   "name": "@metorial/circleci",
-  "description": "Trigger, manage, and monitor CI/CD pipelines, workflows, and jobs. Retrieve build artifacts, test metadata, and insights on project performance. Manage project settings, environment variables, contexts, checkout keys, and scheduled pipeline triggers. Approve, rerun, or cancel workflows and jobs. Configure outbound webhooks for workflow and job completion events. Manage OIDC tokens for cloud provider authentication and organization-level policies. Look up user information and track credit and compute usage across projects.",
+  "description": "Trigger, manage, and monitor CircleCI pipelines, workflows, and jobs. Retrieve artifact links, test metadata, workflow insights, and flaky-test details. Manage project and context environment variables, scheduled pipeline triggers, and signed outbound webhooks. Approve, rerun, or cancel workflows and jobs, and look up user and organization information.",
   "categories": ["apis-and-http-requests"],
   "skills": [
     "trigger pipelines with parameters",
     "manage workflows and jobs",
-    "download build artifacts",
+    "retrieve build artifact links",
     "manage environment variables",
     "create scheduled triggers",
     "monitor project insights",
     "manage contexts",
-    "configure outbound webhooks",
-    "approve workflow jobs",
-    "manage OIDC tokens"
+    "configure signed outbound webhooks",
+    "approve and selectively rerun workflow jobs"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/circleci-logo.svg"
 }

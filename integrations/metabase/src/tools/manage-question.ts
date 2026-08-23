@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -16,7 +16,7 @@ Set **archived** to true to move a question to the trash.`,
     'For MBQL: set datasetQuery to { "database": 1, "type": "query", "query": { "source-table": 2 } }'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -64,10 +64,20 @@ Set **archived** to true to move a question to the trash.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    if (
+      ctx.input.action === 'create' &&
+      (!ctx.input.name?.trim() || ctx.input.datasetQuery === undefined)
+    ) {
+      throw createApiServiceError('Creating a question requires name and datasetQuery.', {
+        reason: 'metabase_question_create_input_missing'
+      });
+    }
+    if (['get', 'update'].includes(ctx.input.action) && ctx.input.cardId === undefined) {
+      throw createApiServiceError(`${ctx.input.action} requires cardId.`, {
+        reason: 'metabase_question_id_missing'
+      });
+    }
+    let client = new MetabaseClient(ctx.auth);
 
     let card: any;
 

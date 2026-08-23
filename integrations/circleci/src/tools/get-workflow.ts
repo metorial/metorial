@@ -13,7 +13,11 @@ export let getWorkflow = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      workflowId: z.string().describe('The UUID of the workflow to retrieve')
+      workflowId: z.string().describe('The UUID of the workflow to retrieve'),
+      jobsPageToken: z
+        .string()
+        .optional()
+        .describe('Pagination token for the workflow job page')
     })
   )
   .output(
@@ -37,14 +41,18 @@ export let getWorkflow = SlateTool.create(spec, {
           jobNumber: z.number().optional(),
           approvalRequestId: z.string().optional()
         })
-      )
+      ),
+      jobsNextPageToken: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let workflow = await client.getWorkflow(ctx.input.workflowId);
-    let jobsResponse = await client.getWorkflowJobs(ctx.input.workflowId);
+    let jobsResponse = await client.getWorkflowJobs(
+      ctx.input.workflowId,
+      ctx.input.jobsPageToken
+    );
 
     let jobs = (jobsResponse.items || []).map((j: any) => ({
       jobId: j.id,
@@ -67,7 +75,8 @@ export let getWorkflow = SlateTool.create(spec, {
         pipelineId: workflow.pipeline_id,
         pipelineNumber: workflow.pipeline_number,
         projectSlug: workflow.project_slug,
-        jobs
+        jobs,
+        jobsNextPageToken: jobsResponse.next_page_token
       },
       message: `Workflow **${workflow.name}** is **${workflow.status}** with ${jobs.length} job(s).`
     };

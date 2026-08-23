@@ -27,11 +27,13 @@ export let cancelJob = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
-    await client.cancelJob(ctx.input.projectSlug, ctx.input.jobNumber);
+    let result = await client.cancelJob(ctx.input.projectSlug, ctx.input.jobNumber);
 
     return {
       output: { success: true },
-      message: `Job **#${ctx.input.jobNumber}** in project \`${ctx.input.projectSlug}\` has been **cancelled**.`
+      message:
+        result.message ||
+        `Job **#${ctx.input.jobNumber}** in project \`${ctx.input.projectSlug}\` has been **cancelled**.`
     };
   })
   .build();

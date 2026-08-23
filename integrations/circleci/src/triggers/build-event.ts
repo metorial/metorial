@@ -1,5 +1,7 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
+import { circleCiValidationError } from '../lib/validation';
 import { spec } from '../spec';
 
 let vcsInfoSchema = z
@@ -22,7 +24,8 @@ export let buildEvent = SlateTrigger.create(spec, {
   description:
     'Triggered when a workflow or job completes in a CircleCI project. Covers both workflow-completed and job-completed events with full pipeline, workflow, job, and VCS details.',
   instructions: [
-    'Configure the webhook URL in your CircleCI project settings under Webhooks, subscribing to workflow-completed and/or job-completed events.'
+    'Configure the webhook URL in your CircleCI project settings under Webhooks, subscribing to workflow-completed and/or job-completed events.',
+    'Set webhookSigningSecret in the integration configuration to the same signing secret used by the CircleCI webhook so deliveries are authenticated.'
   ]
 })
   .input(
@@ -80,15 +83,42 @@ export let buildEvent = SlateTrigger.create(spec, {
       revision: z.string().optional(),
       repositoryUrl: z.string().optional(),
       commitSubject: z.string().optional(),
+      commitBody: z.string().optional(),
       authorName: z.string().optional(),
       authorEmail: z.string().optional()
     })
   )
   .webhook({
     handleRequest: async ctx => {
-      let body = (await ctx.input.request.json()) as any;
+      let rawBody = await ctx.request.text();
+      verifyCircleCiSignature({
+        body: rawBody,
+        signature: ctx.request.headers.get('circleci-signature'),
+        secret: ctx.config.webhookSigningSecret
+      });
+
+      let body: any;
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        throw circleCiValidationError('CircleCI webhook payload must be valid JSON.');
+      }
 
       let eventType = body.type as 'workflow-completed' | 'job-completed';
+      if (eventType !== 'workflow-completed' && eventType !== 'job-completed') {
+        return { inputs: [] };
+      }
+      if (
+        typeof body.id !== 'string' ||
+        typeof body.happened_at !== 'string' ||
+        typeof body.project?.id !== 'string' ||
+        typeof body.pipeline?.id !== 'string' ||
+        typeof body.workflow?.id !== 'string'
+      ) {
+        throw circleCiValidationError(
+          'CircleCI webhook payload is missing required event, project, pipeline, or workflow identifiers.'
+        );
+      }
 
       let vcsData = body.pipeline?.vcs;
       let triggerParams = body.pipeline?.trigger_parameters;
@@ -181,6 +211,7 @@ export let buildEvent = SlateTrigger.create(spec, {
           revision: ctx.input.vcs?.revision,
           repositoryUrl: ctx.input.vcs?.repositoryUrl,
           commitSubject: ctx.input.vcs?.commitSubject,
+          commitBody: ctx.input.vcs?.commitBody,
           authorName: ctx.input.vcs?.authorName,
           authorEmail: ctx.input.vcs?.authorEmail
         }
@@ -188,3 +219,30 @@ export let buildEvent = SlateTrigger.create(spec, {
     }
   })
   .build();
+
+let verifyCircleCiSignature = (input: {
+  body: string;
+  signature: string | null;
+  secret?: string;
+}) => {
+  if (!input.secret) return;
+  let received = input.signature
+    ?.split(',')
+    .map(value => value.trim().split('='))
+    .find(([version]) => version === 'v1')?.[1];
+  if (!received) {
+    throw circleCiValidationError(
+      'CircleCI webhook signature header is missing a v1 signature.'
+    );
+  }
+
+  let expected = createHmac('sha256', input.secret).update(input.body).digest('hex');
+  let expectedBuffer = Buffer.from(expected);
+  let receivedBuffer = Buffer.from(received);
+  if (
+    expectedBuffer.length !== receivedBuffer.length ||
+    !timingSafeEqual(expectedBuffer, receivedBuffer)
+  ) {
+    throw circleCiValidationError('CircleCI webhook signature is invalid.');
+  }
+};

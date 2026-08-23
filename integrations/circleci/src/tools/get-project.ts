@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let getProject = SlateTool.create(spec, {
   name: 'Get Project',
   key: 'get_project',
-  description: `Retrieve information about a CircleCI project, including its VCS URL, organization, and settings.`,
+  description: `Retrieve a CircleCI project's stable ID, slug, organization identifiers, VCS URL, provider, and default branch.`,
   tags: {
     readOnly: true
   }
@@ -21,9 +21,11 @@ export let getProject = SlateTool.create(spec, {
   .output(
     z.object({
       projectSlug: z.string(),
+      projectId: z.string().optional(),
       projectName: z.string().optional(),
       organizationName: z.string().optional(),
       organizationId: z.string().optional(),
+      organizationSlug: z.string().optional(),
       vcsUrl: z.string().optional(),
       vcsProvider: z.string().optional(),
       vcsDefaultBranch: z.string().optional()
@@ -36,10 +38,12 @@ export let getProject = SlateTool.create(spec, {
     return {
       output: {
         projectSlug: project.slug,
+        projectId: project.id,
         projectName: project.name,
         organizationName: project.organization_name,
         organizationId: project.organization_id,
-        vcsUrl: project.vcs_url,
+        organizationSlug: project.organization_slug,
+        vcsUrl: project.vcs_info?.vcs_url,
         vcsProvider: project.vcs_info?.provider,
         vcsDefaultBranch: project.vcs_info?.default_branch
       },

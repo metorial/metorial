@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let listFeatureFlags = SlateTool.create(spec, {
@@ -53,14 +54,9 @@ export let listFeatureFlags = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error(
-        'projectKey is required. Provide it in the input or set a default in config.'
-      );
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let result = await client.listFeatureFlags(projectKey, {
       env: ctx.input.environmentKey ?? ctx.config.environmentKey,
       tag: ctx.input.tag,

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { circleCiValidationError } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageProjectEnvVars = SlateTool.create(spec, {
@@ -13,6 +14,7 @@ export let manageProjectEnvVars = SlateTool.create(spec, {
     'Use action "delete" to remove a variable by name.'
   ],
   tags: {
+    destructive: true,
     readOnly: false
   }
 })
@@ -29,7 +31,8 @@ export let manageProjectEnvVars = SlateTool.create(spec, {
       value: z
         .string()
         .optional()
-        .describe('Value of the environment variable (required for create)')
+        .describe('Value of the environment variable (required for create)'),
+      pageToken: z.string().optional().describe('Pagination token for the list action')
     })
   )
   .output(
@@ -48,27 +51,33 @@ export let manageProjectEnvVars = SlateTool.create(spec, {
           value: z.string()
         })
         .optional(),
-      deleted: z.boolean().optional()
+      deleted: z.boolean().optional(),
+      nextPageToken: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.pageToken && ctx.input.action !== 'list') {
+      throw circleCiValidationError('pageToken is only supported for the list action.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let result = await client.listProjectEnvVars(ctx.input.projectSlug);
+      let result = await client.listProjectEnvVars(ctx.input.projectSlug, ctx.input.pageToken);
       let envVars = (result.items || []).map((e: any) => ({
         name: e.name,
         value: e.value
       }));
       return {
-        output: { envVars },
+        output: { envVars, nextPageToken: result.next_page_token },
         message: `Found **${envVars.length}** environment variable(s) for project \`${ctx.input.projectSlug}\`.`
       };
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.name || !ctx.input.value) {
-        throw new Error('Both name and value are required to create an environment variable.');
+      if (!ctx.input.name || ctx.input.value === undefined) {
+        throw circleCiValidationError(
+          'Both name and value are required to create an environment variable.'
+        );
       }
       let result = await client.createProjectEnvVar(
         ctx.input.projectSlug,
@@ -83,7 +92,7 @@ export let manageProjectEnvVars = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.name) {
-        throw new Error('Name is required to delete an environment variable.');
+        throw circleCiValidationError('Name is required to delete an environment variable.');
       }
       await client.deleteProjectEnvVar(ctx.input.projectSlug, ctx.input.name);
       return {
@@ -92,6 +101,6 @@ export let manageProjectEnvVars = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw circleCiValidationError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

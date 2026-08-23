@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { circleCiValidationError } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getUser = SlateTool.create(spec, {
@@ -32,19 +33,26 @@ export let getUser = SlateTool.create(spec, {
       userId: z.string(),
       name: z.string().optional(),
       login: z.string().optional(),
+      avatarUrl: z.string().optional(),
       collaborations: z
         .array(
           z.object({
-            organizationId: z.string(),
+            organizationId: z.string().optional(),
             organizationName: z.string().optional(),
             vcsType: z.string().optional(),
-            avatarUrl: z.string().optional()
+            avatarUrl: z.string().optional(),
+            slug: z.string().optional()
           })
         )
         .optional()
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.userId && ctx.input.includeCollaborations) {
+      throw circleCiValidationError(
+        'includeCollaborations is only supported for the currently authenticated user; omit userId.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let user: any;
@@ -56,10 +64,11 @@ export let getUser = SlateTool.create(spec, {
 
     let collaborations:
       | {
-          organizationId: string;
+          organizationId?: string;
           organizationName?: string;
           vcsType?: string;
           avatarUrl?: string;
+          slug?: string;
         }[]
       | undefined;
 
@@ -68,8 +77,9 @@ export let getUser = SlateTool.create(spec, {
       collaborations = (collabs || []).map((c: any) => ({
         organizationId: c.id,
         organizationName: c.name,
-        vcsType: c.vcs_type,
-        avatarUrl: c.avatar_url
+        vcsType: c['vcs-type'],
+        avatarUrl: c.avatar_url,
+        slug: c.slug
       }));
     }
 
@@ -78,6 +88,7 @@ export let getUser = SlateTool.create(spec, {
         userId: user.id,
         name: user.name,
         login: user.login,
+        avatarUrl: user.avatar_url,
         collaborations
       },
       message: `User **${user.name || user.login || user.id}**.`

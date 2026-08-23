@@ -28,7 +28,13 @@ export let queryAuditLog = SlateTool.create(spec, {
         .describe(
           'Resource specifier to filter entries (e.g., "proj/my-project:env/production:flag/my-flag")'
         ),
-      limit: z.number().optional().describe('Maximum number of entries to return (default 20)')
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(20)
+        .optional()
+        .describe('Maximum number of entries to return (1-20, default 10)')
     })
   )
   .output(
@@ -53,7 +59,8 @@ export let queryAuditLog = SlateTool.create(spec, {
           target: z
             .object({
               resourceKind: z.string().optional(),
-              resourceName: z.string().optional()
+              resourceName: z.string().optional(),
+              resourceSpecifier: z.string().optional()
             })
             .optional()
             .describe('Target resource of the change')
@@ -63,7 +70,7 @@ export let queryAuditLog = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let result = await client.getAuditLogEntries({
       q: ctx.input.query,
       after: ctx.input.after,
@@ -87,8 +94,13 @@ export let queryAuditLog = SlateTool.create(spec, {
       titleVerb: entry.titleVerb,
       target: entry.target
         ? {
-            resourceKind: entry.target.resources?.[0]?.kind,
-            resourceName: entry.target.resources?.[0]?.name
+            resourceKind: entry.kind,
+            resourceName: entry.target.name,
+            resourceSpecifier: Array.isArray(entry.target.resources)
+              ? entry.target.resources.find(
+                  (resource: unknown) => typeof resource === 'string'
+                )
+              : undefined
           }
         : undefined
     }));

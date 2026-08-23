@@ -14,3 +14,4 @@ export * from './manage-schedules';
 export * from './manage-webhooks';
 export * from './manage-workflow';
 export * from './trigger-pipeline';
+export * from './trigger-pipeline-run';

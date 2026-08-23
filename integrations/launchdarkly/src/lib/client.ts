@@ -1,16 +1,30 @@
 import { createAxios } from 'slates';
+import { launchDarklyApiError } from './errors';
+
+export const LAUNCHDARKLY_API_VERSION = '20240415';
+export const LAUNCHDARKLY_API_BASE_URLS = {
+  commercial: 'https://app.launchdarkly.com/api/v2',
+  eu: 'https://app.eu.launchdarkly.com/api/v2',
+  federal: 'https://app.launchdarkly.us/api/v2'
+} as const;
 
 export class LaunchDarklyClient {
   private http: ReturnType<typeof createAxios>;
 
-  constructor(token: string) {
+  constructor(token: string, baseUrl: string = LAUNCHDARKLY_API_BASE_URLS.commercial) {
     this.http = createAxios({
-      baseURL: 'https://app.launchdarkly.com/api/v2',
+      baseURL: baseUrl,
       headers: {
         Authorization: token,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'LD-API-Version': LAUNCHDARKLY_API_VERSION
       }
     });
+
+    this.http.interceptors.response.use(
+      response => response,
+      error => Promise.reject(launchDarklyApiError(error))
+    );
   }
 
   // ─── Feature Flags ──────────────────────────────────────────────
@@ -51,6 +65,9 @@ export class LaunchDarklyClient {
       tags?: string[];
       variations?: Array<{ value: any; name?: string; description?: string }>;
       temporary?: boolean;
+      isFlagOn?: boolean;
+      maintainerId?: string;
+      maintainerTeamKey?: string;
       clientSideAvailability?: {
         usingMobileKey?: boolean;
         usingEnvironmentId?: boolean;
@@ -59,20 +76,24 @@ export class LaunchDarklyClient {
         onVariation: number;
         offVariation: number;
       };
-    }
+    },
+    params: { clone?: string } = {}
   ) {
-    let response = await this.http.post(`/flags/${projectKey}`, data);
+    let response = await this.http.post(`/flags/${projectKey}`, data, { params });
     return response.data;
   }
 
   async updateFeatureFlag(
     projectKey: string,
     flagKey: string,
-    instructions: Record<string, any>[]
+    instructions: Record<string, any>[],
+    options: { environmentKey?: string; comment?: string } = {}
   ) {
     let response = await this.http.patch(
       `/flags/${projectKey}/${flagKey}`,
       {
+        environmentKey: options.environmentKey,
+        comment: options.comment,
         instructions
       },
       {
@@ -91,7 +112,13 @@ export class LaunchDarklyClient {
   // ─── Projects ───────────────────────────────────────────────────
 
   async listProjects(
-    params: { limit?: number; offset?: number; filter?: string; sort?: string } = {}
+    params: {
+      limit?: number;
+      offset?: number;
+      filter?: string;
+      sort?: string;
+      expand?: string;
+    } = {}
   ) {
     let response = await this.http.get('/projects', { params });
     return response.data;
@@ -139,6 +166,8 @@ export class LaunchDarklyClient {
     params: {
       limit?: number;
       offset?: number;
+      filter?: string;
+      sort?: string;
     } = {}
   ) {
     let response = await this.http.get(`/projects/${projectKey}/environments`, { params });
@@ -164,6 +193,7 @@ export class LaunchDarklyClient {
       defaultTrackEvents?: boolean;
       requireComments?: boolean;
       confirmChanges?: boolean;
+      critical?: boolean;
     }
   ) {
     let response = await this.http.post(`/projects/${projectKey}/environments`, data);
@@ -236,11 +266,14 @@ export class LaunchDarklyClient {
     projectKey: string,
     environmentKey: string,
     segmentKey: string,
-    instructions: Record<string, any>[]
+    instructions: Record<string, any>[],
+    options: { comment?: string } = {}
   ) {
     let response = await this.http.patch(
       `/segments/${projectKey}/${environmentKey}/${segmentKey}`,
       {
+        environmentKey,
+        comment: options.comment,
         instructions
       },
       {
@@ -320,7 +353,13 @@ export class LaunchDarklyClient {
   // ─── Account Members ──────────────────────────────────────────
 
   async listMembers(
-    params: { limit?: number; offset?: number; filter?: string; sort?: string } = {}
+    params: {
+      limit?: number;
+      offset?: number;
+      filter?: string;
+      sort?: string;
+      expand?: string;
+    } = {}
   ) {
     let response = await this.http.get('/members', { params });
     return response.data;
@@ -336,6 +375,7 @@ export class LaunchDarklyClient {
       email: string;
       role?: string;
       customRoles?: string[];
+      roleAttributes?: Record<string, string[]>;
     }>
   ) {
     let response = await this.http.post('/members', members);
@@ -349,6 +389,8 @@ export class LaunchDarklyClient {
     params: {
       limit?: number;
       offset?: number;
+      filter?: string;
+      sort?: string;
     } = {}
   ) {
     let response = await this.http.get(`/metrics/${projectKey}`, { params });
@@ -503,8 +545,12 @@ export class LaunchDarklyClient {
 
   // ─── Caller Identity ──────────────────────────────────────────
 
-  async getCaller() {
-    let response = await this.http.get('/caller');
+  async getCallerIdentity() {
+    let response = await this.http.get('/caller-identity');
     return response.data;
+  }
+
+  async getCaller() {
+    return this.getCallerIdentity();
   }
 }

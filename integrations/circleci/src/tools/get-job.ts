@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { circleCiValidationError } from '../lib/validation';
 import { spec } from '../spec';
 
 export let getJob = SlateTool.create(spec, {
@@ -24,7 +25,15 @@ export let getJob = SlateTool.create(spec, {
       includeTests: z
         .boolean()
         .optional()
-        .describe('Whether to include test metadata in the response')
+        .describe('Whether to include test metadata in the response'),
+      artifactsPageToken: z
+        .string()
+        .optional()
+        .describe('Pagination token for the artifact page'),
+      testsPageToken: z
+        .string()
+        .optional()
+        .describe('Pagination token for the test-result page')
     })
   )
   .output(
@@ -43,6 +52,7 @@ export let getJob = SlateTool.create(spec, {
         })
         .optional(),
       parallelism: z.number().optional(),
+      webUrl: z.string().optional(),
       artifacts: z
         .array(
           z.object({
@@ -52,6 +62,7 @@ export let getJob = SlateTool.create(spec, {
           })
         )
         .optional(),
+      artifactsNextPageToken: z.string().nullable().optional(),
       tests: z
         .object({
           items: z.array(
@@ -61,30 +72,46 @@ export let getJob = SlateTool.create(spec, {
               result: z.string().optional(),
               runTime: z.number().optional(),
               message: z.string().optional(),
-              source: z.string().optional()
+              source: z.string().optional(),
+              file: z.string().optional()
             })
           ),
           totalCount: z.number().optional()
         })
-        .optional()
+        .optional(),
+      testsNextPageToken: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.artifactsPageToken && !ctx.input.includeArtifacts) {
+      throw circleCiValidationError(
+        'includeArtifacts must be enabled when artifactsPageToken is provided.'
+      );
+    }
+    if (ctx.input.testsPageToken && !ctx.input.includeTests) {
+      throw circleCiValidationError(
+        'includeTests must be enabled when testsPageToken is provided.'
+      );
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let job = await client.getJobDetails(ctx.input.projectSlug, ctx.input.jobNumber);
+    let jobNumber = job.number ?? job.job_number;
 
     let artifacts: { path: string; nodeIndex?: number; url: string }[] | undefined;
+    let artifactsNextPageToken: string | null | undefined;
     if (ctx.input.includeArtifacts) {
       let artifactsResponse = await client.getJobArtifacts(
         ctx.input.projectSlug,
-        ctx.input.jobNumber
+        ctx.input.jobNumber,
+        ctx.input.artifactsPageToken
       );
       artifacts = (artifactsResponse.items || []).map((a: any) => ({
         path: a.path,
         nodeIndex: a.node_index,
         url: a.url
       }));
+      artifactsNextPageToken = artifactsResponse.next_page_token;
     }
 
     let tests:
@@ -96,14 +123,17 @@ export let getJob = SlateTool.create(spec, {
             runTime?: number;
             message?: string;
             source?: string;
+            file?: string;
           }[];
           totalCount?: number;
         }
       | undefined;
+    let testsNextPageToken: string | null | undefined;
     if (ctx.input.includeTests) {
       let testsResponse = await client.getJobTestMetadata(
         ctx.input.projectSlug,
-        ctx.input.jobNumber
+        ctx.input.jobNumber,
+        ctx.input.testsPageToken
       );
       tests = {
         items: (testsResponse.items || []).map((t: any) => ({
@@ -112,16 +142,18 @@ export let getJob = SlateTool.create(spec, {
           result: t.result,
           runTime: t.run_time,
           message: t.message,
-          source: t.source
+          source: t.source,
+          file: t.file
         })),
         totalCount: testsResponse.items?.length
       };
+      testsNextPageToken = testsResponse.next_page_token;
     }
 
     return {
       output: {
-        jobId: job.web_url ? undefined : job.id,
-        jobNumber: job.number,
+        jobId: job.id,
+        jobNumber,
         name: job.name,
         status: job.status,
         startedAt: job.started_at,
@@ -134,10 +166,13 @@ export let getJob = SlateTool.create(spec, {
             }
           : undefined,
         parallelism: job.parallelism,
+        webUrl: job.web_url,
         artifacts,
-        tests
+        artifactsNextPageToken,
+        tests,
+        testsNextPageToken
       },
-      message: `Job **#${job.number}** (${job.name || 'unnamed'}) is **${job.status}**.`
+      message: `Job **#${jobNumber}** (${job.name || 'unnamed'}) is **${job.status}**.`
     };
   })
   .build();

@@ -1,170 +1,214 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
 
+let alertOutput = (alert: any) => ({
+  alertId: alert.id,
+  cardId: alert.payload?.card_id ?? alert.card?.id,
+  alertCondition: alert.payload?.send_condition ?? alert.alert_condition,
+  sendCondition: alert.payload?.send_condition,
+  creatorId: alert.creator_id ?? alert.creator?.id,
+  active: alert.active,
+  subscriptions: alert.subscriptions,
+  handlers: alert.handlers
+});
+
 export let manageAlert = SlateTool.create(spec, {
-  name: 'Manage Alert',
+  name: 'Manage Question Alert',
   key: 'manage_alert',
-  description: `Create, update, retrieve, list, or delete alerts on questions in Metabase.
-Alerts trigger when specific conditions are met on a question's results — such as when results exist,
-a time series crosses a goal line, or a progress bar reaches a goal.
-Alerts can be delivered via email, Slack, or webhook.`,
+  description: `Create, update, retrieve, list, or archive scheduled alerts for saved questions.
+Alerts use Metabase notification handlers for email, Slack, or HTTP delivery and Quartz cron schedules.`,
   instructions: [
-    'alertCondition "rows" triggers when the question returns any results.',
-    'alertCondition "goal" triggers when a goal line is crossed (use alertAboveGoal to control direction).'
+    'Use sendCondition "has_result" when any result row should trigger delivery.',
+    'Use "goal_above" or "goal_below" only for questions with a goal configured.',
+    'A handler channelType is channel/email, channel/slack, or channel/http. Recipients use Metabase notification-recipient objects.',
+    'Cron schedules use Quartz syntax, for example "0 0 8 * * ? *" for daily at 08:00.'
   ],
-  tags: {
-    destructive: false,
-    readOnly: false
-  }
+  tags: { destructive: true, readOnly: false }
 })
   .input(
     z.object({
       action: z
         .enum(['create', 'update', 'get', 'list', 'list_for_question', 'delete'])
-        .describe('The action to perform'),
+        .describe('Operation to perform; delete archives the alert'),
       alertId: z
         .number()
+        .int()
+        .positive()
         .optional()
-        .describe('ID of the alert (required for get, update, delete)'),
+        .describe('Alert ID for get, update, or delete'),
       cardId: z
         .number()
+        .int()
+        .positive()
         .optional()
-        .describe('ID of the question/card (required for create and list_for_question)'),
+        .describe('Question ID for create or list_for_question'),
+      sendCondition: z
+        .enum(['has_result', 'goal_above', 'goal_below'])
+        .optional()
+        .describe('Current Metabase alert condition'),
+      sendOnce: z
+        .boolean()
+        .optional()
+        .describe('Deactivate after the first successful trigger'),
+      handlers: z
+        .array(z.any())
+        .optional()
+        .describe('Notification handlers with channel_type and recipients'),
+      subscriptions: z
+        .array(z.any())
+        .optional()
+        .describe('Schedule subscriptions containing cron_schedule'),
+      cronSchedule: z
+        .string()
+        .optional()
+        .describe('Convenience Quartz cron schedule used when subscriptions is omitted'),
+      active: z.boolean().optional().describe('Whether the alert is active'),
+      includeInactive: z.boolean().optional().describe('Include archived alerts when listing'),
       alertCondition: z
         .enum(['rows', 'goal'])
         .optional()
-        .describe('Condition that triggers the alert'),
-      alertFirstOnly: z
-        .boolean()
-        .optional()
-        .describe('Only trigger the alert the first time the condition is met'),
+        .describe('Legacy condition alias; prefer sendCondition'),
+      alertFirstOnly: z.boolean().optional().describe('Legacy alias for sendOnce'),
       alertAboveGoal: z
         .boolean()
         .optional()
-        .describe('For goal alerts: true if alert triggers when above goal'),
-      channels: z
-        .array(z.any())
+        .describe('Direction for the legacy goal condition'),
+      channels: z.array(z.any()).optional().describe('Legacy alias for handlers'),
+      archived: z
+        .boolean()
         .optional()
-        .describe('Notification channels configuration (email, slack, webhook)'),
-      archived: z.boolean().optional().describe('Set to true to archive the alert')
+        .describe('Legacy update field; true sets active to false')
     })
   )
   .output(
     z.object({
-      alertId: z.number().optional().describe('ID of the alert'),
-      cardId: z.number().optional().describe('ID of the associated question/card'),
-      alertCondition: z.string().optional().describe('Alert condition type'),
-      creatorId: z.number().optional().describe('ID of the alert creator'),
+      alertId: z.number().optional(),
+      cardId: z.number().optional(),
+      alertCondition: z.string().optional(),
+      sendCondition: z.string().optional(),
+      creatorId: z.number().optional(),
+      active: z.boolean().optional(),
+      subscriptions: z.array(z.any()).optional(),
+      handlers: z.array(z.any()).optional(),
       alerts: z
         .array(
           z.object({
-            alertId: z.number().describe('Alert ID'),
-            cardId: z.number().optional().describe('Card/Question ID'),
-            alertCondition: z.string().describe('Alert condition'),
-            creatorId: z.number().optional().describe('Creator user ID')
+            alertId: z.number(),
+            cardId: z.number().optional(),
+            alertCondition: z.string().optional(),
+            sendCondition: z.string().optional(),
+            creatorId: z.number().optional(),
+            active: z.boolean().optional(),
+            subscriptions: z.array(z.any()).optional(),
+            handlers: z.array(z.any()).optional()
           })
         )
-        .optional()
-        .describe('List of alerts'),
-      success: z.boolean().optional().describe('Whether the operation succeeded')
+        .optional(),
+      success: z.boolean().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
-
-    if (ctx.input.action === 'list') {
-      let alerts = await client.listAlerts();
-      let items = (Array.isArray(alerts) ? alerts : []).map((a: any) => ({
-        alertId: a.id,
-        cardId: a.card?.id,
-        alertCondition: a.alert_condition,
-        creatorId: a.creator?.id ?? a.creator_id
-      }));
-
-      return {
-        output: { alerts: items },
-        message: `Found **${items.length}** alert(s)`
-      };
+    if (
+      ['get', 'update', 'delete'].includes(ctx.input.action) &&
+      ctx.input.alertId === undefined
+    ) {
+      throw createApiServiceError(`${ctx.input.action} requires alertId.`, {
+        reason: 'metabase_alert_id_missing'
+      });
+    }
+    if (
+      ['create', 'list_for_question'].includes(ctx.input.action) &&
+      ctx.input.cardId === undefined
+    ) {
+      throw createApiServiceError(`${ctx.input.action} requires cardId.`, {
+        reason: 'metabase_alert_card_id_missing'
+      });
     }
 
-    if (ctx.input.action === 'list_for_question') {
-      let alerts = await client.getAlertsForQuestion(ctx.input.cardId!);
-      let items = (Array.isArray(alerts) ? alerts : []).map((a: any) => ({
-        alertId: a.id,
-        cardId: a.card?.id ?? ctx.input.cardId,
-        alertCondition: a.alert_condition,
-        creatorId: a.creator?.id ?? a.creator_id
-      }));
+    let client = new MetabaseClient(ctx.auth);
 
+    if (ctx.input.action === 'list' || ctx.input.action === 'list_for_question') {
+      let alerts = await client.listAlerts({
+        cardId: ctx.input.action === 'list_for_question' ? ctx.input.cardId : undefined,
+        includeInactive: ctx.input.includeInactive
+      });
+      let items = alerts.map(alertOutput);
       return {
         output: { alerts: items, cardId: ctx.input.cardId },
-        message: `Found **${items.length}** alert(s) for question ${ctx.input.cardId}`
+        message: `Found **${items.length}** question alert(s)`
       };
     }
 
     if (ctx.input.action === 'get') {
       let alert = await client.getAlert(ctx.input.alertId!);
-      return {
-        output: {
-          alertId: alert.id,
-          cardId: alert.card?.id,
-          alertCondition: alert.alert_condition,
-          creatorId: alert.creator?.id ?? alert.creator_id
-        },
-        message: `Retrieved alert ${alert.id} (condition: ${alert.alert_condition})`
-      };
+      return { output: alertOutput(alert), message: `Retrieved alert ${alert.id}` };
     }
 
     if (ctx.input.action === 'create') {
+      let sendCondition = ctx.input.sendCondition;
+      if (!sendCondition && ctx.input.alertCondition === 'rows') sendCondition = 'has_result';
+      if (!sendCondition && ctx.input.alertCondition === 'goal') {
+        sendCondition = ctx.input.alertAboveGoal === false ? 'goal_below' : 'goal_above';
+      }
+      if (!sendCondition) {
+        throw createApiServiceError('Creating an alert requires sendCondition.', {
+          reason: 'metabase_alert_condition_missing'
+        });
+      }
+      let handlers = ctx.input.handlers ?? ctx.input.channels;
+      if (!handlers?.length) {
+        throw createApiServiceError('Creating an alert requires at least one handler.', {
+          reason: 'metabase_alert_handler_missing'
+        });
+      }
+      let subscriptions = ctx.input.subscriptions ?? [
+        { cron_schedule: ctx.input.cronSchedule ?? '0 0 8 * * ? *' }
+      ];
       let alert = await client.createAlert({
         cardId: ctx.input.cardId!,
-        alertCondition: ctx.input.alertCondition!,
-        alertFirstOnly: ctx.input.alertFirstOnly,
-        alertAboveGoal: ctx.input.alertAboveGoal,
-        channels: ctx.input.channels || []
+        sendCondition,
+        sendOnce: ctx.input.sendOnce ?? ctx.input.alertFirstOnly,
+        handlers,
+        subscriptions
       });
-
-      return {
-        output: {
-          alertId: alert.id,
-          cardId: alert.card?.id ?? ctx.input.cardId,
-          alertCondition: alert.alert_condition,
-          creatorId: alert.creator?.id ?? alert.creator_id
-        },
-        message: `Created alert ${alert.id} on question ${ctx.input.cardId}`
-      };
+      return { output: alertOutput(alert), message: `Created alert ${alert.id}` };
     }
 
     if (ctx.input.action === 'update') {
+      let sendCondition = ctx.input.sendCondition;
+      if (!sendCondition && ctx.input.alertCondition === 'rows') sendCondition = 'has_result';
+      if (!sendCondition && ctx.input.alertCondition === 'goal') {
+        sendCondition = ctx.input.alertAboveGoal === false ? 'goal_below' : 'goal_above';
+      }
+      let payload: Record<string, unknown> = {};
+      if (sendCondition !== undefined) payload.send_condition = sendCondition;
+      if (ctx.input.sendOnce !== undefined || ctx.input.alertFirstOnly !== undefined) {
+        payload.send_once = ctx.input.sendOnce ?? ctx.input.alertFirstOnly;
+      }
+      let subscriptions = ctx.input.subscriptions;
+      if (!subscriptions && ctx.input.cronSchedule) {
+        subscriptions = [{ cron_schedule: ctx.input.cronSchedule }];
+      }
       let alert = await client.updateAlert(ctx.input.alertId!, {
-        alertCondition: ctx.input.alertCondition,
-        alertFirstOnly: ctx.input.alertFirstOnly,
-        alertAboveGoal: ctx.input.alertAboveGoal,
-        channels: ctx.input.channels,
-        archived: ctx.input.archived
+        payload: Object.keys(payload).length > 0 ? payload : undefined,
+        handlers: ctx.input.handlers ?? ctx.input.channels,
+        subscriptions,
+        active: ctx.input.archived === true ? false : ctx.input.active
       });
-
-      return {
-        output: {
-          alertId: alert.id,
-          cardId: alert.card?.id,
-          alertCondition: alert.alert_condition,
-          creatorId: alert.creator?.id ?? alert.creator_id
-        },
-        message: `Updated alert ${alert.id}`
-      };
+      return { output: alertOutput(alert), message: `Updated alert ${alert.id}` };
     }
 
-    // delete
-    await client.deleteAlert(ctx.input.alertId!);
+    let alert = await client.deleteAlert(ctx.input.alertId!);
     return {
-      output: { alertId: ctx.input.alertId, success: true },
-      message: `Deleted alert ${ctx.input.alertId}`
+      output: {
+        ...alertOutput(alert),
+        alertId: ctx.input.alertId,
+        active: false,
+        success: true
+      },
+      message: `Archived alert ${ctx.input.alertId}`
     };
   })
   .build();

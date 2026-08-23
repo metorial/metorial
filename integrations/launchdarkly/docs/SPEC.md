@@ -1,10 +1,8 @@
-Now let me get more details on the API features by checking the API docs:Now let me get more details on the API resource categories:Now I have enough information to write the specification.
-
-# Slates Specification for LaunchDarkly
+# LaunchDarkly integration specification
 
 ## Overview
 
-LaunchDarkly is a feature management platform that allows teams to control feature flags, run experiments, manage rollouts, and target specific user segments. It provides a REST API (base URL: `https://app.launchdarkly.com/api/v2`) that covers all functionality available in the LaunchDarkly UI, including managing flags, projects, environments, contexts, segments, experiments, and account members.
+This integration manages feature flags, projects, environments, segments, and account invitations. It can inspect credentials, contexts, members, metrics, experiments, and audit entries, and can receive signed change notifications. It calls LaunchDarkly REST API version `20240415` and supports commercial, EU, and US federal API hosts.
 
 ## Authentication
 
@@ -30,24 +28,13 @@ Example header:
 Authorization: api-12345abcde
 ```
 
-### OAuth 2.0
-
-You can connect your LaunchDarkly account to external applications using the OAuth 2.0 protocol. The OAuth2 client API allows you to register a LaunchDarkly OAuth client for use in your own custom integrations. Registering a LaunchDarkly OAuth client allows you to use LaunchDarkly as an identity provider so that account members can log into your application with their LaunchDarkly account.
-
-To use OAuth 2.0, you must register an OAuth client via the API or by contacting LaunchDarkly, providing a client name, redirect URI, and description. This API acknowledges creation of your client with a response containing a unique `_clientSecret`. If you lose your client secret, you will have to register a new client.
-
-OAuth apps inherit the permissions of the authorizing account member and can never exceed them.
-
 ## Features
 
 ### Feature Flag Management
 
 Create, update, toggle, and delete feature flags across projects and environments. Flags support multiple variation types (boolean, string, number, JSON), targeting rules, percentage rollouts, and prerequisites. A project can contain multiple environments, and feature flags exist across all environments within a project. When you create a new flag, it is created in every environment in your LaunchDarkly project. However, the changes you make to a flag in one environment do not apply to the same flag in any other environment.
 
-- Supports progressive rollouts and guarded rollouts for safe releases.
-- Flag triggers allow external services to toggle flags via webhook URLs.
-- Scheduled changes allow planning flag changes for a future time.
-- Flag links let you associate flags with external resources (e.g., Jira tickets).
+Semantic patch updates expose LaunchDarkly's targeting, rollout, prerequisite, variation, and flag-metadata instructions. The dedicated toggle tool covers the common on/off operation.
 
 ### Segments
 
@@ -70,42 +57,19 @@ Create and manage projects and environments. Each project can contain multiple e
 
 Experimentation lets you validate the impact of features you roll out to your app or infrastructure. You can measure things like page views, clicks, load time, infrastructure costs, and more.
 
-- Create and manage experiments tied to feature flag variations.
-- Define metrics (conversion, numeric, funnel) to measure experiment outcomes.
-- Supports multi-armed bandits and holdout groups.
-- Warehouse-native experimentation with Snowflake is also available.
+The integration lists experiments and their current iteration details. Experiment creation and mutation are not exposed.
 
 ### Metrics
 
-Define custom metrics that track events in your application. Metrics can be used in experiments to measure the impact of flag variations. Supports metric groups for organizing related metrics together.
+List custom metrics used by experiments, including their type, active state, numeric settings, tags, and creation date. Metric creation and mutation are not exposed.
 
 ### Account and Team Management
 
-Manage account members. For example, you can invite new members or find account members in a particular role. Create and manage teams, assign custom roles, and control access to resources through role-based policies.
+List account members and invite new members with built-in roles, custom roles, or role attributes. Team and role administration are not exposed.
 
 ### Change History (Audit Log)
 
 LaunchDarkly keeps a running log of changes made to feature flags and other resources in each environment. Query audit log entries by date range, resource specifier, or full-text search. Useful for compliance and tracking who changed what and when.
-
-### Release Pipelines
-
-Manage releases across environments using release pipelines. Supports release policies and workflows that define the process for promoting flag changes through environments.
-
-### Relay Proxy Configuration
-
-Manage Relay Proxy configurations through the API. The Relay Proxy acts as a proxy between LaunchDarkly SDKs and LaunchDarkly's servers, useful for firewalled environments or to reduce outbound connections.
-
-### Data Export Destinations
-
-Configure destinations for exporting flag evaluation event data to external services and data warehouses.
-
-### Integrations and Integration Audit Log Subscriptions
-
-Configure integrations with third-party services. Audit log subscriptions allow you to forward change history events to external services like Datadog, Slack, and others using configurable policies.
-
-### Workflows and Workflow Templates
-
-Define multi-step workflows for flag changes, such as requiring approval before enabling a flag in production. Workflow templates allow reusing common patterns.
 
 ## Events
 
@@ -122,6 +86,13 @@ LaunchDarkly's webhooks allow you to build your own integrations that subscribe 
 - If LaunchDarkly receives a non-2xx response to a webhook POST, it will retry the delivery one time. Webhook delivery is not guaranteed. If you build an integration on webhooks, make sure it is tolerant of delivery failures.
 - Webhooks may not be delivered in chronological order. We recommend using the payload's "date" field as a timestamp to reorder webhooks as they are received.
 
-### Integration Audit Log Subscriptions
+The resource-change trigger registers a signed webhook and verifies LaunchDarkly's `X-LD-Signature` header. The flag-change trigger polls the audit log. Both parse canonical string resource specifiers to expose project, environment, flag, segment, or member identifiers.
 
-A more structured alternative to raw webhooks, audit log subscriptions let you forward change history events to supported third-party integrations (e.g., Datadog, Slack, Microsoft Teams, Splunk). These support the same policy-based filtering as webhooks but use pre-built templates to format the payload for each integration.
+## Official API references
+
+- [LaunchDarkly REST API overview](https://launchdarkly.com/docs/api)
+- [API version migration guide](https://launchdarkly.com/docs/guides/api/api-migration-guide)
+- [Feature flags](https://launchdarkly.com/docs/api/feature-flags)
+- [Segments](https://launchdarkly.com/docs/api/segments)
+- [Caller identity](https://launchdarkly.com/docs/api/other/get-caller-identity)
+- [Webhooks](https://launchdarkly.com/docs/api/webhooks)

@@ -39,7 +39,7 @@ export let listMembers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let result = await client.listMembers({
       limit: ctx.input.limit,
       offset: ctx.input.offset,
@@ -55,8 +55,8 @@ export let listMembers = SlateTool.create(spec, {
       lastName: m.lastName,
       role: m.role,
       customRoles: (m.customRoles ?? []).map((r: any) => (typeof r === 'string' ? r : r.key)),
-      pendingInvite: m.pendingInvite ?? false,
-      lastSeen: m.lastSeen ? String(m.lastSeen) : undefined
+      pendingInvite: m._pendingInvite ?? false,
+      lastSeen: m._lastSeen === undefined ? undefined : String(m._lastSeen)
     }));
 
     return {

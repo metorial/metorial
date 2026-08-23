@@ -1,4 +1,4 @@
-Let me get more details on the full API v2 reference to understand all features.# Slates Specification for CircleCI
+# CircleCI Integration Specification
 
 ## Overview
 
@@ -6,7 +6,7 @@ CircleCI is a continuous integration and continuous delivery (CI/CD) platform th
 
 ## Authentication
 
-CircleCI uses **token-based authentication** via Personal API Tokens. These tokens are used to interact with the CircleCI APIs (v1 and v2), and grant full read and write permissions.
+CircleCI uses **token-based authentication** via Personal API Tokens. These tokens authenticate requests to the CircleCI API v2 and grant access according to the user's permissions.
 
 There are two ways to pass the token:
 
@@ -27,7 +27,7 @@ In the CircleCI application, go to your User settings. Select Personal API Token
 
 ### Pipeline Management
 
-Trigger, view, and manage pipelines for projects. One of the benefits of the CircleCI API v2 is the ability to remotely trigger pipelines with parameters. You can specify a branch, tag, or git revision, and pass custom pipeline parameters to control which workflows run and how they behave.
+Trigger and view pipelines for projects. The recommended trigger API supports GitHub App, GitHub OAuth, GitHub Server, Bitbucket Cloud, and Bitbucket Data Center projects; the deprecated compatibility endpoint remains available for existing calls. GitLab triggering is not supported by either API.
 
 ### Workflow Management
 
@@ -35,39 +35,31 @@ Retrieve details about workflows within a pipeline, including their status, jobs
 
 ### Job Management
 
-Retrieve details about individual jobs, including their status and steps. You can cancel running jobs and retrieve test metadata associated with a job.
+Retrieve details about individual jobs, including status, executor, timing, artifacts, and test metadata. Running jobs can be cancelled by project slug and job number.
 
 ### Artifacts
 
-List the artifacts produced by a given build. Download artifacts generated during job execution, such as build outputs, test reports, and other files stored during a pipeline run.
+List artifact paths and authenticated download URLs produced by a job.
 
 ### Project Management
 
-CircleCI has released new API v2 endpoints that help in the automated creation and configuration of projects through the API v2. Retrieve project information, manage project-level environment variables, manage checkout keys, and configure project settings.
+Retrieve project and organization identifiers and VCS metadata. Create, list, and delete project-level environment variables.
 
 ### Contexts
 
-Use contexts to secure and share environment variables. Create, list, and delete contexts for an organization. Manage environment variables within contexts, and configure project or expression restrictions on contexts.
+Use contexts to secure and share environment variables. Create, list, get, and delete contexts by organization ID or slug, and list, set, or delete their environment variables.
 
 ### Insights
 
-Use Insights to monitor credit and compute usage for your projects. Get summary metrics and trends for a project at workflow and branch level. Workflow runs going back at most 90 days are included in the aggregation window. Trends are only supported up to last 30 days. View job-level timeseries data and flaky test detection.
+Use Insights to retrieve workflow and job summary metrics, recent workflow runs, and flaky-test details. Workflow runs going back at most 90 days are included in the aggregation window. Trends are only supported up to the last 30 days.
 
 ### Schedules
 
-Create and manage scheduled pipeline triggers using cron expressions. To trigger a workflow on a schedule, add the triggers key to the workflow and specify a schedule. Scheduled workflows use the cron syntax to represent Coordinated Universal Time (UTC).
+Create and manage API schedule triggers with UTC timetable fields for hours, weekdays or month days, and months. These endpoints support GitHub OAuth and Bitbucket Cloud pipeline definitions; GitHub App projects use pipeline-definition trigger endpoints instead.
 
 ### User Information
 
 Retrieve information about the currently authenticated user and look up users by ID.
-
-### OIDC Token Management
-
-Manage custom claims for OpenID Connect tokens at the organization and project level. OIDC tokens enable CircleCI jobs to authenticate with cloud providers (AWS, GCP) without storing long-lived credentials.
-
-### Policy Management
-
-Manage organization-level policies and retrieve decision audit logs for policy enforcement.
 
 ### Webhook Management (API-based)
 
@@ -79,7 +71,7 @@ CircleCI supports **outbound webhooks** that push event notifications to externa
 
 Setting up an outbound webhook on CircleCI enables your third party service to receive information (referred to as events) from CircleCI, as they happen.
 
-Webhooks are configured at the project level and require a receiver URL and an optional secret token for signature verification. Each outgoing HTTP request to your service will contain a `circleci-signature` header. The signature uses HMAC-SHA256 for payload verification. There is a limit of 5 webhooks per project.
+Webhooks are configured at the project level and the API requires an HTTPS receiver URL and a signing secret. Each outgoing request contains a `circleci-signature` header. The integration verifies its v1 HMAC-SHA256 signature when `webhookSigningSecret` is configured. There is a limit of 5 webhooks per project.
 
 ### Workflow Completed
 
