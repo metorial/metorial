@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -13,7 +13,7 @@ Public links allow anyone with the URL to view the question or dashboard without
     'Public sharing must be enabled in the instance settings.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -34,10 +34,7 @@ Public links allow anyone with the URL to view the question or dashboard without
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    let client = new MetabaseClient(ctx.auth);
 
     if (ctx.input.action === 'create') {
       let result: any;
@@ -48,6 +45,11 @@ Public links allow anyone with the URL to view the question or dashboard without
       }
 
       let uuid = result.uuid;
+      if (typeof uuid !== 'string' || uuid.length === 0) {
+        throw createApiServiceError('Metabase did not return a public-link UUID.', {
+          reason: 'metabase_public_link_uuid_missing'
+        });
+      }
       let path = ctx.input.resourceType === 'question' ? 'question' : 'dashboard';
       let publicUrl = `${ctx.auth.instanceUrl}/public/${path}/${uuid}`;
 

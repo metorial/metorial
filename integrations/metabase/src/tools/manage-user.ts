@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,7 @@ Supports setting the user's name, email, group memberships, and superuser status
 Use **deactivate** to disable a user account or **reactivate** to restore it.`,
   constraints: ['Most user management operations require superuser (admin) privileges.'],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -69,10 +69,20 @@ Use **deactivate** to disable a user account or **reactivate** to restore it.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    if (ctx.input.action === 'create' && !ctx.input.email?.trim()) {
+      throw createApiServiceError('Creating a user requires email.', {
+        reason: 'metabase_user_create_input_missing'
+      });
+    }
+    if (
+      ['get', 'update', 'deactivate', 'reactivate'].includes(ctx.input.action) &&
+      ctx.input.userId === undefined
+    ) {
+      throw createApiServiceError(`${ctx.input.action} requires userId.`, {
+        reason: 'metabase_user_id_missing'
+      });
+    }
+    let client = new MetabaseClient(ctx.auth);
 
     if (ctx.input.action === 'list') {
       let result = await client.listUsers({
@@ -131,7 +141,7 @@ Use **deactivate** to disable a user account or **reactivate** to restore it.`,
           dateJoined: user.date_joined,
           lastLogin: user.last_login ?? null
         },
-        message: `Created user **${user.first_name} ${user.last_name}** (ID: ${user.id})`
+        message: `Created user **${[user.first_name, user.last_name].filter(Boolean).join(' ') || user.email}** (ID: ${user.id})`
       };
     }
 

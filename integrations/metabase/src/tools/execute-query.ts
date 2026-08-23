@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -14,8 +14,12 @@ Returns query results including column metadata and row data.`,
     'For ad-hoc MBQL: provide databaseId, set queryType to "query", and provide the MBQL object in mbqlQuery.',
     'To run a saved question: provide the cardId instead. Parameters can be passed to customize the query.'
   ],
+  constraints: [
+    'Native SQL is executed with the connected database permissions and may modify data. Use a read-only database role and SELECT statements for read-only workflows.'
+  ],
   tags: {
-    readOnly: true
+    destructive: true,
+    readOnly: false
   }
 })
   .input(
@@ -68,15 +72,49 @@ Returns query results including column metadata and row data.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    let usesSavedQuestion = ctx.input.cardId !== undefined;
+    let usesAdHocFields =
+      ctx.input.databaseId !== undefined ||
+      ctx.input.queryType !== undefined ||
+      ctx.input.nativeQuery !== undefined ||
+      ctx.input.mbqlQuery !== undefined ||
+      ctx.input.templateTags !== undefined;
+    if (usesSavedQuestion && usesAdHocFields) {
+      throw createApiServiceError(
+        'Provide cardId for a saved question, or the ad-hoc query fields, but not both.',
+        { reason: 'metabase_query_mode_conflict' }
+      );
+    }
+    if (!usesSavedQuestion && (ctx.input.databaseId === undefined || !ctx.input.queryType)) {
+      throw createApiServiceError('Ad-hoc queries require databaseId and queryType.', {
+        reason: 'metabase_query_input_missing'
+      });
+    }
+    if (
+      !usesSavedQuestion &&
+      ctx.input.queryType === 'native' &&
+      !ctx.input.nativeQuery?.trim()
+    ) {
+      throw createApiServiceError('Native queries require a non-empty nativeQuery.', {
+        reason: 'metabase_native_query_missing'
+      });
+    }
+    if (
+      !usesSavedQuestion &&
+      ctx.input.queryType === 'query' &&
+      ctx.input.mbqlQuery === undefined
+    ) {
+      throw createApiServiceError('MBQL queries require mbqlQuery.', {
+        reason: 'metabase_mbql_query_missing'
+      });
+    }
+
+    let client = new MetabaseClient(ctx.auth);
 
     let result: any;
 
-    if (ctx.input.cardId) {
-      result = await client.executeCardQuery(ctx.input.cardId, {
+    if (usesSavedQuestion) {
+      result = await client.executeCardQuery(ctx.input.cardId!, {
         parameters: ctx.input.parameters
       });
     } else {
@@ -88,6 +126,13 @@ Returns query results including column metadata and row data.`,
         parameters: ctx.input.parameters,
         templateTags: ctx.input.templateTags
       });
+    }
+
+    if (result.status && result.status !== 'completed') {
+      throw createApiServiceError(
+        `Metabase could not complete the query${result.error ? `: ${String(result.error)}` : '.'}`,
+        { reason: 'metabase_query_failed' }
+      );
     }
 
     let columns = (result.data?.cols || []).map((col: any) => ({

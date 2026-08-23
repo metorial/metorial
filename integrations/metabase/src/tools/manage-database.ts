@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let manageDatabase = SlateTool.create(spec, {
   name: 'Manage Database',
   key: 'manage_database',
   description: `List connected databases, retrieve database details and metadata, or trigger a sync/rescan.
-Use the **metadata** action to get all tables, fields, and field values for a database.
+Use the **metadata** action to list tables, then get_table_metadata to inspect one table's fields.
 Use **sync** to trigger a manual schema metadata sync, or **rescan** to trigger a field value scan.`,
   tags: {
     readOnly: false
@@ -64,10 +64,12 @@ Use **sync** to trigger a manual schema metadata sync, or **rescan** to trigger 
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    if (ctx.input.action !== 'list' && ctx.input.databaseId === undefined) {
+      throw createApiServiceError(`${ctx.input.action} requires databaseId.`, {
+        reason: 'metabase_database_id_missing'
+      });
+    }
+    let client = new MetabaseClient(ctx.auth);
 
     if (ctx.input.action === 'list') {
       let result = await client.listDatabases({ includesTables: ctx.input.includeTables });

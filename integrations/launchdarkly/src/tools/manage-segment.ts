@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireEnvironmentKey, requireInput, requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let manageSegment = SlateTool.create(spec, {
@@ -11,7 +12,8 @@ export let manageSegment = SlateTool.create(spec, {
     'To create, set action to "create" with segmentKey, name, and optionally description and tags.',
     'To update, set action to "update" with semantic patch instructions like "addIncludedTargets", "removeIncludedTargets", "addExcludedTargets", "removeExcludedTargets", "updateName".',
     'To delete, set action to "delete" with the segmentKey.'
-  ]
+  ],
+  tags: { destructive: true }
 })
   .input(
     z.object({
@@ -28,7 +30,11 @@ export let manageSegment = SlateTool.create(spec, {
       instructions: z
         .array(z.record(z.string(), z.any()))
         .optional()
-        .describe('Semantic patch instructions for updating the segment')
+        .describe('Semantic patch instructions for updating the segment'),
+      comment: z
+        .string()
+        .optional()
+        .describe('Optional comment recorded in LaunchDarkly change history')
     })
   )
   .output(
@@ -41,25 +47,21 @@ export let manageSegment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error('projectKey is required.');
-    }
-    let envKey = ctx.input.environmentKey ?? ctx.config.environmentKey;
-    if (!envKey) {
-      throw new Error('environmentKey is required.');
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
+    let envKey = requireEnvironmentKey(ctx.input.environmentKey, ctx.config.environmentKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let { action, segmentKey } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) {
-        throw new Error('name is required when creating a segment.');
-      }
+      requireInput(
+        ctx.input.name,
+        'name is required when creating a segment.',
+        'launchdarkly_segment_name_required'
+      );
       let segment = await client.createSegment(projectKey, envKey, {
         key: segmentKey,
-        name: ctx.input.name,
+        name: ctx.input.name!,
         description: ctx.input.description,
         tags: ctx.input.tags
       });
@@ -76,14 +78,17 @@ export let manageSegment = SlateTool.create(spec, {
     }
 
     if (action === 'update') {
-      if (!ctx.input.instructions || ctx.input.instructions.length === 0) {
-        throw new Error('instructions are required when updating a segment.');
-      }
+      requireInput(
+        ctx.input.instructions?.length,
+        'instructions are required when updating a segment.',
+        'launchdarkly_segment_instructions_required'
+      );
       let segment = await client.updateSegment(
         projectKey,
         envKey,
         segmentKey,
-        ctx.input.instructions
+        ctx.input.instructions!,
+        { comment: ctx.input.comment }
       );
 
       return {

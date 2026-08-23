@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireEnvironmentKey, requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let listSegments = SlateTool.create(spec, {
@@ -41,16 +42,10 @@ export let listSegments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error('projectKey is required.');
-    }
-    let envKey = ctx.input.environmentKey ?? ctx.config.environmentKey;
-    if (!envKey) {
-      throw new Error('environmentKey is required.');
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
+    let envKey = requireEnvironmentKey(ctx.input.environmentKey, ctx.config.environmentKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let result = await client.listSegments(projectKey, envKey, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
@@ -64,8 +59,20 @@ export let listSegments = SlateTool.create(spec, {
       name: s.name,
       description: s.description ?? '',
       tags: s.tags ?? [],
-      includedCount: (s.included ?? []).length,
-      excludedCount: (s.excluded ?? []).length,
+      includedCount:
+        s._unboundedMetadata?.includedCount ??
+        (s.included ?? []).length +
+          (s.includedContexts ?? []).reduce(
+            (count: number, targets: any) => count + (targets.values ?? []).length,
+            0
+          ),
+      excludedCount:
+        s._unboundedMetadata?.excludedCount ??
+        (s.excluded ?? []).length +
+          (s.excludedContexts ?? []).reduce(
+            (count: number, targets: any) => count + (targets.values ?? []).length,
+            0
+          ),
       creationDate: String(s.creationDate)
     }));
 

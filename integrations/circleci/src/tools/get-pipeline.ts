@@ -21,7 +21,11 @@ export let getPipeline = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      pipelineId: z.string().describe('The UUID of the pipeline to retrieve')
+      pipelineId: z.string().describe('The UUID of the pipeline to retrieve'),
+      workflowsPageToken: z
+        .string()
+        .optional()
+        .describe('Pagination token for the pipeline workflow page')
     })
   )
   .output(
@@ -45,14 +49,18 @@ export let getPipeline = SlateTool.create(spec, {
           originRepositoryUrl: z.string().optional()
         })
         .optional(),
-      workflows: z.array(workflowSchema).optional()
+      workflows: z.array(workflowSchema).optional(),
+      workflowsNextPageToken: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
     let pipeline = await client.getPipeline(ctx.input.pipelineId);
-    let workflowsResponse = await client.getPipelineWorkflows(ctx.input.pipelineId);
+    let workflowsResponse = await client.getPipelineWorkflows(
+      ctx.input.pipelineId,
+      ctx.input.workflowsPageToken
+    );
 
     let workflows = (workflowsResponse.items || []).map((w: any) => ({
       workflowId: w.id,
@@ -85,7 +93,8 @@ export let getPipeline = SlateTool.create(spec, {
             }
           : undefined,
         vcs,
-        workflows
+        workflows,
+        workflowsNextPageToken: workflowsResponse.next_page_token
       },
       message: `Pipeline **#${pipeline.number}** is in state **${pipeline.state}** with ${workflows.length} workflow(s).`
     };

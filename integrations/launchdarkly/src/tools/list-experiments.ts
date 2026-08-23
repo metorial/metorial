@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireEnvironmentKey, requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let listExperiments = SlateTool.create(spec, {
@@ -46,16 +47,10 @@ export let listExperiments = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error('projectKey is required.');
-    }
-    let envKey = ctx.input.environmentKey ?? ctx.config.environmentKey;
-    if (!envKey) {
-      throw new Error('environmentKey is required.');
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
+    let envKey = requireEnvironmentKey(ctx.input.environmentKey, ctx.config.environmentKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let result = await client.listExperiments(projectKey, envKey, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
@@ -69,15 +64,15 @@ export let listExperiments = SlateTool.create(spec, {
         experimentKey: e.key,
         name: e.name,
         description: e.description ?? '',
-        creationDate: String(e.creationDate),
+        creationDate: String(e._creationDate),
         currentIteration: currentIteration
           ? {
               status: currentIteration.status,
               hypothesis: currentIteration.hypothesis,
-              startDate: currentIteration.startDate
-                ? String(currentIteration.startDate)
+              startDate: currentIteration.startedAt
+                ? String(currentIteration.startedAt)
                 : undefined,
-              endDate: currentIteration.endDate ? String(currentIteration.endDate) : undefined
+              endDate: currentIteration.endedAt ? String(currentIteration.endedAt) : undefined
             }
           : undefined
       };
@@ -86,9 +81,9 @@ export let listExperiments = SlateTool.create(spec, {
     return {
       output: {
         experiments,
-        totalCount: result.totalCount ?? items.length
+        totalCount: result.total_count ?? result.totalCount ?? items.length
       },
-      message: `Found **${result.totalCount ?? items.length}** experiments in \`${envKey}\`.`
+      message: `Found **${result.total_count ?? result.totalCount ?? items.length}** experiments in \`${envKey}\`.`
     };
   })
   .build();

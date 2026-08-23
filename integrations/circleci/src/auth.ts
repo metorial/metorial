@@ -1,9 +1,20 @@
-import { createAxios, SlateAuth } from 'slates';
+import { SlateAuth } from 'slates';
 import { z } from 'zod';
+import { Client } from './lib/client';
 
-let httpClient = createAxios({
-  baseURL: 'https://circleci.com/api/v2'
-});
+let getProfile = async (token: string) => {
+  let user = await new Client({ token }).getCurrentUser();
+
+  return {
+    profile: {
+      id: user.id,
+      name: user.name,
+      metadata: {
+        login: user.login
+      }
+    }
+  };
+};
 
 export let auth = SlateAuth.create()
   .output(
@@ -28,21 +39,6 @@ export let auth = SlateAuth.create()
       };
     },
 
-    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {
-      let response = await httpClient.get('/me', {
-        headers: {
-          'Circle-Token': ctx.output.token
-        }
-      });
-
-      let user = response.data;
-
-      return {
-        profile: {
-          id: user.id,
-          name: user.name,
-          email: user.login
-        }
-      };
-    }
+    getProfile: async (ctx: { output: { token: string }; input: { token: string } }) =>
+      getProfile(ctx.output.token)
   });

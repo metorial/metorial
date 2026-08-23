@@ -1,6 +1,7 @@
-import { SlateTrigger } from 'slates';
+import { SlateTrigger, verifyHmacSignature } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { parseResourceSpecifiers } from '../lib/resource-specifier';
 import { spec } from '../spec';
 
 export let resourceChangeTrigger = SlateTrigger.create(spec, {
@@ -44,11 +45,11 @@ export let resourceChangeTrigger = SlateTrigger.create(spec, {
   )
   .webhook({
     autoRegisterWebhook: async ctx => {
-      let client = new LaunchDarklyClient(ctx.auth.token);
+      let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
 
       let webhook = await client.createWebhook({
         url: ctx.input.webhookBaseUrl,
-        name: 'Slates Integration Webhook',
+        name: 'LaunchDarkly change notifications',
         sign: true,
         on: true,
         statements: [
@@ -75,15 +76,35 @@ export let resourceChangeTrigger = SlateTrigger.create(spec, {
     },
 
     autoUnregisterWebhook: async ctx => {
-      let client = new LaunchDarklyClient(ctx.auth.token);
+      let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
       let details = ctx.input.registrationDetails as { webhookId: string };
       await client.deleteWebhook(details.webhookId);
     },
 
     handleRequest: async ctx => {
+      let rawBody = await ctx.request.text();
+      let registrationDetails = ctx.registrationDetails as { secret?: string } | undefined;
+      let signature = ctx.request.headers.get('x-ld-signature');
+
+      if (
+        !registrationDetails?.secret ||
+        !signature ||
+        !verifyHmacSignature({
+          secret: registrationDetails.secret,
+          payload: rawBody,
+          signature: signature.trim(),
+          digest: 'hex'
+        })
+      ) {
+        return {
+          inputs: [],
+          response: new Response('Invalid signature', { status: 401 })
+        };
+      }
+
       let data: any;
       try {
-        data = await ctx.request.json();
+        data = JSON.parse(rawBody);
       } catch {
         return { inputs: [] };
       }
@@ -95,18 +116,9 @@ export let resourceChangeTrigger = SlateTrigger.create(spec, {
       let kind = data.kind ?? 'unknown';
       let action = data.titleVerb ?? data.name ?? 'changed';
 
-      let projectKey: string | undefined;
-      let environmentKey: string | undefined;
-      let resourceKey: string | undefined;
-
-      if (data.target?.resources) {
-        for (let resource of data.target.resources) {
-          if (resource.type === 'proj') projectKey = resource.key;
-          if (resource.type === 'env') environmentKey = resource.key;
-          if (resource.type === 'flag' || resource.type === 'segment')
-            resourceKey = resource.key;
-        }
-      }
+      let { projectKey, environmentKey, flagKey, segmentKey, memberId } =
+        parseResourceSpecifiers(data.target?.resources);
+      let resourceKey = flagKey ?? segmentKey ?? memberId ?? environmentKey ?? projectKey;
 
       return {
         inputs: [

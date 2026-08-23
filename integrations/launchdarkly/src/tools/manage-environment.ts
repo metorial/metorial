@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireInput, requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let manageEnvironment = SlateTool.create(spec, {
@@ -12,7 +13,8 @@ export let manageEnvironment = SlateTool.create(spec, {
     'To update, provide action "update" with fields to change.',
     'To delete, provide action "delete" with the environmentKey.',
     'Color must be a 6-character hex code without the # prefix (e.g., "417505").'
-  ]
+  ],
+  tags: { destructive: true }
 })
   .input(
     z.object({
@@ -22,13 +24,21 @@ export let manageEnvironment = SlateTool.create(spec, {
       name: z.string().optional().describe('Environment name (required for create)'),
       color: z
         .string()
+        .regex(/^[0-9A-Fa-f]{6}$/)
         .optional()
         .describe('Environment color hex code, e.g. "417505" (required for create)'),
       tags: z.array(z.string()).optional().describe('Environment tags'),
       requireComments: z.boolean().optional().describe('Require comments for flag changes'),
       confirmChanges: z.boolean().optional().describe('Require confirmation for flag changes'),
       secureMode: z.boolean().optional().describe('Enable secure mode for this environment'),
-      defaultTrackEvents: z.boolean().optional().describe('Track events by default')
+      defaultTrackEvents: z.boolean().optional().describe('Track events by default'),
+      defaultTtl: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Default PHP SDK cache TTL in minutes'),
+      critical: z.boolean().optional().describe('Whether the environment is critical')
     })
   )
   .output(
@@ -40,29 +50,28 @@ export let manageEnvironment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error(
-        'projectKey is required. Provide it in the input or set a default in config.'
-      );
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let { action, environmentKey } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name || !ctx.input.color) {
-        throw new Error('name and color are required when creating an environment.');
-      }
+      requireInput(
+        ctx.input.name && ctx.input.color,
+        'name and color are required when creating an environment.',
+        'launchdarkly_environment_create_fields_required'
+      );
       let env = await client.createEnvironment(projectKey, {
         key: environmentKey,
-        name: ctx.input.name,
-        color: ctx.input.color,
+        name: ctx.input.name!,
+        color: ctx.input.color!,
         tags: ctx.input.tags,
         secureMode: ctx.input.secureMode,
         defaultTrackEvents: ctx.input.defaultTrackEvents,
         requireComments: ctx.input.requireComments,
-        confirmChanges: ctx.input.confirmChanges
+        confirmChanges: ctx.input.confirmChanges,
+        defaultTtl: ctx.input.defaultTtl,
+        critical: ctx.input.critical
       });
 
       return {
@@ -101,12 +110,18 @@ export let manageEnvironment = SlateTool.create(spec, {
           path: '/defaultTrackEvents',
           value: ctx.input.defaultTrackEvents
         });
+      if (ctx.input.defaultTtl !== undefined)
+        patches.push({ op: 'replace', path: '/defaultTtl', value: ctx.input.defaultTtl });
+      if (ctx.input.critical !== undefined)
+        patches.push({ op: 'replace', path: '/critical', value: ctx.input.critical });
       if (ctx.input.tags !== undefined)
         patches.push({ op: 'replace', path: '/tags', value: ctx.input.tags });
 
-      if (patches.length === 0) {
-        throw new Error('No fields to update.');
-      }
+      requireInput(
+        patches.length > 0,
+        'No fields to update.',
+        'launchdarkly_environment_update_empty'
+      );
 
       let env = await client.updateEnvironment(projectKey, environmentKey, patches);
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let deleteFeatureFlag = SlateTool.create(spec, {
@@ -27,14 +28,9 @@ export let deleteFeatureFlag = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error(
-        'projectKey is required. Provide it in the input or set a default in config.'
-      );
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     await client.deleteFeatureFlag(projectKey, ctx.input.flagKey);
 
     return {

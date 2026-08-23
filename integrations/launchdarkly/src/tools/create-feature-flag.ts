@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let createFeatureFlag = SlateTool.create(spec, {
@@ -25,7 +26,20 @@ export let createFeatureFlag = SlateTool.create(spec, {
       temporary: z
         .boolean()
         .optional()
-        .describe('Whether this is a temporary flag (default false)'),
+        .describe('Whether this is a temporary flag. LaunchDarkly defaults this to true.'),
+      cloneFlagKey: z
+        .string()
+        .optional()
+        .describe('Existing flag key whose targeting configuration should be cloned'),
+      isFlagOn: z
+        .boolean()
+        .optional()
+        .describe('Whether to turn the new flag on in every environment (default false)'),
+      maintainerId: z.string().optional().describe('Member ID to assign as flag maintainer'),
+      maintainerTeamKey: z
+        .string()
+        .optional()
+        .describe('Team key to assign as flag maintainer'),
       variations: z
         .array(
           z.object({
@@ -72,24 +86,28 @@ export let createFeatureFlag = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error(
-        'projectKey is required. Provide it in the input or set a default in config.'
-      );
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
-    let flag = await client.createFeatureFlag(projectKey, {
-      key: ctx.input.flagKey,
-      name: ctx.input.name,
-      description: ctx.input.description,
-      tags: ctx.input.tags,
-      temporary: ctx.input.temporary,
-      variations: ctx.input.variations,
-      defaults: ctx.input.defaults,
-      clientSideAvailability: ctx.input.clientSideAvailability
-    });
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
+    let flag = await client.createFeatureFlag(
+      projectKey,
+      {
+        key: ctx.input.flagKey,
+        name: ctx.input.name,
+        description: ctx.input.description,
+        tags: ctx.input.tags,
+        temporary: ctx.input.temporary,
+        isFlagOn: ctx.input.isFlagOn,
+        maintainerId: ctx.input.maintainerId,
+        maintainerTeamKey: ctx.input.maintainerTeamKey,
+        variations: ctx.input.variations,
+        defaults: ctx.input.defaults,
+        clientSideAvailability: ctx.input.clientSideAvailability
+      },
+      {
+        clone: ctx.input.cloneFlagKey
+      }
+    );
 
     return {
       output: {

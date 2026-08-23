@@ -1,20 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { circleCiValidationError, validatePipelineParameters } from '../lib/validation';
 import { spec } from '../spec';
 
 export let triggerPipeline = SlateTool.create(spec, {
   name: 'Trigger Pipeline',
   key: 'trigger_pipeline',
-  description: `Trigger a new CI/CD pipeline for a project. You can specify a branch or tag to build, and pass custom pipeline parameters to control which workflows run and how they behave.
-The project slug format is \`vcs-slug/org-name/repo-name\` (e.g., \`gh/my-org/my-repo\` or \`github/my-org/my-repo\`).`,
+  description: `DEPRECATED — use \`trigger_pipeline_run\` instead. Trigger a new CI/CD pipeline through CircleCI's compatibility endpoint. You can specify a branch or tag to build, and pass custom pipeline parameters to control which workflows run and how they behave.
+    The project slug format is \`vcs-slug/org-name/repo-name\` (e.g., \`gh/my-org/my-repo\`).`,
   instructions: [
+    'Use trigger_pipeline_run for new calls; this tool is retained for backward compatibility.',
     'The branch and tag fields are mutually exclusive — provide one or neither.',
     'Pipeline parameters must be declared in the project .circleci/config.yml under a top-level parameters key.'
   ],
+  constraints: [
+    'This compatibility endpoint supports GitHub OAuth and Bitbucket Cloud projects; CircleCI documents it as unsupported for GitHub App and GitLab projects.'
+  ],
   tags: {
     destructive: false,
-    readOnly: false
+    readOnly: false,
+    deprecated: true
   }
 })
   .input(
@@ -44,6 +50,11 @@ The project slug format is \`vcs-slug/org-name/repo-name\` (e.g., \`gh/my-org/my
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.branch && ctx.input.tag) {
+      throw circleCiValidationError('Provide either branch or tag, not both.');
+    }
+    validatePipelineParameters(ctx.input.parameters);
+
     let client = new Client({ token: ctx.auth.token });
 
     let params: { branch?: string; tag?: string; parameters?: Record<string, any> } = {};

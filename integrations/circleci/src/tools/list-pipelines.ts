@@ -33,7 +33,7 @@ export let listPipelines = SlateTool.create(spec, {
           tag: z.string().optional()
         })
       ),
-      nextPageToken: z.string().optional()
+      nextPageToken: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {

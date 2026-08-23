@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/metabase.png" height="20"> Metabase
 
-Create, manage, and execute queries against connected databases. Build and organize questions (saved queries) using SQL or MBQL, and export results in JSON, CSV, or XLSX formats. Create, update, and share dashboards with configurable parameters and filters. Organize items into collections, manage database connections and metadata, and control user permissions and group access. Set up scheduled alerts on question results with delivery to email, Slack, or webhooks. Search across all Metabase objects, upload CSV data, configure instance settings, and manage embedding with public links or signed tokens.
+Run and export saved questions, execute SQL or MBQL queries, inspect database and table metadata, and manage questions, dashboards, collections, users, groups, permissions, public links, and scheduled question alerts.
 
 ## Tools
 
@@ -8,21 +8,33 @@ Create, manage, and execute queries against connected databases. Build and organ
 
 Execute an ad-hoc query or run a saved question's query against a connected database. Supports native SQL queries and Metabase's structured query language (MBQL). Returns query results including column metadata and row data.
 
+### Export Question Results
+
+Run a saved question and return its complete CSV, JSON, or XLSX result as a downloadable file.
+
+### Get Current User
+
+Return the Metabase user represented by the current connection.
+
+### Get Table Metadata
+
+Inspect a table and its fields before building an MBQL query or understanding available data.
+
 ### List Dashboards
 
-List dashboards in Metabase with optional filtering. Returns all dashboards, your dashboards, favorites, or archived dashboards.
+List dashboards in Metabase with optional filtering. Returns all dashboards, dashboards you created, or archived dashboards.
 
 ### List Questions
 
-List saved questions (cards) in Metabase with optional filtering. Returns all questions, your questions, favorites, archived questions, or questions filtered by database/table.
+List saved questions (cards) in Metabase with optional filtering. Returns all questions, your questions, bookmarked or archived questions, or questions filtered by a related object.
 
 ### Manage Alert
 
-Create, update, retrieve, list, or delete alerts on questions in Metabase. Alerts trigger when specific conditions are met on a question's results — such as when results exist, a time series crosses a goal line, or a progress bar reaches a goal. Alerts can be delivered via email, Slack, or webhook.
+Create, update, retrieve, list, or archive scheduled alerts for saved questions. Alerts use Metabase notification handlers for email, Slack, or HTTP delivery and Quartz cron schedules.
 
 ### Manage Collection
 
-Create, update, retrieve, or archive a collection in Metabase. Collections organize questions, dashboards, and other items (similar to folders). Use "root" as the collectionId to access the root collection.
+Create, update, retrieve, list, or archive collections in Metabase. Collections organize questions, dashboards, and other content. Use "root" for top-level content and "trash" for archived content.
 
 ### Manage Dashboard Cards
 
@@ -34,11 +46,11 @@ Create, update, retrieve, copy, or archive a dashboard in Metabase. Dashboards o
 
 ### Manage Database
 
-List connected databases, retrieve database details and metadata, or trigger a sync/rescan. Use the **metadata** action to get all tables, fields, and field values for a database. Use **sync** to trigger a manual schema metadata sync, or **rescan** to trigger a field value scan.
+List connected databases, retrieve database details and table metadata, or trigger a sync/rescan. Use Get Table Metadata to inspect fields for one table.
 
 ### Manage Permissions
 
-Manage permission groups and group memberships in Metabase. Create or delete permission groups, add or remove users from groups, and list all groups. Permission groups control access to databases, tables, and collections.
+Manage permission groups, group memberships, and the versioned data permissions graph in Metabase.
 
 ### Manage Public Link
 

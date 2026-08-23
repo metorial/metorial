@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireInput } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let manageProject = SlateTool.create(spec, {
@@ -13,7 +14,7 @@ export let manageProject = SlateTool.create(spec, {
     'To delete a project, set action to "delete" and provide projectKey.'
   ],
   tags: {
-    destructive: false
+    destructive: true
   }
 })
   .input(
@@ -43,16 +44,18 @@ export let manageProject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let { action, projectKey } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) {
-        throw new Error('name is required when creating a project.');
-      }
+      requireInput(
+        ctx.input.name,
+        'name is required when creating a project.',
+        'launchdarkly_project_name_required'
+      );
       let project = await client.createProject({
         key: projectKey,
-        name: ctx.input.name,
+        name: ctx.input.name!,
         tags: ctx.input.tags,
         environments: ctx.input.environments
       });
@@ -61,7 +64,9 @@ export let manageProject = SlateTool.create(spec, {
         output: {
           projectKey: project.key,
           name: project.name,
-          environmentCount: (project.environments ?? []).length
+          environmentCount: Array.isArray(project.environments)
+            ? project.environments.length
+            : project.environments?.totalCount
         },
         message: `Created project **${project.name}** (\`${project.key}\`).`
       };
@@ -75,9 +80,11 @@ export let manageProject = SlateTool.create(spec, {
       if (ctx.input.tags !== undefined) {
         patches.push({ op: 'replace', path: '/tags', value: ctx.input.tags });
       }
-      if (patches.length === 0) {
-        throw new Error('No fields to update. Provide name or tags.');
-      }
+      requireInput(
+        patches.length > 0,
+        'No fields to update. Provide name or tags.',
+        'launchdarkly_project_update_empty'
+      );
 
       let project = await client.updateProject(projectKey, patches);
 
@@ -85,7 +92,9 @@ export let manageProject = SlateTool.create(spec, {
         output: {
           projectKey: project.key,
           name: project.name,
-          environmentCount: (project.environments ?? []).length
+          environmentCount: Array.isArray(project.environments)
+            ? project.environments.length
+            : project.environments?.totalCount
         },
         message: `Updated project **${project.name}** (\`${project.key}\`).`
       };

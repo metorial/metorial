@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 let variationSchema = z.object({
@@ -74,8 +75,21 @@ export let getFeatureFlag = SlateTool.create(spec, {
           z.object({
             ruleId: z.string().optional(),
             description: z.string().optional(),
+            clauses: z
+              .array(
+                z.object({
+                  clauseId: z.string().optional(),
+                  contextKind: z.string().optional(),
+                  attribute: z.string(),
+                  op: z.string(),
+                  negate: z.boolean(),
+                  values: z.array(z.any())
+                })
+              )
+              .describe('Rule clauses and IDs used by semantic patch instructions'),
             variationIndex: z.number().optional(),
-            rollout: z.any().optional()
+            rollout: z.any().optional(),
+            trackEvents: z.boolean().optional()
           })
         )
         .optional()
@@ -90,15 +104,10 @@ export let getFeatureFlag = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error(
-        'projectKey is required. Provide it in the input or set a default in config.'
-      );
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
 
     let envKey = ctx.input.environmentKey ?? ctx.config.environmentKey;
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let flag = await client.getFeatureFlag(projectKey, ctx.input.flagKey, {
       env: envKey
     });
@@ -127,16 +136,29 @@ export let getFeatureFlag = SlateTool.create(spec, {
           flagKey: p.key,
           variationIndex: p.variation
         })),
-        targets: envConfig?.targets?.map((t: any) => ({
-          contextKind: t.contextKind,
-          values: t.values ?? [],
-          variationIndex: t.variation
-        })),
+        targets: envConfig
+          ? [...(envConfig.targets ?? []), ...(envConfig.contextTargets ?? [])].map(
+              (target: any) => ({
+                contextKind: target.contextKind ?? 'user',
+                values: target.values ?? [],
+                variationIndex: target.variation
+              })
+            )
+          : undefined,
         rules: envConfig?.rules?.map((r: any) => ({
           ruleId: r._id,
           description: r.description,
+          clauses: (r.clauses ?? []).map((clause: any) => ({
+            clauseId: clause._id,
+            contextKind: clause.contextKind,
+            attribute: clause.attribute,
+            op: clause.op,
+            negate: clause.negate ?? false,
+            values: clause.values ?? []
+          })),
           variationIndex: r.variation,
-          rollout: r.rollout
+          rollout: r.rollout,
+          trackEvents: r.trackEvents
         })),
         fallthrough: envConfig?.fallthrough
           ? {

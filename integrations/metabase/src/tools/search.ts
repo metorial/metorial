@@ -23,7 +23,13 @@ Optionally filter by object type, collection, or database. Returns matching item
             'collection',
             'database',
             'table',
+            'dataset',
+            'metric',
+            'segment',
+            'measure',
+            'document',
             'action',
+            'transform',
             'indexed-entity'
           ])
         )
@@ -31,15 +37,25 @@ Optionally filter by object type, collection, or database. Returns matching item
         .describe('Filter by object types'),
       collectionId: z.number().optional().describe('Restrict search to a specific collection'),
       databaseId: z.number().optional().describe('Restrict search to a specific database'),
-      archived: z.boolean().optional().describe('Search archived items')
+      archived: z.boolean().optional().describe('Search archived items'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .max(100)
+        .optional()
+        .describe('Maximum results to return'),
+      offset: z.number().int().min(0).optional().describe('Number of matching results to skip')
     })
   )
   .output(
     z.object({
-      total: z.number().describe('Total number of results'),
+      total: z.number().describe('Total number of matching results'),
+      hasMore: z.boolean().describe('Whether more results are available'),
+      nextOffset: z.number().optional().describe('Offset for the next page'),
       results: z.array(
         z.object({
-          itemId: z.number().describe('ID of the item'),
+          itemId: z.union([z.number(), z.string()]).describe('ID of the item'),
           name: z.string().describe('Name of the item'),
           model: z.string().describe('Type of item (card, dashboard, collection, etc.)'),
           description: z.string().nullable().describe('Description of the item'),
@@ -53,17 +69,16 @@ Optionally filter by object type, collection, or database. Returns matching item
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    let client = new MetabaseClient(ctx.auth);
 
     let result = await client.search({
       query: ctx.input.query,
       models: ctx.input.models,
       collectionId: ctx.input.collectionId,
       tableDatabaseId: ctx.input.databaseId,
-      archived: ctx.input.archived
+      archived: ctx.input.archived,
+      limit: ctx.input.limit,
+      offset: ctx.input.offset
     });
 
     let data = result.data || result;
@@ -75,9 +90,14 @@ Optionally filter by object type, collection, or database. Returns matching item
       collectionName: item.collection?.name ?? null
     }));
 
+    let total = result.total ?? items.length;
+    let offset = ctx.input.offset ?? 0;
+    let hasMore = offset + items.length < total;
     return {
       output: {
-        total: result.total ?? items.length,
+        total,
+        hasMore,
+        nextOffset: hasMore ? offset + items.length : undefined,
         results: items
       },
       message: `Found **${items.length}** result(s)${ctx.input.query ? ` for "${ctx.input.query}"` : ''}`

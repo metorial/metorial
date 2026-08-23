@@ -27,8 +27,13 @@ export let getFlakyTests = SlateTool.create(spec, {
           source: z.string().optional(),
           jobName: z.string().optional(),
           workflowName: z.string().optional(),
+          workflowId: z.string().optional(),
+          workflowCreatedAt: z.string().optional(),
           timesFlaked: z.number().optional(),
-          pipelineNumber: z.number().optional()
+          pipelineNumber: z.number().optional(),
+          jobNumber: z.number().optional(),
+          file: z.string().optional(),
+          timeWasted: z.number().optional()
         })
       ),
       totalCount: z.number()
@@ -38,20 +43,25 @@ export let getFlakyTests = SlateTool.create(spec, {
     let client = new Client({ token: ctx.auth.token });
     let result = await client.getFlakyTests(ctx.input.projectSlug);
 
-    let flakyTests = (result.flaky_tests || []).map((t: any) => ({
-      testName: t.test_name,
+    let flakyTests = (result['flaky-tests'] || []).map((t: any) => ({
+      testName: t['test-name'],
       className: t.classname,
       source: t.source,
-      jobName: t.job_name,
-      workflowName: t.workflow_name,
-      timesFlaked: t.times_flaked,
-      pipelineNumber: t.pipeline_number
+      jobName: t['job-name'],
+      jobNumber: t['job-number'],
+      workflowName: t['workflow-name'],
+      workflowId: t['workflow-id'],
+      workflowCreatedAt: t['workflow-created-at'],
+      timesFlaked: t['times-flaked'],
+      pipelineNumber: t['pipeline-number'],
+      file: t.file,
+      timeWasted: t['time-wasted']
     }));
 
     return {
       output: {
         flakyTests,
-        totalCount: result.total_flaky_tests || flakyTests.length
+        totalCount: result['total-flaky-tests'] ?? flakyTests.length
       },
       message: `Found **${flakyTests.length}** flaky test(s) in project \`${ctx.input.projectSlug}\`.`
     };

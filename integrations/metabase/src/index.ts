@@ -2,6 +2,9 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   executeQuery,
+  exportQuestionResults,
+  getCurrentUser,
+  getTableMetadata,
   listDashboards,
   listQuestions,
   manageAlert,
@@ -23,6 +26,9 @@ export let provider = Slate.create({
     manageQuestion,
     listQuestions,
     executeQuery,
+    exportQuestionResults,
+    getCurrentUser,
+    getTableMetadata,
     manageDashboard,
     listDashboards,
     manageDashboardCards,
