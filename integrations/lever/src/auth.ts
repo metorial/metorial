@@ -131,12 +131,12 @@ function createLeverOauth(name: string, key: string, environment: 'production' |
     key,
     docs: [
       {
-        type: 'docs.auth.oauth',
+        type: 'docs.auth.oauth' as const,
         name: 'OAuth documentation',
         url: 'https://hire.lever.co/developer/documentation#authentication'
       },
       {
-        type: 'docs.auth.oauth_scopes',
+        type: 'docs.auth.oauth_scopes' as const,
         name: 'OAuth scopes',
         url: 'https://hire.lever.co/developer/documentation#scopes'
       }

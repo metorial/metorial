@@ -22,7 +22,9 @@ export let slatesMessageActionsListRequest = z.object({
   jsonrpc: z.literal('2.0'),
   method: z.literal('slates/actions.list'),
   id: z.string(),
-  params: z.object({})
+  params: z.object({
+    includeAdapterActions: z.optional(z.nullable(z.boolean()))
+  })
 });
 
 export type SlatesMessageActionsListRequest = z.infer<typeof slatesMessageActionsListRequest>;
@@ -90,6 +92,7 @@ export let slatesMessageActionInvokeResponse = z.object({
       .array(
         z.object({
           mimeType: z.string().optional(),
+          attachmentHash: z.string().optional(),
           content: z.union([
             z.object({
               type: z.literal('url'),

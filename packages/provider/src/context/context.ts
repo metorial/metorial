@@ -2,30 +2,20 @@ import type { SlateHttpTrace } from '../axios/trace';
 import type { SlateLogger, SlateLogMessageInput } from '../logger';
 import type { SlateSpecification } from '../specification/specification';
 
-export class SlateContext<ConfigType extends {}, AuthType extends {}, InputType extends {}> {
-  #config: ConfigType;
+export class SlatePublicContext<InputType extends {}> {
   #input: InputType;
-  #auth: AuthType;
   #httpTraces: SlateHttpTrace[] = [];
 
   constructor(
-    config: ConfigType,
     input: InputType,
-    auth: AuthType,
-    private readonly spec: SlateSpecification<ConfigType, AuthType>,
+    private readonly spec: SlateSpecification<any, any>,
     private readonly logger: SlateLogger
   ) {
-    this.#config = config;
     this.#input = input;
-    this.#auth = auth;
   }
 
   get specification() {
     return this.spec;
-  }
-
-  get config() {
-    return Object.freeze(this.#config);
   }
 
   get input() {
@@ -54,10 +44,6 @@ export class SlateContext<ConfigType extends {}, AuthType extends {}, InputType 
     ) as 'registrationDetails' extends keyof InputType
       ? InputType['registrationDetails']
       : never;
-  }
-
-  get auth() {
-    return Object.freeze(this.#auth);
   }
 
   recordHttpTrace(trace: SlateHttpTrace) {
@@ -99,5 +85,34 @@ export class SlateContext<ConfigType extends {}, AuthType extends {}, InputType 
 
   progress(message: SlateLogMessageInput) {
     this.logger.progress(message);
+  }
+}
+
+export class SlateContext<
+  ConfigType extends {},
+  AuthType extends {},
+  InputType extends {}
+> extends SlatePublicContext<InputType> {
+  #config: ConfigType;
+  #auth: AuthType;
+
+  constructor(
+    config: ConfigType,
+    input: InputType,
+    auth: AuthType,
+    spec: SlateSpecification<ConfigType, AuthType>,
+    logger: SlateLogger
+  ) {
+    super(input, spec, logger);
+    this.#config = config;
+    this.#auth = auth;
+  }
+
+  get config() {
+    return Object.freeze(this.#config);
+  }
+
+  get auth() {
+    return Object.freeze(this.#auth);
   }
 }

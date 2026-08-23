@@ -1,5 +1,5 @@
 import type { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
-import type { SlateContext } from '../context';
+import type { SlatePublicContext } from '../context';
 
 export interface SlateHttpTraceTextBody {
   contentType?: string;
@@ -29,7 +29,7 @@ export interface SlateHttpTrace {
 }
 
 interface SlateHttpTraceDraft {
-  context: SlateContext<any, any, any>;
+  context: SlatePublicContext<any>;
   startedAt: string;
   startedAtMs: number;
   request: SlateHttpTrace['request'];
@@ -664,7 +664,7 @@ let clearTraceDraft = (
 
 export let attachHttpTraceDraft = (
   config: InternalAxiosRequestConfig,
-  context: SlateContext<any, any, any>
+  context: SlatePublicContext<any>
 ) => {
   let traceAwareConfig = config as TraceAwareAxiosRequestConfig;
   let contentType = getContentType(config.headers);

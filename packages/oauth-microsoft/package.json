@@ -1,6 +1,6 @@
 {
   "name": "@slates/oauth-microsoft",
-  "version": "1.0.0-rc.5",
+  "version": "1.0.0-rc.6",
   "publishConfig": {
     "access": "public"
   },
@@ -31,7 +31,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "slates": "1.0.0-rc.15"
+    "slates": "1.0.0-rc.17"
   },
   "devDependencies": {
     "@types/node": "^20",

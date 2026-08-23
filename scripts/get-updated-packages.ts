@@ -21,7 +21,7 @@ type CliOptions = {
   filters: string[];
 };
 
-const PACKAGES_DIRECTORY = path.resolve(import.meta.dir, '..', 'packages');
+const WORKSPACE_PACKAGE_DIRECTORIES = ['packages', 'adapters'] as const;
 const REGISTRY_RETRY_ATTEMPTS = 5;
 const REGISTRY_RETRY_BASE_DELAY_MS = 2_000;
 const HELP_TEXT = `
@@ -103,40 +103,46 @@ function splitFilters(value: string): string[] {
 }
 
 async function getWorkspacePackages(): Promise<WorkspacePackage[]> {
-  const directoryEntries = await readdir(PACKAGES_DIRECTORY, { withFileTypes: true });
   const packages = await Promise.all(
-    directoryEntries
-      .filter(entry => entry.isDirectory())
-      .map(async entry => {
-        const packageJsonPath = path.join(PACKAGES_DIRECTORY, entry.name, 'package.json');
-        const packageJsonRaw = await readFile(packageJsonPath, 'utf8');
-        const packageJson = JSON.parse(packageJsonRaw) as {
-          name?: string;
-          private?: boolean;
-          scripts?: {
-            build?: string;
-          };
-          version?: string;
-        };
+    WORKSPACE_PACKAGE_DIRECTORIES.map(async workspaceDirectory => {
+      const directoryPath = path.resolve(import.meta.dir, '..', workspaceDirectory);
+      const directoryEntries = await readdir(directoryPath, { withFileTypes: true });
 
-        if (packageJson.private) {
-          return null;
-        }
+      return Promise.all(
+        directoryEntries
+          .filter(entry => entry.isDirectory())
+          .map(async entry => {
+            const packageJsonPath = path.join(directoryPath, entry.name, 'package.json');
+            const packageJsonRaw = await readFile(packageJsonPath, 'utf8');
+            const packageJson = JSON.parse(packageJsonRaw) as {
+              name?: string;
+              private?: boolean;
+              scripts?: {
+                build?: string;
+              };
+              version?: string;
+            };
 
-        if (!packageJson.name || !packageJson.version) {
-          throw new Error(`Missing name or version in ${packageJsonPath}.`);
-        }
+            if (packageJson.private) {
+              return null;
+            }
 
-        return {
-          directory: path.posix.join('packages', entry.name),
-          hasBuildScript: Boolean(packageJson.scripts?.build),
-          name: packageJson.name,
-          version: packageJson.version
-        } satisfies WorkspacePackage;
-      })
+            if (!packageJson.name || !packageJson.version) {
+              throw new Error(`Missing name or version in ${packageJsonPath}.`);
+            }
+
+            return {
+              directory: path.posix.join(workspaceDirectory, entry.name),
+              hasBuildScript: Boolean(packageJson.scripts?.build),
+              name: packageJson.name,
+              version: packageJson.version
+            } satisfies WorkspacePackage;
+          })
+      );
+    })
   );
 
-  return packages.filter((pkg): pkg is WorkspacePackage => pkg !== null);
+  return packages.flat().filter((pkg): pkg is WorkspacePackage => pkg !== null);
 }
 
 function matchesAnyFilter(packageName: string, filters: string[]): boolean {

@@ -1,24 +1,19 @@
 import { AsyncLocalStorage } from 'async_hooks';
-import type { SlateContext } from './context';
+import type { SlateContext, SlatePublicContext } from './context';
 
 let slateContextStorageKey = Symbol.for('slates.provider.context.asyncLocalStorage');
 let globalWithSlateContext = globalThis as typeof globalThis & {
-  [key: symbol]: AsyncLocalStorage<SlateContext<any, any, any>> | undefined;
+  [key: symbol]: AsyncLocalStorage<SlatePublicContext<any>> | undefined;
 };
 
 let asyncLocalStorage =
   globalWithSlateContext[slateContextStorageKey] ??
-  new AsyncLocalStorage<SlateContext<any, any, any>>();
+  new AsyncLocalStorage<SlatePublicContext<any>>();
 
 globalWithSlateContext[slateContextStorageKey] = asyncLocalStorage;
 
-export let runWithContext = <
-  ConfigType extends {},
-  AuthType extends {},
-  InputType extends {},
-  RV
->(
-  context: SlateContext<ConfigType, AuthType, InputType>,
+export let runWithContext = <InputType extends {}, RV>(
+  context: SlatePublicContext<InputType>,
   fn: () => Promise<RV>
 ): Promise<RV> => {
   return asyncLocalStorage.run(context, fn);

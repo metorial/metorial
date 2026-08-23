@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import type { SlateContext } from '../context';
+import type { SlateContext, SlatePublicContext } from '../context';
 import type { SlateActionDocsReference } from '../docs';
 import type { SlateSpecification } from '../specification/specification';
 import type { SlateAttachment } from './attachment';
@@ -29,6 +29,8 @@ export interface SlateActionParameters {
   scopes?: SlateActionScopes;
   authMethods?: string[];
   docs?: SlateActionDocsReference[];
+  adapter?: string | null;
+  isPublic?: boolean;
 }
 
 export type SlateToolInvocationHandler<
@@ -37,6 +39,14 @@ export type SlateToolInvocationHandler<
   InputType extends {},
   OutputType extends {}
 > = (context: SlateContext<ConfigType, AuthType, InputType>) => Promise<{
+  output: OutputType;
+  message: string;
+  attachments?: SlateAttachment[];
+}>;
+
+export type SlatePublicToolInvocationHandler<InputType extends {}, OutputType extends {}> = (
+  context: SlatePublicContext<InputType>
+) => Promise<{
   output: OutputType;
   message: string;
   attachments?: SlateAttachment[];
@@ -257,5 +267,13 @@ export abstract class SlateAction<
 
   get docs() {
     return this._params.docs;
+  }
+
+  get adapter() {
+    return this._params.adapter ?? null;
+  }
+
+  get isPublic() {
+    return this._params.isPublic === true;
   }
 }

@@ -9,15 +9,15 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/oauth-zoho": "1.0.0-rc.4",
+    "@slates/oauth-zoho": "1.0.0-rc.5",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.16",
+    "slates": "1.0.0-rc.17",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.10",
+    "@slates/test": "1.0.0-rc.14",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.0-rc.11"
+  "version": "0.2.0-rc.14"
 }

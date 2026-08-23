@@ -1,6 +1,14 @@
 import { badRequestError, notFoundError, ServiceError } from '@lowerdeck/error';
-import type { SlateAuthenticationMethod, SlatesAction } from '@slates/proto';
-import { type Slate, SlateDefaultPollingIntervalSeconds } from '@slates/provider';
+import type {
+  SlateAuthenticationMethod,
+  SlatesAction,
+  SlateAdapter as SlatesAdapter
+} from '@slates/proto';
+import {
+  type Slate,
+  type SlateAdapter,
+  SlateDefaultPollingIntervalSeconds
+} from '@slates/provider';
 import z from 'zod';
 import { toJsonSchema } from './validation';
 
@@ -67,6 +75,26 @@ export let getAction = <ConfigType extends {}, AuthType extends {}>(
   return action;
 };
 
+export let getAdapter = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  adapterId: string
+) => {
+  let adapter = slate.adapters.find(m => m.id === adapterId);
+  if (!adapter) {
+    throw new ServiceError(notFoundError(`adapter`, adapterId));
+  }
+
+  return adapter;
+};
+
+export let mapAdapter = <ConfigType extends {}, AuthType extends {}>(
+  adapter: SlateAdapter<ConfigType, AuthType>
+): SlatesAdapter => ({
+  id: adapter.id,
+  name: adapter.name,
+  capabilities: adapter.capabilities
+});
+
 export let getActionWithType = <
   Type extends 'tool' | 'trigger',
   ConfigType extends {},
@@ -103,6 +131,7 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
     scopes: a.scopes,
     authMethods: a.authMethods,
     docs: a.docs ?? [],
+    ...(a.adapter ? { adapter: a.adapter } : {}),
 
     inputSchema: toJsonSchema(a.inputSchema),
     outputSchema: toJsonSchema(a.outputSchema)
@@ -112,7 +141,8 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
     return {
       ...base,
       type: 'action.tool',
-      capabilities: {}
+      capabilities: {},
+      isPublic: a.isPublic
     };
   }
 

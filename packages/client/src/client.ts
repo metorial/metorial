@@ -2,6 +2,7 @@ import {
   SLATES_PROTOCOL_VERSION,
   type SlateAuthenticationMethod,
   type SlatesAction,
+  type SlatesActionTool,
   type SlatesMessageActionGetResponse,
   type SlatesMessageActionInvokeResponse,
   type SlatesMessageActionsListResponse,
@@ -173,9 +174,11 @@ export class SlatesProtocolClient {
     return this.request('slates/actions.list', {});
   }
 
-  async listTools(): Promise<SlatesAction[]> {
+  async listTools(): Promise<SlatesActionTool[]> {
     let result = await this.listActions();
-    return result.actions.filter(action => action.type === 'action.tool');
+    return result.actions.filter(
+      (action): action is SlatesActionTool => action.type === 'action.tool'
+    );
   }
 
   async listTriggers(): Promise<SlatesAction[]> {

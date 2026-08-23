@@ -34,12 +34,15 @@ export let slatesActionBase = z.object({
       name: z.string(),
       url: z.string()
     })
-  )
+  ),
+
+  adapter: z.optional(z.nullable(z.string()))
 });
 
 export let slatesActionTool = slatesActionBase.extend({
   type: z.literal('action.tool'),
-  capabilities: z.object({})
+  capabilities: z.object({}),
+  isPublic: z.boolean()
 });
 
 export let slatesWebhookRequestMatcher = z.object({

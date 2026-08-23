@@ -56,7 +56,7 @@ type LoadedManifest = {
 };
 
 const ROOT_DIRECTORY = path.resolve(import.meta.dir, '..');
-const PACKAGES_DIRECTORY = path.join(ROOT_DIRECTORY, 'packages');
+const WORKSPACE_PACKAGE_DIRECTORIES = ['packages', 'adapters'] as const;
 const INTEGRATION_DIRECTORIES = [
   path.join(ROOT_DIRECTORY, 'integrations'),
   path.join(ROOT_DIRECTORY, 'test-integrations')
@@ -203,7 +203,7 @@ async function syncPackageManifests(
 
     if (pass === maxPasses - 1) {
       throw new Error(
-        'Package version sync did not converge. Check for dependency cycles in packages/*.'
+        'Package version sync did not converge. Check for dependency cycles in workspace packages.'
       );
     }
   }
@@ -438,36 +438,55 @@ function splitFilters(value: string): string[] {
 }
 
 async function getWorkspacePackages(): Promise<WorkspacePackage[]> {
-  const entries = await readdir(PACKAGES_DIRECTORY, { withFileTypes: true });
   const packages = await Promise.all(
-    entries
-      .filter(entry => entry.isDirectory())
-      .map(async entry => {
-        const packageJsonPath = path.join(PACKAGES_DIRECTORY, entry.name, 'package.json');
-        const raw = await readFile(packageJsonPath, 'utf8');
-        const packageJson = JSON.parse(raw) as { name?: string; version?: string };
+    WORKSPACE_PACKAGE_DIRECTORIES.map(async workspaceDirectory => {
+      const directoryPath = path.join(ROOT_DIRECTORY, workspaceDirectory);
+      const entries = await readdir(directoryPath, { withFileTypes: true });
 
-        if (!packageJson.name || !packageJson.version) {
-          throw new Error(`Missing name or version in ${packageJsonPath}.`);
-        }
+      return Promise.all(
+        entries
+          .filter(entry => entry.isDirectory())
+          .map(async entry => {
+            const packageJsonPath = path.join(directoryPath, entry.name, 'package.json');
+            const raw = await readFile(packageJsonPath, 'utf8');
+            const packageJson = JSON.parse(raw) as { name?: string; version?: string };
 
-        return {
-          name: packageJson.name,
-          version: packageJson.version
-        } satisfies WorkspacePackage;
-      })
+            if (!packageJson.name || !packageJson.version) {
+              throw new Error(`Missing name or version in ${packageJsonPath}.`);
+            }
+
+            return {
+              name: packageJson.name,
+              version: packageJson.version
+            } satisfies WorkspacePackage;
+          })
+      );
+    })
   );
 
-  return packages.sort((left, right) => left.name.localeCompare(right.name));
+  return packages.flat().sort((left, right) => left.name.localeCompare(right.name));
 }
 
 async function getManifestTargets(): Promise<
   Array<{ directory: string; kind: 'package' | 'integration' }>
 > {
-  const [packageEntries, ...integrationEntryLists] = await Promise.all([
-    readdir(PACKAGES_DIRECTORY, { withFileTypes: true }),
+  const entryLists = await Promise.all([
+    ...WORKSPACE_PACKAGE_DIRECTORIES.map(directory =>
+      readdir(path.join(ROOT_DIRECTORY, directory), { withFileTypes: true })
+    ),
     ...INTEGRATION_DIRECTORIES.map(dir => readdir(dir, { withFileTypes: true }))
   ]);
+  const workspaceEntryLists = entryLists.slice(0, WORKSPACE_PACKAGE_DIRECTORIES.length);
+  const integrationEntryLists = entryLists.slice(WORKSPACE_PACKAGE_DIRECTORIES.length);
+
+  const workspaceTargets = WORKSPACE_PACKAGE_DIRECTORIES.flatMap((directory, index) =>
+    workspaceEntryLists[index]
+      .filter(entry => entry.isDirectory())
+      .map(entry => ({
+        directory: path.join(ROOT_DIRECTORY, directory, entry.name),
+        kind: 'package' as const
+      }))
+  );
 
   const integrationTargets = INTEGRATION_DIRECTORIES.flatMap((dir, index) =>
     integrationEntryLists[index]
@@ -478,15 +497,9 @@ async function getManifestTargets(): Promise<
       }))
   );
 
-  return [
-    ...packageEntries
-      .filter(entry => entry.isDirectory())
-      .map(entry => ({
-        directory: path.join(PACKAGES_DIRECTORY, entry.name),
-        kind: 'package' as const
-      })),
-    ...integrationTargets
-  ].sort((left, right) => left.directory.localeCompare(right.directory));
+  return [...workspaceTargets, ...integrationTargets].sort((left, right) =>
+    left.directory.localeCompare(right.directory)
+  );
 }
 
 function updateDependencySections(
