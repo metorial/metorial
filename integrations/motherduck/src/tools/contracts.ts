@@ -84,8 +84,8 @@ let guide = z.looseObject({
   current_version: z.number().int(),
   created_at: z.string(),
   updated_at: z.string(),
-  version_change_comment: z.string().optional(),
-  version_external_id: z.string().optional(),
+  version_change_comment: nullableString.optional(),
+  version_external_id: nullableString.optional(),
   version_created_at: z.string().optional(),
   references: z.array(z.unknown()).optional()
 });

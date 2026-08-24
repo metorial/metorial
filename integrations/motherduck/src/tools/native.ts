@@ -37,6 +37,15 @@ class SqlParameters {
   json(value: unknown, cast: string) {
     return `CAST(${this.add(JSON.stringify(value), 'JSON')} AS ${cast})`;
   }
+
+  inline(query: string) {
+    return query.replace(/\$(\d+)\b/g, (_placeholder, rawIndex: string) => {
+      let value = this.values[Number(rawIndex) - 1];
+      if (value === null || value === undefined) return 'NULL';
+      if (value instanceof Date) value = value.toISOString();
+      return `'${String(value).replace(/'/g, "''")}'`;
+    });
+  }
 }
 
 let scalar = (value: unknown) => {
@@ -99,8 +108,10 @@ let functionQuery = async (
 ) => {
   let invocation = `SELECT * FROM ${name}(${args.filter(Boolean).join(', ')})`;
   let result = await client.query(
-    `SELECT to_json(result_row) AS result FROM (${invocation}) AS result_row`,
-    parameters.values,
+    parameters.inline(
+      `SELECT to_json(result_row) AS result FROM (${invocation}) AS result_row`
+    ),
+    [],
     database
   );
   return result.rows.map(row => normalizeRow(parseJson(row.result)));
@@ -114,8 +125,8 @@ let procedureQuery = async (
   database = 'md:'
 ) => {
   let result = await client.query(
-    `CALL ${name}(${args.filter(Boolean).join(', ')})`,
-    parameters.values,
+    parameters.inline(`CALL ${name}(${args.filter(Boolean).join(', ')})`),
+    [],
     database
   );
   return result.rows.map(normalizeRow);

@@ -172,15 +172,39 @@ describe('MotherDuck native tool execution', () => {
     expect(query).toHaveBeenCalledOnce();
     expect(query.mock.calls[0]?.[0]).toContain('SELECT * FROM MD_CREATE_FLIGHT(');
     expect(query.mock.calls[0]?.[0]).toContain('config := CAST(');
-    expect(query.mock.calls[0]?.[1]).toEqual([
-      'daily-ingest',
-      'print("ok")',
-      JSON.stringify({ TARGET: 'analytics' })
-    ]);
+    expect(query.mock.calls[0]?.[0]).toContain("name := 'daily-ingest'::VARCHAR");
+    expect(query.mock.calls[0]?.[0]).toContain('source_code := \'print("ok")\'::VARCHAR');
+    expect(query.mock.calls[0]?.[1]).toEqual([]);
     expect(output).toMatchObject({
       success: true,
       flight: { name: 'daily-ingest', current_version: 1 }
     });
+  });
+
+  it('inlines and escapes native function and procedure arguments', async () => {
+    let flightId = '99a8ec93-2ae5-49c3-8adf-e6f50a829326';
+    let { client, query } = fakeClient([
+      {
+        id: flightId,
+        name: "today's-flight",
+        current_version: 2
+      }
+    ]);
+
+    await invokeMotherDuckTool(client, 'create_flight', {
+      name: "today's-flight",
+      source_code: "print('safe')"
+    });
+    await invokeMotherDuckTool(client, 'update_flight', {
+      id: flightId,
+      name: "tomorrow's-flight"
+    });
+
+    expect(query.mock.calls[0]?.[0]).toContain("name := 'today''s-flight'::VARCHAR");
+    expect(query.mock.calls[0]?.[0]).toContain("source_code := 'print(''safe'')'::VARCHAR");
+    expect(query.mock.calls[0]?.[1]).toEqual([]);
+    expect(query.mock.calls[1]?.[0]).toContain("name := 'tomorrow''s-flight'::VARCHAR");
+    expect(query.mock.calls[1]?.[1]).toEqual([]);
   });
 
   it('reconstructs Guide navigation without loading root Guide bodies', async () => {
@@ -252,7 +276,9 @@ describe('MotherDuck native tool execution', () => {
     let output = await invokeMotherDuckTool(client, 'list_guides', { topic: 'metrics' });
 
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[1]?.[1]).toEqual(['metrics', 500, 500]);
+    expect(query.mock.calls[1]?.[0]).toContain("topic := 'metrics'::VARCHAR");
+    expect(query.mock.calls[1]?.[0]).toContain('"offset" := \'500\'::INTEGER');
+    expect(query.mock.calls[1]?.[1]).toEqual([]);
     expect(output.guides).toHaveLength(501);
   });
 
@@ -291,7 +317,8 @@ describe('MotherDuck native tool execution', () => {
     });
 
     expect(query).toHaveBeenCalledTimes(2);
-    expect(query.mock.calls[1]?.[1]).toEqual([500, 500]);
+    expect(query.mock.calls[1]?.[0]).toContain('"OFFSET" := \'500\'::UINTEGER');
+    expect(query.mock.calls[1]?.[1]).toEqual([]);
     expect(output.flights).toHaveLength(1);
     expect(output.flights[0]?.flight_name).toBe('Daily Revenue');
     expect(output.totalCount).toBe(1);
