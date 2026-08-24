@@ -134,18 +134,17 @@ describe('looker auth contract', () => {
     expect(method.capabilities.getProfile?.enabled).toBe(true);
   });
 
-  it('requires the instance URL in auth input and keeps output fields backward-compatible', async () => {
+  it('keeps legacy auth input and output fields backward-compatible', async () => {
     let client = await loadProviderClient();
     let result = await client.getAuthMethod('api_key');
     let method = result.authenticationMethod;
     let required = (method.inputSchema.required as string[] | undefined) ?? [];
     let outputRequired = (method.outputSchema.required as string[] | undefined) ?? [];
 
-    // Production auth stacks never receive provider config, so the login URL
-    // must come from the auth input.
-    expect(required).toEqual(
-      expect.arrayContaining(['clientId', 'clientSecret', 'instanceUrl'])
-    );
+    expect(required).toEqual(expect.arrayContaining(['clientId', 'clientSecret']));
+    // Older connections stored the URL in provider config. Keeping this field
+    // optional prevents their persisted auth input from failing schema validation.
+    expect(required).not.toContain('instanceUrl');
     expect(method.inputSchema.properties?.instanceUrl).toMatchObject({ type: 'string' });
     expect(method.outputSchema.properties?.expiresAt).toMatchObject({ type: 'string' });
     expect(method.outputSchema.properties?.authenticatedInstanceUrl).toMatchObject({
