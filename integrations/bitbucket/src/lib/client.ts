@@ -118,7 +118,7 @@ export class Client {
 
   async createPullRequest(repoSlug: string, body: Record<string, any>) {
     let response = await this.api.post(
-      `/repositories/${this.params.workspace}/${repoSlug}/pullrequests`,
+      `${this.getRepositoryPath(repoSlug)}/pullrequests`,
       body
     );
     return response.data;
