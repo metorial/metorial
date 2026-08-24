@@ -119,6 +119,97 @@ describe('MotherDuck native tool execution', () => {
     expect(query).not.toHaveBeenCalled();
   });
 
+  it('rejects a second statement hidden behind a comment marker inside a string literal', async () => {
+    let { client, query } = fakeClient();
+
+    await expect(
+      invokeMotherDuckTool(client, 'query', {
+        database: 'analytics',
+        sql: `SELECT 1 WHERE 'a--' = 'b'; DROP TABLE victim`
+      })
+    ).rejects.toThrow('exactly one SQL statement');
+    await expect(
+      invokeMotherDuckTool(client, 'query', {
+        database: 'analytics',
+        sql: 'SELECT $$payload$$; DROP TABLE victim'
+      })
+    ).rejects.toThrow('exactly one SQL statement');
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('rejects read-only SQL with an unterminated literal or quoted identifier', async () => {
+    let { client, query } = fakeClient();
+
+    await expect(
+      invokeMotherDuckTool(client, 'query', { database: 'analytics', sql: "SELECT 'abc" })
+    ).rejects.toThrow('unterminated string literal');
+    await expect(
+      invokeMotherDuckTool(client, 'query', { database: 'analytics', sql: 'SELECT "abc' })
+    ).rejects.toThrow('unterminated quoted identifier');
+    await expect(
+      invokeMotherDuckTool(client, 'query', { database: 'analytics', sql: 'SELECT 1 /* abc' })
+    ).rejects.toThrow('unterminated block comment');
+    await expect(
+      invokeMotherDuckTool(client, 'query', { database: 'analytics', sql: 'SELECT $tag$abc' })
+    ).rejects.toThrow('unterminated dollar-quoted string');
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('rejects a second statement hidden by a nested block comment', async () => {
+    let { client, query } = fakeClient();
+
+    for (let sql of [
+      'SELECT 1 /* /* */ -- */ ; DROP TABLE victim',
+      `SELECT 1 /* /* */ ' */ ; DROP TABLE victim -- '`,
+      'SELECT 1 /* /* /* */ */ -- */ ; DROP TABLE victim'
+    ]) {
+      await expect(
+        invokeMotherDuckTool(client, 'query', { database: 'analytics', sql })
+      ).rejects.toThrow('exactly one SQL statement');
+    }
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('rejects mutating functions invoked through a quoted identifier', async () => {
+    let { client, query } = fakeClient();
+
+    for (let sql of [
+      `SELECT * FROM "MD_DELETE_DIVE"('99a8ec93-2ae5-49c3-8adf-e6f50a829326')`,
+      `SELECT * FROM "query"('SELECT 1')`,
+      `SELECT * FROM "md_delete_dive" ('99a8ec93-2ae5-49c3-8adf-e6f50a829326')`
+    ]) {
+      await expect(
+        invokeMotherDuckTool(client, 'query', { database: 'analytics', sql })
+      ).rejects.toThrow('quoted identifier used as a function name');
+    }
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('scans large dollar-quoted input in linear time', async () => {
+    let { client } = fakeClient();
+    let sql = `SELECT 1 WHERE 'x' = '${Array.from({ length: 32_000 }, (_, index) => `$t${index}$`).join(' ')}'`;
+
+    let started = performance.now();
+    await invokeMotherDuckTool(client, 'query', { database: 'analytics', sql });
+
+    expect(performance.now() - started).toBeLessThan(1_000);
+  });
+
+  it('allows write keywords that only appear inside literals or quoted identifiers', async () => {
+    let { client, query } = fakeClient();
+
+    await invokeMotherDuckTool(client, 'query', {
+      database: 'analytics',
+      sql: 'SELECT $$DROP TABLE t$$ AS note'
+    });
+    await invokeMotherDuckTool(client, 'query', {
+      database: 'analytics',
+      sql: 'SELECT * FROM "update"'
+    });
+
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
   it('allows the documented ATTACH and DETACH workflow for read-only database shares', async () => {
     let { client, query } = fakeClient();
 
@@ -322,6 +413,118 @@ describe('MotherDuck native tool execution', () => {
     expect(output.flights).toHaveLength(1);
     expect(output.flights[0]?.flight_name).toBe('Daily Revenue');
     expect(output.totalCount).toBe(1);
+  });
+
+  it('paginates Dive listings instead of capping the catalog at 500 entries', async () => {
+    let firstPage = Array.from({ length: 500 }, (_, index) => ({
+      id: `dive-${index}`,
+      title: `Dive ${index}`,
+      description: 'seeded',
+      status: 'active'
+    }));
+    let query = vi
+      .fn()
+      .mockResolvedValueOnce({
+        rows: firstPage.map(result => ({ result })),
+        fields: [],
+        rowCount: firstPage.length
+      })
+      .mockResolvedValueOnce({
+        rows: [
+          {
+            result: {
+              id: 'dive-500',
+              title: 'Dive 500',
+              description: 'seeded',
+              status: 'active'
+            }
+          }
+        ],
+        fields: [],
+        rowCount: 1
+      });
+    let client = { query } as unknown as MotherDuckClient;
+
+    let output = await invokeMotherDuckTool(client, 'list_dives', {});
+
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(query.mock.calls[1]?.[0]).toContain('"offset" := \'500\'::INTEGER');
+    expect(output.dives).toHaveLength(501);
+    expect(output.totalCount).toBe(501);
+    expect(output.truncated).toBe(false);
+  });
+
+  it('reports that Flight run history is capped at the native fetch limit', async () => {
+    let { client } = fakeClient(
+      Array.from({ length: 500 }, (_, index) => ({
+        run_id: `run-${index}`,
+        flight_id: 'flight-1',
+        run_number: index + 1
+      }))
+    );
+
+    let output = await invokeMotherDuckTool(client, 'list_flight_runs', {
+      id: '99a8ec93-2ae5-49c3-8adf-e6f50a829326',
+      limit: 20
+    });
+
+    expect(output.runs).toHaveLength(20);
+    expect(output.totalCount).toBe(500);
+    expect(output.truncated).toBe(true);
+    expect(getMotherDuckInvocationNotice(output)).toContain('most recent runs');
+  });
+
+  it('truncates Flight logs on a UTF-8 character boundary', async () => {
+    let logs = 'é'.repeat(700);
+    let query = vi.fn(async (sql: string) => ({
+      rows: sql.includes('MD_GET_FLIGHT_LOGS')
+        ? [{ result: { logs } }]
+        : [{ result: { run_id: 'run-1', flight_id: 'flight-1', run_number: 7 } }],
+      fields: [],
+      rowCount: 1
+    }));
+    let client = { query } as unknown as MotherDuckClient;
+
+    let output = await invokeMotherDuckTool(client, 'get_flight_run_logs', {
+      id: '99a8ec93-2ae5-49c3-8adf-e6f50a829326',
+      run_number: 7,
+      max_bytes: 1_025
+    });
+
+    expect(output.original_length).toBe(1_400);
+    expect(output.truncated).toBe(true);
+    expect(output.logs).toBe('é'.repeat(512));
+    expect(output.logs).not.toContain('\uFFFD');
+  });
+
+  it('reports the relevance score computed by the catalog query', async () => {
+    let query = vi.fn(async () => ({
+      rows: [
+        {
+          type: 'table',
+          name: 'zzz',
+          fully_qualified_name: 'analytics.main.zzz',
+          database: 'analytics',
+          schema: 'main',
+          table_name: null,
+          data_type: null,
+          comment: null,
+          relevance_score: 0.77
+        }
+      ],
+      fields: [],
+      rowCount: 1
+    }));
+    let client = { query } as unknown as MotherDuckClient;
+
+    let output = await invokeMotherDuckTool(client, 'search_catalog', {
+      query: 'sales',
+      object_types: ['table']
+    });
+
+    expect(query).toHaveBeenCalledOnce();
+    expect(output.results).toHaveLength(1);
+    expect(output.results[0]?.relevanceScore).toBe(0.77);
   });
 
   it('carries view_dive initial state in a base64url URL fragment', async () => {

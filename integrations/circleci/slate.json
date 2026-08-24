@@ -13,5 +13,5 @@
     "configure signed outbound webhooks",
     "approve and selectively rerun workflow jobs"
   ],
-  "logoUrl": "https://provider-logos.metorial-cdn.com/circleci-logo.svg"
+  "logoUrl": "https://provider-logos.metorial-cdn.com/circleci.svg"
 }

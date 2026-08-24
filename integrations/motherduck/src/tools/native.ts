@@ -6,6 +6,12 @@ type Row = Record<string, any>;
 
 const DEFAULT_LIMIT = 100;
 const DIVE_APP_URL = 'https://app.motherduck.com/dives/';
+// MD_LIST_FLIGHT_RUNS exposes no offset argument, so run history cannot be paged past this.
+const FLIGHT_RUN_FETCH_LIMIT = 500;
+const PAGE_SIZE = 500;
+// A page that never shrinks (an ignored or clamped offset) would otherwise loop forever and
+// grow the row buffer without bound.
+const MAX_PAGES = 20;
 const QUERY_ROW_LIMIT = 2_048;
 const QUERY_CHARACTER_LIMIT = 50_000;
 const SEARCH_RESULT_LIMIT = 100;
@@ -38,6 +44,9 @@ class SqlParameters {
     return `CAST(${this.add(JSON.stringify(value), 'JSON')} AS ${cast})`;
   }
 
+  // DuckDB named-argument table functions reject PostgreSQL bind parameters, so values are
+  // inlined instead. DuckDB string literals treat only '' as an escape, which makes quote
+  // doubling sufficient; callers must pass scalars or JSON built by `json()`.
   inline(query: string) {
     return query.replace(/\$(\d+)\b/g, (_placeholder, rawIndex: string) => {
       let value = this.values[Number(rawIndex) - 1];
@@ -92,6 +101,15 @@ let boolean = (value: unknown) =>
 
 let text = (value: unknown, fallback = '') =>
   value === null || value === undefined ? fallback : String(value);
+
+// Slicing raw bytes can split a multi-byte UTF-8 character, so skip any continuation bytes
+// left at the head of the tail before decoding.
+let tailBytes = (value: string, maxBytes: number) => {
+  let buffer = Buffer.from(value);
+  let start = Math.max(buffer.length - maxBytes, 0);
+  while (start < buffer.length && (buffer[start]! & 0xc0) === 0x80) start += 1;
+  return buffer.subarray(start).toString();
+};
 
 let optional = (name: string, value: unknown, sql: SqlParameters, cast = 'VARCHAR') =>
   value === undefined ? undefined : `${name} := ${sql.add(value, cast)}`;
@@ -175,12 +193,116 @@ let mapInBatches = async <InputValue, OutputValue>(
   return output;
 };
 
+// Blanks every literal, quoted identifier, and comment so the checks below only see live
+// SQL. A regex cannot do this: block comments nest, so their end must be found by tracking
+// depth, and a single-pass alternation that stops at the first `*/` resumes scanning inside
+// comment text where a stray quote or `--` can then swallow a trailing `; DROP ...`. The
+// simple query protocol executes such a batch, so anything the scanner cannot model exactly
+// is rejected rather than blanked.
+let scanReadOnlySql = (sql: string) => {
+  let scrubbed = '';
+  let index = 0;
+  let reject = (invalid: string) => ({ scrubbed, invalid });
+
+  while (index < sql.length) {
+    let pair = sql.slice(index, index + 2);
+
+    if (pair === '--') {
+      while (index < sql.length && sql[index] !== '\n' && sql[index] !== '\r') index += 1;
+      scrubbed += ' ';
+      continue;
+    }
+
+    if (pair === '/*') {
+      let depth = 0;
+      while (index < sql.length) {
+        if (sql.slice(index, index + 2) === '/*') {
+          depth += 1;
+          index += 2;
+          continue;
+        }
+        if (sql.slice(index, index + 2) === '*/') {
+          depth -= 1;
+          index += 2;
+          if (depth === 0) break;
+          continue;
+        }
+        index += 1;
+      }
+      if (depth !== 0) return reject('an unterminated block comment');
+      scrubbed += ' ';
+      continue;
+    }
+
+    let quote = sql[index]!;
+    if (quote === "'" || quote === '"') {
+      // E'...' honours backslash escapes, so \' does not close the literal there.
+      let escapes =
+        quote === "'" &&
+        (sql[index - 1] === 'E' || sql[index - 1] === 'e') &&
+        !/[A-Za-z0-9_]/.test(sql[index - 2] ?? '');
+      let closed = false;
+      index += 1;
+      while (index < sql.length) {
+        if (escapes && sql[index] === '\\') {
+          index += 2;
+          continue;
+        }
+        if (sql[index] === quote && sql[index + 1] === quote) {
+          index += 2;
+          continue;
+        }
+        if (sql[index] === quote) {
+          index += 1;
+          closed = true;
+          break;
+        }
+        index += 1;
+      }
+      if (!closed)
+        return reject(
+          quote === "'"
+            ? 'an unterminated string literal'
+            : 'an unterminated quoted identifier'
+        );
+      // Quoting hides a name from the blocklist, and DuckDB resolves "query"(...) and
+      // "MD_DELETE_DIVE"(...) exactly like their bare forms.
+      if (quote === '"' && /^\s*\(/.test(sql.slice(index)))
+        return reject('a quoted identifier used as a function name');
+      scrubbed += ' ';
+      continue;
+    }
+
+    if (quote === '$') {
+      let tagEnd = index + 1;
+      if (/[A-Za-z_]/.test(sql[tagEnd] ?? '')) {
+        while (/[A-Za-z0-9_]/.test(sql[tagEnd] ?? '')) tagEnd += 1;
+      }
+      if (sql[tagEnd] === '$') {
+        let opener = sql.slice(index, tagEnd + 1);
+        let close = sql.indexOf(opener, tagEnd + 1);
+        if (close === -1) return reject('an unterminated dollar-quoted string');
+        index = close + opener.length;
+        scrubbed += ' ';
+        continue;
+      }
+    }
+
+    scrubbed += quote;
+    index += 1;
+  }
+
+  return { scrubbed, invalid: undefined };
+};
+
 let assertReadOnlySql = (sql: string) => {
-  let scrubbed = sql
-    .replace(/--[^\n\r]*/g, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/'(?:''|[^'])*'/g, "''")
-    .trim();
+  let { scrubbed: scanned, invalid } = scanReadOnlySql(sql);
+  if (invalid) {
+    throw createApiServiceError(`Read-only queries must not contain ${invalid}.`, {
+      reason: 'motherduck_read_only_query_required'
+    });
+  }
+  let scrubbed = scanned.trim();
   let statements = scrubbed.split(';').filter(statement => statement.trim());
   if (statements.length !== 1) {
     throw createApiServiceError('Read-only queries must contain exactly one SQL statement.', {
@@ -313,6 +435,10 @@ let jaroWinklerSimilarity = (leftValue: string, rightValue: string) => {
   return jaro + prefix * 0.1 * (1 - jaro);
 };
 
+// Approximates the catalog query's scoring so shares, which come from a separate metadata
+// view that query cannot rank, stay roughly comparable when both sets are merged. The two
+// are close but not identical: this normalizes whitespace and DuckDB's
+// jaro_winkler_similarity does not.
 let searchRelevance = (name: unknown, qualifiedName: unknown, query: unknown) => {
   let needle = normalizeSearchText(query);
   let normalizedName = normalizeSearchText(name);
@@ -509,6 +635,26 @@ let getDive = async (client: MotherDuckClient, id: string, version?: number) => 
     : current;
 };
 
+let listAllDives = async (client: MotherDuckClient) => {
+  let rows: Row[] = [];
+  for (let page = 0; page < MAX_PAGES; page += 1) {
+    let params = new SqlParameters();
+    let batch = await functionQuery(
+      client,
+      'MD_LIST_DIVES',
+      [
+        `"limit" := ${params.add(PAGE_SIZE, 'INTEGER')}`,
+        `"offset" := ${params.add(rows.length, 'INTEGER')}`,
+        `include_org_shares := ${params.add(true, 'BOOLEAN')}`
+      ],
+      params
+    );
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) return { rows, truncated: false };
+  }
+  return { rows, truncated: true };
+};
+
 let getFlight = async (client: MotherDuckClient, id: string, version?: number) => {
   let params = new SqlParameters();
   let summary = (
@@ -539,23 +685,23 @@ let getFlight = async (client: MotherDuckClient, id: string, version?: number) =
 };
 
 let listAllFlights = async (client: MotherDuckClient, ownerOnly?: unknown) => {
-  const pageSize = 500;
   let rows: Row[] = [];
-  while (true) {
+  for (let page = 0; page < MAX_PAGES; page += 1) {
     let params = new SqlParameters();
-    let page = await functionQuery(
+    let batch = await functionQuery(
       client,
       'MD_LIST_FLIGHTS',
       [
-        `"LIMIT" := ${params.add(pageSize, 'UINTEGER')}`,
+        `"LIMIT" := ${params.add(PAGE_SIZE, 'UINTEGER')}`,
         `"OFFSET" := ${params.add(rows.length, 'UINTEGER')}`,
         optional('owner_only', ownerOnly, params, 'BOOLEAN')
       ],
       params
     );
-    rows.push(...page);
-    if (page.length < pageSize) return rows;
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
   }
+  return rows;
 };
 
 let getGuide = async (client: MotherDuckClient, id: string, version?: number) => {
@@ -574,23 +720,23 @@ let getGuide = async (client: MotherDuckClient, id: string, version?: number) =>
 };
 
 let listAllGuides = async (client: MotherDuckClient, topic?: unknown) => {
-  const pageSize = 500;
   let rows: Row[] = [];
-  while (true) {
+  for (let page = 0; page < MAX_PAGES; page += 1) {
     let params = new SqlParameters();
-    let page = await functionQuery(
+    let batch = await functionQuery(
       client,
       'MD_LIST_GUIDES',
       [
         optional('topic', topic, params),
-        `"limit" := ${params.add(pageSize, 'INTEGER')}`,
+        `"limit" := ${params.add(PAGE_SIZE, 'INTEGER')}`,
         `"offset" := ${params.add(rows.length, 'INTEGER')}`
       ],
       params
     );
-    rows.push(...page);
-    if (page.length < pageSize) return rows;
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
   }
+  return rows;
 };
 
 let coreTool = async (client: MotherDuckClient, key: string, input: Input): Promise<Row> => {
@@ -841,7 +987,7 @@ let coreTool = async (client: MotherDuckClient, key: string, input: Input): Prom
           table: row.table_name ?? null,
           dataType: row.data_type ?? null,
           comment: row.comment ?? null,
-          relevanceScore: searchRelevance(row.name, row.fully_qualified_name, input.query)
+          relevanceScore: number(row.relevance_score)
         };
       })
       .filter(row => !input.object_types || input.object_types.includes(row.type));
@@ -886,17 +1032,7 @@ let diveTool = async (client: MotherDuckClient, key: string, input: Input): Prom
   }
 
   if (key === 'list_dives') {
-    let params = new SqlParameters();
-    let rows = await functionQuery(
-      client,
-      'MD_LIST_DIVES',
-      [
-        `"limit" := ${params.add(500, 'INTEGER')}`,
-        `"offset" := ${params.add(0, 'INTEGER')}`,
-        `include_org_shares := ${params.add(true, 'BOOLEAN')}`
-      ],
-      params
-    );
+    let { rows, truncated } = await listAllDives(client);
     let words = text(input.keywords).toLowerCase().split(/\s+/).filter(Boolean);
     let all = rows.filter(row => {
       let matchesStatus =
@@ -925,8 +1061,8 @@ let diveTool = async (client: MotherDuckClient, key: string, input: Input): Prom
       dives,
       count: dives.length,
       totalCount: dives.length,
-      truncated: rows.length === 500,
-      message: rows.length === 500 ? 'Results are capped at 500 Dives.' : undefined
+      truncated,
+      message: truncated ? `Results are capped at ${PAGE_SIZE * MAX_PAGES} Dives.` : undefined
     };
   }
 
@@ -1163,18 +1299,25 @@ let flightTool = async (client: MotherDuckClient, key: string, input: Input): Pr
       'MD_LIST_FLIGHT_RUNS',
       [
         `flight_id := ${params.add(input.id, 'UUID')}`,
-        `"LIMIT" := ${params.add(500, 'UINTEGER')}`
+        `"LIMIT" := ${params.add(FLIGHT_RUN_FETCH_LIMIT, 'UINTEGER')}`
       ],
       params
     );
     let selected = rows.slice(0, limit);
-    return {
-      success: true,
-      flight_id: input.id,
-      runs: selected.map(flightRun),
-      count: selected.length,
-      totalCount: rows.length
-    };
+    let reachedFetchLimit = rows.length === FLIGHT_RUN_FETCH_LIMIT;
+    return withInvocationNotice(
+      {
+        success: true,
+        flight_id: input.id,
+        runs: selected.map(flightRun),
+        count: selected.length,
+        totalCount: rows.length,
+        truncated: reachedFetchLimit || selected.length < rows.length
+      },
+      reachedFetchLimit
+        ? `MotherDuck returned only the ${FLIGHT_RUN_FETCH_LIMIT} most recent runs, so totalCount is a lower bound.`
+        : undefined
+    );
   }
 
   if (key === 'list_flight_versions') {
@@ -1249,7 +1392,7 @@ let flightTool = async (client: MotherDuckClient, key: string, input: Input): Pr
       'MD_LIST_FLIGHT_RUNS',
       [
         `flight_id := ${runParams.add(input.id, 'UUID')}`,
-        `"LIMIT" := ${runParams.add(500, 'UINTEGER')}`
+        `"LIMIT" := ${runParams.add(FLIGHT_RUN_FETCH_LIMIT, 'UINTEGER')}`
       ],
       runParams
     );
@@ -1257,20 +1400,24 @@ let flightTool = async (client: MotherDuckClient, key: string, input: Input): Pr
     let originalLength = Buffer.byteLength(logs);
     let maxBytes = input.max_bytes ?? originalLength;
     let truncated = originalLength > maxBytes;
-    if (truncated)
-      logs = Buffer.from(logs)
-        .subarray(originalLength - maxBytes)
-        .toString();
+    if (truncated) logs = tailBytes(logs, maxBytes);
     let run = runs.find(candidate => number(candidate.run_number) === input.run_number);
-    return {
-      success: true,
-      flight_id: input.id,
-      run_number: input.run_number,
-      run: run ? flightRun(run) : undefined,
-      logs,
-      truncated,
-      original_length: originalLength
-    };
+    return withInvocationNotice(
+      {
+        success: true,
+        flight_id: input.id,
+        run_number: input.run_number,
+        run: run ? flightRun(run) : undefined,
+        logs,
+        truncated,
+        original_length: originalLength
+      },
+      run
+        ? undefined
+        : runs.length === FLIGHT_RUN_FETCH_LIMIT
+          ? `Run ${input.run_number} is outside the ${FLIGHT_RUN_FETCH_LIMIT} most recent runs, so its run record is unavailable.`
+          : `Run ${input.run_number} was not found for this Flight.`
+    );
   }
 
   throw createApiServiceError(`Unknown MotherDuck Flight tool: ${key}`);

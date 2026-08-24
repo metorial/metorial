@@ -38,5 +38,6 @@ export let auth = SlateAuth.create()
         .describe('MotherDuck account region shown in the MotherDuck UI')
     }),
     getOutput: async ctx => ({ output: ctx.input }),
-    getProfile: async (ctx: any) => validateProfile(ctx.output.token, ctx.output.region)
+    getProfile: async (ctx: { output: z.infer<typeof outputSchema> }) =>
+      validateProfile(ctx.output.token, ctx.output.region)
   });
