@@ -101,6 +101,28 @@ describe('Slack expanded tool contract', () => {
       expect(JSON.stringify(publicMetadata)).not.toMatch(PUBLIC_COPY_LEAK_PATTERN);
     }
   });
+
+  it('accepts both Slack threadTs and the legacy messageTs for read_thread', () => {
+    let action = provider.actions.find(
+      candidate => candidate.type === 'tool' && candidate.key === 'read_thread'
+    );
+
+    expect(action?.type).toBe('tool');
+    if (!action || action.type !== 'tool') return;
+
+    expect(
+      action._inputSchema.safeParse({
+        channelId: 'C0B3P8AK5FU',
+        threadTs: '1782200123.004500'
+      }).success
+    ).toBe(true);
+    expect(
+      action._inputSchema.safeParse({
+        channelId: 'C0B3P8AK5FU',
+        messageTs: '1782200123.004500'
+      }).success
+    ).toBe(true);
+  });
 });
 
 const BOT_OAUTH_SCOPE_MANIFEST = [
