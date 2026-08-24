@@ -292,6 +292,100 @@ describe('New Relic client payload helpers', () => {
     });
   });
 
+  it('includes the required value function when creating an NRQL alert condition', async () => {
+    let client = new NerdGraphClient({
+      token: 'token',
+      region: 'us',
+      accountId: '123'
+    });
+    let query = vi.spyOn(client, 'query').mockResolvedValue({
+      alertsNrqlConditionStaticCreate: {
+        id: 'condition-1',
+        name: 'Synthetic failures'
+      }
+    });
+
+    await client.createNrqlAlertCondition('policy-1', {
+      name: 'Synthetic failures',
+      nrql: 'SELECT count(*) FROM SyntheticCheck',
+      enabled: false,
+      type: 'STATIC',
+      critical: {
+        threshold: 1,
+        thresholdDuration: 300,
+        operator: 'ABOVE',
+        thresholdOccurrences: 'AT_LEAST_ONCE'
+      },
+      violationTimeLimitSeconds: 3600
+    });
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('alertsNrqlConditionStaticCreate'),
+      {
+        accountId: 123,
+        policyId: 'policy-1',
+        condition: {
+          name: 'Synthetic failures',
+          enabled: false,
+          nrql: { query: 'SELECT count(*) FROM SyntheticCheck' },
+          terms: [
+            {
+              threshold: 1,
+              thresholdDuration: 300,
+              operator: 'ABOVE',
+              thresholdOccurrences: 'AT_LEAST_ONCE',
+              priority: 'CRITICAL'
+            }
+          ],
+          valueFunction: 'SINGLE_VALUE',
+          signal: {
+            aggregationWindow: 60,
+            aggregationMethod: 'EVENT_FLOW',
+            aggregationDelay: 120
+          },
+          violationTimeLimitSeconds: 3600
+        }
+      }
+    );
+  });
+
+  it('omits the static value function when creating a baseline NRQL alert condition', async () => {
+    let client = new NerdGraphClient({
+      token: 'token',
+      region: 'us',
+      accountId: '123'
+    });
+    let query = vi.spyOn(client, 'query').mockResolvedValue({
+      alertsNrqlConditionBaselineCreate: {
+        id: 'condition-2',
+        name: 'Latency baseline'
+      }
+    });
+
+    await client.createNrqlAlertCondition('policy-1', {
+      name: 'Latency baseline',
+      nrql: 'SELECT average(duration) FROM Transaction',
+      type: 'BASELINE',
+      baselineDirection: 'UPPER_ONLY',
+      critical: {
+        threshold: 3,
+        thresholdDuration: 300,
+        operator: 'ABOVE',
+        thresholdOccurrences: 'ALL'
+      }
+    });
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringContaining('alertsNrqlConditionBaselineCreate'),
+      expect.objectContaining({
+        condition: expect.objectContaining({
+          baselineDirection: 'UPPER_ONLY'
+        })
+      })
+    );
+    expect(query.mock.calls[0]?.[1]?.condition).not.toHaveProperty('valueFunction');
+  });
+
   it('requests only supported NRQL result metadata fields', async () => {
     let client = new NerdGraphClient({
       token: 'token',

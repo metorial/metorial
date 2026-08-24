@@ -2,10 +2,8 @@ import { Slate } from '@slates/provider';
 import { spec } from './spec';
 import {
   browseSourceTool,
-  commentOnIssueTool,
   commentOnPullRequestTool,
   createCommitStatusTool,
-  createIssueTool,
   createPullRequestTool,
   createRepositoryTool,
   deleteRepositoryTool,
@@ -13,7 +11,6 @@ import {
   getPullRequestTool,
   getRepositoryTool,
   listCommitsTool,
-  listIssuesTool,
   listPullRequestCommentsTool,
   listPullRequestsTool,
   listRepositoriesTool,
@@ -27,14 +24,9 @@ import {
   manageTagsTool,
   manageWebhooksTool,
   searchCodeTool,
-  updateIssueTool,
   updateRepositoryTool
 } from './tools';
-import {
-  issueEventsTrigger,
-  pullRequestEventsTrigger,
-  repositoryEventsTrigger
-} from './triggers';
+import { pullRequestEventsTrigger, repositoryEventsTrigger } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -51,10 +43,6 @@ export let provider = Slate.create({
     managePullRequestTool,
     commentOnPullRequestTool,
     listPullRequestCommentsTool,
-    listIssuesTool,
-    createIssueTool,
-    updateIssueTool,
-    commentOnIssueTool,
     manageBranchesTool,
     manageTagsTool,
     listCommitsTool,
@@ -68,5 +56,5 @@ export let provider = Slate.create({
     manageDefaultReviewersTool,
     manageBranchRestrictionsTool
   ],
-  triggers: [repositoryEventsTrigger, pullRequestEventsTrigger, issueEventsTrigger]
+  triggers: [repositoryEventsTrigger, pullRequestEventsTrigger]
 });

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Bitbucket is an Atlassian-hosted Git repository management platform that provides source code hosting, pull requests, issue tracking, CI/CD pipelines, and team collaboration features. It is available as Bitbucket Cloud (hosted at bitbucket.org) and Bitbucket Data Center (self-hosted). The REST API (v2.0 for Cloud) enables programmatic management of workspaces, repositories, pull requests, pipelines, and more.
+Bitbucket is an Atlassian-hosted Git repository management platform that provides source code hosting, pull requests, CI/CD pipelines, and team collaboration features. It is available as Bitbucket Cloud (hosted at bitbucket.org) and Bitbucket Data Center (self-hosted). The REST API (v2.0 for Cloud) enables programmatic management of workspaces, repositories, pull requests, pipelines, and more.
 
 ## Authentication
 
@@ -28,7 +28,6 @@ Bitbucket Cloud REST API integrations and Atlassian Connect for Bitbucket add-on
 
 - `repository` / `repository:write` / `repository:admin` / `repository:delete` — Read, write, admin, or delete access to repositories
 - `pullrequest` / `pullrequest:write` — Read or write access to pull requests
-- `issue` / `issue:write` — Read or write access to issues
 - `snippet` / `snippet:write` — Read or write access to snippets
 - `webhook` — Access to manage webhooks
 - `pipeline` / `pipeline:write` / `pipeline:variable` — Access to pipelines
@@ -66,10 +65,6 @@ Browse repository source files at any revision. List and inspect commits across 
 ### Branching and Refs
 
 Create, list, and delete branches and tags. Configure branching models (e.g., feature, bugfix, hotfix, release prefixes). Set branch permissions to restrict who can push or merge.
-
-### Issue Tracking
-
-Bitbucket includes a built-in lightweight issue tracker per repository. Create, update, list, and query issues with fields like priority, status, type, component, milestone, and version. Import and export issue data. Comment on issues.
 
 ### Pipelines (CI/CD)
 
@@ -119,14 +114,6 @@ Events related to repository-level activity:
 - **Build Status Created** (`repo:commit_status_created`): Triggered when a build status is initially set on a commit.
 - **Build Status Updated** (`repo:commit_status_updated`): Triggered when a build status is updated on a commit.
 - **Deleted** (`repo:deleted`): Triggered when a repository is hard deleted.
-
-### Issue Events
-
-Events related to the built-in issue tracker:
-
-- **Issue Created** (`issue:created`): Triggered when a user creates an issue.
-- **Issue Updated** (`issue:updated`): Triggered when a user updates an issue (includes change details).
-- **Issue Comment Created** (`issue:comment_created`): Triggered when a user comments on an issue.
 
 ### Pull Request Events
 
