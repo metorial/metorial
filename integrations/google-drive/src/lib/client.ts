@@ -198,6 +198,20 @@ function httpStatusFromAxiosError(e: unknown): number | undefined {
   return typeof s === 'number' ? s : undefined;
 }
 
+function isInvalidDriveQueryError(e: unknown): boolean {
+  let errors = (
+    e as {
+      response?: { data?: { error?: { errors?: Array<{ location?: unknown }> } } };
+    }
+  )?.response?.data?.error?.errors;
+
+  return (
+    httpStatusFromAxiosError(e) === 400 &&
+    Array.isArray(errors) &&
+    errors.some(error => error.location === 'q')
+  );
+}
+
 export function normalizeGoogleDrivePageToken(pageToken?: string): string | undefined {
   if (pageToken === undefined) return undefined;
 
@@ -337,6 +351,16 @@ export class GoogleDriveClient {
     try {
       response = await this.api.get('/files', { params: requestParams });
     } catch (e) {
+      if (params.query && isInvalidDriveQueryError(e)) {
+        throw createApiServiceError(
+          "Google Drive rejected the search query. Use Drive query syntax in the form `query_term operator value`; wrap string values in single quotes and escape apostrophes or backslashes with a backslash. For example: `name contains 'report' and trashed = false`.",
+          {
+            reason: 'invalid_search_query',
+            upstreamStatus: 400,
+            parent: e
+          }
+        );
+      }
       if (pageToken && httpStatusFromAxiosError(e) === 400) {
         throw createApiServiceError(
           'Google Drive rejected pageToken. Discard the token and restart pagination by omitting pageToken; only reuse the exact nextPageToken from a previous response with the same query, orderBy, driveId, and spaces.',
