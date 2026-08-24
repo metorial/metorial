@@ -17,7 +17,10 @@ export let resolveSearchContentQuery = (input: SearchContentInput) => {
   let query = input.query?.trim();
 
   if (cql && query) {
-    throw confluenceServiceError('Provide either cql or query, not both.');
+    return {
+      cql: `(${cql}) AND ${quoteCqlTextSearch(query)}`,
+      label: `CQL query: \`${cql}\` combined with query: \`${query}\``
+    };
   }
 
   if (cql) {
@@ -57,13 +60,13 @@ export let searchContent = SlateTool.create(spec, {
         .string()
         .optional()
         .describe(
-          'Plain-text search terms. The tool converts this to a Confluence CQL text search. Provide either query or cql, not both.'
+          'Plain-text search terms. The tool converts this to a Confluence CQL text search. When cql is also provided, both conditions must match.'
         ),
       cql: z
         .string()
         .optional()
         .describe(
-          'Advanced Confluence Query Language query string. Provide either cql or query, not both.'
+          'Advanced Confluence Query Language filter. When query is also provided, the plain-text condition is combined with this filter using AND.'
         ),
       limit: z
         .number()
