@@ -318,7 +318,6 @@ export class NerdGraphClient {
             nrql(query: $nrql, timeout: $timeout) {
               results
               metadata {
-                timeWindow { begin end }
                 facets
               }
             }

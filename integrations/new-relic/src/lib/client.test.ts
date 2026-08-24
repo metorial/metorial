@@ -292,6 +292,36 @@ describe('New Relic client payload helpers', () => {
     });
   });
 
+  it('requests only supported NRQL result metadata fields', async () => {
+    let client = new NerdGraphClient({
+      token: 'token',
+      region: 'us',
+      accountId: '123'
+    });
+    let query = vi.spyOn(client, 'query').mockResolvedValue({
+      actor: {
+        account: {
+          nrql: {
+            results: [{ count: 1 }],
+            metadata: { facets: [] }
+          }
+        }
+      }
+    });
+
+    await client.runNrql('SELECT count(*) FROM Transaction SINCE 1 hour ago');
+
+    expect(query).toHaveBeenCalledWith(
+      expect.stringMatching(/results\s+metadata\s*\{\s*facets\s*\}/),
+      {
+        accountId: 123,
+        nrql: 'SELECT count(*) FROM Transaction SINCE 1 hour ago',
+        timeout: 30
+      }
+    );
+    expect(query.mock.calls[0]?.[0]).not.toContain('timeWindow');
+  });
+
   it('opts alert issue queries into the AiIssues schema', async () => {
     let client = new NerdGraphClient({
       token: 'token',
