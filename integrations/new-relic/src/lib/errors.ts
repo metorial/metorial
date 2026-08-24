@@ -1,9 +1,20 @@
 import { buildApiServiceError, createApiServiceError, extractApiErrorMessage } from 'slates';
 
 let newRelicMessageOptions = {
-  detailKeys: ['message', 'description', 'details', 'error_description', 'error', 'type'],
+  detailKeys: [
+    'message',
+    'description',
+    'details',
+    'error_description',
+    'error',
+    'type',
+    'code',
+    'errorCode',
+    'errorClass',
+    'reason'
+  ],
   includeNumbers: false,
-  nestedKeys: ['errors']
+  nestedKeys: ['errors', 'extensions', 'validationErrors', 'argumentPath']
 };
 
 export let newRelicApiError = (error: unknown, operation = 'request') =>

@@ -270,19 +270,13 @@ export class SlidesClient {
   async deleteText(
     presentationId: string,
     objectId: string,
-    startIndex: number,
-    endIndex: number,
-    type?: string
+    textRange: { type: 'ALL' } | { type: 'FIXED_RANGE'; startIndex: number; endIndex: number }
   ): Promise<any> {
     return this.batchUpdate(presentationId, [
       {
         deleteText: {
           objectId,
-          textRange: {
-            type: type || 'FIXED_RANGE',
-            startIndex,
-            endIndex
-          }
+          textRange
         }
       }
     ]);

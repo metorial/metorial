@@ -318,7 +318,6 @@ export class NerdGraphClient {
             nrql(query: $nrql, timeout: $timeout) {
               results
               metadata {
-                timeWindow { begin end }
                 facets
               }
             }
@@ -626,12 +625,17 @@ export class NerdGraphClient {
         aggregationMethod: 'EVENT_FLOW',
         aggregationDelay: 120
       },
-      description: params.description || '',
       violationTimeLimitSeconds: params.violationTimeLimitSeconds || 86400
     };
 
+    if (params.description !== undefined) {
+      conditionInput.description = params.description;
+    }
+
     if (params.type === 'BASELINE') {
       conditionInput.baselineDirection = params.baselineDirection || 'UPPER_ONLY';
+    } else {
+      conditionInput.valueFunction = 'SINGLE_VALUE';
     }
 
     if (params.expiration) {

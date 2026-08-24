@@ -19,8 +19,14 @@ Supports setting title, labels, value, expected close date, linked person/organi
       action: z.enum(['create', 'update', 'delete']).describe('Action to perform'),
       leadId: z.string().optional().describe('Lead ID (required for update and delete)'),
       title: z.string().optional().describe('Lead title (required for create)'),
-      personId: z.number().optional().describe('Person ID to link'),
-      organizationId: z.number().optional().describe('Organization ID to link'),
+      personId: z
+        .number()
+        .optional()
+        .describe('Person ID to link (required for create unless organizationId is provided)'),
+      organizationId: z
+        .number()
+        .optional()
+        .describe('Organization ID to link (required for create unless personId is provided)'),
       labelIds: z.array(z.string()).optional().describe('Array of label UUIDs to assign'),
       value: z
         .object({
@@ -50,6 +56,17 @@ Supports setting title, labels, value, expected close date, linked person/organi
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.action === 'create') {
+      if (!ctx.input.title) {
+        throw pipedriveServiceError('title is required for create action');
+      }
+      if (!ctx.input.personId && !ctx.input.organizationId) {
+        throw pipedriveServiceError(
+          'personId or organizationId is required for create action'
+        );
+      }
+    }
+
     let client = createClient(ctx);
 
     if (ctx.input.action === 'delete') {

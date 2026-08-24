@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 let axiosMocks = vi.hoisted(() => ({
   api: {
     get: vi.fn(),
+    post: vi.fn(),
     interceptors: {
       response: {
         use: vi.fn()
@@ -24,6 +25,8 @@ import { Client } from './client';
 
 beforeEach(() => {
   axiosMocks.api.get.mockReset();
+  axiosMocks.api.post.mockReset();
+  axiosMocks.api.post.mockResolvedValue({ data: {} });
   axiosMocks.api.interceptors.response.use.mockReset();
   axiosMocks.createAxios.mockReset();
   axiosMocks.createAxios.mockReturnValue(axiosMocks.api);
@@ -78,6 +81,9 @@ describe('Bitbucket repository paths', () => {
     await client.getRepository('acme-workspace/repo-one');
     await client.listPullRequests('acme-workspace/repo-one');
     await client.getPullRequest('acme-workspace/repo-one', 42);
+    await client.createPullRequest('acme-workspace/repo-one', {
+      title: 'Repository path test'
+    });
     await client.listPullRequestComments('acme-workspace/repo-one', 42);
     await client.getSource('acme-workspace/repo-one', {
       revision: 'e5626804d6c3c238dac1add29e754cf2190d2417',
@@ -91,6 +97,10 @@ describe('Bitbucket repository paths', () => {
       '/repositories/acme-workspace/repo-one/pullrequests/42/comments',
       '/repositories/acme-workspace/repo-one/src/e5626804d6c3c238dac1add29e754cf2190d2417/README.md'
     ]);
+    expect(axiosMocks.api.post).toHaveBeenCalledWith(
+      '/repositories/acme-workspace/repo-one/pullrequests',
+      { title: 'Repository path test' }
+    );
   });
 });
 

@@ -113,6 +113,33 @@ describe('GoogleDriveClient pagination validation', () => {
     });
   });
 
+  it('turns Drive query syntax errors into actionable ServiceErrors', async () => {
+    axiosMocks.api.get.mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          error: {
+            message: 'Invalid Value',
+            errors: [{ reason: 'invalid', location: 'q', locationType: 'parameter' }]
+          }
+        }
+      }
+    });
+
+    let client = new GoogleDriveClient('token');
+
+    await expect(
+      client.listFiles({
+        query: 'invalid query'
+      })
+    ).rejects.toMatchObject({
+      data: {
+        reason: 'invalid_search_query',
+        upstreamStatus: 400
+      }
+    });
+  });
+
   it('validates and forwards Drive changes pagination using current v3 fields', async () => {
     axiosMocks.api.get.mockResolvedValue({
       data: {

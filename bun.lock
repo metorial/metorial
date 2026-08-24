@@ -6895,7 +6895,7 @@
     },
     "integrations/jira": {
       "name": "@slates-integrations/jira",
-      "version": "0.2.0-rc.16",
+      "version": "0.2.0",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/provider": "1.0.0-rc.18",

@@ -87,13 +87,23 @@ describe('Confluence search content', () => {
     expect(jsonSchema.allOf).toBeUndefined();
   });
 
-  it('rejects missing and conflicting search inputs with ServiceError', () => {
-    expect(() => resolveSearchContentQuery({})).toThrow(ServiceError);
-    expect(() =>
-      resolveSearchContentQuery({
-        cql: 'type=page',
-        query: 'page'
+  it('combines CQL filters with plain-text search terms', async () => {
+    await searchContent.handleInvocation(
+      createCtx({
+        cql: 'type=page AND space=DEV',
+        query: 'release notes'
       })
-    ).toThrow(ServiceError);
+    );
+
+    expect(confluenceClientMocks.search).toHaveBeenCalledWith({
+      cql: '(type=page AND space=DEV) AND text ~ "release notes"',
+      limit: 25,
+      start: undefined,
+      includeArchivedSpaces: undefined
+    });
+  });
+
+  it('rejects missing search inputs with ServiceError', () => {
+    expect(() => resolveSearchContentQuery({})).toThrow(ServiceError);
   });
 });

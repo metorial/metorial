@@ -197,6 +197,7 @@ export let auth = SlateAuth.create()
       instanceUrl: z
         .string()
         .refine(value => value.trim() !== '', 'Looker instance URL is required.')
+        .optional()
         .describe(
           'Base URL of your Looker instance (e.g., https://mycompany.cloud.looker.com). Any pasted form works: a missing scheme, trailing slashes, query parameters, an /api/4.0 suffix, or a full Looker page URL are normalized automatically. Include any explicit port or proxy path prefix your self-hosted instance requires; do not include credentials.'
         )
