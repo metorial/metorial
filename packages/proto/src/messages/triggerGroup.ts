@@ -191,6 +191,37 @@ export type SlatesMessageTriggerGroupWebhookManualSetupResponse = z.infer<
 >;
 
 /**
+ * Manual Webhook Finish
+ */
+export let slatesMessageTriggerGroupWebhookManualFinishRequest = z.object({
+  jsonrpc: z.literal('2.0'),
+  method: z.literal('slates/trigger_group.webhook.manual_finish'),
+  id: z.string(),
+  params: z.object({
+    triggerGroupId: z.string(),
+    webhookUrl: z.string(),
+    partialWebhookRegistrationPayload: z.any(),
+    userWebhookRegistrationPayload: z.any()
+  })
+});
+
+export type SlatesMessageTriggerGroupWebhookManualFinishRequest = z.infer<
+  typeof slatesMessageTriggerGroupWebhookManualFinishRequest
+>;
+
+export let slatesMessageTriggerGroupWebhookManualFinishResponse = z.object({
+  jsonrpc: z.literal('2.0'),
+  id: z.string(),
+  result: withRequestTraces({
+    webhookRegistrationPayload: z.any()
+  })
+});
+
+export type SlatesMessageTriggerGroupWebhookManualFinishResponse = z.infer<
+  typeof slatesMessageTriggerGroupWebhookManualFinishResponse
+>;
+
+/**
  * Process Webhook Request
  */
 export let slatesMessageTriggerGroupWebhookProcessRequest = z.object({
@@ -294,6 +325,7 @@ export type SlatesTriggerGroupRequests =
   | SlatesMessageTriggerGroupWebhookRegisterRequest
   | SlatesMessageTriggerGroupWebhookUnregisterRequest
   | SlatesMessageTriggerGroupWebhookManualSetupRequest
+  | SlatesMessageTriggerGroupWebhookManualFinishRequest
   | SlatesMessageTriggerGroupWebhookProcessRequest
   | SlatesMessageTriggerGroupRoutingMatchersGetRequest
   | SlatesMessageTriggerGroupPollingPollRequest;
@@ -305,6 +337,7 @@ export type SlatesTriggerGroupResponses =
   | SlatesMessageTriggerGroupWebhookRegisterResponse
   | SlatesMessageTriggerGroupWebhookUnregisterResponse
   | SlatesMessageTriggerGroupWebhookManualSetupResponse
+  | SlatesMessageTriggerGroupWebhookManualFinishResponse
   | SlatesMessageTriggerGroupWebhookProcessResponse
   | SlatesMessageTriggerGroupRoutingMatchersGetResponse
   | SlatesMessageTriggerGroupPollingPollResponse;
@@ -318,6 +351,8 @@ export let slatesTriggerGroupResponsesByMethod = {
   'slates/trigger_group.webhook.unregister': slatesMessageTriggerGroupWebhookUnregisterResponse,
   'slates/trigger_group.webhook.manual_setup':
     slatesMessageTriggerGroupWebhookManualSetupResponse,
+  'slates/trigger_group.webhook.manual_finish':
+    slatesMessageTriggerGroupWebhookManualFinishResponse,
   'slates/trigger_group.webhook.process': slatesMessageTriggerGroupWebhookProcessResponse,
   'slates/trigger_group.routing_matchers.get':
     slatesMessageTriggerGroupRoutingMatchersGetResponse,
@@ -332,6 +367,8 @@ export let slatesTriggerGroupRequestsByMethod = {
   'slates/trigger_group.webhook.register': slatesMessageTriggerGroupWebhookRegisterRequest,
   'slates/trigger_group.webhook.unregister': slatesMessageTriggerGroupWebhookUnregisterRequest,
   'slates/trigger_group.webhook.manual_setup': slatesMessageTriggerGroupWebhookManualSetupRequest,
+  'slates/trigger_group.webhook.manual_finish':
+    slatesMessageTriggerGroupWebhookManualFinishRequest,
   'slates/trigger_group.webhook.process': slatesMessageTriggerGroupWebhookProcessRequest,
   'slates/trigger_group.routing_matchers.get':
     slatesMessageTriggerGroupRoutingMatchersGetRequest,
