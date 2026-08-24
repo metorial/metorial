@@ -1,5 +1,5 @@
 import z from 'zod';
-import { slatesAuthenticationMethod } from '../types';
+import { slatesAuthenticationMethod, slatesTriggerRoutingMatcher } from '../types';
 import { withRequestTraces } from './tracing';
 
 /**
@@ -199,7 +199,8 @@ export let slatesMessageAuthAuthorizationCallbackHandleResponse = z.object({
   result: withRequestTraces({
     output: z.record(z.string(), z.any()),
     input: z.record(z.string(), z.any()).optional(),
-    scopes: z.array(z.string()).optional()
+    scopes: z.array(z.string()).optional(),
+    routingMatchers: z.array(slatesTriggerRoutingMatcher).optional()
   })
 });
 
@@ -234,7 +235,8 @@ export let slatesMessageAuthTokenRefreshHandleResponse = z.object({
   id: z.string(),
   result: withRequestTraces({
     output: z.record(z.string(), z.any()),
-    input: z.record(z.string(), z.any()).optional()
+    input: z.record(z.string(), z.any()).optional(),
+    routingMatchers: z.array(slatesTriggerRoutingMatcher).optional()
   })
 });
 

@@ -5,6 +5,7 @@ export * from './config';
 export * from './controlFlow';
 export * from './identify';
 export * from './tracing';
+export * from './triggerGroup';
 
 import type { z } from 'zod';
 import {
@@ -45,6 +46,12 @@ import {
   slatesIdentifyRequestsByMethod,
   slatesIdentifyResponsesByMethod
 } from './identify';
+import {
+  type SlatesTriggerGroupRequests,
+  type SlatesTriggerGroupResponses,
+  slatesTriggerGroupRequestsByMethod,
+  slatesTriggerGroupResponsesByMethod
+} from './triggerGroup';
 
 export type SlatesNotifications =
   | SlatesAuthNotifications
@@ -56,21 +63,24 @@ export type SlatesRequests =
   | SlatesAdapterRequests
   | SlatesAuthRequests
   | SlatesConfigRequests
-  | SlatesIdentifyRequests;
+  | SlatesIdentifyRequests
+  | SlatesTriggerGroupRequests;
 
 export type SlatesResponses =
   | SlatesActionResponses
   | SlatesAdapterResponses
   | SlatesAuthResponses
   | SlatesConfigResponses
-  | SlatesIdentifyResponses;
+  | SlatesIdentifyResponses
+  | SlatesTriggerGroupResponses;
 
 export let slatesResponsesByMethod = {
   ...slatesActionResponsesByMethod,
   ...slatesAdapterResponsesByMethod,
   ...slatesAuthResponsesByMethod,
   ...slatesConfigResponsesByMethod,
-  ...slatesIdentifyResponsesByMethod
+  ...slatesIdentifyResponsesByMethod,
+  ...slatesTriggerGroupResponsesByMethod
 };
 
 export let slatesRequestsByMethod = {
@@ -78,7 +88,8 @@ export let slatesRequestsByMethod = {
   ...slatesAdapterRequestsByMethod,
   ...slatesAuthRequestsByMethod,
   ...slatesConfigRequestsByMethod,
-  ...slatesIdentifyRequestsByMethod
+  ...slatesIdentifyRequestsByMethod,
+  ...slatesTriggerGroupRequestsByMethod
 };
 
 export let slatesNotificationsByMethod = {
