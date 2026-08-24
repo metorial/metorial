@@ -129,6 +129,10 @@ export type JenkinsReplayBuildResult = {
   queueItem?: JenkinsRecord;
 };
 
+// Bound recursive job discovery so one tool call stays inside the invocation deadline.
+export let jobListingRequestLimit = 12;
+export let jobListingRequestTimeoutMs = 2000;
+
 // Keep controller-wide SCM scans inside the platform's 60-second invocation deadline.
 export let scmSearchBatchSize = 16;
 export let scmSearchInspectionLimit = 96;
@@ -1325,6 +1329,7 @@ export class JenkinsClient {
 
   async listJobsWithStatus(options: JenkinsListJobsOptions = {}) {
     let maxDepth = normalizeLimit(options.maxDepth, options.recursive ? 5 : 1, 20, 'maxDepth');
+    let nameFilter = options.nameContains?.trim().toLowerCase();
     let jobs: JenkinsJobSummary[] = [];
     let requestCount = 0;
     let traversalComplete = true;
@@ -1369,7 +1374,12 @@ export class JenkinsClient {
         }
 
         let fullName = summary.fullName;
-        if (!summary.isFolder || options.includeFolders) {
+        let matchesName =
+          !nameFilter ||
+          [summary.name, summary.fullName].some(value =>
+            value?.toLowerCase().includes(nameFilter)
+          );
+        if ((!summary.isFolder || options.includeFolders) && matchesName) {
           jobs.push(summary);
         }
         if (options.recursive && summary.isFolder && fullName && depth < maxDepth) {
@@ -1379,13 +1389,6 @@ export class JenkinsClient {
     };
 
     await visit(options.folderFullName, 1);
-
-    let nameFilter = options.nameContains?.trim().toLowerCase();
-    if (nameFilter) {
-      jobs = jobs.filter(job =>
-        [job.name, job.fullName].some(value => value?.toLowerCase().includes(nameFilter))
-      );
-    }
 
     return { jobs, traversalComplete };
   }
