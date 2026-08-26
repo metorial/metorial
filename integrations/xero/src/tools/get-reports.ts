@@ -1,7 +1,80 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { xeroServiceError } from '../lib/errors';
 import { createClientFromContext } from '../lib/helpers';
 import { spec } from '../spec';
+
+let reportTypeSchema = z.enum([
+  'BalanceSheet',
+  'ProfitAndLoss',
+  'TrialBalance',
+  'BudgetSummary',
+  'ExecutiveSummary',
+  'BankSummary',
+  'AgedReceivablesByContact',
+  'AgedPayablesByContact',
+  'TenNinetyNine'
+]);
+
+let getReportInputSchema = z.object({
+  reportType: reportTypeSchema.describe('Type of report to generate'),
+  contactId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe(
+      'Required Xero contact ID for AgedReceivablesByContact and AgedPayablesByContact'
+    ),
+  date: z.string().optional().describe('Report date (YYYY-MM-DD)'),
+  fromDate: z.string().optional().describe('Start date for date-range reports (YYYY-MM-DD)'),
+  toDate: z.string().optional().describe('End date for date-range reports (YYYY-MM-DD)'),
+  periods: z
+    .number()
+    .optional()
+    .describe('Number of periods to compare (for comparative reports)'),
+  timeframe: z
+    .enum(['MONTH', 'QUARTER', 'YEAR'])
+    .optional()
+    .describe('Period timeframe for comparative reports'),
+  trackingCategoryId: z.string().optional().describe('Tracking category ID for filtering'),
+  trackingOptionId: z.string().optional().describe('Tracking option ID for filtering'),
+  standardLayout: z
+    .boolean()
+    .optional()
+    .describe('Use standard layout (true) or payday layout (false)'),
+  paymentsOnly: z.boolean().optional().describe('Show payments only in the report')
+});
+
+type GetReportInput = z.infer<typeof getReportInputSchema>;
+
+let agedReportTypes = new Set<GetReportInput['reportType']>([
+  'AgedReceivablesByContact',
+  'AgedPayablesByContact'
+]);
+
+export let buildReportParams = (input: GetReportInput) => {
+  if (agedReportTypes.has(input.reportType) && !input.contactId) {
+    throw xeroServiceError(`contactId is required for the ${input.reportType} report.`);
+  }
+
+  let params: Record<string, string> = {};
+  if (input.contactId) params.contactId = input.contactId;
+  if (input.date) params.date = input.date;
+  if (input.fromDate) params.fromDate = input.fromDate;
+  if (input.toDate) params.toDate = input.toDate;
+  if (input.periods !== undefined) params.periods = String(input.periods);
+  if (input.timeframe) params.timeframe = input.timeframe;
+  if (input.trackingCategoryId) params.trackingCategoryID = input.trackingCategoryId;
+  if (input.trackingOptionId) params.trackingOptionID = input.trackingOptionId;
+  if (input.standardLayout !== undefined) {
+    params.standardLayout = String(input.standardLayout);
+  }
+  if (input.paymentsOnly !== undefined) {
+    params.paymentsOnly = String(input.paymentsOnly);
+  }
+
+  return params;
+};
 
 let reportCellSchema = z.object({
   value: z.string().optional().describe('Cell value'),
@@ -45,66 +118,16 @@ export let getReport = SlateTool.create(spec, {
     'Date parameters use YYYY-MM-DD format',
     'Most reports accept a "date" parameter for the reporting date',
     'Profit and Loss accepts "fromDate" and "toDate" for a date range',
-    'Aged reports accept "date" and optionally "fromDate" and "toDate"'
+    'AgedReceivablesByContact and AgedPayablesByContact require "contactId" and accept optional "date", "fromDate", and "toDate" parameters'
   ],
   tags: { destructive: false, readOnly: true }
 })
-  .input(
-    z.object({
-      reportType: z
-        .enum([
-          'BalanceSheet',
-          'ProfitAndLoss',
-          'TrialBalance',
-          'BudgetSummary',
-          'ExecutiveSummary',
-          'BankSummary',
-          'AgedReceivablesByContact',
-          'AgedPayablesByContact',
-          'TenNinetyNine'
-        ])
-        .describe('Type of report to generate'),
-      date: z.string().optional().describe('Report date (YYYY-MM-DD)'),
-      fromDate: z
-        .string()
-        .optional()
-        .describe('Start date for date-range reports (YYYY-MM-DD)'),
-      toDate: z.string().optional().describe('End date for date-range reports (YYYY-MM-DD)'),
-      periods: z
-        .number()
-        .optional()
-        .describe('Number of periods to compare (for comparative reports)'),
-      timeframe: z
-        .enum(['MONTH', 'QUARTER', 'YEAR'])
-        .optional()
-        .describe('Period timeframe for comparative reports'),
-      trackingCategoryId: z.string().optional().describe('Tracking category ID for filtering'),
-      trackingOptionId: z.string().optional().describe('Tracking option ID for filtering'),
-      standardLayout: z
-        .boolean()
-        .optional()
-        .describe('Use standard layout (true) or payday layout (false)'),
-      paymentsOnly: z.boolean().optional().describe('Show payments only in the report')
-    })
-  )
+  .input(getReportInputSchema)
   .output(reportOutputSchema)
   .handleInvocation(async ctx => {
     let client = createClientFromContext(ctx);
 
-    let params: Record<string, string> = {};
-    if (ctx.input.date) params.date = ctx.input.date;
-    if (ctx.input.fromDate) params.fromDate = ctx.input.fromDate;
-    if (ctx.input.toDate) params.toDate = ctx.input.toDate;
-    if (ctx.input.periods !== undefined) params.periods = String(ctx.input.periods);
-    if (ctx.input.timeframe) params.timeframe = ctx.input.timeframe;
-    if (ctx.input.trackingCategoryId) params.trackingCategoryID = ctx.input.trackingCategoryId;
-    if (ctx.input.trackingOptionId) params.trackingOptionID = ctx.input.trackingOptionId;
-    if (ctx.input.standardLayout !== undefined)
-      params.standardLayout = String(ctx.input.standardLayout);
-    if (ctx.input.paymentsOnly !== undefined)
-      params.paymentsOnly = String(ctx.input.paymentsOnly);
-
-    let report = await client.getReport(ctx.input.reportType, params);
+    let report = await client.getReport(ctx.input.reportType, buildReportParams(ctx.input));
 
     let output = {
       reportName: report.ReportName,

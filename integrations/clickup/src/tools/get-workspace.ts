@@ -71,9 +71,9 @@ export let getWorkspaceMembers = SlateTool.create(spec, {
         members: members.map((m: any) => ({
           userId: String(m.user?.id ?? m.id),
           username: m.user?.username ?? m.username,
-          email: m.user?.email ?? m.email,
-          role: m.role,
-          profilePicture: m.user?.profilePicture
+          email: m.user?.email ?? m.email ?? undefined,
+          role: m.role ?? undefined,
+          profilePicture: m.user?.profilePicture ?? undefined
         }))
       },
       message: `Found **${members.length}** member(s) in workspace.`
