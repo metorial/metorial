@@ -13,7 +13,7 @@ let oauthAxios = createAxios({
 
 type QuickBooksEnvironment = 'sandbox' | 'production';
 
-let getUserInfoBaseUrl = (environment?: QuickBooksEnvironment) =>
+let getUserInfoBaseUrl = (environment: QuickBooksEnvironment) =>
   environment === 'sandbox'
     ? 'https://sandbox-accounts.platform.intuit.com'
     : 'https://accounts.platform.intuit.com';
@@ -58,7 +58,7 @@ let scopes = [
 let createQuickBooksOauth = (
   name: string,
   key: string,
-  environment?: QuickBooksEnvironment
+  environment: QuickBooksEnvironment
 ) => ({
   type: 'auth.oauth' as const,
   name,
@@ -110,6 +110,12 @@ let createQuickBooksOauth = (
         data?.x_refresh_token_expires_in,
         { providerLabel: 'QuickBooks', operation: 'token exchange' }
       );
+      let realmId = ctx.callbackParams?.realmId;
+      if (typeof realmId !== 'string' || !realmId.trim()) {
+        throw quickBooksServiceError(
+          'QuickBooks OAuth callback did not include a company Realm ID.'
+        );
+      }
 
       return {
         output: {
@@ -117,11 +123,8 @@ let createQuickBooksOauth = (
           refreshToken: token.refreshToken,
           expiresAt: token.expiresAt,
           refreshTokenExpiresAt,
-          realmId: ctx.callbackParams?.realmId,
-          // Only dedicated environment-pinned auth methods persist the
-          // environment. The generic method leaves it unset so tools keep
-          // following the live config value.
-          ...(environment ? { environment } : {})
+          realmId: realmId.trim(),
+          environment
         }
       };
     } catch (error) {
@@ -134,9 +137,6 @@ let createQuickBooksOauth = (
       throw quickBooksServiceError('QuickBooks OAuth refresh requires a refresh token.');
     }
 
-    // Preserve an environment that is already persisted (or pinned by a
-    // dedicated auth method), but never introduce one from live config.
-    let resolvedEnvironment = environment ?? ctx.output.environment;
     let credentials = btoa(`${ctx.clientId}:${ctx.clientSecret}`);
 
     try {
@@ -175,7 +175,7 @@ let createQuickBooksOauth = (
           expiresAt: token.expiresAt,
           refreshTokenExpiresAt,
           realmId: ctx.output.realmId,
-          ...(resolvedEnvironment ? { environment: resolvedEnvironment } : {})
+          environment
         }
       };
     } catch (error) {
@@ -189,20 +189,15 @@ let createQuickBooksOauth = (
       refreshToken?: string;
       expiresAt?: string;
       refreshTokenExpiresAt?: string;
-      realmId?: string;
-      environment?: QuickBooksEnvironment;
+      realmId: string;
+      environment: QuickBooksEnvironment;
     };
     input: {};
     scopes: string[];
-    config?: {
-      environment?: QuickBooksEnvironment;
-    };
   }) => {
     try {
-      let resolvedEnvironment =
-        environment ?? ctx.output.environment ?? ctx.config?.environment;
       let userInfoAxios = createAxios({
-        baseURL: getUserInfoBaseUrl(resolvedEnvironment)
+        baseURL: getUserInfoBaseUrl(environment)
       });
       let response = await userInfoAxios.get('/v1/openid_connect/userinfo', {
         headers: {
@@ -236,10 +231,9 @@ export let auth = SlateAuth.create()
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional(),
       refreshTokenExpiresAt: z.string().optional(),
-      realmId: z.string().optional(),
-      environment: z.enum(['sandbox', 'production']).optional()
+      realmId: z.string(),
+      environment: z.enum(['sandbox', 'production'])
     })
   )
-  .addOauth(createQuickBooksOauth('QuickBooks OAuth', 'quickbooks_oauth'))
   .addOauth(createQuickBooksOauth('Production', 'quickbooks_oauth_production', 'production'))
   .addOauth(createQuickBooksOauth('Sandbox', 'quickbooks_oauth_sandbox', 'sandbox'));

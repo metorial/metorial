@@ -81,32 +81,32 @@ export let getTask = SlateTool.create(spec, {
       output: {
         taskId: task.id,
         taskName: task.name,
-        description: task.description,
-        textContent: task.text_content,
+        description: task.description ?? undefined,
+        textContent: task.text_content ?? undefined,
         taskUrl: task.url,
-        status: task.status?.status,
-        statusColor: task.status?.color,
-        priority: task.priority?.priority,
+        status: task.status?.status ?? undefined,
+        statusColor: task.status?.color ?? undefined,
+        priority: task.priority?.priority ?? undefined,
         assignees:
           task.assignees?.map((a: any) => ({
             userId: String(a.id),
             username: a.username,
-            email: a.email
+            email: a.email ?? undefined
           })) ?? [],
         tags: task.tags?.map((t: any) => t.name) ?? [],
-        dueDate: task.due_date,
-        startDate: task.start_date,
-        dateCreated: task.date_created,
-        dateUpdated: task.date_updated,
-        dateClosed: task.date_closed,
-        timeEstimate: task.time_estimate,
-        listId: task.list?.id,
-        listName: task.list?.name,
-        folderId: task.folder?.id,
-        folderName: task.folder?.name,
-        spaceId: task.space?.id,
-        spaceName: task.space?.name,
-        parentTaskId: task.parent,
+        dueDate: task.due_date ?? undefined,
+        startDate: task.start_date ?? undefined,
+        dateCreated: task.date_created ?? undefined,
+        dateUpdated: task.date_updated ?? undefined,
+        dateClosed: task.date_closed ?? undefined,
+        timeEstimate: task.time_estimate ?? undefined,
+        listId: task.list?.id ?? undefined,
+        listName: task.list?.name ?? undefined,
+        folderId: task.folder?.id ?? undefined,
+        folderName: task.folder?.name ?? undefined,
+        spaceId: task.space?.id ?? undefined,
+        spaceName: task.space?.name ?? undefined,
+        parentTaskId: task.parent ?? undefined,
         customFields:
           task.custom_fields?.map((cf: any) => ({
             fieldId: cf.id,
@@ -118,7 +118,7 @@ export let getTask = SlateTool.create(spec, {
           task.subtasks?.map((s: any) => ({
             taskId: s.id,
             taskName: s.name,
-            status: s.status?.status
+            status: s.status?.status ?? undefined
           })) ?? []
       },
       message: `Retrieved task **${task.name}** (${task.id}).`

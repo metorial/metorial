@@ -8,8 +8,7 @@ export class Client {
     this.axios = createAxios({
       baseURL: 'https://app.asana.com/api/1.0',
       headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${config.token}`
       }
     });
 
@@ -70,7 +69,7 @@ export class Client {
         offset: params?.offset,
         archived: params?.archived,
         opt_fields:
-          'name,gid,archived,color,created_at,current_status,due_on,start_on,modified_at,owner,team,workspace,notes,public,default_view'
+          'name,gid,archived,color,created_at,due_on,start_on,modified_at,owner,team,workspace,notes,public,default_view'
       }
     });
     return response.data;
@@ -80,7 +79,7 @@ export class Client {
     let response = await this.axios.get(`/projects/${projectId}`, {
       params: {
         opt_fields:
-          'name,gid,archived,color,created_at,current_status,due_on,start_on,modified_at,owner,team,workspace,notes,public,default_view,members,followers,custom_fields,custom_field_settings'
+          'name,gid,archived,color,created_at,due_on,start_on,modified_at,owner,team,workspace,notes,public,default_view,members,followers,custom_fields,custom_field_settings'
       }
     });
     return response.data.data;
@@ -435,7 +434,7 @@ export class Client {
       limit: params.limit ?? 100,
       offset: params.offset,
       opt_fields:
-        'name,gid,owner,due_on,start_on,status,html_notes,notes,current_status_update,workspace,team,followers,liked,likes'
+        'name,gid,owner,due_on,start_on,status,html_notes,notes,workspace,team,followers'
     };
     if (params.workspaceId) queryParams.workspace = params.workspaceId;
     if (params.portfolioId) queryParams.portfolio = params.portfolioId;
@@ -451,7 +450,7 @@ export class Client {
     let response = await this.axios.get(`/goals/${goalId}`, {
       params: {
         opt_fields:
-          'name,gid,owner,due_on,start_on,status,html_notes,notes,current_status_update,workspace,team,followers,liked,likes,metric'
+          'name,gid,owner,due_on,start_on,status,html_notes,notes,workspace,team,followers,metric'
       }
     });
     return response.data.data;
@@ -675,7 +674,7 @@ export class Client {
         team: params.teamId,
         limit: params.limit ?? 100,
         offset: params.offset,
-        opt_fields: 'name,gid,description,color,public,requested_dates,team,workspace'
+        opt_fields: 'name,gid,description,color,public,requested_dates,team'
       }
     });
     return response.data;
@@ -684,7 +683,7 @@ export class Client {
   async getProjectTemplate(templateId: string) {
     let response = await this.axios.get(`/project_templates/${templateId}`, {
       params: {
-        opt_fields: 'name,gid,description,color,public,requested_dates,team,workspace'
+        opt_fields: 'name,gid,description,color,public,requested_dates,team'
       }
     });
     return response.data.data;
