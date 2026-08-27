@@ -1,10 +1,8 @@
-Now let me get the complete list of webhook events from the ClickUp API reference:Now I have comprehensive information. Let me compile the specification.
-
-# Slates Specification for ClickUp
+# ClickUp Integration Specification
 
 ## Overview
 
-ClickUp is a project management and productivity platform that provides tasks, docs, goals, time tracking, chat, and customizable workflows within a hierarchical structure of Workspaces, Spaces, Folders, and Lists. Its REST API allows programmatic access to create, read, update, and delete resources across the platform.
+ClickUp is a project management and productivity platform that organizes tasks within Workspaces, Spaces, Folders, and Lists. This integration exposes task management, comments, checklists, existing custom-field values, hierarchy management, Goals, Space tags, time tracking, Workspace members, and event triggers. One connection can access every Workspace authorized for its account.
 
 ## Authentication
 
@@ -40,59 +38,53 @@ Required for apps or integrations used by multiple users. A Workspace owner or a
 
 OAuth access tokens currently do not expire. Each user gets an individualized token scoped to the Workspaces they authorized. ClickUp's OAuth does not use granular scopes — the token inherits the permissions of the authorizing user's account.
 
+## Multi-Workspace Behavior
+
+The connection is account-scoped rather than tied to one preset Workspace. `get_workspaces` discovers the Workspace IDs authorized for the connection. Tools that call Workspace-scoped ClickUp endpoints require an explicit `workspaceId`, allowing each request to select its target Workspace. This applies to Workspace members, Spaces, Goals, task search, time entries, and timers, including task searches narrowed by `listId`. Tools that operate on an existing resource ID continue to use that resource ID directly.
+
+Webhook triggers register once in every authorized Workspace. Registration retains the Workspace-to-webhook mapping so emitted task and Workspace events identify their source Workspace, and cleanup removes every registered webhook.
+
 ## Features
 
 ### Workspace & Hierarchy Management
 
-Manage the organizational hierarchy: Workspaces (teams), Spaces, Folders, and Lists. Create, update, delete, and retrieve these structural elements to organize work. Users can query which Workspaces are authorized for their token.
+Discover authorized Workspaces and create, retrieve, update, and delete Spaces, Folders, and Lists within them. Users call `get_workspaces` to discover authorized Workspace IDs, then pass the selected `workspaceId` to Workspace-scoped tools.
 
 ### Task Management
 
-Create, update, delete, and retrieve tasks within Lists. Tasks support names, descriptions, assignees, statuses, priorities, due dates, start dates, time estimates, tags, and subtasks. Tasks can be moved between Lists and linked via dependencies or plain relationships.
+Create, retrieve, update, delete, and search tasks within Lists or across a selected Workspace. Tasks support names, descriptions, assignees, statuses, priorities, due dates, start dates, time estimates, tags, custom-field values, and subtasks.
 
-### Custom Fields
+### Existing Custom Field Values
 
-Define and manage custom fields on Lists to extend ClickUp's data model. Set and update custom field values on individual tasks. Supported field types include text, numbers, dropdowns, checkboxes, dates, and more.
+Set or clear values on existing custom fields on tasks. List the fields accessible on a List to discover the required field IDs and available options.
 
-### Comments & Communication
+### Comments & Checklists
 
-Add, update, and retrieve comments on tasks. Comments support rich text formatting. The API also provides access to ClickUp's Chat feature for channel-based messaging.
+Create, retrieve, update, and delete task comments. Create, update, and delete task checklists and checklist items.
 
-### Docs
+### Goals
 
-Access and manage ClickUp Docs. Note: the Docs API has known limitations around import/export capabilities.
-
-### Views
-
-Create and manage views (List, Board, Calendar, Gantt, etc.) within Spaces, Folders, and Lists. Views can be filtered and configured programmatically.
-
-### Goals & Targets
-
-Create and manage Goals (objectives) and Targets (key results) to track progress. Goals can be grouped into folders (e.g., for OKRs or sprint cycles) and linked to tasks for automatic progress tracking.
+Create, retrieve, update, and delete Goals in a selected Workspace.
 
 ### Time Tracking
 
-Track time on tasks by creating, updating, and deleting time entries. Start and stop timers, retrieve running time entries, query entries within date ranges, and manage time entry labels. Requires the Time Tracking ClickApp to be enabled by a Workspace admin.
-
-### Attachments
-
-Upload and manage file attachments on tasks.
+Track time on tasks by creating, updating, deleting, and querying time entries. Start and stop timers and retrieve the currently running timer. Requires the Time Tracking ClickApp to be enabled by a Workspace admin.
 
 ### Tags
 
 Create, update, and delete tags at the Space level and apply or remove them from tasks.
 
-### Members & Teams
+### Workspace Members
 
-Retrieve workspace members and manage team-level information. Access user details for the authenticated user.
+Retrieve members of a selected Workspace, including available user IDs, names, email addresses, roles, and profile pictures.
 
 ### Task Filtering & Search
 
-Query and filter tasks by various criteria including status, assignee, priority, due dates, tags, and custom field values. Supports advanced filtering with range operators on custom fields.
+Query and filter tasks by status, assignee, tags, due dates, creation dates, update dates, Space, or List.
 
 ## Events
 
-ClickUp supports webhooks via its API. Webhooks are registered per Workspace and can be scoped to a specific location in the hierarchy (Space, Folder, List, or Task). Each webhook can subscribe to specific event types or use a wildcard (`*`) for all events. Webhook payloads are signed with a shared secret for verification.
+The integration's task and Workspace event triggers create a webhook in every Workspace authorized for the connection. Emitted events include the source `workspaceId`, and removing a trigger cleans up every webhook registered for it.
 
 ### Task Events
 
@@ -117,12 +109,6 @@ Covers creation, update, and deletion of Folders.
 
 Covers creation, update, and deletion of Spaces.
 
-### Goal & Target Events
+### Goal Events
 
-Covers creation, update, and deletion of Goals and Targets (key results).
-
-### Configuration Options
-
-- **Location filtering:** Scope a webhook to a specific Space, Folder, List, or Task. Only the most specific level applies when multiple are provided.
-- **Event filtering:** Subscribe to one or more specific event types, or use `*` for all events.
-- **Webhook health:** Webhooks that consistently fail (100 consecutive failures) are automatically suspended and must be reactivated via the API.
+Covers creation, update, and deletion of Goals.

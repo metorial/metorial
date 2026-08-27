@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClickUpClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getSpaces = SlateTool.create(spec, {
   name: 'Get Spaces',
   key: 'get_spaces',
-  description: `Retrieve all spaces in the configured ClickUp workspace, including their names, IDs, and statuses.`,
+  description: `Retrieve all spaces in the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       archived: z.boolean().optional().describe('Include archived spaces')
     })
   )
@@ -38,7 +40,7 @@ export let getSpaces = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let spaces = await client.getSpaces(ctx.config.workspaceId, ctx.input.archived);
+    let spaces = await client.getSpaces(ctx.input.workspaceId, ctx.input.archived);
 
     return {
       output: {
@@ -62,13 +64,14 @@ export let getSpaces = SlateTool.create(spec, {
 export let createSpace = SlateTool.create(spec, {
   name: 'Create Space',
   key: 'create_space',
-  description: `Create a new space in the configured ClickUp workspace.`,
+  description: `Create a new space in the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Name for the new space'),
       multipleAssignees: z.boolean().optional().describe('Allow multiple assignees on tasks')
     })
@@ -81,7 +84,7 @@ export let createSpace = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let space = await client.createSpace(ctx.config.workspaceId, {
+    let space = await client.createSpace(ctx.input.workspaceId, {
       name: ctx.input.name,
       multipleAssignees: ctx.input.multipleAssignees
     });
