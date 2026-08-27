@@ -162,6 +162,18 @@ describe('xero auth scope contract', () => {
 });
 
 describe('xero OAuth tenant resolution', () => {
+  it('disables Xero bulk organisation selection in the authorization flow', async () => {
+    let result = await getOauthMethod().getAuthorizationUrl?.({
+      clientId: 'client-id',
+      redirectUri: 'https://example.com/callback',
+      scopes: expectedScopes,
+      state: 'state-123'
+    } as never);
+
+    let url = new URL(result?.url ?? '');
+    expect(url.searchParams.get('acr_values')).toBe('bulk_connect:false');
+  });
+
   it('decodes a Base64URL JWT, binds the lookup to its auth event, and pins the exact tenant', async () => {
     let accessToken = jwt({
       authentication_event_id: 'auth-event-123',
@@ -200,14 +212,21 @@ describe('xero OAuth tenant resolution', () => {
     expect(http.connectionsGet).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['zero', []],
-    ['multiple', [{ tenantId: 'tenant-1' }, { tenantId: 'tenant-2' }]]
-  ])('rejects %s connections for the current auth event', async (_label, connections) => {
-    http.connectionsGet.mockResolvedValueOnce({ data: connections });
+  it('rejects a current auth event with no organisation', async () => {
+    http.connectionsGet.mockResolvedValueOnce({ data: [] });
 
     await expect(callback(jwt({ authentication_event_id: 'auth-event-123' }))).rejects.toThrow(
-      /exactly one/i
+      /no organisation/i
+    );
+  });
+
+  it('rejects a bulk auth event instead of guessing between organisations', async () => {
+    http.connectionsGet.mockResolvedValueOnce({
+      data: [{ tenantId: 'tenant-1' }, { tenantId: 'tenant-2' }]
+    });
+
+    await expect(callback(jwt({ authentication_event_id: 'auth-event-123' }))).rejects.toThrow(
+      /returned 2 organisations.*select exactly one/i
     );
   });
 

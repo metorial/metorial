@@ -57,9 +57,17 @@ let resolveTenantId = async (accessToken: string) => {
   }
 
   let connections = connectionsResponse?.data as unknown;
-  if (!Array.isArray(connections) || connections.length !== 1) {
+  if (!Array.isArray(connections)) {
+    throw xeroServiceError('Xero connections lookup returned an invalid response.');
+  }
+  if (connections.length === 0) {
     throw xeroServiceError(
-      'Xero connections lookup must return exactly one connection for the current authentication event.'
+      'Xero connections lookup returned no organisation for the current authentication event. Reauthorize Xero and select one organisation.'
+    );
+  }
+  if (connections.length > 1) {
+    throw xeroServiceError(
+      `Xero connections lookup returned ${connections.length} organisations for the current authentication event. Reauthorize Xero and select exactly one organisation.`
     );
   }
 
@@ -221,7 +229,8 @@ export let auth = SlateAuth.create()
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         scope: ctx.scopes.join(' '),
-        state: ctx.state
+        state: ctx.state,
+        acr_values: 'bulk_connect:false'
       });
 
       return {
