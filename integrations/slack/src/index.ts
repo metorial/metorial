@@ -1,4 +1,5 @@
 import { Slate } from 'slates';
+import { slackChatAdapter } from './chat';
 import { spec } from './spec';
 import {
   createCanvas,
@@ -111,5 +112,13 @@ export let provider = Slate.create({
     manageDnd,
     managePresence
   ],
-  triggers: [newMessage, newMessageWebhook, channelActivity, newReaction, newFile, userChange]
+  triggers: [
+    newMessage,
+    newMessageWebhook,
+    channelActivity,
+    newReaction,
+    newFile,
+    userChange
+  ],
+  adapters: [slackChatAdapter]
 });

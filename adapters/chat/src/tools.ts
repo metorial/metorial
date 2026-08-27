@@ -355,6 +355,11 @@ export let searchUsers = ChatAdapter.defineTool({
   })
 });
 
+// `message` is meaningfully used: for providers where uploading a file IS
+// itself a full message-send (e.g. Telegram's sendDocument/sendPhoto), this
+// field carries that newly-created message; for providers with a real
+// separate upload step (Slack) or a no-op upload (Discord -- see
+// docs/file-uploads.md), it stays undefined.
 export let uploadFile = ChatAdapter.defineTool({
   key: 'metorial_chat$file.upload',
   name: 'Upload File',
