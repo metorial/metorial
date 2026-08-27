@@ -37,10 +37,10 @@ beforeEach(() => {
 });
 
 describe('QuickBooks auth contract', () => {
-  it('exposes Production first and Sandbox second with no generic method', () => {
+  it('exposes production OAuth first and sandbox OAuth second with no generic method', () => {
     expect(auth.authStack.map(method => ({ key: method.key, name: method.name }))).toEqual([
-      { key: 'quickbooks_oauth_production', name: 'Production' },
-      { key: 'quickbooks_oauth_sandbox', name: 'Sandbox' }
+      { key: 'quickbooks_oauth_production', name: 'OAuth (production)' },
+      { key: 'quickbooks_oauth_sandbox', name: 'OAuth (sandbox)' }
     ]);
   });
 
@@ -60,12 +60,12 @@ describe('QuickBooks auth contract', () => {
     ).toBe(false);
 
     expect(
-      config.configSchema.parse({
-        environment: 'sandbox',
-        companyId: 'realm-123',
-        webhookVerifierToken: 'verifier-token'
-      })
-    ).toEqual({ webhookVerifierToken: 'verifier-token' });
+      config.configSchema.parse({ environment: 'sandbox', companyId: 'realm-123' })
+    ).toEqual({});
+  });
+
+  it('does not expose a webhook verifier token in integration config', () => {
+    expect(config.configSchema.parse({ webhookVerifierToken: 'verifier-token' })).toEqual({});
   });
 
   it.each([

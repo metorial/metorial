@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import { SlateTrigger } from '@slates/provider';
 import { z } from 'zod';
 import { quickBooksServiceError } from '../lib/errors';
@@ -49,29 +48,6 @@ let parseCloudEventType = (type: unknown) => {
   };
 };
 
-let verifyWebhookSignature = (d: {
-  body: string;
-  signature: string | null;
-  verifierToken?: string;
-}) => {
-  if (!d.verifierToken) return;
-
-  if (!d.signature) {
-    throw quickBooksServiceError('QuickBooks webhook signature header is missing.');
-  }
-
-  let expected = createHmac('sha256', d.verifierToken).update(d.body).digest('base64');
-  let expectedBuffer = Buffer.from(expected);
-  let actualBuffer = Buffer.from(d.signature);
-
-  if (
-    expectedBuffer.length !== actualBuffer.length ||
-    !timingSafeEqual(expectedBuffer, actualBuffer)
-  ) {
-    throw quickBooksServiceError('QuickBooks webhook signature is invalid.');
-  }
-};
-
 export let entityWebhook = SlateTrigger.create(spec, {
   name: 'Entity Change Webhook',
   key: 'entity_change_webhook',
@@ -105,11 +81,6 @@ export let entityWebhook = SlateTrigger.create(spec, {
   .webhook({
     handleRequest: async ctx => {
       let rawBody = await ctx.request.text();
-      verifyWebhookSignature({
-        body: rawBody,
-        signature: ctx.request.headers.get('intuit-signature'),
-        verifierToken: ctx.config.webhookVerifierToken
-      });
 
       let body: any;
       try {

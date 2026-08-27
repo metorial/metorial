@@ -235,5 +235,7 @@ export let auth = SlateAuth.create()
       environment: z.enum(['sandbox', 'production'])
     })
   )
-  .addOauth(createQuickBooksOauth('Production', 'quickbooks_oauth_production', 'production'))
-  .addOauth(createQuickBooksOauth('Sandbox', 'quickbooks_oauth_sandbox', 'sandbox'));
+  .addOauth(
+    createQuickBooksOauth('OAuth (production)', 'quickbooks_oauth_production', 'production')
+  )
+  .addOauth(createQuickBooksOauth('OAuth (sandbox)', 'quickbooks_oauth_sandbox', 'sandbox'));
