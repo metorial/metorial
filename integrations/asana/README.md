@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/asana.png" height="20"> Asana
 
-Create, read, update, and delete tasks, projects, portfolios, and goals in Asana workspaces. Manage task assignments, due dates, subtasks, dependencies, tags, custom fields, attachments, and comments. Organize work with sections, project templates, and portfolios. Search tasks across workspaces, track time entries, manage team memberships, and subscribe to webhooks for real-time change notifications on resources.
+Create, read, update, and delete tasks, projects, portfolios, and goals in Asana workspaces. Manage task assignments, due dates, subtasks, dependencies, tags, custom fields, attachments, and comments. Organize work with sections, project templates, and portfolios. Search tasks across workspaces, track time entries, and manage team memberships.
 
 ## Tools
 

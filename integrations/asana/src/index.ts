@@ -37,7 +37,6 @@ import {
   updateSection,
   updateTask
 } from './tools';
-import { projectEvents, taskChangesWebhook, taskEvents } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -78,5 +77,5 @@ export let provider = Slate.create({
     listTimeTrackingEntries,
     typeaheadSearch
   ],
-  triggers: [projectEvents, taskEvents, taskChangesWebhook]
+  triggers: []
 });

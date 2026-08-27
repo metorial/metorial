@@ -1,13 +1,11 @@
 import { SlateDefaultPollingIntervalSeconds, SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { Client } from '../lib/client';
 import { spec } from '../spec';
 
 export let projectEvents = SlateTrigger.create(spec, {
   name: 'Task Changes',
   key: 'task_changes',
-  description:
-    '[Polling fallback] Polls for recently modified tasks in the configured workspace. Detects new and updated tasks by tracking modification timestamps. Requires workspaceId to be set in configuration. Prefer Task Changes (Webhook) on a project when possible.'
+  description: 'Temporarily disabled while Asana trigger scoping is redesigned.'
 })
   .input(
     z.object({
@@ -43,53 +41,8 @@ export let projectEvents = SlateTrigger.create(spec, {
     },
 
     pollEvents: async ctx => {
-      let client = new Client({ token: ctx.auth.token });
-
-      if (!ctx.config.workspaceId) {
-        ctx.warn(
-          'No workspaceId configured. Set workspaceId in config to poll for task events.'
-        );
-        return { inputs: [], updatedState: ctx.state };
-      }
-
-      let lastPollTime = (ctx.state as any)?.lastPollTime as string | undefined;
-      let now = new Date().toISOString();
-
-      // On first poll, set the timestamp and return empty
-      if (!lastPollTime) {
-        return {
-          inputs: [],
-          updatedState: { lastPollTime: now }
-        };
-      }
-
-      let result = await client.searchTasks(ctx.config.workspaceId, {
-        'modified_on.after': lastPollTime.split('T')[0],
-        sort_by: 'modified_at',
-        sort_ascending: false
-      });
-
-      let tasks = (result.data || []).filter(
-        (t: any) => t.modified_at && t.modified_at > lastPollTime!
-      );
-
-      let inputs = tasks.map((t: any) => ({
-        taskId: t.gid,
-        taskName: t.name,
-        assignee: t.assignee,
-        completed: t.completed,
-        completedAt: t.completed_at,
-        createdAt: t.created_at,
-        dueOn: t.due_on,
-        modifiedAt: t.modified_at,
-        notes: t.notes,
-        projects: t.projects
-      }));
-
-      return {
-        inputs,
-        updatedState: { lastPollTime: now }
-      };
+      ctx.warn('Asana triggers are temporarily disabled.');
+      return { inputs: [], updatedState: ctx.state };
     },
 
     handleEvent: async ctx => {
