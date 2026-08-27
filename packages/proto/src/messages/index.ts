@@ -6,6 +6,7 @@ export * from './controlFlow';
 export * from './identify';
 export * from './tracing';
 export * from './triggerGroup';
+export * from './webhookErrors';
 
 import type { z } from 'zod';
 import {

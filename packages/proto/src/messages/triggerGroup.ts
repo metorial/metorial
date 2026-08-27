@@ -1,5 +1,9 @@
 import z from 'zod';
-import { slatesTriggerGroup, slatesTriggerRoutingMatcher, slatesWebhookTarget } from '../types';
+import {
+  slatesTriggerGroup,
+  slatesTriggerRoutingMatcher,
+  slatesWebhookTarget
+} from '../types';
 import { slatesWebhookHttpResponse } from './action';
 import { withRequestTraces } from './tracing';
 
@@ -91,7 +95,7 @@ export let slatesMessageTriggerGroupWebhookTargetsListResponse = z.object({
   jsonrpc: z.literal('2.0'),
   id: z.string(),
   result: withRequestTraces({
-    resources: z.array(slatesWebhookTarget),
+    targets: z.array(slatesWebhookTarget),
     nextPageToken: z.any().nullable()
   })
 });
@@ -348,7 +352,8 @@ export let slatesTriggerGroupResponsesByMethod = {
   'slates/trigger_group.webhook.targets_list':
     slatesMessageTriggerGroupWebhookTargetsListResponse,
   'slates/trigger_group.webhook.register': slatesMessageTriggerGroupWebhookRegisterResponse,
-  'slates/trigger_group.webhook.unregister': slatesMessageTriggerGroupWebhookUnregisterResponse,
+  'slates/trigger_group.webhook.unregister':
+    slatesMessageTriggerGroupWebhookUnregisterResponse,
   'slates/trigger_group.webhook.manual_setup':
     slatesMessageTriggerGroupWebhookManualSetupResponse,
   'slates/trigger_group.webhook.manual_finish':
@@ -366,7 +371,8 @@ export let slatesTriggerGroupRequestsByMethod = {
     slatesMessageTriggerGroupWebhookTargetsListRequest,
   'slates/trigger_group.webhook.register': slatesMessageTriggerGroupWebhookRegisterRequest,
   'slates/trigger_group.webhook.unregister': slatesMessageTriggerGroupWebhookUnregisterRequest,
-  'slates/trigger_group.webhook.manual_setup': slatesMessageTriggerGroupWebhookManualSetupRequest,
+  'slates/trigger_group.webhook.manual_setup':
+    slatesMessageTriggerGroupWebhookManualSetupRequest,
   'slates/trigger_group.webhook.manual_finish':
     slatesMessageTriggerGroupWebhookManualFinishRequest,
   'slates/trigger_group.webhook.process': slatesMessageTriggerGroupWebhookProcessRequest,
