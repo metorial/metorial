@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,7 +7,7 @@ export let listDashboards = SlateTool.create(spec, {
   name: 'List Dashboards',
   key: 'list_dashboards',
   description: `List dashboards in Metabase with optional filtering.
-Returns all dashboards, your dashboards, favorites, or archived dashboards.`,
+Returns all dashboards, dashboards you created, or archived dashboards.`,
   tags: {
     readOnly: true
   }
@@ -15,9 +15,9 @@ Returns all dashboards, your dashboards, favorites, or archived dashboards.`,
   .input(
     z.object({
       filter: z
-        .enum(['all', 'mine', 'fav', 'archived'])
+        .enum(['all', 'mine', 'archived', 'fav'])
         .optional()
-        .describe('Filter to apply when listing dashboards')
+        .describe('Filter to apply; fav is retained only for input compatibility')
     })
   )
   .output(
@@ -34,10 +34,13 @@ Returns all dashboards, your dashboards, favorites, or archived dashboards.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    if (ctx.input.filter === 'fav') {
+      throw createApiServiceError(
+        'Current Metabase versions do not support filtering the dashboard list by bookmarks. Use all, mine, or archived.',
+        { reason: 'metabase_dashboard_filter_unsupported' }
+      );
+    }
+    let client = new MetabaseClient(ctx.auth);
 
     let dashboards = await client.listDashboards({ filter: ctx.input.filter });
     let items = Array.isArray(dashboards) ? dashboards : [];

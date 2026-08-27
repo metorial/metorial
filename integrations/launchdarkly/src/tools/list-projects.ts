@@ -33,12 +33,13 @@ export let listProjects = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let result = await client.listProjects({
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       filter: ctx.input.filter,
-      sort: ctx.input.sort
+      sort: ctx.input.sort,
+      expand: 'environments'
     });
 
     let items = result.items ?? [];
@@ -46,7 +47,9 @@ export let listProjects = SlateTool.create(spec, {
       projectKey: p.key,
       name: p.name,
       tags: p.tags ?? [],
-      environmentCount: (p.environments ?? []).length
+      environmentCount: Array.isArray(p.environments)
+        ? p.environments.length
+        : (p.environments?.totalCount ?? p.environments?.items?.length ?? 0)
     }));
 
     return {

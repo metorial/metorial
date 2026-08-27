@@ -1,7 +1,11 @@
 import { SlateDefaultPollingIntervalSeconds, SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { parseResourceSpecifiers } from '../lib/resource-specifier';
 import { spec } from '../spec';
+
+const AUDIT_LOG_PAGE_SIZE = 20;
+const MAX_AUDIT_LOG_PAGES_PER_POLL = 10;
 
 export let flagChangeTrigger = SlateTrigger.create(spec, {
   name: 'Flag Changes',
@@ -42,12 +46,12 @@ export let flagChangeTrigger = SlateTrigger.create(spec, {
     },
 
     pollEvents: async ctx => {
-      let client = new LaunchDarklyClient(ctx.auth.token);
+      let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
       let state = ctx.state as { lastTimestamp?: number } | undefined;
       let lastTimestamp = state?.lastTimestamp;
 
       let params: Record<string, any> = {
-        limit: 50,
+        limit: AUDIT_LOG_PAGE_SIZE,
         spec: 'proj/*:env/*:flag/*'
       };
 
@@ -57,6 +61,29 @@ export let flagChangeTrigger = SlateTrigger.create(spec, {
 
       let result = await client.getAuditLogEntries(params);
       let items = result.items ?? [];
+
+      if (lastTimestamp) {
+        let page = items;
+        for (
+          let pageNumber = 1;
+          page.length === AUDIT_LOG_PAGE_SIZE && pageNumber < MAX_AUDIT_LOG_PAGES_PER_POLL;
+          pageNumber++
+        ) {
+          let oldestDate = Math.min(
+            ...page.map((entry: any) =>
+              typeof entry.date === 'number' ? entry.date : Number.parseInt(entry.date, 10)
+            )
+          );
+          if (!Number.isFinite(oldestDate) || oldestDate <= lastTimestamp) break;
+
+          let nextResult = await client.getAuditLogEntries({
+            ...params,
+            before: oldestDate
+          });
+          page = nextResult.items ?? [];
+          items.push(...page);
+        }
+      }
 
       if (items.length === 0) {
         return {
@@ -72,17 +99,9 @@ export let flagChangeTrigger = SlateTrigger.create(spec, {
       }, lastTimestamp ?? 0);
 
       let inputs = items.map((entry: any) => {
-        let projectKey: string | undefined;
-        let environmentKey: string | undefined;
-        let flagKey: string | undefined;
-
-        if (entry.target?.resources) {
-          for (let resource of entry.target.resources) {
-            if (resource.type === 'proj') projectKey = resource.key;
-            if (resource.type === 'env') environmentKey = resource.key;
-            if (resource.type === 'flag') flagKey = resource.key;
-          }
-        }
+        let { projectKey, environmentKey, flagKey } = parseResourceSpecifiers(
+          entry.target?.resources
+        );
 
         return {
           action: entry.titleVerb ?? 'changed',

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeNotionRichTextAnnotations } from './rich-text';
+import {
+  normalizeNotionBlockUpdateContent,
+  normalizeNotionRichTextAnnotations
+} from './rich-text';
 
 describe('normalizeNotionRichTextAnnotations', () => {
   it('moves misplaced text annotations to the rich text object', () => {
@@ -62,6 +65,75 @@ describe('normalizeNotionRichTextAnnotations', () => {
       },
       annotations: {
         italic: true
+      }
+    });
+  });
+});
+
+describe('normalizeNotionBlockUpdateContent', () => {
+  it('removes the response-only type discriminator from image updates', () => {
+    expect(
+      normalizeNotionBlockUpdateContent({
+        image: {
+          type: 'file_upload',
+          file_upload: {
+            id: 'upload-id'
+          }
+        }
+      })
+    ).toEqual({
+      image: {
+        file_upload: {
+          id: 'upload-id'
+        }
+      }
+    });
+  });
+
+  it("splits rich text content at Notion's 2,000-character request limit", () => {
+    let content = 'a'.repeat(2001);
+
+    expect(
+      normalizeNotionBlockUpdateContent({
+        code: {
+          rich_text: [
+            {
+              type: 'text',
+              text: {
+                content,
+                link: null
+              },
+              annotations: {
+                bold: true
+              }
+            }
+          ]
+        }
+      })
+    ).toEqual({
+      code: {
+        rich_text: [
+          {
+            type: 'text',
+            text: {
+              content: 'a'.repeat(2000),
+              link: null
+            },
+            annotations: {
+              bold: true
+            }
+          },
+          {
+            type: 'text',
+            text: {
+              content: 'a',
+              link: null
+            },
+            annotations: {
+              bold: true
+            }
+          }
+        ]
       }
     });
   });

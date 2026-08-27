@@ -1,0 +1,13 @@
+{
+  "name": "@metorial/motherduck",
+  "description": "Query MotherDuck databases, explore catalogs, and manage Dives, Flights, and Guides through native SQL and the PostgreSQL endpoint.",
+  "categories": ["data-and-analytics", "apis-and-http-requests"],
+  "skills": [
+    "query cloud data warehouses",
+    "explore database catalogs",
+    "manage interactive data apps",
+    "manage scheduled data workflows",
+    "manage organizational data guides"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/motherduck.svg"
+}

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { circleCiValidationError } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageWebhooks = SlateTool.create(spec, {
@@ -9,6 +10,7 @@ export let manageWebhooks = SlateTool.create(spec, {
   description: `Create, list, update, or delete outbound webhooks for a CircleCI project. Webhooks push event notifications (workflow-completed, job-completed) to external HTTP endpoints.`,
   constraints: ['Maximum of 5 webhooks per project.'],
   tags: {
+    destructive: true,
     readOnly: false
   }
 })
@@ -34,11 +36,14 @@ export let manageWebhooks = SlateTool.create(spec, {
       signingSecret: z
         .string()
         .optional()
-        .describe('Secret for HMAC-SHA256 signature verification'),
+        .describe(
+          'Secret for HMAC-SHA256 signature verification (required for create; replaces the secret on update)'
+        ),
       verifyTls: z
         .boolean()
         .optional()
-        .describe('Whether to verify TLS certificates (defaults to true)')
+        .describe('Whether to verify TLS certificates (defaults to true)'),
+      pageToken: z.string().optional().describe('Pagination token for the list action')
     })
   )
   .output(
@@ -67,10 +72,14 @@ export let manageWebhooks = SlateTool.create(spec, {
           updatedAt: z.string().optional()
         })
         .optional(),
-      deleted: z.boolean().optional()
+      deleted: z.boolean().optional(),
+      nextPageToken: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.pageToken && ctx.input.action !== 'list') {
+      throw circleCiValidationError('pageToken is only supported for the list action.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     let mapWebhook = (w: any) => ({
@@ -78,23 +87,29 @@ export let manageWebhooks = SlateTool.create(spec, {
       name: w.name,
       url: w.url,
       events: w.events,
-      verifyTls: w['verify-tls'],
-      createdAt: w['created-at'],
-      updatedAt: w['updated-at']
+      verifyTls: w.verify_tls,
+      createdAt: w.created_at,
+      updatedAt: w.updated_at
     });
 
     if (ctx.input.action === 'list') {
-      if (!ctx.input.projectId) throw new Error('projectId is required for listing webhooks.');
-      let result = await client.listWebhooks(ctx.input.projectId);
+      if (!ctx.input.projectId)
+        throw circleCiValidationError('projectId is required for listing webhooks.');
+      let result = await client.listWebhooks(
+        ctx.input.projectId,
+        'project',
+        ctx.input.pageToken
+      );
       let webhooks = (result.items || []).map(mapWebhook);
       return {
-        output: { webhooks },
+        output: { webhooks, nextPageToken: result.next_page_token },
         message: `Found **${webhooks.length}** webhook(s) for project.`
       };
     }
 
     if (ctx.input.action === 'get') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required to get a webhook.');
+      if (!ctx.input.webhookId)
+        throw circleCiValidationError('webhookId is required to get a webhook.');
       let w = await client.getWebhook(ctx.input.webhookId);
       return {
         output: { webhook: mapWebhook(w) },
@@ -103,11 +118,19 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'create') {
-      if (!ctx.input.projectId) throw new Error('projectId is required to create a webhook.');
-      if (!ctx.input.name) throw new Error('name is required to create a webhook.');
-      if (!ctx.input.url) throw new Error('url is required to create a webhook.');
+      if (!ctx.input.projectId)
+        throw circleCiValidationError('projectId is required to create a webhook.');
+      if (!ctx.input.name)
+        throw circleCiValidationError('name is required to create a webhook.');
+      if (!ctx.input.url)
+        throw circleCiValidationError('url is required to create a webhook.');
+      validateHttpsUrl(ctx.input.url);
       if (!ctx.input.events || ctx.input.events.length === 0)
-        throw new Error('At least one event is required to create a webhook.');
+        throw circleCiValidationError('At least one event is required to create a webhook.');
+      if (!ctx.input.signingSecret)
+        throw circleCiValidationError(
+          'signingSecret is required to create an outbound webhook through the CircleCI API.'
+        );
 
       let w = await client.createWebhook({
         name: ctx.input.name,
@@ -124,7 +147,21 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'update') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required to update a webhook.');
+      if (!ctx.input.webhookId)
+        throw circleCiValidationError('webhookId is required to update a webhook.');
+      if (
+        ctx.input.name === undefined &&
+        ctx.input.url === undefined &&
+        ctx.input.events === undefined &&
+        ctx.input.signingSecret === undefined &&
+        ctx.input.verifyTls === undefined
+      ) {
+        throw circleCiValidationError('Provide at least one webhook field to update.');
+      }
+      if (ctx.input.url) validateHttpsUrl(ctx.input.url);
+      if (ctx.input.events && ctx.input.events.length === 0) {
+        throw circleCiValidationError('events must contain at least one webhook event.');
+      }
       let w = await client.updateWebhook(ctx.input.webhookId, {
         name: ctx.input.name,
         url: ctx.input.url,
@@ -139,7 +176,8 @@ export let manageWebhooks = SlateTool.create(spec, {
     }
 
     if (ctx.input.action === 'delete') {
-      if (!ctx.input.webhookId) throw new Error('webhookId is required to delete a webhook.');
+      if (!ctx.input.webhookId)
+        throw circleCiValidationError('webhookId is required to delete a webhook.');
       await client.deleteWebhook(ctx.input.webhookId);
       return {
         output: { deleted: true },
@@ -147,6 +185,18 @@ export let manageWebhooks = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw circleCiValidationError(`Unknown action: ${ctx.input.action}`);
   })
   .build();
+
+let validateHttpsUrl = (url: string) => {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw circleCiValidationError('Provide a valid HTTPS webhook URL.');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw circleCiValidationError('CircleCI outbound webhook URLs must use HTTPS.');
+  }
+};

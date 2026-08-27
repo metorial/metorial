@@ -1,8 +1,12 @@
-# <img src="https://provider-logos.metorial-cdn.com/circleci-logo.svg" height="20"> Circleci
+# <img src="https://provider-logos.metorial-cdn.com/circleci-logo.svg" height="20"> CircleCI
 
-Trigger, manage, and monitor CI/CD pipelines, workflows, and jobs. Retrieve build artifacts, test metadata, and insights on project performance. Manage project settings, environment variables, contexts, checkout keys, and scheduled pipeline triggers. Approve, rerun, or cancel workflows and jobs. Configure outbound webhooks for workflow and job completion events. Manage OIDC tokens for cloud provider authentication and organization-level policies. Look up user information and track credit and compute usage across projects.
+Trigger, manage, and monitor CircleCI pipelines, workflows, and jobs. Retrieve artifact links, test metadata, workflow insights, and flaky-test details. Manage project and context environment variables, scheduled pipeline triggers, and signed outbound webhooks. Approve, selectively rerun, or cancel workflows and jobs, and look up user and organization information.
 
 ## Tools
+
+### Trigger Pipeline Run
+
+Trigger a pipeline through CircleCI's recommended API for GitHub App, GitHub OAuth, GitHub Server, Bitbucket Cloud, or Bitbucket Data Center projects.
 
 ### Cancel Job
 
@@ -26,7 +30,7 @@ Retrieve details about a specific pipeline by ID, including its workflows and th
 
 ### Get Project
 
-Retrieve information about a CircleCI project, including its VCS URL, organization, and settings.
+Retrieve a CircleCI project's stable ID, slug, organization identifiers, VCS URL, provider, and default branch.
 
 ### Get User
 
@@ -58,15 +62,15 @@ Create, list, update, or delete scheduled pipeline triggers for a CircleCI proje
 
 ### Manage Webhooks
 
-Create, list, update, or delete outbound webhooks for a CircleCI project. Webhooks push event notifications (workflow-completed, job-completed) to external HTTP endpoints.
+Create, list, update, or delete signed outbound webhooks for a CircleCI project. Webhooks push workflow-completed and job-completed notifications to HTTPS endpoints.
 
 ### Manage Workflow
 
-Cancel, rerun, or approve a pending job within a workflow. Use this to control workflow execution — stop a running workflow, rerun it (optionally from failed jobs only), or approve a held approval job.
+Cancel, rerun, or approve a pending job within a workflow. Reruns can start from failed jobs or target selected job UUIDs, with optional sparse-tree and SSH controls.
 
 ### Trigger Pipeline
 
-Trigger a new CI/CD pipeline for a project. You can specify a branch or tag to build, and pass custom pipeline parameters to control which workflows run and how they behave. The project slug format is \
+Deprecated compatibility tool for GitHub OAuth and Bitbucket Cloud projects. Use Trigger Pipeline Run for new calls.
 
 ## License
 

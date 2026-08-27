@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let createRepositoryTool = SlateTool.create(spec, {
   name: 'Create Repository',
   key: 'create_repository',
-  description: `Create a new Git repository in the configured workspace. **Only repoSlug is required.** Display **name** defaults to the slug; **isPrivate** defaults to **true** and is always sent so the create payload matches Bitbucket's expectations. Optional: project, issue tracker, wiki, fork policy, language, description.`
+  description: `Create a new Git repository in the configured workspace. **Only repoSlug is required.** Display **name** defaults to the slug; **isPrivate** defaults to **true** and is always sent so the create payload matches Bitbucket's expectations. Optional: project, wiki, fork policy, language, description.`
 })
   .input(
     z.object({
@@ -29,7 +29,6 @@ export let createRepositoryTool = SlateTool.create(spec, {
         .enum(['allow_forks', 'no_public_forks', 'no_forks'])
         .optional()
         .describe('Fork policy for the repository'),
-      hasIssues: z.boolean().optional().describe('Whether the issue tracker is enabled'),
       hasWiki: z.boolean().optional().describe('Whether the wiki is enabled')
     })
   )
@@ -63,9 +62,6 @@ export let createRepositoryTool = SlateTool.create(spec, {
     }
     if (ctx.input.forkPolicy) {
       body.fork_policy = ctx.input.forkPolicy;
-    }
-    if (ctx.input.hasIssues !== undefined) {
-      body.has_issues = ctx.input.hasIssues;
     }
     if (ctx.input.hasWiki !== undefined) {
       body.has_wiki = ctx.input.hasWiki;

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { circleCiValidationError } from '../lib/validation';
 import { spec } from '../spec';
 
 export let manageContextEnvVars = SlateTool.create(spec, {
@@ -8,6 +9,7 @@ export let manageContextEnvVars = SlateTool.create(spec, {
   key: 'manage_context_env_vars',
   description: `List, set, or delete environment variables within a CircleCI context. Context env vars are shared across all projects that use the context.`,
   tags: {
+    destructive: true,
     readOnly: false
   }
 })
@@ -22,7 +24,8 @@ export let manageContextEnvVars = SlateTool.create(spec, {
       value: z
         .string()
         .optional()
-        .describe('Value of the environment variable (required for set)')
+        .describe('Value of the environment variable (required for set)'),
+      pageToken: z.string().optional().describe('Pagination token for the list action')
     })
   )
   .output(
@@ -45,14 +48,18 @@ export let manageContextEnvVars = SlateTool.create(spec, {
           updatedAt: z.string().optional()
         })
         .optional(),
-      deleted: z.boolean().optional()
+      deleted: z.boolean().optional(),
+      nextPageToken: z.string().nullable().optional()
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.pageToken && ctx.input.action !== 'list') {
+      throw circleCiValidationError('pageToken is only supported for the list action.');
+    }
     let client = new Client({ token: ctx.auth.token });
 
     if (ctx.input.action === 'list') {
-      let result = await client.listContextEnvVars(ctx.input.contextId);
+      let result = await client.listContextEnvVars(ctx.input.contextId, ctx.input.pageToken);
       let envVars = (result.items || []).map((e: any) => ({
         variable: e.variable,
         contextId: e.context_id,
@@ -60,14 +67,14 @@ export let manageContextEnvVars = SlateTool.create(spec, {
         updatedAt: e.updated_at
       }));
       return {
-        output: { envVars },
+        output: { envVars, nextPageToken: result.next_page_token },
         message: `Found **${envVars.length}** environment variable(s) in context \`${ctx.input.contextId}\`.`
       };
     }
 
     if (ctx.input.action === 'set') {
-      if (!ctx.input.name || !ctx.input.value) {
-        throw new Error(
+      if (!ctx.input.name || ctx.input.value === undefined) {
+        throw circleCiValidationError(
           'Both name and value are required to set a context environment variable.'
         );
       }
@@ -79,8 +86,11 @@ export let manageContextEnvVars = SlateTool.create(spec, {
       return {
         output: {
           updated: {
-            variable: result.variable,
-            contextId: result.context_id,
+            // The documented endpoint may return either the environment-variable
+            // object or a message-only response. The request still gives us the
+            // stable identifiers in the latter case.
+            variable: result.variable ?? ctx.input.name,
+            contextId: result.context_id ?? ctx.input.contextId,
             createdAt: result.created_at,
             updatedAt: result.updated_at
           }
@@ -91,7 +101,9 @@ export let manageContextEnvVars = SlateTool.create(spec, {
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.name) {
-        throw new Error('Name is required to delete a context environment variable.');
+        throw circleCiValidationError(
+          'Name is required to delete a context environment variable.'
+        );
       }
       await client.deleteContextEnvVar(ctx.input.contextId, ctx.input.name);
       return {
@@ -100,6 +112,6 @@ export let manageContextEnvVars = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${ctx.input.action}`);
+    throw circleCiValidationError(`Unknown action: ${ctx.input.action}`);
   })
   .build();

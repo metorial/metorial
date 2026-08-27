@@ -34,7 +34,7 @@ Retrieve a Notion database by its ID, including its schema (properties), title, 
 
 ### Get Page
 
-Retrieve a Notion page by its ID, including all properties, metadata, and optionally its content blocks. Use this to read a page's title, properties, timestamps, parent info, icon, cover, and block content.
+Retrieve a Notion page by page ID or URL, including its properties, metadata, and optionally its complete nested block content. If only the title is known, use Search with the page filter and pass the matching result object's `id`. A 404 means the ID is wrong or the page has not been shared with the connected Notion integration.
 
 ### List Comments
 
@@ -50,7 +50,7 @@ Query a Notion database to retrieve its entries (pages) with optional filtering 
 
 ### Search
 
-Search across all pages and databases shared with the integration by title. Returns matching pages and databases with their metadata. Best suited for finding resources by name rather than exhaustive enumeration.
+Search across all pages and databases shared with the integration by title. Returns matching pages and databases with their metadata. Pass a page result object's `id` to Get Page or a database result object's `id` to Get Database or Query Database. Best suited for finding resources by name rather than exhaustive enumeration.
 
 ### Update Block
 

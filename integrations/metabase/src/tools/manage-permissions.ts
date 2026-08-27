@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -7,11 +7,11 @@ export let managePermissions = SlateTool.create(spec, {
   name: 'Manage Permissions',
   key: 'manage_permissions',
   description: `Manage permission groups and group memberships in Metabase.
-Create or delete permission groups, add or remove users from groups, and list all groups.
+Create or delete permission groups, add or remove users from groups, and retrieve or replace the versioned data permissions graph.
 Permission groups control access to databases, tables, and collections.`,
   constraints: ['Requires superuser (admin) privileges.'],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -24,7 +24,9 @@ Permission groups control access to databases, tables, and collections.`,
           'create_group',
           'delete_group',
           'add_member',
-          'remove_member'
+          'remove_member',
+          'get_data_graph',
+          'update_data_graph'
         ])
         .describe('The action to perform'),
       groupId: z
@@ -42,7 +44,13 @@ Permission groups control access to databases, tables, and collections.`,
       membershipId: z
         .number()
         .optional()
-        .describe('Membership ID to remove (required for remove_member)')
+        .describe('Membership ID to remove (required for remove_member)'),
+      permissionsGraph: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe(
+          'Complete permissions graph including its revision; required for update_data_graph'
+        )
     })
   )
   .output(
@@ -64,6 +72,10 @@ Permission groups control access to databases, tables, and collections.`,
         .array(
           z.object({
             userId: z.number().describe('User ID'),
+            membershipId: z
+              .number()
+              .optional()
+              .describe('Membership ID used by remove_member'),
             email: z.string().optional().describe('User email'),
             firstName: z.string().nullable().optional().describe('First name'),
             lastName: z.string().nullable().optional().describe('Last name')
@@ -71,14 +83,44 @@ Permission groups control access to databases, tables, and collections.`,
         )
         .optional()
         .describe('Members of the group'),
-      success: z.boolean().optional().describe('Whether the operation succeeded')
+      success: z.boolean().optional().describe('Whether the operation succeeded'),
+      permissionsGraph: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('Current data permissions graph')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    let requirements: Record<string, Array<keyof typeof ctx.input>> = {
+      get_group: ['groupId'],
+      delete_group: ['groupId'],
+      add_member: ['groupId', 'userId'],
+      remove_member: ['membershipId'],
+      create_group: ['groupName'],
+      update_data_graph: ['permissionsGraph']
+    };
+    let missing = (requirements[ctx.input.action] ?? []).filter(
+      key => ctx.input[key] === undefined
+    );
+    if (missing.length > 0) {
+      throw createApiServiceError(`${ctx.input.action} requires ${missing.join(', ')}.`, {
+        reason: 'metabase_permissions_input_missing'
+      });
+    }
+    let client = new MetabaseClient(ctx.auth);
+
+    if (ctx.input.action === 'get_data_graph') {
+      let permissionsGraph = await client.getPermissionsGraph();
+      return { output: { permissionsGraph }, message: 'Retrieved the data permissions graph' };
+    }
+
+    if (ctx.input.action === 'update_data_graph') {
+      let permissionsGraph = await client.updatePermissionsGraph(ctx.input.permissionsGraph);
+      return {
+        output: { permissionsGraph, success: true },
+        message: 'Updated the data permissions graph'
+      };
+    }
 
     if (ctx.input.action === 'list_groups') {
       let groups = await client.listPermissionGroups();
@@ -97,7 +139,8 @@ Permission groups control access to databases, tables, and collections.`,
     if (ctx.input.action === 'get_group') {
       let group = await client.getPermissionGroup(ctx.input.groupId!);
       let members = (group.members || []).map((m: any) => ({
-        userId: m.user_id,
+        userId: m.id ?? m.user_id,
+        membershipId: m.membership_id,
         email: m.email,
         firstName: m.first_name ?? null,
         lastName: m.last_name ?? null
@@ -135,10 +178,16 @@ Permission groups control access to databases, tables, and collections.`,
 
     if (ctx.input.action === 'add_member') {
       let result = await client.addUserToGroup(ctx.input.userId!, ctx.input.groupId!);
+      if (typeof result.membership_id !== 'number') {
+        throw createApiServiceError(
+          'Metabase added the user but did not return a resolvable membership ID. Refresh the group before attempting removal.',
+          { reason: 'metabase_membership_id_missing' }
+        );
+      }
       return {
         output: {
           groupId: ctx.input.groupId,
-          membershipId: result.membership_id ?? result.id,
+          membershipId: result.membership_id,
           success: true
         },
         message: `Added user ${ctx.input.userId} to group ${ctx.input.groupId}`

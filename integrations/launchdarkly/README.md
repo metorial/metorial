@@ -1,6 +1,6 @@
-# <img src="https://provider-logos.metorial-cdn.com/launch-darkly-logo.png" height="20"> Launchdarkly
+# <img src="https://provider-logos.metorial-cdn.com/launch-darkly-logo.png" height="20"> LaunchDarkly
 
-Manage feature flags, experiments, and progressive rollouts across projects and environments. Create, update, toggle, and delete feature flags with targeting rules, percentage rollouts, and prerequisites. Define user segments for bulk targeting. Run experiments to measure the impact of flag variations using custom metrics. Manage projects, environments, account members, teams, and role-based access. Query the audit log for change history. Configure webhooks, release pipelines, relay proxy settings, and data export destinations. Set up scheduled flag changes, approval workflows, and integration audit log subscriptions.
+Manage LaunchDarkly feature flags, targeting, projects, environments, and segments. Inspect connected credentials, contexts, members, metrics, experiments, and change history; invite account members; and receive signed change notifications.
 
 ## Tools
 
@@ -15,6 +15,14 @@ Permanently delete a feature flag from a project. This removes the flag from all
 ### Get Feature Flag
 
 Retrieve detailed information about a specific feature flag, including its variations, targeting rules, and environment-specific configuration. Use this to inspect a flag's full setup before making changes.
+
+### Get Current Identity
+
+Identify the API credential connected to LaunchDarkly, including its account, token kind, scopes, and member profile when available.
+
+### Get Segment
+
+Retrieve one segment with its targeting rules, rule and clause IDs, explicitly included and excluded context keys, and big-segment metadata. Use this before semantic updates that refer to existing rule or clause IDs.
 
 ### Invite Members
 

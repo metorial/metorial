@@ -3,7 +3,9 @@ import { spec } from './spec';
 import {
   createFeatureFlag,
   deleteFeatureFlag,
+  getCurrentIdentity,
   getFeatureFlag,
+  getSegment,
   inviteMembers,
   listEnvironments,
   listExperiments,
@@ -25,6 +27,7 @@ import { flagChangeTrigger, resourceChangeTrigger } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentIdentity,
     listFeatureFlags,
     getFeatureFlag,
     createFeatureFlag,
@@ -36,6 +39,7 @@ export let provider = Slate.create({
     listEnvironments,
     manageEnvironment,
     listSegments,
+    getSegment,
     manageSegment,
     queryAuditLog,
     listMembers,

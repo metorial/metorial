@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let manageDashboardCards = SlateTool.create(spec, {
 When adding a card, you can specify its position and size on the dashboard grid.
 Parameter mappings allow you to connect dashboard filters to the card's parameters.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -26,13 +26,38 @@ Parameter mappings allow you to connect dashboard filters to the card's paramete
         .number()
         .optional()
         .describe('ID of the dashcard to remove (required for remove)'),
-      row: z.number().optional().describe('Row position on the dashboard grid (default: 0)'),
+      row: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Row position on the dashboard grid (default: 0)'),
       col: z
         .number()
+        .int()
+        .min(0)
         .optional()
         .describe('Column position on the dashboard grid (default: 0)'),
-      sizeX: z.number().optional().describe('Width in grid units (default: 6)'),
-      sizeY: z.number().optional().describe('Height in grid units (default: 4)'),
+      sizeX: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Width in grid units (default: 6)'),
+      sizeY: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Height in grid units (default: 4)'),
+      dashboardTabId: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe(
+          'Dashboard tab ID for the new card. When omitted on a tabbed dashboard, the first tab is used.'
+        ),
       parameterMappings: z
         .array(z.any())
         .optional()
@@ -48,10 +73,17 @@ Parameter mappings allow you to connect dashboard filters to the card's paramete
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    if (ctx.input.action === 'add' && ctx.input.cardId === undefined) {
+      throw createApiServiceError('Adding a dashboard card requires cardId.', {
+        reason: 'metabase_dashcard_card_id_missing'
+      });
+    }
+    if (ctx.input.action === 'remove' && ctx.input.dashcardId === undefined) {
+      throw createApiServiceError('Removing a dashboard card requires dashcardId.', {
+        reason: 'metabase_dashcard_id_missing'
+      });
+    }
+    let client = new MetabaseClient(ctx.auth);
 
     if (ctx.input.action === 'add') {
       let result = await client.addCardToDashboard(ctx.input.dashboardId, {
@@ -60,8 +92,14 @@ Parameter mappings allow you to connect dashboard filters to the card's paramete
         col: ctx.input.col,
         sizeX: ctx.input.sizeX,
         sizeY: ctx.input.sizeY,
+        dashboardTabId: ctx.input.dashboardTabId,
         parameterMappings: ctx.input.parameterMappings
       });
+      if (typeof result?.id !== 'number') {
+        throw createApiServiceError('Metabase did not return the newly created dashcard ID.', {
+          reason: 'metabase_dashcard_response_invalid'
+        });
+      }
 
       return {
         output: {

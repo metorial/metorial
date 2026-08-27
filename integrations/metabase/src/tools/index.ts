@@ -1,4 +1,7 @@
 export * from './execute-query';
+export * from './export-question-results';
+export * from './get-current-user';
+export * from './get-table-metadata';
 export * from './list-dashboards';
 export * from './list-questions';
 export * from './manage-alert';

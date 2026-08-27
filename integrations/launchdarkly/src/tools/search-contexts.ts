@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { LaunchDarklyClient } from '../lib/client';
+import { requireEnvironmentKey, requireProjectKey } from '../lib/inputs';
 import { spec } from '../spec';
 
 export let searchContexts = SlateTool.create(spec, {
@@ -21,7 +22,9 @@ export let searchContexts = SlateTool.create(spec, {
       filter: z
         .string()
         .optional()
-        .describe('Filter expression for contexts (e.g., \'kind:"user" key:"user-123"\')'),
+        .describe(
+          'Context filter expression, for example `kind equals "user",key equals "user-123"`'
+        ),
       sort: z.string().optional().describe('Sort field (e.g., "-ts" for most recent)'),
       limit: z.number().optional().describe('Maximum number of contexts to return'),
       continuationToken: z.string().optional().describe('Continuation token for pagination')
@@ -32,10 +35,29 @@ export let searchContexts = SlateTool.create(spec, {
       contexts: z.array(
         z.object({
           contextKind: z.string().describe('Context kind'),
-          contextKey: z.string().describe('Context key'),
+          contextKey: z.string().optional().describe('Context key for a single-kind context'),
+          contextInstanceId: z
+            .string()
+            .optional()
+            .describe('Unique context instance ID returned by LaunchDarkly'),
+          contextKinds: z
+            .array(z.string())
+            .describe('All context kinds included in this context instance'),
           name: z.string().optional().describe('Context name'),
           attributes: z.record(z.string(), z.any()).optional().describe('Context attributes'),
-          lastSeen: z.string().optional().describe('Last seen timestamp')
+          lastSeen: z.string().optional().describe('Last seen timestamp'),
+          applicationId: z
+            .string()
+            .optional()
+            .describe('Application or SDK that sent the context'),
+          context: z
+            .record(z.string(), z.any())
+            .optional()
+            .describe('Complete LaunchDarkly context, including multi-context data'),
+          associatedContexts: z
+            .number()
+            .optional()
+            .describe('Number of associated contexts for this record')
         })
       ),
       totalCount: z.number().optional().describe('Total matching contexts'),
@@ -43,16 +65,10 @@ export let searchContexts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let projectKey = ctx.input.projectKey ?? ctx.config.projectKey;
-    if (!projectKey) {
-      throw new Error('projectKey is required.');
-    }
-    let envKey = ctx.input.environmentKey ?? ctx.config.environmentKey;
-    if (!envKey) {
-      throw new Error('environmentKey is required.');
-    }
+    let projectKey = requireProjectKey(ctx.input.projectKey, ctx.config.projectKey);
+    let envKey = requireEnvironmentKey(ctx.input.environmentKey, ctx.config.environmentKey);
 
-    let client = new LaunchDarklyClient(ctx.auth.token);
+    let client = new LaunchDarklyClient(ctx.auth.token, ctx.auth.baseUrl);
     let result = await client.searchContexts(projectKey, envKey, {
       filter: ctx.input.filter,
       sort: ctx.input.sort,
@@ -62,21 +78,31 @@ export let searchContexts = SlateTool.create(spec, {
 
     let items = result.items ?? [];
     let contexts = items.map((c: any) => {
-      let contextKind = c.kind ?? 'user';
-      let contextKey = c.key ?? '';
-      let name = c.name;
-      let attributes: Record<string, any> = {};
-
-      if (c.attributes) {
-        attributes = c.attributes;
-      }
+      let context = c.context ?? {};
+      let contextKind = context.kind ?? 'user';
+      let contextKey = typeof context.key === 'string' ? context.key : undefined;
+      let contextKinds =
+        contextKind === 'multi'
+          ? Object.entries(context)
+              .filter(
+                ([key, value]) => key !== 'kind' && value !== null && typeof value === 'object'
+              )
+              .map(([key]) => key)
+          : [contextKind];
+      let name = context.name;
+      let { kind: _kind, key: _key, name: _name, ...attributes } = context;
 
       return {
         contextKind,
         contextKey,
+        contextInstanceId: c.id,
+        contextKinds,
         name,
         attributes: Object.keys(attributes).length > 0 ? attributes : undefined,
-        lastSeen: c.lastSeen ? String(c.lastSeen) : undefined
+        lastSeen: c.lastSeen ? String(c.lastSeen) : undefined,
+        applicationId: c.applicationId,
+        context: Object.keys(context).length > 0 ? context : undefined,
+        associatedContexts: c.associatedContexts
       };
     });
 
@@ -84,7 +110,7 @@ export let searchContexts = SlateTool.create(spec, {
       output: {
         contexts,
         totalCount: result.totalCount,
-        continuationToken: result._links?.next?.href ? result.continuationToken : undefined
+        continuationToken: result.continuationToken
       },
       message: `Found **${contexts.length}** contexts in \`${envKey}\`.`
     };

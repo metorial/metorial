@@ -1,5 +1,6 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
+import { confluenceServiceError } from '../lib/errors';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
@@ -78,7 +79,14 @@ export let getSpace = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      spaceId: z.string().describe('The space ID to retrieve')
+      spaceId: z
+        .string()
+        .optional()
+        .describe('The space ID to retrieve. Use this field for new calls.'),
+      id: z
+        .string()
+        .optional()
+        .describe('Compatibility alias for spaceId, used only when spaceId is omitted.')
     })
   )
   .output(
@@ -94,8 +102,13 @@ export let getSpace = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    let spaceId = (ctx.input.spaceId ?? ctx.input.id)?.trim();
+    if (!spaceId) {
+      throw confluenceServiceError('Provide a spaceId or id to retrieve a space.');
+    }
+
     let client = createClient(ctx.auth, ctx.config);
-    let space = await client.getSpaceById(ctx.input.spaceId);
+    let space = await client.getSpaceById(spaceId);
 
     return {
       output: {

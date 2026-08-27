@@ -14,6 +14,15 @@ describe('normalizeCallbackRedirectUriForIntegration', () => {
     ).toBe('http://localhost:45873/callback');
   });
 
+  it('normalizes QuickBooks loopback redirects to localhost', () => {
+    expect(
+      normalizeCallbackRedirectUriForIntegration(
+        'quickbooks',
+        'http://127.0.0.1:45873/callback'
+      )
+    ).toBe('http://localhost:45873/callback');
+  });
+
   it('normalizes Typeform loopback redirects to localhost', () => {
     expect(
       normalizeCallbackRedirectUriForIntegration('typeform', 'http://127.0.0.1:45873/callback')

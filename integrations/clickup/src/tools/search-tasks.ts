@@ -110,13 +110,13 @@ export let searchTasks = SlateTool.create(spec, {
           taskId: t.id,
           taskName: t.name,
           taskUrl: t.url,
-          status: t.status?.status,
-          priority: t.priority?.priority,
+          status: t.status?.status ?? undefined,
+          priority: t.priority?.priority ?? undefined,
           assignees: t.assignees?.map((a: any) => String(a.id)) ?? [],
-          dueDate: t.due_date,
-          dateCreated: t.date_created,
-          listId: t.list?.id,
-          listName: t.list?.name
+          dueDate: t.due_date ?? undefined,
+          dateCreated: t.date_created ?? undefined,
+          listId: t.list?.id ?? undefined,
+          listName: t.list?.name ?? undefined
         }))
       },
       message: `Found **${tasks.length}** task(s).`

@@ -41,12 +41,12 @@ export let getGoals = SlateTool.create(spec, {
         goals: (goals ?? []).map((g: any) => ({
           goalId: g.id,
           goalName: g.name,
-          description: g.description,
-          dueDate: g.due_date,
-          percentCompleted: g.percent_completed,
-          color: g.color,
+          description: g.description ?? undefined,
+          dueDate: g.due_date ?? undefined,
+          percentCompleted: g.percent_completed ?? undefined,
+          color: g.color ?? undefined,
           ownerIds: g.owners?.map((o: any) => String(o.id)) ?? [],
-          keyResultCount: g.key_results?.length
+          keyResultCount: g.key_results?.length ?? undefined
         }))
       },
       message: `Found **${(goals ?? []).length}** goal(s).`

@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { MetabaseClient } from '../lib/client';
 import { spec } from '../spec';
@@ -10,7 +10,7 @@ export let manageDashboard = SlateTool.create(spec, {
 Dashboards organize questions (cards) into a visual layout. Use this to manage dashboard properties like name, description, collection, and parameters.
 Set **archived** to true to move a dashboard to the trash.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
@@ -56,10 +56,17 @@ Set **archived** to true to move a dashboard to the trash.`,
     })
   )
   .handleInvocation(async ctx => {
-    let client = new MetabaseClient({
-      token: ctx.auth.token,
-      instanceUrl: ctx.auth.instanceUrl
-    });
+    if (ctx.input.action === 'create' && !ctx.input.name?.trim()) {
+      throw createApiServiceError('Creating a dashboard requires name.', {
+        reason: 'metabase_dashboard_name_missing'
+      });
+    }
+    if (ctx.input.action !== 'create' && ctx.input.dashboardId === undefined) {
+      throw createApiServiceError(`${ctx.input.action} requires dashboardId.`, {
+        reason: 'metabase_dashboard_id_missing'
+      });
+    }
+    let client = new MetabaseClient(ctx.auth);
 
     let dashboard: any;
 

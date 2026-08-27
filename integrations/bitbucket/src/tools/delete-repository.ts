@@ -6,7 +6,7 @@ import { spec } from '../spec';
 export let deleteRepositoryTool = SlateTool.create(spec, {
   name: 'Delete Repository',
   key: 'delete_repository',
-  description: `Permanently delete a repository from the workspace. This action is **irreversible** and removes all repository data including branches, commits, pull requests, and issues.`,
+  description: `Permanently delete a repository from the workspace. This action is **irreversible** and removes all repository data including branches, commits, and pull requests.`,
   tags: {
     destructive: true
   }
