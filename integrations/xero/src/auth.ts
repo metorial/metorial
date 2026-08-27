@@ -42,33 +42,49 @@ let getAuthenticationEventId = (accessToken: string) => {
 let resolveTenantId = async (accessToken: string) => {
   let authEventId = getAuthenticationEventId(accessToken);
   let connectionsClient = createAxios({ baseURL: 'https://api.xero.com' });
-  let connectionsResponse: any;
+  let getConnections = async (params?: { authEventId: string }) => {
+    let connectionsResponse: any;
 
-  try {
-    connectionsResponse = await connectionsClient.get('/connections', {
-      params: { authEventId },
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
-      }
-    });
-  } catch (error) {
-    throw xeroApiError(error, 'connections lookup');
-  }
+    try {
+      connectionsResponse = await connectionsClient.get('/connections', {
+        ...(params ? { params } : {}),
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      throw xeroApiError(error, 'connections lookup');
+    }
 
-  let connections = connectionsResponse?.data as unknown;
-  if (!Array.isArray(connections)) {
-    throw xeroServiceError('Xero connections lookup returned an invalid response.');
-  }
-  if (connections.length === 0) {
-    throw xeroServiceError(
-      'Xero connections lookup returned no organisation for the current authentication event. Reauthorize Xero and select one organisation.'
-    );
-  }
+    let connections = connectionsResponse?.data as unknown;
+    if (!Array.isArray(connections)) {
+      throw xeroServiceError('Xero connections lookup returned an invalid response.');
+    }
+
+    return connections;
+  };
+
+  let connections = await getConnections({ authEventId });
   if (connections.length > 1) {
     throw xeroServiceError(
       `Xero connections lookup returned ${connections.length} organisations for the current authentication event. Reauthorize Xero and select exactly one organisation.`
     );
+  }
+
+  if (connections.length === 0) {
+    connections = await getConnections();
+
+    if (connections.length === 0) {
+      throw xeroServiceError(
+        'Xero connections lookup returned no authorised organisations. Reauthorize Xero and select one organisation.'
+      );
+    }
+    if (connections.length > 1) {
+      throw xeroServiceError(
+        `Xero has ${connections.length} authorised organisations, but none were newly authorised in the current authentication event. The selected organisation cannot be determined safely.`
+      );
+    }
   }
 
   let connection = connections[0];

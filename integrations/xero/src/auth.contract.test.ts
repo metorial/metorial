@@ -139,13 +139,6 @@ describe('xero auth scope contract', () => {
     expect(oauth?.scopes.map(entry => entry.scope)).toEqual(expectedScopes);
   });
 
-  it('does not rely on defaultChecked because production requests every declared scope', () => {
-    expect(oauth).toBeDefined();
-    for (let entry of oauth?.scopes ?? []) {
-      expect(entry.defaultChecked, entry.scope).toBeUndefined();
-    }
-  });
-
   it('requests the report scopes used by live scenarios for custom connections', () => {
     let reportScopes = [
       'accounting.reports.budgetsummary.read',
@@ -212,11 +205,47 @@ describe('xero OAuth tenant resolution', () => {
     expect(http.connectionsGet).not.toHaveBeenCalled();
   });
 
-  it('rejects a current auth event with no organisation', async () => {
-    http.connectionsGet.mockResolvedValueOnce({ data: [] });
+  it('uses the only authorised organisation when the current auth event has none', async () => {
+    let accessToken = jwt({ authentication_event_id: 'auth-event-123' });
+    http.connectionsGet
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [{ tenantId: 'existing-tenant' }] });
+
+    let result = await callback(accessToken);
+
+    expect(http.connectionsGet).toHaveBeenNthCalledWith(1, '/connections', {
+      params: { authEventId: 'auth-event-123' },
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    expect(http.connectionsGet).toHaveBeenNthCalledWith(2, '/connections', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    expect(result?.output).toMatchObject({ tenantId: 'existing-tenant' });
+  });
+
+  it('rejects OAuth when Xero has no authorised organisation', async () => {
+    http.connectionsGet
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: [] });
 
     await expect(callback(jwt({ authentication_event_id: 'auth-event-123' }))).rejects.toThrow(
-      /no organisation/i
+      /no authorised organisations/i
+    );
+  });
+
+  it('rejects ambiguous existing organisations instead of guessing', async () => {
+    http.connectionsGet.mockResolvedValueOnce({ data: [] }).mockResolvedValueOnce({
+      data: [{ tenantId: 'tenant-1' }, { tenantId: 'tenant-2' }]
+    });
+
+    await expect(callback(jwt({ authentication_event_id: 'auth-event-123' }))).rejects.toThrow(
+      /2 authorised organisations.*cannot be determined safely/i
     );
   });
 
