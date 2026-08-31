@@ -48,7 +48,7 @@ Tool validation failures, auth failures, and upstream Tableau API failures are n
 
 ## Live E2E
 
-The private live E2E suite lives at `tests/integrations/tableau/tools.e2e.ts`. Stable content IDs can be supplied through `SLATES_E2E_FIXTURES`:
+The private live E2E suite lives at `tests/integrations/tableau/tools.e2e.ts`. Stable content IDs can be supplied through `tests/integrations/tableau/fixtures.json`:
 
 - `workbookId`
 - `datasourceId`

@@ -83,7 +83,6 @@ export let auth = SlateAuth.create()
       {
         title: 'Google Contacts (Read-only)',
         description: 'See and download your Google Contacts for address lookup.',
-        defaultChecked: true,
         scope: gmailScopes.contactsReadonly
       },
       {

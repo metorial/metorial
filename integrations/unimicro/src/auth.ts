@@ -211,8 +211,7 @@ export let auth = SlateAuth.create()
       {
         title: 'Read Only',
         description: 'Read-only API access where enabled by the UniMicro application.',
-        scope: 'READ_ONLY',
-        defaultChecked: false
+        scope: 'READ_ONLY'
       }
     ],
 

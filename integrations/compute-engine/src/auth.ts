@@ -170,8 +170,7 @@ export let auth = SlateAuth.create()
       {
         title: 'Compute Engine Full Access',
         description: 'View and manage Google Compute Engine resources.',
-        scope: computeEngineScopes.compute,
-        defaultChecked: true
+        scope: computeEngineScopes.compute
       },
       {
         title: 'Compute Engine Read Only',
@@ -186,14 +185,12 @@ export let auth = SlateAuth.create()
       {
         title: 'Google Account Profile',
         description: 'View your basic Google Account profile for connection identity.',
-        scope: computeEngineScopes.userinfoProfile,
-        defaultChecked: true
+        scope: computeEngineScopes.userinfoProfile
       },
       {
         title: 'Google Account Email',
         description: 'View your Google Account email address for connection identity.',
-        scope: computeEngineScopes.userinfoEmail,
-        defaultChecked: true
+        scope: computeEngineScopes.userinfoEmail
       }
     ],
 

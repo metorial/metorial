@@ -106,16 +106,14 @@ describe('gmail provider contract', () => {
       scope => scope.id === gmailScopes.contactsReadonly
     );
     expect(contactScope).toMatchObject({
-      title: 'Google Contacts (Read-only)',
-      defaultChecked: true
+      title: 'Google Contacts (Read-only)'
     });
 
     let otherContactScope = (oauth.authenticationMethod.scopes ?? []).find(
       scope => scope.id === gmailScopes.contactsOtherReadonly
     );
     expect(otherContactScope).toMatchObject({
-      title: 'Google Other Contacts (Read-only)',
-      defaultChecked: undefined
+      title: 'Google Other Contacts (Read-only)'
     });
   });
 

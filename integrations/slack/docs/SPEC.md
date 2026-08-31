@@ -4,7 +4,7 @@
 
 This integration exposes Slack messaging and collaboration through bot OAuth, user OAuth, bot tokens, and user tokens. It supports classic messaging and conversation workflows together with focused identity, thread, file, search, Canvas, Slack List, profile, DND, presence, and read-cursor tools.
 
-The release is additive. These 21 established tool keys remain registered with their existing contracts:
+The release is additive. These 21 established tool keys remain registered (`search_messages` and `search_files` are re-based on Real-time Search; the other 19 keep their existing contracts):
 
 - `send_message`, `update_message`, `schedule_message`, `manage_scheduled_messages`
 - `get_conversation_history`, `get_conversation_info`, `open_conversation`, `list_conversations`
@@ -43,7 +43,7 @@ Downloaded file bytes are never returned in structured output. `read_file` and `
 - `search_users` resolves people by profile fields.
 - `search_emojis` finds custom emoji names and aliases.
 
-`search_public_and_private` is consent-sensitive. An agent must obtain explicit user consent before invoking it because results may include private-channel and direct-message content. Search never expands access beyond content the connected Slack user can already read. All four Real-time Search tools (`search_public`, `search_public_and_private`, `search_channels`, `search_users`) are user-auth-only, as are `update_user_profile`, `mark_conversation_read`, `manage_dnd`, and the pre-existing `manage_reminders`, `manage_user_status`, `search_messages`, and `search_files`. Legacy `search_messages` and `search_files` remain registered for compatibility and classic search behavior.
+`search_public_and_private` is consent-sensitive. An agent must obtain explicit user consent before invoking it because results may include private-channel and direct-message content. Search never expands access beyond content the connected Slack user can already read. All six Real-time Search tools (`search_public`, `search_public_and_private`, `search_channels`, `search_users`, `search_messages`, `search_files`) are user-auth-only, as are `update_user_profile`, `mark_conversation_read`, `manage_dnd`, and the pre-existing `manage_reminders` and `manage_user_status`. `search_messages` and `search_files` are message-only and file-only Real-time Search tools; they default to public channels and require explicit consent plus the matching granular scopes before widening to private channels, DMs, or group DMs.
 
 ### Canvases
 
@@ -86,7 +86,7 @@ The auth-method keys remain stable:
 
 The bot OAuth method includes the existing collaboration scopes plus `canvases:read`, `canvases:write`, `lists:read`, `lists:write`, and `emoji:read`. Unused `commands`, `incoming-webhook`, and `users.profile:read` scopes are not requested; the profile tools are user-auth-only, so profile scopes live only on the user method.
 
-The user OAuth method retains legacy `search:read` for the established search tools and adds the granular search scopes `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`, and `search:read.users`. It also includes Canvas, Lists, custom emoji, `dnd:read`, `dnd:write`, and `users:write` scopes for the added user-productivity tools.
+The user OAuth method requests only the granular search scopes `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`, and `search:read.users`. The legacy `search:read` scope is not requested; Slack has deprecated it and does not accept it for Marketplace-listed apps, and all search tools now use the Real-time Search API. It also includes Canvas, Lists, custom emoji, `dnd:read`, `dnd:write`, and `users:write` scopes for the added user-productivity tools.
 
 Existing OAuth connections keep their previously granted scopes and continue to pass established tool gates. New tools remain unavailable until the customer reconnects the same auth method and approves its expanded scope manifest. This is expected upgrade behavior. Pasted tokens have no OAuth reconnection step; each new tool becomes available only when the pasted token already carries its required scopes.
 

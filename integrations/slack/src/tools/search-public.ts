@@ -16,7 +16,7 @@ export let searchPublic = SlateTool.create(spec, {
   instructions: [
     'Use several focused queries and follow important message results with read_thread or conversation reads.',
     'Use search_channels to resolve channel names and search_users to resolve people before composing channel- or person-scoped queries.',
-    'The legacy search_messages and search_files tools remain available for legacy user-token search behavior.'
+    'Use search_messages or search_files when only message results or only file results are needed.'
   ],
   constraints: [
     'Requires a user token with search:read.public.',

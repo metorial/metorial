@@ -48,7 +48,7 @@ API keys can be used for accessing publicly shared files only. An API key can be
 
 ### File and Folder Management
 
-Download files from Drive and upload files to Drive. Create, copy, move, rename, trash, and permanently delete files and folders. Supports uploading via simple, multipart, and resumable upload methods. When you create a file, you can convert some file types into a Google Docs, Google Sheets, or Google Slides document. Files can be exported from Google Workspace formats (Docs, Sheets, Slides) to standard formats (PDF, DOCX, XLSX, etc.).
+Generate browser download links for files in Drive and upload files to Drive. Create, copy, move, rename, trash, and permanently delete files and folders. Supports uploading via simple, multipart, and resumable upload methods. When you create a file, you can convert some file types into a Google Docs, Google Sheets, or Google Slides document. Files can be exported from Google Workspace formats (Docs, Sheets, Slides) to standard formats (PDF, DOCX, XLSX, etc.).
 
 `upload_file` performs Drive-native conversion by pairing a source media MIME type (for example, `text/markdown`) with a Google Workspace metadata MIME type (for example, `application/vnd.google-apps.document`). `create_file` creates empty native Docs, Sheets, and Slides when given the corresponding Google Workspace MIME type. These existing contracts make a separate conversion flag unnecessary.
 

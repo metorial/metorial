@@ -6,7 +6,7 @@ Use Slack bot OAuth or user OAuth to work with messages, threads, conversations,
 
 The existing `oauth`, `user_oauth`, `bot_token`, and `user_token` connection methods remain supported. Existing OAuth connections keep their previously granted scopes and continue to work with the original tools. Reconnect the same OAuth method to approve the expanded scope manifest before using tools that need modern search, Canvas, Lists, custom emoji, DND, or presence permissions. Pasted tokens do not have a consent flow and must already carry each tool's required scopes.
 
-Real-time private search is user-authenticated and searches only content visible to the connected user. `search_public_and_private` must be used only after the user explicitly consents to searching private channels, DMs, or group DMs. The legacy `search_messages` and `search_files` tools remain available.
+Real-time private search is user-authenticated and searches only content visible to the connected user. `search_public_and_private` must be used only after the user explicitly consents to searching private channels, DMs, or group DMs. `search_messages` and `search_files` also use Real-time Search; they default to public channels and require the same explicit consent before widening to private conversations.
 
 File downloads and Slack List exports return downloadable files capped at 10 MiB per call, alongside structured metadata. Binary uploads accept validated base64 input up to 6 MiB decoded; use another transfer path for larger files.
 
@@ -76,11 +76,11 @@ Create, complete, delete, or list Slack reminders. Reminders notify a user at a 
 
 ### Search Messages
 
-Search for messages across a Slack workspace by keyword query.
+Search messages across a Slack workspace with Real-time Search. Defaults to public channels; private conversations require consent and granular search scopes.
 
 ### Search Files
 
-Search for files across a Slack workspace by keyword query.
+Search files shared across a Slack workspace with Real-time Search. Defaults to public channels; private conversations require consent and granular search scopes.
 
 ### Manage Scheduled Messages
 

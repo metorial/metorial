@@ -94,15 +94,4 @@ describe('microsoft-teams auth scope contract', () => {
       }
     }
   });
-
-  it('does not rely on defaultChecked (CLI-only; production requests all declared scopes)', () => {
-    for (let method of methods) {
-      for (let entry of method.scopes) {
-        expect(
-          entry.defaultChecked,
-          `${method.key}/${entry.scope} must not carry defaultChecked`
-        ).toBeUndefined();
-      }
-    }
-  });
 });

@@ -90,9 +90,7 @@ let resolveTenantId = async (accessToken: string) => {
   let connection = connections[0];
   let tenantId = isRecord(connection) ? connection.tenantId : undefined;
   if (typeof tenantId !== 'string' || !tenantId.trim()) {
-    throw xeroServiceError(
-      'Xero connection for the current authentication event did not include a non-empty tenantId.'
-    );
+    throw xeroServiceError('Resolved Xero connection did not include a non-empty tenantId.');
   }
 
   return tenantId;

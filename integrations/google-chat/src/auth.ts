@@ -177,8 +177,7 @@ export let auth = SlateAuth.create()
         title: 'Messages',
         description:
           'View, create, update, and delete Google Chat messages and manage reactions.',
-        scope: googleChatScopes.messages,
-        defaultChecked: true
+        scope: googleChatScopes.messages
       },
       {
         title: 'Messages (Read Only)',
@@ -229,14 +228,12 @@ export let auth = SlateAuth.create()
       {
         title: 'Google Account Email',
         description: 'View the Google Account email address for connection identity.',
-        scope: googleChatScopes.userInfoEmail,
-        defaultChecked: true
+        scope: googleChatScopes.userInfoEmail
       },
       {
         title: 'Google Account Profile',
         description: 'View the basic Google Account profile for connection identity.',
-        scope: googleChatScopes.userInfoProfile,
-        defaultChecked: true
+        scope: googleChatScopes.userInfoProfile
       }
     ],
 

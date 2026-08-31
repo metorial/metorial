@@ -1422,46 +1422,6 @@ export class SlackClient {
     };
   }
 
-  async searchMessages(params: {
-    query: string;
-    sort?: string;
-    sortDir?: string;
-    count?: number;
-    page?: number;
-  }): Promise<{ messages: { total: number; matches: any[] }; nextCursor?: string }> {
-    let query: Record<string, any> = { query: params.query };
-    if (params.sort) query.sort = params.sort;
-    if (params.sortDir) query.sort_dir = params.sortDir;
-    if (params.count) query.count = params.count;
-    if (params.page) query.page = params.page;
-
-    let data = await this.get<SlackResponse & { messages: { total: number; matches: any[] } }>(
-      'search.messages',
-      query
-    );
-    return { messages: data.messages };
-  }
-
-  async searchFiles(params: {
-    query: string;
-    sort?: string;
-    sortDir?: string;
-    count?: number;
-    page?: number;
-  }): Promise<{ files: { total: number; matches: any[] } }> {
-    let query: Record<string, any> = { query: params.query };
-    if (params.sort) query.sort = params.sort;
-    if (params.sortDir) query.sort_dir = params.sortDir;
-    if (params.count) query.count = params.count;
-    if (params.page) query.page = params.page;
-
-    let data = await this.get<SlackResponse & { files: { total: number; matches: any[] } }>(
-      'search.files',
-      query
-    );
-    return { files: data.files };
-  }
-
   // ─── Open Conversation (DM) ───────────────────────────────────
 
   async openConversation(params: {

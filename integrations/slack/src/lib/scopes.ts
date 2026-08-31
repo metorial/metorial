@@ -324,11 +324,6 @@ export let slackUserOAuthScopes = [
     scope: 'team:read'
   },
   {
-    title: 'Search Workspace',
-    description: 'Search messages and files with user-token search APIs',
-    scope: 'search:read'
-  },
-  {
     title: 'Search Public Content',
     description: 'Search messages and channels in public conversations',
     scope: 'search:read.public'
@@ -417,7 +412,6 @@ export let slackActionScopes = {
   userGroups: allOf('usergroups:read', 'usergroups:write'),
   bookmarks: allOf('bookmarks:read', 'bookmarks:write'),
   teamInfo: anyOf('team:read'),
-  search: anyOf('search:read'),
   searchPublic: anyOf('search:read.public'),
   searchPrivate: allOf(
     'search:read.public',
@@ -426,6 +420,7 @@ export let slackActionScopes = {
     'search:read.mpim'
   ),
   searchUsers: anyOf('search:read.users'),
+  searchFiles: allOf('search:read.public', 'search:read.files'),
   userStatus: allOf('users.profile:read', 'users.profile:write'),
   userProfileWrite: anyOf('users.profile:write'),
   dndRead: anyOf('dnd:read'),

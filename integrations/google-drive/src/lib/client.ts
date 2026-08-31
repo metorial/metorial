@@ -18,8 +18,6 @@ import type {
 let FILE_FIELDS =
   'id,name,mimeType,description,starred,trashed,parents,webViewLink,webContentLink,iconLink,thumbnailLink,size,createdTime,modifiedTime,sharedWithMeTime,owners,lastModifyingUser,shared,capabilities';
 
-/** Max bytes returned in one **Download File** response (base64 in JSON); avoids MCP / JSON payload limits. */
-export let MAX_DRIVE_DOWNLOAD_BYTES = 6 * 1024 * 1024;
 export let GOOGLE_DRIVE_DEFAULT_PAGE_SIZE = 100;
 export let GOOGLE_DRIVE_MAX_PAGE_SIZE = 1000;
 export let GOOGLE_DRIVE_CHANGES_MAX_PAGE_SIZE = 1000;
@@ -519,7 +517,7 @@ export class GoogleDriveClient {
           ? 'Google Vids cannot be exported, and downloading Google Vids is not currently supported by this integration. Use the Google Drive `files.download` API outside this integration.'
           : meta.mimeType?.startsWith(GOOGLE_WORKSPACE_MIME_PREFIX)
             ? 'Drive does not provide an export format for this type of Google Workspace item.'
-            : 'Drive only exports Google Workspace files. Use the **Download File** tool instead.';
+            : 'Drive only exports Google Workspace files. Use the **Get Download URL** tool instead.';
       throw createApiServiceError(
         `This file cannot be exported (${meta.mimeType ?? 'unknown MIME type'}${meta.name ? `, "${meta.name}"` : ''}). ${guidance}`,
         { reason: 'google_drive_file_not_exportable' }
@@ -548,32 +546,20 @@ export class GoogleDriveClient {
     };
   }
 
-  async downloadFile(
-    fileId: string
-  ): Promise<{ contentBase64: string; mimeType?: string; byteLength: number }> {
-    let meta = await this.getFileLightMeta(fileId);
-    if (meta.mimeType?.startsWith('application/vnd.google-apps.')) {
-      throw createApiServiceError(
-        `This file is Google Workspace format (${meta.mimeType}${meta.name ? `, "${meta.name}"` : ''}). ` +
-          `Drive does not allow \`alt=media\` download for Docs/Sheets/Slides/etc. Use the **Export File** tool instead ` +
-          `(e.g. \`text/plain\`, \`application/pdf\`, or DOCX/XLSX depending on the source type).`,
-        { reason: 'google_workspace_download_requires_export' }
-      );
-    }
-    let declaredBytes =
-      meta.size !== undefined && meta.size !== '' ? Number(meta.size) : Number.NaN;
-    if (Number.isFinite(declaredBytes) && declaredBytes > MAX_DRIVE_DOWNLOAD_BYTES) {
-      throw createApiServiceError(
-        `File size (~${declaredBytes} bytes) exceeds this tool's limit of ${MAX_DRIVE_DOWNLOAD_BYTES} bytes for MCP-safe JSON payloads. Download via another path or split the file.`,
-        { reason: 'drive_download_too_large' }
-      );
-    }
-
+  async getFileDownloadLink(fileId: string): Promise<{
+    fileId: string;
+    downloadUrl: string;
+    fileName: string;
+    mimeType?: string;
+    byteLength?: number;
+  }> {
     let response: any;
     try {
       response = await this.api.get(`/files/${encodeURIComponent(fileId)}`, {
-        params: { alt: 'media', supportsAllDrives: true },
-        responseType: 'arraybuffer'
+        params: {
+          fields: 'id,name,mimeType,size,webContentLink,capabilities(canDownload)',
+          supportsAllDrives: true
+        }
       });
     } catch (e) {
       if (httpStatusFromAxiosError(e) === 404) {
@@ -581,19 +567,38 @@ export class GoogleDriveClient {
       }
       throw e;
     }
-    let buf = Buffer.from(response.data as ArrayBuffer);
-    if (buf.length > MAX_DRIVE_DOWNLOAD_BYTES) {
+
+    let file = mapFile(response.data);
+    if (file.mimeType?.startsWith(GOOGLE_WORKSPACE_MIME_PREFIX)) {
       throw createApiServiceError(
-        `Downloaded ${buf.length} bytes, which exceeds the tool limit of ${MAX_DRIVE_DOWNLOAD_BYTES} bytes for MCP-safe JSON.`,
-        { reason: 'drive_download_too_large' }
+        `This file is Google Workspace format (${file.mimeType}${file.name ? `, "${file.name}"` : ''}). ` +
+          `Drive does not provide a browser content link for Docs/Sheets/Slides/etc. Use the **Export File** tool instead ` +
+          `(e.g. \`text/plain\`, \`application/pdf\`, or DOCX/XLSX depending on the source type).`,
+        { reason: 'google_workspace_download_requires_export' }
       );
     }
-    let ct = response.headers['content-type'];
-    let mimeType = Array.isArray(ct) ? ct[0] : ct;
+
+    if (file.capabilities?.canDownload === false) {
+      throw createApiServiceError(
+        `Google Drive does not allow the signed-in user to download "${file.name}". The owner may have restricted downloads, or the user may not have sufficient access.`,
+        { reason: 'google_drive_download_restricted' }
+      );
+    }
+
+    if (!file.webContentLink) {
+      throw createApiServiceError(
+        `Google Drive did not return a browser download link for "${file.name}". Confirm that it is a regular file and that the signed-in user can download it.`,
+        { reason: 'google_drive_download_link_unavailable' }
+      );
+    }
+
+    let byteLength = file.size ? Number(file.size) : Number.NaN;
     return {
-      contentBase64: buf.toString('base64'),
-      mimeType: typeof mimeType === 'string' ? mimeType : undefined,
-      byteLength: buf.length
+      fileId: file.fileId,
+      downloadUrl: file.webContentLink,
+      fileName: file.name,
+      mimeType: file.mimeType,
+      byteLength: Number.isFinite(byteLength) ? byteLength : undefined
     };
   }
 
