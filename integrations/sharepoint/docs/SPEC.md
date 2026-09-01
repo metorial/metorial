@@ -41,7 +41,9 @@ Key SharePoint-related scopes for Microsoft Graph include:
 - `User.Read`, `offline_access`
 - `Sites.Selected` — restricts an application's access to specific site collections. Now lists, list items, folders, and files are also supported, and all Selected scopes support delegated and application modes.
 
-Application permissions typically require admin consent. Access tokens generated for Microsoft Graph resources are not valid for the SharePoint REST API — use the correct audience (`https://graph.microsoft.com` vs. `https://{tenant}.sharepoint.com`) depending on which API you call. SharePoint REST-backed tools derive the tenant SharePoint host from Microsoft Graph and exchange the refresh token for a SharePoint resource token.
+SharePoint REST-backed list and column operations require the Office 365 SharePoint Online delegated `AllSites.Manage` permission. Microsoft Graph `Sites.Manage.All` is a separate permission and does not authorize SharePoint REST calls. Custom Entra applications must configure both API resources, grant tenant consent when required, and reconnect after permission changes.
+
+Application permissions typically require admin consent. Access tokens generated for Microsoft Graph resources are not valid for the SharePoint REST API — use the correct audience (`https://graph.microsoft.com` vs. `https://{tenant}.sharepoint.com`) depending on which API you call. SharePoint REST-backed tools derive the tenant SharePoint host from Microsoft Graph and exchange the refresh token for a SharePoint resource token. Connection health requires complete, unexpired auth state for both resources.
 
 ### Certificate-Based Authentication
 

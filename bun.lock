@@ -11408,7 +11408,7 @@
     },
     "integrations/sharepoint": {
       "name": "@slates-integrations/sharepoint",
-      "version": "0.2.0-rc.17",
+      "version": "0.3.0",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/oauth-microsoft": "1.0.0-rc.5",
