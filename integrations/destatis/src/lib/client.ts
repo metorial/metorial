@@ -24,6 +24,9 @@ import type {
 } from './types';
 
 export let GENESIS_BASE_URL = 'https://genesis.destatis.de/genesisWS/rest/2020';
+// File delivery also creates a base64 representation, so bound the response before parsing
+// or encoding it. GENESIS direct table downloads are already limited to 40,000 values.
+export let GENESIS_MAX_DOWNLOAD_BYTES = 64 * 1024 * 1024;
 
 type RecordValue = Record<string, unknown>;
 
@@ -86,6 +89,7 @@ let hasJsonPrefix = (buffer: Buffer) => {
 };
 
 let parseJsonBuffer = (buffer: Buffer): unknown | undefined => {
+  if (buffer.length > 1024 * 1024) return undefined;
   try {
     return JSON.parse(buffer.toString('utf8')) as unknown;
   } catch {
@@ -93,9 +97,13 @@ let parseJsonBuffer = (buffer: Buffer): unknown | undefined => {
   }
 };
 
-let MAX_ZIP_BYTES = 256 * 1024 * 1024;
+let MAX_ZIP_BYTES = GENESIS_MAX_DOWNLOAD_BYTES;
 let MAX_ZIP_ENTRIES = 4096;
-let MAX_ZIP_UNCOMPRESSED_BYTES = 256 * 1024 * 1024;
+let MAX_ZIP_UNCOMPRESSED_BYTES = 32 * 1024 * 1024;
+let MAX_OOXML_PART_BYTES = 2 * 1024 * 1024;
+let MAX_XML_BYTES = 32 * 1024 * 1024;
+let MAX_CSV_INSPECTION_BYTES = 1024 * 1024;
+let MAX_HTML_INSPECTION_BYTES = 1024 * 1024;
 
 let crc32Table = Array.from({ length: 256 }, (_, value) => {
   let checksum = value;
@@ -113,7 +121,89 @@ let crc32 = (buffer: Buffer) => {
   return (checksum ^ 0xffffffff) >>> 0;
 };
 
-type InspectedZip = { fileNames: Set<string> };
+let cp437Extended = [
+  ...'ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■ '
+];
+
+let decodeUtf8 = (value: Buffer) => {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(value);
+  } catch {
+    return undefined;
+  }
+};
+
+let decodeCp437 = (value: Buffer) =>
+  [...value]
+    .map(byte => (byte < 128 ? String.fromCharCode(byte) : (cp437Extended[byte - 128] ?? '')))
+    .join('');
+
+let unicodeZipPath = (
+  nameBytes: Buffer,
+  extra: Buffer
+): { found: boolean; value?: string } | undefined => {
+  let cursor = 0;
+  while (cursor < extra.length) {
+    if (cursor + 4 > extra.length) return undefined;
+    let fieldId = extra.readUInt16LE(cursor);
+    let fieldLength = extra.readUInt16LE(cursor + 2);
+    let dataOffset = cursor + 4;
+    let nextCursor = dataOffset + fieldLength;
+    if (nextCursor > extra.length) return undefined;
+    if (fieldId === 0x7075) {
+      if (
+        fieldLength < 6 ||
+        extra[dataOffset] !== 1 ||
+        extra.readUInt32LE(dataOffset + 1) !== crc32(nameBytes)
+      ) {
+        return undefined;
+      }
+      let value = decodeUtf8(extra.subarray(dataOffset + 5, nextCursor));
+      return value ? { found: true, value } : undefined;
+    }
+    cursor = nextCursor;
+  }
+  return { found: false };
+};
+
+let decodeZipFileName = (nameBytes: Buffer, flags: number, extra: Buffer) => {
+  let unicodePath = unicodeZipPath(nameBytes, extra);
+  if (!unicodePath) return undefined;
+  let decoded =
+    (flags & 0x0800) !== 0
+      ? decodeUtf8(nameBytes)
+      : unicodePath.found
+        ? unicodePath.value
+        : decodeCp437(nameBytes);
+  if (!decoded) return undefined;
+  let normalized = decoded.normalize('NFC');
+  let hasControl = [...normalized].some(character => {
+    let code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
+  if (
+    hasControl ||
+    normalized.includes('\\') ||
+    normalized.startsWith('/') ||
+    /^[A-Za-z]:\//.test(normalized) ||
+    normalized.split('/').includes('..')
+  ) {
+    return undefined;
+  }
+  return normalized;
+};
+
+let retainedOoxmlParts = new Set([
+  '[Content_Types].xml',
+  '_rels/.rels',
+  'xl/workbook.xml',
+  'xl/_rels/workbook.xml.rels'
+]);
+
+type InspectedZip = {
+  fileNames: Set<string>;
+  retainedContents: Map<string, Buffer>;
+};
 
 let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
   try {
@@ -152,6 +242,7 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
     }
 
     let fileNames = new Set<string>();
+    let retainedContents = new Map<string, Buffer>();
     let cursor = centralOffset;
     let totalUncompressedBytes = 0;
     for (let index = 0; index < totalEntries; index += 1) {
@@ -181,16 +272,14 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
         return undefined;
       }
 
-      let nameBytes = buffer.subarray(cursor + 46, cursor + 46 + nameLength);
-      let fileName = nameBytes.toString('utf8');
-      if (
-        !fileName ||
-        fileName.includes('\uFFFD') ||
-        fileName.includes('\\') ||
-        fileName.startsWith('/') ||
-        fileName.split('/').includes('..') ||
-        fileNames.has(fileName)
-      ) {
+      let nameOffset = cursor + 46;
+      let nameBytes = buffer.subarray(nameOffset, nameOffset + nameLength);
+      let extra = buffer.subarray(
+        nameOffset + nameLength,
+        nameOffset + nameLength + extraLength
+      );
+      let fileName = decodeZipFileName(nameBytes, flags, extra);
+      if (!fileName || fileNames.has(fileName)) {
         return undefined;
       }
 
@@ -209,6 +298,25 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
       let localExtraLength = buffer.readUInt16LE(localOffset + 28);
       let dataOffset = localOffset + 30 + localNameLength + localExtraLength;
       let dataEnd = dataOffset + compressedSize;
+      let descriptorEnd = dataEnd;
+      if ((flags & 0x08) !== 0) {
+        let descriptorOffset = dataEnd;
+        if (
+          descriptorOffset + 4 <= centralOffset &&
+          buffer.readUInt32LE(descriptorOffset) === 0x08074b50
+        ) {
+          descriptorOffset += 4;
+        }
+        descriptorEnd = descriptorOffset + 12;
+        if (
+          descriptorEnd > centralOffset ||
+          buffer.readUInt32LE(descriptorOffset) !== expectedCrc ||
+          buffer.readUInt32LE(descriptorOffset + 4) !== compressedSize ||
+          buffer.readUInt32LE(descriptorOffset + 8) !== uncompressedSize
+        ) {
+          return undefined;
+        }
+      }
       if (
         localFlags !== flags ||
         localCompressionMethod !== compressionMethod ||
@@ -216,7 +324,7 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
           (localCrc !== expectedCrc ||
             localCompressedSize !== compressedSize ||
             localUncompressedSize !== uncompressedSize)) ||
-        dataEnd > centralOffset ||
+        descriptorEnd > centralOffset ||
         !buffer
           .subarray(localOffset + 30, localOffset + 30 + localNameLength)
           .equals(nameBytes)
@@ -227,7 +335,7 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
       totalUncompressedBytes += uncompressedSize;
       if (
         totalUncompressedBytes > MAX_ZIP_UNCOMPRESSED_BYTES ||
-        uncompressedSize > compressedSize * 1000 + 1024 * 1024
+        uncompressedSize > compressedSize * 200 + 1024 * 1024
       ) {
         return undefined;
       }
@@ -243,9 +351,15 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
       }
 
       fileNames.add(fileName);
+      if (retainedOoxmlParts.has(fileName)) {
+        if (uncompressed.length > MAX_OOXML_PART_BYTES) return undefined;
+        retainedContents.set(fileName, Buffer.from(uncompressed));
+      }
       cursor = nextCursor;
     }
-    return cursor === centralOffset + centralSize ? { fileNames } : undefined;
+    return cursor === centralOffset + centralSize
+      ? { fileNames, retainedContents }
+      : undefined;
   } catch {
     return undefined;
   }
@@ -272,10 +386,14 @@ let decodeTextFile = (buffer: Buffer): string | undefined => {
     }
   }
 
-  let hasDisallowedControl = [...text].some(character => {
+  let hasDisallowedControl = false;
+  for (let character of text) {
     let code = character.charCodeAt(0);
-    return code < 32 && code !== 9 && code !== 10 && code !== 13;
-  });
+    if (code < 32 && code !== 9 && code !== 10 && code !== 13) {
+      hasDisallowedControl = true;
+      break;
+    }
+  }
   return hasDisallowedControl ? undefined : text.replace(/^\uFEFF/, '');
 };
 
@@ -290,12 +408,306 @@ let startsLikeXml = (text: string) => {
   );
 };
 
+let boundedTextPrefix = (buffer: Buffer, maximumBytes: number) => {
+  let length = Math.min(buffer.length, maximumBytes);
+  if (
+    length < buffer.length &&
+    ((buffer[0] === 0xff && buffer[1] === 0xfe) ||
+      (buffer[0] === 0xfe && buffer[1] === 0xff)) &&
+    length % 2 !== 0
+  ) {
+    length -= 1;
+  }
+  return decodeTextFile(buffer.subarray(0, length));
+};
+
+let hasBoundedXmlShape = (text: string) => {
+  if (/<!doctype\b/i.test(text)) return false;
+  let depth = 0;
+  let elements = 0;
+  let cursor = 0;
+  while (cursor < text.length) {
+    let start = text.indexOf('<', cursor);
+    if (start < 0) break;
+    if (text.startsWith('<!--', start)) {
+      let end = text.indexOf('-->', start + 4);
+      if (end < 0) return false;
+      cursor = end + 3;
+      continue;
+    }
+    if (text.startsWith('<![CDATA[', start)) {
+      let end = text.indexOf(']]>', start + 9);
+      if (end < 0) return false;
+      cursor = end + 3;
+      continue;
+    }
+    if (text.startsWith('<?', start)) {
+      let end = text.indexOf('?>', start + 2);
+      if (end < 0) return false;
+      cursor = end + 2;
+      continue;
+    }
+    let quote: string | undefined;
+    let end = start + 1;
+    for (; end < text.length; end += 1) {
+      let character = text[end];
+      if (quote) {
+        if (character === quote) quote = undefined;
+      } else if (character === '"' || character === "'") {
+        quote = character;
+      } else if (character === '>') {
+        break;
+      }
+    }
+    if (end >= text.length || quote) return false;
+    let tag = text.slice(start + 1, end).trim();
+    if (tag.startsWith('/')) {
+      depth -= 1;
+      if (depth < 0) return false;
+    } else if (!tag.startsWith('!')) {
+      elements += 1;
+      if (elements > 100_000) return false;
+      if (!tag.endsWith('/')) {
+        depth += 1;
+        if (depth > 64) return false;
+      }
+    }
+    cursor = end + 1;
+  }
+  return depth === 0 && elements > 0;
+};
+
+let parseBoundedXml = (buffer: Buffer, maximumBytes: number) => {
+  if (buffer.length > maximumBytes) return undefined;
+  let text = decodeTextFile(buffer);
+  if (!text || !startsLikeXml(text) || !hasBoundedXmlShape(text)) return undefined;
+  if (XMLValidator.validate(text) !== true) return undefined;
+  try {
+    let parsed = new XMLParser({
+      ignoreAttributes: false,
+      processEntities: false
+    }).parse(text) as unknown;
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+let localXmlName = (name: string) => name.split(':').pop()?.toLowerCase() ?? '';
+
+let xmlRoot = (document: RecordValue | undefined) => {
+  let entry = Object.entries(document ?? {}).find(([name]) => !name.startsWith('?'));
+  return entry ? { name: entry[0], value: entry[1] } : undefined;
+};
+
+let xmlNamespace = (qualifiedName: string, value: unknown) => {
+  if (!isRecord(value)) return undefined;
+  let separator = qualifiedName.indexOf(':');
+  return separator < 0
+    ? value['@_xmlns']
+    : value[`@_xmlns:${qualifiedName.slice(0, separator)}`];
+};
+
+let xmlChildren = (value: unknown, localName: string) => {
+  if (!isRecord(value)) return [];
+  let child = Object.entries(value).find(([name]) => localXmlName(name) === localName)?.[1];
+  return child === undefined ? [] : Array.isArray(child) ? child : [child];
+};
+
+let packageRelationshipNamespace =
+  'http://schemas.openxmlformats.org/package/2006/relationships';
+let contentTypesNamespace = 'http://schemas.openxmlformats.org/package/2006/content-types';
+let spreadsheetNamespaces = new Set([
+  'http://schemas.openxmlformats.org/spreadsheetml/2006/main',
+  'http://purl.oclc.org/ooxml/spreadsheetml/main'
+]);
+let officeRelationshipNamespaces = new Set([
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+  'http://purl.oclc.org/ooxml/officeDocument/relationships'
+]);
+let officeDocumentRelationshipTypes = new Set([
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument',
+  'http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument'
+]);
+let worksheetRelationshipTypes = new Set([
+  'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet',
+  'http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet'
+]);
+let workbookContentType =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml';
+let worksheetContentType =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
+
+let hasUnsafePackageTargetCharacters = (value: string) => {
+  if (value.includes('\\') || value.includes('?') || value.includes('#')) return true;
+  for (let character of value) {
+    let code = character.charCodeAt(0);
+    if (code < 32 || code === 127) return true;
+  }
+  return false;
+};
+
+let safePackageTarget = (sourcePart: string, target: unknown) => {
+  if (
+    typeof target !== 'string' ||
+    !target ||
+    hasUnsafePackageTargetCharacters(target) ||
+    /^[A-Za-z][A-Za-z0-9+.-]*:/.test(target)
+  ) {
+    return undefined;
+  }
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(target);
+  } catch {
+    return undefined;
+  }
+  if (hasUnsafePackageTargetCharacters(decoded) || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(decoded)) {
+    return undefined;
+  }
+  let parts = decoded.startsWith('/')
+    ? []
+    : sourcePart.split('/').slice(0, -1).filter(Boolean);
+  for (let part of decoded.split('/')) {
+    if (!part || part === '.') continue;
+    if (part === '..') {
+      if (parts.length === 0) return undefined;
+      parts.pop();
+    } else {
+      parts.push(part);
+    }
+  }
+  return parts.join('/');
+};
+
+let relationshipRecords = (document: RecordValue | undefined) => {
+  let root = xmlRoot(document);
+  if (
+    !root ||
+    localXmlName(root.name) !== 'relationships' ||
+    xmlNamespace(root.name, root.value) !== packageRelationshipNamespace
+  ) {
+    return undefined;
+  }
+  let records = xmlChildren(root.value, 'relationship');
+  return records.every(isRecord) ? records : undefined;
+};
+
+let validateOoxmlWorkbook = (archive: InspectedZip) => {
+  let contentTypes = parseBoundedXml(
+    archive.retainedContents.get('[Content_Types].xml') ?? Buffer.alloc(0),
+    MAX_OOXML_PART_BYTES
+  );
+  let rootRelationships = relationshipRecords(
+    parseBoundedXml(
+      archive.retainedContents.get('_rels/.rels') ?? Buffer.alloc(0),
+      MAX_OOXML_PART_BYTES
+    )
+  );
+  let workbook = parseBoundedXml(
+    archive.retainedContents.get('xl/workbook.xml') ?? Buffer.alloc(0),
+    MAX_OOXML_PART_BYTES
+  );
+  let workbookRelationships = relationshipRecords(
+    parseBoundedXml(
+      archive.retainedContents.get('xl/_rels/workbook.xml.rels') ?? Buffer.alloc(0),
+      MAX_OOXML_PART_BYTES
+    )
+  );
+  let typesRoot = xmlRoot(contentTypes);
+  let workbookRoot = xmlRoot(workbook);
+  let workbookRootValue = workbookRoot?.value;
+  if (
+    !typesRoot ||
+    localXmlName(typesRoot.name) !== 'types' ||
+    xmlNamespace(typesRoot.name, typesRoot.value) !== contentTypesNamespace ||
+    !rootRelationships ||
+    !workbookRoot ||
+    localXmlName(workbookRoot.name) !== 'workbook' ||
+    !isRecord(workbookRootValue) ||
+    !spreadsheetNamespaces.has(String(xmlNamespace(workbookRoot.name, workbookRootValue))) ||
+    !workbookRelationships
+  ) {
+    return false;
+  }
+
+  let overrides = xmlChildren(typesRoot.value, 'override').filter(isRecord);
+  let defaults = xmlChildren(typesRoot.value, 'default').filter(isRecord);
+  let contentTypeFor = (partName: string) =>
+    overrides.find(override => override['@_PartName'] === `/${partName}`)?.['@_ContentType'];
+  let defaultContentTypeFor = (extension: string) =>
+    defaults.find(entry => entry['@_Extension'] === extension)?.['@_ContentType'];
+  if (
+    contentTypeFor('xl/workbook.xml') !== workbookContentType ||
+    defaultContentTypeFor('rels') !==
+      'application/vnd.openxmlformats-package.relationships+xml' ||
+    defaultContentTypeFor('xml') !== 'application/xml'
+  ) {
+    return false;
+  }
+
+  let officeRelationships = rootRelationships.filter(
+    relationship =>
+      officeDocumentRelationshipTypes.has(String(relationship['@_Type'])) &&
+      relationship['@_TargetMode'] !== 'External'
+  );
+  if (
+    officeRelationships.length !== 1 ||
+    typeof officeRelationships[0]?.['@_Id'] !== 'string' ||
+    !officeRelationships[0]?.['@_Id'] ||
+    safePackageTarget('', officeRelationships[0]?.['@_Target']) !== 'xl/workbook.xml'
+  ) {
+    return false;
+  }
+
+  let workbookRelationshipMap = new Map<string, RecordValue>();
+  for (let relationship of workbookRelationships) {
+    let id = relationship['@_Id'];
+    if (typeof id !== 'string' || !id || workbookRelationshipMap.has(id)) return false;
+    workbookRelationshipMap.set(id, relationship);
+  }
+  let workbookNamespace = xmlNamespace(workbookRoot.name, workbookRootValue);
+  let sheetsContainer = xmlChildren(workbookRootValue, 'sheets');
+  let sheets = sheetsContainer.flatMap(container => xmlChildren(container, 'sheet'));
+  if (sheets.length < 1 || !sheets.every(isRecord)) return false;
+  for (let sheet of sheets) {
+    let relationshipIdEntry = Object.entries(sheet).find(([name]) => {
+      let match = /^@_([^:]+):id$/.exec(name);
+      return (
+        match?.[1] !== undefined &&
+        officeRelationshipNamespaces.has(String(workbookRootValue[`@_xmlns:${match[1]}`]))
+      );
+    });
+    let relationshipId = relationshipIdEntry?.[1];
+    let relationship =
+      typeof relationshipId === 'string'
+        ? workbookRelationshipMap.get(relationshipId)
+        : undefined;
+    let target = relationship
+      ? safePackageTarget('xl/workbook.xml', relationship['@_Target'])
+      : undefined;
+    if (
+      typeof sheet['@_name'] !== 'string' ||
+      !sheet['@_name'].trim() ||
+      !relationship ||
+      relationship['@_TargetMode'] === 'External' ||
+      !worksheetRelationshipTypes.has(String(relationship['@_Type'])) ||
+      !target ||
+      !archive.fileNames.has(target) ||
+      contentTypeFor(target) !== worksheetContentType ||
+      !spreadsheetNamespaces.has(String(workbookNamespace))
+    ) {
+      return false;
+    }
+  }
+  return true;
+};
+
 let validateZipFile = (buffer: Buffer, operation: string, format: 'csv' | 'xlsx') => {
   let archive = inspectZipArchive(buffer);
   let hasExpectedEntries =
     format === 'xlsx'
-      ? archive?.fileNames.has('[Content_Types].xml') === true &&
-        archive.fileNames.has('xl/workbook.xml')
+      ? archive !== undefined && validateOoxmlWorkbook(archive)
       : [...(archive?.fileNames ?? [])].some(name => name.toLowerCase().endsWith('.csv'));
   if (!archive || !hasExpectedEntries) {
     throw destatisValidationError(
@@ -304,19 +716,27 @@ let validateZipFile = (buffer: Buffer, operation: string, format: 'csv' | 'xlsx'
   }
 };
 
-let parseDelimitedRows = (text: string, delimiter: string): string[][] | undefined => {
-  let rows: string[][] = [];
-  let row: string[] = [];
-  let field = '';
+let scanDelimitedRows = (text: string, delimiter: string, complete: boolean) => {
+  let counts = new Map<number, number>();
+  let fields = 1;
+  let fieldHasCharacters = false;
+  let rowHasContent = false;
   let quoted = false;
   let afterQuote = false;
+  let finishRow = () => {
+    if (rowHasContent && fields >= 2) counts.set(fields, (counts.get(fields) ?? 0) + 1);
+    fields = 1;
+    fieldHasCharacters = false;
+    rowHasContent = false;
+    afterQuote = false;
+  };
   for (let index = 0; index < text.length; index += 1) {
     let character = text[index] ?? '';
     if (quoted) {
       if (character !== '"') {
-        field += character;
+        if (!/\s/.test(character)) rowHasContent = true;
       } else if (text[index + 1] === '"') {
-        field += '"';
+        rowHasContent = true;
         index += 1;
       } else {
         quoted = false;
@@ -328,44 +748,33 @@ let parseDelimitedRows = (text: string, delimiter: string): string[][] | undefin
       return undefined;
     }
     if (character === '"') {
-      if (field.length !== 0) return undefined;
+      if (fieldHasCharacters) return false;
       quoted = true;
     } else if (character === delimiter) {
-      row.push(field);
-      field = '';
+      fields += 1;
+      fieldHasCharacters = false;
       afterQuote = false;
     } else if (character === '\r' || character === '\n') {
       if (character === '\r' && text[index + 1] === '\n') index += 1;
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = '';
-      afterQuote = false;
+      finishRow();
     } else {
-      field += character;
+      fieldHasCharacters = true;
+      if (!/\s/.test(character)) rowHasContent = true;
     }
   }
-  if (quoted) return undefined;
-  row.push(field);
-  rows.push(row);
-  return rows;
+  if (complete) {
+    if (quoted) return false;
+    finishRow();
+  }
+  return [...counts.values()].some(count => count >= 2);
 };
 
-let hasTabularCsvStructure = (text: string) => {
+let hasTabularCsvStructure = (text: string, complete: boolean) => {
   // GENESIS cube exports use semicolon-separated K/D records; regular CSV headers and
   // comma/tab delimiters also occur across language and encoding variants. Requiring two
   // records with the same tabular width rejects gateway prose without assuming one layout.
   for (let delimiter of [',', ';', '\t']) {
-    let rows = parseDelimitedRows(text, delimiter)?.filter(row =>
-      row.some(field => field.trim().length > 0)
-    );
-    if (!rows) continue;
-    let counts = new Map<number, number>();
-    for (let row of rows) {
-      if (row.length < 2) continue;
-      counts.set(row.length, (counts.get(row.length) ?? 0) + 1);
-    }
-    if ([...counts.values()].some(count => count >= 2)) return true;
+    if (scanDelimitedRows(text, delimiter, complete)) return true;
   }
   return false;
 };
@@ -376,7 +785,7 @@ let startsLikeGatewayError = (text: string) =>
   );
 
 let validateCsvFile = (buffer: Buffer, mimeType: string, operation: string) => {
-  let text = decodeTextFile(buffer);
+  let text = boundedTextPrefix(buffer, MAX_CSV_INSPECTION_BYTES);
   let explicitCsvMime = new Set([
     'text/csv',
     'application/csv',
@@ -395,7 +804,7 @@ let validateCsvFile = (buffer: Buffer, mimeType: string, operation: string) => {
     looksLikeStructuredError ||
     startsLikeGatewayError(start) ||
     (!explicitCsvMime && !genericTextMime) ||
-    !hasTabularCsvStructure(text)
+    !hasTabularCsvStructure(text, buffer.length <= MAX_CSV_INSPECTION_BYTES)
   ) {
     throw destatisValidationError(
       `Destatis GENESIS-Online API ${operation} returned data that is not a valid CSV file.`
@@ -404,7 +813,7 @@ let validateCsvFile = (buffer: Buffer, mimeType: string, operation: string) => {
 };
 
 let validateHtmlFile = (buffer: Buffer, mimeType: string, operation: string) => {
-  let text = decodeTextFile(buffer);
+  let text = boundedTextPrefix(buffer, MAX_HTML_INSPECTION_BYTES);
   let compatibleMime =
     mimeType === 'text/html' ||
     mimeType === 'application/xhtml+xml' ||
@@ -424,7 +833,6 @@ let validateHtmlFile = (buffer: Buffer, mimeType: string, operation: string) => 
 };
 
 let validateGenmlFile = (buffer: Buffer, mimeType: string, operation: string) => {
-  let text = decodeTextFile(buffer);
   let compatibleMime = new Set([
     'application/xml',
     'text/xml',
@@ -432,22 +840,10 @@ let validateGenmlFile = (buffer: Buffer, mimeType: string, operation: string) =>
     'application/octet-stream',
     'text/plain'
   ]).has(mimeType);
-  let parsed: unknown;
-  let validDocument = text ? XMLValidator.validate(text) === true : false;
-  if (validDocument && text) {
-    try {
-      parsed = new XMLParser({
-        ignoreAttributes: false,
-        processEntities: false
-      }).parse(text) as unknown;
-    } catch {
-      parsed = undefined;
-    }
-  }
-  let document = isRecord(parsed) ? parsed : undefined;
-  let rootEntry = Object.entries(document ?? {}).find(([name]) => !name.startsWith('?'));
-  let rootName = rootEntry?.[0].split(':').pop()?.toLowerCase() ?? '';
-  let root = rootEntry?.[1];
+  let document = parseBoundedXml(buffer, MAX_XML_BYTES);
+  let rootEntry = xmlRoot(document);
+  let rootName = rootEntry ? localXmlName(rootEntry.name) : '';
+  let root = rootEntry?.value;
   let hasGenesisRoot = new Set([
     'genml',
     'genesis',
@@ -458,24 +854,33 @@ let validateGenmlFile = (buffer: Buffer, mimeType: string, operation: string) =>
   let hasDocumentElements =
     isRecord(root) &&
     Object.keys(root).some(name => !name.startsWith('@_') && name !== '#text');
-  let containsErrorEnvelope = (value: unknown): boolean => {
-    if (Array.isArray(value)) return value.some(containsErrorEnvelope);
-    if (!isRecord(value)) return false;
-    return Object.entries(value).some(([name, child]) => {
-      let localName = name.split(':').pop()?.toLowerCase();
-      return localName === 'error' || localName === 'exception' || localName === 'fault'
-        ? true
-        : containsErrorEnvelope(child);
-    });
+  let containsErrorEnvelope = () => {
+    let stack = [root];
+    let visited = 0;
+    while (stack.length > 0) {
+      let value = stack.pop();
+      visited += 1;
+      if (visited > 100_000) return true;
+      if (Array.isArray(value)) {
+        for (let child of value) stack.push(child);
+      } else if (isRecord(value)) {
+        for (let [name, child] of Object.entries(value)) {
+          let localName = localXmlName(name);
+          if (localName === 'error' || localName === 'exception' || localName === 'fault') {
+            return true;
+          }
+          stack.push(child);
+        }
+      }
+    }
+    return false;
   };
   if (
-    !text ||
     !compatibleMime ||
-    !startsLikeXml(text) ||
-    !validDocument ||
+    !document ||
     !hasGenesisRoot ||
     !hasDocumentElements ||
-    containsErrorEnvelope(root)
+    containsErrorEnvelope()
   ) {
     throw destatisValidationError(
       `Destatis GENESIS-Online API ${operation} returned data that is not a valid GENML/XML file.`
@@ -556,6 +961,16 @@ let canonicalTableMime = (format: GenesisTableFormat | undefined, responseMime: 
   return responseMime;
 };
 
+let isAxiosSizeLimitError = (error: unknown) => {
+  if (!isRecord(error)) return false;
+  let message = typeof error.message === 'string' ? error.message : '';
+  return (
+    error.code === 'ERR_FR_MAX_BODY_LENGTH_EXCEEDED' ||
+    (error.code === 'ERR_BAD_RESPONSE' &&
+      /maxContentLength|larger than maxBodyLength/i.test(message))
+  );
+};
+
 export class GenesisClient {
   private readonly http: ReturnType<typeof createAxios>;
   private readonly token: string;
@@ -606,8 +1021,17 @@ export class GenesisClient {
     }
   ): Promise<GenesisFile> {
     try {
-      let response = await this.http.post(path, form, { responseType: 'arraybuffer' });
+      let response = await this.http.post(path, form, {
+        responseType: 'arraybuffer',
+        maxContentLength: GENESIS_MAX_DOWNLOAD_BYTES,
+        maxBodyLength: GENESIS_MAX_DOWNLOAD_BYTES
+      });
       let buffer = asBuffer(response.data);
+      if (buffer.byteLength > GENESIS_MAX_DOWNLOAD_BYTES) {
+        throw destatisValidationError(
+          `Destatis GENESIS-Online API ${operation} returned a file larger than the 64 MiB download limit.`
+        );
+      }
       if (buffer.byteLength === 0) {
         throw destatisValidationError(
           `Destatis GENESIS-Online API ${operation} returned an empty file.`
@@ -645,6 +1069,11 @@ export class GenesisClient {
         isArchive: options.isArchive(mimeType)
       };
     } catch (error) {
+      if (isAxiosSizeLimitError(error)) {
+        throw destatisValidationError(
+          `Destatis GENESIS-Online API ${operation} exceeded the 64 MiB download limit.`
+        );
+      }
       throw destatisSecureApiError(error, this.token, operation);
     }
   }

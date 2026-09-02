@@ -76,6 +76,7 @@ export let downloadTable = SlateTool.create(spec, {
   ],
   constraints: [
     'Direct table downloads can be rejected when they exceed 40,000 values; narrow years, time slices, contents, or variable selections.',
+    'Downloads larger than 64 MiB are rejected; narrow the requested table if necessary.',
     'CSV, data CSV, and flat CSV table formats are packaged as ZIP files by the provider.',
     'English responses can contain provider metadata that has not been translated.',
     'Token-authenticated downloads cannot enqueue asynchronous jobs.'
