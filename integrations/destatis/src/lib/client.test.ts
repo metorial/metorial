@@ -69,6 +69,53 @@ describe('GenesisClient request contracts', () => {
     expect((body as URLSearchParams).toString()).not.toContain('password');
   });
 
+  it.each([
+    ['all', 'all'],
+    ['cube', 'cubes'],
+    ['statistic', 'statistics'],
+    ['table', 'tables'],
+    ['time_series', 'time series'],
+    ['variable', 'variables']
+  ] as const)('maps the %s search category to provider value %s', async (category, expected) => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: successfulEnvelope({ Tables: [] })
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await client.searchCatalog({
+      language: 'en',
+      searchTerm: 'population',
+      category,
+      pageLength: 50
+    });
+
+    let body = mocks.http.post.mock.calls[0]?.[1] as URLSearchParams;
+    expect(body.get('category')).toBe(expected);
+    expect(body.get('pagelength')).toBe('50');
+  });
+
+  it('normalizes a documented code-104 catalogue miss to an empty list', async () => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: {
+        Status: { Code: 104, Content: 'No objects found', Type: 'Warning' },
+        Copyright: '© Destatis'
+      }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.searchCatalog({
+        language: 'en',
+        searchTerm: 'definitely-not-present',
+        allowNoResult: true
+      })
+    ).resolves.toEqual({
+      data: [],
+      warning: 'No objects found',
+      copyright: '© Destatis'
+    });
+  });
+
   it('maps metadata, value, and download parameters to documented form names', async () => {
     mocks.http.post
       .mockResolvedValueOnce({ data: successfulEnvelope({ Object: { Code: '12411-0001' } }) })
