@@ -184,6 +184,29 @@ let sheetJsXlsxFixture = () => {
   );
 };
 
+let multiSheetJsXlsxFixture = () => {
+  let workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet([
+      { code: 'A', value: 1 },
+      { code: 'B', value: 2 }
+    ]),
+    'Values'
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ['updated', 'status'],
+      ['2026-09-03', 'current']
+    ]),
+    'Metadata'
+  );
+  return Buffer.from(
+    XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer', compression: false })
+  );
+};
+
 let twoSheetXlsxOverrides = (
   firstSheetAttributes: string,
   secondSheetAttributes: string,
@@ -854,6 +877,10 @@ describe('GenesisClient binary responses', () => {
       bytes: sheetJsXlsxFixture()
     },
     {
+      label: 'multi-sheet uncompressed workbook emitted by SheetJS',
+      bytes: multiSheetJsXlsxFixture()
+    },
+    {
       label: 'override-only required part content types',
       bytes: xlsxFixture({
         '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml']
@@ -1276,6 +1303,38 @@ describe('GenesisClient binary responses', () => {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
     {
+      label: 'XLSX with a mixed-case content types root',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml']
+          .replace('<Types ', '<types ')
+          .replace('</Types>', '</types>')
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a mixed-case content type Override child',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml'].replace(
+          '<Override PartName="/xl/workbook.xml"',
+          '<override PartName="/xl/workbook.xml"'
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a mixed-case content type Default child',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml'].replace(
+          '<Default Extension="rels"',
+          '<default Extension="rels"'
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
       label: 'XLSX content type Override child in the wrong namespace',
       format: 'xlsx' as const,
       bytes: xlsxFixture({
@@ -1326,6 +1385,27 @@ describe('GenesisClient binary responses', () => {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
     {
+      label: 'XLSX with a mixed-case package Relationships root',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        '_rels/.rels': minimalXlsxParts['_rels/.rels']
+          .replace('<Relationships ', '<relationships ')
+          .replace('</Relationships>', '</relationships>')
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a mixed-case package Relationship child',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        '_rels/.rels': minimalXlsxParts['_rels/.rels'].replace(
+          '<Relationship ',
+          '<relationship '
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
       label: 'XLSX package Relationship child in the wrong namespace',
       format: 'xlsx' as const,
       bytes: xlsxFixture({
@@ -1348,6 +1428,27 @@ describe('GenesisClient binary responses', () => {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
     {
+      label: 'XLSX with a mixed-case workbook Relationships root',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/_rels/workbook.xml.rels': minimalXlsxParts['xl/_rels/workbook.xml.rels']
+          .replace('<Relationships ', '<relationships ')
+          .replace('</Relationships>', '</relationships>')
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a mixed-case workbook Relationship child',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/_rels/workbook.xml.rels': minimalXlsxParts['xl/_rels/workbook.xml.rels'].replace(
+          '<Relationship ',
+          '<relationship '
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
       label: 'XLSX with a traversing officeDocument target',
       format: 'xlsx' as const,
       bytes: xlsxFixture({
@@ -1365,6 +1466,37 @@ describe('GenesisClient binary responses', () => {
         'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml'].replace(
           ' xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',
           ''
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a mixed-case workbook root',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml']
+          .replace('<workbook ', '<Workbook ')
+          .replace('</workbook>', '</Workbook>')
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a mixed-case sheets child',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml']
+          .replace('<sheets>', '<Sheets>')
+          .replace('</sheets>', '</Sheets>')
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a mixed-case sheet child',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml'].replace(
+          '<sheet name=',
+          '<Sheet name='
         )
       }),
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -1420,6 +1552,16 @@ describe('GenesisClient binary responses', () => {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
     {
+      label: 'XLSX with a mixed-case Worksheet root',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/worksheets/sheet1.xml': minimalXlsxParts['xl/worksheets/sheet1.xml']
+          .replace('<worksheet ', '<Worksheet ')
+          .replace('</worksheet>', '</Worksheet>')
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
       label: 'XLSX with a referenced worksheet in the wrong namespace',
       format: 'xlsx' as const,
       bytes: xlsxFixture({
@@ -1452,6 +1594,17 @@ describe('GenesisClient binary responses', () => {
       bytes: xlsxFixture({
         'xl/worksheets/sheet1.xml':
           '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><evil:sheetData xmlns:evil="urn:wrong"/></worksheet>'
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a mixed-case SheetData child',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/worksheets/sheet1.xml': minimalXlsxParts['xl/worksheets/sheet1.xml'].replace(
+          '<sheetData/>',
+          '<SheetData/>'
+        )
       }),
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },

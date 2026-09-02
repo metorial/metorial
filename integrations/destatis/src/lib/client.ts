@@ -497,7 +497,8 @@ let parseBoundedXml = (buffer: Buffer, maximumBytes: number) => {
   }
 };
 
-let localXmlName = (name: string) => name.split(':').pop()?.toLowerCase() ?? '';
+let localXmlName = (name: string) => name.split(':').pop() ?? '';
+let normalizedGenesisXmlName = (name: string) => localXmlName(name).toLowerCase();
 
 type XmlElement = {
   name: string;
@@ -612,12 +613,12 @@ let relationshipRecords = (document: RecordValue | undefined) => {
   let root = xmlRoot(document);
   if (
     !root ||
-    localXmlName(root.name) !== 'relationships' ||
+    localXmlName(root.name) !== 'Relationships' ||
     xmlNamespace(root) !== packageRelationshipNamespace
   ) {
     return undefined;
   }
-  let relationships = xmlChildren(root, 'relationship', packageRelationshipNamespace);
+  let relationships = xmlChildren(root, 'Relationship', packageRelationshipNamespace);
   if (!relationships) return undefined;
   let records = relationships.map(relationship => relationship.value);
   return records.every(isRecord) ? records : undefined;
@@ -671,7 +672,7 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
   let workbookRootValue = workbookRoot?.value;
   if (
     !typesRoot ||
-    localXmlName(typesRoot.name) !== 'types' ||
+    localXmlName(typesRoot.name) !== 'Types' ||
     xmlNamespace(typesRoot) !== contentTypesNamespace ||
     !rootRelationships ||
     !workbookRoot ||
@@ -683,8 +684,8 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
     return false;
   }
 
-  let overrideElements = xmlChildren(typesRoot, 'override', contentTypesNamespace);
-  let defaultElements = xmlChildren(typesRoot, 'default', contentTypesNamespace);
+  let overrideElements = xmlChildren(typesRoot, 'Override', contentTypesNamespace);
+  let defaultElements = xmlChildren(typesRoot, 'Default', contentTypesNamespace);
   if (!overrideElements || !defaultElements) return false;
   let overrides = overrideElements.map(element => element.value).filter(isRecord);
   let defaults = defaultElements.map(element => element.value).filter(isRecord);
@@ -812,7 +813,7 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
     let worksheetNamespace = worksheetRoot ? xmlNamespace(worksheetRoot) : undefined;
     let sheetDataElements =
       worksheetRoot && worksheetNamespace
-        ? xmlChildren(worksheetRoot, 'sheetdata', worksheetNamespace)
+        ? xmlChildren(worksheetRoot, 'sheetData', worksheetNamespace)
         : undefined;
     if (
       typeof sheet['@_name'] !== 'string' ||
@@ -995,7 +996,7 @@ let validateGenmlFile = (buffer: Buffer, mimeType: string, operation: string) =>
   ]).has(mimeType);
   let document = parseBoundedXml(buffer, MAX_XML_BYTES);
   let rootEntry = xmlRoot(document);
-  let rootName = rootEntry ? localXmlName(rootEntry.name) : '';
+  let rootName = rootEntry ? normalizedGenesisXmlName(rootEntry.name) : '';
   let root = rootEntry?.value;
   let hasGenesisRoot = new Set([
     'genml',
@@ -1018,7 +1019,7 @@ let validateGenmlFile = (buffer: Buffer, mimeType: string, operation: string) =>
         for (let child of value) stack.push(child);
       } else if (isRecord(value)) {
         for (let [name, child] of Object.entries(value)) {
-          let localName = localXmlName(name);
+          let localName = normalizedGenesisXmlName(name);
           if (localName === 'error' || localName === 'exception' || localName === 'fault') {
             return true;
           }
