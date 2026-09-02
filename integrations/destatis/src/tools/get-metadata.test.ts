@@ -216,6 +216,10 @@ describe('Destatis metadata discovery', () => {
       code: ' 12411-0001 '
     });
     let jsonSchema = z.toJSONSchema(getMetadata.inputSchema) as Record<string, unknown>;
+    let properties = jsonSchema.properties as Record<
+      string,
+      { description?: string } | undefined
+    >;
 
     expect(defaults).toMatchObject({
       success: true,
@@ -225,6 +229,9 @@ describe('Destatis metadata discovery', () => {
     expect(jsonSchema.oneOf).toBeUndefined();
     expect(jsonSchema.anyOf).toBeUndefined();
     expect(jsonSchema.allOf).toBeUndefined();
+    expect(properties.code?.description).toContain('search_catalog');
+    expect(properties.code?.description).toContain('list_variable_values');
+    expect(getMetadata.instructions?.join(' ')).toContain('list_variable_values');
     expect(getMetadata.tags).toMatchObject({ readOnly: true, destructive: false });
   });
 });

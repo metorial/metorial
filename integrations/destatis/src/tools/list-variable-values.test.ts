@@ -141,6 +141,31 @@ describe('Destatis variable value discovery', () => {
     });
   });
 
+  it('caps values to pageLength and composes a truncation warning with the provider warning', async () => {
+    clientMocks.listVariableValues.mockResolvedValueOnce({
+      data: [
+        { Code: '1', Content: 'Male' },
+        { Code: '2', Content: 'Female' },
+        { Code: '3', Content: 'Diverse' }
+      ],
+      warning: 'The provider corrected the search criterion.'
+    });
+
+    let result = await listVariableValues.handleInvocation(
+      createCtx({ variableCode: 'GES', pageLength: 2 })
+    );
+
+    expect(result.output).toEqual({
+      variableCode: 'GES',
+      values: [
+        { code: '1', title: 'Male' },
+        { code: '2', title: 'Female' }
+      ],
+      warning:
+        'The provider corrected the search criterion. Returned the first 2 of 3 values to respect pageLength 2.'
+    });
+  });
+
   it('exports a bounded top-level object schema and safe read-only tags', () => {
     let defaults = listVariableValues.inputSchema.safeParse({ variableCode: ' GES ' });
     let jsonSchema = z.toJSONSchema(listVariableValues.inputSchema) as Record<string, unknown>;

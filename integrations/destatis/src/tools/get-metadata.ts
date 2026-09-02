@@ -21,7 +21,9 @@ let boundedCode = z
   .trim()
   .min(1, 'Enter a non-empty object code.')
   .max(15, 'Object codes are at most 15 characters.')
-  .describe('Destatis GENESIS-Online object code, from search_catalog.');
+  .describe(
+    'Destatis GENESIS-Online object code. Use search_catalog for table, cube, statistic, time-series, and variable codes; use list_variable_values for value codes.'
+  );
 
 let getMetadataInputSchema = z.object({
   objectType: metadataObjectTypeSchema.describe(
@@ -128,7 +130,7 @@ export let getMetadata = SlateTool.create(spec, {
   description:
     'Inspect a Destatis GENESIS-Online object and return its stable identity, time coverage, and table or cube dimensions alongside provider-specific metadata.',
   instructions: [
-    'Use search_catalog first when you do not already know the object code and type.',
+    'Use search_catalog for table, cube, statistic, time-series, or variable codes. Use list_variable_values to discover value codes.',
     'When a dimension reports a value count but does not enumerate value codes, call list_variable_values with that dimension code before building a filtered download.'
   ],
   tags: {

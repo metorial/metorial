@@ -125,13 +125,20 @@ export let listVariableValues = SlateTool.create(spec, {
         'Destatis GENESIS-Online returned an invalid variable value list.'
       );
     }
-    let values = result.data.map(mapVariableValue);
+    let values = result.data.slice(0, parsed.data.pageLength).map(mapVariableValue);
+    let truncationWarning =
+      result.data.length > parsed.data.pageLength
+        ? `Returned the first ${parsed.data.pageLength} of ${result.data.length} values to respect pageLength ${parsed.data.pageLength}.`
+        : undefined;
+    let warning = [result.warning, truncationWarning]
+      .filter((value): value is string => value !== undefined)
+      .join(' ');
 
     return {
       output: {
         variableCode: parsed.data.variableCode,
         values,
-        ...(result.warning ? { warning: result.warning } : {}),
+        ...(warning ? { warning } : {}),
         ...(result.copyright ? { copyright: result.copyright } : {})
       },
       message: `Found **${values.length}** values for **${parsed.data.variableCode}**.`
