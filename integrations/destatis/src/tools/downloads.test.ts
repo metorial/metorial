@@ -125,6 +125,9 @@ describe('download_table', () => {
     { tableCode: '12345678901' },
     { tableCode: '1', contents: [] },
     { tableCode: '1', contents: ['1234567'] },
+    { tableCode: '1', contents: [','] },
+    { tableCode: '1', contents: ['1,2'] },
+    { tableCode: '1', contents: ['BEV', ' BEV '] },
     { tableCode: '1', startYear: '1899' },
     { tableCode: '1', startYear: '2101' },
     { tableCode: '1', startYear: '2024-25' },
@@ -134,6 +137,19 @@ describe('download_table', () => {
     { tableCode: '1', updatedAfter: '29.02.2023' },
     { tableCode: '1', updatedAfter: '01.01.2024 24:00' },
     { tableCode: '1', regionalSelection: { variableCode: 'DLAND', valueCodes: [] } },
+    {
+      tableCode: '1',
+      regionalSelection: { variableCode: 'DLAND', valueCodes: ['01', ' 01 '] }
+    },
+    {
+      tableCode: '1',
+      regionalSelection: { variableCode: 'DLAND', valueCodes: [','] }
+    },
+    {
+      tableCode: '1',
+      classifyingSelections: [{ variableCode: 'GES', valueCodes: ['1,2'] }]
+    },
+    { tableCode: '1', classifyingSelections: [] },
     {
       tableCode: '1',
       classifyingSelections: [
@@ -232,6 +248,12 @@ describe('download_cube', () => {
   it.each([
     { cubeCode: '' },
     { cubeCode: '12345678901' },
+    { cubeCode: '1', contents: ['A&B'] },
+    {
+      cubeCode: '1',
+      classifyingSelections: [{ variableCode: 'GES', valueCodes: ['1', ' 1 '] }]
+    },
+    { cubeCode: '1', classifyingSelections: [] },
     { cubeCode: '1', updatedAfter: '00.01.2024' },
     {
       cubeCode: '1',

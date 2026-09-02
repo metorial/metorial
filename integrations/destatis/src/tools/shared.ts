@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { destatisValidationError } from '../lib/errors';
+import { GENESIS_ATOMIC_CODE_PATTERN } from '../lib/selections';
 
 export let trimmedRequiredString = (description: string) =>
   z.string().trim().min(1, 'Enter a non-empty value.').describe(description);
@@ -15,6 +16,22 @@ export let boundedTrimmedString = (maximumLength: number, description: string) =
     .max(maximumLength, `Enter at most ${maximumLength} characters.`)
     .describe(description);
 
+let atomicCodeSchema = (maximumLength: number, description: string) =>
+  boundedTrimmedString(maximumLength, description).regex(
+    GENESIS_ATOMIC_CODE_PATTERN,
+    'Use only letters, digits, *, ., _, +, or -; commas and form delimiters are not valid codes.'
+  );
+
+let duplicateCodeIndexes = (values: string[]) => {
+  let seen = new Set<string>();
+  let duplicates: number[] = [];
+  for (let [index, value] of values.entries()) {
+    if (seen.has(value)) duplicates.push(index);
+    seen.add(value);
+  }
+  return duplicates;
+};
+
 export let areaSchema = z
   .enum(['public', 'user', 'all'])
   .optional()
@@ -23,18 +40,27 @@ export let areaSchema = z
 
 let selectionSchema = (maximumValueCodeLength: number) =>
   z.object({
-    variableCode: boundedTrimmedString(
+    variableCode: atomicCodeSchema(
       6,
       'Variable code. Use get_metadata to identify dimensions.'
     ),
     valueCodes: z
       .array(
-        boundedTrimmedString(
+        atomicCodeSchema(
           maximumValueCodeLength,
           'Value code or provider wildcard. Use list_variable_values to discover codes.'
         )
       )
       .min(1, 'Select at least one value code.')
+      .superRefine((values, context) => {
+        for (let index of duplicateCodeIndexes(values)) {
+          context.addIssue({
+            code: 'custom',
+            path: [index],
+            message: `Duplicate code ${values[index]}.`
+          });
+        }
+      })
       .describe('Value codes to include for this variable.')
   });
 
@@ -45,6 +71,7 @@ export let regionalSelectionSchema = selectionSchema(8)
 export let classifyingSelectionsSchema = (maximumSelections: number) =>
   z
     .array(selectionSchema(15))
+    .min(1)
     .max(maximumSelections)
     .superRefine((selections, context) => {
       let seen = new Set<string>();
@@ -66,12 +93,21 @@ export let classifyingSelectionsSchema = (maximumSelections: number) =>
 
 export let contentsSchema = z
   .array(
-    boundedTrimmedString(
+    atomicCodeSchema(
       6,
       'Content code to include. Use get_metadata to discover table or cube contents.'
     )
   )
   .min(1)
+  .superRefine((values, context) => {
+    for (let index of duplicateCodeIndexes(values)) {
+      context.addIssue({
+        code: 'custom',
+        path: [index],
+        message: `Duplicate code ${values[index]}.`
+      });
+    }
+  })
   .optional()
   .describe('Content codes to include in the downloaded data.');
 

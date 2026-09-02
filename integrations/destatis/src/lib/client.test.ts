@@ -121,8 +121,8 @@ describe('GenesisClient request contracts', () => {
       .mockResolvedValueOnce({ data: successfulEnvelope({ Object: { Code: '12411-0001' } }) })
       .mockResolvedValueOnce({ data: successfulEnvelope({ List: [] }) })
       .mockResolvedValueOnce({
-        data: Buffer.from('a,b\n1,2\n'),
-        headers: { 'content-type': 'text/csv' }
+        data: Buffer.from('PK\u0003\u0004table'),
+        headers: { 'content-type': 'application/zip' }
       })
       .mockResolvedValueOnce({
         data: Buffer.from('cube'),
@@ -389,6 +389,13 @@ describe('GenesisClient request contracts', () => {
         ]
       })
     ).rejects.toBeInstanceOf(ServiceError);
+    await expect(
+      client.downloadTable({
+        language: 'en',
+        tableCode: '12411-0001',
+        contents: ['BEV,INSG']
+      })
+    ).rejects.toBeInstanceOf(ServiceError);
     expect(mocks.http.post).not.toHaveBeenCalled();
   });
 });
@@ -567,6 +574,7 @@ describe('GenesisClient binary responses', () => {
   it.each([
     {
       format: 'datencsv' as const,
+      bytes: Buffer.from('PK\u0003\u0004data-csv'),
       headers: { 'content-type': 'application/octet-stream' },
       expectedMime: 'application/zip',
       expectedName: '12411-0001.zip',
@@ -574,6 +582,7 @@ describe('GenesisClient binary responses', () => {
     },
     {
       format: 'ffcsv' as const,
+      bytes: Buffer.from('PK\u0003\u0004flat-csv'),
       headers: { 'content-type': 'text/csv' },
       expectedMime: 'application/zip',
       expectedName: '12411-0001.zip',
@@ -581,6 +590,7 @@ describe('GenesisClient binary responses', () => {
     },
     {
       format: 'xlsx' as const,
+      bytes: Buffer.from('PK\u0003\u0004xlsx'),
       headers: { 'content-type': 'application/zip' },
       expectedMime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       expectedName: '12411-0001.xlsx',
@@ -588,6 +598,7 @@ describe('GenesisClient binary responses', () => {
     },
     {
       format: 'html' as const,
+      bytes: Buffer.from('<!doctype html><html><body>Table</body></html>'),
       headers: { 'content-type': 'text/html; charset=utf-8' },
       expectedMime: 'text/html',
       expectedName: '12411-0001.html',
@@ -595,14 +606,14 @@ describe('GenesisClient binary responses', () => {
     },
     {
       format: 'genml' as const,
+      bytes: Buffer.from('<?xml version="1.0"?><GENML><DATA /></GENML>'),
       headers: {},
       expectedMime: 'application/xml',
       expectedName: '12411-0001.xml',
       expectedArchive: false
     }
   ])('uses canonical or defensible MIME metadata for $format table files', async example => {
-    let bytes = Buffer.from('non-json-file');
-    mocks.http.post.mockResolvedValueOnce({ data: bytes, headers: example.headers });
+    mocks.http.post.mockResolvedValueOnce({ data: example.bytes, headers: example.headers });
     let client = new GenesisClient({ token: 'token' });
 
     await expect(
@@ -612,9 +623,9 @@ describe('GenesisClient binary responses', () => {
         format: example.format
       })
     ).resolves.toEqual({
-      contentBase64: bytes.toString('base64'),
+      contentBase64: example.bytes.toString('base64'),
       mimeType: example.expectedMime,
-      byteLength: bytes.byteLength,
+      byteLength: example.bytes.byteLength,
       fileName: example.expectedName,
       isArchive: example.expectedArchive
     });
@@ -631,6 +642,141 @@ describe('GenesisClient binary responses', () => {
     await expect(
       client.downloadCube({ language: 'en', cubeCode: '12411BJ01' })
     ).resolves.toMatchObject({ mimeType: 'text/csv', isArchive: false });
+  });
+
+  it.each([
+    {
+      label: 'HTML gateway for a zipped table',
+      format: 'csv' as const,
+      bytes: Buffer.from('<html><body>Gateway error</body></html>'),
+      contentType: 'text/html'
+    },
+    {
+      label: 'corrupt XLSX',
+      format: 'xlsx' as const,
+      bytes: Buffer.from('not-a-zip'),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'plain text mislabeled as HTML',
+      format: 'html' as const,
+      bytes: Buffer.from('temporary gateway failure'),
+      contentType: 'text/html'
+    },
+    {
+      label: 'HTML mislabeled as GENML',
+      format: 'genml' as const,
+      bytes: Buffer.from('<html><body>Error</body></html>'),
+      contentType: 'application/xml'
+    }
+  ])('rejects $label before file delivery', async example => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: example.bytes,
+      headers: { 'content-type': example.contentType }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadTable({
+        language: 'en',
+        tableCode: '12411-0001',
+        format: example.format
+      })
+    ).rejects.toBeInstanceOf(ServiceError);
+  });
+
+  it.each([
+    {
+      label: 'HTML gateway',
+      bytes: Buffer.from('<!doctype html><html><body>Error</body></html>'),
+      contentType: 'text/html'
+    },
+    {
+      label: 'binary payload',
+      bytes: Buffer.from([0, 1, 2, 3, 4, 5]),
+      contentType: 'application/octet-stream'
+    },
+    {
+      label: 'XML error document',
+      bytes: Buffer.from('<?xml version="1.0"?><Error>Denied</Error>'),
+      contentType: 'application/xml'
+    },
+    {
+      label: 'unstructured generic text',
+      bytes: Buffer.from('temporary gateway failure'),
+      contentType: 'application/octet-stream'
+    }
+  ])('rejects a cube $label instead of labeling it CSV', async example => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: example.bytes,
+      headers: { 'content-type': example.contentType }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadCube({ language: 'en', cubeCode: '12411BJ01' })
+    ).rejects.toBeInstanceOf(ServiceError);
+  });
+
+  it.each([
+    {
+      label: 'UTF-8 BOM',
+      bytes: Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from('code;value\nA;1\n')])
+    },
+    {
+      label: 'UTF-16LE BOM',
+      bytes: Buffer.concat([
+        Buffer.from([0xff, 0xfe]),
+        Buffer.from('code,value\r\nA,1\r\n', 'utf16le')
+      ])
+    }
+  ])('accepts defensible $label cube CSV text', async example => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: example.bytes,
+      headers: { 'content-type': 'application/octet-stream' }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadCube({ language: 'en', cubeCode: '12411BJ01' })
+    ).resolves.toMatchObject({ mimeType: 'text/csv', byteLength: example.bytes.byteLength });
+  });
+
+  it('canonicalizes requested extensions and bounds oversized provider filenames', async () => {
+    let longName = `${'a'.repeat(250)}.zip`;
+    mocks.http.post
+      .mockResolvedValueOnce({
+        data: Buffer.from('PK\u0003\u0004csv'),
+        headers: {
+          'content-type': 'application/zip',
+          'content-disposition': 'attachment; filename="table.csv"'
+        }
+      })
+      .mockResolvedValueOnce({
+        data: Buffer.from('PK\u0003\u0004xlsx'),
+        headers: {
+          'content-type': 'application/zip',
+          'content-disposition': 'attachment; filename="workbook.zip"'
+        }
+      })
+      .mockResolvedValueOnce({
+        data: Buffer.from('code,value\nA,1\n'),
+        headers: {
+          'content-type': 'text/csv',
+          'content-disposition': `attachment; filename="${longName}"`
+        }
+      });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadTable({ language: 'en', tableCode: '12411-0001', format: 'csv' })
+    ).resolves.toMatchObject({ fileName: 'table.zip' });
+    await expect(
+      client.downloadTable({ language: 'en', tableCode: '12411-0001', format: 'xlsx' })
+    ).resolves.toMatchObject({ fileName: 'workbook.xlsx' });
+    let cube = await client.downloadCube({ language: 'en', cubeCode: '12411BJ01' });
+    expect(cube.fileName).toMatch(/\.csv$/);
+    expect([...cube.fileName]).toHaveLength(120);
   });
 
   it('falls back to a quoted filename when filename* percent encoding is malformed', async () => {

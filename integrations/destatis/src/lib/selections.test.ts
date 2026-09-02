@@ -1,6 +1,6 @@
 import { ServiceError } from '@lowerdeck/error';
 import { describe, expect, it } from 'vitest';
-import { encodeSelections } from './selections';
+import { encodeContents, encodeSelections } from './selections';
 
 describe('GENESIS structured selection encoding', () => {
   it('emits trimmed regional and numbered classifying form fields', () => {
@@ -57,6 +57,55 @@ describe('GENESIS structured selection encoding', () => {
         5
       )
     ).toThrow(/duplicate variableCode GES/);
+  });
+
+  it.each([
+    ',',
+    '1,2',
+    'A&B',
+    'A=B',
+    'A B'
+  ])('rejects delimiter-bearing regional and classifying value code %s', valueCode => {
+    expect(() =>
+      encodeSelections(
+        new URLSearchParams(),
+        { variableCode: 'DLAND', valueCodes: [valueCode] },
+        undefined,
+        5
+      )
+    ).toThrow(ServiceError);
+    expect(() =>
+      encodeSelections(
+        new URLSearchParams(),
+        undefined,
+        [{ variableCode: 'GES', valueCodes: [valueCode] }],
+        5
+      )
+    ).toThrow(ServiceError);
+  });
+
+  it('rejects empty classifying arrays and duplicate trimmed selection values', () => {
+    expect(() => encodeSelections(new URLSearchParams(), undefined, [], 5)).toThrow(
+      ServiceError
+    );
+    expect(() =>
+      encodeSelections(
+        new URLSearchParams(),
+        { variableCode: 'DLAND', valueCodes: ['01', ' 01 '] },
+        undefined,
+        5
+      )
+    ).toThrow(/duplicate codes/i);
+  });
+
+  it('serializes bounded atomic contents and rejects ambiguous or duplicate codes', () => {
+    let form = new URLSearchParams();
+    encodeContents(form, [' BEV001 ', 'RATE-1', '*']);
+    expect(form.toString()).toBe('contents=BEV001%2CRATE-1%2C*');
+
+    for (let contents of [[','], ['1,2'], ['A&B'], ['BEV', ' BEV '], []]) {
+      expect(() => encodeContents(new URLSearchParams(), contents)).toThrow(ServiceError);
+    }
   });
 
   it.each([
