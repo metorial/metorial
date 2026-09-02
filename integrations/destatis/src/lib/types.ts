@@ -70,8 +70,6 @@ export interface GenesisVariableValuesParams {
 
 export type GenesisTableFormat = 'xlsx' | 'csv' | 'datencsv' | 'ffcsv';
 
-export type GenesisSelection = Readonly<Record<string, string | readonly string[]>>;
-
 export interface GenesisDownloadParams {
   language: GenesisLanguage;
   area?: GenesisArea;
@@ -81,7 +79,6 @@ export interface GenesisDownloadParams {
   updatedAfter?: string;
   transpose?: boolean;
   compress?: boolean;
-  selection?: GenesisSelection;
 }
 
 export interface GenesisTableDownloadParams extends GenesisDownloadParams {

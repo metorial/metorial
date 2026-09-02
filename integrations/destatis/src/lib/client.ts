@@ -15,7 +15,6 @@ import type {
   GenesisMetadataParams,
   GenesisResponse,
   GenesisSearchParams,
-  GenesisSelection,
   GenesisTableDownloadParams,
   GenesisTableFormat,
   GenesisVariableValuesParams
@@ -34,24 +33,6 @@ let append = (
   value: string | number | boolean | undefined
 ) => {
   if (value !== undefined) form.set(name, String(value));
-};
-
-let appendSelection = (form: URLSearchParams, selection: GenesisSelection | undefined) => {
-  if (!selection) return;
-  let reserved = new Set([
-    'format',
-    'job',
-    'language',
-    'name',
-    'parameter',
-    'password',
-    'token',
-    'username'
-  ]);
-  for (let [name, value] of Object.entries(selection)) {
-    if (reserved.has(name.toLocaleLowerCase('en'))) continue;
-    form.set(name, typeof value === 'string' ? value : value.join(','));
-  }
 };
 
 let categoryValues = {
@@ -113,7 +94,15 @@ let safeFilename = (disposition: string | undefined, fallback: string) => {
   let encoded = disposition?.match(/filename\*\s*=\s*UTF-8''([^;]+)/i)?.[1];
   let quoted = disposition?.match(/filename\s*=\s*"([^"]+)"/i)?.[1];
   let bare = disposition?.match(/filename\s*=\s*([^;]+)/i)?.[1];
-  let candidate = encoded ? decodeURIComponent(encoded.trim()) : (quoted ?? bare)?.trim();
+  let decoded: string | undefined;
+  if (encoded) {
+    try {
+      decoded = decodeURIComponent(encoded.trim());
+    } catch {
+      decoded = undefined;
+    }
+  }
+  let candidate = decoded ?? (quoted ?? bare)?.trim();
   let leaf = (candidate ?? fallback).replaceAll('\\', '/').split('/').pop() ?? fallback;
   let cleaned = [...leaf]
     .filter(character => {
@@ -336,6 +325,5 @@ export class GenesisClient {
     append(form, 'stand', params.updatedAfter);
     append(form, 'transpose', params.transpose);
     append(form, 'compress', params.compress);
-    appendSelection(form, params.selection);
   }
 }

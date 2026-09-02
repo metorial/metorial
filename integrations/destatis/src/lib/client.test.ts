@@ -137,6 +137,37 @@ describe('GenesisClient request contracts', () => {
       'language=de&name=12411BJ001&format=csv&area=all&startyear=2020&endyear=2024'
     );
   });
+
+  it('ignores deferred selection passthrough so canonical download fields cannot be overwritten', async () => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: Buffer.from('PK\u0003\u0004csv'),
+      headers: { 'content-type': 'application/zip' }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await client.downloadTable({
+      language: 'en',
+      tableCode: '12411-0001',
+      format: 'csv',
+      area: 'public',
+      startYear: 2020,
+      transpose: false,
+      compress: true,
+      selection: {
+        area: 'user',
+        compress: 'false',
+        startyear: '1900',
+        transpose: 'true',
+        unsupported: 'must-not-be-sent'
+      }
+    } as Parameters<GenesisClient['downloadTable']>[0] & {
+      selection: Record<string, string>;
+    });
+
+    expect((mocks.http.post.mock.calls[0]?.[1] as URLSearchParams).toString()).toBe(
+      'language=en&name=12411-0001&format=csv&area=public&startyear=2020&transpose=false&compress=true&job=false'
+    );
+  });
 });
 
 describe('GenesisClient loginCheck', () => {
@@ -308,5 +339,27 @@ describe('GenesisClient binary responses', () => {
       fileName: 'cube.csv',
       isArchive: false
     });
+  });
+
+  it('falls back to a quoted filename when filename* percent encoding is malformed', async () => {
+    let bytes = Buffer.from('code,value\nA,1\n');
+    mocks.http.post.mockResolvedValueOnce({
+      data: bytes,
+      headers: {
+        'content-type': 'text/csv',
+        'content-disposition':
+          'attachment; filename="valid-cube.csv"; filename*=UTF-8\'\'bad%ZZ.csv'
+      }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadCube({ language: 'en', cubeCode: '12411BJ001' })
+    ).resolves.toEqual(
+      expect.objectContaining({
+        fileName: 'valid-cube.csv',
+        contentBase64: bytes.toString('base64')
+      })
+    );
   });
 });

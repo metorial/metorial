@@ -99,9 +99,11 @@ export let normalizeGenesisResponse = <T = RecordValue>(
   let warning = text(status.Content);
 
   if (code === '104' && options.allowNoResult === true && options.emptyValue !== undefined) {
+    let copyright = extractCopyright(value.Copyright);
     return {
       data: options.emptyValue,
-      ...(warning ? { warning } : {})
+      ...(warning ? { warning } : {}),
+      ...(copyright ? { copyright } : {})
     };
   }
 

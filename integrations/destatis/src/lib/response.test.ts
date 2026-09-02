@@ -41,12 +41,15 @@ describe('normalizeGenesisResponse', () => {
     };
 
     expect(
-      normalizeGenesisResponse(noResult, {
-        operation: 'find tables',
-        allowNoResult: true,
-        emptyValue: []
-      })
-    ).toEqual({ data: [], warning: 'No results found' });
+      normalizeGenesisResponse(
+        { ...noResult, Copyright: '© Destatis' },
+        {
+          operation: 'find tables',
+          allowNoResult: true,
+          emptyValue: []
+        }
+      )
+    ).toEqual({ data: [], warning: 'No results found', copyright: '© Destatis' });
     expect(() => normalizeGenesisResponse(noResult, { operation: 'get metadata' })).toThrow(
       expect.objectContaining({ data: expect.objectContaining({ upstreamCode: '104' }) })
     );
