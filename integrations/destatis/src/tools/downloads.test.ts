@@ -193,6 +193,15 @@ describe('download_table', () => {
     expect(jsonSchema.properties?.job).toBeUndefined();
   });
 
+  it('documents the outer response and expanded archive/XML safety limits', () => {
+    let constraints = (downloadTable.constraints ?? []).join(' ');
+    expect(constraints).toMatch(/64 MiB.*response/i);
+    expect(constraints).toMatch(/32 MiB after expansion/i);
+    expect(constraints).toMatch(/4,096.*entries/i);
+    expect(constraints).toMatch(/200 times.*1 MiB/i);
+    expect(constraints).toMatch(/GENML\/XML.*32 MiB/i);
+  });
+
   it('accepts provider codes containing URL-encoded literals and internal spaces', async () => {
     await downloadTable.handleInvocation(
       createCtx({
@@ -244,6 +253,12 @@ describe('download_cube', () => {
     expect(result.output).not.toHaveProperty('contentBase64');
     expect(result.output).not.toHaveProperty('content');
     expect(result.output).not.toHaveProperty('attachmentCount');
+  });
+
+  it('documents the CSV response size limit without implying archive expansion', () => {
+    let constraints = (downloadCube.constraints ?? []).join(' ');
+    expect(constraints).toMatch(/CSV response.*64 MiB/i);
+    expect(constraints).not.toMatch(/expanded ZIP|GENML/i);
   });
 
   it('passes explicit cube-only flags and at most three selections', async () => {

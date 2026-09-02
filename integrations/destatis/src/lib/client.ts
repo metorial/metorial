@@ -100,7 +100,6 @@ let parseJsonBuffer = (buffer: Buffer): unknown | undefined => {
 let MAX_ZIP_BYTES = GENESIS_MAX_DOWNLOAD_BYTES;
 let MAX_ZIP_ENTRIES = 4096;
 let MAX_ZIP_UNCOMPRESSED_BYTES = 32 * 1024 * 1024;
-let MAX_OOXML_PART_BYTES = 2 * 1024 * 1024;
 let MAX_XML_BYTES = 32 * 1024 * 1024;
 let MAX_CSV_INSPECTION_BYTES = 1024 * 1024;
 let MAX_HTML_INSPECTION_BYTES = 1024 * 1024;
@@ -193,21 +192,27 @@ let decodeZipFileName = (nameBytes: Buffer, flags: number, extra: Buffer) => {
   return normalized;
 };
 
-let retainedOoxmlParts = new Set([
-  '[Content_Types].xml',
-  '_rels/.rels',
-  'xl/workbook.xml',
-  'xl/_rels/workbook.xml.rels'
-]);
-
 type InspectedZip = {
   fileNames: Set<string>;
   retainedContents: Map<string, Buffer>;
 };
 
-let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
+type ZipInspection =
+  | { kind: 'valid'; archive: InspectedZip }
+  | {
+      kind: 'size-limit';
+      reason: 'outer-size' | 'entry-count' | 'expanded-size' | 'compression-ratio';
+    }
+  | { kind: 'invalid' };
+
+let invalidZipInspection: ZipInspection = { kind: 'invalid' };
+
+let inspectZipArchive = (buffer: Buffer, retainContents: boolean): ZipInspection => {
   try {
-    if (buffer.length < 22 || buffer.length > MAX_ZIP_BYTES) return undefined;
+    if (buffer.length > MAX_ZIP_BYTES) {
+      return { kind: 'size-limit', reason: 'outer-size' };
+    }
+    if (buffer.length < 22) return invalidZipInspection;
 
     let earliestEocd = Math.max(0, buffer.length - 22 - 65_535);
     let eocdOffset = -1;
@@ -219,7 +224,7 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
         break;
       }
     }
-    if (eocdOffset < 0) return undefined;
+    if (eocdOffset < 0) return invalidZipInspection;
 
     let disk = buffer.readUInt16LE(eocdOffset + 4);
     let centralDisk = buffer.readUInt16LE(eocdOffset + 6);
@@ -232,13 +237,15 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
       centralDisk !== 0 ||
       diskEntries !== totalEntries ||
       totalEntries < 1 ||
-      totalEntries > MAX_ZIP_ENTRIES ||
       totalEntries === 0xffff ||
       centralSize === 0xffffffff ||
       centralOffset === 0xffffffff ||
       centralOffset + centralSize !== eocdOffset
     ) {
-      return undefined;
+      return invalidZipInspection;
+    }
+    if (totalEntries > MAX_ZIP_ENTRIES) {
+      return { kind: 'size-limit', reason: 'entry-count' };
     }
 
     let fileNames = new Set<string>();
@@ -247,7 +254,7 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
     let totalUncompressedBytes = 0;
     for (let index = 0; index < totalEntries; index += 1) {
       if (cursor + 46 > eocdOffset || buffer.readUInt32LE(cursor) !== 0x02014b50) {
-        return undefined;
+        return invalidZipInspection;
       }
       let flags = buffer.readUInt16LE(cursor + 8);
       let compressionMethod = buffer.readUInt16LE(cursor + 10);
@@ -269,7 +276,7 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
         uncompressedSize === 0xffffffff ||
         localOffset === 0xffffffff
       ) {
-        return undefined;
+        return invalidZipInspection;
       }
 
       let nameOffset = cursor + 46;
@@ -280,14 +287,14 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
       );
       let fileName = decodeZipFileName(nameBytes, flags, extra);
       if (!fileName || fileNames.has(fileName)) {
-        return undefined;
+        return invalidZipInspection;
       }
 
       if (
         localOffset + 30 > centralOffset ||
         buffer.readUInt32LE(localOffset) !== 0x04034b50
       ) {
-        return undefined;
+        return invalidZipInspection;
       }
       let localFlags = buffer.readUInt16LE(localOffset + 6);
       let localCompressionMethod = buffer.readUInt16LE(localOffset + 8);
@@ -314,7 +321,7 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
           buffer.readUInt32LE(descriptorOffset + 4) !== compressedSize ||
           buffer.readUInt32LE(descriptorOffset + 8) !== uncompressedSize
         ) {
-          return undefined;
+          return invalidZipInspection;
         }
       }
       if (
@@ -329,15 +336,15 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
           .subarray(localOffset + 30, localOffset + 30 + localNameLength)
           .equals(nameBytes)
       ) {
-        return undefined;
+        return invalidZipInspection;
       }
 
       totalUncompressedBytes += uncompressedSize;
-      if (
-        totalUncompressedBytes > MAX_ZIP_UNCOMPRESSED_BYTES ||
-        uncompressedSize > compressedSize * 200 + 1024 * 1024
-      ) {
-        return undefined;
+      if (totalUncompressedBytes > MAX_ZIP_UNCOMPRESSED_BYTES) {
+        return { kind: 'size-limit', reason: 'expanded-size' };
+      }
+      if (uncompressedSize > compressedSize * 200 + 1024 * 1024) {
+        return { kind: 'size-limit', reason: 'compression-ratio' };
       }
       let compressed = buffer.subarray(dataOffset, dataEnd);
       let uncompressed =
@@ -347,21 +354,18 @@ let inspectZipArchive = (buffer: Buffer): InspectedZip | undefined => {
               maxOutputLength: Math.min(uncompressedSize + 1, MAX_ZIP_UNCOMPRESSED_BYTES + 1)
             });
       if (uncompressed.length !== uncompressedSize || crc32(uncompressed) !== expectedCrc) {
-        return undefined;
+        return invalidZipInspection;
       }
 
       fileNames.add(fileName);
-      if (retainedOoxmlParts.has(fileName)) {
-        if (uncompressed.length > MAX_OOXML_PART_BYTES) return undefined;
-        retainedContents.set(fileName, Buffer.from(uncompressed));
-      }
+      if (retainContents) retainedContents.set(fileName, uncompressed);
       cursor = nextCursor;
     }
     return cursor === centralOffset + centralSize
-      ? { fileNames, retainedContents }
-      : undefined;
+      ? { kind: 'valid', archive: { fileNames, retainedContents } }
+      : invalidZipInspection;
   } catch {
-    return undefined;
+    return invalidZipInspection;
   }
 };
 
@@ -537,6 +541,7 @@ let workbookContentType =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml';
 let worksheetContentType =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml';
+let relationshipsContentType = 'application/vnd.openxmlformats-package.relationships+xml';
 
 let hasUnsafePackageTargetCharacters = (value: string) => {
   if (value.includes('\\') || value.includes('?') || value.includes('#')) return true;
@@ -593,25 +598,47 @@ let relationshipRecords = (document: RecordValue | undefined) => {
   return records.every(isRecord) ? records : undefined;
 };
 
+let inheritedXmlNamespace = (prefix: string, values: RecordValue[]) => {
+  for (let value of values) {
+    let namespace = value[`@_xmlns:${prefix}`];
+    if (typeof namespace === 'string') return namespace;
+  }
+  return undefined;
+};
+
+let isValidRelationshipId = (value: unknown): value is string =>
+  typeof value === 'string' &&
+  /^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{N}\p{M}_.\-\u00B7\u203F\u2040]*$/u.test(value);
+
+let normalizedSheetId = (value: unknown) => {
+  if (typeof value !== 'string' || !/^\+?\d+$/.test(value)) return undefined;
+  try {
+    let parsed = BigInt(value);
+    return parsed > 0n && parsed <= 4_294_967_295n ? parsed.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
 let validateOoxmlWorkbook = (archive: InspectedZip) => {
   let contentTypes = parseBoundedXml(
     archive.retainedContents.get('[Content_Types].xml') ?? Buffer.alloc(0),
-    MAX_OOXML_PART_BYTES
+    MAX_XML_BYTES
   );
   let rootRelationships = relationshipRecords(
     parseBoundedXml(
       archive.retainedContents.get('_rels/.rels') ?? Buffer.alloc(0),
-      MAX_OOXML_PART_BYTES
+      MAX_XML_BYTES
     )
   );
   let workbook = parseBoundedXml(
     archive.retainedContents.get('xl/workbook.xml') ?? Buffer.alloc(0),
-    MAX_OOXML_PART_BYTES
+    MAX_XML_BYTES
   );
   let workbookRelationships = relationshipRecords(
     parseBoundedXml(
       archive.retainedContents.get('xl/_rels/workbook.xml.rels') ?? Buffer.alloc(0),
-      MAX_OOXML_PART_BYTES
+      MAX_XML_BYTES
     )
   );
   let typesRoot = xmlRoot(contentTypes);
@@ -633,15 +660,47 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
 
   let overrides = xmlChildren(typesRoot.value, 'override').filter(isRecord);
   let defaults = xmlChildren(typesRoot.value, 'default').filter(isRecord);
-  let contentTypeFor = (partName: string) =>
-    overrides.find(override => override['@_PartName'] === `/${partName}`)?.['@_ContentType'];
-  let defaultContentTypeFor = (extension: string) =>
-    defaults.find(entry => entry['@_Extension'] === extension)?.['@_ContentType'];
+  let overrideTypes = new Map<string, string>();
+  for (let override of overrides) {
+    let partName = override['@_PartName'];
+    let contentType = override['@_ContentType'];
+    if (
+      typeof partName !== 'string' ||
+      !partName.startsWith('/') ||
+      typeof contentType !== 'string' ||
+      !contentType ||
+      overrideTypes.has(partName)
+    ) {
+      return false;
+    }
+    overrideTypes.set(partName, contentType);
+  }
+  let defaultTypes = new Map<string, string>();
+  for (let entry of defaults) {
+    let extension = entry['@_Extension'];
+    let contentType = entry['@_ContentType'];
+    if (
+      typeof extension !== 'string' ||
+      !extension ||
+      typeof contentType !== 'string' ||
+      !contentType ||
+      defaultTypes.has(extension.toLowerCase())
+    ) {
+      return false;
+    }
+    defaultTypes.set(extension.toLowerCase(), contentType);
+  }
+  let contentTypeFor = (partName: string) => {
+    let override = overrideTypes.get(`/${partName}`);
+    if (override) return override;
+    let leaf = partName.split('/').pop() ?? '';
+    let dot = leaf.lastIndexOf('.');
+    return dot >= 0 ? defaultTypes.get(leaf.slice(dot + 1).toLowerCase()) : undefined;
+  };
   if (
     contentTypeFor('xl/workbook.xml') !== workbookContentType ||
-    defaultContentTypeFor('rels') !==
-      'application/vnd.openxmlformats-package.relationships+xml' ||
-    defaultContentTypeFor('xml') !== 'application/xml'
+    contentTypeFor('_rels/.rels') !== relationshipsContentType ||
+    contentTypeFor('xl/_rels/workbook.xml.rels') !== relationshipsContentType
   ) {
     return false;
   }
@@ -653,8 +712,7 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
   );
   if (
     officeRelationships.length !== 1 ||
-    typeof officeRelationships[0]?.['@_Id'] !== 'string' ||
-    !officeRelationships[0]?.['@_Id'] ||
+    !isValidRelationshipId(officeRelationships[0]?.['@_Id']) ||
     safePackageTarget('', officeRelationships[0]?.['@_Target']) !== 'xl/workbook.xml'
   ) {
     return false;
@@ -663,22 +721,41 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
   let workbookRelationshipMap = new Map<string, RecordValue>();
   for (let relationship of workbookRelationships) {
     let id = relationship['@_Id'];
-    if (typeof id !== 'string' || !id || workbookRelationshipMap.has(id)) return false;
+    if (!isValidRelationshipId(id) || workbookRelationshipMap.has(id)) return false;
     workbookRelationshipMap.set(id, relationship);
   }
-  let workbookNamespace = xmlNamespace(workbookRoot.name, workbookRootValue);
   let sheetsContainer = xmlChildren(workbookRootValue, 'sheets');
-  let sheets = sheetsContainer.flatMap(container => xmlChildren(container, 'sheet'));
-  if (sheets.length < 1 || !sheets.every(isRecord)) return false;
-  for (let sheet of sheets) {
-    let relationshipIdEntry = Object.entries(sheet).find(([name]) => {
+  let sheets: Array<{ sheet: RecordValue; ancestors: RecordValue[] }> = [];
+  for (let container of sheetsContainer) {
+    if (!isRecord(container)) return false;
+    for (let sheet of xmlChildren(container, 'sheet')) {
+      if (!isRecord(sheet)) return false;
+      sheets.push({ sheet, ancestors: [sheet, container, workbookRootValue] });
+    }
+  }
+  if (sheets.length < 1) return false;
+  let usedSheetIds = new Set<string>();
+  let usedRelationshipIds = new Set<string>();
+  let usedWorksheetTargets = new Set<string>();
+  for (let { sheet, ancestors } of sheets) {
+    let relationshipIdEntries = Object.entries(sheet).filter(([name]) => {
       let match = /^@_([^:]+):id$/.exec(name);
       return (
         match?.[1] !== undefined &&
-        officeRelationshipNamespaces.has(String(workbookRootValue[`@_xmlns:${match[1]}`]))
+        officeRelationshipNamespaces.has(String(inheritedXmlNamespace(match[1], ancestors)))
       );
     });
-    let relationshipId = relationshipIdEntry?.[1];
+    let sheetId = normalizedSheetId(sheet['@_sheetId']);
+    let relationshipId = relationshipIdEntries[0]?.[1];
+    if (
+      !sheetId ||
+      usedSheetIds.has(sheetId) ||
+      relationshipIdEntries.length !== 1 ||
+      !isValidRelationshipId(relationshipId) ||
+      usedRelationshipIds.has(relationshipId)
+    ) {
+      return false;
+    }
     let relationship =
       typeof relationshipId === 'string'
         ? workbookRelationshipMap.get(relationshipId)
@@ -686,6 +763,10 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
     let target = relationship
       ? safePackageTarget('xl/workbook.xml', relationship['@_Target'])
       : undefined;
+    let worksheetDocument = target
+      ? parseBoundedXml(archive.retainedContents.get(target) ?? Buffer.alloc(0), MAX_XML_BYTES)
+      : undefined;
+    let worksheetRoot = xmlRoot(worksheetDocument);
     if (
       typeof sheet['@_name'] !== 'string' ||
       !sheet['@_name'].trim() ||
@@ -693,18 +774,36 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
       relationship['@_TargetMode'] === 'External' ||
       !worksheetRelationshipTypes.has(String(relationship['@_Type'])) ||
       !target ||
+      usedWorksheetTargets.has(target) ||
       !archive.fileNames.has(target) ||
       contentTypeFor(target) !== worksheetContentType ||
-      !spreadsheetNamespaces.has(String(workbookNamespace))
+      !worksheetRoot ||
+      localXmlName(worksheetRoot.name) !== 'worksheet' ||
+      !spreadsheetNamespaces.has(String(xmlNamespace(worksheetRoot.name, worksheetRoot.value)))
     ) {
       return false;
     }
+    usedSheetIds.add(sheetId);
+    usedRelationshipIds.add(relationshipId);
+    usedWorksheetTargets.add(target);
   }
   return true;
 };
 
 let validateZipFile = (buffer: Buffer, operation: string, format: 'csv' | 'xlsx') => {
-  let archive = inspectZipArchive(buffer);
+  let inspection = inspectZipArchive(buffer, format === 'xlsx');
+  if (inspection.kind === 'size-limit') {
+    let guidance = {
+      'outer-size': 'the 64 MiB download limit',
+      'entry-count': 'the 4,096-entry ZIP limit',
+      'expanded-size': 'the 32 MiB expanded ZIP limit',
+      'compression-ratio': 'the ZIP expansion safety limit'
+    }[inspection.reason];
+    throw destatisValidationError(
+      `Destatis GENESIS-Online API ${operation} returned a file exceeding ${guidance}. Narrow the requested table and try again.`
+    );
+  }
+  let archive = inspection.kind === 'valid' ? inspection.archive : undefined;
   let hasExpectedEntries =
     format === 'xlsx'
       ? archive !== undefined && validateOoxmlWorkbook(archive)
@@ -833,6 +932,11 @@ let validateHtmlFile = (buffer: Buffer, mimeType: string, operation: string) => 
 };
 
 let validateGenmlFile = (buffer: Buffer, mimeType: string, operation: string) => {
+  if (buffer.length > MAX_XML_BYTES) {
+    throw destatisValidationError(
+      `Destatis GENESIS-Online API ${operation} returned a file exceeding the 32 MiB GENML/XML limit. Narrow the requested table and try again.`
+    );
+  }
   let compatibleMime = new Set([
     'application/xml',
     'text/xml',

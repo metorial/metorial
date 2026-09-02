@@ -1,6 +1,7 @@
 import { deflateRawSync } from 'node:zlib';
 import { ServiceError } from '@lowerdeck/error';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as XLSX from 'xlsx';
 
 let mocks = vi.hoisted(() => ({
   http: {
@@ -167,6 +168,43 @@ let xlsxFixture = (overrides: Record<string, string | undefined> = {}) => {
   }
   return zipFixture(parts);
 };
+
+let sheetJsXlsxFixture = () => {
+  let workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.aoa_to_sheet([
+      ['code', 'value'],
+      ['A', 1]
+    ]),
+    'Data'
+  );
+  return Buffer.from(
+    XLSX.write(workbook, { bookType: 'xlsx', type: 'buffer', compression: true })
+  );
+};
+
+let twoSheetXlsxOverrides = (
+  firstSheetAttributes: string,
+  secondSheetAttributes: string,
+  secondRelationshipTarget = 'worksheets/sheet2.xml'
+) => ({
+  '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml'].replace(
+    '</Types>',
+    '  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>\n</Types>'
+  ),
+  'xl/workbook.xml': `<?xml version="1.0" encoding="UTF-8"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="First" ${firstSheetAttributes}/><sheet name="Second" ${secondSheetAttributes}/></sheets>
+</workbook>`,
+  'xl/_rels/workbook.xml.rels': `<?xml version="1.0" encoding="UTF-8"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="${secondRelationshipTarget}"/>
+</Relationships>`,
+  'xl/worksheets/sheet2.xml': `<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>`
+});
 
 describe('GenesisClient request contracts', () => {
   beforeEach(() => {
@@ -785,6 +823,59 @@ describe('GenesisClient binary responses', () => {
     );
   });
 
+  it.each([
+    {
+      label: 'workbook emitted by SheetJS',
+      bytes: sheetJsXlsxFixture()
+    },
+    {
+      label: 'override-only required part content types',
+      bytes: xlsxFixture({
+        '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml']
+          .replace(
+            '  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+            '  <Override PartName="/_rels/.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>\n  <Override PartName="/xl/_rels/workbook.xml.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+          )
+          .replace('  <Default Extension="xml" ContentType="application/xml"/>\n', '')
+      })
+    },
+    {
+      label: 'relationship namespace declared on the sheet element',
+      bytes: xlsxFixture({
+        'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml']
+          .replace(
+            ' xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"',
+            ''
+          )
+          .replace(
+            '<sheet name="Table" sheetId="1" r:id="rId1"/>',
+            '<sheet xmlns:local="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="Table" sheetId="1" local:id="rId1"/>'
+          )
+      })
+    },
+    {
+      label: 'minimal two-sheet workbook with distinct IDs and targets',
+      bytes: xlsxFixture(
+        twoSheetXlsxOverrides('sheetId="1" r:id="rId1"', 'sheetId="2" r:id="rId2"')
+      )
+    }
+  ])('accepts a standards-valid XLSX with $label', async example => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: example.bytes,
+      headers: {
+        'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadTable({ language: 'en', tableCode: '12411-0001', format: 'xlsx' })
+    ).resolves.toMatchObject({
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      isArchive: false
+    });
+  });
+
   it('uses a safe cube filename and the response MIME type for CSV bytes', async () => {
     let bytes = Buffer.from('code,value\nA,1\n');
     mocks.http.post.mockResolvedValueOnce({
@@ -1013,14 +1104,13 @@ describe('GenesisClient binary responses', () => {
 
     await expect(
       client.downloadTable({ language: 'en', tableCode: '12411-0001', format: 'csv' })
-    ).rejects.toBeInstanceOf(ServiceError);
+    ).rejects.toThrow(/ZIP expansion safety limit|narrow/i);
   });
 
-  it('rejects a ZIP whose aggregate expansion exceeds the bounded parser budget', async () => {
-    let bytes = zipFixtureEntries([
-      { name: 'part1.csv', contents: Buffer.alloc(17 * 1024 * 1024, 0x31) },
-      { name: 'part2.csv', contents: Buffer.alloc(17 * 1024 * 1024, 0x32) }
-    ]);
+  it('accepts a ZIP at the exact 32 MiB expanded-data boundary', async () => {
+    let bytes = zipFixture({
+      'table.csv': Buffer.alloc(32 * 1024 * 1024, 'code;value\nA;1\n')
+    });
     mocks.http.post.mockResolvedValueOnce({
       data: bytes,
       headers: { 'content-type': 'application/zip' }
@@ -1029,7 +1119,27 @@ describe('GenesisClient binary responses', () => {
 
     await expect(
       client.downloadTable({ language: 'en', tableCode: '12411-0001', format: 'csv' })
-    ).rejects.toBeInstanceOf(ServiceError);
+    ).resolves.toMatchObject({ mimeType: 'application/zip', isArchive: true });
+  });
+
+  it('rejects a ZIP whose aggregate expansion exceeds the bounded parser budget', async () => {
+    let bytes = zipFixture({
+      'table.csv': Buffer.alloc(34 * 1024 * 1024, 'code;value\nA;1\n')
+    });
+    mocks.http.post.mockResolvedValueOnce({
+      data: bytes,
+      headers: { 'content-type': 'application/zip' }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    let failure = await client
+      .downloadTable({ language: 'en', tableCode: '12411-0001', format: 'csv' })
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ServiceError);
+    expect(String(failure)).toMatch(/32 MiB expanded ZIP limit/i);
+    expect(String(failure)).toMatch(/narrow/i);
+    expect(String(failure)).not.toContain('code;value');
   });
 
   it('rejects a ZIP with more than the bounded entry count', async () => {
@@ -1047,7 +1157,7 @@ describe('GenesisClient binary responses', () => {
 
     await expect(
       client.downloadTable({ language: 'en', tableCode: '12411-0001', format: 'csv' })
-    ).rejects.toBeInstanceOf(ServiceError);
+    ).rejects.toThrow(/4,096-entry ZIP limit|narrow/i);
   });
 
   it.each([
@@ -1171,6 +1281,88 @@ describe('GenesisClient binary responses', () => {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
     {
+      label: 'XLSX with a corrupt referenced worksheet leaf and a correct archive CRC',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/worksheets/sheet1.xml':
+          '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData></worksheet>'
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a non-worksheet referenced leaf root',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/worksheets/sheet1.xml':
+          '<chartsheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>'
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a referenced worksheet in the wrong namespace',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/worksheets/sheet1.xml':
+          '<worksheet xmlns="https://example.invalid/sheet"><sheetData/></worksheet>'
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    ...[
+      {
+        label: 'XLSX sheet without sheetId',
+        workbook: minimalXlsxParts['xl/workbook.xml'].replace(' sheetId="1"', '')
+      },
+      {
+        label: 'XLSX sheet with zero sheetId',
+        workbook: minimalXlsxParts['xl/workbook.xml'].replace('sheetId="1"', 'sheetId="0"')
+      },
+      {
+        label: 'XLSX sheet with noninteger sheetId',
+        workbook: minimalXlsxParts['xl/workbook.xml'].replace('sheetId="1"', 'sheetId="1.5"')
+      },
+      {
+        label: 'XLSX sheet without a relationship ID',
+        workbook: minimalXlsxParts['xl/workbook.xml'].replace(' r:id="rId1"', '')
+      },
+      {
+        label: 'XLSX sheet with an invalid relationship ID',
+        workbook: minimalXlsxParts['xl/workbook.xml'].replace('r:id="rId1"', 'r:id="bad id"')
+      }
+    ].map(example => ({
+      label: example.label,
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({ 'xl/workbook.xml': example.workbook }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })),
+    {
+      label: 'XLSX with duplicate numeric sheetIds',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture(
+        twoSheetXlsxOverrides('sheetId="1" r:id="rId1"', 'sheetId="01" r:id="rId2"')
+      ),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with duplicate sheet relationship IDs',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture(
+        twoSheetXlsxOverrides('sheetId="1" r:id="rId1"', 'sheetId="2" r:id="rId1"')
+      ),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with distinct relationship IDs resolving to one worksheet target',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture(
+        twoSheetXlsxOverrides(
+          'sheetId="1" r:id="rId1"',
+          'sheetId="2" r:id="rId2"',
+          'worksheets/sheet1.xml'
+        )
+      ),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
       label: 'encrypted XLSX archive',
       format: 'xlsx' as const,
       bytes: (() => {
@@ -1237,17 +1429,25 @@ describe('GenesisClient binary responses', () => {
   });
 
   it('rejects GENML before parsing when it exceeds the XML byte budget', async () => {
-    let bytes = Buffer.alloc(32 * 1024 * 1024 + 1, 0x20);
-    bytes.write('<GENML><Data>');
+    let prefix = '<GENML><Data>';
+    let suffix = '</Data></GENML>';
+    let bytes = Buffer.from(
+      `${prefix}${' '.repeat(33 * 1024 * 1024 - prefix.length - suffix.length)}${suffix}`
+    );
     mocks.http.post.mockResolvedValueOnce({
       data: bytes,
       headers: { 'content-type': 'application/xml' }
     });
     let client = new GenesisClient({ token: 'token' });
 
-    await expect(
-      client.downloadTable({ language: 'en', tableCode: '12411-0001', format: 'genml' })
-    ).rejects.toBeInstanceOf(ServiceError);
+    let failure = await client
+      .downloadTable({ language: 'en', tableCode: '12411-0001', format: 'genml' })
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ServiceError);
+    expect(String(failure)).toMatch(/32 MiB GENML\/XML limit/i);
+    expect(String(failure)).toMatch(/narrow/i);
+    expect(JSON.stringify(failure)).not.toContain(prefix);
   });
 
   it.each([

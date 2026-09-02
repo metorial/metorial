@@ -70,7 +70,7 @@ export let downloadCube = SlateTool.create(spec, {
   ],
   constraints: [
     'Narrow years, time slices, contents, or variable selections if the provider rejects a large direct download.',
-    'Downloads larger than 64 MiB are rejected; narrow the requested cube if necessary.',
+    'The downloadable CSV response is limited to 64 MiB; narrow the requested cube if necessary.',
     'English responses can contain provider metadata that has not been translated.'
   ],
   tags: { readOnly: true, destructive: false }
