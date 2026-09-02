@@ -144,22 +144,29 @@ let catalogGroups: ReadonlyArray<readonly [string, GenesisCatalogCategory]> = [
   ['Variables', 'variable']
 ];
 
-export let flattenGenesisCatalog = (payload: RecordValue): GenesisCatalogItem[] => {
+export let flattenGenesisCatalog = (
+  payload: RecordValue
+): GenesisCatalogItem[] | undefined => {
   let items: GenesisCatalogItem[] = [];
+  let hasCatalogGroup = false;
 
   for (let [providerKey, category] of catalogGroups) {
+    if (!Object.prototype.hasOwnProperty.call(payload, providerKey)) continue;
+
     let group = payload[providerKey];
-    if (!Array.isArray(group)) continue;
+    if (group !== null && !Array.isArray(group)) return undefined;
+    hasCatalogGroup = true;
+    if (group === null) continue;
 
     for (let entry of group) {
       let sanitized = sanitizeProviderValue(entry);
       if (isRecord(sanitized)) {
-        items.push({ category, ...sanitized });
+        items.push({ ...sanitized, category });
       } else {
         items.push({ category, value: sanitized });
       }
     }
   }
 
-  return items;
+  return hasCatalogGroup ? items : undefined;
 };

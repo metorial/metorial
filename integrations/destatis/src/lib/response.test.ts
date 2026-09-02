@@ -103,6 +103,27 @@ describe('normalizeGenesisResponse', () => {
       })
     ).toThrow(ServiceError);
   });
+
+  it.each([
+    [
+      'code-0 response',
+      { Status: { Code: 0, Content: 'Success', Type: 'Information' }, Unexpected: [] }
+    ],
+    [
+      'non-104 warning',
+      {
+        Status: { Code: 7, Content: 'Partial result', Type: 'Warning' },
+        Unexpected: []
+      }
+    ]
+  ])('rejects a %s without a recognized catalogue group', (_label, response) => {
+    expect(() =>
+      normalizeGenesisResponse(response, {
+        operation: 'find catalogue entries',
+        select: flattenGenesisCatalog
+      })
+    ).toThrow(ServiceError);
+  });
 });
 
 describe('flattenGenesisCatalog', () => {
@@ -123,5 +144,19 @@ describe('flattenGenesisCatalog', () => {
       { category: 'time_series', Code: 'series' },
       { category: 'variable', Code: 'variable' }
     ]);
+  });
+
+  it('keeps the trusted group category when an entry contains a colliding category field', () => {
+    expect(
+      flattenGenesisCatalog({
+        Tables: [{ Code: 'table', category: 'variable' }]
+      })
+    ).toEqual([{ Code: 'table', category: 'table' }]);
+  });
+
+  it('accepts a documented null group but rejects missing or malformed group shapes', () => {
+    expect(flattenGenesisCatalog({ Timeseries: null })).toEqual([]);
+    expect(flattenGenesisCatalog({ Unexpected: [] })).toBeUndefined();
+    expect(flattenGenesisCatalog({ Tables: { Code: 'table' } })).toBeUndefined();
   });
 });
