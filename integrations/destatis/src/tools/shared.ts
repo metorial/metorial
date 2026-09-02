@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { destatisValidationError } from '../lib/errors';
-import { GENESIS_ATOMIC_CODE_PATTERN } from '../lib/selections';
+import { hasUnsafeGenesisCodeCharacters } from '../lib/selections';
 
 export let trimmedRequiredString = (description: string) =>
   z.string().trim().min(1, 'Enter a non-empty value.').describe(description);
@@ -17,9 +17,9 @@ export let boundedTrimmedString = (maximumLength: number, description: string) =
     .describe(description);
 
 let atomicCodeSchema = (maximumLength: number, description: string) =>
-  boundedTrimmedString(maximumLength, description).regex(
-    GENESIS_ATOMIC_CODE_PATTERN,
-    'Use only letters, digits, *, ., _, +, or -; commas and form delimiters are not valid codes.'
+  boundedTrimmedString(maximumLength, description).refine(
+    value => !hasUnsafeGenesisCodeCharacters(value),
+    'Commas and control characters are not valid inside a code.'
   );
 
 let duplicateCodeIndexes = (values: string[]) => {

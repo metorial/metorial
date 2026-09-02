@@ -24,6 +24,8 @@ describe('GENESIS structured selection encoding', () => {
   it.each([
     [{ variableCode: '', valueCodes: ['01'] }, undefined],
     [{ variableCode: '1234567', valueCodes: ['01'] }, undefined],
+    [{ variableCode: 'D,L', valueCodes: ['01'] }, undefined],
+    [{ variableCode: 'D\u0000L', valueCodes: ['01'] }, undefined],
     [{ variableCode: 'DLAND', valueCodes: [] }, undefined],
     [{ variableCode: 'DLAND', valueCodes: ['123456789'] }, undefined],
     [{ variableCode: 'DLAND', valueCodes: ['   '] }, undefined]
@@ -36,6 +38,8 @@ describe('GENESIS structured selection encoding', () => {
   it.each([
     { selections: [{ variableCode: '', valueCodes: ['A'] }] },
     { selections: [{ variableCode: '1234567', valueCodes: ['A'] }] },
+    { selections: [{ variableCode: 'G,S', valueCodes: ['A'] }] },
+    { selections: [{ variableCode: 'G\nS', valueCodes: ['A'] }] },
     { selections: [{ variableCode: 'GES', valueCodes: [] }] },
     { selections: [{ variableCode: 'GES', valueCodes: ['1234567890123456'] }] },
     { selections: [{ variableCode: 'GES', valueCodes: [''] }] }
@@ -62,10 +66,10 @@ describe('GENESIS structured selection encoding', () => {
   it.each([
     ',',
     '1,2',
-    'A&B',
-    'A=B',
-    'A B'
-  ])('rejects delimiter-bearing regional and classifying value code %s', valueCode => {
+    'A\u0000B',
+    'A\nB',
+    'A\u007fB'
+  ])('rejects ambiguous or control-bearing regional and classifying value code %s', valueCode => {
     expect(() =>
       encodeSelections(
         new URLSearchParams(),
@@ -82,6 +86,31 @@ describe('GENESIS structured selection encoding', () => {
         5
       )
     ).toThrow(ServiceError);
+  });
+
+  it('preserves URL-encodable provider codes without creating or overwriting form keys', () => {
+    let form = new URLSearchParams({ area: 'public', regionalkey: 'canonical' });
+    encodeSelections(
+      form,
+      { variableCode: 'D&=/', valueCodes: ['A&B', 'A=B', 'A/B', 'A B'] },
+      [{ variableCode: 'G &', valueCodes: ['X&Y', 'X=Y', 'X/Y', 'X Y'] }],
+      5
+    );
+
+    expect(form.get('area')).toBe('public');
+    expect(form.get('regionalvariable')).toBe('D&=/');
+    expect(form.get('regionalkey')).toBe('A&B,A=B,A/B,A B');
+    expect(form.get('classifyingvariable1')).toBe('G &');
+    expect(form.get('classifyingkey1')).toBe('X&Y,X=Y,X/Y,X Y');
+    expect([...form.keys()]).toEqual([
+      'area',
+      'regionalkey',
+      'regionalvariable',
+      'classifyingvariable1',
+      'classifyingkey1'
+    ]);
+    expect(form.toString()).toContain('regionalvariable=D%26%3D%2F');
+    expect(form.toString()).toContain('regionalkey=A%26B%2CA%3DB%2CA%2FB%2CA+B');
   });
 
   it('rejects empty classifying arrays and duplicate trimmed selection values', () => {
@@ -103,9 +132,18 @@ describe('GENESIS structured selection encoding', () => {
     encodeContents(form, [' BEV001 ', 'RATE-1', '*']);
     expect(form.toString()).toBe('contents=BEV001%2CRATE-1%2C*');
 
-    for (let contents of [[','], ['1,2'], ['A&B'], ['BEV', ' BEV '], []]) {
+    for (let contents of [[','], ['1,2'], ['A\rB'], ['A\u007fB'], ['BEV', ' BEV '], []]) {
       expect(() => encodeContents(new URLSearchParams(), contents)).toThrow(ServiceError);
     }
+  });
+
+  it('serializes ampersands, equals signs, slashes, and internal spaces as literal contents', () => {
+    let form = new URLSearchParams({ area: 'public' });
+    encodeContents(form, ['A&B', 'A=B', 'A/B', 'A B']);
+
+    expect(form.get('contents')).toBe('A&B,A=B,A/B,A B');
+    expect([...form.keys()]).toEqual(['area', 'contents']);
+    expect(form.toString()).toBe('area=public&contents=A%26B%2CA%3DB%2CA%2FB%2CA+B');
   });
 
   it.each([

@@ -3519,6 +3519,7 @@
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
+        "fast-xml-parser": "^5.7.2",
         "slates": "1.0.0-rc.17",
         "zod": "^4.2",
       },

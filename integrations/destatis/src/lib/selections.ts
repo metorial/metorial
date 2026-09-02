@@ -1,17 +1,22 @@
 import { destatisValidationError } from './errors';
 import type { GenesisSelection } from './types';
 
-export let GENESIS_ATOMIC_CODE_PATTERN = /^[A-Za-z0-9*._+-]+$/;
+export let hasUnsafeGenesisCodeCharacters = (value: string) =>
+  value.includes(',') ||
+  [...value].some(character => {
+    let code = character.charCodeAt(0);
+    return code < 32 || code === 127;
+  });
 
 let normalizeAtomicCode = (value: string, label: string, maximumLength: number) => {
   let normalized = value.trim();
   if (
     normalized.length < 1 ||
     normalized.length > maximumLength ||
-    !GENESIS_ATOMIC_CODE_PATTERN.test(normalized)
+    hasUnsafeGenesisCodeCharacters(normalized)
   ) {
     throw destatisValidationError(
-      `${label} must be 1-${maximumLength} characters using only letters, digits, *, ., _, +, or -.`
+      `${label} must be 1-${maximumLength} characters without commas or control characters.`
     );
   }
   return normalized;

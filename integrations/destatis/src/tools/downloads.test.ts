@@ -127,6 +127,9 @@ describe('download_table', () => {
     { tableCode: '1', contents: ['1234567'] },
     { tableCode: '1', contents: [','] },
     { tableCode: '1', contents: ['1,2'] },
+    { tableCode: '1', contents: ['A\u0000B'] },
+    { tableCode: '1', contents: ['A\nB'] },
+    { tableCode: '1', contents: ['A\u007fB'] },
     { tableCode: '1', contents: ['BEV', ' BEV '] },
     { tableCode: '1', startYear: '1899' },
     { tableCode: '1', startYear: '2101' },
@@ -147,7 +150,15 @@ describe('download_table', () => {
     },
     {
       tableCode: '1',
+      regionalSelection: { variableCode: 'D,L', valueCodes: ['01'] }
+    },
+    {
+      tableCode: '1',
       classifyingSelections: [{ variableCode: 'GES', valueCodes: ['1,2'] }]
+    },
+    {
+      tableCode: '1',
+      classifyingSelections: [{ variableCode: 'G\nS', valueCodes: ['1'] }]
     },
     { tableCode: '1', classifyingSelections: [] },
     {
@@ -180,6 +191,25 @@ describe('download_table', () => {
     expect(jsonSchema.properties?.compress?.description).toMatch(/suppress empty rows/i);
     expect(jsonSchema.properties?.compress?.description).toMatch(/does not control ZIP/i);
     expect(jsonSchema.properties?.job).toBeUndefined();
+  });
+
+  it('accepts provider codes containing URL-encoded literals and internal spaces', async () => {
+    await downloadTable.handleInvocation(
+      createCtx({
+        tableCode: '1',
+        contents: ['A&B', 'A=B', 'A/B', 'A B'],
+        regionalSelection: { variableCode: 'D&=/', valueCodes: ['A&B'] },
+        classifyingSelections: [{ variableCode: 'G &', valueCodes: ['X=Y', 'X/Y', 'X Y'] }]
+      })
+    );
+
+    expect(clientMocks.downloadTable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        contents: ['A&B', 'A=B', 'A/B', 'A B'],
+        regionalSelection: { variableCode: 'D&=/', valueCodes: ['A&B'] },
+        classifyingSelections: [{ variableCode: 'G &', valueCodes: ['X=Y', 'X/Y', 'X Y'] }]
+      })
+    );
   });
 });
 
@@ -248,7 +278,8 @@ describe('download_cube', () => {
   it.each([
     { cubeCode: '' },
     { cubeCode: '12345678901' },
-    { cubeCode: '1', contents: ['A&B'] },
+    { cubeCode: '1', contents: ['A,B'] },
+    { cubeCode: '1', contents: ['A\rB'] },
     {
       cubeCode: '1',
       classifyingSelections: [{ variableCode: 'GES', valueCodes: ['1', ' 1 '] }]

@@ -24,6 +24,75 @@ let successfulEnvelope = (extra: Record<string, unknown>) => ({
   ...extra
 });
 
+let testCrc32Table = Array.from({ length: 256 }, (_, value) => {
+  let checksum = value;
+  for (let bit = 0; bit < 8; bit += 1) {
+    checksum = (checksum & 1) === 1 ? 0xedb88320 ^ (checksum >>> 1) : checksum >>> 1;
+  }
+  return checksum >>> 0;
+});
+
+let testCrc32 = (buffer: Buffer) => {
+  let checksum = 0xffffffff;
+  for (let byte of buffer) {
+    checksum = (testCrc32Table[(checksum ^ byte) & 0xff] ?? 0) ^ (checksum >>> 8);
+  }
+  return (checksum ^ 0xffffffff) >>> 0;
+};
+
+// GENESIS table CSV downloads are ZIP archives containing CSV files. Stored entries keep
+// these fixtures dependency-free while exercising real local headers, central records, CRCs,
+// and the end-of-central-directory record.
+let zipFixture = (entries: Record<string, string>) => {
+  let localRecords: Buffer[] = [];
+  let centralRecords: Buffer[] = [];
+  let localOffset = 0;
+  for (let [name, contents] of Object.entries(entries)) {
+    let nameBytes = Buffer.from(name);
+    let data = Buffer.from(contents);
+    let checksum = testCrc32(data);
+    let local = Buffer.alloc(30 + nameBytes.length + data.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt32LE(checksum, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBytes.length, 26);
+    nameBytes.copy(local, 30);
+    data.copy(local, 30 + nameBytes.length);
+
+    let central = Buffer.alloc(46 + nameBytes.length);
+    central.writeUInt32LE(0x02014b50, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt32LE(checksum, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBytes.length, 28);
+    central.writeUInt32LE(localOffset, 42);
+    nameBytes.copy(central, 46);
+
+    localRecords.push(local);
+    centralRecords.push(central);
+    localOffset += local.length;
+  }
+  let centralSize = centralRecords.reduce((sum, record) => sum + record.length, 0);
+  let eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(localRecords.length, 8);
+  eocd.writeUInt16LE(localRecords.length, 10);
+  eocd.writeUInt32LE(centralSize, 12);
+  eocd.writeUInt32LE(localOffset, 16);
+  return Buffer.concat([...localRecords, ...centralRecords, eocd]);
+};
+
+let csvZipFixture = () => zipFixture({ '12411-0001.csv': 'code;value\nA;1\n' });
+let xlsxFixture = () =>
+  zipFixture({
+    '[Content_Types].xml': '<Types />',
+    'xl/workbook.xml': '<workbook />'
+  });
+
 describe('GenesisClient request contracts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -121,11 +190,11 @@ describe('GenesisClient request contracts', () => {
       .mockResolvedValueOnce({ data: successfulEnvelope({ Object: { Code: '12411-0001' } }) })
       .mockResolvedValueOnce({ data: successfulEnvelope({ List: [] }) })
       .mockResolvedValueOnce({
-        data: Buffer.from('PK\u0003\u0004table'),
+        data: csvZipFixture(),
         headers: { 'content-type': 'application/zip' }
       })
       .mockResolvedValueOnce({
-        data: Buffer.from('cube'),
+        data: Buffer.from('code,value\nA,1\n'),
         headers: { 'content-type': 'text/csv' }
       });
     let client = new GenesisClient({ token: 'token' });
@@ -337,7 +406,7 @@ describe('GenesisClient request contracts', () => {
 
   it('ignores deferred selection passthrough so canonical download fields cannot be overwritten', async () => {
     mocks.http.post.mockResolvedValueOnce({
-      data: Buffer.from('PK\u0003\u0004csv'),
+      data: csvZipFixture(),
       headers: { 'content-type': 'application/zip' }
     });
     let client = new GenesisClient({ token: 'token' });
@@ -364,6 +433,42 @@ describe('GenesisClient request contracts', () => {
     expect((mocks.http.post.mock.calls[0]?.[1] as URLSearchParams).toString()).toBe(
       'language=en&name=12411-0001&format=csv&area=public&startyear=2020&transpose=false&compress=true&job=false'
     );
+  });
+
+  it('URL-encodes literal provider code characters without introducing form fields', async () => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: csvZipFixture(),
+      headers: { 'content-type': 'application/zip' }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await client.downloadTable({
+      language: 'en',
+      tableCode: '12411-0001',
+      format: 'csv',
+      area: 'public',
+      contents: ['A&B', 'A=B', 'A/B', 'A B'],
+      regionalSelection: { variableCode: 'D&=/', valueCodes: ['A&B', 'A=B'] },
+      classifyingSelections: [{ variableCode: 'G &', valueCodes: ['X/Y', 'X Y'] }]
+    });
+
+    let form = mocks.http.post.mock.calls[0]?.[1] as URLSearchParams;
+    expect(form.get('contents')).toBe('A&B,A=B,A/B,A B');
+    expect(form.get('regionalvariable')).toBe('D&=/');
+    expect(form.get('regionalkey')).toBe('A&B,A=B');
+    expect(form.get('classifyingvariable1')).toBe('G &');
+    expect([...form.keys()]).toEqual([
+      'language',
+      'name',
+      'format',
+      'area',
+      'contents',
+      'regionalvariable',
+      'regionalkey',
+      'classifyingvariable1',
+      'classifyingkey1',
+      'job'
+    ]);
   });
 
   it('rejects too many or duplicate structured selections before transport', async () => {
@@ -500,7 +605,7 @@ describe('GenesisClient binary responses', () => {
   it.each([
     {
       label: 'ZIP CSV table',
-      bytes: Buffer.from('PK\u0003\u0004csv'),
+      bytes: csvZipFixture(),
       contentType: 'application/zip',
       disposition: 'attachment; filename="table-export.zip"',
       format: 'csv' as const,
@@ -509,7 +614,7 @@ describe('GenesisClient binary responses', () => {
     },
     {
       label: 'XLSX table',
-      bytes: Buffer.from('PK\u0003\u0004xlsx'),
+      bytes: xlsxFixture(),
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       disposition: 'attachment; filename="table.xlsx"',
       format: 'xlsx' as const,
@@ -574,7 +679,7 @@ describe('GenesisClient binary responses', () => {
   it.each([
     {
       format: 'datencsv' as const,
-      bytes: Buffer.from('PK\u0003\u0004data-csv'),
+      bytes: csvZipFixture(),
       headers: { 'content-type': 'application/octet-stream' },
       expectedMime: 'application/zip',
       expectedName: '12411-0001.zip',
@@ -582,7 +687,7 @@ describe('GenesisClient binary responses', () => {
     },
     {
       format: 'ffcsv' as const,
-      bytes: Buffer.from('PK\u0003\u0004flat-csv'),
+      bytes: csvZipFixture(),
       headers: { 'content-type': 'text/csv' },
       expectedMime: 'application/zip',
       expectedName: '12411-0001.zip',
@@ -590,7 +695,7 @@ describe('GenesisClient binary responses', () => {
     },
     {
       format: 'xlsx' as const,
-      bytes: Buffer.from('PK\u0003\u0004xlsx'),
+      bytes: xlsxFixture(),
       headers: { 'content-type': 'application/zip' },
       expectedMime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       expectedName: '12411-0001.xlsx',
@@ -598,7 +703,9 @@ describe('GenesisClient binary responses', () => {
     },
     {
       format: 'html' as const,
-      bytes: Buffer.from('<!doctype html><html><body>Table</body></html>'),
+      bytes: Buffer.from(
+        '<!doctype html><html><head><meta name="generator" content="GENESIS-Online"></head><body><table><tr><th>Code</th></tr><tr><td>A</td></tr></table></body></html>'
+      ),
       headers: { 'content-type': 'text/html; charset=utf-8' },
       expectedMime: 'text/html',
       expectedName: '12411-0001.html',
@@ -606,7 +713,9 @@ describe('GenesisClient binary responses', () => {
     },
     {
       format: 'genml' as const,
-      bytes: Buffer.from('<?xml version="1.0"?><GENML><DATA /></GENML>'),
+      bytes: Buffer.from(
+        '<?xml version="1.0"?><GENML><Header><Code>12411-0001</Code></Header><Data><Value>1</Value></Data></GENML>'
+      ),
       headers: {},
       expectedMime: 'application/xml',
       expectedName: '12411-0001.xml',
@@ -652,9 +761,44 @@ describe('GenesisClient binary responses', () => {
       contentType: 'text/html'
     },
     {
+      label: 'truncated ZIP with a local-file signature',
+      format: 'ffcsv' as const,
+      bytes: Buffer.from('PK\u0003\u0004table.csv'),
+      contentType: 'application/zip'
+    },
+    {
+      label: 'ZIP whose entry fails its CRC',
+      format: 'datencsv' as const,
+      bytes: (() => {
+        let bytes = Buffer.from(csvZipFixture());
+        let dataOffset = 30 + Buffer.byteLength('12411-0001.csv');
+        bytes[dataOffset] = (bytes[dataOffset] ?? 0) ^ 0xff;
+        return bytes;
+      })(),
+      contentType: 'application/zip'
+    },
+    {
       label: 'corrupt XLSX',
       format: 'xlsx' as const,
       bytes: Buffer.from('not-a-zip'),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'pseudo-XLSX ZIP without workbook entries',
+      format: 'xlsx' as const,
+      bytes: zipFixture({ 'table.csv': 'code,value\nA,1\n' }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'encrypted XLSX archive',
+      format: 'xlsx' as const,
+      bytes: (() => {
+        let bytes = Buffer.from(xlsxFixture());
+        bytes.writeUInt16LE(1, 6);
+        let centralOffset = bytes.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
+        bytes.writeUInt16LE(1, centralOffset + 8);
+        return bytes;
+      })(),
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
     {
@@ -664,9 +808,29 @@ describe('GenesisClient binary responses', () => {
       contentType: 'text/html'
     },
     {
+      label: 'recognizable HTML gateway requested as a table',
+      format: 'html' as const,
+      bytes: Buffer.from(
+        '<!doctype html><html><head><title>Gateway Error</title></head><body><h1>Gateway Error</h1></body></html>'
+      ),
+      contentType: 'text/html'
+    },
+    {
       label: 'HTML mislabeled as GENML',
       format: 'genml' as const,
       bytes: Buffer.from('<html><body>Error</body></html>'),
+      contentType: 'application/xml'
+    },
+    {
+      label: 'XML error envelope requested as GENML',
+      format: 'genml' as const,
+      bytes: Buffer.from('<?xml version="1.0"?><Error><Message>Denied</Message></Error>'),
+      contentType: 'application/xml'
+    },
+    {
+      label: 'malformed GENML document',
+      format: 'genml' as const,
+      bytes: Buffer.from('<GENML><Data></GENML>'),
       contentType: 'application/xml'
     }
   ])('rejects $label before file delivery', async example => {
@@ -705,6 +869,21 @@ describe('GenesisClient binary responses', () => {
       label: 'unstructured generic text',
       bytes: Buffer.from('temporary gateway failure'),
       contentType: 'application/octet-stream'
+    },
+    {
+      label: 'explicit text/csv gateway text',
+      bytes: Buffer.from('temporary gateway failure'),
+      contentType: 'text/csv'
+    },
+    {
+      label: 'newline-only text/csv payload',
+      bytes: Buffer.from('\r\n\n'),
+      contentType: 'text/csv'
+    },
+    {
+      label: 'tabular-looking generic error payload',
+      bytes: Buffer.from('Error,Message\nGateway,Unavailable\n'),
+      contentType: 'text/csv'
     }
   ])('rejects a cube $label instead of labeling it CSV', async example => {
     mocks.http.post.mockResolvedValueOnce({
@@ -718,6 +897,23 @@ describe('GenesisClient binary responses', () => {
     ).rejects.toBeInstanceOf(ServiceError);
   });
 
+  it('uses a safe CSV validation error without echoing upstream bytes', async () => {
+    let upstreamSecret = 'provider-debug-value-that-must-not-leak';
+    mocks.http.post.mockResolvedValueOnce({
+      data: Buffer.from(`Error: ${upstreamSecret}`),
+      headers: { 'content-type': 'text/csv' }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    let failure = await client
+      .downloadCube({ language: 'en', cubeCode: '12411BJ01' })
+      .catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(ServiceError);
+    expect(String(failure)).not.toContain(upstreamSecret);
+    expect(JSON.stringify(failure)).not.toContain(upstreamSecret);
+  });
+
   it.each([
     {
       label: 'UTF-8 BOM',
@@ -729,6 +925,14 @@ describe('GenesisClient binary responses', () => {
         Buffer.from([0xff, 0xfe]),
         Buffer.from('code,value\r\nA,1\r\n', 'utf16le')
       ])
+    },
+    {
+      label: 'documented GENESIS K/D cube records separated by semicolons',
+      // The GENESIS export guide defines K header records and D data records in semicolon
+      // CSV. The fixture keeps several record widths because real cube metadata is sectional.
+      bytes: Buffer.from(
+        'K;DQ;FACH-SCHL;"nur Werte"\r\nD;61111BM001\r\nK;DQ-ERH;FACH-SCHL\r\nD;61111\r\nK;DQA;NAME\r\nD;MONAT\r\nD;DINSG\r\n'
+      )
     }
   ])('accepts defensible $label cube CSV text', async example => {
     mocks.http.post.mockResolvedValueOnce({
@@ -746,14 +950,14 @@ describe('GenesisClient binary responses', () => {
     let longName = `${'a'.repeat(250)}.zip`;
     mocks.http.post
       .mockResolvedValueOnce({
-        data: Buffer.from('PK\u0003\u0004csv'),
+        data: csvZipFixture(),
         headers: {
           'content-type': 'application/zip',
           'content-disposition': 'attachment; filename="table.csv"'
         }
       })
       .mockResolvedValueOnce({
-        data: Buffer.from('PK\u0003\u0004xlsx'),
+        data: xlsxFixture(),
         headers: {
           'content-type': 'application/zip',
           'content-disposition': 'attachment; filename="workbook.zip"'
