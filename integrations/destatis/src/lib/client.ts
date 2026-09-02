@@ -499,23 +499,46 @@ let parseBoundedXml = (buffer: Buffer, maximumBytes: number) => {
 
 let localXmlName = (name: string) => name.split(':').pop()?.toLowerCase() ?? '';
 
+type XmlElement = {
+  name: string;
+  value: unknown;
+  ancestors: RecordValue[];
+};
+
 let xmlRoot = (document: RecordValue | undefined) => {
   let entry = Object.entries(document ?? {}).find(([name]) => !name.startsWith('?'));
-  return entry ? { name: entry[0], value: entry[1] } : undefined;
+  return entry ? { name: entry[0], value: entry[1], ancestors: [] } : undefined;
 };
 
-let xmlNamespace = (qualifiedName: string, value: unknown) => {
-  if (!isRecord(value)) return undefined;
-  let separator = qualifiedName.indexOf(':');
-  return separator < 0
-    ? value['@_xmlns']
-    : value[`@_xmlns:${qualifiedName.slice(0, separator)}`];
+let xmlNamespace = (element: XmlElement) => {
+  let separator = element.name.indexOf(':');
+  let declaration = separator < 0 ? '@_xmlns' : `@_xmlns:${element.name.slice(0, separator)}`;
+  let scopes = isRecord(element.value)
+    ? [element.value, ...element.ancestors]
+    : element.ancestors;
+  for (let scope of scopes) {
+    if (Object.prototype.hasOwnProperty.call(scope, declaration)) {
+      return typeof scope[declaration] === 'string' ? scope[declaration] : undefined;
+    }
+  }
+  return undefined;
 };
 
-let xmlChildren = (value: unknown, localName: string) => {
-  if (!isRecord(value)) return [];
-  let child = Object.entries(value).find(([name]) => localXmlName(name) === localName)?.[1];
-  return child === undefined ? [] : Array.isArray(child) ? child : [child];
+let xmlChildren = (
+  parent: XmlElement,
+  localName: string,
+  namespace: string
+): XmlElement[] | undefined => {
+  if (!isRecord(parent.value)) return [];
+  let children: XmlElement[] = [];
+  let ancestors = [parent.value, ...parent.ancestors];
+  for (let [name, rawValue] of Object.entries(parent.value)) {
+    if (name.startsWith('@_') || localXmlName(name) !== localName) continue;
+    for (let value of Array.isArray(rawValue) ? rawValue : [rawValue]) {
+      children.push({ name, value, ancestors });
+    }
+  }
+  return children.every(child => xmlNamespace(child) === namespace) ? children : undefined;
 };
 
 let packageRelationshipNamespace =
@@ -590,11 +613,13 @@ let relationshipRecords = (document: RecordValue | undefined) => {
   if (
     !root ||
     localXmlName(root.name) !== 'relationships' ||
-    xmlNamespace(root.name, root.value) !== packageRelationshipNamespace
+    xmlNamespace(root) !== packageRelationshipNamespace
   ) {
     return undefined;
   }
-  let records = xmlChildren(root.value, 'relationship');
+  let relationships = xmlChildren(root, 'relationship', packageRelationshipNamespace);
+  if (!relationships) return undefined;
+  let records = relationships.map(relationship => relationship.value);
   return records.every(isRecord) ? records : undefined;
 };
 
@@ -647,19 +672,28 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
   if (
     !typesRoot ||
     localXmlName(typesRoot.name) !== 'types' ||
-    xmlNamespace(typesRoot.name, typesRoot.value) !== contentTypesNamespace ||
+    xmlNamespace(typesRoot) !== contentTypesNamespace ||
     !rootRelationships ||
     !workbookRoot ||
     localXmlName(workbookRoot.name) !== 'workbook' ||
     !isRecord(workbookRootValue) ||
-    !spreadsheetNamespaces.has(String(xmlNamespace(workbookRoot.name, workbookRootValue))) ||
+    !spreadsheetNamespaces.has(String(xmlNamespace(workbookRoot))) ||
     !workbookRelationships
   ) {
     return false;
   }
 
-  let overrides = xmlChildren(typesRoot.value, 'override').filter(isRecord);
-  let defaults = xmlChildren(typesRoot.value, 'default').filter(isRecord);
+  let overrideElements = xmlChildren(typesRoot, 'override', contentTypesNamespace);
+  let defaultElements = xmlChildren(typesRoot, 'default', contentTypesNamespace);
+  if (!overrideElements || !defaultElements) return false;
+  let overrides = overrideElements.map(element => element.value).filter(isRecord);
+  let defaults = defaultElements.map(element => element.value).filter(isRecord);
+  if (
+    overrides.length !== overrideElements.length ||
+    defaults.length !== defaultElements.length
+  ) {
+    return false;
+  }
   let overrideTypes = new Map<string, string>();
   for (let override of overrides) {
     let partName = override['@_PartName'];
@@ -724,13 +758,21 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
     if (!isValidRelationshipId(id) || workbookRelationshipMap.has(id)) return false;
     workbookRelationshipMap.set(id, relationship);
   }
-  let sheetsContainer = xmlChildren(workbookRootValue, 'sheets');
+  let workbookNamespace = xmlNamespace(workbookRoot);
+  if (!workbookNamespace) return false;
+  let sheetsContainers = xmlChildren(workbookRoot, 'sheets', workbookNamespace);
+  if (!sheetsContainers) return false;
   let sheets: Array<{ sheet: RecordValue; ancestors: RecordValue[] }> = [];
-  for (let container of sheetsContainer) {
-    if (!isRecord(container)) return false;
-    for (let sheet of xmlChildren(container, 'sheet')) {
-      if (!isRecord(sheet)) return false;
-      sheets.push({ sheet, ancestors: [sheet, container, workbookRootValue] });
+  for (let container of sheetsContainers) {
+    if (!isRecord(container.value)) return false;
+    let sheetElements = xmlChildren(container, 'sheet', workbookNamespace);
+    if (!sheetElements) return false;
+    for (let sheet of sheetElements) {
+      if (!isRecord(sheet.value)) return false;
+      sheets.push({
+        sheet: sheet.value,
+        ancestors: [sheet.value, ...sheet.ancestors]
+      });
     }
   }
   if (sheets.length < 1) return false;
@@ -767,6 +809,11 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
       ? parseBoundedXml(archive.retainedContents.get(target) ?? Buffer.alloc(0), MAX_XML_BYTES)
       : undefined;
     let worksheetRoot = xmlRoot(worksheetDocument);
+    let worksheetNamespace = worksheetRoot ? xmlNamespace(worksheetRoot) : undefined;
+    let sheetDataElements =
+      worksheetRoot && worksheetNamespace
+        ? xmlChildren(worksheetRoot, 'sheetdata', worksheetNamespace)
+        : undefined;
     if (
       typeof sheet['@_name'] !== 'string' ||
       !sheet['@_name'].trim() ||
@@ -779,7 +826,9 @@ let validateOoxmlWorkbook = (archive: InspectedZip) => {
       contentTypeFor(target) !== worksheetContentType ||
       !worksheetRoot ||
       localXmlName(worksheetRoot.name) !== 'worksheet' ||
-      !spreadsheetNamespaces.has(String(xmlNamespace(worksheetRoot.name, worksheetRoot.value)))
+      !spreadsheetNamespaces.has(String(worksheetNamespace)) ||
+      !sheetDataElements ||
+      sheetDataElements.length !== 1
     ) {
       return false;
     }

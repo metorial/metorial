@@ -206,6 +206,31 @@ let twoSheetXlsxOverrides = (
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>`
 });
 
+let prefixedXlsxFixture = () =>
+  xlsxFixture({
+    '[Content_Types].xml': `<?xml version="1.0" encoding="UTF-8"?>
+<ct:Types xmlns:ct="http://schemas.openxmlformats.org/package/2006/content-types">
+  <ct:Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <ct:Default Extension="xml" ContentType="application/xml"/>
+  <ct:Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <ct:Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</ct:Types>`,
+    '_rels/.rels': `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:Relationships xmlns:pkg="http://schemas.openxmlformats.org/package/2006/relationships">
+  <pkg:Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</pkg:Relationships>`,
+    'xl/workbook.xml': `<?xml version="1.0" encoding="UTF-8"?>
+<ss:workbook xmlns:ss="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <ss:sheets><ss:sheet xmlns:local="http://schemas.openxmlformats.org/officeDocument/2006/relationships" name="Table" sheetId="1" local:id="rId1"/></ss:sheets>
+</ss:workbook>`,
+    'xl/_rels/workbook.xml.rels': `<?xml version="1.0" encoding="UTF-8"?>
+<pkg:Relationships xmlns:pkg="http://schemas.openxmlformats.org/package/2006/relationships">
+  <pkg:Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+</pkg:Relationships>`,
+    'xl/worksheets/sheet1.xml': `<?xml version="1.0" encoding="UTF-8"?>
+<ss:worksheet xmlns:ss="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><ss:sheetData/></ss:worksheet>`
+  });
+
 describe('GenesisClient request contracts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -854,6 +879,37 @@ describe('GenesisClient binary responses', () => {
       })
     },
     {
+      label: 'prefixed graph elements inheriting namespaces from their roots',
+      bytes: prefixedXlsxFixture()
+    },
+    {
+      label: 'graph children with locally declared namespace prefixes',
+      bytes: xlsxFixture({
+        '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml'].replace(
+          '<Override PartName="/xl/workbook.xml"',
+          '<ct:Override xmlns:ct="http://schemas.openxmlformats.org/package/2006/content-types" PartName="/xl/workbook.xml"'
+        ),
+        '_rels/.rels': minimalXlsxParts['_rels/.rels'].replace(
+          '<Relationship ',
+          '<pkg:Relationship xmlns:pkg="http://schemas.openxmlformats.org/package/2006/relationships" '
+        ),
+        'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml']
+          .replace(
+            '<sheets>',
+            '<ss:sheets xmlns:ss="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+          )
+          .replace('</sheets>', '</ss:sheets>'),
+        'xl/_rels/workbook.xml.rels': minimalXlsxParts['xl/_rels/workbook.xml.rels'].replace(
+          '<Relationship ',
+          '<pkg:Relationship xmlns:pkg="http://schemas.openxmlformats.org/package/2006/relationships" '
+        ),
+        'xl/worksheets/sheet1.xml': minimalXlsxParts['xl/worksheets/sheet1.xml'].replace(
+          '<sheetData/>',
+          '<ss:sheetData xmlns:ss="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>'
+        )
+      })
+    },
+    {
       label: 'minimal two-sheet workbook with distinct IDs and targets',
       bytes: xlsxFixture(
         twoSheetXlsxOverrides('sheetId="1" r:id="rId1"', 'sheetId="2" r:id="rId2"')
@@ -1220,6 +1276,28 @@ describe('GenesisClient binary responses', () => {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
     {
+      label: 'XLSX content type Override child in the wrong namespace',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml'].replace(
+          '<Override PartName="/xl/workbook.xml"',
+          '<evil:Override xmlns:evil="urn:wrong" PartName="/xl/workbook.xml"'
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX content type Default child in the wrong namespace',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        '[Content_Types].xml': minimalXlsxParts['[Content_Types].xml'].replace(
+          '<Default Extension="rels"',
+          '<evil:Default xmlns:evil="urn:wrong" Extension="rels"'
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
       label: 'XLSX with an incorrect workbook content type',
       format: 'xlsx' as const,
       bytes: xlsxFixture({
@@ -1248,6 +1326,28 @@ describe('GenesisClient binary responses', () => {
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
     {
+      label: 'XLSX package Relationship child in the wrong namespace',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        '_rels/.rels': minimalXlsxParts['_rels/.rels'].replace(
+          '<Relationship ',
+          '<evil:Relationship xmlns:evil="urn:wrong" '
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX workbook Relationship child in the wrong namespace',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/_rels/workbook.xml.rels': minimalXlsxParts['xl/_rels/workbook.xml.rels'].replace(
+          '<Relationship ',
+          '<evil:Relationship xmlns:evil="urn:wrong" '
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
       label: 'XLSX with a traversing officeDocument target',
       format: 'xlsx' as const,
       bytes: xlsxFixture({
@@ -1265,6 +1365,27 @@ describe('GenesisClient binary responses', () => {
         'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml'].replace(
           ' xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',
           ''
+        )
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX workbook sheets child in the wrong namespace',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml']
+          .replace('<sheets>', '<evil:sheets xmlns:evil="urn:wrong">')
+          .replace('</sheets>', '</evil:sheets>')
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX workbook sheet child in the wrong namespace',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/workbook.xml': minimalXlsxParts['xl/workbook.xml'].replace(
+          '<sheet name=',
+          '<evil:sheet xmlns:evil="urn:wrong" name='
         )
       }),
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -1304,6 +1425,33 @@ describe('GenesisClient binary responses', () => {
       bytes: xlsxFixture({
         'xl/worksheets/sheet1.xml':
           '<worksheet xmlns="https://example.invalid/sheet"><sheetData/></worksheet>'
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a referenced worksheet missing direct sheetData',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/worksheets/sheet1.xml':
+          '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>'
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with duplicate direct sheetData children',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/worksheets/sheet1.xml':
+          '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/><sheetData/></worksheet>'
+      }),
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    },
+    {
+      label: 'XLSX with a direct sheetData child in the wrong namespace',
+      format: 'xlsx' as const,
+      bytes: xlsxFixture({
+        'xl/worksheets/sheet1.xml':
+          '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><evil:sheetData xmlns:evil="urn:wrong"/></worksheet>'
       }),
       contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     },
