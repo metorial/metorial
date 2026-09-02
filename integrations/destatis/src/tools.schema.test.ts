@@ -30,6 +30,7 @@ type JsonSchemaNode = {
   properties?: Record<string, JsonSchemaNode>;
   required?: string[];
   type?: string;
+  [key: string]: unknown;
 };
 
 type FieldContract = Omit<
@@ -96,48 +97,98 @@ let collectPropertyNames = (schema: JsonSchemaNode): string[] => {
   return names;
 };
 
-type FlattenedField = { required: boolean; schema: JsonSchemaNode };
-let flattenFields = (
-  objectSchema: JsonSchemaNode,
-  prefix = '',
-  fields = new Map<string, FlattenedField>()
-) => {
-  for (let [name, fieldSchema] of Object.entries(objectSchema.properties ?? {})) {
-    let path = prefix ? `${prefix}.${name}` : name;
-    fields.set(path, {
-      required: objectSchema.required?.includes(name) ?? false,
-      schema: fieldSchema
-    });
-    if (fieldSchema.type === 'object') {
-      flattenFields(fieldSchema, path, fields);
-    } else if (fieldSchema.type === 'array' && fieldSchema.items?.type === 'object') {
-      flattenFields(fieldSchema.items, `${path}[]`, fields);
-    } else if (fieldSchema.type === 'array' && fieldSchema.items) {
-      fields.set(`${path}[]`, { required: true, schema: fieldSchema.items });
+type NormalizedNode = Record<string, unknown>;
+type NodeContracts = Record<string, NormalizedNode>;
+
+let ignoredGeneratorKeys = new Set(['$schema', '$defs', 'definitions']);
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+let normalizeSchemaNode = (schema: JsonSchemaNode): NormalizedNode => {
+  let normalized: NormalizedNode = {};
+  for (let key of Object.keys(schema).sort()) {
+    if (ignoredGeneratorKeys.has(key)) continue;
+    let value = schema[key];
+    if (key === 'properties' && isRecord(value)) {
+      normalized.properties = Object.keys(value).sort();
+    } else if (key === 'required' && Array.isArray(value)) {
+      normalized.required = [...value].sort();
+    } else if (key === 'items' && isRecord(value)) {
+      normalized.items = true;
+    } else if (Array.isArray(value)) {
+      normalized[key] = value.map(item =>
+        isRecord(item) ? normalizeSchemaNode(item as JsonSchemaNode) : item
+      );
+    } else if (isRecord(value)) {
+      normalized[key] = normalizeSchemaNode(value as JsonSchemaNode);
+    } else {
+      normalized[key] = value;
     }
   }
-  return fields;
+  return normalized;
 };
 
-let expectFieldContracts = (
-  toolKey: ToolKey,
-  kind: 'input' | 'output',
-  expected: FieldContracts
-) => {
-  let actual = flattenFields(schemaFor(toolKey, kind));
-  expect([...actual.keys()].sort(), `${toolKey}.${kind} field inventory`).toEqual(
-    Object.keys(expected).sort()
-  );
-  for (let [path, contract] of Object.entries(expected)) {
-    let field = actual.get(path);
-    expect(field, `${toolKey}.${kind}.${path}`).toBeDefined();
-    if (!field) continue;
-    let { help, required, ...serializedShape } = contract;
-    expect(field.required, `${toolKey}.${kind}.${path} required`).toBe(required);
-    expect(field.schema, `${toolKey}.${kind}.${path} shape`).toMatchObject(serializedShape);
-    expect(field.schema.description, `${toolKey}.${kind}.${path} help`).toMatch(help);
-    expect(field.schema.description?.trim().length).toBeGreaterThan(12);
+let flattenSchemaNodes = (schema: JsonSchemaNode, path = '$', nodes: NodeContracts = {}) => {
+  nodes[path] = normalizeSchemaNode(schema);
+  for (let [name, property] of Object.entries(schema.properties ?? {})) {
+    let propertyPath = path === '$' ? name : `${path}.${name}`;
+    flattenSchemaNodes(property, propertyPath, nodes);
   }
+  if (schema.items) flattenSchemaNodes(schema.items, `${path}[]`, nodes);
+  return nodes;
+};
+
+let directChildren = (contracts: FieldContracts, parentPath: string) =>
+  Object.entries(contracts).filter(([path]) => {
+    if (path.endsWith('[]')) return false;
+    if (parentPath === '$') return !path.includes('.');
+    if (!path.startsWith(`${parentPath}.`)) return false;
+    return !path.slice(parentPath.length + 1).includes('.');
+  });
+
+let objectContract = (
+  contracts: FieldContracts,
+  parentPath: string,
+  additionalProperties: boolean
+): NormalizedNode => {
+  let children = directChildren(contracts, parentPath);
+  return {
+    additionalProperties,
+    properties: children.map(([path]) => path.split('.').at(-1)).sort(),
+    required: children
+      .filter(([, contract]) => contract.required)
+      .map(([path]) => path.split('.').at(-1))
+      .sort(),
+    type: 'object'
+  };
+};
+
+let buildExpectedNodes = (
+  contracts: FieldContracts,
+  descriptions: Record<string, string>,
+  objectItemPaths: string[],
+  extras: Record<string, NormalizedNode> = {}
+): NodeContracts => {
+  let expected: NodeContracts = { $: objectContract(contracts, '$', false) };
+  for (let [path, contract] of Object.entries(contracts)) {
+    let { help, required: _required, ...serializedShape } = contract;
+    let description = descriptions[path];
+    if (description === undefined) throw new TypeError(`Missing description for ${path}.`);
+    if (!help.test(description)) throw new TypeError(`Unhelpful description for ${path}.`);
+    expected[path] = {
+      ...serializedShape,
+      description,
+      ...(contract.type === 'array' ? { items: true } : {}),
+      ...(contract.type === 'object' && directChildren(contracts, path).length > 0
+        ? objectContract(contracts, path, contract.additionalProperties === true)
+        : {}),
+      ...(extras[path] ?? {})
+    };
+  }
+  for (let path of objectItemPaths) {
+    expected[path] = objectContract(contracts, path, false);
+  }
+  return expected;
 };
 
 let areaContract: FieldContract = {
@@ -487,6 +538,178 @@ let outputFieldContracts: Record<ToolKey, FieldContracts> = {
   download_cube: downloadOutputContracts('cubeCode', true)
 };
 
+let downloadInputDescriptions = (
+  codeField: 'tableCode' | 'cubeCode',
+  maximumClassifyingSelections: number
+) => ({
+  [codeField]: `${codeField === 'tableCode' ? 'Table' : 'Cube'} code returned by search_catalog or get_metadata.`,
+  area: 'GENESIS-Online data area. Public data is used by default.',
+  contents: 'Content codes to include in the downloaded data.',
+  'contents[]':
+    'Content code to include. Use get_metadata to discover table or cube contents.',
+  startYear: 'First period to include, written as YYYY or YYYY/YY.',
+  endYear: 'Last period to include, written as YYYY or YYYY/YY.',
+  timeSlices: 'Positive number of recent time slices to include.',
+  regionalSelection: 'Optional regional variable and values used to filter the download.',
+  'regionalSelection.variableCode': 'Variable code. Use get_metadata to identify dimensions.',
+  'regionalSelection.valueCodes': 'Value codes to include for this variable.',
+  'regionalSelection.valueCodes[]':
+    'Value code or provider wildcard. Use list_variable_values to discover codes.',
+  classifyingSelections: `Optional classifying-variable filters, with at most ${maximumClassifyingSelections} entries.`,
+  'classifyingSelections[].variableCode':
+    'Variable code. Use get_metadata to identify dimensions.',
+  'classifyingSelections[].valueCodes': 'Value codes to include for this variable.',
+  'classifyingSelections[].valueCodes[]':
+    'Value code or provider wildcard. Use list_variable_values to discover codes.',
+  updatedAfter:
+    'Return data updated after this real calendar date (dd.mm.yyyy or dd.mm.yyyy hh:mm).'
+});
+
+let inputDescriptions: Record<ToolKey, Record<string, string>> = {
+  search_catalog: {
+    term: 'Keyword or phrase to find in the Destatis GENESIS-Online catalogue.',
+    category: 'Type of statistical object to search. Searches all object types by default.',
+    pageLength: 'Maximum number of matching catalogue objects to return, from 1 to 1000.'
+  },
+  get_metadata: {
+    objectType: 'Type of statistical object whose structure and metadata should be returned.',
+    code: 'Destatis GENESIS-Online object code. Use search_catalog for table, cube, statistic, time-series, and variable codes; use list_variable_values for value codes.',
+    area: 'Catalogue area containing the object. Uses the public area by default.'
+  },
+  list_variable_values: {
+    variableCode: 'Variable code from search_catalog or a dimension returned by get_metadata.',
+    selection:
+      'Value code or provider wildcard pattern to match. Uses * to return all values by default.',
+    searchCriterion: 'Whether selection matches provider value codes or titles.',
+    sortCriterion: 'Whether values are sorted by provider code or title.',
+    area: 'Catalogue area containing the variable. Uses the public area by default.',
+    pageLength: 'Maximum number of variable values to return, from 1 to 1000.'
+  },
+  download_table: {
+    ...downloadInputDescriptions('tableCode', 5),
+    format: 'Presentation-table download format. CSV variants are delivered in ZIP files.',
+    compress:
+      'When true, suppress empty rows and columns and change the table shape. This does not control ZIP packaging.',
+    transpose: 'Whether to exchange the table rows and columns.'
+  },
+  download_cube: {
+    ...downloadInputDescriptions('cubeCode', 3),
+    includeValues: 'Whether the CSV includes provider value labels.',
+    includeMetadata: 'Whether the CSV includes provider metadata.',
+    includeAdditionalMetadata: 'Whether the CSV includes additional provider metadata.'
+  }
+};
+
+let downloadOutputDescriptions = (codeField: 'tableCode' | 'cubeCode') => ({
+  [codeField]: `Downloaded GENESIS-Online ${codeField === 'tableCode' ? 'table' : 'cube'} code.`,
+  format: `Downloaded ${codeField === 'tableCode' ? 'table' : 'cube'} format.`,
+  fileName: 'Provider file name or a safe generated fallback.',
+  mimeType: `MIME type of the downloadable${codeField === 'cubeCode' ? ' CSV' : ''} file.`,
+  byteLength: 'Downloaded file size in bytes.',
+  isArchive:
+    codeField === 'cubeCode'
+      ? 'Cube CSV downloads are not ZIP archives.'
+      : 'Whether the downloadable file is a ZIP archive.'
+});
+
+let outputDescriptions: Record<ToolKey, Record<string, string>> = {
+  search_catalog: {
+    items: 'Matching catalogue objects.',
+    'items[].type': 'Kind of GENESIS-Online catalogue object.',
+    'items[].code': 'Stable provider code for this catalogue object.',
+    'items[].title': 'Human-readable provider title or description.',
+    'items[].state': 'Provider availability or completeness state.',
+    'items[].timeRange': 'Available time span reported by the provider.',
+    'items[].lastUpdated': 'Provider-reported last update time.',
+    'items[].valueCount': 'Number of values reported for a variable.',
+    'items[].hasInformation':
+      'Whether the provider reports additional information for this object.',
+    warning: 'Non-fatal provider warning, including a normal no-results notice.',
+    copyright: 'Provider copyright and attribution notice.'
+  },
+  get_metadata: {
+    objectType: 'Requested statistical object type.',
+    code: 'Stable provider code reported for this object.',
+    title: 'Human-readable provider title.',
+    updatedAt: 'Provider-reported last update time.',
+    timeRange: 'Available time span reported by the provider.',
+    dimensions: 'Table or cube dimensions reported by the provider.',
+    'dimensions[].code': 'Stable provider code for this dimension.',
+    'dimensions[].title': 'Human-readable provider title for this dimension.',
+    'dimensions[].type': 'Provider-reported dimension type.',
+    'dimensions[].valueCount': 'Number of available values reported for this dimension.',
+    'dimensions[].selectedCount': 'Number of selected values reported for this dimension.',
+    metadata: 'Provider metadata for resource-specific statistical semantics.',
+    warning: 'Non-fatal provider warning.',
+    copyright: 'Provider copyright and attribution notice.'
+  },
+  list_variable_values: {
+    variableCode: 'Variable code whose values were returned.',
+    values: 'Matching provider values.',
+    'values[].code': 'Stable provider code for this variable value.',
+    'values[].title': 'Human-readable provider title for this variable value.',
+    'values[].variableCount': 'Number of related variables reported by the provider.',
+    'values[].hasInformation':
+      'Whether the provider reports additional information for this value.',
+    warning: 'Non-fatal provider warning.',
+    copyright: 'Provider copyright and attribution notice.'
+  },
+  download_table: downloadOutputDescriptions('tableCode'),
+  download_cube: downloadOutputDescriptions('cubeCode')
+};
+
+let objectItemPaths: Record<'input' | 'output', Record<ToolKey, string[]>> = {
+  input: {
+    search_catalog: [],
+    get_metadata: [],
+    list_variable_values: [],
+    download_table: ['classifyingSelections[]'],
+    download_cube: ['classifyingSelections[]']
+  },
+  output: {
+    search_catalog: ['items[]'],
+    get_metadata: ['dimensions[]'],
+    list_variable_values: ['values[]'],
+    download_table: [],
+    download_cube: []
+  }
+};
+
+let schemaExtras: Record<'input' | 'output', Partial<Record<ToolKey, NodeContracts>>> = {
+  input: {},
+  output: {
+    get_metadata: {
+      metadata: { additionalProperties: {}, propertyNames: { type: 'string' } }
+    }
+  }
+};
+
+let expectedSchemaNodes = (toolKey: ToolKey, kind: 'input' | 'output') => {
+  let contracts =
+    kind === 'input' ? inputFieldContracts[toolKey] : outputFieldContracts[toolKey];
+  let descriptions =
+    kind === 'input' ? inputDescriptions[toolKey] : outputDescriptions[toolKey];
+  expect(Object.keys(descriptions).sort(), `${toolKey}.${kind} descriptions`).toEqual(
+    Object.keys(contracts).sort()
+  );
+  return buildExpectedNodes(
+    contracts,
+    descriptions,
+    objectItemPaths[kind][toolKey],
+    schemaExtras[kind][toolKey]
+  );
+};
+
+let expectExactSchemaContract = (
+  toolKey: ToolKey,
+  kind: 'input' | 'output',
+  schema = schemaFor(toolKey, kind)
+) => {
+  expect(flattenSchemaNodes(schema), `${toolKey}.${kind} exact schema`).toEqual(
+    expectedSchemaNodes(toolKey, kind)
+  );
+};
+
 describeMcpCompatibleToolSchemas('Destatis tool input schemas', provider.actions);
 
 describe('Destatis public tool contract', () => {
@@ -514,15 +737,32 @@ describe('Destatis public tool contract', () => {
 
   it('locks every recursive input field, default, enum, bound, pattern, and help text', () => {
     for (let toolKey of expectedToolKeys) {
-      expectFieldContracts(toolKey, 'input', inputFieldContracts[toolKey]);
+      expectExactSchemaContract(toolKey, 'input');
     }
   });
 
   it('locks every recursive output field and its required or optional status', () => {
     for (let toolKey of expectedToolKeys) {
-      expectFieldContracts(toolKey, 'output', outputFieldContracts[toolKey]);
-      expect(schemaFor(toolKey, 'output').additionalProperties, toolKey).toBe(false);
+      expectExactSchemaContract(toolKey, 'output');
     }
+  });
+
+  it('detects unexpected nested constraints and object openness mutations', () => {
+    let patternMutation = structuredClone(schemaFor('download_table', 'input'));
+    let contentsItem = patternMutation.properties?.contents?.items;
+    if (!contentsItem) throw new TypeError('Missing contents item schema.');
+    contentsItem.pattern = '^UNEXPECTED$';
+    expect(() =>
+      expectExactSchemaContract('download_table', 'input', patternMutation)
+    ).toThrow();
+
+    let opennessMutation = structuredClone(schemaFor('download_cube', 'input'));
+    let regionalSelection = opennessMutation.properties?.regionalSelection;
+    if (!regionalSelection) throw new TypeError('Missing regional selection schema.');
+    regionalSelection.additionalProperties = true;
+    expect(() =>
+      expectExactSchemaContract('download_cube', 'input', opennessMutation)
+    ).toThrow();
   });
 
   it.each([
@@ -573,7 +813,7 @@ describe('Destatis public tool contract', () => {
   ])('applies caller-omittable defaults for $toolKey', ({ toolKey, input, output }) => {
     let parsed = actionFor(toolKey).inputSchema.safeParse(input);
     expect(parsed.success).toBe(true);
-    if (parsed.success) expect(parsed.data).toMatchObject(output);
+    if (parsed.success) expect(parsed.data).toEqual(output);
   });
 
   it.each([
@@ -604,11 +844,23 @@ describe('Destatis public tool contract', () => {
       });
       expect(parsed.success).toBe(true);
       if (!parsed.success) return;
-      expect(parsed.data).toMatchObject({
+      expect(parsed.data).toEqual({
         [codeField]: '12411-0001',
+        area: 'public',
+        ...(toolKey === 'download_table'
+          ? { format: 'ffcsv', compress: false, transpose: false }
+          : {
+              includeValues: true,
+              includeMetadata: true,
+              includeAdditionalMetadata: false
+            }),
         contents: ['BEV001', 'RATE-1'],
+        startYear: '1900/01',
+        endYear: '2100/99',
+        timeSlices: 1,
         regionalSelection: { variableCode: 'DLAND', valueCodes: ['01', '*'] },
-        classifyingSelections: [{ variableCode: 'GES', valueCodes: ['1', '2'] }]
+        classifyingSelections: [{ variableCode: 'GES', valueCodes: ['1', '2'] }],
+        updatedAfter: '29.02.2024 23:59'
       });
       expect(() =>
         validateYearOrder(parsed.data.startYear, parsed.data.endYear)
@@ -629,6 +881,7 @@ describe('Destatis public tool contract', () => {
       { label: 'comma-bearing content', value: { ...baseInput, contents: ['A,B'] } },
       { label: 'control-bearing content', value: { ...baseInput, contents: ['A\u0000B'] } },
       { label: 'out-of-range leading year', value: { ...baseInput, startYear: '1899' } },
+      { label: 'above-range leading year', value: { ...baseInput, startYear: '2101' } },
       { label: 'invalid year syntax', value: { ...baseInput, endYear: '2024/001' } },
       { label: 'zero time slices', value: { ...baseInput, timeSlices: 0 } },
       { label: 'fractional time slices', value: { ...baseInput, timeSlices: 1.5 } },
@@ -766,9 +1019,7 @@ describe('Destatis public tool contract', () => {
     let clientSource = readFileSync(new URL('./lib/client.ts', import.meta.url), 'utf8');
     expect(clientSource).toContain("append(form, 'job', false);");
     expect(clientSource).toContain("append(form, 'format', 'csv');");
-    expect(schemaFor('download_cube', 'output').properties?.format).toMatchObject({
-      const: 'csv'
-    });
+    expect(schemaFor('download_cube', 'output').properties?.format?.const).toBe('csv');
   });
 
   it('publishes every table and cube download safety constraint', () => {
@@ -836,7 +1087,7 @@ describe('Destatis public tool contract', () => {
       expect(action.name.trim().length, action.key).toBeGreaterThan(5);
       expect(action.description?.trim().length, action.key).toBeGreaterThan(70);
       expect(action.instructions?.length, action.key).toBeGreaterThan(0);
-      expect(action.tags, action.key).toMatchObject({ readOnly: true, destructive: false });
+      expect(action.tags, action.key).toEqual({ readOnly: true, destructive: false });
     }
   });
 
@@ -888,22 +1139,24 @@ describe('Destatis marketplace metadata', () => {
     let metadata = JSON.parse(
       readFileSync(new URL('../slate.json', import.meta.url), 'utf8')
     ) as Record<string, unknown>;
-    expect(metadata).toMatchObject({
+    expect(metadata).toEqual({
       name: '@metorial/destatis',
+      description:
+        'Use five read-only tools with a personal API token to search and inspect official German statistics in Destatis GENESIS-Online, discover table and cube dimensions and value codes, and download filtered table or cube data as CSV, XLSX, HTML, or GENML files.',
       categories: ['data-and-analytics', 'government'],
+      skills: [
+        'find official German statistics',
+        'inspect GENESIS-Online table and cube dimensions',
+        'discover regional and statistical value codes',
+        'download flat CSV table data',
+        'download presentation tables as XLSX',
+        'download linearized cube data'
+      ],
       logoUrl:
         'https://www.destatis.de/SiteGlobals/Frontend/Images/logo.svg?__blob=normal&v=11'
     });
     expect(typeof metadata.description).toBe('string');
     expect(String(metadata.description)).toMatch(/five read-only tools/i);
     expect(String(metadata.description)).toMatch(/personal API token/i);
-    expect(metadata.skills).toEqual([
-      'find official German statistics',
-      'inspect GENESIS-Online table and cube dimensions',
-      'discover regional and statistical value codes',
-      'download flat CSV table data',
-      'download presentation tables as XLSX',
-      'download linearized cube data'
-    ]);
   });
 });
