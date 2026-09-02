@@ -244,18 +244,20 @@ export class GenesisClient {
   }
 
   async getMetadata(params: GenesisMetadataParams): Promise<GenesisResponse<unknown>> {
+    let metadataPath = Object.prototype.hasOwnProperty.call(metadataPaths, params.objectType)
+      ? metadataPaths[params.objectType]
+      : undefined;
+    if (!metadataPath) {
+      throw destatisValidationError('Select a supported metadata object type.');
+    }
     let form = new URLSearchParams();
     append(form, 'language', params.language);
     append(form, 'name', params.code);
     append(form, 'area', params.area);
-    let response = await this.postJson(
-      `/metadata/${metadataPaths[params.objectType]}`,
-      form,
-      'get metadata'
-    );
+    let response = await this.postJson(`/metadata/${metadataPath}`, form, 'get metadata');
     return this.normalizeJson(response, {
       operation: 'get metadata',
-      select: payload => payload.Object
+      select: payload => (isRecord(payload.Object) ? payload.Object : undefined)
     });
   }
 
@@ -265,10 +267,18 @@ export class GenesisClient {
     let form = new URLSearchParams();
     append(form, 'language', params.language);
     append(form, 'name', params.variableCode);
-    append(form, 'selection', params.searchTerm);
+    append(form, 'selection', params.selection);
     append(form, 'area', params.area);
-    append(form, 'searchcriterion', params.search ? sortValues[params.search] : undefined);
-    append(form, 'sortcriterion', params.sort ? sortValues[params.sort] : undefined);
+    append(
+      form,
+      'searchcriterion',
+      params.searchCriterion ? sortValues[params.searchCriterion] : undefined
+    );
+    append(
+      form,
+      'sortcriterion',
+      params.sortCriterion ? sortValues[params.sortCriterion] : undefined
+    );
     append(form, 'pagelength', params.pageLength);
     let response = await this.postJson(
       '/catalogue/values2variable',

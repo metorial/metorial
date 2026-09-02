@@ -139,10 +139,10 @@ describe('GenesisClient request contracts', () => {
     await client.listVariableValues({
       language: 'en',
       variableCode: 'GES',
-      searchTerm: 'female',
+      selection: 'female',
       area: 'all',
-      search: 'content',
-      sort: 'code',
+      searchCriterion: 'content',
+      sortCriterion: 'code',
       pageLength: 50
     });
     await client.downloadTable({
@@ -183,6 +183,149 @@ describe('GenesisClient request contracts', () => {
     expect((mocks.http.post.mock.calls[3]?.[1] as URLSearchParams).toString()).toBe(
       'language=de&name=12411BJ001&format=csv&area=all&startyear=2020&endyear=2024'
     );
+  });
+
+  it.each([
+    ['table', '/metadata/table'],
+    ['cube', '/metadata/cube'],
+    ['statistic', '/metadata/statistic'],
+    ['time_series', '/metadata/timeseries'],
+    ['variable', '/metadata/variable'],
+    ['value', '/metadata/value']
+  ] as const)('maps only the allowlisted %s metadata type to %s', async (objectType, path) => {
+    mocks.http.post.mockResolvedValueOnce({
+      data: successfulEnvelope({ Object: { Code: '12411-0001' } })
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await client.getMetadata({
+      language: 'en',
+      objectType,
+      code: '12411-0001',
+      area: 'public'
+    });
+
+    expect(mocks.http.post).toHaveBeenCalledWith(path, expect.any(URLSearchParams));
+    expect((mocks.http.post.mock.calls[0]?.[1] as URLSearchParams).toString()).toBe(
+      'language=en&name=12411-0001&area=public'
+    );
+  });
+
+  it.each([
+    '../data/tablefile',
+    '__proto__',
+    'toString'
+  ])('rejects arbitrary metadata path fragment %s before making a request', async objectType => {
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.getMetadata({
+        language: 'en',
+        objectType,
+        code: '12411-0001',
+        area: 'public'
+      } as never)
+    ).rejects.toBeInstanceOf(ServiceError);
+    expect(mocks.http.post).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['code', 'code', 'Code', 'Code'],
+    ['code', 'content', 'Code', 'Inhalt'],
+    ['content', 'code', 'Inhalt', 'Code'],
+    ['content', 'content', 'Inhalt', 'Inhalt']
+  ] as const)('maps %s search and %s sort criteria to exact provider values', async (searchCriterion, sortCriterion, expectedSearch, expectedSort) => {
+    mocks.http.post.mockResolvedValueOnce({ data: successfulEnvelope({ List: [] }) });
+    let client = new GenesisClient({ token: 'token' });
+
+    await client.listVariableValues({
+      language: 'de',
+      variableCode: 'GES',
+      selection: '*',
+      searchCriterion,
+      sortCriterion,
+      area: 'public',
+      pageLength: 100
+    });
+
+    expect(mocks.http.post).toHaveBeenCalledWith(
+      '/catalogue/values2variable',
+      expect.any(URLSearchParams)
+    );
+    expect((mocks.http.post.mock.calls[0]?.[1] as URLSearchParams).toString()).toBe(
+      `language=de&name=GES&selection=*&area=public&searchcriterion=${expectedSearch}&sortcriterion=${expectedSort}&pagelength=100`
+    );
+  });
+
+  it('retains warning metadata with usable Object and List payloads', async () => {
+    mocks.http.post
+      .mockResolvedValueOnce({
+        data: {
+          Status: { Code: 7, Content: 'Partial metadata', Type: 'Warning' },
+          Object: { Code: '12411-0001' }
+        }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          Status: { Code: 7, Content: 'Criterion corrected', Type: 'Warning' },
+          List: [{ Code: '1', Content: 'Male' }]
+        }
+      });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.getMetadata({
+        language: 'en',
+        objectType: 'table',
+        code: '12411-0001',
+        area: 'public'
+      })
+    ).resolves.toEqual({
+      data: { Code: '12411-0001' },
+      warning: 'Partial metadata'
+    });
+    await expect(
+      client.listVariableValues({
+        language: 'en',
+        variableCode: 'GES',
+        selection: '*',
+        searchCriterion: 'code',
+        sortCriterion: 'code',
+        area: 'public',
+        pageLength: 100
+      })
+    ).resolves.toEqual({
+      data: [{ Code: '1', Content: 'Male' }],
+      warning: 'Criterion corrected'
+    });
+  });
+
+  it.each([
+    ['metadata', { Object: [] }],
+    ['values', { List: {} }]
+  ])('rejects malformed successful %s payloads', async (kind, payload) => {
+    mocks.http.post.mockResolvedValueOnce({ data: successfulEnvelope(payload) });
+    let client = new GenesisClient({ token: 'token' });
+
+    let request =
+      kind === 'metadata'
+        ? client.getMetadata({
+            language: 'en',
+            objectType: 'table',
+            code: '12411-0001',
+            area: 'public'
+          })
+        : client.listVariableValues({
+            language: 'en',
+            variableCode: 'GES',
+            selection: '*',
+            searchCriterion: 'code',
+            sortCriterion: 'code',
+            area: 'public',
+            pageLength: 100
+          });
+
+    await expect(request).rejects.toBeInstanceOf(ServiceError);
   });
 
   it('ignores deferred selection passthrough so canonical download fields cannot be overwritten', async () => {

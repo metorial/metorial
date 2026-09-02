@@ -1,9 +1,9 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-import { searchCatalog } from './tools';
+import { getMetadata, listVariableValues, searchCatalog } from './tools';
 
 export let provider = Slate.create({
   spec,
-  tools: [searchCatalog],
+  tools: [searchCatalog, getMetadata, listVariableValues],
   triggers: []
 });

@@ -60,10 +60,10 @@ export interface GenesisMetadataParams {
 export interface GenesisVariableValuesParams {
   language: GenesisLanguage;
   variableCode: string;
-  searchTerm?: string;
+  selection?: string;
   area?: GenesisArea;
-  search?: 'content' | 'code';
-  sort?: 'content' | 'code';
+  searchCriterion?: 'content' | 'code';
+  sortCriterion?: 'content' | 'code';
   pageLength?: number;
   allowNoResult?: boolean;
 }
