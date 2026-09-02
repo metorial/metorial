@@ -150,10 +150,13 @@ describe('GenesisClient request contracts', () => {
       tableCode: '12411-0001',
       format: 'csv',
       area: 'user',
-      startYear: 2020,
-      endYear: 2024,
+      contents: ['BEV', 'RATE'],
+      startYear: '2020/21',
+      endYear: '2024/25',
       timeSlices: 5,
-      updatedAfter: '2024-01-01',
+      regionalSelection: { variableCode: 'DLAND', valueCodes: ['01', '02'] },
+      classifyingSelections: [{ variableCode: 'GES', valueCodes: ['1', '2'] }],
+      updatedAfter: '01.01.2024',
       transpose: false,
       compress: true
     });
@@ -161,8 +164,12 @@ describe('GenesisClient request contracts', () => {
       language: 'de',
       cubeCode: '12411BJ001',
       area: 'all',
-      startYear: 2020,
-      endYear: 2024
+      contents: ['BEV'],
+      startYear: '2020',
+      endYear: '2024',
+      includeValues: false,
+      includeMetadata: true,
+      includeAdditionalMetadata: false
     });
 
     expect(mocks.http.post.mock.calls.map(call => call[0])).toEqual([
@@ -178,10 +185,10 @@ describe('GenesisClient request contracts', () => {
       'language=en&name=GES&selection=female&area=all&searchcriterion=Inhalt&sortcriterion=Code&pagelength=50'
     );
     expect((mocks.http.post.mock.calls[2]?.[1] as URLSearchParams).toString()).toBe(
-      'language=en&name=12411-0001&format=csv&area=user&startyear=2020&endyear=2024&timeslices=5&stand=2024-01-01&transpose=false&compress=true&job=false'
+      'language=en&name=12411-0001&format=csv&area=user&contents=BEV%2CRATE&startyear=2020%2F21&endyear=2024%2F25&timeslices=5&stand=01.01.2024&regionalvariable=DLAND&regionalkey=01%2C02&classifyingvariable1=GES&classifyingkey1=1%2C2&transpose=false&compress=true&job=false'
     );
     expect((mocks.http.post.mock.calls[3]?.[1] as URLSearchParams).toString()).toBe(
-      'language=de&name=12411BJ001&format=csv&area=all&startyear=2020&endyear=2024'
+      'language=de&name=12411BJ001&format=csv&area=all&contents=BEV&startyear=2020&endyear=2024&values=false&metadata=true&additionals=false'
     );
   });
 
@@ -340,7 +347,7 @@ describe('GenesisClient request contracts', () => {
       tableCode: '12411-0001',
       format: 'csv',
       area: 'public',
-      startYear: 2020,
+      startYear: '2020',
       transpose: false,
       compress: true,
       selection: {
@@ -357,6 +364,32 @@ describe('GenesisClient request contracts', () => {
     expect((mocks.http.post.mock.calls[0]?.[1] as URLSearchParams).toString()).toBe(
       'language=en&name=12411-0001&format=csv&area=public&startyear=2020&transpose=false&compress=true&job=false'
     );
+  });
+
+  it('rejects too many or duplicate structured selections before transport', async () => {
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadCube({
+        language: 'en',
+        cubeCode: '12411BJ01',
+        classifyingSelections: Array.from({ length: 4 }, (_, index) => ({
+          variableCode: `V${index}`,
+          valueCodes: ['*']
+        }))
+      })
+    ).rejects.toBeInstanceOf(ServiceError);
+    await expect(
+      client.downloadTable({
+        language: 'en',
+        tableCode: '12411-0001',
+        classifyingSelections: [
+          { variableCode: 'GES', valueCodes: ['1'] },
+          { variableCode: ' GES ', valueCodes: ['2'] }
+        ]
+      })
+    ).rejects.toBeInstanceOf(ServiceError);
+    expect(mocks.http.post).not.toHaveBeenCalled();
   });
 });
 
@@ -529,6 +562,75 @@ describe('GenesisClient binary responses', () => {
       fileName: 'cube.csv',
       isArchive: false
     });
+  });
+
+  it.each([
+    {
+      format: 'datencsv' as const,
+      headers: { 'content-type': 'application/octet-stream' },
+      expectedMime: 'application/zip',
+      expectedName: '12411-0001.zip',
+      expectedArchive: true
+    },
+    {
+      format: 'ffcsv' as const,
+      headers: { 'content-type': 'text/csv' },
+      expectedMime: 'application/zip',
+      expectedName: '12411-0001.zip',
+      expectedArchive: true
+    },
+    {
+      format: 'xlsx' as const,
+      headers: { 'content-type': 'application/zip' },
+      expectedMime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      expectedName: '12411-0001.xlsx',
+      expectedArchive: false
+    },
+    {
+      format: 'html' as const,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      expectedMime: 'text/html',
+      expectedName: '12411-0001.html',
+      expectedArchive: false
+    },
+    {
+      format: 'genml' as const,
+      headers: {},
+      expectedMime: 'application/xml',
+      expectedName: '12411-0001.xml',
+      expectedArchive: false
+    }
+  ])('uses canonical or defensible MIME metadata for $format table files', async example => {
+    let bytes = Buffer.from('non-json-file');
+    mocks.http.post.mockResolvedValueOnce({ data: bytes, headers: example.headers });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadTable({
+        language: 'en',
+        tableCode: '12411-0001',
+        format: example.format
+      })
+    ).resolves.toEqual({
+      contentBase64: bytes.toString('base64'),
+      mimeType: example.expectedMime,
+      byteLength: bytes.byteLength,
+      fileName: example.expectedName,
+      isArchive: example.expectedArchive
+    });
+  });
+
+  it('normalizes a generic cube response to CSV metadata', async () => {
+    let bytes = Buffer.from('code,value\nA,1\n');
+    mocks.http.post.mockResolvedValueOnce({
+      data: bytes,
+      headers: { 'content-type': 'application/octet-stream' }
+    });
+    let client = new GenesisClient({ token: 'token' });
+
+    await expect(
+      client.downloadCube({ language: 'en', cubeCode: '12411BJ01' })
+    ).resolves.toMatchObject({ mimeType: 'text/csv', isArchive: false });
   });
 
   it('falls back to a quoted filename when filename* percent encoding is malformed', async () => {

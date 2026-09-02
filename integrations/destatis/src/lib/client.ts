@@ -5,6 +5,7 @@ import {
   type NormalizeGenesisOptions,
   normalizeGenesisResponse
 } from './response';
+import { encodeSelections } from './selections';
 import type {
   GenesisCatalogItem,
   GenesisCubeDownloadParams,
@@ -115,13 +116,29 @@ let safeFilename = (disposition: string | undefined, fallback: string) => {
   return cleaned || fallback;
 };
 
-let tableFallbackMime = (format: GenesisTableFormat | undefined) =>
-  format === 'csv' || format === 'datencsv' || format === 'ffcsv'
-    ? 'application/zip'
-    : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+let zippedTableFormats = new Set<GenesisTableFormat>(['csv', 'datencsv', 'ffcsv']);
 
-let tableFallbackName = (code: string, format: GenesisTableFormat | undefined) =>
-  `${code}.${format === 'csv' || format === 'datencsv' || format === 'ffcsv' ? 'zip' : 'xlsx'}`;
+let tableFallbackMime = (format: GenesisTableFormat | undefined) => {
+  if (!format || zippedTableFormats.has(format)) return 'application/zip';
+  if (format === 'xlsx') {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+  if (format === 'html') return 'text/html';
+  return 'application/xml';
+};
+
+let tableFallbackName = (code: string, format: GenesisTableFormat | undefined) => {
+  if (!format || zippedTableFormats.has(format)) return `${code}.zip`;
+  return `${code}.${format === 'genml' ? 'xml' : format}`;
+};
+
+let canonicalTableMime = (format: GenesisTableFormat | undefined, responseMime: string) => {
+  if (!format || zippedTableFormats.has(format)) return 'application/zip';
+  if (format === 'xlsx') {
+    return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  }
+  return responseMime;
+};
 
 export class GenesisClient {
   private readonly http: ReturnType<typeof createAxios>;
@@ -166,6 +183,7 @@ export class GenesisClient {
     options: {
       fallbackMimeType: string;
       fallbackFileName: string;
+      resolveMimeType?: (responseMimeType: string) => string;
       isArchive: (mimeType: string) => boolean;
     }
   ): Promise<GenesisFile> {
@@ -177,8 +195,8 @@ export class GenesisClient {
           `Destatis GENESIS-Online API ${operation} returned an empty file.`
         );
       }
-      let mimeType = normalizedMimeType(response.headers, options.fallbackMimeType);
-      let declaredJson = mimeType.includes('json');
+      let responseMimeType = normalizedMimeType(response.headers, options.fallbackMimeType);
+      let declaredJson = responseMimeType.includes('json');
       if (declaredJson || hasJsonPrefix(buffer)) {
         let parsed = parseJsonBuffer(buffer);
         if (parsed !== undefined) {
@@ -195,6 +213,7 @@ export class GenesisClient {
       }
 
       let disposition = getResponseHeaderValue(response.headers, 'content-disposition');
+      let mimeType = options.resolveMimeType?.(responseMimeType) ?? responseMimeType;
       return {
         contentBase64: buffer.toString('base64'),
         mimeType,
@@ -294,18 +313,19 @@ export class GenesisClient {
   }
 
   async downloadTable(params: GenesisTableDownloadParams): Promise<GenesisFile> {
+    let format = params.format ?? 'ffcsv';
     let form = new URLSearchParams();
     append(form, 'language', params.language);
     append(form, 'name', params.tableCode);
-    append(form, 'format', params.format);
-    this.appendDownloadOptions(form, params);
+    append(form, 'format', format);
+    this.appendDownloadOptions(form, params, 5);
     append(form, 'job', false);
-    let archiveFormat =
-      params.format === 'csv' || params.format === 'datencsv' || params.format === 'ffcsv';
+    let archiveFormat = zippedTableFormats.has(format);
     return this.postFile('/data/tablefile', form, 'download table', {
-      fallbackMimeType: tableFallbackMime(params.format),
-      fallbackFileName: tableFallbackName(params.tableCode, params.format),
-      isArchive: mimeType => archiveFormat || mimeType === 'application/zip'
+      fallbackMimeType: tableFallbackMime(format),
+      fallbackFileName: tableFallbackName(params.tableCode, format),
+      resolveMimeType: mimeType => canonicalTableMime(format, mimeType),
+      isArchive: () => archiveFormat
     });
   }
 
@@ -314,26 +334,36 @@ export class GenesisClient {
     append(form, 'language', params.language);
     append(form, 'name', params.cubeCode);
     append(form, 'format', 'csv');
-    this.appendDownloadOptions(form, params);
+    this.appendDownloadOptions(form, params, 3);
+    append(form, 'values', params.includeValues);
+    append(form, 'metadata', params.includeMetadata);
+    append(form, 'additionals', params.includeAdditionalMetadata);
     return this.postFile('/data/cubefile', form, 'download cube', {
       fallbackMimeType: 'text/csv',
       fallbackFileName: `${params.cubeCode}.csv`,
-      isArchive: mimeType => mimeType === 'application/zip'
+      resolveMimeType: () => 'text/csv',
+      isArchive: () => false
     });
   }
 
   private appendDownloadOptions(
     form: URLSearchParams,
-    params:
-      | Omit<GenesisTableDownloadParams, 'tableCode' | 'format'>
-      | GenesisCubeDownloadParams
+    params: GenesisTableDownloadParams | GenesisCubeDownloadParams,
+    maximumClassifyingSelections: number
   ) {
     append(form, 'area', params.area);
+    append(form, 'contents', params.contents?.join(','));
     append(form, 'startyear', params.startYear);
     append(form, 'endyear', params.endYear);
     append(form, 'timeslices', params.timeSlices);
     append(form, 'stand', params.updatedAfter);
-    append(form, 'transpose', params.transpose);
-    append(form, 'compress', params.compress);
+    encodeSelections(
+      form,
+      params.regionalSelection,
+      params.classifyingSelections,
+      maximumClassifyingSelections
+    );
+    if ('transpose' in params) append(form, 'transpose', params.transpose);
+    if ('compress' in params) append(form, 'compress', params.compress);
   }
 }

@@ -9,7 +9,9 @@ describe('destatis provider contract', () => {
     expect(provider.actions.map(action => action.key)).toEqual([
       'search_catalog',
       'get_metadata',
-      'list_variable_values'
+      'list_variable_values',
+      'download_table',
+      'download_cube'
     ]);
   });
 });

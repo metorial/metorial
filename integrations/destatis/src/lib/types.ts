@@ -68,26 +68,37 @@ export interface GenesisVariableValuesParams {
   allowNoResult?: boolean;
 }
 
-export type GenesisTableFormat = 'xlsx' | 'csv' | 'datencsv' | 'ffcsv';
+export type GenesisTableFormat = 'csv' | 'datencsv' | 'ffcsv' | 'html' | 'genml' | 'xlsx';
+
+export interface GenesisSelection {
+  variableCode: string;
+  valueCodes: string[];
+}
 
 export interface GenesisDownloadParams {
   language: GenesisLanguage;
   area?: GenesisArea;
-  startYear?: number;
-  endYear?: number;
+  contents?: string[];
+  startYear?: string;
+  endYear?: string;
   timeSlices?: number;
+  regionalSelection?: GenesisSelection;
+  classifyingSelections?: GenesisSelection[];
   updatedAfter?: string;
-  transpose?: boolean;
-  compress?: boolean;
 }
 
 export interface GenesisTableDownloadParams extends GenesisDownloadParams {
   tableCode: string;
   format?: GenesisTableFormat;
+  transpose?: boolean;
+  compress?: boolean;
 }
 
 export interface GenesisCubeDownloadParams extends GenesisDownloadParams {
   cubeCode: string;
+  includeValues?: boolean;
+  includeMetadata?: boolean;
+  includeAdditionalMetadata?: boolean;
 }
 
 export interface GenesisFile {
