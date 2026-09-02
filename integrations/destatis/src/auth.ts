@@ -13,7 +13,9 @@ export let auth = SlateAuth.create()
         .string()
         .trim()
         .min(1)
-        .describe('Personal token from the GENESIS-Online API profile.')
+        .describe(
+          'Personal token shown in the Webservice (API) modal after signing in to GENESIS-Online.'
+        )
     }),
     getOutput: async ctx => ({ output: { token: ctx.input.token } }),
     getProfile: async (ctx: { output: { token: string }; input: { token: string } }) => {

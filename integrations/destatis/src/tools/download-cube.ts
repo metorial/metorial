@@ -71,7 +71,8 @@ export let downloadCube = SlateTool.create(spec, {
   constraints: [
     'Narrow years, time slices, contents, or variable selections if the provider rejects a large direct download.',
     'The downloadable CSV response is limited to 64 MiB; narrow the requested cube if necessary.',
-    'English responses can contain provider metadata that has not been translated.'
+    'English responses can contain provider metadata that has not been translated.',
+    "This tool uses the provider's direct cube export and does not enqueue asynchronous jobs."
   ],
   tags: { readOnly: true, destructive: false }
 })
