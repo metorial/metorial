@@ -127,7 +127,7 @@ Commas and control characters are rejected inside individual codes because comma
 
 - Any outer file response above 64 MiB is rejected before encoding or parsing.
 - ZIP and XLSX archives allow at most 4,096 entries and 32 MiB total expanded content. Each entry is rejected when its expanded size exceeds 200 times its compressed size plus 1 MiB.
-- Multi-disk, ZIP64, encrypted, unsupported-compression, duplicate-name, unsafe-path, inconsistent-header, size, CRC, and malformed-central-directory archives are rejected. CSV archives must contain a CSV entry. XLSX archives must contain the expected safe OOXML workbook, worksheet, relationship, and content-type structure and must not use external relationships.
+- Multi-disk, ZIP64, encrypted, unsupported-compression, duplicate-name, unsafe-path, inconsistent-header, size, CRC, and malformed-central-directory archives are rejected. CSV archives must contain a CSV entry. XLSX archives must contain the expected safe OOXML workbook, worksheet, relationship, and content-type structure. The required package office-document relationship and workbook-referenced worksheet relationships must resolve to internal package parts; unrelated OOXML relationship parts are not exhaustively inspected.
 - GENML/XML is limited to 32 MiB, 64 nested elements, and 100,000 elements. DTD declarations, malformed XML, unexpected document roots, and error/fault documents are rejected. The parser does not fetch external resources.
 - CSV and HTML validation inspects at most the first 1 MiB for an expected document shape and rejects gateway/error pages or incompatible MIME types.
 - File names are reduced to safe leaf names, control characters and leading dots are removed, and the extension is canonicalized for the selected format.
