@@ -2,7 +2,7 @@
 
 ## Purpose and source classification
 
-This document is the implementation and maintenance contract for the read-only Destatis GENESIS-Online integration. Statements labeled **Provider fact** come from official Destatis or GENESIS-Online sources. Statements labeled **Integration contract** or **Integration safety choice** describe the behavior implemented in this package and are not provider limits unless explicitly stated.
+This document is the implementation and maintenance contract for the non-mutating Destatis GENESIS-Online data integration. Statements labeled **Provider fact** come from official Destatis or GENESIS-Online sources. Statements labeled **Integration contract** or **Integration safety choice** describe the behavior implemented in this package and are not provider limits unless explicitly stated. The integration does not mutate database content or account settings; credential validation has the provider-documented operational behavior described below.
 
 Official sources, rechecked on 2 September 2026:
 
@@ -23,7 +23,9 @@ Official sources, rechecked on 2 September 2026:
 | Current REST requests use `POST` with `Content-Type: application/x-www-form-urlencoded`. Account data is placed in the `username` and `password` HTTP headers; action parameters are form fields in the body. | Provider fact |
 | A personal token is displayed after sign-in in the **Webservice (API)** modal. The token is sent as `username`; `password` is empty. Regenerating a token immediately invalidates the old token. | Provider fact |
 | Personal tokens cannot call profile password/removal operations or submit `job=true` requests; those require username/password authentication. | Provider fact |
+| When more than three requests run concurrently, `logincheck` automatically terminates requests that have been running for more than 15 minutes. | Provider fact |
 | The integration exposes only personal-token authentication and validates it with `POST /helloworld/logincheck`. | Integration contract |
+| Credential validation therefore can end an affected long-running provider request. A user can retry or narrow that request after validation completes. | Integration contract and user impact |
 | The non-secret `language` configuration is `en` or `de`, defaults to `en`, and applies to messages and descriptions. Some provider metadata can remain untranslated. | Provider fact plus integration default |
 
 The token is never returned in tool output. The client removes provider `Parameter` transport metadata from normalized JSON output, recursively removes nested `Parameter` properties, and redacts the token from user-facing error messages, upstream status text, and upstream codes. These are **integration safety choices**.
@@ -40,7 +42,7 @@ The actions are registered in this stable order:
 | 4 | `destatis-download_table` | `POST /data/tablefile` with `job=false` | One downloadable table file plus structured file metadata. |
 | 5 | `destatis-download_cube` | `POST /data/cubefile` with `format=csv` | One downloadable cube CSV plus structured file metadata. |
 
-Every full tool ID is below the 60-character bridge limit. All five tools are read-only and non-destructive.
+Every full tool ID is below the 60-character bridge limit. All five tool operations leave database content and account settings unchanged; credential validation separately calls `logincheck` as documented above.
 
 ## Request and response envelopes
 
@@ -51,7 +53,7 @@ Every full tool ID is below the 60-character bridge limit. All five tools are re
 - Code `0` with a usable payload is success.
 - A non-error warning with a usable `List` or `Object` remains usable; warning text and provider copyright are retained.
 - Code `104` means no object matches the selection. `search_catalog` and `list_variable_values` explicitly convert it to an empty list with the provider warning. Other actions treat it as an error because they require a concrete object or file.
-- Code `98` is the provider's direct-table size failure. The error tells the caller to narrow years, time slices, or selected variables. The official POST example documents the current direct limit as more than 40,000 table values.
+- Code `98` is the provider's direct-table size failure. A provider POST example dated 24 March 2025 documented that tables above 40,000 values could not be downloaded directly; the current API guide does not publish a fixed threshold. Treat 40,000 as a dated example, not a current guarantee. If the provider rejects a large export, narrow years, time slices, contents, or variable selections.
 - Other nonzero error envelopes become user-facing provider errors carrying the normalized upstream code without the request `Parameter` block.
 - File actions detect a JSON error envelope even when it arrives in a nominal file response and apply the same status policy.
 
@@ -160,7 +162,7 @@ No binary or base64 file contents are placed in structured outputs.
 - Unit tests cover auth validation, request mapping, JSON envelope normalization, code `98` and `104` handling, secure error redaction, structured selection encoding, file validation, and each tool workflow.
 - `src/tools.schema.test.ts` must cover every registered action in stable order, top-level object compatibility, tool ID length, defaults/bounds, output metadata shape, marketplace metadata, and provider-facing public copy.
 - Package tests, package typecheck, package build, repository formatting/lint, link checks, SVG validation, and secret/public-language scans are required before landing changes.
-- A private live E2E suite should exercise all five tools with a dedicated token profile and small public datasets; it must narrow downloads and clean up no provider resources because the surface is read-only.
+- A private live E2E suite should exercise all five tools with a dedicated token profile and small public datasets; it must narrow downloads and needs no provider-resource cleanup because the surface creates or mutates no provider resources.
 - Tool-use evals are expected when tool descriptions, input schemas, workflow guidance, or behavior affecting schema-only selection changes. At minimum they should test search-to-metadata discovery, value-code discovery before filtered downloads, and choosing table versus cube download.
 - Business-logic changes require a normal release version bump under repository policy. This documentation/schema task intentionally retains version `0.1.0-rc.1`.
 

@@ -75,7 +75,7 @@ export let downloadTable = SlateTool.create(spec, {
     'Use list_variable_values to discover valid regional and classifying value codes.'
   ],
   constraints: [
-    'The provider does not directly return tables with more than 40,000 values; narrow years, time slices, contents, or variable selections.',
+    'A Destatis example dated 24 March 2025 documented a 40,000-value direct-table threshold; the current API guide publishes no fixed threshold. If the provider rejects a large export, narrow years, time slices, contents, or variable selections.',
     'The downloaded response is limited to 64 MiB; narrow the requested table if necessary.',
     'ZIP-based CSV and XLSX files are limited to 32 MiB after expansion and 4,096 archive entries; an entry is rejected when its expanded size exceeds 200 times its compressed size plus 1 MiB.',
     'GENML/XML files are limited to 32 MiB; XML deeper than 64 elements or containing more than 100,000 elements is rejected.',

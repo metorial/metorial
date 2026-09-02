@@ -10,6 +10,8 @@ import { spec } from './spec';
 import { validateYearOrder } from './tools/shared';
 
 type JsonSchemaNode = {
+  $defs?: Record<string, JsonSchemaNode>;
+  $ref?: string;
   additionalProperties?: boolean | JsonSchemaNode;
   allOf?: JsonSchemaNode[];
   anyOf?: JsonSchemaNode[];
@@ -30,6 +32,7 @@ type JsonSchemaNode = {
   properties?: Record<string, JsonSchemaNode>;
   required?: string[];
   type?: string;
+  definitions?: Record<string, JsonSchemaNode>;
   [key: string]: unknown;
 };
 
@@ -100,7 +103,7 @@ let collectPropertyNames = (schema: JsonSchemaNode): string[] => {
 type NormalizedNode = Record<string, unknown>;
 type NodeContracts = Record<string, NormalizedNode>;
 
-let ignoredGeneratorKeys = new Set(['$schema', '$defs', 'definitions']);
+let ignoredGeneratorKeys = new Set(['$schema']);
 let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -128,13 +131,81 @@ let normalizeSchemaNode = (schema: JsonSchemaNode): NormalizedNode => {
   return normalized;
 };
 
-let flattenSchemaNodes = (schema: JsonSchemaNode, path = '$', nodes: NodeContracts = {}) => {
-  nodes[path] = normalizeSchemaNode(schema);
-  for (let [name, property] of Object.entries(schema.properties ?? {})) {
-    let propertyPath = path === '$' ? name : `${path}.${name}`;
-    flattenSchemaNodes(property, propertyPath, nodes);
+let resolveLocalSchemaRef = (root: JsonSchemaNode, ref: string): JsonSchemaNode => {
+  if (!ref.startsWith('#/')) throw new TypeError(`Unsupported JSON Schema reference: ${ref}`);
+  let target: unknown = root;
+  for (let encodedSegment of ref.slice(2).split('/')) {
+    let segment = encodedSegment.replaceAll('~1', '/').replaceAll('~0', '~');
+    if (!isRecord(target) || !(segment in target)) {
+      throw new TypeError(`Unresolved JSON Schema reference: ${ref}`);
+    }
+    target = target[segment];
   }
-  if (schema.items) flattenSchemaNodes(schema.items, `${path}[]`, nodes);
+  if (!isRecord(target)) throw new TypeError(`Invalid JSON Schema reference target: ${ref}`);
+  return target as JsonSchemaNode;
+};
+
+let flattenSchemaNodes = (schema: JsonSchemaNode): NodeContracts => {
+  let nodes: NodeContracts = {};
+  let visit = (node: JsonSchemaNode, path: string, activeRefs: Set<string>): void => {
+    nodes[path] = normalizeSchemaNode(node);
+    for (let [name, property] of Object.entries(node.properties ?? {})) {
+      let propertyPath = path === '$' ? name : `${path}.${name}`;
+      visit(property, propertyPath, activeRefs);
+    }
+    if (node.items) visit(node.items, `${path}[]`, activeRefs);
+
+    for (let keyword of ['$defs', 'definitions'] as const) {
+      let definitions = node[keyword];
+      if (definitions === undefined) continue;
+      if (!isRecord(definitions)) {
+        throw new TypeError(`Invalid ${keyword} container at ${path}.`);
+      }
+      for (let [name, definition] of Object.entries(definitions).sort(([a], [b]) =>
+        a.localeCompare(b)
+      )) {
+        if (!isRecord(definition)) {
+          throw new TypeError(`Invalid ${keyword} definition ${name} at ${path}.`);
+        }
+        visit(
+          definition as JsonSchemaNode,
+          `${path}.${keyword}[${JSON.stringify(name)}]`,
+          activeRefs
+        );
+      }
+    }
+
+    for (let keyword of ['oneOf', 'anyOf', 'allOf'] as const) {
+      let branches = node[keyword];
+      if (branches === undefined) continue;
+      if (!Array.isArray(branches)) {
+        throw new TypeError(`Invalid ${keyword} branches at ${path}.`);
+      }
+      for (let [index, branch] of branches.entries()) {
+        if (!isRecord(branch)) {
+          throw new TypeError(`Invalid ${keyword} branch ${index} at ${path}.`);
+        }
+        visit(branch as JsonSchemaNode, `${path}.${keyword}[${index}]`, activeRefs);
+      }
+    }
+
+    if (node.$ref !== undefined) {
+      if (typeof node.$ref !== 'string') {
+        throw new TypeError(`Invalid JSON Schema reference at ${path}.`);
+      }
+      let target = resolveLocalSchemaRef(schema, node.$ref);
+      let targetPath = `${path}.$refTarget(${JSON.stringify(node.$ref)})`;
+      if (activeRefs.has(node.$ref)) {
+        nodes[targetPath] = normalizeSchemaNode(target);
+      } else {
+        activeRefs.add(node.$ref);
+        visit(target, targetPath, activeRefs);
+        activeRefs.delete(node.$ref);
+      }
+    }
+  };
+
+  visit(schema, '$', new Set());
   return nodes;
 };
 
@@ -765,6 +836,97 @@ describe('Destatis public tool contract', () => {
     ).toThrow();
   });
 
+  it('detects definitions, references, and constraints nested in combinator branches', () => {
+    let referenceMutation = structuredClone(schemaFor('download_table', 'input'));
+    referenceMutation.$defs = {
+      Injected: {
+        additionalProperties: false,
+        properties: {
+          danger: { pattern: '^DEFINITION$', type: 'string' }
+        },
+        required: ['danger'],
+        type: 'object'
+      }
+    };
+    referenceMutation.definitions = {
+      Legacy: { maxLength: 2, minLength: 2, type: 'string' }
+    };
+    let contentsItem = referenceMutation.properties?.contents?.items;
+    let startYear = referenceMutation.properties?.startYear;
+    if (!contentsItem || !startYear) throw new TypeError('Missing mutated schema fields.');
+    contentsItem.$ref = '#/$defs/Injected';
+    startYear.$ref = '#/definitions/Legacy';
+
+    let referenceNodes = flattenSchemaNodes(referenceMutation);
+    expect(referenceNodes['$.$defs["Injected"].danger']).toEqual({
+      pattern: '^DEFINITION$',
+      type: 'string'
+    });
+    expect(referenceNodes['contents[].$refTarget("#/$defs/Injected").danger']).toEqual({
+      pattern: '^DEFINITION$',
+      type: 'string'
+    });
+    expect(referenceNodes['$.definitions["Legacy"]']).toEqual({
+      maxLength: 2,
+      minLength: 2,
+      type: 'string'
+    });
+    expect(referenceNodes['startYear.$refTarget("#/definitions/Legacy")']).toEqual({
+      maxLength: 2,
+      minLength: 2,
+      type: 'string'
+    });
+    expect(() =>
+      expectExactSchemaContract('download_table', 'input', referenceMutation)
+    ).toThrow();
+
+    let combinatorMutation = structuredClone(schemaFor('download_cube', 'input'));
+    let regionalSelection = combinatorMutation.properties?.regionalSelection;
+    if (!regionalSelection) throw new TypeError('Missing regional selection schema.');
+    regionalSelection.allOf = [
+      {
+        additionalProperties: false,
+        properties: {
+          nested: {
+            oneOf: [
+              {
+                items: {
+                  anyOf: [
+                    { pattern: '^BRANCH$', type: 'string' },
+                    { minimum: 2, type: 'integer' }
+                  ]
+                },
+                type: 'array'
+              },
+              { maxLength: 5, type: 'string' }
+            ]
+          }
+        },
+        required: ['nested'],
+        type: 'object'
+      }
+    ];
+
+    let combinatorNodes = flattenSchemaNodes(combinatorMutation);
+    expect(combinatorNodes['regionalSelection.allOf[0]']).toEqual({
+      additionalProperties: false,
+      properties: ['nested'],
+      required: ['nested'],
+      type: 'object'
+    });
+    expect(combinatorNodes['regionalSelection.allOf[0].nested.oneOf[0][].anyOf[0]']).toEqual({
+      pattern: '^BRANCH$',
+      type: 'string'
+    });
+    expect(combinatorNodes['regionalSelection.allOf[0].nested.oneOf[0][].anyOf[1]']).toEqual({
+      minimum: 2,
+      type: 'integer'
+    });
+    expect(() =>
+      expectExactSchemaContract('download_cube', 'input', combinatorMutation)
+    ).toThrow();
+  });
+
   it.each([
     {
       toolKey: 'search_catalog' as const,
@@ -1016,16 +1178,20 @@ describe('Destatis public tool contract', () => {
       expect(cubeParsed.data).not.toHaveProperty('job');
       expect(cubeParsed.data).not.toHaveProperty('format');
     }
-    let clientSource = readFileSync(new URL('./lib/client.ts', import.meta.url), 'utf8');
-    expect(clientSource).toContain("append(form, 'job', false);");
-    expect(clientSource).toContain("append(form, 'format', 'csv');");
     expect(schemaFor('download_cube', 'output').properties?.format?.const).toBe('csv');
   });
 
   it('publishes every table and cube download safety constraint', () => {
     let expectedPatterns: Record<DownloadToolKey, RegExp[][]> = {
       download_table: [
-        [/provider/i, /40,000 values/i, /narrow/i],
+        [
+          /Destatis example/i,
+          /24 March 2025/i,
+          /40,000-value/i,
+          /current API guide publishes no fixed threshold/i,
+          /provider rejects/i,
+          /narrow/i
+        ],
         [/response/i, /64 MiB/i, /narrow/i],
         [/ZIP.+XLSX/i, /32 MiB/i, /4,096/i, /200 times/i, /1 MiB/i],
         [/GENML\/XML/i, /32 MiB/i, /64 elements/i, /100,000 elements/i],

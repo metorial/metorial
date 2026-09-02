@@ -8,6 +8,8 @@ Search, inspect, and download official German statistics from the [Destatis GENE
 2. Open the **Webservice (API)** modal in the GENESIS-Online account interface and copy the personal API token. The [official API guide](https://genesis.destatis.de/datenbank/online/docs/GENESIS-Webservices_Introduction.pdf) explains where the token is shown and how it can be regenerated.
 3. Connect the integration with that token.
 
+Credential validation calls the provider's `logincheck` action. The [official API guide](https://genesis.destatis.de/datenbank/online/docs/GENESIS-Webservices_Introduction.pdf) documents that, when more than three requests are running concurrently, `logincheck` terminates requests that have been running longer than 15 minutes. If that affects a long-running export, retry or narrow it after validation.
+
 The `language` setting accepts `en` or `de` and defaults to `en`. Destatis notes that some metadata is not fully translated, so German text can still appear in English responses.
 
 ## Tools and workflows
@@ -39,10 +41,10 @@ Example requests include:
 ## Formats and limits
 
 - `ffcsv` is the default table format and is designed for further processing. Destatis packages `csv`, `datencsv`, and `ffcsv` table downloads as ZIP files. XLSX, HTML, and GENML are returned in their respective file formats. Cube downloads are CSV files.
-- The provider does not directly return tables with more than 40,000 values. Narrow the year range, recent time slices, contents, regional values, or classifying values when a table is too large.
+- A Destatis example dated 24 March 2025 documented a 40,000-value threshold for direct table exports; the current API guide does not publish a fixed threshold. If Destatis rejects a large export, narrow the year range, recent time slices, contents, regional values, or classifying values.
 - A downloaded response is limited to 64 MiB. ZIP and XLSX contents are also limited to 32 MiB after expansion, and GENML/XML files are limited to 32 MiB.
 - Archives with more than 4,096 entries, unsafe paths, corrupt records, or extreme expansion ratios are rejected. XML files with unsafe declarations or excessive nesting or element counts are also rejected.
-- Personal-token authentication cannot use the provider's asynchronous table-job mode. This integration always performs direct, read-only requests and does not change account or database state.
+- Personal-token authentication cannot use the provider's asynchronous table-job mode. This integration performs direct requests and does not mutate database content or account settings.
 - Provider wildcard codes can be used for regional and classifying values. Explicit value codes within one selection must be unique.
 
 The downloaded data remains subject to the [Data Licence Germany - Attribution - Version 2.0 and the current Destatis copyright notice](https://www.destatis.de/DE/Service/Impressum/_inhalt.html). Retain the attribution returned by GENESIS-Online when republishing results.
