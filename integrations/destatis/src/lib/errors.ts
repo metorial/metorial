@@ -42,9 +42,15 @@ export let destatisSecureApiError = (
   operation = 'request'
 ) => {
   let mapped = destatisApiError(error, operation);
+  let upstreamStatus = mapped.data.upstreamStatus;
+  let upstreamCode = mapped.data.upstreamCode;
   return createApiServiceError(redact(mapped.data.message, secret), {
     reason: 'destatis_api_error',
-    upstreamStatus: mapped.data.upstreamStatus,
-    upstreamCode: mapped.data.upstreamCode
+    ...(typeof upstreamStatus === 'number'
+      ? { upstreamStatus }
+      : typeof upstreamStatus === 'string'
+        ? { upstreamStatus: redact(upstreamStatus, secret) }
+        : {}),
+    ...(typeof upstreamCode === 'string' ? { upstreamCode: redact(upstreamCode, secret) } : {})
   });
 };

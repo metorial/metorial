@@ -21,7 +21,8 @@ export let auth = SlateAuth.create()
       let username = result.username.trim();
       return {
         profile: {
-          name: username && username !== ctx.input.token ? username : 'Destatis GENESIS-Online'
+          name:
+            username && username !== ctx.output.token ? username : 'Destatis GENESIS-Online'
         }
       };
     }
