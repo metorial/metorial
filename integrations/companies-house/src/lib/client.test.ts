@@ -74,14 +74,26 @@ describe('CompaniesHouseClient transport setup', () => {
 describe('CompaniesHouseClient endpoint requests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    httpMocks.publicGet.mockImplementation((path: string) =>
-      Promise.resolve({
-        data:
-          path === '/company/A%2FB'
-            ? { company_number: 'A/B', company_name: 'Example Limited' }
-            : emptySearch
-      })
-    );
+    httpMocks.publicGet.mockImplementation((path: string) => {
+      let data: Record<string, unknown> = emptySearch;
+      if (path === '/company/A%2FB') {
+        data = { company_number: 'A/B', company_name: 'Example Limited' };
+      } else if (path === '/company/A%2FB/officers') {
+        data = {
+          ...emptySearch,
+          active_count: 0,
+          resigned_count: 0,
+          inactive_count: 0
+        };
+      } else if (path === '/officers/officer%2F1/appointments') {
+        data = { ...emptySearch, name: 'DOE, Jane' };
+      } else if (path === '/disqualified-officers/natural/officer%2F1') {
+        data = { forename: 'Jane', surname: 'Doe' };
+      } else if (path === '/disqualified-officers/corporate/company%2F1') {
+        data = { company_name: 'Example Limited' };
+      }
+      return Promise.resolve({ data });
+    });
     httpMocks.documentGet.mockResolvedValue({ data: metadata() });
   });
 

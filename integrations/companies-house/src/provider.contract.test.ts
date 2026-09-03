@@ -6,7 +6,12 @@ import { companiesHouseToolKeys } from './tools';
 const implementedToolKeys: (typeof companiesHouseToolKeys)[number][] = [
   'search_companies',
   'search_companies_advanced',
-  'get_company_profile'
+  'get_company_profile',
+  'search_officers',
+  'list_company_officers',
+  'list_officer_appointments',
+  'search_disqualified_officers',
+  'get_officer_disqualifications'
 ];
 
 describe('companies-house provider contract', () => {
@@ -109,7 +114,12 @@ describe('companies-house provider contract', () => {
     expect(companiesHouseToolKeys).toEqual([
       'search_companies',
       'search_companies_advanced',
-      'get_company_profile'
+      'get_company_profile',
+      'search_officers',
+      'list_company_officers',
+      'list_officer_appointments',
+      'search_disqualified_officers',
+      'get_officer_disqualifications'
     ]);
     expect(new Set(companiesHouseToolKeys).size).toBe(companiesHouseToolKeys.length);
     for (let key of companiesHouseToolKeys) {

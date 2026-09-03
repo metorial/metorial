@@ -27,11 +27,15 @@ import {
 import {
   mapAdvancedCompanySearchEnvelope,
   mapChargeRecord,
+  mapCompanyOfficerListEnvelope,
   mapCompanyProfile,
   mapCompanySearchRecord,
+  mapDisqualifiedOfficerRecord,
+  mapDisqualifiedOfficerSearchRecord,
   mapDocumentMetadata,
   mapFilingRecord,
-  mapOfficerRecord,
+  mapOfficerAppointmentListEnvelope,
+  mapOfficerSearchRecord,
   mapPaginatedEnvelope,
   mapPscRecord
 } from './mappers';
@@ -316,7 +320,7 @@ export class CompaniesHouseClient {
     let data = await this.publicData<ProviderRecord>('search officers', '/search/officers', {
       params: { q: query, items_per_page: page.itemsPerPage, start_index: page.startIndex }
     });
-    return mapPaginatedEnvelope(data, mapOfficerRecord, page);
+    return mapPaginatedEnvelope(data, mapOfficerSearchRecord, page);
   }
 
   async listCompanyOfficers(companyNumber: string, params: CompanyOfficerListParams = {}) {
@@ -356,7 +360,7 @@ export class CompaniesHouseClient {
         })
       }
     );
-    return mapPaginatedEnvelope(data, mapOfficerRecord, page);
+    return mapCompanyOfficerListEnvelope(data, companyNumber, page);
   }
 
   async listOfficerAppointments(officerId: string, params: CompaniesHousePagination = {}) {
@@ -368,7 +372,7 @@ export class CompaniesHouseClient {
         params: { items_per_page: page.itemsPerPage, start_index: page.startIndex }
       }
     );
-    return mapPaginatedEnvelope(data, mapOfficerRecord, page);
+    return mapOfficerAppointmentListEnvelope(data, officerId, page);
   }
 
   async searchDisqualifiedOfficers(params: { query: string } & CompaniesHousePagination) {
@@ -382,7 +386,7 @@ export class CompaniesHouseClient {
         params: { q: query, items_per_page: page.itemsPerPage, start_index: page.startIndex }
       }
     );
-    return mapPaginatedEnvelope(data, mapOfficerRecord, page);
+    return mapPaginatedEnvelope(data, mapDisqualifiedOfficerSearchRecord, page);
   }
 
   async getOfficerDisqualifications(officerId: string, officerType: DisqualifiedOfficerType) {
@@ -394,7 +398,7 @@ export class CompaniesHouseClient {
       'get officer disqualifications',
       `${resourcePath}${pathSegment(officerId)}`
     );
-    return mapOfficerRecord(data);
+    return mapDisqualifiedOfficerRecord(data, officerType, officerId);
   }
 
   async listFilingHistory(

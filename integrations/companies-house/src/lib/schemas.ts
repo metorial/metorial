@@ -131,6 +131,113 @@ export const companyProfileOutputSchema = z.object({
   record: providerRecordSchema
 });
 
+export const publishedDateOfBirthSchema = z.union([
+  z.string(),
+  z
+    .object({
+      day: z.number().int().optional(),
+      month: z.number().int().optional(),
+      year: z.number().int().optional()
+    })
+    .passthrough()
+]);
+
+export const officerSearchItemSchema = z.object({
+  officerId: z.string().optional(),
+  name: z.string(),
+  appointmentCount: z.number().int().nonnegative().optional(),
+  dateOfBirth: publishedDateOfBirthSchema.optional(),
+  addressSnippet: z.string().optional(),
+  appointmentsUrl: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const officerSearchOutputSchema = z.object({
+  items: z.array(officerSearchItemSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  totalResults: z.number().int().nonnegative(),
+  record: providerRecordSchema
+});
+
+export const companyOfficerSchema = z.object({
+  officerId: z.string().optional(),
+  name: z.string(),
+  role: z.string(),
+  appointedOn: z.string().optional(),
+  resignedOn: z.string().optional(),
+  nationality: z.string().optional(),
+  occupation: z.string().optional(),
+  countryOfResidence: z.string().optional(),
+  address: mappedAddressSchema.optional(),
+  dateOfBirth: publishedDateOfBirthSchema.optional(),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const companyOfficerListOutputSchema = z.object({
+  companyNumber: z.string(),
+  activeCount: z.number().int().nonnegative(),
+  resignedCount: z.number().int().nonnegative(),
+  inactiveCount: z.number().int().nonnegative(),
+  officers: z.array(companyOfficerSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  totalResults: z.number().int().nonnegative(),
+  record: providerRecordSchema
+});
+
+export const officerAppointmentSchema = z.object({
+  companyNumber: z.string(),
+  companyName: z.string(),
+  companyStatus: z.string().optional(),
+  role: z.string(),
+  appointedOn: z.string().optional(),
+  resignedOn: z.string().optional(),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const officerAppointmentListOutputSchema = z.object({
+  officerId: z.string(),
+  name: z.string(),
+  dateOfBirth: publishedDateOfBirthSchema.optional(),
+  appointments: z.array(officerAppointmentSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  totalResults: z.number().int().nonnegative(),
+  record: providerRecordSchema
+});
+
+export const disqualifiedOfficerSearchItemSchema = z.object({
+  officerId: z.string().optional(),
+  officerType: z.string().optional(),
+  name: z.string(),
+  addressSnippet: z.string().optional(),
+  disqualificationsUrl: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const disqualifiedOfficerSearchOutputSchema = z.object({
+  items: z.array(disqualifiedOfficerSearchItemSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  totalResults: z.number().int().nonnegative(),
+  record: providerRecordSchema
+});
+
+export const officerDisqualificationsOutputSchema = z.object({
+  officerId: z.string(),
+  officerType: z.string(),
+  name: z.string(),
+  dateOfBirth: publishedDateOfBirthSchema.optional(),
+  nationality: z.string().optional(),
+  disqualifications: z.array(providerRecordSchema),
+  exemptions: z.array(providerRecordSchema),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
 export const addressSchema = z
   .object({
     address_line_1: z.string().optional(),

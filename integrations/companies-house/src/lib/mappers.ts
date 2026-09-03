@@ -12,19 +12,27 @@ import type {
   MappedCharge,
   MappedCompany,
   MappedCompanyAccounts,
+  MappedCompanyOfficer,
+  MappedCompanyOfficerList,
   MappedCompanyProfile,
   MappedCompanySearchItem,
   MappedConfirmationStatement,
   MappedDatedRecord,
+  MappedDisqualifiedOfficer,
+  MappedDisqualifiedOfficerSearchItem,
   MappedDocumentMetadata,
   MappedDocumentResource,
   MappedFiling,
   MappedOfficer,
+  MappedOfficerAppointment,
+  MappedOfficerAppointmentList,
+  MappedOfficerSearchItem,
   MappedPage,
   MappedPreviousCompanyName,
   MappedPsc,
   ProviderEnvelope,
-  ProviderRecord
+  ProviderRecord,
+  PublishedDateOfBirth
 } from './types';
 
 let asRecord = (value: unknown): ProviderRecord | undefined =>
@@ -41,6 +49,30 @@ let stringArray = (value: unknown) =>
   Array.isArray(value) && value.every(item => typeof item === 'string')
     ? (value as string[])
     : undefined;
+
+let nonNegativeInteger = (value: unknown) =>
+  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+
+let requiredNonNegativeInteger = (record: ProviderRecord, key: string, label: string) => {
+  let value = nonNegativeInteger(record[key]);
+  if (value !== undefined) return value;
+  throw companiesHouseValidationError(
+    `Companies House returned a ${label} response without a valid ${key} value.`,
+    'companies_house_response_invalid'
+  );
+};
+
+let mapPublishedDateOfBirth = (value: unknown): PublishedDateOfBirth | undefined => {
+  let text = stringValue(value);
+  if (text) return text;
+  let record = asRecord(value);
+  if (!record) return undefined;
+  return [record.day, record.month, record.year].some(
+    part => typeof part === 'number' && Number.isInteger(part)
+  )
+    ? (record as PublishedDateOfBirth)
+    : undefined;
+};
 
 let decodePathSegment = (value: string | undefined) => {
   if (!value) return undefined;
@@ -307,6 +339,113 @@ export const mapOfficerRecord = (value: unknown): MappedOfficer => {
   };
 };
 
+export const mapOfficerSearchRecord = (value: unknown): MappedOfficerSearchItem => {
+  let record = asRecord(value) ?? {};
+  let links = asRecord(record.links);
+  let appointmentsUrl = stringValue(links?.self);
+  return pickDefined({
+    officerId: parseOfficerIdFromLink(appointmentsUrl),
+    name: requiredStringValue(record, ['name', 'title'], 'officer search'),
+    appointmentCount: nonNegativeInteger(record.appointment_count),
+    dateOfBirth: mapPublishedDateOfBirth(record.date_of_birth),
+    addressSnippet: stringValue(record.address_snippet),
+    appointmentsUrl,
+    record
+  }) as MappedOfficerSearchItem;
+};
+
+export const mapCompanyOfficerRecord = (value: unknown): MappedCompanyOfficer => {
+  let record = asRecord(value) ?? {};
+  let links = asRecord(record.links);
+  let officerLinks = asRecord(links?.officer);
+  return pickDefined({
+    officerId:
+      parseOfficerIdFromLink(officerLinks?.appointments) ??
+      parseOfficerIdFromLink(links?.appointments),
+    name: requiredStringValue(record, ['name'], 'company officer'),
+    role: requiredStringValue(record, ['officer_role'], 'company officer'),
+    appointedOn: stringValue(record.appointed_on),
+    resignedOn: stringValue(record.resigned_on),
+    nationality: stringValue(record.nationality),
+    occupation: stringValue(record.occupation),
+    countryOfResidence: stringValue(record.country_of_residence),
+    address: mapAddress(record.address),
+    dateOfBirth: mapPublishedDateOfBirth(record.date_of_birth),
+    links,
+    record
+  }) as MappedCompanyOfficer;
+};
+
+export const mapOfficerAppointmentRecord = (value: unknown): MappedOfficerAppointment => {
+  let record = asRecord(value) ?? {};
+  let company = asRecord(record.appointed_to) ?? {};
+  return pickDefined({
+    companyNumber: requiredStringValue(company, ['company_number'], 'officer appointment'),
+    companyName: requiredStringValue(company, ['company_name'], 'officer appointment'),
+    companyStatus: stringValue(company.company_status),
+    role: requiredStringValue(record, ['officer_role'], 'officer appointment'),
+    appointedOn: stringValue(record.appointed_on),
+    resignedOn: stringValue(record.resigned_on),
+    links: asRecord(record.links),
+    record
+  }) as MappedOfficerAppointment;
+};
+
+export const mapDisqualifiedOfficerSearchRecord = (
+  value: unknown
+): MappedDisqualifiedOfficerSearchItem => {
+  let record = asRecord(value) ?? {};
+  let links = asRecord(record.links);
+  let disqualificationsUrl = stringValue(links?.self);
+  let parsed = parseDisqualifiedOfficerLink(disqualificationsUrl);
+  return pickDefined({
+    officerId: parsed?.officerId,
+    officerType: parsed?.officerType,
+    name: requiredStringValue(
+      record,
+      ['name', 'title', 'company_name'],
+      'disqualified officer search'
+    ),
+    addressSnippet: stringValue(record.address_snippet),
+    disqualificationsUrl,
+    record
+  }) as MappedDisqualifiedOfficerSearchItem;
+};
+
+export const mapDisqualifiedOfficerRecord = (
+  value: unknown,
+  officerType: DisqualifiedOfficerType,
+  officerId: string
+): MappedDisqualifiedOfficer => {
+  let record = asRecord(value) ?? {};
+  let nameParts = [record.forename, record.other_forenames, record.surname]
+    .filter(part => typeof part === 'string' && part.length > 0)
+    .join(' ');
+  return pickDefined({
+    officerId,
+    officerType,
+    name: requiredStringValue(
+      { ...record, composed_name: nameParts },
+      ['name', 'company_name', 'composed_name', 'title'],
+      'disqualified officer'
+    ),
+    dateOfBirth: mapPublishedDateOfBirth(record.date_of_birth),
+    nationality: stringValue(record.nationality),
+    disqualifications: Array.isArray(record.disqualifications)
+      ? record.disqualifications.filter(
+          (item): item is ProviderRecord => asRecord(item) !== undefined
+        )
+      : [],
+    exemptions: Array.isArray(record.exemptions)
+      ? record.exemptions.filter(
+          (item): item is ProviderRecord => asRecord(item) !== undefined
+        )
+      : [],
+    links: asRecord(record.links),
+    record
+  }) as MappedDisqualifiedOfficer;
+};
+
 export const mapFilingRecord = (value: unknown): MappedFiling => {
   let record = asRecord(value) ?? {};
   let links = asRecord(record.links);
@@ -383,9 +522,6 @@ export const mapDocumentMetadata = (value: unknown): MappedDocumentMetadata => {
   };
 };
 
-let nonNegativeInteger = (value: unknown) =>
-  typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
-
 export const mapPaginatedEnvelope = <T>(
   value: unknown,
   mapper: (record: unknown) => T,
@@ -403,6 +539,53 @@ export const mapPaginatedEnvelope = <T>(
       items.length,
     record
   };
+};
+
+export const mapCompanyOfficerListEnvelope = (
+  value: unknown,
+  companyNumber: string,
+  requested: { itemsPerPage: number; startIndex: number }
+): MappedCompanyOfficerList => {
+  let record = asRecord(value) ?? {};
+  let officers = Array.isArray(record.items) ? record.items.map(mapCompanyOfficerRecord) : [];
+  return {
+    companyNumber,
+    activeCount: requiredNonNegativeInteger(record, 'active_count', 'company officers'),
+    resignedCount: requiredNonNegativeInteger(record, 'resigned_count', 'company officers'),
+    inactiveCount: requiredNonNegativeInteger(record, 'inactive_count', 'company officers'),
+    officers,
+    itemsPerPage: nonNegativeInteger(record.items_per_page) ?? requested.itemsPerPage,
+    startIndex: nonNegativeInteger(record.start_index) ?? requested.startIndex,
+    totalResults:
+      nonNegativeInteger(record.total_results) ??
+      nonNegativeInteger(record.total_count) ??
+      officers.length,
+    record
+  };
+};
+
+export const mapOfficerAppointmentListEnvelope = (
+  value: unknown,
+  officerId: string,
+  requested: { itemsPerPage: number; startIndex: number }
+): MappedOfficerAppointmentList => {
+  let record = asRecord(value) ?? {};
+  let appointments = Array.isArray(record.items)
+    ? record.items.map(mapOfficerAppointmentRecord)
+    : [];
+  return pickDefined({
+    officerId,
+    name: requiredStringValue(record, ['name'], 'officer appointments'),
+    dateOfBirth: mapPublishedDateOfBirth(record.date_of_birth),
+    appointments,
+    itemsPerPage: nonNegativeInteger(record.items_per_page) ?? requested.itemsPerPage,
+    startIndex: nonNegativeInteger(record.start_index) ?? requested.startIndex,
+    totalResults:
+      nonNegativeInteger(record.total_results) ??
+      nonNegativeInteger(record.total_count) ??
+      appointments.length,
+    record
+  }) as MappedOfficerAppointmentList;
 };
 
 export const mapAdvancedCompanySearchEnvelope = (

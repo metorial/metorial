@@ -121,6 +121,94 @@ export type MappedOfficer = {
   record: ProviderRecord;
 };
 
+export type PublishedDateOfBirth =
+  | string
+  | (ProviderRecord & {
+      day?: number;
+      month?: number;
+      year?: number;
+    });
+
+export type MappedOfficerSearchItem = {
+  officerId?: string;
+  name: string;
+  appointmentCount?: number;
+  dateOfBirth?: PublishedDateOfBirth;
+  addressSnippet?: string;
+  appointmentsUrl?: string;
+  record: ProviderRecord;
+};
+
+export type MappedCompanyOfficer = {
+  officerId?: string;
+  name: string;
+  role: string;
+  appointedOn?: string;
+  resignedOn?: string;
+  nationality?: string;
+  occupation?: string;
+  countryOfResidence?: string;
+  address?: MappedAddress;
+  dateOfBirth?: PublishedDateOfBirth;
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
+export type MappedCompanyOfficerList = {
+  companyNumber: string;
+  activeCount: number;
+  resignedCount: number;
+  inactiveCount: number;
+  officers: MappedCompanyOfficer[];
+  itemsPerPage: number;
+  startIndex: number;
+  totalResults: number;
+  record: ProviderRecord;
+};
+
+export type MappedOfficerAppointment = {
+  companyNumber: string;
+  companyName: string;
+  companyStatus?: string;
+  role: string;
+  appointedOn?: string;
+  resignedOn?: string;
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
+export type MappedOfficerAppointmentList = {
+  officerId: string;
+  name: string;
+  dateOfBirth?: PublishedDateOfBirth;
+  appointments: MappedOfficerAppointment[];
+  itemsPerPage: number;
+  startIndex: number;
+  totalResults: number;
+  record: ProviderRecord;
+};
+
+export type MappedDisqualifiedOfficerSearchItem = {
+  officerId?: string;
+  officerType?: string;
+  name: string;
+  addressSnippet?: string;
+  disqualificationsUrl?: string;
+  record: ProviderRecord;
+};
+
+export type MappedDisqualifiedOfficer = {
+  officerId: string;
+  officerType: string;
+  name: string;
+  dateOfBirth?: PublishedDateOfBirth;
+  nationality?: string;
+  disqualifications: ProviderRecord[];
+  exemptions: ProviderRecord[];
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
 export type MappedFiling = {
   transactionId?: string;
   documentId?: string;
