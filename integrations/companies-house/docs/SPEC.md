@@ -100,7 +100,7 @@ The supported allowlist is `application/pdf`, `application/json`, `application/x
 2. The location must be an absolute HTTPS URL with no embedded username or password.
 3. The destination is fetched without the Companies House API key, with further redirects disabled, and must return a `2xx` response.
 4. Both declared content length and received bytes are limited to 50 MiB (52,428,800 bytes); empty or non-binary bodies are rejected.
-5. If the response `Content-Type` is missing or is the generic `application/octet-stream` type, the requested allowlisted MIME type is used. Any unexpected specific MIME type is rejected.
+5. If the response `Content-Type` is missing, `application/octet-stream`, or the legacy `binary/octet-stream`, the requested allowlisted MIME type is used. Any unexpected specific MIME type is rejected.
 
 The successful result exposes the document ID, generated file name, MIME type, and byte length, and makes the document available as a downloadable file. File contents are not included in structured output.
 

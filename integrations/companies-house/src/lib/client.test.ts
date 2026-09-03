@@ -539,6 +539,48 @@ describe('CompaniesHouseClient document downloads', () => {
     });
   });
 
+  it('rejects an HTTPS redirect with embedded credentials without exposing them', async () => {
+    httpMocks.documentGet.mockResolvedValueOnce({
+      status: 302,
+      headers: {
+        location: 'https://download-user:download-password@files.example.gov.uk/document.pdf'
+      }
+    });
+
+    let error = await createClient()
+      .getDocumentContent('doc-123', 'application/pdf')
+      .catch(error => error);
+
+    expect(error).toBeInstanceOf(ServiceError);
+    expect(error.data.reason).toBe('companies_house_document_redirect_invalid');
+    expect(error.data.message).not.toContain('download-user');
+    expect(error.data.message).not.toContain('download-password');
+    expect(httpMocks.downloadGet).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { name: 'malformed', contentLength: '12MB' },
+    { name: 'negative', contentLength: '-1' },
+    { name: 'overflowing', contentLength: '9'.repeat(400) }
+  ])('rejects a $name Content-Length before accepting the body', async ({ contentLength }) => {
+    httpMocks.documentGet.mockResolvedValueOnce({
+      status: 302,
+      headers: { location: 'https://files.example.gov.uk/document.pdf' }
+    });
+    httpMocks.downloadGet.mockResolvedValueOnce({
+      status: 200,
+      data: Buffer.from([1]),
+      headers: { 'content-type': 'application/pdf', 'content-length': contentLength }
+    });
+
+    let error = await createClient()
+      .getDocumentContent('doc-123', 'application/pdf')
+      .catch(error => error);
+
+    expect(error).toBeInstanceOf(ServiceError);
+    expect(error.data.reason).toBe('companies_house_document_too_large');
+  });
+
   it.each([
     {
       name: 'missing redirect location',
