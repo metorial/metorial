@@ -109,6 +109,19 @@ describe('CompaniesHouseClient endpoint requests', () => {
           transaction_id: 'tx/1',
           type: 'AA'
         };
+      } else if (path === '/company/A%2FB/charges/charge%2F1') {
+        data = {
+          charge_number: 1,
+          classification: [],
+          id: 'charge/1',
+          status: 'outstanding'
+        };
+      } else if (path === '/company/A%2FB/insolvency') {
+        data = { etag: 'etag-1', cases: [] };
+      } else if (path === '/company/A%2FB/persons-with-significant-control') {
+        data = { ...emptySearch, active_count: 0, ceased_count: 0 };
+      } else if (path === '/company/A%2FB/persons-with-significant-control-statements') {
+        data = { ...emptySearch, active_count: 0, ceased_count: 0 };
       }
       return Promise.resolve({ data });
     });
@@ -141,7 +154,7 @@ describe('CompaniesHouseClient endpoint requests', () => {
     await client.listCompanyCharges('A/B', { itemsPerPage: 7, startIndex: 40 });
     await client.getCompanyCharge('A/B', 'charge/1');
     await client.getCompanyInsolvency('A/B');
-    await client.listCompanyPscs('A/B', { registerView: false });
+    await client.listCompanyPscs('A/B');
     await client.listPscStatements('A/B', { registerView: true });
 
     expect(httpMocks.publicGet.mock.calls).toEqual([
@@ -266,6 +279,20 @@ describe('CompaniesHouseClient endpoint requests', () => {
   });
 
   it.each([
+    { name: 'an empty list', categories: [] },
+    { name: 'duplicate values', categories: ['accounts', 'accounts'] },
+    { name: 'blank values', categories: ['accounts', '   '] }
+  ])('rejects filing categories containing $name before HTTP', async ({ categories }) => {
+    let error = await createClient()
+      .listFilingHistory('01234567', { categories })
+      .catch(error => error);
+
+    expect(error).toBeInstanceOf(ServiceError);
+    expect(error.data.message).toContain('categories');
+    expect(httpMocks.publicGet).not.toHaveBeenCalled();
+  });
+
+  it.each([
     [{}, 'business filter'],
     [
       {
@@ -336,7 +363,7 @@ describe('CompaniesHouseClient endpoint requests', () => {
     ).resolves.toMatchObject({
       itemsPerPage: 7,
       startIndex: 40,
-      totalResults: 0
+      totalCount: 0
     });
   });
 });
@@ -447,7 +474,7 @@ describe('CompaniesHouseClient document downloads', () => {
     expect(httpMocks.downloadGet).not.toHaveBeenCalled();
   });
 
-  it('discovers metadata, follows one HTTPS location, and never sends auth to it', async () => {
+  it('follows one HTTPS location without a hidden metadata call or forwarded auth', async () => {
     let bytes = Buffer.from([0, 255, 13, 37]);
     httpMocks.documentGet.mockResolvedValueOnce({
       status: 302,

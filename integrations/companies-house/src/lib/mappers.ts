@@ -10,8 +10,14 @@ import type {
   AdvancedCompanySearchEnvelope,
   MappedAddress,
   MappedCharge,
+  MappedChargeDescription,
+  MappedChargeInsolvencyCase,
+  MappedChargeList,
+  MappedChargeParticular,
+  MappedChargeTransaction,
   MappedCompany,
   MappedCompanyAccounts,
+  MappedCompanyInsolvency,
   MappedCompanyOfficer,
   MappedCompanyOfficerList,
   MappedCompanyProfile,
@@ -27,14 +33,23 @@ import type {
   MappedDocumentResource,
   MappedFiling,
   MappedFilingHistory,
+  MappedInsolvencyCase,
+  MappedInsolvencyDate,
+  MappedInsolvencyPractitioner,
   MappedOfficer,
   MappedOfficerAppointment,
   MappedOfficerAppointmentList,
   MappedOfficerSearchItem,
   MappedPage,
   MappedPermissionToAct,
+  MappedPersonEntitled,
   MappedPreviousCompanyName,
   MappedPsc,
+  MappedPscIdentification,
+  MappedPscIdentityVerification,
+  MappedPscList,
+  MappedPscStatement,
+  MappedPscStatementList,
   ProviderEnvelope,
   ProviderRecord,
   PublishedDateOfBirth
@@ -173,7 +188,10 @@ export const parsePscLink = (value: unknown): ParsedPscLink | undefined => {
 };
 
 export const parseChargeIdFromLink = (value: unknown) => {
-  let path = linkPath(value, PUBLIC_DATA_BASE_URL);
+  let link = Array.isArray(value)
+    ? value.map(asRecord).find(record => stringValue(record?.self))?.self
+    : (asRecord(value)?.self ?? value);
+  let path = linkPath(link, PUBLIC_DATA_BASE_URL);
   let match = path?.match(/^\/company\/([^/]+)\/charges\/([^/]+)$/);
   return decodePathSegment(match?.[2]);
 };
@@ -648,37 +666,347 @@ export const mapFilingHistoryEnvelope = (
   }) as MappedFilingHistory;
 };
 
-export const mapChargeRecord = (value: unknown): MappedCharge => {
+let mapChargeDescription = (value: unknown): MappedChargeDescription | undefined => {
+  let record = asRecord(value);
+  return record
+    ? (pickDefined({
+        description: stringValue(record.description),
+        type: stringValue(record.type),
+        record
+      }) as MappedChargeDescription)
+    : undefined;
+};
+
+let mapChargeParticular = (value: unknown): MappedChargeParticular | undefined => {
+  let record = asRecord(value);
+  return record
+    ? (pickDefined({
+        chargorActingAsBareTrustee: booleanValue(record.chargor_acting_as_bare_trustee),
+        containsFixedCharge: booleanValue(record.contains_fixed_charge),
+        containsFloatingCharge: booleanValue(record.contains_floating_charge),
+        containsNegativePledge: booleanValue(record.contains_negative_pledge),
+        description: stringValue(record.description),
+        floatingChargeCoversAll: booleanValue(record.floating_charge_covers_all),
+        type: stringValue(record.type),
+        record
+      }) as MappedChargeParticular)
+    : undefined;
+};
+
+let mapPersonEntitled = (value: unknown): MappedPersonEntitled | undefined => {
+  let record = asRecord(value);
+  return record
+    ? (pickDefined({ name: stringValue(record.name), record }) as MappedPersonEntitled)
+    : undefined;
+};
+
+let recordArray = (value: unknown) =>
+  Array.isArray(value)
+    ? value.map(asRecord).filter((record): record is ProviderRecord => record !== undefined)
+    : undefined;
+
+let mapChargeTransaction = (value: unknown): MappedChargeTransaction | undefined => {
+  let record = asRecord(value);
+  return record
+    ? (pickDefined({
+        deliveredOn: stringValue(record.delivered_on),
+        filingType: stringValue(record.filing_type),
+        insolvencyCaseNumber: stringValue(record.insolvency_case_number),
+        links: recordArray(record.links),
+        record
+      }) as MappedChargeTransaction)
+    : undefined;
+};
+
+let mapChargeInsolvencyCase = (value: unknown): MappedChargeInsolvencyCase | undefined => {
+  let record = asRecord(value);
+  return record
+    ? (pickDefined({
+        caseNumber: stringValue(record.case_number),
+        links: recordArray(record.links),
+        record
+      }) as MappedChargeInsolvencyCase)
+    : undefined;
+};
+
+let mapOptionalArray = <T>(value: unknown, mapper: (item: unknown) => T | undefined) =>
+  Array.isArray(value)
+    ? value.map(mapper).filter((item): item is T => item !== undefined)
+    : undefined;
+
+export const mapChargeRecord = (value: unknown, fallbackId?: string): MappedCharge => {
   let record = asRecord(value) ?? {};
-  let links = asRecord(record.links);
-  let classification = asRecord(record.classification);
-  return {
-    chargeId: stringValue(record.id) ?? parseChargeIdFromLink(links?.self),
-    status: stringValue(record.status),
+  let links = asRecord(record.links) ?? recordArray(record.links);
+  let chargeId =
+    stringValue(record.id) ?? parseChargeIdFromLink(record.links) ?? stringValue(fallbackId);
+  if (!chargeId) {
+    throw companiesHouseValidationError(
+      'Companies House returned a charge record without a usable id or self link.',
+      'companies_house_response_invalid'
+    );
+  }
+  if (!Array.isArray(record.classification)) {
+    throw companiesHouseValidationError(
+      'Companies House returned a charge record without a required classification array.',
+      'companies_house_response_invalid'
+    );
+  }
+  return pickDefined({
+    chargeId,
+    chargeCode: stringValue(record.charge_code),
+    chargeNumber: nonNegativeInteger(record.charge_number),
+    status: requiredStringValue(record, ['status'], 'charge'),
+    acquiredOn: stringValue(record.acquired_on),
+    assetsCeasedReleased: stringValue(record.assests_ceased_released),
+    coveringInstrumentOn: stringValue(record.covering_instrument_date),
     createdOn: stringValue(record.created_on),
     deliveredOn: stringValue(record.delivered_on),
+    resolvedOn: stringValue(record.resolved_on),
     satisfiedOn: stringValue(record.satisfied_on),
-    classification:
-      stringValue(classification?.description) ?? stringValue(classification?.type),
+    classification: record.classification
+      .map(mapChargeDescription)
+      .filter((item): item is MappedChargeDescription => item !== undefined),
+    securedDetails: mapOptionalArray(record.secured_details, mapChargeDescription),
+    particulars: mapOptionalArray(record.particulars, mapChargeParticular),
+    personsEntitled: mapOptionalArray(record.persons_entitled, mapPersonEntitled),
+    moreThanFourPersonsEntitled: booleanValue(record.more_than_four_persons_entitled),
+    transactions: mapOptionalArray(record.transactions, mapChargeTransaction),
+    insolvencyCases: mapOptionalArray(record.insolvency_cases, mapChargeInsolvencyCase),
+    links,
     record
-  };
+  }) as MappedCharge;
+};
+
+export const mapChargeListEnvelope = (
+  value: unknown,
+  companyNumber: string,
+  requested: { itemsPerPage: number; startIndex: number }
+): MappedChargeList => {
+  let record = asRecord(value) ?? {};
+  let charges = Array.isArray(record.items)
+    ? record.items.map(item => mapChargeRecord(item))
+    : [];
+  return pickDefined({
+    companyNumber,
+    totalCount: nonNegativeInteger(record.total_count),
+    satisfiedCount: nonNegativeInteger(record.satisfied_count),
+    partSatisfiedCount: nonNegativeInteger(record.part_satisfied_count),
+    charges,
+    itemsPerPage: nonNegativeInteger(record.items_per_page) ?? requested.itemsPerPage,
+    startIndex: nonNegativeInteger(record.start_index) ?? requested.startIndex,
+    record
+  }) as MappedChargeList;
+};
+
+let mapInsolvencyDate = (value: unknown): MappedInsolvencyDate | undefined => {
+  let record = asRecord(value);
+  return record
+    ? {
+        type: requiredStringValue(record, ['type'], 'insolvency case date'),
+        date: requiredStringValue(record, ['date'], 'insolvency case date'),
+        record
+      }
+    : undefined;
+};
+
+let mapInsolvencyPractitioner = (value: unknown): MappedInsolvencyPractitioner | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  let addresses = Array.isArray(record.address)
+    ? record.address
+        .map(mapAddress)
+        .filter((address): address is MappedAddress => address !== undefined)
+    : [];
+  return pickDefined({
+    name: requiredStringValue(record, ['name'], 'insolvency practitioner'),
+    addresses,
+    appointedOn: stringValue(record.appointed_on),
+    ceasedToActOn: stringValue(record.ceased_to_act_on),
+    role: stringValue(record.role),
+    record
+  }) as MappedInsolvencyPractitioner;
+};
+
+let mapInsolvencyCase = (value: unknown): MappedInsolvencyCase | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  let dates = Array.isArray(record.dates)
+    ? record.dates
+        .map(mapInsolvencyDate)
+        .filter((date): date is MappedInsolvencyDate => date !== undefined)
+    : [];
+  let practitioners = Array.isArray(record.practitioners)
+    ? record.practitioners
+        .map(mapInsolvencyPractitioner)
+        .filter(
+          (practitioner): practitioner is MappedInsolvencyPractitioner =>
+            practitioner !== undefined
+        )
+    : [];
+  return pickDefined({
+    type: requiredStringValue(record, ['type'], 'insolvency case'),
+    number: stringValue(record.number),
+    dates,
+    notes: stringArray(record.notes),
+    practitioners,
+    links: asRecord(record.links),
+    record
+  }) as MappedInsolvencyCase;
+};
+
+export const mapCompanyInsolvency = (
+  value: unknown,
+  companyNumber: string
+): MappedCompanyInsolvency => {
+  let record = asRecord(value) ?? {};
+  if (!Array.isArray(record.cases)) {
+    throw companiesHouseValidationError(
+      'Companies House returned company insolvency without a required cases array.',
+      'companies_house_response_invalid'
+    );
+  }
+  return pickDefined({
+    companyNumber,
+    status: stringValue(record.status),
+    cases: record.cases
+      .map(mapInsolvencyCase)
+      .filter((item): item is MappedInsolvencyCase => item !== undefined),
+    record
+  }) as MappedCompanyInsolvency;
+};
+
+let mapPscIdentification = (value: unknown): MappedPscIdentification | undefined => {
+  let record = asRecord(value);
+  return record
+    ? (pickDefined({
+        legalAuthority: stringValue(record.legal_authority),
+        legalForm: stringValue(record.legal_form),
+        placeRegistered: stringValue(record.place_registered),
+        registrationNumber: stringValue(record.registration_number),
+        countryRegistered: stringValue(record.country_registered),
+        record
+      }) as MappedPscIdentification)
+    : undefined;
+};
+
+let mapPscIdentityVerification = (
+  value: unknown
+): MappedPscIdentityVerification | undefined => {
+  let record = asRecord(value);
+  return record
+    ? (pickDefined({
+        antiMoneyLaunderingSupervisoryBodies: stringArray(
+          record.anti_money_laundering_supervisory_bodies
+        ),
+        appointmentVerificationEndOn: stringValue(record.appointment_verification_end_on),
+        appointmentVerificationStartOn: stringValue(record.appointment_verification_start_on),
+        appointmentVerificationStatementDate: stringValue(
+          record.appointment_verification_statement_date
+        ),
+        appointmentVerificationStatementDueOn: stringValue(
+          record.appointment_verification_statement_due_on
+        ),
+        authorisedCorporateServiceProviderName: stringValue(
+          record.authorised_corporate_service_provider_name
+        ),
+        identityVerifiedOn: stringValue(record.identity_verified_on),
+        preferredName: stringValue(record.preferred_name),
+        record
+      }) as MappedPscIdentityVerification)
+    : undefined;
 };
 
 export const mapPscRecord = (value: unknown): MappedPsc => {
   let record = asRecord(value) ?? {};
   let links = asRecord(record.links);
   let parsed = parsePscLink(links?.self);
-  return {
-    pscId: parsed?.pscId,
-    companyNumber: parsed?.companyNumber,
-    name: stringValue(record.name) ?? stringValue(record.statement),
+  return pickDefined({
+    notificationId: parsed?.resourceType === 'psc' ? parsed.pscId : undefined,
+    name: stringValue(record.name),
     kind: stringValue(record.kind),
+    description: stringValue(record.description),
     notifiedOn: stringValue(record.notified_on),
     ceasedOn: stringValue(record.ceased_on),
     ceased: booleanValue(record.ceased),
     naturesOfControl: stringArray(record.natures_of_control),
+    nationality: stringValue(record.nationality),
+    countryOfResidence: stringValue(record.country_of_residence),
+    address: mapAddress(record.address),
+    principalOfficeAddress: mapAddress(record.principal_office_address),
+    dateOfBirth: mapPublishedDateOfBirth(record.date_of_birth),
+    isSanctioned: booleanValue(record.is_sanctioned),
+    identification: mapPscIdentification(record.identification),
+    identityVerificationDetails: mapPscIdentityVerification(
+      record.identity_verification_details
+    ),
+    links,
     record
-  };
+  }) as MappedPsc;
+};
+
+export const mapPscListEnvelope = (
+  value: unknown,
+  companyNumber: string,
+  requested: { itemsPerPage: number; startIndex: number }
+): MappedPscList => {
+  let record = asRecord(value) ?? {};
+  let pscs = Array.isArray(record.items) ? record.items.map(mapPscRecord) : [];
+  return pickDefined({
+    companyNumber,
+    activeCount: requiredNonNegativeInteger(record, 'active_count', 'PSC list'),
+    ceasedCount: requiredNonNegativeInteger(record, 'ceased_count', 'PSC list'),
+    pscs,
+    itemsPerPage: nonNegativeInteger(record.items_per_page) ?? requested.itemsPerPage,
+    startIndex: nonNegativeInteger(record.start_index) ?? requested.startIndex,
+    totalResults:
+      nonNegativeInteger(record.total_results) ??
+      nonNegativeInteger(record.total_count) ??
+      pscs.length,
+    links: asRecord(record.links),
+    record
+  }) as MappedPscList;
+};
+
+export const mapPscStatementRecord = (value: unknown): MappedPscStatement => {
+  let record = asRecord(value) ?? {};
+  let links = asRecord(record.links);
+  let parsed = parsePscLink(links?.self);
+  return pickDefined({
+    statementId: parsed?.resourceType === 'statement' ? parsed.pscId : undefined,
+    kind: requiredStringValue(record, ['kind'], 'PSC statement'),
+    statement: requiredStringValue(record, ['statement'], 'PSC statement'),
+    notifiedOn: requiredStringValue(record, ['notified_on'], 'PSC statement'),
+    ceasedOn: stringValue(record.ceased_on),
+    linkedPscName: stringValue(record.linked_psc_name),
+    restrictionsNoticeWithdrawalReason: stringValue(
+      record.restrictions_notice_withdrawal_reason
+    ),
+    links,
+    record
+  }) as MappedPscStatement;
+};
+
+export const mapPscStatementListEnvelope = (
+  value: unknown,
+  companyNumber: string,
+  requested: { itemsPerPage: number; startIndex: number }
+): MappedPscStatementList => {
+  let record = asRecord(value) ?? {};
+  let statements = Array.isArray(record.items) ? record.items.map(mapPscStatementRecord) : [];
+  return pickDefined({
+    companyNumber,
+    activeCount: requiredNonNegativeInteger(record, 'active_count', 'PSC statement list'),
+    ceasedCount: requiredNonNegativeInteger(record, 'ceased_count', 'PSC statement list'),
+    statements,
+    itemsPerPage: nonNegativeInteger(record.items_per_page) ?? requested.itemsPerPage,
+    startIndex: nonNegativeInteger(record.start_index) ?? requested.startIndex,
+    totalResults:
+      nonNegativeInteger(record.total_results) ??
+      nonNegativeInteger(record.total_count) ??
+      statements.length,
+    links: asRecord(record.links),
+    record
+  }) as MappedPscStatementList;
 };
 
 export const mapDocumentMetadata = (value: unknown): MappedDocumentMetadata => {

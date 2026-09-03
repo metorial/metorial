@@ -103,10 +103,11 @@ describe('Companies House record mappers', () => {
 
     let charge = {
       id: 'charge-123',
+      charge_number: 1,
       status: 'outstanding',
       created_on: '2022-03-04',
       delivered_on: '2022-03-05',
-      classification: { description: 'Fixed charge' },
+      classification: [{ description: 'Fixed charge', type: 'charge-description' }],
       future_field: 3
     };
     expect(mapChargeRecord(charge)).toMatchObject({
@@ -114,7 +115,13 @@ describe('Companies House record mappers', () => {
       status: 'outstanding',
       createdOn: '2022-03-04',
       deliveredOn: '2022-03-05',
-      classification: 'Fixed charge',
+      classification: [
+        {
+          description: 'Fixed charge',
+          type: 'charge-description',
+          record: charge.classification[0]
+        }
+      ],
       record: charge
     });
 
@@ -129,8 +136,7 @@ describe('Companies House record mappers', () => {
       future_field: 4
     };
     expect(mapPscRecord(psc)).toMatchObject({
-      pscId: 'psc-123',
-      companyNumber: '01234567',
+      notificationId: 'psc-123',
       name: 'Example Holdings Limited',
       kind: 'corporate-entity-person-with-significant-control',
       notifiedOn: '2023-01-01',

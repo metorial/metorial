@@ -26,7 +26,9 @@ import {
 } from './errors';
 import {
   mapAdvancedCompanySearchEnvelope,
+  mapChargeListEnvelope,
   mapChargeRecord,
+  mapCompanyInsolvency,
   mapCompanyOfficerListEnvelope,
   mapCompanyProfile,
   mapCompanySearchRecord,
@@ -38,7 +40,8 @@ import {
   mapOfficerAppointmentListEnvelope,
   mapOfficerSearchRecord,
   mapPaginatedEnvelope,
-  mapPscRecord
+  mapPscListEnvelope,
+  mapPscStatementListEnvelope
 } from './mappers';
 import type { MappedDocumentMetadata, ProviderRecord } from './types';
 
@@ -565,7 +568,7 @@ export class CompaniesHouseClient {
       `/company/${pathSegment(companyNumber)}/charges`,
       { params: { items_per_page: page.itemsPerPage, start_index: page.startIndex } }
     );
-    return mapPaginatedEnvelope(data, mapChargeRecord, page);
+    return mapChargeListEnvelope(data, companyNumber, page);
   }
 
   async getCompanyCharge(companyNumber: string, chargeId: string) {
@@ -573,15 +576,15 @@ export class CompaniesHouseClient {
       'get company charge',
       `/company/${pathSegment(companyNumber)}/charges/${pathSegment(chargeId)}`
     );
-    return mapChargeRecord(data);
+    return mapChargeRecord(data, chargeId);
   }
 
   async getCompanyInsolvency(companyNumber: string) {
-    let record = await this.publicData<ProviderRecord>(
+    let data = await this.publicData<ProviderRecord>(
       'get company insolvency',
       `/company/${pathSegment(companyNumber)}/insolvency`
     );
-    return { record };
+    return mapCompanyInsolvency(data, companyNumber);
   }
 
   async listCompanyPscs(companyNumber: string, params: RegisterViewPagination = {}) {
@@ -592,13 +595,12 @@ export class CompaniesHouseClient {
       {
         params: pickDefined({
           items_per_page: page.itemsPerPage,
-          register_view:
-            params.registerView === undefined ? undefined : String(params.registerView),
+          register_view: String(params.registerView ?? false),
           start_index: page.startIndex
         })
       }
     );
-    return mapPaginatedEnvelope(data, mapPscRecord, page);
+    return mapPscListEnvelope(data, companyNumber, page);
   }
 
   async listPscStatements(companyNumber: string, params: RegisterViewPagination = {}) {
@@ -609,12 +611,11 @@ export class CompaniesHouseClient {
       {
         params: pickDefined({
           items_per_page: page.itemsPerPage,
-          register_view:
-            params.registerView === undefined ? undefined : String(params.registerView),
+          register_view: String(params.registerView ?? false),
           start_index: page.startIndex
         })
       }
     );
-    return mapPaginatedEnvelope(data, mapPscRecord, page);
+    return mapPscStatementListEnvelope(data, companyNumber, page);
   }
 }

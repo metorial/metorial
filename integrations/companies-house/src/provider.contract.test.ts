@@ -1,7 +1,7 @@
 import { createLocalSlateTestClient, expectSlateContract } from '@slates/test';
 import { describe, expect, it } from 'vitest';
 import { provider } from './index';
-import { companiesHouseToolKeys } from './tools';
+import { companiesHouseToolKeys, tools } from './tools';
 
 const implementedToolKeys: (typeof companiesHouseToolKeys)[number][] = [
   'search_companies',
@@ -15,7 +15,12 @@ const implementedToolKeys: (typeof companiesHouseToolKeys)[number][] = [
   'list_filing_history',
   'get_filing_history_item',
   'get_document_metadata',
-  'download_filing_document'
+  'download_filing_document',
+  'list_company_charges',
+  'get_company_charge',
+  'get_company_insolvency',
+  'list_company_pscs',
+  'list_psc_statements'
 ];
 
 describe('companies-house provider contract', () => {
@@ -127,9 +132,19 @@ describe('companies-house provider contract', () => {
       'list_filing_history',
       'get_filing_history_item',
       'get_document_metadata',
-      'download_filing_document'
+      'download_filing_document',
+      'list_company_charges',
+      'get_company_charge',
+      'get_company_insolvency',
+      'list_company_pscs',
+      'list_psc_statements'
     ]);
     expect(new Set(companiesHouseToolKeys).size).toBe(companiesHouseToolKeys.length);
+    expect(companiesHouseToolKeys).toHaveLength(17);
+    expect(tools).toHaveLength(17);
+    for (let tool of tools) {
+      expect(tool.tags).toEqual({ readOnly: true, destructive: false });
+    }
     for (let key of companiesHouseToolKeys) {
       expect(`companies-house-${key}`.length).toBeLessThan(60);
     }

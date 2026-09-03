@@ -306,25 +306,182 @@ export type MappedFilingHistory = {
   record: ProviderRecord;
 };
 
+export type ProviderLinks = ProviderRecord | ProviderRecord[];
+
+export type MappedChargeDescription = {
+  description?: string;
+  type?: string;
+  record: ProviderRecord;
+};
+
+export type MappedChargeParticular = MappedChargeDescription & {
+  chargorActingAsBareTrustee?: boolean;
+  containsFixedCharge?: boolean;
+  containsFloatingCharge?: boolean;
+  containsNegativePledge?: boolean;
+  floatingChargeCoversAll?: boolean;
+};
+
+export type MappedPersonEntitled = {
+  name?: string;
+  record: ProviderRecord;
+};
+
+export type MappedChargeTransaction = {
+  deliveredOn?: string;
+  filingType?: string;
+  insolvencyCaseNumber?: string;
+  links?: ProviderRecord[];
+  record: ProviderRecord;
+};
+
+export type MappedChargeInsolvencyCase = {
+  caseNumber?: string;
+  links?: ProviderRecord[];
+  record: ProviderRecord;
+};
+
 export type MappedCharge = {
-  chargeId?: string;
-  status?: string;
+  chargeId: string;
+  chargeCode?: string;
+  chargeNumber?: number;
+  status: string;
+  acquiredOn?: string;
+  assetsCeasedReleased?: string;
+  coveringInstrumentOn?: string;
   createdOn?: string;
   deliveredOn?: string;
+  resolvedOn?: string;
   satisfiedOn?: string;
-  classification?: string;
+  classification: MappedChargeDescription[];
+  securedDetails?: MappedChargeDescription[];
+  particulars?: MappedChargeParticular[];
+  personsEntitled?: MappedPersonEntitled[];
+  moreThanFourPersonsEntitled?: boolean;
+  transactions?: MappedChargeTransaction[];
+  insolvencyCases?: MappedChargeInsolvencyCase[];
+  links?: ProviderLinks;
+  record: ProviderRecord;
+};
+
+export type MappedChargeList = {
+  companyNumber: string;
+  totalCount?: number;
+  satisfiedCount?: number;
+  partSatisfiedCount?: number;
+  charges: MappedCharge[];
+  itemsPerPage: number;
+  startIndex: number;
+  record: ProviderRecord;
+};
+
+export type MappedInsolvencyDate = {
+  type: string;
+  date: string;
+  record: ProviderRecord;
+};
+
+export type MappedInsolvencyPractitioner = {
+  name: string;
+  addresses: MappedAddress[];
+  appointedOn?: string;
+  ceasedToActOn?: string;
+  role?: string;
+  record: ProviderRecord;
+};
+
+export type MappedInsolvencyCase = {
+  type: string;
+  number?: string;
+  dates: MappedInsolvencyDate[];
+  notes?: string[];
+  practitioners: MappedInsolvencyPractitioner[];
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
+export type MappedCompanyInsolvency = {
+  companyNumber: string;
+  status?: string;
+  cases: MappedInsolvencyCase[];
+  record: ProviderRecord;
+};
+
+export type MappedPscIdentification = {
+  legalAuthority?: string;
+  legalForm?: string;
+  placeRegistered?: string;
+  registrationNumber?: string;
+  countryRegistered?: string;
+  record: ProviderRecord;
+};
+
+export type MappedPscIdentityVerification = {
+  antiMoneyLaunderingSupervisoryBodies?: string[];
+  appointmentVerificationEndOn?: string;
+  appointmentVerificationStartOn?: string;
+  appointmentVerificationStatementDate?: string;
+  appointmentVerificationStatementDueOn?: string;
+  authorisedCorporateServiceProviderName?: string;
+  identityVerifiedOn?: string;
+  preferredName?: string;
   record: ProviderRecord;
 };
 
 export type MappedPsc = {
-  pscId?: string;
-  companyNumber?: string;
+  notificationId?: string;
   name?: string;
   kind?: string;
+  description?: string;
   notifiedOn?: string;
   ceasedOn?: string;
   ceased?: boolean;
   naturesOfControl?: string[];
+  nationality?: string;
+  countryOfResidence?: string;
+  address?: MappedAddress;
+  principalOfficeAddress?: MappedAddress;
+  dateOfBirth?: PublishedDateOfBirth;
+  isSanctioned?: boolean;
+  identification?: MappedPscIdentification;
+  identityVerificationDetails?: MappedPscIdentityVerification;
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
+export type MappedPscList = {
+  companyNumber: string;
+  activeCount: number;
+  ceasedCount: number;
+  pscs: MappedPsc[];
+  itemsPerPage: number;
+  startIndex: number;
+  totalResults: number;
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
+export type MappedPscStatement = {
+  statementId?: string;
+  kind: string;
+  statement: string;
+  notifiedOn: string;
+  ceasedOn?: string;
+  linkedPscName?: string;
+  restrictionsNoticeWithdrawalReason?: string;
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
+export type MappedPscStatementList = {
+  companyNumber: string;
+  activeCount: number;
+  ceasedCount: number;
+  statements: MappedPscStatement[];
+  itemsPerPage: number;
+  startIndex: number;
+  totalResults: number;
+  links?: ProviderRecord;
   record: ProviderRecord;
 };
 

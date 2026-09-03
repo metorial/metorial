@@ -367,6 +367,192 @@ export const downloadedDocumentOutputSchema = z.object({
   byteLength: z.number().int().nonnegative()
 });
 
+export const providerLinksSchema = z.union([
+  providerRecordSchema,
+  z.array(providerRecordSchema)
+]);
+
+export const chargeDescriptionSchema = z.object({
+  description: z.string().optional(),
+  type: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const chargeParticularSchema = chargeDescriptionSchema.extend({
+  chargorActingAsBareTrustee: z.boolean().optional(),
+  containsFixedCharge: z.boolean().optional(),
+  containsFloatingCharge: z.boolean().optional(),
+  containsNegativePledge: z.boolean().optional(),
+  floatingChargeCoversAll: z.boolean().optional()
+});
+
+export const personEntitledSchema = z.object({
+  name: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const chargeTransactionSchema = z.object({
+  deliveredOn: z.string().optional(),
+  filingType: z.string().optional(),
+  insolvencyCaseNumber: z.string().optional(),
+  links: z.array(providerRecordSchema).optional(),
+  record: providerRecordSchema
+});
+
+export const chargeInsolvencyCaseSchema = z.object({
+  caseNumber: z.string().optional(),
+  links: z.array(providerRecordSchema).optional(),
+  record: providerRecordSchema
+});
+
+export const chargeSchema = z.object({
+  chargeId: z.string(),
+  chargeCode: z.string().optional(),
+  chargeNumber: z.number().int().nonnegative().optional(),
+  status: z.string(),
+  acquiredOn: z.string().optional(),
+  assetsCeasedReleased: z.string().optional(),
+  coveringInstrumentOn: z.string().optional(),
+  createdOn: z.string().optional(),
+  deliveredOn: z.string().optional(),
+  resolvedOn: z.string().optional(),
+  satisfiedOn: z.string().optional(),
+  classification: z.array(chargeDescriptionSchema),
+  securedDetails: z.array(chargeDescriptionSchema).optional(),
+  particulars: z.array(chargeParticularSchema).optional(),
+  personsEntitled: z.array(personEntitledSchema).optional(),
+  moreThanFourPersonsEntitled: z.boolean().optional(),
+  transactions: z.array(chargeTransactionSchema).optional(),
+  insolvencyCases: z.array(chargeInsolvencyCaseSchema).optional(),
+  links: providerLinksSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const chargeListOutputSchema = z.object({
+  companyNumber: z.string(),
+  totalCount: z.number().int().nonnegative().optional(),
+  satisfiedCount: z.number().int().nonnegative().optional(),
+  partSatisfiedCount: z.number().int().nonnegative().optional(),
+  charges: z.array(chargeSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  record: providerRecordSchema
+});
+
+export const chargeDetailOutputSchema = chargeSchema.extend({
+  companyNumber: z.string()
+});
+
+export const insolvencyDateSchema = z.object({
+  type: z.string(),
+  date: z.string(),
+  record: providerRecordSchema
+});
+
+export const insolvencyPractitionerSchema = z.object({
+  name: z.string(),
+  addresses: z.array(mappedAddressSchema),
+  appointedOn: z.string().optional(),
+  ceasedToActOn: z.string().optional(),
+  role: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const insolvencyCaseSchema = z.object({
+  type: z.string(),
+  number: z.string().optional(),
+  dates: z.array(insolvencyDateSchema),
+  notes: z.array(z.string()).optional(),
+  practitioners: z.array(insolvencyPractitionerSchema),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const companyInsolvencyOutputSchema = z.object({
+  companyNumber: z.string(),
+  status: z.string().optional(),
+  cases: z.array(insolvencyCaseSchema),
+  record: providerRecordSchema
+});
+
+export const pscIdentificationSchema = z.object({
+  legalAuthority: z.string().optional(),
+  legalForm: z.string().optional(),
+  placeRegistered: z.string().optional(),
+  registrationNumber: z.string().optional(),
+  countryRegistered: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const pscIdentityVerificationSchema = z.object({
+  antiMoneyLaunderingSupervisoryBodies: z.array(z.string()).optional(),
+  appointmentVerificationEndOn: z.string().optional(),
+  appointmentVerificationStartOn: z.string().optional(),
+  appointmentVerificationStatementDate: z.string().optional(),
+  appointmentVerificationStatementDueOn: z.string().optional(),
+  authorisedCorporateServiceProviderName: z.string().optional(),
+  identityVerifiedOn: z.string().optional(),
+  preferredName: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const pscSchema = z.object({
+  notificationId: z.string().optional(),
+  name: z.string().optional(),
+  kind: z.string().optional(),
+  description: z.string().optional(),
+  notifiedOn: z.string().optional(),
+  ceasedOn: z.string().optional(),
+  ceased: z.boolean().optional(),
+  naturesOfControl: z.array(z.string()).optional(),
+  nationality: z.string().optional(),
+  countryOfResidence: z.string().optional(),
+  address: mappedAddressSchema.optional(),
+  principalOfficeAddress: mappedAddressSchema.optional(),
+  dateOfBirth: publishedDateOfBirthSchema.optional(),
+  isSanctioned: z.boolean().optional(),
+  identification: pscIdentificationSchema.optional(),
+  identityVerificationDetails: pscIdentityVerificationSchema.optional(),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const pscListOutputSchema = z.object({
+  companyNumber: z.string(),
+  activeCount: z.number().int().nonnegative(),
+  ceasedCount: z.number().int().nonnegative(),
+  pscs: z.array(pscSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  totalResults: z.number().int().nonnegative(),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const pscStatementSchema = z.object({
+  statementId: z.string().optional(),
+  kind: z.string(),
+  statement: z.string(),
+  notifiedOn: z.string(),
+  ceasedOn: z.string().optional(),
+  linkedPscName: z.string().optional(),
+  restrictionsNoticeWithdrawalReason: z.string().optional(),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const pscStatementListOutputSchema = z.object({
+  companyNumber: z.string(),
+  activeCount: z.number().int().nonnegative(),
+  ceasedCount: z.number().int().nonnegative(),
+  statements: z.array(pscStatementSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  totalResults: z.number().int().nonnegative(),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
 export const addressSchema = z
   .object({
     address_line_1: z.string().optional(),
@@ -439,12 +625,14 @@ export const filingRecordSchema = z
 
 export const chargeRecordSchema = z
   .object({
-    id: z.string().optional(),
-    status: z.string().optional(),
+    id: z.string(),
+    charge_number: z.number(),
+    classification: z.array(providerRecordSchema),
+    status: z.string(),
     created_on: z.string().optional(),
     delivered_on: z.string().optional(),
     satisfied_on: z.string().optional(),
-    links: linksSchema.optional()
+    links: z.array(providerRecordSchema).optional()
   })
   .passthrough();
 
@@ -456,6 +644,7 @@ export const pscRecordSchema = z
     ceased_on: z.string().optional(),
     ceased: z.boolean().optional(),
     natures_of_control: z.array(z.string()).optional(),
+    identity_verification_details: providerRecordSchema.optional(),
     links: linksSchema.optional()
   })
   .passthrough();
