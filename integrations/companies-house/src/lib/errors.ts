@@ -68,8 +68,11 @@ export const companiesHouseApiError = (
         detailKeys: ['message', 'error', 'detail', 'description'],
         nestedKeys: ['errors']
       });
-      return details.length > 0
-        ? redact(details.join(' - '), secrets)
+      if (details.length > 0) return redact(details.join(' - '), secrets);
+      let interceptedMessage =
+        currentError instanceof Error ? currentError.message.trim() : '';
+      return interceptedMessage
+        ? redact(interceptedMessage, secrets)
         : 'The provider returned an unexpected error.';
     }
   });

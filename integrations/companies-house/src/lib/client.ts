@@ -552,15 +552,14 @@ export class CompaniesHouseClient {
     };
   }
 
-  async listCompanyCharges(companyNumber: string) {
+  async listCompanyCharges(companyNumber: string, params: CompaniesHousePagination = {}) {
+    let page = normalizePagination(params);
     let data = await this.publicData<ProviderRecord>(
       'list company charges',
-      `/company/${pathSegment(companyNumber)}/charges`
+      `/company/${pathSegment(companyNumber)}/charges`,
+      { params: { items_per_page: page.itemsPerPage, start_index: page.startIndex } }
     );
-    return mapPaginatedEnvelope(data, mapChargeRecord, {
-      itemsPerPage: DEFAULT_ITEMS_PER_PAGE,
-      startIndex: 0
-    });
+    return mapPaginatedEnvelope(data, mapChargeRecord, page);
   }
 
   async getCompanyCharge(companyNumber: string, chargeId: string) {

@@ -1,4 +1,5 @@
 import { ServiceError } from '@lowerdeck/error';
+import { SlateError } from 'slates';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const httpMocks = vi.hoisted(() => ({
@@ -100,7 +101,7 @@ describe('CompaniesHouseClient endpoint requests', () => {
     await client.listFilingHistory('A/B', { categories: ['accounts', 'capital'] });
     await client.getFilingHistoryItem('A/B', 'tx/1');
     await client.getDocumentMetadata('doc/1');
-    await client.listCompanyCharges('A/B');
+    await client.listCompanyCharges('A/B', { itemsPerPage: 7, startIndex: 40 });
     await client.getCompanyCharge('A/B', 'charge/1');
     await client.getCompanyInsolvency('A/B');
     await client.listCompanyPscs('A/B', { registerView: false });
@@ -147,7 +148,7 @@ describe('CompaniesHouseClient endpoint requests', () => {
         { params: { category: 'accounts,capital', items_per_page: 20, start_index: 0 } }
       ],
       ['/company/A%2FB/filing-history/tx%2F1'],
-      ['/company/A%2FB/charges'],
+      ['/company/A%2FB/charges', { params: { items_per_page: 7, start_index: 40 } }],
       ['/company/A%2FB/charges/charge%2F1'],
       ['/company/A%2FB/insolvency'],
       [
@@ -279,6 +280,18 @@ describe('CompaniesHouseClient endpoint requests', () => {
     expect(discriminatorError.data.message).toContain('officerType');
     expect(httpMocks.publicGet).not.toHaveBeenCalled();
   });
+
+  it('uses requested charge pagination when the provider omits page coordinates', async () => {
+    httpMocks.publicGet.mockResolvedValueOnce({ data: { items: [], total_count: 0 } });
+
+    await expect(
+      createClient().listCompanyCharges('01234567', { itemsPerPage: 7, startIndex: 40 })
+    ).resolves.toMatchObject({
+      itemsPerPage: 7,
+      startIndex: 40,
+      totalResults: 0
+    });
+  });
 });
 
 describe('CompaniesHouseClient error normalization', () => {
@@ -331,6 +344,25 @@ describe('CompaniesHouseClient error normalization', () => {
       expect(error.data.message).toContain('X-RateLimit-Reset time 120');
       expect(error.data.message).not.toContain('120 seconds');
     }
+  });
+
+  it('uses the safe intercepted error message when response data has no detail', async () => {
+    httpMocks.publicGet.mockRejectedValueOnce(
+      new SlateError({
+        code: 'upstream.error',
+        message: 'Gateway connection closed for secret-key',
+        upstream: { status: 500 },
+        baggage: { response: {} }
+      })
+    );
+
+    let error = await createClient()
+      .getCompanyProfile('01234567')
+      .catch(error => error);
+
+    expect(error).toBeInstanceOf(ServiceError);
+    expect(error.data.message).toContain('Gateway connection closed for [redacted]');
+    expect(error.data.message).not.toContain('secret-key');
   });
 });
 
