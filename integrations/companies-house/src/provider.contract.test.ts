@@ -2,6 +2,7 @@ import { createLocalSlateTestClient, expectSlateContract } from '@slates/test';
 import { describe, expect, it } from 'vitest';
 import { provider } from './index';
 import { companiesHouseToolKeys, tools } from './tools';
+import { downloadFilingDocument } from './tools/documents';
 
 const implementedToolKeys: (typeof companiesHouseToolKeys)[number][] = [
   'search_companies',
@@ -148,5 +149,11 @@ describe('companies-house provider contract', () => {
     for (let key of companiesHouseToolKeys) {
       expect(`companies-house-${key}`.length).toBeLessThan(60);
     }
+  });
+
+  it('publishes the filing download size limit and remediation', () => {
+    expect(downloadFilingDocument.constraints).toEqual([
+      'Maximum downloadable file size is 50 MiB. If the selected representation exceeds this limit, download it directly from Companies House or choose a smaller content type returned by get_document_metadata.'
+    ]);
   });
 });

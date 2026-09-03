@@ -57,6 +57,9 @@ export let downloadFilingDocument = SlateTool.create(spec, {
   key: 'download_filing_document',
   description:
     'Download one advertised representation of a Companies House filing document as a file.',
+  constraints: [
+    'Maximum downloadable file size is 50 MiB. If the selected representation exceeds this limit, download it directly from Companies House or choose a smaller content type returned by get_document_metadata.'
+  ],
   tags: { readOnly: true, destructive: false }
 })
   .input(
