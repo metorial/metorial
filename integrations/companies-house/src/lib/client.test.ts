@@ -264,20 +264,30 @@ describe('CompaniesHouseClient endpoint requests', () => {
     expect(httpMocks.publicGet).not.toHaveBeenCalled();
   });
 
-  it('rejects a register type without register view and an unknown disqualification path', async () => {
+  it('rejects a register type without register view', async () => {
     let client = createClient();
 
     let registerError = await client
       .listCompanyOfficers('01234567', { registerType: 'directors' })
       .catch(error => error);
-    let discriminatorError = await client
-      .getOfficerDisqualifications('officer-1', 'unknown' as 'natural')
-      .catch(error => error);
 
     expect(registerError).toBeInstanceOf(ServiceError);
     expect(registerError.data.message).toContain('registerView');
-    expect(discriminatorError).toBeInstanceOf(ServiceError);
-    expect(discriminatorError.data.message).toContain('officerType');
+    expect(httpMocks.publicGet).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'unknown',
+    'toString',
+    'constructor',
+    '__proto__'
+  ])('rejects disqualification path discriminator %j before HTTP', async officerType => {
+    let error = await createClient()
+      .getOfficerDisqualifications('officer-1', officerType as 'natural')
+      .catch(error => error);
+
+    expect(error).toBeInstanceOf(ServiceError);
+    expect(error.data.message).toContain('officerType');
     expect(httpMocks.publicGet).not.toHaveBeenCalled();
   });
 
@@ -369,6 +379,21 @@ describe('CompaniesHouseClient error normalization', () => {
 describe('CompaniesHouseClient document downloads', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it.each([
+    'toString',
+    'constructor',
+    '__proto__'
+  ])('rejects inherited object key %j as a requested MIME type before HTTP', async mimeType => {
+    let error = await createClient()
+      .getDocumentContent('doc-123', mimeType)
+      .catch(error => error);
+
+    expect(error).toBeInstanceOf(ServiceError);
+    expect(error.data.reason).toBe('companies_house_document_mime_invalid');
+    expect(httpMocks.documentGet).not.toHaveBeenCalled();
+    expect(httpMocks.downloadGet).not.toHaveBeenCalled();
   });
 
   it('discovers metadata, follows one HTTPS location, and never sends auth to it', async () => {

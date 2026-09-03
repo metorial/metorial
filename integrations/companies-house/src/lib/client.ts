@@ -12,11 +12,12 @@ import {
   DISQUALIFICATION_RESOURCE_PATHS,
   type DisqualifiedOfficerType,
   DOCUMENT_API_BASE_URL,
+  isDisqualifiedOfficerType,
+  isSafeDocumentMimeType,
   MAX_DOCUMENT_DOWNLOAD_BYTES,
   MAX_ITEMS_PER_PAGE,
   PUBLIC_DATA_BASE_URL,
-  SAFE_DOCUMENT_MIME_EXTENSIONS,
-  type SafeDocumentMimeType
+  SAFE_DOCUMENT_MIME_EXTENSIONS
 } from './constants';
 import {
   companiesHouseApiError,
@@ -372,10 +373,10 @@ export class CompaniesHouseClient {
   }
 
   async getOfficerDisqualifications(officerId: string, officerType: DisqualifiedOfficerType) {
-    let resourcePath = DISQUALIFICATION_RESOURCE_PATHS[officerType];
-    if (!resourcePath) {
+    if (!isDisqualifiedOfficerType(officerType)) {
       throw companiesHouseValidationError('officerType must be either natural or corporate.');
     }
+    let resourcePath = DISQUALIFICATION_RESOURCE_PATHS[officerType];
     let data = await this.publicData<ProviderRecord>(
       'get officer disqualifications',
       `${resourcePath}${pathSegment(officerId)}`
@@ -420,13 +421,13 @@ export class CompaniesHouseClient {
 
   async getDocumentContent(documentId: string, requestedMimeType: string) {
     let mimeType = normalizedMimeType(requestedMimeType);
-    if (!mimeType || !(mimeType in SAFE_DOCUMENT_MIME_EXTENSIONS)) {
+    if (!isSafeDocumentMimeType(mimeType)) {
       throw companiesHouseValidationError(
         'The requested document MIME type is not safe to download.',
         'companies_house_document_mime_invalid'
       );
     }
-    let safeMimeType = mimeType as SafeDocumentMimeType;
+    let safeMimeType = mimeType;
     let metadata = await this.getDocumentMetadata(documentId);
     let resource = metadata.resources[safeMimeType];
     if (!resource) {
@@ -534,10 +535,7 @@ export class CompaniesHouseClient {
       responseMimeType === 'binary/octet-stream'
         ? safeMimeType
         : responseMimeType;
-    if (
-      !(resolvedMimeType in SAFE_DOCUMENT_MIME_EXTENSIONS) ||
-      resolvedMimeType !== safeMimeType
-    ) {
+    if (!isSafeDocumentMimeType(resolvedMimeType) || resolvedMimeType !== safeMimeType) {
       throw companiesHouseValidationError(
         `Companies House returned an unexpected document MIME type "${resolvedMimeType}".`,
         'companies_house_document_mime_invalid'

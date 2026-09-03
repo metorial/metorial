@@ -17,12 +17,18 @@ export const SAFE_DOCUMENT_MIME_EXTENSIONS = {
 
 export type SafeDocumentMimeType = keyof typeof SAFE_DOCUMENT_MIME_EXTENSIONS;
 
+export let isSafeDocumentMimeType = (value: unknown): value is SafeDocumentMimeType =>
+  typeof value === 'string' && Object.hasOwn(SAFE_DOCUMENT_MIME_EXTENSIONS, value);
+
 export const DISQUALIFICATION_RESOURCE_PATHS = {
   natural: '/disqualified-officers/natural/',
   corporate: '/disqualified-officers/corporate/'
 } as const;
 
 export type DisqualifiedOfficerType = keyof typeof DISQUALIFICATION_RESOURCE_PATHS;
+
+export let isDisqualifiedOfficerType = (value: unknown): value is DisqualifiedOfficerType =>
+  typeof value === 'string' && Object.hasOwn(DISQUALIFICATION_RESOURCE_PATHS, value);
 
 export const PSC_RESOURCE_DISCRIMINATORS = [
   'corporate-entity-beneficial-owner',

@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import {
   DEFAULT_ITEMS_PER_PAGE,
-  MAX_ITEMS_PER_PAGE,
-  SAFE_DOCUMENT_MIME_EXTENSIONS
+  isSafeDocumentMimeType,
+  MAX_ITEMS_PER_PAGE
 } from './constants';
 
 export const trimmedStringSchema = z.string().trim().min(1);
@@ -30,7 +30,7 @@ export const paginationSchema = z.object(paginationFields);
 export const isoDateSchema = z.iso.date();
 
 export const documentMimeTypeSchema = trimmedStringSchema.refine(
-  value => value in SAFE_DOCUMENT_MIME_EXTENSIONS,
+  isSafeDocumentMimeType,
   'Choose a MIME type advertised by Companies House document metadata.'
 );
 
