@@ -44,6 +44,11 @@ export type CompaniesHouseSearchRestriction =
   | 'active-companies'
   | 'legally-equivalent-company-name';
 
+const COMPANY_SEARCH_RESTRICTIONS = [
+  'active-companies',
+  'legally-equivalent-company-name'
+] as const;
+
 export type CompaniesHouseAdvancedSearchParams = CompaniesHousePagination & {
   companyNameIncludes?: string;
   companyNameExcludes?: string;
@@ -98,6 +103,30 @@ let trimmed = (value: string | undefined) => {
 let commaList = (value: string[] | undefined) => {
   let normalized = value?.map(item => item.trim()).filter(Boolean);
   return normalized && normalized.length > 0 ? normalized.join(',') : undefined;
+};
+
+let simpleSearchRestrictions = (value: unknown) => {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length === 0) {
+    throw companiesHouseValidationError(
+      'restrictions must be a non-empty array of supported Companies House restrictions.'
+    );
+  }
+  if (
+    !value.every(
+      item =>
+        typeof item === 'string' &&
+        COMPANY_SEARCH_RESTRICTIONS.includes(item as CompaniesHouseSearchRestriction)
+    )
+  ) {
+    throw companiesHouseValidationError(
+      'restrictions may contain only active-companies and legally-equivalent-company-name.'
+    );
+  }
+  if (new Set(value).size !== value.length) {
+    throw companiesHouseValidationError('restrictions must not contain duplicate values.');
+  }
+  return value.join(' ');
 };
 
 let validateDate = (value: string | undefined, field: string) => {
@@ -196,10 +225,7 @@ export class CompaniesHouseClient {
     let data = await this.publicData<ProviderRecord>('search companies', '/search/companies', {
       params: pickDefined({
         q: query,
-        restrictions:
-          params.restrictions && params.restrictions.length > 0
-            ? params.restrictions.join(' ')
-            : undefined,
+        restrictions: simpleSearchRestrictions(params.restrictions),
         items_per_page: page.itemsPerPage,
         start_index: page.startIndex
       })
@@ -526,14 +552,15 @@ export class CompaniesHouseClient {
     };
   }
 
-  async listCompanyCharges(companyNumber: string, params: CompaniesHousePagination = {}) {
-    let page = normalizePagination(params);
+  async listCompanyCharges(companyNumber: string) {
     let data = await this.publicData<ProviderRecord>(
       'list company charges',
-      `/company/${pathSegment(companyNumber)}/charges`,
-      { params: { items_per_page: page.itemsPerPage, start_index: page.startIndex } }
+      `/company/${pathSegment(companyNumber)}/charges`
     );
-    return mapPaginatedEnvelope(data, mapChargeRecord, page);
+    return mapPaginatedEnvelope(data, mapChargeRecord, {
+      itemsPerPage: DEFAULT_ITEMS_PER_PAGE,
+      startIndex: 0
+    });
   }
 
   async getCompanyCharge(companyNumber: string, chargeId: string) {

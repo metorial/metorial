@@ -24,7 +24,11 @@ vi.mock('slates', async importOriginal => {
   };
 });
 
-import { type CompaniesHouseAdvancedSearchParams, CompaniesHouseClient } from './client';
+import {
+  type CompaniesHouseAdvancedSearchParams,
+  CompaniesHouseClient,
+  type CompaniesHouseSearchRestriction
+} from './client';
 import {
   DOCUMENT_API_BASE_URL,
   MAX_DOCUMENT_DOWNLOAD_BYTES,
@@ -143,7 +147,7 @@ describe('CompaniesHouseClient endpoint requests', () => {
         { params: { category: 'accounts,capital', items_per_page: 20, start_index: 0 } }
       ],
       ['/company/A%2FB/filing-history/tx%2F1'],
-      ['/company/A%2FB/charges', { params: { items_per_page: 20, start_index: 0 } }],
+      ['/company/A%2FB/charges'],
       ['/company/A%2FB/charges/charge%2F1'],
       ['/company/A%2FB/insolvency'],
       [
@@ -199,6 +203,28 @@ describe('CompaniesHouseClient endpoint requests', () => {
         start_index: 50
       }
     });
+  });
+
+  it.each([
+    { name: 'an empty list', restrictions: [] },
+    {
+      name: 'duplicate values',
+      restrictions: ['active-companies', 'active-companies']
+    },
+    { name: 'an invalid runtime value', restrictions: ['dissolved-companies'] }
+  ])('rejects simple-search restrictions containing $name before HTTP', async ({
+    restrictions
+  }) => {
+    let error = await createClient()
+      .searchCompanies({
+        query: 'Example',
+        restrictions: restrictions as CompaniesHouseSearchRestriction[]
+      })
+      .catch(error => error);
+
+    expect(error).toBeInstanceOf(ServiceError);
+    expect(error.data.message).toContain('restrictions');
+    expect(httpMocks.publicGet).not.toHaveBeenCalled();
   });
 
   it.each([

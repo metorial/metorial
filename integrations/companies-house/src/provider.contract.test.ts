@@ -21,25 +21,84 @@ describe('companies-house provider contract', () => {
       authMethodIds: ['api_key']
     });
 
-    expect(contract.actions).toEqual([]);
-    expect(contract.configSchema).toMatchObject({
-      type: 'object',
-      properties: {}
+    expect(contract.provider).toEqual({
+      type: 'provider',
+      id: 'companies-house',
+      name: 'Companies House',
+      description:
+        'Search and inspect companies, officers, filings, charges, insolvency records, and people with significant control in the UK public register.',
+      metadata: {}
     });
+    expect(contract.actions).toEqual([]);
+    expect(contract.tools).toEqual([]);
+    expect(contract.triggers).toEqual([]);
+    expect(contract.configSchema).toEqual({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      type: 'object',
+      properties: {},
+      additionalProperties: false
+    });
+    expect((await client.getDefaultConfig()).config).toBeNull();
+    let configUpdate = await client.updateConfig(null, { unexpected: true });
+    expect(configUpdate.success).toBe(true);
+    expect(configUpdate.config).toEqual({});
 
     let apiKey = await client.getAuthMethod('api_key');
-    expect(apiKey.authenticationMethod).toMatchObject({
+    expect(apiKey.authenticationMethod).toEqual({
       id: 'api_key',
       name: 'API Key',
-      type: 'auth.token'
+      type: 'auth.token',
+      inputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: {
+          apiKey: {
+            type: 'string',
+            minLength: 1,
+            description:
+              'Companies House API key. Create or manage keys at https://developer.company-information.service.gov.uk/manage-applications'
+          }
+        },
+        required: ['apiKey'],
+        additionalProperties: false
+      },
+      outputSchema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: {
+          token: { type: 'string' }
+        },
+        required: ['token'],
+        additionalProperties: false
+      },
+      capabilities: {
+        getDefaultInput: { enabled: false },
+        handleTokenRefresh: { enabled: false },
+        handleChangedInput: { enabled: false },
+        getProfile: { enabled: false }
+      },
+      docs: []
     });
-    expect(apiKey.authenticationMethod.capabilities.getProfile?.enabled).not.toBe(true);
+    expect(contract.authMethods).toEqual([apiKey.authenticationMethod]);
 
     let output = await client.getAuthOutput({
       authenticationMethodId: 'api_key',
       input: { apiKey: '  secret-key  ' }
     });
     expect(output.output).toEqual({ token: 'secret-key' });
+
+    await expect(
+      client.getAuthOutput({
+        authenticationMethodId: 'api_key',
+        input: { apiKey: '   ' }
+      })
+    ).rejects.toThrow();
+    await expect(
+      client.getAuthOutput({
+        authenticationMethodId: 'api_key',
+        input: {}
+      })
+    ).rejects.toThrow();
   });
 
   it('defines the complete planned tool-key contract', () => {
