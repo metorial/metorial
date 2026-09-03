@@ -158,7 +158,6 @@ export type MappedCompanyOfficerList = {
   companyNumber: string;
   activeCount: number;
   resignedCount: number;
-  inactiveCount: number;
   officers: MappedCompanyOfficer[];
   itemsPerPage: number;
   startIndex: number;
@@ -168,9 +167,9 @@ export type MappedCompanyOfficerList = {
 
 export type MappedOfficerAppointment = {
   companyNumber: string;
-  companyName: string;
+  companyName?: string;
   companyStatus?: string;
-  role: string;
+  role?: string;
   appointedOn?: string;
   resignedOn?: string;
   links?: ProviderRecord;
@@ -197,15 +196,61 @@ export type MappedDisqualifiedOfficerSearchItem = {
   record: ProviderRecord;
 };
 
+export type MappedDisqualificationVariation = {
+  caseIdentifier?: string;
+  courtName?: string;
+  variedOn?: string;
+  record: ProviderRecord;
+};
+
+export type MappedDisqualificationReason = {
+  act: string;
+  article?: string;
+  descriptionIdentifier: string;
+  section?: string;
+  record: ProviderRecord;
+};
+
+export type MappedDisqualification = {
+  address: MappedAddress;
+  caseIdentifier?: string;
+  companyNames?: string[];
+  courtName?: string;
+  disqualificationType: string;
+  disqualifiedFrom: string;
+  disqualifiedUntil: string;
+  heardOn?: string;
+  undertakenOn?: string;
+  lastVariations?: MappedDisqualificationVariation[];
+  reason: MappedDisqualificationReason;
+  record: ProviderRecord;
+};
+
+export type MappedPermissionToAct = {
+  companyNames?: string[];
+  courtName?: string;
+  expiresOn: string;
+  grantedOn: string;
+  record: ProviderRecord;
+};
+
 export type MappedDisqualifiedOfficer = {
   officerId: string;
   officerType: string;
   name: string;
+  personNumber?: string;
+  companyNumber?: string;
+  countryOfRegistration?: string;
+  forename?: string;
+  otherForenames?: string;
+  surname?: string;
+  title?: string;
+  honours?: string;
   dateOfBirth?: PublishedDateOfBirth;
   nationality?: string;
-  disqualifications: ProviderRecord[];
-  exemptions: ProviderRecord[];
-  links?: ProviderRecord;
+  disqualifications: MappedDisqualification[];
+  permissionsToAct: MappedPermissionToAct[];
+  links: ProviderRecord;
   record: ProviderRecord;
 };
 

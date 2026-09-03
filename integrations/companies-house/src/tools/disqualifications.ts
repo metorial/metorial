@@ -39,7 +39,7 @@ export let getOfficerDisqualifications = SlateTool.create(spec, {
   name: 'Get Officer Disqualifications',
   key: 'get_officer_disqualifications',
   description:
-    'Get the published Companies House disqualifications and exemptions for a natural or corporate officer record.',
+    'Get published Companies House disqualifications and permissions to act for a natural or corporate officer record.',
   tags: { readOnly: true, destructive: false }
 })
   .input(

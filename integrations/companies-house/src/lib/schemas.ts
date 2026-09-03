@@ -179,7 +179,6 @@ export const companyOfficerListOutputSchema = z.object({
   companyNumber: z.string(),
   activeCount: z.number().int().nonnegative(),
   resignedCount: z.number().int().nonnegative(),
-  inactiveCount: z.number().int().nonnegative(),
   officers: z.array(companyOfficerSchema),
   itemsPerPage: z.number().int().nonnegative(),
   startIndex: z.number().int().nonnegative(),
@@ -189,9 +188,9 @@ export const companyOfficerListOutputSchema = z.object({
 
 export const officerAppointmentSchema = z.object({
   companyNumber: z.string(),
-  companyName: z.string(),
+  companyName: z.string().optional(),
   companyStatus: z.string().optional(),
-  role: z.string(),
+  role: z.string().optional(),
   appointedOn: z.string().optional(),
   resignedOn: z.string().optional(),
   links: providerRecordSchema.optional(),
@@ -226,15 +225,61 @@ export const disqualifiedOfficerSearchOutputSchema = z.object({
   record: providerRecordSchema
 });
 
+export const disqualificationVariationSchema = z.object({
+  caseIdentifier: z.string().optional(),
+  courtName: z.string().optional(),
+  variedOn: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const disqualificationReasonSchema = z.object({
+  act: z.string(),
+  article: z.string().optional(),
+  descriptionIdentifier: z.string(),
+  section: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const disqualificationSchema = z.object({
+  address: mappedAddressSchema,
+  caseIdentifier: z.string().optional(),
+  companyNames: z.array(z.string()).optional(),
+  courtName: z.string().optional(),
+  disqualificationType: z.string(),
+  disqualifiedFrom: z.string(),
+  disqualifiedUntil: z.string(),
+  heardOn: z.string().optional(),
+  undertakenOn: z.string().optional(),
+  lastVariations: z.array(disqualificationVariationSchema).optional(),
+  reason: disqualificationReasonSchema,
+  record: providerRecordSchema
+});
+
+export const permissionToActSchema = z.object({
+  companyNames: z.array(z.string()).optional(),
+  courtName: z.string().optional(),
+  expiresOn: z.string(),
+  grantedOn: z.string(),
+  record: providerRecordSchema
+});
+
 export const officerDisqualificationsOutputSchema = z.object({
   officerId: z.string(),
   officerType: z.string(),
   name: z.string(),
+  personNumber: z.string().optional(),
+  companyNumber: z.string().optional(),
+  countryOfRegistration: z.string().optional(),
+  forename: z.string().optional(),
+  otherForenames: z.string().optional(),
+  surname: z.string().optional(),
+  title: z.string().optional(),
+  honours: z.string().optional(),
   dateOfBirth: publishedDateOfBirthSchema.optional(),
   nationality: z.string().optional(),
-  disqualifications: z.array(providerRecordSchema),
-  exemptions: z.array(providerRecordSchema),
-  links: providerRecordSchema.optional(),
+  disqualifications: z.array(disqualificationSchema),
+  permissionsToAct: z.array(permissionToActSchema),
+  links: providerRecordSchema,
   record: providerRecordSchema
 });
 

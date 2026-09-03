@@ -82,15 +82,23 @@ describe('CompaniesHouseClient endpoint requests', () => {
         data = {
           ...emptySearch,
           active_count: 0,
-          resigned_count: 0,
-          inactive_count: 0
+          resigned_count: 0
         };
       } else if (path === '/officers/officer%2F1/appointments') {
         data = { ...emptySearch, name: 'DOE, Jane' };
       } else if (path === '/disqualified-officers/natural/officer%2F1') {
-        data = { forename: 'Jane', surname: 'Doe' };
+        data = {
+          forename: 'Jane',
+          surname: 'Doe',
+          disqualifications: [],
+          links: { self: path }
+        };
       } else if (path === '/disqualified-officers/corporate/company%2F1') {
-        data = { company_name: 'Example Limited' };
+        data = {
+          name: 'Example Limited',
+          disqualifications: [],
+          links: { self: path }
+        };
       }
       return Promise.resolve({ data });
     });

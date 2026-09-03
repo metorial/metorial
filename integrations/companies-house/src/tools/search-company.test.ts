@@ -2,6 +2,7 @@ import { describeMcpCompatibleToolSchemas } from '@slates/test';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { provider } from '../index';
 import { CompaniesHouseClient } from '../lib/client';
+import { mapCompanySearchRecord } from '../lib/mappers';
 import { getCompanyProfile } from './company-profile';
 import { searchCompanies, searchCompaniesAdvanced } from './search-companies';
 
@@ -134,6 +135,16 @@ describe('search_companies', () => {
       record: { items: [record], total_results: 41 }
     });
   });
+
+  it('uses the official simple-search self link as the profile URL', () => {
+    expect(
+      mapCompanySearchRecord({
+        company_number: '01234567',
+        title: 'EXAMPLE LIMITED',
+        links: { self: '/company/01234567' }
+      })
+    ).toMatchObject({ profileUrl: '/company/01234567' });
+  });
 });
 
 describe('search_companies_advanced', () => {
@@ -232,6 +243,19 @@ describe('search_companies_advanced', () => {
       startIndex: 14,
       totalResults: 42
     });
+  });
+
+  it('prefers the advanced-search company_profile link', () => {
+    expect(
+      mapCompanySearchRecord({
+        company_number: '01234567',
+        company_name: 'EXAMPLE LIMITED',
+        links: {
+          company_profile: '/advanced/company/01234567',
+          self: '/simple/company/01234567'
+        }
+      })
+    ).toMatchObject({ profileUrl: '/advanced/company/01234567' });
   });
 });
 

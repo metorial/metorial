@@ -18,6 +18,9 @@ import type {
   MappedCompanySearchItem,
   MappedConfirmationStatement,
   MappedDatedRecord,
+  MappedDisqualification,
+  MappedDisqualificationReason,
+  MappedDisqualificationVariation,
   MappedDisqualifiedOfficer,
   MappedDisqualifiedOfficerSearchItem,
   MappedDocumentMetadata,
@@ -28,6 +31,7 @@ import type {
   MappedOfficerAppointmentList,
   MappedOfficerSearchItem,
   MappedPage,
+  MappedPermissionToAct,
   MappedPreviousCompanyName,
   MappedPsc,
   ProviderEnvelope,
@@ -227,7 +231,7 @@ export const mapCompanySearchRecord = (value: unknown): MappedCompanySearchItem 
     incorporatedOn: stringValue(record.date_of_creation),
     dissolvedOn: stringValue(record.date_of_cessation),
     addressSnippet: stringValue(record.address_snippet),
-    profileUrl: stringValue(links?.company_profile),
+    profileUrl: stringValue(links?.company_profile) ?? stringValue(links?.self),
     record
   }) as MappedCompanySearchItem;
 };
@@ -381,9 +385,9 @@ export const mapOfficerAppointmentRecord = (value: unknown): MappedOfficerAppoin
   let company = asRecord(record.appointed_to) ?? {};
   return pickDefined({
     companyNumber: requiredStringValue(company, ['company_number'], 'officer appointment'),
-    companyName: requiredStringValue(company, ['company_name'], 'officer appointment'),
+    companyName: stringValue(company.company_name),
     companyStatus: stringValue(company.company_status),
-    role: requiredStringValue(record, ['officer_role'], 'officer appointment'),
+    role: stringValue(record.officer_role),
     appointedOn: stringValue(record.appointed_on),
     resignedOn: stringValue(record.resigned_on),
     links: asRecord(record.links),
@@ -412,36 +416,145 @@ export const mapDisqualifiedOfficerSearchRecord = (
   }) as MappedDisqualifiedOfficerSearchItem;
 };
 
+let requiredMappedAddress = (record: ProviderRecord, key: string, label: string) => {
+  let address = mapAddress(record[key]);
+  if (address) return address;
+  throw companiesHouseValidationError(
+    `Companies House returned a ${label} record without a required ${key} value.`,
+    'companies_house_response_invalid'
+  );
+};
+
+let requiredRecordValue = (record: ProviderRecord, key: string, label: string) => {
+  let value = asRecord(record[key]);
+  if (value) return value;
+  throw companiesHouseValidationError(
+    `Companies House returned a ${label} record without a required ${key} value.`,
+    'companies_house_response_invalid'
+  );
+};
+
+let mapDisqualificationVariation = (
+  value: unknown
+): MappedDisqualificationVariation | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  return pickDefined({
+    caseIdentifier: stringValue(record.case_identifier),
+    courtName: stringValue(record.court_name),
+    variedOn: stringValue(record.varied_on),
+    record
+  }) as MappedDisqualificationVariation;
+};
+
+let mapDisqualificationReason = (value: unknown): MappedDisqualificationReason | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  return pickDefined({
+    act: requiredStringValue(record, ['act'], 'disqualification reason'),
+    article: stringValue(record.article),
+    descriptionIdentifier: requiredStringValue(
+      record,
+      ['description_identifier'],
+      'disqualification reason'
+    ),
+    section: stringValue(record.section),
+    record
+  }) as MappedDisqualificationReason;
+};
+
+let mapDisqualification = (value: unknown): MappedDisqualification | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  let reason = mapDisqualificationReason(record.reason);
+  if (!reason) {
+    throw companiesHouseValidationError(
+      'Companies House returned a disqualification record without a required reason value.',
+      'companies_house_response_invalid'
+    );
+  }
+  let lastVariations = Array.isArray(record.last_variation)
+    ? record.last_variation
+        .map(mapDisqualificationVariation)
+        .filter((item): item is MappedDisqualificationVariation => item !== undefined)
+    : undefined;
+  return pickDefined({
+    address: requiredMappedAddress(record, 'address', 'disqualification'),
+    caseIdentifier: stringValue(record.case_identifier),
+    companyNames: stringArray(record.company_names),
+    courtName: stringValue(record.court_name),
+    disqualificationType: requiredStringValue(
+      record,
+      ['disqualification_type'],
+      'disqualification'
+    ),
+    disqualifiedFrom: requiredStringValue(record, ['disqualified_from'], 'disqualification'),
+    disqualifiedUntil: requiredStringValue(record, ['disqualified_until'], 'disqualification'),
+    heardOn: stringValue(record.heard_on),
+    undertakenOn: stringValue(record.undertaken_on),
+    lastVariations,
+    reason,
+    record
+  }) as MappedDisqualification;
+};
+
+let mapPermissionToAct = (value: unknown): MappedPermissionToAct | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  return pickDefined({
+    companyNames: stringArray(record.company_names),
+    courtName: stringValue(record.court_name),
+    expiresOn: requiredStringValue(record, ['expires_on'], 'permission to act'),
+    grantedOn: requiredStringValue(record, ['granted_on'], 'permission to act'),
+    record
+  }) as MappedPermissionToAct;
+};
+
 export const mapDisqualifiedOfficerRecord = (
   value: unknown,
   officerType: DisqualifiedOfficerType,
   officerId: string
 ): MappedDisqualifiedOfficer => {
   let record = asRecord(value) ?? {};
-  let nameParts = [record.forename, record.other_forenames, record.surname]
-    .filter(part => typeof part === 'string' && part.length > 0)
-    .join(' ');
+  if (!Array.isArray(record.disqualifications)) {
+    throw companiesHouseValidationError(
+      'Companies House returned a disqualified officer record without a required disqualifications value.',
+      'companies_house_response_invalid'
+    );
+  }
+  let name =
+    officerType === 'corporate'
+      ? requiredStringValue(record, ['name'], 'corporate disqualified officer')
+      : [
+          stringValue(record.forename),
+          stringValue(record.other_forenames),
+          requiredStringValue(record, ['surname'], 'natural disqualified officer')
+        ]
+          .filter((part): part is string => part !== undefined)
+          .join(' ');
   return pickDefined({
     officerId,
     officerType,
-    name: requiredStringValue(
-      { ...record, composed_name: nameParts },
-      ['name', 'company_name', 'composed_name', 'title'],
-      'disqualified officer'
-    ),
+    name,
+    personNumber: stringValue(record.person_number),
+    companyNumber: stringValue(record.company_number),
+    countryOfRegistration: stringValue(record.country_of_registration),
+    forename: stringValue(record.forename),
+    otherForenames: stringValue(record.other_forenames),
+    surname: stringValue(record.surname),
+    title: stringValue(record.title),
+    honours: stringValue(record.honours),
     dateOfBirth: mapPublishedDateOfBirth(record.date_of_birth),
     nationality: stringValue(record.nationality),
-    disqualifications: Array.isArray(record.disqualifications)
-      ? record.disqualifications.filter(
-          (item): item is ProviderRecord => asRecord(item) !== undefined
-        )
+    disqualifications: record.disqualifications
+      .map(mapDisqualification)
+      .filter((item): item is MappedDisqualification => item !== undefined),
+    permissionsToAct: Array.isArray(record.permissions_to_act)
+      ? record.permissions_to_act
+          .map(mapPermissionToAct)
+          .filter((item): item is MappedPermissionToAct => item !== undefined)
       : [],
-    exemptions: Array.isArray(record.exemptions)
-      ? record.exemptions.filter(
-          (item): item is ProviderRecord => asRecord(item) !== undefined
-        )
-      : [],
-    links: asRecord(record.links),
+    links: requiredRecordValue(record, 'links', 'disqualified officer'),
     record
   }) as MappedDisqualifiedOfficer;
 };
@@ -552,7 +665,6 @@ export const mapCompanyOfficerListEnvelope = (
     companyNumber,
     activeCount: requiredNonNegativeInteger(record, 'active_count', 'company officers'),
     resignedCount: requiredNonNegativeInteger(record, 'resigned_count', 'company officers'),
-    inactiveCount: requiredNonNegativeInteger(record, 'inactive_count', 'company officers'),
     officers,
     itemsPerPage: nonNegativeInteger(record.items_per_page) ?? requested.itemsPerPage,
     startIndex: nonNegativeInteger(record.start_index) ?? requested.startIndex,

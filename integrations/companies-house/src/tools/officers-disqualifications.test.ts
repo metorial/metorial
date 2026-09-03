@@ -102,7 +102,7 @@ describe('officer record mapping', () => {
     let record = {
       title: 'DOE, Jane',
       appointment_count: 3,
-      date_of_birth: { month: 2, year: 1980 },
+      date_of_birth: '1980-02-03',
       address_snippet: '1 Example Street, London',
       links: { self: '/officers/officer%2F1/appointments' },
       future: true
@@ -112,7 +112,7 @@ describe('officer record mapping', () => {
       officerId: 'officer/1',
       name: 'DOE, Jane',
       appointmentCount: 3,
-      dateOfBirth: { month: 2, year: 1980 },
+      dateOfBirth: '1980-02-03',
       addressSnippet: '1 Example Street, London',
       appointmentsUrl: '/officers/officer%2F1/appointments',
       record
@@ -171,6 +171,16 @@ describe('officer record mapping', () => {
       links: appointmentRecord.links,
       record: appointmentRecord
     });
+
+    let incompleteHistoricalAppointment = {
+      appointed_to: { company_number: '00000001' },
+      links: { company: '/company/00000001' }
+    };
+    expect(mapOfficerAppointmentRecord(incompleteHistoricalAppointment)).toEqual({
+      companyNumber: '00000001',
+      links: incompleteHistoricalAppointment.links,
+      record: incompleteHistoricalAppointment
+    });
   });
 
   it('maps company and officer envelope metadata without conflating pagination', () => {
@@ -179,7 +189,6 @@ describe('officer record mapping', () => {
         {
           active_count: 2,
           resigned_count: 3,
-          inactive_count: 1,
           items_per_page: 7,
           start_index: 14,
           total_results: 6,
@@ -192,7 +201,6 @@ describe('officer record mapping', () => {
       companyNumber: '01234567',
       activeCount: 2,
       resignedCount: 3,
-      inactiveCount: 1,
       officers: [],
       itemsPerPage: 7,
       startIndex: 14,
@@ -280,24 +288,127 @@ describe('disqualification record mapping', () => {
     });
   });
 
-  it('maps detailed natural and corporate records with public details and arrays', () => {
+  it('maps official natural disqualification details to stable fields', () => {
     let record = {
       forename: 'Jane',
+      other_forenames: 'Alice',
       surname: 'Doe',
-      date_of_birth: '1980-02-03',
+      title: 'Dr',
+      honours: 'OBE',
+      person_number: '1234567890',
+      date_of_birth: { month: 2, year: 1980 },
       nationality: 'British',
-      disqualifications: [{ disqualified_from: '2020-01-02' }],
-      exemptions: [{ exemption_type: 'court-permission' }],
+      disqualifications: [
+        {
+          address: { locality: 'London' },
+          case_identifier: 'CASE-1',
+          company_names: ['EXAMPLE LIMITED'],
+          court_name: 'High Court',
+          disqualification_type: 'court-order',
+          disqualified_from: '2020-01-02',
+          disqualified_until: '2026-01-02',
+          heard_on: '2019-12-01',
+          undertaken_on: '2019-12-02',
+          last_variation: [
+            {
+              case_identifier: 'VAR-1',
+              court_name: 'High Court',
+              varied_on: '2021-01-01'
+            }
+          ],
+          reason: {
+            act: 'company-directors-disqualification-act-1986',
+            article: '4',
+            description_identifier: 'misconduct',
+            section: '6'
+          }
+        }
+      ],
+      permissions_to_act: [
+        {
+          company_names: ['PERMITTED LIMITED'],
+          court_name: 'High Court',
+          expires_on: '2025-01-01',
+          granted_on: '2024-01-01'
+        }
+      ],
       links: { self: '/disqualified-officers/natural/natural-1' }
     };
     expect(mapDisqualifiedOfficerRecord(record, 'natural', 'natural-1')).toEqual({
       officerId: 'natural-1',
       officerType: 'natural',
-      name: 'Jane Doe',
-      dateOfBirth: '1980-02-03',
+      name: 'Jane Alice Doe',
+      personNumber: '1234567890',
+      forename: 'Jane',
+      otherForenames: 'Alice',
+      surname: 'Doe',
+      title: 'Dr',
+      honours: 'OBE',
+      dateOfBirth: { month: 2, year: 1980 },
       nationality: 'British',
-      disqualifications: record.disqualifications,
-      exemptions: record.exemptions,
+      disqualifications: [
+        {
+          address: { locality: 'London', record: record.disqualifications[0]!.address },
+          caseIdentifier: 'CASE-1',
+          companyNames: ['EXAMPLE LIMITED'],
+          courtName: 'High Court',
+          disqualificationType: 'court-order',
+          disqualifiedFrom: '2020-01-02',
+          disqualifiedUntil: '2026-01-02',
+          heardOn: '2019-12-01',
+          undertakenOn: '2019-12-02',
+          lastVariations: [
+            {
+              caseIdentifier: 'VAR-1',
+              courtName: 'High Court',
+              variedOn: '2021-01-01',
+              record: record.disqualifications[0]!.last_variation[0]!
+            }
+          ],
+          reason: {
+            act: 'company-directors-disqualification-act-1986',
+            article: '4',
+            descriptionIdentifier: 'misconduct',
+            section: '6',
+            record: record.disqualifications[0]!.reason
+          },
+          record: record.disqualifications[0]
+        }
+      ],
+      permissionsToAct: [
+        {
+          companyNames: ['PERMITTED LIMITED'],
+          courtName: 'High Court',
+          expiresOn: '2025-01-01',
+          grantedOn: '2024-01-01',
+          record: record.permissions_to_act[0]
+        }
+      ],
+      links: record.links,
+      record
+    });
+  });
+
+  it('maps official corporate-only disqualification details', () => {
+    let record = {
+      name: 'EXAMPLE HOLDINGS LIMITED',
+      company_number: '01234567',
+      country_of_registration: 'United Kingdom',
+      person_number: '9988776655',
+      disqualifications: [],
+      permissions_to_act: [],
+      links: { self: '/disqualified-officers/corporate/corporate-1' }
+    };
+
+    expect(mapDisqualifiedOfficerRecord(record, 'corporate', 'corporate-1')).toEqual({
+      officerId: 'corporate-1',
+      officerType: 'corporate',
+      name: 'EXAMPLE HOLDINGS LIMITED',
+      personNumber: '9988776655',
+      companyNumber: '01234567',
+      countryOfRegistration: 'United Kingdom',
+      disqualifications: [],
+      permissionsToAct: [],
       links: record.links,
       record
     });
@@ -310,7 +421,6 @@ describe('officer and disqualification invocations', () => {
       companyNumber: '01234567',
       activeCount: 1,
       resignedCount: 2,
-      inactiveCount: 0,
       officers: [],
       itemsPerPage: 5,
       startIndex: 10,
@@ -377,7 +487,8 @@ describe('officer and disqualification invocations', () => {
       officerType,
       name: 'Example',
       disqualifications: [],
-      exemptions: [],
+      permissionsToAct: [],
+      links: { self: `/disqualified-officers/${officerType}/officer%2F1` },
       record: {}
     };
     vi.spyOn(CompaniesHouseClient.prototype, 'getOfficerDisqualifications').mockResolvedValue(
