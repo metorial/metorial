@@ -2827,6 +2827,21 @@
         "typescript": "^5",
       },
     },
+    "integrations/companies-house": {
+      "name": "@slates-integrations/companies-house",
+      "version": "0.1.0-rc.1",
+      "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.17",
+        "zod": "^4.2",
+      },
+      "devDependencies": {
+        "@slates/test": "1.0.0-rc.14",
+        "typescript": "^5",
+        "vitest": "^3.1.2",
+      },
+    },
     "integrations/compute-engine": {
       "name": "@slates-integrations/compute-engine",
       "version": "0.1.0-rc.5",
@@ -15617,6 +15632,8 @@
     "@slates-integrations/college-football-data": ["@slates-integrations/college-football-data@workspace:integrations/college-football-data"],
 
     "@slates-integrations/commcare": ["@slates-integrations/commcare@workspace:integrations/commcare"],
+
+    "@slates-integrations/companies-house": ["@slates-integrations/companies-house@workspace:integrations/companies-house"],
 
     "@slates-integrations/compute-engine": ["@slates-integrations/compute-engine@workspace:integrations/compute-engine"],
 
