@@ -30,7 +30,7 @@ List all caption tracks for a YouTube video. Returns caption metadata including 
 
 ### Download Caption
 
-Download an editable caption track in its original or a converted format as a Slate attachment, optionally machine-translated to a BCP-47 language tag. The authenticated user must have permission to edit the video.
+Download an editable caption track in its original or a converted format as a downloadable file, optionally machine-translated to a BCP-47 language tag. The authenticated user must have permission to edit the video.
 
 ### List Comments
 

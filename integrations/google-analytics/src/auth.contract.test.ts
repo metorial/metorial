@@ -58,7 +58,9 @@ describe('google-analytics auth contract', () => {
       clientSecret: 'client-secret',
       scopes: [
         googleAnalyticsScopes.analyticsReadonly,
-        googleAnalyticsScopes.openIdEmailProfile
+        googleAnalyticsScopes.openId,
+        googleAnalyticsScopes.email,
+        googleAnalyticsScopes.profile
       ]
     });
 
@@ -67,7 +69,7 @@ describe('google-analytics auth contract', () => {
       'https://accounts.google.com/o/oauth2/v2/auth'
     );
     expect(url.searchParams.get('scope')).toBe(
-      `${googleAnalyticsScopes.analyticsReadonly} ${googleAnalyticsScopes.openIdEmailProfile}`
+      `${googleAnalyticsScopes.analyticsReadonly} ${googleAnalyticsScopes.openId} ${googleAnalyticsScopes.email} ${googleAnalyticsScopes.profile}`
     );
     expect(result.input).toEqual({});
   });
@@ -121,7 +123,7 @@ describe('google-analytics auth contract', () => {
           access_token: 'access-token',
           refresh_token: 'refresh-token',
           expires_in: 3600,
-          scope: `${googleAnalyticsScopes.analyticsEdit} ${googleAnalyticsScopes.openIdEmailProfile}`
+          scope: `${googleAnalyticsScopes.analyticsEdit} ${googleAnalyticsScopes.openId} ${googleAnalyticsScopes.email} ${googleAnalyticsScopes.profile}`
         })
       )
       .mockResolvedValueOnce(
@@ -245,7 +247,11 @@ describe('google-analytics auth contract', () => {
         token: 'profile-token'
       },
       input: {},
-      scopes: [googleAnalyticsScopes.openIdEmailProfile]
+      scopes: [
+        googleAnalyticsScopes.openId,
+        googleAnalyticsScopes.email,
+        googleAnalyticsScopes.profile
+      ]
     });
 
     expect(result.profile).toEqual({

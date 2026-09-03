@@ -1,4 +1,4 @@
-# Slates Specification for Google Address Validation
+# Google Address Validation specification
 
 ## Overview
 
@@ -30,6 +30,7 @@ For server-to-server integration, a Google Cloud service account can be used. Th
 
 - A Google Cloud project with billing enabled
 - The Address Validation API enabled on the project
+- The billing-enabled project ID configured as the OAuth quota project. OAuth requests send it in the `X-Goog-User-Project` header.
 
 ## Features
 

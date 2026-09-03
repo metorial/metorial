@@ -4,8 +4,6 @@ export let googleMeetScopes = {
   spaceCreated: 'https://www.googleapis.com/auth/meetings.space.created',
   spaceReadonly: 'https://www.googleapis.com/auth/meetings.space.readonly',
   spaceSettings: 'https://www.googleapis.com/auth/meetings.space.settings',
-  driveReadonly: 'https://www.googleapis.com/auth/drive.readonly',
-  driveMeetReadonly: 'https://www.googleapis.com/auth/drive.meet.readonly',
   userInfoProfile: 'https://www.googleapis.com/auth/userinfo.profile',
   userInfoEmail: 'https://www.googleapis.com/auth/userinfo.email'
 } as const;

@@ -18,7 +18,7 @@ Get detailed information about a Cloud Storage bucket including its location, st
 
 ### Get Object
 
-Get an object's metadata and optionally download its content from a Cloud Storage bucket. By default only returns metadata; set **includeContent** to true to download the object's data as text.
+Get an object's metadata and optionally download its content from a Cloud Storage bucket. By default only returns metadata; set **includeContent** to true to receive a binary-safe downloadable file with the object's content type, name, and size metadata.
 
 ### List Buckets
 

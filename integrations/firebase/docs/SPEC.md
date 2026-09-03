@@ -1,4 +1,4 @@
-# Slates Specification for Firebase
+# Firebase specification
 
 ## Overview
 
@@ -94,7 +94,7 @@ The Firebase Management REST API exposes project apps and SDK configuration arti
 
 - List Android, iOS, and Web apps associated with a Firebase project.
 - Retrieve an individual app by app ID or resource name.
-- Download SDK configuration artifacts such as `google-services.json`, `GoogleService-Info.plist`, and Web app config metadata.
+- Download native SDK configuration artifacts such as `google-services.json` and `GoogleService-Info.plist` as files without exposing encoded file contents in structured output; return Web app config as structured metadata.
 
 ### Remote Config
 

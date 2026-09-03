@@ -23,8 +23,8 @@ For the Meet REST API, you can only authenticate using user authentication.
 | `https://www.googleapis.com/auth/meetings.space.created`  | Create, modify, and read metadata about meeting spaces created by your app. | Sensitive     |
 | `https://www.googleapis.com/auth/meetings.space.readonly` | Read metadata about any meeting space the user has access to.               | Sensitive     |
 | `https://www.googleapis.com/auth/meetings.space.settings` | Edit and see the settings for all Google Meet calls.                        | Non-sensitive |
-| `https://www.googleapis.com/auth/drive.readonly`          | Download recording and transcript files from Google Drive.                  | Restricted    |
-| `https://www.googleapis.com/auth/drive.meet.readonly`     | View Drive files created or edited by Google Meet.                          | Restricted    |
+
+No Drive scopes are requested. Recording, transcript, and smart-note artifacts are returned as Google Drive file references; downloading the file bytes is done through a Google Drive connection.
 
 **Domain-Wide Delegation:**
 
@@ -64,11 +64,11 @@ Get a list of participants and participant sessions. Retrieve meeting and partic
 
 Get meeting artifacts including recordings, transcripts, and transcript entries. Artifacts are saved to the meeting organizer's Google Drive.
 
-- Retrieve recording metadata and download recording files via Google Drive.
+- Retrieve recording metadata, including the Google Drive file reference of the recording.
 - Retrieve transcript metadata and individual transcript entries (speaker, text, timestamps).
 - Retrieve smart notes metadata and the generated Google Docs destination for a conference record.
 - Artifacts are usually ready to be fetched soon after a conference ends.
-- Downloading the actual files requires the `drive.readonly` or `drive.meet.readonly` scope.
+- Downloading the actual recording or document files is done through a Google Drive connection using the returned file IDs; this integration requests no Drive scopes.
 
 ## Events
 

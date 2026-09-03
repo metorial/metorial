@@ -22,7 +22,7 @@ Delete a Google Photos Picker session. This revokes access to the session and an
 
 ### Download Media Item
 
-Download one app-created Library API photo or READY video up to 50 MiB and return its bytes as a Slate attachment. The tool retrieves fresh media metadata for each call and immediately uses the temporary Library API base URL, which remains valid for 60 minutes. Picker API selections use separate IDs and access rules and cannot be downloaded with this tool.
+Download one app-created Library API photo or READY video up to 50 MiB as a downloadable file. The tool retrieves fresh media metadata for each call and immediately uses the temporary Library API base URL, which remains valid for 60 minutes. Picker API selections use separate IDs and access rules and cannot be downloaded with this tool.
 
 ### Get Album
 

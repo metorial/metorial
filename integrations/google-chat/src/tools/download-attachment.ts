@@ -42,8 +42,7 @@ export let buildDownloadAttachmentRequest = (resourceName: string) => {
 export let downloadAttachment = SlateTool.create(spec, {
   name: 'Download Attachment',
   key: 'download_attachment',
-  description:
-    'Download the bytes of an uploaded Google Chat attachment and return them as a Slate attachment.',
+  description: 'Download an uploaded Google Chat attachment as a downloadable file.',
   constraints: [
     'This endpoint downloads Google Chat uploaded content only. Use the Google Drive integration for DRIVE_FILE attachments.'
   ],
@@ -61,14 +60,14 @@ export let downloadAttachment = SlateTool.create(spec, {
         .trim()
         .min(1)
         .describe(
-          'Uploaded-content resourceName from attachmentDataRef, returned by get_attachment or a message read tool'
+          'Uploaded-content resourceName from attachmentDataRef or a Google Chat message read result'
         ),
       filename: z
         .string()
         .trim()
         .min(1)
         .optional()
-        .describe('Original filename for output metadata, typically from get_attachment'),
+        .describe('Original filename for the downloaded file'),
       mimeType: z
         .string()
         .trim()
@@ -83,9 +82,8 @@ export let downloadAttachment = SlateTool.create(spec, {
         .string()
         .describe('Downloaded Google Chat attachment data resource name'),
       filename: z.string().optional().describe('Original filename when provided'),
-      mimeType: z.string().describe('MIME type used for the Slate attachment'),
-      byteLength: z.number().int().nonnegative().describe('Downloaded byte count'),
-      attachmentCount: z.number().int().describe('Number of Slate attachments returned')
+      mimeType: z.string().describe('MIME type of the downloaded file'),
+      byteLength: z.number().int().nonnegative().describe('Downloaded byte count')
     })
   )
   .handleInvocation(async ctx => {
@@ -105,8 +103,7 @@ export let downloadAttachment = SlateTool.create(spec, {
         attachmentDataResourceName: request.attachmentDataResourceName,
         filename: ctx.input.filename,
         mimeType,
-        byteLength: bytes.byteLength,
-        attachmentCount: 1
+        byteLength: bytes.byteLength
       },
       message: `Downloaded${ctx.input.filename ? ` **${ctx.input.filename}**` : ' Google Chat attachment'} (${bytes.byteLength} bytes).`,
       attachments: [createBase64Attachment(bytes.toString('base64'), mimeType)]

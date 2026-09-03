@@ -8,7 +8,7 @@ export let getSlideThumbnail = SlateTool.create(spec, {
   name: 'Get Slide Thumbnail',
   key: 'get_slide_thumbnail',
   description:
-    'Generates a PNG thumbnail of the latest version of a Google Slides page and returns the image bytes as a Slate attachment.',
+    'Generate a PNG thumbnail of the latest version of a Google Slides page as a downloadable file.',
   instructions: [
     'Use get_presentation to discover the pageObjectId for a slide.',
     'SMALL targets a 200 px width, MEDIUM 800 px, and LARGE 1600 px; portrait pages may be narrower.',
@@ -45,10 +45,9 @@ export let getSlideThumbnail = SlateTool.create(spec, {
         .describe('Requested thumbnail size preset, when provided'),
       widthPixels: z.number().int().positive().describe('Rendered image width in pixels'),
       heightPixels: z.number().int().positive().describe('Rendered image height in pixels'),
-      mimeType: z.literal('image/png').describe('Attachment MIME type'),
+      mimeType: z.literal('image/png').describe('Downloaded file MIME type'),
       sizeBytes: z.number().int().positive().describe('Downloaded PNG byte length'),
-      fileName: z.string().describe('Suggested attachment file name'),
-      attachmentCount: z.number().int().describe('Number of returned Slate attachments')
+      fileName: z.string().describe('Suggested downloadable file name')
     })
   )
   .handleInvocation(async ctx => {
@@ -71,13 +70,12 @@ export let getSlideThumbnail = SlateTool.create(spec, {
         heightPixels: thumbnail.height,
         mimeType: thumbnail.mimeType,
         sizeBytes: thumbnail.content.length,
-        fileName,
-        attachmentCount: 1
+        fileName
       },
       attachments: [
         createBase64Attachment(thumbnail.content.toString('base64'), thumbnail.mimeType)
       ],
-      message: `Generated a **${thumbnail.width} x ${thumbnail.height}** PNG thumbnail for slide page \`${ctx.input.pageObjectId}\` and returned it as an attachment.`
+      message: `Generated a **${thumbnail.width} x ${thumbnail.height}** PNG thumbnail file for slide page \`${ctx.input.pageObjectId}\`.`
     };
   })
   .build();

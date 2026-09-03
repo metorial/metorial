@@ -31,7 +31,6 @@ describe('google-admin provider contract', () => {
         'manage_domains',
         'get_activity_reports',
         'get_usage_reports',
-        'manage_alerts',
         'manage_calendar_resources',
         'manage_licenses',
         'transfer_data',
@@ -56,7 +55,6 @@ describe('google-admin provider contract', () => {
         { id: 'manage_domains', readOnly: false, destructive: false },
         { id: 'get_activity_reports', readOnly: true, destructive: false },
         { id: 'get_usage_reports', readOnly: true, destructive: false },
-        { id: 'manage_alerts', readOnly: false, destructive: false },
         { id: 'manage_calendar_resources', readOnly: false, destructive: false },
         { id: 'manage_licenses', readOnly: false, destructive: false },
         { id: 'transfer_data', readOnly: false, destructive: false },
@@ -68,7 +66,7 @@ describe('google-admin provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(23);
+    expect(contract.actions).toHaveLength(22);
     expect(Object.keys(contract.configSchema.properties ?? {}).sort()).toEqual([
       'customerId',
       'domain'
@@ -91,7 +89,6 @@ describe('google-admin provider contract', () => {
       manage_domains: googleAdminActionScopes.manageDomains,
       get_activity_reports: googleAdminActionScopes.getActivityReports,
       get_usage_reports: googleAdminActionScopes.getUsageReports,
-      manage_alerts: googleAdminActionScopes.manageAlerts,
       manage_calendar_resources: googleAdminActionScopes.manageCalendarResources,
       manage_licenses: googleAdminActionScopes.manageLicenses,
       transfer_data: googleAdminActionScopes.transferData,

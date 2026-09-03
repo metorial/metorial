@@ -36,7 +36,7 @@ describe('get_slide_thumbnail tool behavior', () => {
     vi.clearAllMocks();
   });
 
-  it('returns PNG bytes only through one Slate attachment', async () => {
+  it('returns PNG bytes only through one downloadable file', async () => {
     let png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     clientMocks.getPageThumbnail.mockResolvedValue({
       width: 200,
@@ -65,8 +65,7 @@ describe('get_slide_thumbnail tool behavior', () => {
       heightPixels: 113,
       mimeType: 'image/png',
       sizeBytes: 8,
-      fileName: 'google-slides-slide____1-thumbnail.png',
-      attachmentCount: 1
+      fileName: 'google-slides-slide____1-thumbnail.png'
     });
     expect(result.attachments).toEqual([
       {
