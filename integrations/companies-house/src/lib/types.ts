@@ -254,15 +254,55 @@ export type MappedDisqualifiedOfficer = {
   record: ProviderRecord;
 };
 
-export type MappedFiling = {
-  transactionId?: string;
-  documentId?: string;
-  category?: string;
+export type MappedFilingAnnotation = {
+  annotation?: string;
+  date?: string;
+  description?: string;
+  record: ProviderRecord;
+};
+
+export type MappedAssociatedFiling = {
   date?: string;
   description?: string;
   type?: string;
+  record: ProviderRecord;
+};
+
+export type MappedFilingResolution = {
+  category?: string;
+  description?: string;
+  documentId?: string;
+  receivedOn?: string;
+  subcategory?: string;
+  type?: string;
+  record: ProviderRecord;
+};
+
+export type MappedFiling = {
+  transactionId: string;
+  documentId?: string;
+  barcode?: string;
+  category: string;
+  subcategory?: string;
+  date: string;
+  description: string;
+  type: string;
   pages?: number;
   paperFiled?: boolean;
+  annotations?: MappedFilingAnnotation[];
+  associatedFilings?: MappedAssociatedFiling[];
+  resolutions?: MappedFilingResolution[];
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
+export type MappedFilingHistory = {
+  companyNumber: string;
+  filingHistoryStatus?: string;
+  filings: MappedFiling[];
+  itemsPerPage: number;
+  startIndex: number;
+  totalCount: number;
   record: ProviderRecord;
 };
 
@@ -304,11 +344,13 @@ export type MappedDocumentResource = {
 };
 
 export type MappedDocumentMetadata = {
-  documentId?: string;
+  documentId: string;
+  companyNumber?: string;
   createdAt?: string;
   updatedAt?: string;
   pages?: number;
-  availableMimeTypes: string[];
+  availableContentTypes: Array<MappedDocumentResource & { mimeType: string }>;
+  links?: ProviderRecord;
   resources: Record<string, MappedDocumentResource>;
   record: ProviderRecord;
 };

@@ -11,7 +11,11 @@ const implementedToolKeys: (typeof companiesHouseToolKeys)[number][] = [
   'list_company_officers',
   'list_officer_appointments',
   'search_disqualified_officers',
-  'get_officer_disqualifications'
+  'get_officer_disqualifications',
+  'list_filing_history',
+  'get_filing_history_item',
+  'get_document_metadata',
+  'download_filing_document'
 ];
 
 describe('companies-house provider contract', () => {
@@ -119,7 +123,11 @@ describe('companies-house provider contract', () => {
       'list_company_officers',
       'list_officer_appointments',
       'search_disqualified_officers',
-      'get_officer_disqualifications'
+      'get_officer_disqualifications',
+      'list_filing_history',
+      'get_filing_history_item',
+      'get_document_metadata',
+      'download_filing_document'
     ]);
     expect(new Set(companiesHouseToolKeys).size).toBe(companiesHouseToolKeys.length);
     for (let key of companiesHouseToolKeys) {

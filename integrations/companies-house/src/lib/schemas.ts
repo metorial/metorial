@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import {
   DEFAULT_ITEMS_PER_PAGE,
-  isSafeDocumentMimeType,
-  MAX_ITEMS_PER_PAGE
+  MAX_ITEMS_PER_PAGE,
+  SAFE_DOCUMENT_MIME_EXTENSIONS
 } from './constants';
 
 export const trimmedStringSchema = z.string().trim().min(1);
@@ -29,9 +29,11 @@ export const paginationSchema = z.object(paginationFields);
 
 export const isoDateSchema = z.iso.date();
 
-export const documentMimeTypeSchema = trimmedStringSchema.refine(
-  isSafeDocumentMimeType,
-  'Choose a MIME type advertised by Companies House document metadata.'
+export const documentMimeTypeSchema = z.enum(
+  Object.keys(SAFE_DOCUMENT_MIME_EXTENSIONS) as [
+    keyof typeof SAFE_DOCUMENT_MIME_EXTENSIONS,
+    ...(keyof typeof SAFE_DOCUMENT_MIME_EXTENSIONS)[]
+  ]
 );
 
 export const providerRecordSchema = z.record(z.string(), z.unknown());
@@ -283,6 +285,88 @@ export const officerDisqualificationsOutputSchema = z.object({
   record: providerRecordSchema
 });
 
+export const filingAnnotationSchema = z.object({
+  annotation: z.string().optional(),
+  date: z.string().optional(),
+  description: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const associatedFilingSchema = z.object({
+  date: z.string().optional(),
+  description: z.string().optional(),
+  type: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const filingResolutionSchema = z.object({
+  category: z.string().optional(),
+  description: z.string().optional(),
+  documentId: z.string().optional(),
+  receivedOn: z.string().optional(),
+  subcategory: z.string().optional(),
+  type: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const filingSchema = z.object({
+  transactionId: z.string(),
+  documentId: z.string().optional(),
+  barcode: z.string().optional(),
+  category: z.string(),
+  subcategory: z.string().optional(),
+  date: z.string(),
+  description: z.string(),
+  type: z.string(),
+  pages: z.number().int().nonnegative().optional(),
+  paperFiled: z.boolean().optional(),
+  annotations: z.array(filingAnnotationSchema).optional(),
+  associatedFilings: z.array(associatedFilingSchema).optional(),
+  resolutions: z.array(filingResolutionSchema).optional(),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const filingHistoryOutputSchema = z.object({
+  companyNumber: z.string(),
+  filingHistoryStatus: z.string().optional(),
+  filings: z.array(filingSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  totalCount: z.number().int().nonnegative(),
+  record: providerRecordSchema
+});
+
+export const filingHistoryItemOutputSchema = filingSchema.extend({
+  companyNumber: z.string()
+});
+
+export const documentContentTypeSchema = z.object({
+  mimeType: z.string(),
+  contentLength: z.number().int().nonnegative().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const documentMetadataOutputSchema = z.object({
+  documentId: z.string(),
+  companyNumber: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  pages: z.number().int().nonnegative().optional(),
+  availableContentTypes: z.array(documentContentTypeSchema),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
+export const downloadedDocumentOutputSchema = z.object({
+  documentId: z.string(),
+  fileName: z.string(),
+  mimeType: z.string(),
+  byteLength: z.number().int().nonnegative()
+});
+
 export const addressSchema = z
   .object({
     address_line_1: z.string().optional(),
@@ -337,11 +421,18 @@ export const officerRecordSchema = z
 
 export const filingRecordSchema = z
   .object({
-    transaction_id: z.string().optional(),
-    category: z.string().optional(),
-    date: z.string().optional(),
-    description: z.string().optional(),
-    type: z.string().optional(),
+    transaction_id: z.string(),
+    annotations: z.array(providerRecordSchema).optional(),
+    associated_filings: z.array(providerRecordSchema).optional(),
+    barcode: z.string().optional(),
+    category: z.string(),
+    date: z.string(),
+    description: z.string(),
+    pages: z.number().optional(),
+    paper_filed: z.boolean().optional(),
+    resolutions: z.array(providerRecordSchema).optional(),
+    subcategory: z.string().optional(),
+    type: z.string(),
     links: linksSchema.optional()
   })
   .passthrough();
@@ -371,11 +462,12 @@ export const pscRecordSchema = z
 
 export const documentMetadataSchema = z
   .object({
-    id: z.string().optional(),
-    created_at: z.string().optional(),
+    id: z.string(),
+    company_number: z.string().optional(),
+    created_at: z.string(),
     updated_at: z.string().optional(),
     pages: z.number().optional(),
-    links: linksSchema.optional(),
+    links: linksSchema,
     resources: z.record(z.string(), providerRecordSchema).optional()
   })
   .passthrough();

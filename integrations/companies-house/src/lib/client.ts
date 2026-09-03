@@ -33,6 +33,7 @@ import {
   mapDisqualifiedOfficerRecord,
   mapDisqualifiedOfficerSearchRecord,
   mapDocumentMetadata,
+  mapFilingHistoryEnvelope,
   mapFilingRecord,
   mapOfficerAppointmentListEnvelope,
   mapOfficerSearchRecord,
@@ -106,9 +107,19 @@ let trimmed = (value: string | undefined) => {
   return normalized ? normalized : undefined;
 };
 
-let commaList = (value: string[] | undefined) => {
-  let normalized = value?.map(item => item.trim()).filter(Boolean);
-  return normalized && normalized.length > 0 ? normalized.join(',') : undefined;
+let filingCategories = (value: string[] | undefined) => {
+  if (value === undefined) return undefined;
+  if (value.length === 0) {
+    throw companiesHouseValidationError('categories must not be an empty array.');
+  }
+  let normalized = value.map(item => item.trim());
+  if (normalized.some(item => item.length === 0)) {
+    throw companiesHouseValidationError('categories must contain only non-empty values.');
+  }
+  if (new Set(normalized).size !== normalized.length) {
+    throw companiesHouseValidationError('categories must not contain duplicate values.');
+  }
+  return normalized.join(',');
 };
 
 let advancedCommaList = (value: string[] | undefined, field: string) => {
@@ -411,13 +422,13 @@ export class CompaniesHouseClient {
       `/company/${pathSegment(companyNumber)}/filing-history`,
       {
         params: pickDefined({
-          category: commaList(params.categories),
+          category: filingCategories(params.categories),
           items_per_page: page.itemsPerPage,
           start_index: page.startIndex
         })
       }
     );
-    return mapPaginatedEnvelope(data, mapFilingRecord, page);
+    return mapFilingHistoryEnvelope(data, companyNumber, page);
   }
 
   async getFilingHistoryItem(companyNumber: string, transactionId: string) {
@@ -445,26 +456,6 @@ export class CompaniesHouseClient {
       );
     }
     let safeMimeType = mimeType;
-    let metadata = await this.getDocumentMetadata(documentId);
-    let resource = metadata.resources[safeMimeType];
-    if (!resource) {
-      throw companiesHouseValidationError(
-        `Companies House does not advertise ${safeMimeType} for this document.`,
-        'companies_house_document_mime_unavailable'
-      );
-    }
-    if (
-      resource.contentLength !== undefined &&
-      (!Number.isSafeInteger(resource.contentLength) ||
-        resource.contentLength < 0 ||
-        resource.contentLength > MAX_DOCUMENT_DOWNLOAD_BYTES)
-    ) {
-      throw companiesHouseValidationError(
-        `The requested Companies House document exceeds the ${MAX_DOCUMENT_DOWNLOAD_BYTES}-byte download limit.`,
-        'companies_house_document_too_large'
-      );
-    }
-
     let locationResponse = await requestAxios(
       'locate document content',
       () =>

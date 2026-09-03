@@ -141,9 +141,12 @@ describe('Companies House record mappers', () => {
 
   it('maps document metadata and its advertised representations', () => {
     let record = {
+      etag: 'etag-1',
       id: 'doc-123',
+      company_number: '01234567',
       created_at: '2024-01-02T03:04:05Z',
       pages: 3,
+      links: { self: '/document/doc-123', document: '/document/doc-123/content' },
       resources: {
         'application/pdf': { content_length: 1234, created_at: '2024-01-02T03:04:05Z' },
         'text/csv': { content_length: 55, future_field: true }
@@ -153,21 +156,31 @@ describe('Companies House record mappers', () => {
 
     expect(mapDocumentMetadata(record)).toEqual({
       documentId: 'doc-123',
+      companyNumber: '01234567',
       createdAt: '2024-01-02T03:04:05Z',
-      updatedAt: undefined,
       pages: 3,
-      availableMimeTypes: ['application/pdf', 'text/csv'],
+      availableContentTypes: [
+        {
+          mimeType: 'application/pdf',
+          contentLength: 1234,
+          createdAt: '2024-01-02T03:04:05Z',
+          record: record.resources['application/pdf']
+        },
+        {
+          mimeType: 'text/csv',
+          contentLength: 55,
+          record: record.resources['text/csv']
+        }
+      ],
+      links: record.links,
       resources: {
         'application/pdf': {
           contentLength: 1234,
           createdAt: '2024-01-02T03:04:05Z',
-          updatedAt: undefined,
           record: record.resources['application/pdf']
         },
         'text/csv': {
           contentLength: 55,
-          createdAt: undefined,
-          updatedAt: undefined,
           record: record.resources['text/csv']
         }
       },

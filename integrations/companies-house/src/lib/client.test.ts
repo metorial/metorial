@@ -99,6 +99,16 @@ describe('CompaniesHouseClient endpoint requests', () => {
           disqualifications: [],
           links: { self: path }
         };
+      } else if (path === '/company/A%2FB/filing-history') {
+        data = { items: [], items_per_page: 20, start_index: 0, total_count: 0 };
+      } else if (path === '/company/A%2FB/filing-history/tx%2F1') {
+        data = {
+          category: 'accounts',
+          date: '2024-01-01',
+          description: 'accounts-with-accounts-type-full',
+          transaction_id: 'tx/1',
+          type: 'AA'
+        };
       }
       return Promise.resolve({ data });
     });
@@ -423,14 +433,26 @@ describe('CompaniesHouseClient document downloads', () => {
     expect(httpMocks.downloadGet).not.toHaveBeenCalled();
   });
 
+  it('maps a provider 406 to metadata-first content-type remediation', async () => {
+    httpMocks.documentGet.mockRejectedValueOnce({
+      response: { status: 406, data: { message: 'Not acceptable' } }
+    });
+
+    let error = await createClient()
+      .getDocumentContent('doc-123', 'application/pdf')
+      .catch(error => error);
+
+    expect(error).toBeInstanceOf(ServiceError);
+    expect(error.data.message).toContain('document metadata');
+    expect(httpMocks.downloadGet).not.toHaveBeenCalled();
+  });
+
   it('discovers metadata, follows one HTTPS location, and never sends auth to it', async () => {
     let bytes = Buffer.from([0, 255, 13, 37]);
-    httpMocks.documentGet
-      .mockResolvedValueOnce({ data: metadata(bytes.length) })
-      .mockResolvedValueOnce({
-        status: 302,
-        headers: { location: 'https://files.example.gov.uk/signed/document.pdf' }
-      });
+    httpMocks.documentGet.mockResolvedValueOnce({
+      status: 302,
+      headers: { location: 'https://files.example.gov.uk/signed/document.pdf' }
+    });
     httpMocks.downloadGet.mockResolvedValueOnce({
       status: 200,
       data: bytes,
@@ -439,9 +461,8 @@ describe('CompaniesHouseClient document downloads', () => {
 
     let result = await createClient().getDocumentContent('doc-123', 'application/pdf');
 
-    expect(httpMocks.documentGet).toHaveBeenNthCalledWith(1, '/document/doc-123');
-    expect(httpMocks.documentGet).toHaveBeenNthCalledWith(
-      2,
+    expect(httpMocks.documentGet).toHaveBeenCalledTimes(1);
+    expect(httpMocks.documentGet).toHaveBeenCalledWith(
       '/document/doc-123/content',
       expect.objectContaining({
         headers: { Accept: 'application/pdf' },
@@ -473,12 +494,10 @@ describe('CompaniesHouseClient document downloads', () => {
     'binary/octet-stream'
   ])('falls back to the requested MIME for a generic response MIME %j', async responseMime => {
     let bytes = Buffer.from([1, 2, 3]);
-    httpMocks.documentGet
-      .mockResolvedValueOnce({ data: metadata(bytes.length) })
-      .mockResolvedValueOnce({
-        status: 302,
-        headers: { location: 'https://files.example.gov.uk/signed/document.csv' }
-      });
+    httpMocks.documentGet.mockResolvedValueOnce({
+      status: 302,
+      headers: { location: 'https://files.example.gov.uk/signed/document.csv' }
+    });
     httpMocks.downloadGet.mockResolvedValueOnce({
       status: 200,
       data: bytes,
@@ -495,26 +514,9 @@ describe('CompaniesHouseClient document downloads', () => {
 
   it.each([
     {
-      name: 'unadvertised MIME',
-      setup: () => httpMocks.documentGet.mockResolvedValueOnce({ data: metadata() }),
-      mimeType: 'application/zip',
-      reason: 'companies_house_document_mime_unavailable'
-    },
-    {
-      name: 'metadata-declared oversize content',
-      setup: () =>
-        httpMocks.documentGet.mockResolvedValueOnce({
-          data: metadata(MAX_DOCUMENT_DOWNLOAD_BYTES + 1)
-        }),
-      mimeType: 'application/pdf',
-      reason: 'companies_house_document_too_large'
-    },
-    {
       name: 'missing redirect location',
       setup: () => {
-        httpMocks.documentGet
-          .mockResolvedValueOnce({ data: metadata() })
-          .mockResolvedValueOnce({ status: 302, headers: {} });
+        httpMocks.documentGet.mockResolvedValueOnce({ status: 302, headers: {} });
       },
       mimeType: 'application/pdf',
       reason: 'companies_house_document_redirect_invalid'
@@ -522,12 +524,10 @@ describe('CompaniesHouseClient document downloads', () => {
     {
       name: 'non-HTTPS redirect location',
       setup: () => {
-        httpMocks.documentGet
-          .mockResolvedValueOnce({ data: metadata() })
-          .mockResolvedValueOnce({
-            status: 302,
-            headers: { location: 'http://files.example.gov.uk/document.pdf' }
-          });
+        httpMocks.documentGet.mockResolvedValueOnce({
+          status: 302,
+          headers: { location: 'http://files.example.gov.uk/document.pdf' }
+        });
       },
       mimeType: 'application/pdf',
       reason: 'companies_house_document_redirect_invalid'
@@ -535,12 +535,10 @@ describe('CompaniesHouseClient document downloads', () => {
     {
       name: 'declared oversize download',
       setup: () => {
-        httpMocks.documentGet
-          .mockResolvedValueOnce({ data: metadata() })
-          .mockResolvedValueOnce({
-            status: 302,
-            headers: { location: 'https://files.example.gov.uk/document.pdf' }
-          });
+        httpMocks.documentGet.mockResolvedValueOnce({
+          status: 302,
+          headers: { location: 'https://files.example.gov.uk/document.pdf' }
+        });
         httpMocks.downloadGet.mockResolvedValueOnce({
           status: 200,
           data: Buffer.from([1]),
@@ -556,12 +554,10 @@ describe('CompaniesHouseClient document downloads', () => {
     {
       name: 'empty body',
       setup: () => {
-        httpMocks.documentGet
-          .mockResolvedValueOnce({ data: metadata() })
-          .mockResolvedValueOnce({
-            status: 302,
-            headers: { location: 'https://files.example.gov.uk/document.pdf' }
-          });
+        httpMocks.documentGet.mockResolvedValueOnce({
+          status: 302,
+          headers: { location: 'https://files.example.gov.uk/document.pdf' }
+        });
         httpMocks.downloadGet.mockResolvedValueOnce({
           status: 200,
           data: Buffer.alloc(0),
@@ -574,12 +570,10 @@ describe('CompaniesHouseClient document downloads', () => {
     {
       name: 'non-binary body',
       setup: () => {
-        httpMocks.documentGet
-          .mockResolvedValueOnce({ data: metadata() })
-          .mockResolvedValueOnce({
-            status: 302,
-            headers: { location: 'https://files.example.gov.uk/document.pdf' }
-          });
+        httpMocks.documentGet.mockResolvedValueOnce({
+          status: 302,
+          headers: { location: 'https://files.example.gov.uk/document.pdf' }
+        });
         httpMocks.downloadGet.mockResolvedValueOnce({
           status: 200,
           data: '<html>not a document</html>',
@@ -592,12 +586,10 @@ describe('CompaniesHouseClient document downloads', () => {
     {
       name: 'unexpected unsafe MIME',
       setup: () => {
-        httpMocks.documentGet
-          .mockResolvedValueOnce({ data: metadata() })
-          .mockResolvedValueOnce({
-            status: 302,
-            headers: { location: 'https://files.example.gov.uk/document.pdf' }
-          });
+        httpMocks.documentGet.mockResolvedValueOnce({
+          status: 302,
+          headers: { location: 'https://files.example.gov.uk/document.pdf' }
+        });
         httpMocks.downloadGet.mockResolvedValueOnce({
           status: 200,
           data: Buffer.from([1]),
@@ -618,7 +610,7 @@ describe('CompaniesHouseClient document downloads', () => {
 
   it('rejects actual content above the limit while preserving arbitrary valid bytes otherwise', async () => {
     let oversized = Buffer.alloc(MAX_DOCUMENT_DOWNLOAD_BYTES + 1, 7);
-    httpMocks.documentGet.mockResolvedValueOnce({ data: metadata() }).mockResolvedValueOnce({
+    httpMocks.documentGet.mockResolvedValueOnce({
       status: 302,
       headers: { location: 'https://files.example.gov.uk/document.pdf' }
     });

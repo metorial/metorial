@@ -26,6 +26,7 @@ import type {
   MappedDocumentMetadata,
   MappedDocumentResource,
   MappedFiling,
+  MappedFilingHistory,
   MappedOfficer,
   MappedOfficerAppointment,
   MappedOfficerAppointmentList,
@@ -562,17 +563,89 @@ export const mapDisqualifiedOfficerRecord = (
 export const mapFilingRecord = (value: unknown): MappedFiling => {
   let record = asRecord(value) ?? {};
   let links = asRecord(record.links);
-  return {
-    transactionId: stringValue(record.transaction_id),
+  let annotations = Array.isArray(record.annotations)
+    ? record.annotations.flatMap(value => {
+        let annotation = asRecord(value);
+        return annotation
+          ? [
+              pickDefined({
+                annotation: stringValue(annotation.annotation),
+                date: stringValue(annotation.date),
+                description: stringValue(annotation.description),
+                record: annotation
+              })
+            ]
+          : [];
+      })
+    : undefined;
+  let associatedFilings = Array.isArray(record.associated_filings)
+    ? record.associated_filings.flatMap(value => {
+        let associated = asRecord(value);
+        return associated
+          ? [
+              pickDefined({
+                date: stringValue(associated.date),
+                description: stringValue(associated.description),
+                type: stringValue(associated.type),
+                record: associated
+              })
+            ]
+          : [];
+      })
+    : undefined;
+  let resolutions = Array.isArray(record.resolutions)
+    ? record.resolutions.flatMap(value => {
+        let resolution = asRecord(value);
+        return resolution
+          ? [
+              pickDefined({
+                category: stringValue(resolution.category),
+                description: stringValue(resolution.description),
+                documentId: stringValue(resolution.document_id),
+                receivedOn: stringValue(resolution.receive_date),
+                subcategory: stringValue(resolution.subcategory),
+                type: stringValue(resolution.type),
+                record: resolution
+              })
+            ]
+          : [];
+      })
+    : undefined;
+  return pickDefined({
+    transactionId: requiredStringValue(record, ['transaction_id'], 'filing history'),
     documentId: parseDocumentIdFromLink(links?.document_metadata),
-    category: stringValue(record.category),
-    date: stringValue(record.date),
-    description: stringValue(record.description),
-    type: stringValue(record.type),
-    pages: numberValue(record.pages),
+    barcode: stringValue(record.barcode),
+    category: requiredStringValue(record, ['category'], 'filing history'),
+    subcategory: stringValue(record.subcategory),
+    date: requiredStringValue(record, ['date'], 'filing history'),
+    description: requiredStringValue(record, ['description'], 'filing history'),
+    type: requiredStringValue(record, ['type'], 'filing history'),
+    pages: nonNegativeInteger(record.pages),
     paperFiled: booleanValue(record.paper_filed),
+    annotations,
+    associatedFilings,
+    resolutions,
+    links,
     record
-  };
+  }) as MappedFiling;
+};
+
+export const mapFilingHistoryEnvelope = (
+  value: unknown,
+  companyNumber: string,
+  requested: { itemsPerPage: number; startIndex: number }
+): MappedFilingHistory => {
+  let record = asRecord(value) ?? {};
+  let filings = Array.isArray(record.items) ? record.items.map(mapFilingRecord) : [];
+  return pickDefined({
+    companyNumber,
+    filingHistoryStatus: stringValue(record.filing_history_status),
+    filings,
+    itemsPerPage: nonNegativeInteger(record.items_per_page) ?? requested.itemsPerPage,
+    startIndex: nonNegativeInteger(record.start_index) ?? requested.startIndex,
+    totalCount: requiredNonNegativeInteger(record, 'total_count', 'filing history'),
+    record
+  }) as MappedFilingHistory;
 };
 
 export const mapChargeRecord = (value: unknown): MappedCharge => {
@@ -616,23 +689,28 @@ export const mapDocumentMetadata = (value: unknown): MappedDocumentMetadata => {
   for (let [mimeType, resourceValue] of Object.entries(rawResources)) {
     let resource = asRecord(resourceValue);
     if (!resource) continue;
-    resources[mimeType.toLowerCase()] = {
-      contentLength: numberValue(resource.content_length),
+    resources[mimeType.toLowerCase()] = pickDefined({
+      contentLength: nonNegativeInteger(resource.content_length),
       createdAt: stringValue(resource.created_at),
       updatedAt: stringValue(resource.updated_at),
       record: resource
-    };
+    }) as MappedDocumentResource;
   }
 
-  return {
-    documentId: stringValue(record.id),
+  return pickDefined({
+    documentId: requiredStringValue(record, ['id'], 'document metadata'),
+    companyNumber: stringValue(record.company_number),
     createdAt: stringValue(record.created_at),
     updatedAt: stringValue(record.updated_at),
-    pages: numberValue(record.pages),
-    availableMimeTypes: Object.keys(resources),
+    pages: nonNegativeInteger(record.pages),
+    availableContentTypes: Object.entries(resources).map(([mimeType, resource]) => ({
+      mimeType,
+      ...resource
+    })),
+    links: asRecord(record.links),
     resources,
     record
-  };
+  }) as MappedDocumentMetadata;
 };
 
 export const mapPaginatedEnvelope = <T>(
