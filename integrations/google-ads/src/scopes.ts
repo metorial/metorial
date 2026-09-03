@@ -1,7 +1,9 @@
 import { anyOf } from 'slates';
 
 export let googleAdsScopes = {
-  adwords: 'https://www.googleapis.com/auth/adwords'
+  adwords: 'https://www.googleapis.com/auth/adwords',
+  userInfoEmail: 'https://www.googleapis.com/auth/userinfo.email',
+  userInfoProfile: 'https://www.googleapis.com/auth/userinfo.profile'
 } as const;
 
 let adwordsAccess = anyOf(googleAdsScopes.adwords);

@@ -162,9 +162,19 @@ export let auth = SlateAuth.create()
         scope: googleAnalyticsScopes.analyticsManageUsersReadonly
       },
       {
-        title: 'User Profile',
-        description: 'View basic profile information including email.',
-        scope: googleAnalyticsScopes.openIdEmailProfile
+        title: 'OpenID',
+        description: 'Associate the connection with your Google Account.',
+        scope: googleAnalyticsScopes.openId
+      },
+      {
+        title: 'Email',
+        description: 'View the email address of the authenticated user.',
+        scope: googleAnalyticsScopes.email
+      },
+      {
+        title: 'Profile',
+        description: 'View basic profile information.',
+        scope: googleAnalyticsScopes.profile
       }
     ],
 

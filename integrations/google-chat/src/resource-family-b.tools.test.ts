@@ -493,7 +493,7 @@ describe('google-chat resource tool family B', () => {
     );
   });
 
-  it('returns downloaded bytes only through a Slate attachment', async () => {
+  it('returns downloaded bytes as a downloadable file', async () => {
     let fileBytes = Buffer.from([0, 255, 10, 65]);
     requestSpy.mockResolvedValueOnce(fileBytes);
 
@@ -509,8 +509,7 @@ describe('google-chat resource tool family B', () => {
       attachmentDataResourceName: 'spaces/AAAA/attachments/upload-1',
       filename: 'sample.bin',
       mimeType: 'application/octet-stream',
-      byteLength: 4,
-      attachmentCount: 1
+      byteLength: 4
     });
     expect(result.output).not.toHaveProperty('contentBase64');
     expect(result.attachments).toEqual([

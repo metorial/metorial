@@ -1,4 +1,4 @@
-import { createTextAttachment, SlateTool } from 'slates';
+import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { googleCloudStorageActionScopes } from '../scopes';
@@ -7,10 +7,7 @@ import { spec } from '../spec';
 export let getObject = SlateTool.create(spec, {
   name: 'Get Object',
   key: 'get_object',
-  description: `Get an object's metadata and optionally download its content from a Cloud Storage bucket. By default only returns metadata; set **includeContent** to true to return the object's data as an attachment.`,
-  constraints: [
-    'Content download works best with text-based objects. Binary data may not be fully represented.'
-  ],
+  description: `Get an object's metadata and optionally download its content from a Cloud Storage bucket. By default only returns metadata; set **includeContent** to true to return a binary-safe downloadable file.`,
   tags: {
     readOnly: true
   }
@@ -23,7 +20,7 @@ export let getObject = SlateTool.create(spec, {
       includeContent: z
         .boolean()
         .optional()
-        .describe('Download and include the object content as text')
+        .describe('Download and include the object content as a binary-safe file')
     })
   )
   .output(
@@ -52,20 +49,20 @@ export let getObject = SlateTool.create(spec, {
 
     let metadata = await client.getObjectMetadata(ctx.input.bucketName, ctx.input.objectName);
 
-    let content: string | undefined;
+    let content: Buffer | undefined;
     if (ctx.input.includeContent) {
       content = await client.downloadObject(ctx.input.bucketName, ctx.input.objectName);
-      if (typeof content !== 'string') {
-        content = JSON.stringify(content);
-      }
     }
+
+    let contentType = metadata.contentType || 'application/octet-stream';
+    let sizeBytes = metadata.size ?? (content ? String(content.byteLength) : undefined);
 
     return {
       output: {
         objectName: metadata.name,
         bucketName: metadata.bucket,
-        sizeBytes: metadata.size,
-        contentType: metadata.contentType,
+        sizeBytes,
+        contentType,
         storageClass: metadata.storageClass,
         createdAt: metadata.timeCreated,
         updatedAt: metadata.updated,
@@ -79,9 +76,9 @@ export let getObject = SlateTool.create(spec, {
       },
       attachments:
         content !== undefined
-          ? [createTextAttachment(content, metadata.contentType || undefined)]
+          ? [createBase64Attachment(content.toString('base64'), contentType)]
           : undefined,
-      message: `Retrieved object **${metadata.name}** from bucket **${metadata.bucket}** (${metadata.size} bytes, ${metadata.contentType}).${content !== undefined ? ' Content included.' : ''}`
+      message: `Retrieved object **${metadata.name}** from bucket **${metadata.bucket}** (${sizeBytes ?? 'unknown'} bytes, ${contentType}).${content !== undefined ? ' Downloadable file included.' : ''}`
     };
   })
   .build();

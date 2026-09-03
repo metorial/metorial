@@ -1,0 +1,12 @@
+{
+  "name": "@booble/super-booble-2b",
+  "description": "Use one G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ OAuth connection for Photos, YouTube, YouTube Analytics, and G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Workspace Admin workflows.",
+  "categories": ["productivity", "data-and-analytics", "marketing-and-sales"],
+  "skills": [
+    "manage albums and media in G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Photos",
+    "manage YouTube videos, playlists, comments, and captions",
+    "query YouTube Analytics and bulk reports",
+    "administer G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Workspace users, groups, devices, and licenses"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

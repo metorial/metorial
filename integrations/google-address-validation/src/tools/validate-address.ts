@@ -286,7 +286,11 @@ When re-validating a previously validated address, provide the \`previousRespons
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({
+      token: ctx.auth.token,
+      authMethod: ctx.auth.authMethod,
+      projectId: ctx.config.projectId
+    });
 
     let response = await client.validateAddress({
       address: {
