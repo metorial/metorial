@@ -74,7 +74,14 @@ describe('CompaniesHouseClient transport setup', () => {
 describe('CompaniesHouseClient endpoint requests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    httpMocks.publicGet.mockResolvedValue({ data: emptySearch });
+    httpMocks.publicGet.mockImplementation((path: string) =>
+      Promise.resolve({
+        data:
+          path === '/company/A%2FB'
+            ? { company_number: 'A/B', company_name: 'Example Limited' }
+            : emptySearch
+      })
+    );
     httpMocks.documentGet.mockResolvedValue({ data: metadata() });
   });
 

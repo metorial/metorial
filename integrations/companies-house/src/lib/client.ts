@@ -27,7 +27,8 @@ import {
 import {
   mapAdvancedCompanySearchEnvelope,
   mapChargeRecord,
-  mapCompanyRecord,
+  mapCompanyProfile,
+  mapCompanySearchRecord,
   mapDocumentMetadata,
   mapFilingRecord,
   mapOfficerRecord,
@@ -104,6 +105,18 @@ let trimmed = (value: string | undefined) => {
 let commaList = (value: string[] | undefined) => {
   let normalized = value?.map(item => item.trim()).filter(Boolean);
   return normalized && normalized.length > 0 ? normalized.join(',') : undefined;
+};
+
+let advancedCommaList = (value: string[] | undefined, field: string) => {
+  if (value === undefined) return undefined;
+  if (value.length === 0) {
+    throw companiesHouseValidationError(`${field} must not be an empty array.`);
+  }
+  let normalized = value.map(item => item.trim());
+  if (normalized.some(item => item.length === 0)) {
+    throw companiesHouseValidationError(`${field} must contain only non-empty values.`);
+  }
+  return normalized.join(',');
 };
 
 let simpleSearchRestrictions = (value: unknown) => {
@@ -231,7 +244,7 @@ export class CompaniesHouseClient {
         start_index: page.startIndex
       })
     });
-    return mapPaginatedEnvelope(data, mapCompanyRecord, page);
+    return mapPaginatedEnvelope(data, mapCompanySearchRecord, page);
   }
 
   async searchCompaniesAdvanced(params: CompaniesHouseAdvancedSearchParams) {
@@ -239,15 +252,15 @@ export class CompaniesHouseClient {
     let filters = {
       companyNameIncludes: trimmed(params.companyNameIncludes),
       companyNameExcludes: trimmed(params.companyNameExcludes),
-      companyStatus: commaList(params.companyStatus),
-      companyType: commaList(params.companyType),
-      companySubtype: commaList(params.companySubtype),
+      companyStatus: advancedCommaList(params.companyStatus, 'companyStatuses'),
+      companyType: advancedCommaList(params.companyType, 'companyTypes'),
+      companySubtype: advancedCommaList(params.companySubtype, 'companySubtypes'),
       incorporatedFrom: trimmed(params.incorporatedFrom),
       incorporatedTo: trimmed(params.incorporatedTo),
       dissolvedFrom: trimmed(params.dissolvedFrom),
       dissolvedTo: trimmed(params.dissolvedTo),
       location: trimmed(params.location),
-      sicCodes: commaList(params.sicCodes)
+      sicCodes: advancedCommaList(params.sicCodes, 'sicCodes')
     };
     if (!Object.values(filters).some(value => value !== undefined)) {
       throw companiesHouseValidationError(
@@ -293,7 +306,7 @@ export class CompaniesHouseClient {
       'get company profile',
       `/company/${pathSegment(companyNumber)}`
     );
-    return mapCompanyRecord(data);
+    return mapCompanyProfile(data);
   }
 
   async searchOfficers(params: { query: string } & CompaniesHousePagination) {

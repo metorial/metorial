@@ -1,21 +1,13 @@
 export const companiesHouseToolKeys = [
   'search_companies',
   'search_companies_advanced',
-  'get_company_profile',
-  'search_officers',
-  'list_company_officers',
-  'list_officer_appointments',
-  'search_disqualified_officers',
-  'get_officer_disqualifications',
-  'list_filing_history',
-  'get_filing_history_item',
-  'get_document_metadata',
-  'download_filing_document',
-  'list_company_charges',
-  'get_company_charge',
-  'get_company_insolvency',
-  'list_company_pscs',
-  'list_psc_statements'
+  'get_company_profile'
 ] as const;
 
-export const tools: [] = [];
+export { getCompanyProfile } from './company-profile';
+export { searchCompanies, searchCompaniesAdvanced } from './search-companies';
+
+import { getCompanyProfile } from './company-profile';
+import { searchCompanies, searchCompaniesAdvanced } from './search-companies';
+
+export const tools = [searchCompanies, searchCompaniesAdvanced, getCompanyProfile];

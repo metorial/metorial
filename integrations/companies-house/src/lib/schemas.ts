@@ -36,6 +36,101 @@ export const documentMimeTypeSchema = trimmedStringSchema.refine(
 
 export const providerRecordSchema = z.record(z.string(), z.unknown());
 
+export const mappedAddressSchema = z.object({
+  addressLine1: z.string().optional(),
+  addressLine2: z.string().optional(),
+  careOf: z.string().optional(),
+  country: z.string().optional(),
+  locality: z.string().optional(),
+  poBox: z.string().optional(),
+  postalCode: z.string().optional(),
+  premises: z.string().optional(),
+  region: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const companySearchItemSchema = z.object({
+  companyNumber: z.string(),
+  name: z.string(),
+  status: z.string().optional(),
+  type: z.string().optional(),
+  incorporatedOn: z.string().optional(),
+  dissolvedOn: z.string().optional(),
+  addressSnippet: z.string().optional(),
+  profileUrl: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const companySearchOutputSchema = z.object({
+  items: z.array(companySearchItemSchema),
+  itemsPerPage: z.number().int().nonnegative(),
+  startIndex: z.number().int().nonnegative(),
+  totalResults: z.number().int().nonnegative(),
+  record: providerRecordSchema
+});
+
+const datedRecordSchema = z
+  .object({
+    dueOn: z.string().optional(),
+    madeUpTo: z.string().optional(),
+    periodStartOn: z.string().optional(),
+    periodEndOn: z.string().optional(),
+    type: z.string().optional(),
+    overdue: z.boolean().optional(),
+    record: providerRecordSchema
+  })
+  .passthrough();
+
+export const companyAccountsSchema = z.object({
+  accountingReferenceDate: z
+    .object({
+      day: z.number().int().optional(),
+      month: z.number().int().optional(),
+      record: providerRecordSchema
+    })
+    .optional(),
+  lastAccounts: datedRecordSchema.optional(),
+  nextAccounts: datedRecordSchema.optional(),
+  nextDueOn: z.string().optional(),
+  nextMadeUpTo: z.string().optional(),
+  overdue: z.boolean().optional(),
+  record: providerRecordSchema
+});
+
+export const confirmationStatementSchema = z.object({
+  lastMadeUpTo: z.string().optional(),
+  nextDueOn: z.string().optional(),
+  nextMadeUpTo: z.string().optional(),
+  overdue: z.boolean().optional(),
+  record: providerRecordSchema
+});
+
+export const previousCompanyNameSchema = z.object({
+  name: z.string(),
+  effectiveFrom: z.string().optional(),
+  ceasedOn: z.string().optional(),
+  record: providerRecordSchema
+});
+
+export const companyProfileOutputSchema = z.object({
+  companyNumber: z.string(),
+  name: z.string(),
+  status: z.string().optional(),
+  statusDetail: z.string().optional(),
+  type: z.string().optional(),
+  subtype: z.string().optional(),
+  jurisdiction: z.string().optional(),
+  incorporatedOn: z.string().optional(),
+  dissolvedOn: z.string().optional(),
+  sicCodes: z.array(z.string()),
+  registeredOfficeAddress: mappedAddressSchema.optional(),
+  accounts: companyAccountsSchema.optional(),
+  confirmationStatement: confirmationStatementSchema.optional(),
+  previousNames: z.array(previousCompanyNameSchema),
+  links: providerRecordSchema.optional(),
+  record: providerRecordSchema
+});
+
 export const addressSchema = z
   .object({
     address_line_1: z.string().optional(),

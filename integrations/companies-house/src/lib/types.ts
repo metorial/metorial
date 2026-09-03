@@ -39,6 +39,76 @@ export type MappedCompany = {
   record: ProviderRecord;
 };
 
+export type MappedCompanySearchItem = {
+  companyNumber: string;
+  name: string;
+  status?: string;
+  type?: string;
+  incorporatedOn?: string;
+  dissolvedOn?: string;
+  addressSnippet?: string;
+  profileUrl?: string;
+  record: ProviderRecord;
+};
+
+export type MappedDatedRecord = {
+  dueOn?: string;
+  madeUpTo?: string;
+  periodStartOn?: string;
+  periodEndOn?: string;
+  type?: string;
+  overdue?: boolean;
+  record: ProviderRecord;
+};
+
+export type MappedCompanyAccounts = {
+  accountingReferenceDate?: {
+    day?: number;
+    month?: number;
+    record: ProviderRecord;
+  };
+  lastAccounts?: MappedDatedRecord;
+  nextAccounts?: MappedDatedRecord;
+  nextDueOn?: string;
+  nextMadeUpTo?: string;
+  overdue?: boolean;
+  record: ProviderRecord;
+};
+
+export type MappedConfirmationStatement = {
+  lastMadeUpTo?: string;
+  nextDueOn?: string;
+  nextMadeUpTo?: string;
+  overdue?: boolean;
+  record: ProviderRecord;
+};
+
+export type MappedPreviousCompanyName = {
+  name: string;
+  effectiveFrom?: string;
+  ceasedOn?: string;
+  record: ProviderRecord;
+};
+
+export type MappedCompanyProfile = {
+  companyNumber: string;
+  name: string;
+  status?: string;
+  statusDetail?: string;
+  type?: string;
+  subtype?: string;
+  jurisdiction?: string;
+  incorporatedOn?: string;
+  dissolvedOn?: string;
+  sicCodes: string[];
+  registeredOfficeAddress?: MappedAddress;
+  accounts?: MappedCompanyAccounts;
+  confirmationStatement?: MappedConfirmationStatement;
+  previousNames: MappedPreviousCompanyName[];
+  links?: ProviderRecord;
+  record: ProviderRecord;
+};
+
 export type MappedOfficer = {
   officerId?: string;
   officerType?: string;

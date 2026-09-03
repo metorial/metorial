@@ -3,7 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { provider } from './index';
 import { companiesHouseToolKeys } from './tools';
 
-const implementedToolKeys: (typeof companiesHouseToolKeys)[number][] = [];
+const implementedToolKeys: (typeof companiesHouseToolKeys)[number][] = [
+  'search_companies',
+  'search_companies_advanced',
+  'get_company_profile'
+];
 
 describe('companies-house provider contract', () => {
   it('exposes the provider, API-key auth, empty config, and implemented action subset', async () => {
@@ -16,7 +20,7 @@ describe('companies-house provider contract', () => {
         description:
           'Search and inspect companies, officers, filings, charges, insolvency records, and people with significant control in the UK public register.'
       },
-      toolIds: implementedToolKeys,
+      toolIds: [...implementedToolKeys],
       triggerIds: [],
       authMethodIds: ['api_key']
     });
@@ -29,8 +33,8 @@ describe('companies-house provider contract', () => {
         'Search and inspect companies, officers, filings, charges, insolvency records, and people with significant control in the UK public register.',
       metadata: {}
     });
-    expect(contract.actions).toEqual([]);
-    expect(contract.tools).toEqual([]);
+    expect(contract.actions.map(action => action.id)).toEqual(implementedToolKeys);
+    expect(contract.tools.map(tool => tool.id)).toEqual(implementedToolKeys);
     expect(contract.triggers).toEqual([]);
     expect(contract.configSchema).toEqual({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -105,21 +109,7 @@ describe('companies-house provider contract', () => {
     expect(companiesHouseToolKeys).toEqual([
       'search_companies',
       'search_companies_advanced',
-      'get_company_profile',
-      'search_officers',
-      'list_company_officers',
-      'list_officer_appointments',
-      'search_disqualified_officers',
-      'get_officer_disqualifications',
-      'list_filing_history',
-      'get_filing_history_item',
-      'get_document_metadata',
-      'download_filing_document',
-      'list_company_charges',
-      'get_company_charge',
-      'get_company_insolvency',
-      'list_company_pscs',
-      'list_psc_statements'
+      'get_company_profile'
     ]);
     expect(new Set(companiesHouseToolKeys).size).toBe(companiesHouseToolKeys.length);
     for (let key of companiesHouseToolKeys) {

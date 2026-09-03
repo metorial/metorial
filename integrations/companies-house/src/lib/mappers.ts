@@ -11,11 +11,17 @@ import type {
   MappedAddress,
   MappedCharge,
   MappedCompany,
+  MappedCompanyAccounts,
+  MappedCompanyProfile,
+  MappedCompanySearchItem,
+  MappedConfirmationStatement,
+  MappedDatedRecord,
   MappedDocumentMetadata,
   MappedDocumentResource,
   MappedFiling,
   MappedOfficer,
   MappedPage,
+  MappedPreviousCompanyName,
   MappedPsc,
   ProviderEnvelope,
   ProviderRecord
@@ -167,6 +173,115 @@ export const mapCompanyRecord = (value: unknown): MappedCompany => {
   };
 };
 
+let requiredStringValue = (record: ProviderRecord, keys: string[], label: string) => {
+  for (let key of keys) {
+    let value = stringValue(record[key]);
+    if (value) return value;
+  }
+  throw companiesHouseValidationError(
+    `Companies House returned a ${label} record without a required ${keys[0]} value.`,
+    'companies_house_response_invalid'
+  );
+};
+
+export const mapCompanySearchRecord = (value: unknown): MappedCompanySearchItem => {
+  let record = asRecord(value) ?? {};
+  let links = asRecord(record.links);
+  return pickDefined({
+    companyNumber: requiredStringValue(record, ['company_number'], 'company search'),
+    name: requiredStringValue(record, ['company_name', 'title'], 'company search'),
+    status: stringValue(record.company_status),
+    type: stringValue(record.company_type),
+    incorporatedOn: stringValue(record.date_of_creation),
+    dissolvedOn: stringValue(record.date_of_cessation),
+    addressSnippet: stringValue(record.address_snippet),
+    profileUrl: stringValue(links?.company_profile),
+    record
+  }) as MappedCompanySearchItem;
+};
+
+let mapDateRecord = (value: unknown): MappedDatedRecord | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  return pickDefined({
+    dueOn: stringValue(record.due_on),
+    madeUpTo: stringValue(record.made_up_to),
+    periodStartOn: stringValue(record.period_start_on),
+    periodEndOn: stringValue(record.period_end_on),
+    type: stringValue(record.type),
+    overdue: booleanValue(record.overdue),
+    record
+  }) as MappedDatedRecord;
+};
+
+let mapAccounts = (value: unknown): MappedCompanyAccounts | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  let accountingReferenceDate = asRecord(record.accounting_reference_date);
+  return pickDefined({
+    accountingReferenceDate: accountingReferenceDate
+      ? pickDefined({
+          day: numberValue(accountingReferenceDate.day),
+          month: numberValue(accountingReferenceDate.month),
+          record: accountingReferenceDate
+        })
+      : undefined,
+    lastAccounts: mapDateRecord(record.last_accounts),
+    nextAccounts: mapDateRecord(record.next_accounts),
+    nextDueOn: stringValue(record.next_due),
+    nextMadeUpTo: stringValue(record.next_made_up_to),
+    overdue: booleanValue(record.overdue),
+    record
+  }) as MappedCompanyAccounts;
+};
+
+let mapConfirmationStatement = (value: unknown): MappedConfirmationStatement | undefined => {
+  let record = asRecord(value);
+  if (!record) return undefined;
+  return pickDefined({
+    lastMadeUpTo: stringValue(record.last_made_up_to),
+    nextDueOn: stringValue(record.next_due),
+    nextMadeUpTo: stringValue(record.next_made_up_to),
+    overdue: booleanValue(record.overdue),
+    record
+  }) as MappedConfirmationStatement;
+};
+
+let mapPreviousCompanyName = (value: unknown): MappedPreviousCompanyName => {
+  let record = asRecord(value) ?? {};
+  return pickDefined({
+    name: requiredStringValue(record, ['name'], 'previous company name'),
+    effectiveFrom: stringValue(record.effective_from),
+    ceasedOn: stringValue(record.ceased_on),
+    record
+  }) as MappedPreviousCompanyName;
+};
+
+export const mapCompanyProfile = (value: unknown): MappedCompanyProfile => {
+  let record = asRecord(value) ?? {};
+  let previousNames = Array.isArray(record.previous_company_names)
+    ? record.previous_company_names.map(mapPreviousCompanyName)
+    : [];
+  return pickDefined({
+    companyNumber: requiredStringValue(record, ['company_number'], 'company profile'),
+    name: requiredStringValue(record, ['company_name'], 'company profile'),
+    status: stringValue(record.company_status),
+    statusDetail: stringValue(record.company_status_detail),
+    type: stringValue(record.type) ?? stringValue(record.company_type),
+    subtype: stringValue(record.subtype) ?? stringValue(record.company_subtype),
+    jurisdiction: stringValue(record.jurisdiction),
+    incorporatedOn: stringValue(record.date_of_creation),
+    dissolvedOn: stringValue(record.date_of_cessation),
+    sicCodes: stringArray(record.sic_codes) ?? [],
+    registeredOfficeAddress: mapAddress(record.registered_office_address),
+    accounts: mapAccounts(record.accounts),
+    confirmationStatement: mapConfirmationStatement(record.confirmation_statement),
+    previousNames,
+    links: asRecord(record.links),
+    record
+  }) as MappedCompanyProfile;
+};
+
 export const mapOfficerRecord = (value: unknown): MappedOfficer => {
   let record = asRecord(value) ?? {};
   let links = asRecord(record.links);
@@ -293,7 +408,7 @@ export const mapPaginatedEnvelope = <T>(
 export const mapAdvancedCompanySearchEnvelope = (
   value: unknown,
   requested: { itemsPerPage: number; startIndex: number }
-): MappedPage<MappedCompany> & { topHit?: MappedCompany } => {
+): MappedPage<MappedCompanySearchItem> => {
   let record = asRecord(value) as AdvancedCompanySearchEnvelope | undefined;
   let hits = record?.hits;
   if (!record || typeof hits !== 'string' || !/^(0|[1-9]\d*)$/.test(hits)) {
@@ -311,11 +426,10 @@ export const mapAdvancedCompanySearchEnvelope = (
   }
 
   return {
-    items: Array.isArray(record.items) ? record.items.map(mapCompanyRecord) : [],
+    items: Array.isArray(record.items) ? record.items.map(mapCompanySearchRecord) : [],
     itemsPerPage: requested.itemsPerPage,
     startIndex: requested.startIndex,
     totalResults,
-    ...(record.top_hit ? { topHit: mapCompanyRecord(record.top_hit) } : {}),
     record
   };
 };
