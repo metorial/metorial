@@ -35,7 +35,7 @@ export const companiesHouseApiError = (
 
   if (numericStatus === 401) {
     specialMessage =
-      'Companies House authentication failed. Check that the API key is valid and retry.';
+      'Companies House authentication failed. Check the connection credentials and retry.';
   } else if (numericStatus === 404) {
     specialMessage = `The requested Companies House resource was not found while trying to ${operation}. Check the identifier and retry.`;
   } else if (numericStatus === 406) {

@@ -2,6 +2,8 @@ export const PUBLIC_DATA_BASE_URL = 'https://api.company-information.service.gov
 
 export const DOCUMENT_API_BASE_URL = 'https://document-api.company-information.service.gov.uk';
 
+export const IDENTITY_BASE_URL = 'https://identity.company-information.service.gov.uk';
+
 export const DEFAULT_ITEMS_PER_PAGE = 20;
 export const MAX_ITEMS_PER_PAGE = 100;
 export const MAX_DOCUMENT_DOWNLOAD_BYTES = 50 * 1024 * 1024;

@@ -205,9 +205,12 @@ export class CompaniesHouseClient {
   private downloadHttp: ReturnType<typeof createAxios>;
   private token: string;
 
-  constructor(auth: { token: string }) {
+  constructor(auth: { token: string; authMethod?: 'api_key' | 'oauth' }) {
     this.token = auth.token;
-    let authorization = `Basic ${Buffer.from(`${auth.token}:`).toString('base64')}`;
+    let authorization =
+      auth.authMethod === 'oauth'
+        ? `Bearer ${auth.token}`
+        : `Basic ${Buffer.from(`${auth.token}:`).toString('base64')}`;
     let authenticated = {
       authHeader: { value: authorization },
       contentType: false as const,

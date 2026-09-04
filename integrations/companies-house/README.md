@@ -4,11 +4,14 @@ Search and inspect the United Kingdom public company register. The integration i
 
 ## Authentication
 
-1. Register or sign in to a Companies House developer account.
-2. [Create an application and an API key](https://developer.company-information.service.gov.uk/how-to-create-an-application), or manage an existing key from the [developer applications page](https://developer.company-information.service.gov.uk/manage-applications).
-3. Configure the connection with that API key. Companies House receives it as the username in HTTP Basic authentication with a blank password, as described in the [official authentication guide](https://developer.company-information.service.gov.uk/authentication).
+Choose either supported connection method:
 
-Keep the key secret. Do not commit it to source control or include it in logs.
+- **OAuth:** create a Companies House OAuth web client, then sign in and grant read-profile access. API requests use the resulting bearer access token and refresh automatically.
+- **API key:** create or manage an API key from the [developer applications page](https://developer.company-information.service.gov.uk/manage-applications). API requests use HTTP Basic authentication with the key as the username and a blank password.
+
+See the [official authentication guide](https://developer.company-information.service.gov.uk/authentication) for both methods.
+
+Keep API keys, OAuth client secrets, and tokens secret. Do not commit them to source control or include them in logs.
 
 ## Tools
 
@@ -49,8 +52,8 @@ Call `get_document_metadata` before `download_filing_document`, then pass one of
 - List and search requests default to 20 items and are capped by this integration at 100 items per page, even where a provider endpoint permits a larger page.
 - The tools read the public register only. They do not file or change company information.
 - Public-register results can contain personal data, including names, service addresses, nationalities, occupations, and partial dates of birth. Handle, retain, and republish it only when you have a lawful purpose and comply with applicable data-protection and copyright requirements. See [Companies House guidance on using company data](https://www.gov.uk/guidance/companies-house-data-products#using-companies-house-data) and [personal information on the register](https://www.gov.uk/guidance/your-personal-information-on-the-companies-house-register).
-- The public-data API has no API-key identity endpoint that identifies the owner of a key, so this connection does not expose an identity/profile tool.
-- OAuth-protected filing, discrepancy reporting, streaming feeds, and sandbox test-data generation are outside this integration. It targets the live read-only API hosts. Companies House does not run its Document API in the sandbox, and sandbox searches can return live data; see the [official API testing guide](https://developer.company-information.service.gov.uk/api-testing).
+- OAuth connections read the authenticated user profile during connection setup. API-key connections do not expose an owner identity.
+- Filing, discrepancy reporting, streaming feeds, and sandbox test-data generation remain outside this integration. It targets the live read-only API hosts. Companies House does not run its Document API in the sandbox, and sandbox searches can return live data; see the [official API testing guide](https://developer.company-information.service.gov.uk/api-testing).
 
 ## License
 

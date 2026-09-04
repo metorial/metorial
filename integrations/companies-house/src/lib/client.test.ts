@@ -69,6 +69,24 @@ describe('CompaniesHouseClient transport setup', () => {
     });
     expect(httpMocks.createAxios).toHaveBeenCalledWith();
   });
+
+  it('uses an OAuth bearer token on provider clients', () => {
+    new CompaniesHouseClient({ token: 'access-token', authMethod: 'oauth' });
+
+    expect(httpMocks.createAuthenticatedAxios).toHaveBeenNthCalledWith(1, {
+      baseURL: PUBLIC_DATA_BASE_URL,
+      authHeader: { value: 'Bearer access-token' },
+      contentType: false,
+      headers: { Accept: 'application/json' }
+    });
+    expect(httpMocks.createAuthenticatedAxios).toHaveBeenNthCalledWith(2, {
+      baseURL: DOCUMENT_API_BASE_URL,
+      authHeader: { value: 'Bearer access-token' },
+      contentType: false,
+      headers: { Accept: 'application/json' }
+    });
+    expect(httpMocks.createAxios).toHaveBeenCalledWith();
+  });
 });
 
 describe('CompaniesHouseClient endpoint requests', () => {

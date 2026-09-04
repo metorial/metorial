@@ -25,7 +25,7 @@ const implementedToolKeys: (typeof companiesHouseToolKeys)[number][] = [
 ];
 
 describe('companies-house provider contract', () => {
-  it('exposes the provider, API-key auth, empty config, and implemented action subset', async () => {
+  it('exposes the provider, API-key and OAuth auth, empty config, and implemented action subset', async () => {
     let client = createLocalSlateTestClient({ slate: provider });
     let contract = await expectSlateContract({
       client,
@@ -37,7 +37,7 @@ describe('companies-house provider contract', () => {
       },
       toolIds: [...implementedToolKeys],
       triggerIds: [],
-      authMethodIds: ['api_key']
+      authMethodIds: ['api_key', 'oauth']
     });
 
     expect(contract.provider).toEqual({
@@ -85,7 +85,10 @@ describe('companies-house provider contract', () => {
         $schema: 'https://json-schema.org/draft/2020-12/schema',
         type: 'object',
         properties: {
-          token: { type: 'string' }
+          token: { type: 'string' },
+          refreshToken: { type: 'string' },
+          expiresAt: { type: 'string' },
+          authMethod: { type: 'string', enum: ['api_key', 'oauth'] }
         },
         required: ['token'],
         additionalProperties: false
@@ -98,13 +101,32 @@ describe('companies-house provider contract', () => {
       },
       docs: []
     });
-    expect(contract.authMethods).toEqual([apiKey.authenticationMethod]);
+    let oauth = await client.getAuthMethod('oauth');
+    expect(oauth.authenticationMethod).toMatchObject({
+      id: 'oauth',
+      name: 'OAuth',
+      type: 'auth.oauth',
+      scopes: [
+        {
+          title: 'Read User Profile',
+          description: 'Read the authenticated Companies House user profile'
+        }
+      ],
+      capabilities: {
+        handleTokenRefresh: { enabled: true },
+        getProfile: { enabled: true }
+      }
+    });
+    expect(contract.authMethods).toEqual([
+      apiKey.authenticationMethod,
+      oauth.authenticationMethod
+    ]);
 
     let output = await client.getAuthOutput({
       authenticationMethodId: 'api_key',
       input: { apiKey: '  secret-key  ' }
     });
-    expect(output.output).toEqual({ token: 'secret-key' });
+    expect(output.output).toEqual({ token: 'secret-key', authMethod: 'api_key' });
 
     await expect(
       client.getAuthOutput({
