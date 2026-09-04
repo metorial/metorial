@@ -1,0 +1,31 @@
+{
+  "name": "@slates-integrations/super-booble-3",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@slates-integrations/bigquery": "0.2.0-rc.12",
+    "@slates-integrations/compute-engine": "0.1.0-rc.5",
+    "@slates-integrations/firebase": "0.2.0",
+    "@slates-integrations/google-address-validation": "0.2.0",
+    "@slates-integrations/google-cloud-functions": "0.2.0-rc.10",
+    "@slates-integrations/google-cloud-speech": "0.2.0-rc.11",
+    "@slates-integrations/google-cloud-storage": "0.2.0",
+    "@slates-integrations/google-cloud-vision": "0.2.0-rc.10",
+    "@types/node": "^20",
+    "slates": "1.0.0-rc.17",
+    "zod": "^4.2"
+  },
+  "devDependencies": {
+    "@slates/oauth-google": "workspace:*",
+    "@slates/super-google-tools": "workspace:*",
+    "@slates/test": "1.0.0-rc.14",
+    "typescript": "^5",
+    "vitest": "^3.1.2"
+  },
+  "version": "0.2.1"
+}

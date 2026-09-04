@@ -38,7 +38,7 @@ Retrieves the full structure of a Google Slides presentation including all slide
 
 ### Get Slide Thumbnail
 
-Generates a PNG thumbnail of a slide page using Google's optional SMALL, MEDIUM, or LARGE size preset. The temporary Google content URL is downloaded immediately and the image is returned as a Slate attachment with metadata-only structured output.
+Generates a PNG thumbnail of a slide page using Google's optional SMALL, MEDIUM, or LARGE size preset. The temporary Google content URL is downloaded immediately and the image is returned as a downloadable file with metadata-only structured output.
 
 ### Manage Slides
 

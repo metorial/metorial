@@ -9,7 +9,7 @@ import {
   getUser,
   listGroups,
   listUsers,
-  manageAlerts,
+  // manageAlerts,
   manageCalendarResources,
   manageChromeOsDevices,
   manageDomains,
@@ -44,7 +44,12 @@ export let provider = Slate.create({
     manageDomains,
     getActivityReports,
     getUsageReports,
-    manageAlerts,
+    // manage_alerts is intentionally not registered. The Alert Center API only supports
+    // service accounts with domain-wide delegation, and Google rejects its apps.alerts scope
+    // as invalid for a user OAuth client, so the tool can never succeed through this
+    // integration's OAuth method. The implementation is kept in tools/manage-alerts.ts for a
+    // future service-account auth method.
+    // manageAlerts,
     manageCalendarResources,
     manageLicenses,
     transferData,

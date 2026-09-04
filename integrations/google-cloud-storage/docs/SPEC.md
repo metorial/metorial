@@ -1,6 +1,4 @@
-Now let me fetch the OAuth scopes page to get the exact scope URLs:Now I have all the information needed to write the specification.
-
-# Slates Specification for Google Cloud Storage
+# Google Cloud Storage specification
 
 ## Overview
 
@@ -59,7 +57,7 @@ Create, list, configure, and delete buckets within a project. Buckets can be con
 
 ### Object Storage and Retrieval
 
-Upload, download, list, copy, move, and delete objects in buckets. Supports multiple upload methods including simple uploads, resumable uploads (for large files or unreliable networks), multipart uploads, and parallel composite uploads. Objects can be streamed in or out without being stored locally first.
+Upload, download, list, copy, move, and delete objects in buckets. Downloads preserve arbitrary binary bytes and return them as downloadable files with the object's content type, name, and size metadata. Supports multiple upload methods including simple uploads, resumable uploads (for large files or unreliable networks), multipart uploads, and parallel composite uploads. Objects can be streamed in or out without being stored locally first.
 
 ### Access Control
 

@@ -45,7 +45,11 @@ Helps Google improve future validation results by indicating whether the validat
     })
   )
   .handleInvocation(async ctx => {
-    let client = new Client({ token: ctx.auth.token });
+    let client = new Client({
+      token: ctx.auth.token,
+      authMethod: ctx.auth.authMethod,
+      projectId: ctx.config.projectId
+    });
 
     await client.provideValidationFeedback({
       conclusion: ctx.input.conclusion,

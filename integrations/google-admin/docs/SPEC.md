@@ -48,11 +48,20 @@ Scopes are granular and follow the pattern `https://www.googleapis.com/auth/admi
 | User security      | `admin.directory.user.security`     | —                                            |
 | Reports (audit)    | —                                   | `admin.reports.audit.readonly`               |
 | Reports (usage)    | —                                   | `admin.reports.usage.readonly`               |
-| Alert Center       | `apps.alerts`                       | —                                            |
+| Alert Center       | `apps.alerts` (not requestable)     | —                                            |
 | Groups settings    | `apps.groups.settings`              | —                                            |
 | Licensing          | `apps.licensing`                    | —                                            |
 
 All scopes are prefixed with `https://www.googleapis.com/auth/`.
+
+`apps.alerts` is **not** on the OAuth consent list. The Alert Center API only
+supports service accounts with domain-wide delegation, and the Google Auth
+Platform rejects `apps.alerts` as an invalid scope for a user OAuth client
+(confirmed 2026-09-03). The `manage_alerts` tool therefore cannot be satisfied by
+this integration's user OAuth grant and is **not registered** on the provider
+(commented out in `src/index.ts`). Its implementation is kept in
+`src/tools/manage-alerts.ts`, with its `apps.alerts` clause, so a future
+service-account auth method can register it again.
 
 ## Features
 
@@ -102,7 +111,7 @@ Access detailed audit logs for admin actions, user logins, Drive activity, devic
 
 ### Alert Center
 
-Access and manage security alerts for the Google Workspace domain. Alerts cover threats like phishing, malware, suspicious login activity, and policy violations. Supports listing, retrieving, acknowledging alerts, and managing alert feedback and metadata.
+Access and manage security alerts for the Google Workspace domain. Alerts cover threats like phishing, malware, suspicious login activity, and policy violations. Supports listing, retrieving, acknowledging alerts, and managing alert feedback and metadata. Requires a service account with domain-wide delegation, so the tool is implemented but not registered while the integration only offers user OAuth (see Authentication).
 
 ### Data Transfer
 

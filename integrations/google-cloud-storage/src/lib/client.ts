@@ -1,4 +1,5 @@
-import { createAxios } from 'slates';
+import { Buffer } from 'node:buffer';
+import { createApiServiceError, createAxios } from 'slates';
 
 export interface ClientConfig {
   token: string;
@@ -133,12 +134,30 @@ export class Client {
     return response.data;
   }
 
-  async downloadObject(bucketName: string, objectName: string) {
+  async downloadObject(bucketName: string, objectName: string): Promise<Buffer> {
     let response = await this.api.get(
       `/b/${encodeURIComponent(bucketName)}/o/${encodeURIComponent(objectName)}`,
-      { params: { alt: 'media' }, responseType: 'text' }
+      { params: { alt: 'media' }, responseType: 'arraybuffer' }
     );
-    return response.data;
+
+    if (Buffer.isBuffer(response.data)) {
+      return Buffer.from(response.data);
+    }
+    if (response.data instanceof ArrayBuffer) {
+      return Buffer.from(response.data);
+    }
+    if (ArrayBuffer.isView(response.data)) {
+      return Buffer.from(
+        response.data.buffer,
+        response.data.byteOffset,
+        response.data.byteLength
+      );
+    }
+
+    throw createApiServiceError(
+      'Cloud Storage returned an invalid binary response for the requested object.',
+      { reason: 'google_cloud_storage_download_content_invalid' }
+    );
   }
 
   async uploadObject(

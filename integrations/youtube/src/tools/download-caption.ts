@@ -20,7 +20,7 @@ export let downloadCaption = SlateTool.create(spec, {
   name: 'Download Caption',
   key: 'download_caption',
   description:
-    'Download an editable caption track as a Slate attachment, optionally converting its format or translating its language.',
+    'Download an editable caption track as a downloadable file, optionally converting its format or translating its language.',
   instructions: [
     'The authenticated user must have permission to edit the video; public caption tracks cannot be downloaded through this owner-only API.',
     'Use list_captions on an owned video to discover caption track IDs.'
@@ -49,10 +49,9 @@ export let downloadCaption = SlateTool.create(spec, {
       captionId: z.string().describe('Downloaded caption track ID'),
       format: z.string().optional().describe('Requested caption format'),
       language: z.string().optional().describe('Requested translation language'),
-      fileName: z.string().describe('Suggested attachment file name'),
-      mimeType: z.string().describe('Attachment MIME type returned by YouTube'),
-      sizeBytes: z.number().describe('Downloaded caption byte length'),
-      attachmentCount: z.number().describe('Number of returned Slate attachments')
+      fileName: z.string().describe('Suggested downloadable file name'),
+      mimeType: z.string().describe('Downloaded file MIME type returned by YouTube'),
+      sizeBytes: z.number().describe('Downloaded caption byte length')
     })
   )
   .handleInvocation(async ctx => {
@@ -73,13 +72,12 @@ export let downloadCaption = SlateTool.create(spec, {
         language: ctx.input.language,
         fileName,
         mimeType: result.mimeType,
-        sizeBytes: result.content.length,
-        attachmentCount: 1
+        sizeBytes: result.content.length
       },
       attachments: [
         createBase64Attachment(result.content.toString('base64'), result.mimeType)
       ],
-      message: `Downloaded caption track \`${ctx.input.captionId}\` as an attachment.`
+      message: `Downloaded caption track \`${ctx.input.captionId}\` as a file.`
     };
   })
   .build();

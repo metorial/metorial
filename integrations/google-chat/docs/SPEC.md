@@ -18,7 +18,7 @@ Google Chat is Google Workspace's team messaging service. This integration expos
 | `manage_reaction` | User OAuth | Create, list, and delete reactions |
 | `find_direct_message` | User OAuth or Chat app | `spaces.findDirectMessage` |
 | `get_attachment` | Chat app only | `spaces.messages.attachments.get` metadata |
-| `download_attachment` | User OAuth or Chat app | `media.download`; bytes are returned only as a Slate attachment |
+| `download_attachment` | User OAuth or Chat app | `media.download`; returns a downloadable file |
 | `upload_attachment` | User OAuth or Chat app | Multipart `media.upload`; returns an upload token, not a posted message |
 | `list_space_events` | User OAuth | List events or get one event by ID |
 
@@ -58,7 +58,10 @@ When the search endpoint fails with HTTP 403/`PERMISSION_DENIED` or 404 (tenant 
 
 `upload_attachment` sends multipart bytes to the upload endpoint and returns `attachmentUploadToken` and, when available, the attachment data resource name. To post the file, call `send_message` for the same space and pass the opaque upload token—not the resource name—in `attachmentUploadTokens`. The upload alone does not create a visible Chat message, and the message target must be the same space used for the upload.
 
-`get_attachment` reads metadata with app authentication. `download_attachment` returns Google Chat-hosted bytes through a Slate attachment and only metadata in structured output. Attachments whose source is `DRIVE_FILE` belong to the Google Drive download flow.
+`get_attachment` reads metadata with app authentication. `download_attachment`
+returns Google Chat-hosted bytes as a downloadable file and only file metadata
+in structured output. Attachments whose source is `DRIVE_FILE` belong to the
+Google Drive download flow.
 
 ## Configuration and resource names
 

@@ -1,0 +1,16 @@
+{
+  "name": "@booble/super-booble-3",
+  "description": "Use one G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ OAuth connection for G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Cloud infrastructure, analytics, storage, functions, speech, vision, address validation, and Firebase workflows.",
+  "categories": ["apis-and-http-requests", "data-and-analytics", "code-execution"],
+  "skills": [
+    "manage Compute Engine resources",
+    "query and administer BigQuery",
+    "manage Cloud Storage",
+    "deploy and monitor Cloud Functions",
+    "transcribe and synthesize speech",
+    "analyze images",
+    "validate postal addresses",
+    "manage Firebase services"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"
+}

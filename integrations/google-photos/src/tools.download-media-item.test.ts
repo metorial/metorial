@@ -57,8 +57,7 @@ describe('download_media_item tool behavior', () => {
       fileName: 'holiday_script.jpg',
       mimeType: 'image/jpeg',
       mediaType: 'photo',
-      sizeBytes: 4,
-      attachmentCount: 1
+      sizeBytes: 4
     });
     expect(result.attachments).toEqual([
       {

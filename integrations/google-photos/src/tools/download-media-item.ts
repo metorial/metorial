@@ -56,17 +56,17 @@ export let downloadMediaItem = SlateTool.create(spec, {
   name: 'Download Media Item',
   key: 'download_media_item',
   description:
-    'Download the bytes of one app-created Google Photos Library API media item and return them only as a Slate attachment.',
+    'Download one app-created Google Photos Library API media item as a downloadable file.',
   instructions: [
     'Pass a Library API media item ID returned by get_media_item, search_media_items, or upload_media.',
     'The tool gets current media metadata first, then immediately downloads the temporary base URL with =d for a photo or =dv for a READY video.',
-    'Use the attachment for the file contents; output contains metadata only.'
+    'Use the downloadable file for the contents; structured output contains metadata only.'
   ],
   constraints: [
     'The Library API can retrieve only media items created by this app. Picker API selections use separate IDs and access rules and are not supported by this tool.',
     'Google Photos Library API base URLs remain valid for 60 minutes. This tool requests a fresh base URL for each invocation and does not expose it.',
     'Videos must have finished processing with READY status before they can be downloaded.',
-    `Downloads are limited to ${MAX_GOOGLE_PHOTOS_DOWNLOAD_BYTES} bytes per attachment.`
+    `Downloads are limited to ${MAX_GOOGLE_PHOTOS_DOWNLOAD_BYTES} bytes per file.`
   ],
   tags: {
     readOnly: true,
@@ -86,11 +86,10 @@ export let downloadMediaItem = SlateTool.create(spec, {
   .output(
     z.object({
       mediaItemId: z.string().describe('Downloaded Google Photos media item ID'),
-      fileName: z.string().describe('Safe suggested attachment file name'),
-      mimeType: z.string().describe('Validated MIME type of the downloaded attachment'),
+      fileName: z.string().describe('Safe suggested downloadable file name'),
+      mimeType: z.string().describe('Validated MIME type of the downloaded file'),
       mediaType: z.enum(['photo', 'video']).describe('Downloaded media kind'),
-      sizeBytes: z.number().int().positive().describe('Downloaded byte length'),
-      attachmentCount: z.literal(1).describe('Number of returned Slate attachments')
+      sizeBytes: z.number().int().positive().describe('Downloaded byte length')
     })
   )
   .handleInvocation(async ctx => {
@@ -108,13 +107,12 @@ export let downloadMediaItem = SlateTool.create(spec, {
         fileName,
         mimeType: downloaded.mimeType,
         mediaType: downloaded.mediaType,
-        sizeBytes: downloaded.content.length,
-        attachmentCount: 1 as const
+        sizeBytes: downloaded.content.length
       },
       attachments: [
         createBase64Attachment(downloaded.content.toString('base64'), downloaded.mimeType)
       ],
-      message: `Downloaded **${fileName}** (${downloaded.content.length} bytes) and returned it as an attachment.`
+      message: `Downloaded **${fileName}** (${downloaded.content.length} bytes).`
     };
   })
   .build();

@@ -1,0 +1,18 @@
+{
+  "name": "@booble/super-booble-1",
+  "description": "Work across Gmail, G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Drive, Drive-backed G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Docs and Sheets operations, and G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Chat through one G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ OAuth connection. Search and manage mail and contacts, organize and share Drive files, import and list native G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Docs, delete spreadsheets, and manage Chat spaces, messages, members, reactions, and downloadable uploads.",
+  "categories": ["email-and-messaging", "document-processing"],
+  "skills": [
+    "send and search Gmail messages",
+    "manage Gmail drafts, labels, threads, and settings",
+    "find G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ contacts",
+    "upload, organize, share, and export Drive files",
+    "manage Drive permissions, comments, revisions, and shared drives",
+    "create, replace, and list native G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Docs",
+    "delete G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Sheets spreadsheets",
+    "manage G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Chat spaces, messages, members, and reactions",
+    "download and upload G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Chat files"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg",
+  "version": "0.3.0"
+}
