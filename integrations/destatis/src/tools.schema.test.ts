@@ -1318,8 +1318,7 @@ describe('Destatis marketplace metadata', () => {
         'download presentation tables as XLSX',
         'download linearized cube data'
       ],
-      logoUrl:
-        'https://www.destatis.de/SiteGlobals/Frontend/Images/logo.svg?__blob=normal&v=11'
+      logoUrl: 'https://provider-logos.metorial-cdn.com/destatis-de.svg'
     });
     expect(typeof metadata.description).toBe('string');
     expect(String(metadata.description)).toMatch(/five read-only tools/i);
