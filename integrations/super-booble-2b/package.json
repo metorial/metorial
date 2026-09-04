@@ -21,5 +21,17 @@
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
+  "peerDependencies": {
+    "@slates/oauth-google": "1.0.0",
+    "@slates/super-google-tools": "1.0.0-rc.1"
+  },
+  "peerDependenciesMeta": {
+    "@slates/oauth-google": {
+      "optional": true
+    },
+    "@slates/super-google-tools": {
+      "optional": true
+    }
+  },
   "version": "0.2.2"
 }

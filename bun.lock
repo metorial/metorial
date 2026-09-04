@@ -12369,6 +12369,14 @@
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
+      "peerDependencies": {
+        "@slates/oauth-google": "1.0.0",
+        "@slates/super-google-tools": "1.0.0-rc.1",
+      },
+      "optionalPeers": [
+        "@slates/oauth-google",
+        "@slates/super-google-tools",
+      ],
     },
     "integrations/super-booble-2a": {
       "name": "@slates-integrations/super-booble-2a",
@@ -12394,6 +12402,14 @@
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
+      "peerDependencies": {
+        "@slates/oauth-google": "1.0.0",
+        "@slates/super-google-tools": "1.0.0-rc.1",
+      },
+      "optionalPeers": [
+        "@slates/oauth-google",
+        "@slates/super-google-tools",
+      ],
     },
     "integrations/super-booble-2b": {
       "name": "@slates-integrations/super-booble-2b",
@@ -12412,6 +12428,14 @@
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
+      "peerDependencies": {
+        "@slates/oauth-google": "1.0.0",
+        "@slates/super-google-tools": "1.0.0-rc.1",
+      },
+      "optionalPeers": [
+        "@slates/oauth-google",
+        "@slates/super-google-tools",
+      ],
     },
     "integrations/super-booble-3": {
       "name": "@slates-integrations/super-booble-3",
@@ -12434,6 +12458,14 @@
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
+      "peerDependencies": {
+        "@slates/oauth-google": "1.0.0",
+        "@slates/super-google-tools": "1.0.0-rc.1",
+      },
+      "optionalPeers": [
+        "@slates/oauth-google",
+        "@slates/super-google-tools",
+      ],
     },
     "integrations/superchat": {
       "name": "@slates-integrations/superchat",
