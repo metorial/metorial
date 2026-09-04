@@ -5930,6 +5930,19 @@
         "typescript": "^5",
       },
     },
+    "integrations/granola": {
+      "name": "@slates-integrations/granola",
+      "version": "0.3.0",
+      "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.17",
+        "zod": "^4.2",
+      },
+      "devDependencies": {
+        "typescript": "^5",
+      },
+    },
     "integrations/graphhopper": {
       "name": "@slates-integrations/graphhopper",
       "version": "0.2.0-rc.6",
@@ -16283,6 +16296,8 @@
     "@slates-integrations/grafana": ["@slates-integrations/grafana@workspace:integrations/grafana"],
 
     "@slates-integrations/grafbase": ["@slates-integrations/grafbase@workspace:integrations/grafbase"],
+
+    "@slates-integrations/granola": ["@slates-integrations/granola@workspace:integrations/granola"],
 
     "@slates-integrations/graphhopper": ["@slates-integrations/graphhopper@workspace:integrations/graphhopper"],
 
