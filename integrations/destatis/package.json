@@ -4,7 +4,6 @@
   "type": "module",
   "scripts": {
     "build": "bunx @vercel/ncc build src/index.ts -o dist -m -s",
-    "test": "vitest run --config vitest.config.ts --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -15,10 +14,7 @@
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.14",
-    "typescript": "^5",
-    "vitest": "^3.1.2",
-    "xlsx": "^0.18.5"
+    "typescript": "^5"
   },
   "version": "0.1.0-rc.1"
 }
