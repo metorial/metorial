@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/companies-house",
+  "description": "Search and inspect the United Kingdom public company register. Find companies and officers, review company profiles and officer appointments, check disqualifications and permissions to act, inspect filing history, retrieve filing documents, and review charges, insolvency cases, people with significant control, and significant-control statements.",
+  "categories": ["apis-and-http-requests", "document-processing", "legal-and-compliance"],
+  "skills": [
+    "search the UK company register",
+    "inspect company profiles",
+    "find company officers",
+    "review officer appointments",
+    "check officer disqualifications",
+    "review company filing history",
+    "download filing documents",
+    "inspect registered company charges",
+    "review company insolvency cases",
+    "identify people with significant control"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/companies-house-uk.svg"
+}
