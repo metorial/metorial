@@ -97,8 +97,7 @@ export let auth = SlateAuth.create()
         title: 'Offline',
         description:
           'Request a refresh token. Use only when the Typeform app token expiration period is set to one week; unlimited-token apps must leave this unchecked.',
-        scope: 'offline',
-        defaultChecked: false
+        scope: 'offline'
       }
     ],
 

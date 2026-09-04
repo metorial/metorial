@@ -41,8 +41,7 @@ export let mapAuthMethod = <ConfigType extends {}, AuthType extends {}>(
       ? m.scopes.map(s => ({
           id: s.scope,
           title: s.title,
-          description: s.description,
-          defaultChecked: s.defaultChecked
+          description: s.description
         }))
       : undefined,
 

@@ -1,15 +1,24 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { getNotionBlockTree } from '../lib/block-tree';
 import { NotionClient } from '../lib/client';
+import { requireNotionPageId } from '../lib/id';
 import { spec } from '../spec';
 
 export let getPage = SlateTool.create(spec, {
   name: 'Get Page',
   key: 'get_page',
-  description: `Retrieve a Notion page by its ID, including all properties, metadata, and optionally its content blocks.
-Use this to read a page's title, properties, timestamps, parent info, icon, cover, and block content.`,
+  description: `Retrieve a Notion page by page ID or URL, including its properties, metadata, and optionally its complete nested block content.
+Use this to read a known page. If you only know its title, call Search first and pass the matching page result's id.`,
+  instructions: [
+    'Use the pageId returned by Create Page, or the id of a page object returned by Search or Query Database. Never invent a page ID.',
+    'If the page is unknown, call Search with filterType "page", then pass the matching results[].id to this tool.',
+    'A Notion page URL or compact 32-character page ID is accepted and normalized automatically. For URLs containing ?v=, the v value is a database view ID, not a page ID.',
+    'A 404 object_not_found response means the page ID is wrong or the page has not been shared with the connected Notion integration. Search for an accessible page or ask the user to share it with the connection.'
+  ],
   constraints: [
-    'Page properties return a maximum of 25 references per property. Use the page property endpoint for larger datasets.'
+    'Page properties return a maximum of 25 references per property. Use the page property endpoint for larger datasets.',
+    'With includeContent enabled, nested child blocks are fetched recursively and large pages may require many Notion API requests.'
   ],
   tags: {
     destructive: false,
@@ -18,12 +27,16 @@ Use this to read a page's title, properties, timestamps, parent info, icon, cove
 })
   .input(
     z.object({
-      pageId: z.string().describe('ID of the page to retrieve'),
+      pageId: z
+        .string()
+        .describe(
+          'Notion page UUID, compact 32-character page ID, or page URL. Prefer pageId from Create Page or results[].id from Search or Query Database.'
+        ),
       includeContent: z
         .boolean()
         .optional()
         .default(false)
-        .describe('Whether to also fetch the page content blocks')
+        .describe('Whether to recursively fetch all top-level and nested page content blocks')
     })
   )
   .output(
@@ -42,23 +55,20 @@ Use this to read a page's title, properties, timestamps, parent info, icon, cove
       blocks: z
         .array(z.any())
         .optional()
-        .describe('Page content blocks (if includeContent is true)')
+        .describe(
+          'Complete page block tree when includeContent is true; blocks with children include a nested children array'
+        )
     })
   )
   .handleInvocation(async ctx => {
     let client = new NotionClient({ token: ctx.auth.token });
+    let pageId = requireNotionPageId(ctx.input.pageId);
 
-    let page = await client.getPage(ctx.input.pageId);
+    let page = await client.getPage(pageId);
 
     let blocks: any[] | undefined;
     if (ctx.input.includeContent) {
-      let result = await client.getBlockChildren(ctx.input.pageId);
-      blocks = result.results;
-
-      while (result.has_more && result.next_cursor) {
-        result = await client.getBlockChildren(ctx.input.pageId, result.next_cursor);
-        blocks.push(...result.results);
-      }
+      blocks = await getNotionBlockTree(client, pageId);
     }
 
     let title = extractTitle(page.properties);

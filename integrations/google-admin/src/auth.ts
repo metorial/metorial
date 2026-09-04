@@ -161,6 +161,9 @@ export let auth = SlateAuth.create()
         description: 'View usage reports for apps and entities',
         scope: googleAdminScopes.adminReportsUsageReadonly
       },
+      // apps.alerts is deliberately not requested: the Alert Center API is service-account
+      // (domain-wide delegation) only, and the Google Auth Platform rejects the scope as
+      // invalid for a user OAuth client.
       {
         title: 'Licensing',
         description: 'Manage Google Workspace product licenses',

@@ -3,37 +3,16 @@ import { z } from 'zod';
 import { Client } from '../lib/client';
 import { asanaServiceError } from '../lib/errors';
 import { spec } from '../spec';
+import {
+  formatCustomField,
+  formatEnumOption,
+  manageCustomFieldsOutputSchema
+} from './custom-field-format';
 
 let enumOptionInputSchema = z.object({
   name: z.string(),
   color: z.string().optional(),
   enabled: z.boolean().optional()
-});
-
-let customFieldSchema = z.object({
-  customFieldId: z.string(),
-  name: z.string().optional(),
-  type: z.string().optional(),
-  resourceSubtype: z.string().optional(),
-  description: z.string().nullable().optional(),
-  enumOptions: z.array(z.any()).optional(),
-  precision: z.number().nullable().optional(),
-  format: z.string().nullable().optional(),
-  currencyCode: z.string().nullable().optional(),
-  hasNotificationsEnabled: z.boolean().optional()
-});
-
-let formatCustomField = (field: any) => ({
-  customFieldId: field.gid,
-  name: field.name,
-  type: field.type,
-  resourceSubtype: field.resource_subtype,
-  description: field.description,
-  enumOptions: field.enum_options,
-  precision: field.precision,
-  format: field.format,
-  currencyCode: field.currency_code,
-  hasNotificationsEnabled: field.has_notifications_enabled
 });
 
 let requireField = <T>(value: T | undefined | null, label: string, action: string): T => {
@@ -126,14 +105,7 @@ export let manageCustomFields = SlateTool.create(spec, {
       limit: z.number().optional().describe('Maximum custom fields to return for list action.')
     })
   )
-  .output(
-    z.object({
-      customFields: z.array(customFieldSchema).optional(),
-      customField: customFieldSchema.optional(),
-      enumOption: z.any().optional(),
-      customFieldCount: z.number().optional()
-    })
-  )
+  .output(manageCustomFieldsOutputSchema)
   .handleInvocation(async ctx => {
     let client = new Client({ token: ctx.auth.token });
 
@@ -210,10 +182,12 @@ export let manageCustomFields = SlateTool.create(spec, {
         ctx.input.action
       );
       let name = requireField(ctx.input.enumOptionName, 'enumOptionName', ctx.input.action);
-      let enumOption = await client.createEnumOption(customFieldId, {
-        name,
-        color: ctx.input.enumOptionColor
-      });
+      let enumOption = formatEnumOption(
+        await client.createEnumOption(customFieldId, {
+          name,
+          color: ctx.input.enumOptionColor
+        })
+      );
 
       return {
         output: { enumOption },
@@ -232,7 +206,7 @@ export let manageCustomFields = SlateTool.create(spec, {
       throw asanaServiceError('Provide at least one enum option property to update.');
     }
 
-    let enumOption = await client.updateEnumOption(enumOptionId, enumData);
+    let enumOption = formatEnumOption(await client.updateEnumOption(enumOptionId, enumData));
 
     return {
       output: { enumOption },

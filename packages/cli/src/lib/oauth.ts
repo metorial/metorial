@@ -33,10 +33,7 @@ export let chooseScopes = async (
     choices: authMethod.scopes.map((scope: any) => ({
       name: `${scope.title} (${scope.id})`,
       value: scope.id,
-      checked:
-        initialScopes.length > 0
-          ? initialScopes.includes(scope.id)
-          : (scope.defaultChecked ?? true)
+      checked: initialScopes.length > 0 ? initialScopes.includes(scope.id) : true
     }))
   })) as string[];
 };
@@ -44,6 +41,9 @@ export let chooseScopes = async (
 export let printBrowserUrl = (url: string) => {
   console.log(`Open this URL in your browser:\n${url}`);
 };
+
+export let getOAuthCallbackCode = (params: URLSearchParams) =>
+  params.get('code') ?? params.get('oauth_verifier');
 
 export let createOAuthCallbackListener = async () => {
   return new Promise<{
@@ -62,7 +62,7 @@ export let createOAuthCallbackListener = async () => {
     let server = createServer((req, res) => {
       try {
         let url = new URL(req.url ?? '/', 'http://127.0.0.1');
-        let code = url.searchParams.get('code');
+        let code = getOAuthCallbackCode(url.searchParams);
         let state = url.searchParams.get('state');
         let oauthError = url.searchParams.get('error');
         let oauthErrorDescription = url.searchParams.get('error_description');

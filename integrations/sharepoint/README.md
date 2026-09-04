@@ -8,6 +8,8 @@ When registering the OAuth app in Microsoft Entra ID for local CLI auth, use `ht
 
 SharePoint uses both Microsoft Graph and SharePoint REST APIs. Graph-backed tools use a Graph access token, while SharePoint REST-backed tools such as site user lookup require a token for the tenant SharePoint host.
 
+Custom Microsoft Entra applications must configure delegated permissions for both API resources. In addition to the Microsoft Graph permissions shown during connection setup, add the Office 365 SharePoint Online delegated `AllSites.Manage` permission and grant tenant consent when required. Microsoft Graph `Sites.Manage.All` does not replace SharePoint `AllSites.Manage` because access tokens are issued for a specific API resource. Reconnect SharePoint after adding or changing either resource's permissions.
+
 ## Tools
 
 ### Get Content Types

@@ -38,7 +38,9 @@ Results are paginated; use the cursor to fetch subsequent pages.`,
     z.object({
       results: z
         .array(z.record(z.string(), z.any()))
-        .describe('Array of page objects matching the query'),
+        .describe(
+          "Page objects matching the query. Pass a result object's id as pageId to Get Page or Update Page."
+        ),
       hasMore: z.boolean().describe('Whether more results are available'),
       nextCursor: z.string().nullable().describe('Cursor for the next page of results')
     })

@@ -69,13 +69,11 @@ export let auth = SlateAuth.create()
       {
         title: 'Read Variables',
         description: 'Read variables (Enterprise only)',
-        defaultChecked: false,
         scope: 'file_variables:read'
       },
       {
         title: 'Write Variables',
         description: 'Write variables/collections (Enterprise only)',
-        defaultChecked: false,
         scope: 'file_variables:write'
       },
       {
@@ -86,7 +84,6 @@ export let auth = SlateAuth.create()
       {
         title: 'Library Analytics',
         description: 'Read design system analytics (Enterprise only)',
-        defaultChecked: false,
         scope: 'library_analytics:read'
       },
       {

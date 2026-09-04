@@ -165,27 +165,25 @@ describe('google-chat provider contract', () => {
     }
   });
 
-  it('exposes exact OAuth consent defaults and Chat app auth capabilities', async () => {
+  it('exposes the exact OAuth consent scope list and Chat app auth capabilities', async () => {
     let client = createLocalSlateTestClient({ slate: provider });
     let oauth = await client.getAuthMethod('oauth');
     expect(oauth.authenticationMethod.type).toBe('auth.oauth');
     expect(oauth.authenticationMethod.capabilities.handleTokenRefresh?.enabled).toBe(true);
     expect(oauth.authenticationMethod.capabilities.getProfile?.enabled).toBe(true);
-    expect(
-      (oauth.authenticationMethod.scopes ?? []).map(scope => [scope.id, scope.defaultChecked])
-    ).toEqual([
-      [googleChatScopes.messages, true],
-      [googleChatScopes.messagesReadonly, undefined],
-      [googleChatScopes.messagesCreate, undefined],
-      [googleChatScopes.spaces, undefined],
-      [googleChatScopes.spacesReadonly, undefined],
-      [googleChatScopes.delete, undefined],
-      [googleChatScopes.memberships, undefined],
-      [googleChatScopes.membershipsReadonly, undefined],
-      [googleChatScopes.membershipsApp, undefined],
-      [googleChatScopes.messageReactions, undefined],
-      [googleChatScopes.userInfoEmail, true],
-      [googleChatScopes.userInfoProfile, true]
+    expect((oauth.authenticationMethod.scopes ?? []).map(scope => scope.id)).toEqual([
+      googleChatScopes.messages,
+      googleChatScopes.messagesReadonly,
+      googleChatScopes.messagesCreate,
+      googleChatScopes.spaces,
+      googleChatScopes.spacesReadonly,
+      googleChatScopes.delete,
+      googleChatScopes.memberships,
+      googleChatScopes.membershipsReadonly,
+      googleChatScopes.membershipsApp,
+      googleChatScopes.messageReactions,
+      googleChatScopes.userInfoEmail,
+      googleChatScopes.userInfoProfile
     ]);
 
     let serviceAccount = await client.getAuthMethod('service_account');

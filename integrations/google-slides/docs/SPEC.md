@@ -44,7 +44,7 @@ Create new presentations and retrieve the full structure of existing presentatio
 
 ### Slide Thumbnails
 
-Generate a PNG thumbnail of the latest version of a slide page with Google's SMALL (target width 200 px), MEDIUM (800 px), or LARGE (1600 px) size preset. The Slides API returns a requester-tagged content URL with a default lifetime of 30 minutes; the integration downloads that URL immediately without forwarding the OAuth bearer token, discards the temporary URL, and returns the image bytes only through a Slate attachment. Structured output contains page, pixel-dimension, MIME-type, file-name, and byte-size metadata only.
+Generate a PNG thumbnail of the latest version of a slide page with Google's SMALL (target width 200 px), MEDIUM (800 px), or LARGE (1600 px) size preset. The Slides API returns a requester-tagged content URL with a default lifetime of 30 minutes; the integration downloads that URL immediately without forwarding the OAuth bearer token, discards the temporary URL, and returns a downloadable PNG file. Structured output contains page, pixel-dimension, MIME-type, file-name, and byte-size metadata only.
 
 ### Slide Creation and Manipulation
 

@@ -108,7 +108,7 @@ describe('YouTube Phase 2 tool behavior', () => {
     });
   });
 
-  it('returns caption bytes only through a Slate attachment', async () => {
+  it('returns caption bytes only through a downloadable file', async () => {
     clientMocks.downloadCaption.mockResolvedValue({
       content: Buffer.from('WEBVTT'),
       mimeType: 'application/octet-stream'
@@ -126,8 +126,7 @@ describe('YouTube Phase 2 tool behavior', () => {
       language: undefined,
       fileName: 'youtube-caption-caption____1.vtt',
       mimeType: 'application/octet-stream',
-      sizeBytes: 6,
-      attachmentCount: 1
+      sizeBytes: 6
     });
     expect(result.attachments).toEqual([
       {

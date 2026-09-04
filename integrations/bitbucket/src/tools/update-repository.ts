@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let updateRepositoryTool = SlateTool.create(spec, {
   name: 'Update Repository',
   key: 'update_repository',
-  description: `Update repository settings (issue tracker, wiki, fork policy, project, privacy, language, name, description). Omit a field to leave it unchanged.`
+  description: `Update repository settings (wiki, fork policy, project, privacy, language, name, description). Omit a field to leave it unchanged.`
 })
   .input(
     z.object({
@@ -21,7 +21,6 @@ export let updateRepositoryTool = SlateTool.create(spec, {
         .enum(['allow_forks', 'no_public_forks', 'no_forks'])
         .optional()
         .describe('Fork policy'),
-      hasIssues: z.boolean().optional().describe('Enable or disable the issue tracker'),
       hasWiki: z.boolean().optional().describe('Enable or disable the wiki')
     })
   )
@@ -54,9 +53,6 @@ export let updateRepositoryTool = SlateTool.create(spec, {
     }
     if (ctx.input.forkPolicy !== undefined) {
       body.fork_policy = ctx.input.forkPolicy;
-    }
-    if (ctx.input.hasIssues !== undefined) {
-      body.has_issues = ctx.input.hasIssues;
     }
     if (ctx.input.hasWiki !== undefined) {
       body.has_wiki = ctx.input.hasWiki;

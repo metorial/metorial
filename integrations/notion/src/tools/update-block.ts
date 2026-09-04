@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { NotionClient } from '../lib/client';
+import { normalizeNotionBlockUpdateContent } from '../lib/rich-text';
 import { spec } from '../spec';
 
 export let updateBlock = SlateTool.create(spec, {
@@ -36,10 +37,9 @@ Can also be used to archive (soft-delete) a block by setting archived to true.`,
   .handleInvocation(async ctx => {
     let client = new NotionClient({ token: ctx.auth.token });
 
-    let updateData: Record<string, any> = {};
-    if (ctx.input.blockContent) {
-      Object.assign(updateData, ctx.input.blockContent);
-    }
+    let updateData: Record<string, any> = ctx.input.blockContent
+      ? normalizeNotionBlockUpdateContent(ctx.input.blockContent)
+      : {};
     if (ctx.input.archived !== undefined) {
       updateData.archived = ctx.input.archived;
     }

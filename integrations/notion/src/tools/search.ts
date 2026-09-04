@@ -8,6 +8,10 @@ export let search = SlateTool.create(spec, {
   key: 'search',
   description: `Search across all pages and databases shared with the integration by title.
 Returns matching pages and databases with their metadata. Best suited for finding resources by name rather than exhaustive enumeration.`,
+  instructions: [
+    'When searching for a page to read or update, use filterType "page" and pass the matching result object\'s id to Get Page or Update Page.',
+    "When searching for a database, pass the matching database result object's id to Get Database or Query Database. Do not use a database view ID from a Notion URL."
+  ],
   constraints: [
     'Search is not guaranteed to return all matching resources.',
     'Results are limited to resources the integration has been given access to.'
@@ -43,7 +47,9 @@ Returns matching pages and databases with their metadata. Best suited for findin
     z.object({
       results: z
         .array(z.record(z.string(), z.any()))
-        .describe('Array of matching page and database objects'),
+        .describe(
+          "Matching page and database objects. Use a page result's id as pageId for Get Page; use a database result's id as databaseId."
+        ),
       hasMore: z.boolean().describe('Whether more results are available'),
       nextCursor: z
         .string()

@@ -17,5 +17,5 @@
     "@slates/test": "1.0.0-rc.14",
     "typescript": "^5"
   },
-  "version": "0.2.0-rc.16"
+  "version": "0.2.0"
 }

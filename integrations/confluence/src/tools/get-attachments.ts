@@ -1,7 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { confluenceServiceError } from '../lib/errors';
-import { createClient } from '../lib/helpers';
+import { createClient, resolveContentIdAlias } from '../lib/helpers';
 import { spec } from '../spec';
 
 let attachmentOutputSchema = z.object({
@@ -54,6 +54,12 @@ export let getAttachments = SlateTool.create(spec, {
         .optional()
         .describe('The page ID to list attachments for. Use contentId for new calls.'),
       contentId: z.string().optional().describe('The page or blog post ID'),
+      id: z
+        .string()
+        .optional()
+        .describe(
+          'Compatibility alias for contentId, used only when other ID fields are omitted.'
+        ),
       contentType: z
         .enum(['page', 'blogpost'])
         .optional()
@@ -75,9 +81,9 @@ export let getAttachments = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = createClient(ctx.auth, ctx.config);
-    let contentId = ctx.input.contentId || ctx.input.pageId;
+    let contentId = resolveContentIdAlias(ctx.input);
     if (!contentId) {
-      throw confluenceServiceError('contentId or pageId is required to list attachments.');
+      throw confluenceServiceError('Provide a contentId, pageId, or id to list attachments.');
     }
 
     let response = await client.getContentAttachments(contentId, {

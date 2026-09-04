@@ -10,10 +10,7 @@ export class TrelloClient {
     this.apiKey = config.apiKey;
     this.token = config.token;
     this.http = createAxios({
-      baseURL: 'https://api.trello.com/1',
-      headers: {
-        'Content-Type': 'application/json'
-      }
+      baseURL: 'https://api.trello.com/1'
     });
     this.http.interceptors.response.use(
       response => response,

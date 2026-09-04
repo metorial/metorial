@@ -272,6 +272,71 @@ describe('JenkinsClient log reads', () => {
   });
 });
 
+describe('JenkinsClient job listing', () => {
+  it('stops recursive traversal after collecting the requested filtered matches', async () => {
+    let client = new JenkinsClient({
+      auth: {
+        baseUrl: 'http://jenkins.example',
+        username: 'user',
+        apiToken: 'token'
+      }
+    });
+    let requestedPaths: string[] = [];
+    (
+      client as unknown as {
+        axios: {
+          get: (path: string) => Promise<{ data: Record<string, unknown> }>;
+        };
+      }
+    ).axios = {
+      get: async path => {
+        requestedPaths.push(path);
+        if (path === '/api/json') {
+          return {
+            data: {
+              jobs: [
+                { name: 'unrelated', fullName: 'unrelated', _class: 'hudson.model.Job' },
+                {
+                  name: 'first-folder',
+                  fullName: 'first-folder',
+                  _class: 'com.cloudbees.hudson.plugins.folder.Folder'
+                },
+                {
+                  name: 'second-folder',
+                  fullName: 'second-folder',
+                  _class: 'com.cloudbees.hudson.plugins.folder.Folder'
+                }
+              ]
+            }
+          };
+        }
+
+        return {
+          data: {
+            jobs: [
+              { name: 'target-one', fullName: 'first-folder/target-one' },
+              { name: 'target-two', fullName: 'first-folder/target-two' }
+            ]
+          }
+        };
+      }
+    };
+
+    let result = await client.listJobsWithStatus({
+      recursive: true,
+      nameContains: 'target',
+      maxItems: 2
+    });
+
+    expect(requestedPaths).toEqual(['/api/json', '/job/first-folder/api/json']);
+    expect(result.jobs.map(job => job.fullName)).toEqual([
+      'first-folder/target-one',
+      'first-folder/target-two'
+    ]);
+    expect(result.traversalComplete).toBe(false);
+  });
+});
+
 describe('JenkinsClient SCM search', () => {
   let createClient = () =>
     new JenkinsClient({

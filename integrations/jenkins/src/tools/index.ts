@@ -13,6 +13,8 @@ import {
   type JenkinsRecord,
   jenkinsValidationError,
   jobFullNameFromInput,
+  jobListingRequestLimit,
+  jobListingRequestTimeoutMs,
   normalizeLimit,
   normalizeSkip,
   resolveMaxLogLines
@@ -1078,6 +1080,11 @@ export let listJobs = readOnlyTool({
     z.object({
       folderFullName: z.string().optional().describe('Folder full name used for listing.'),
       count: z.number().describe('Number of jobs returned.'),
+      traversalComplete: z
+        .boolean()
+        .describe(
+          'Whether Jenkins folder traversal completed. False means the bounded recursive traversal returned a partial result.'
+        ),
       jobs: z.array(jobSummarySchema).describe('Matching Jenkins jobs.')
     })
   )
@@ -1085,14 +1092,18 @@ export let listJobs = readOnlyTool({
     let folderFullName = folderFullNameFromInput(ctx.config, ctx.input.folderFullName);
     let skip = normalizeSkip(ctx.input.skip);
     let limit = normalizeLimit(ctx.input.limit, 10, 10, 'limit');
-    let jobs = await createClient(ctx).listJobs({
+    let listing = await createClient(ctx).listJobsWithStatus({
       folderFullName,
       recursive: ctx.input.recursive,
       maxDepth: ctx.input.maxDepth,
       nameContains: ctx.input.nameContains,
-      includeFolders: ctx.input.includeFolders
+      includeFolders: ctx.input.includeFolders,
+      maxItems: skip + limit,
+      maxRequests: jobListingRequestLimit,
+      requestTimeoutMs: jobListingRequestTimeoutMs,
+      bestEffort: true
     });
-    let outputJobs = jobs.slice(skip, skip + limit).map(job => ({
+    let outputJobs = listing.jobs.slice(skip, skip + limit).map(job => ({
       ...job,
       status: statusFromColor(job.color),
       raw: ctx.input.includeRaw ? job.raw : undefined
@@ -1102,9 +1113,12 @@ export let listJobs = readOnlyTool({
       output: {
         folderFullName,
         count: outputJobs.length,
+        traversalComplete: listing.traversalComplete,
         jobs: outputJobs
       },
-      message: `Listed ${outputJobs.length} Jenkins job${outputJobs.length === 1 ? '' : 's'}.`
+      message: listing.traversalComplete
+        ? `Listed ${outputJobs.length} Jenkins job${outputJobs.length === 1 ? '' : 's'}.`
+        : `Listed ${outputJobs.length} Jenkins job${outputJobs.length === 1 ? '' : 's'} from a partial bounded traversal.`
     };
   })
   .build();

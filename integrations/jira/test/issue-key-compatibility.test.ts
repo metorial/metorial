@@ -3,12 +3,17 @@ import { createLocalSlateTestClient } from '@slates/test';
 import { z } from 'zod';
 
 let jiraClientMocks = {
+  addComment: mock(() => Promise.resolve({})),
   getComments: mock(() => Promise.resolve({})),
   getIssue: mock(() => Promise.resolve({}))
 };
 
 mock.module('../src/lib/client', () => ({
   JiraClient: class {
+    addComment(...args: unknown[]) {
+      return jiraClientMocks.addComment(...args);
+    }
+
     getComments(...args: unknown[]) {
       return jiraClientMocks.getComments(...args);
     }
@@ -47,6 +52,12 @@ let getTool = (key: string) => {
 };
 
 beforeEach(() => {
+  jiraClientMocks.addComment.mockClear();
+  jiraClientMocks.addComment.mockResolvedValue({
+    id: '10002',
+    author: { displayName: 'Example User' },
+    created: '2026-08-24T10:00:00.000Z'
+  });
   jiraClientMocks.getComments.mockClear();
   jiraClientMocks.getComments.mockResolvedValue({
     total: 1,
@@ -161,5 +172,74 @@ describe('Jira issueKey input compatibility', () => {
     await expect(client.invokeTool(toolKey, {})).rejects.toThrow(
       'Provide the issue key or ID in issueIdOrKey.'
     );
+  });
+});
+
+describe('Jira Mender input compatibility', () => {
+  it('accepts a single get_issue expand value and normalizes it for Jira', async () => {
+    let client = createJiraToolTestClient();
+
+    await client.invokeTool('get_issue', {
+      issueIdOrKey: 'TF-7919',
+      expand: 'renderedFields'
+    });
+
+    expect(jiraClientMocks.getIssue).toHaveBeenCalledWith('TF-7919', {
+      fields: undefined,
+      expand: ['renderedFields']
+    });
+  });
+
+  it('accepts commentBody as a legacy add_comment alias', async () => {
+    let client = createJiraToolTestClient();
+
+    let result = await client.invokeTool('add_comment', {
+      issueIdOrKey: 'TF-5832',
+      commentBody: 'Compatibility comment'
+    });
+
+    expect(jiraClientMocks.addComment).toHaveBeenCalledWith('TF-5832', {
+      version: 1,
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Compatibility comment' }]
+        }
+      ]
+    });
+    expect(result.output).toMatchObject({
+      commentId: '10002',
+      issueIdOrKey: 'TF-5832'
+    });
+  });
+
+  it('prefers body when both add_comment body fields are supplied', async () => {
+    let client = createJiraToolTestClient();
+
+    await client.invokeTool('add_comment', {
+      issueIdOrKey: 'TF-5832',
+      body: 'Preferred comment',
+      commentBody: 'Legacy comment'
+    });
+
+    expect(jiraClientMocks.addComment).toHaveBeenCalledWith(
+      'TF-5832',
+      expect.objectContaining({
+        content: [
+          expect.objectContaining({
+            content: [{ type: 'text', text: 'Preferred comment' }]
+          })
+        ]
+      })
+    );
+  });
+
+  it('rejects add_comment calls that omit both body fields', async () => {
+    let client = createJiraToolTestClient();
+
+    await expect(
+      client.invokeTool('add_comment', { issueIdOrKey: 'TF-5832' })
+    ).rejects.toThrow('Provide the comment body in body.');
   });
 });

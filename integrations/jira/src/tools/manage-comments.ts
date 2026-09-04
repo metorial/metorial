@@ -1,7 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { JiraClient } from '../lib/client';
-import { resolveJiraIssueIdOrKey } from '../lib/errors';
+import { jiraServiceError, resolveJiraIssueIdOrKey } from '../lib/errors';
 import { spec } from '../spec';
 
 export let addCommentTool = SlateTool.create(spec, {
@@ -15,7 +15,14 @@ export let addCommentTool = SlateTool.create(spec, {
   .input(
     z.object({
       issueIdOrKey: z.string().describe('The issue key or ID to comment on.'),
-      body: z.any().describe('Comment body as a plain text string or ADF object.')
+      body: z
+        .any()
+        .optional()
+        .describe('Comment body as a plain text string or ADF object. Preferred field.'),
+      commentBody: z
+        .any()
+        .optional()
+        .describe('Legacy alias for body, used only when body is omitted.')
     })
   )
   .output(
@@ -33,7 +40,13 @@ export let addCommentTool = SlateTool.create(spec, {
       refreshToken: ctx.auth.refreshToken
     });
 
-    let body = ctx.input.body;
+    let body = ctx.input.body !== undefined ? ctx.input.body : ctx.input.commentBody;
+    if (body === undefined) {
+      throw jiraServiceError(
+        'Provide the comment body in body. The legacy commentBody alias is also accepted.'
+      );
+    }
+
     if (typeof body === 'string') {
       body = {
         version: 1,

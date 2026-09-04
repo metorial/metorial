@@ -1,16 +1,12 @@
 # <img src="https://provider-logos.metorial-cdn.com/bitbucket.svg" height="20"> Bitbucket
 
-Manage Git repositories, pull requests, and CI/CD pipelines on Bitbucket Cloud. Create, fork, and configure repositories within workspaces and projects. Create, review, approve, merge, and decline pull requests with inline code comments. Browse source code, list commits, and manage branches and tags. Track issues with the built-in issue tracker. Trigger, monitor, and manage Bitbucket Pipelines. List workspace members, configure repository default reviewers and branch restrictions, create and manage repository webhooks, and search code across repositories.
+Manage Git repositories, pull requests, and CI/CD pipelines on Bitbucket Cloud. Create, fork, and configure repositories within workspaces and projects. Create, review, approve, merge, and decline pull requests with inline code comments. Browse source code, list commits, and manage branches and tags. Trigger, monitor, and manage Bitbucket Pipelines. List workspace members, configure repository default reviewers and branch restrictions, create and manage repository webhooks, and search code across repositories.
 
 ## Tools
 
 ### Browse Source
 
 Browse repository source files at a specific revision (branch, tag, or commit hash). Returns directory listings or file contents depending on the path.
-
-### Comment on Issue
-
-Add a comment to an issue in the repository's built-in issue tracker.
 
 ### Comment on Pull Request
 
@@ -19,10 +15,6 @@ Add a comment to a pull request. Supports general comments and inline code comme
 ### Create Commit Status
 
 Create or update a build status on a specific commit. Typically used by CI/CD tools to report build results. The **key** uniquely identifies the status — updating with the same key replaces the previous status.
-
-### Create Issue
-
-Create a new issue in a repository's built-in issue tracker. Set title, content, priority, kind, component, milestone, version, and assignee.
 
 ### Create Pull Request
 
@@ -34,7 +26,7 @@ Create a new Git repository in the configured workspace. Supports setting privac
 
 ### Delete Repository
 
-Permanently delete a repository from the workspace. This action is **irreversible** and removes all repository data including branches, commits, pull requests, and issues.
+Permanently delete a repository from the workspace. This action is **irreversible** and removes all repository data including branches, commits, and pull requests.
 
 ### Fork Repository
 
@@ -51,10 +43,6 @@ Retrieve detailed information about a specific repository including its settings
 ### List Commits
 
 List commits in a repository, optionally filtered by branch. Returns commit hashes, messages, authors, and dates.
-
-### List Issues
-
-List issues from a repository's built-in issue tracker. Filter using Bitbucket's query language for status, priority, assignee, and more.
 
 ### List Pull Requests
 
@@ -98,19 +86,15 @@ List, create, or delete tags in a repository. Use action "list" to browse tags, 
 
 ### Manage Webhooks
 
-List, get, create, update, or delete repository webhooks for Bitbucket events such as pushes, pull request changes, issue changes, and build status changes.
+List, get, create, update, or delete repository webhooks for Bitbucket events such as pushes, pull request changes, and build status changes.
 
 ### Search Code
 
 Search for code across repositories in the workspace. Returns matching file paths and code snippets.
 
-### Update Issue
-
-Update an existing issue's fields including title, content, status, priority, kind, assignee, component, milestone, and version.
-
 ### Update Repository
 
-Update repository settings such as name, description, privacy, language, fork policy, project assignment, and issue/wiki toggles.
+Update repository settings such as name, description, privacy, language, fork policy, project assignment, and the wiki toggle.
 
 ## License
 

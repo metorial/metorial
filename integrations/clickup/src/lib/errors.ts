@@ -54,6 +54,9 @@ let extractClickUpMessage = (error: unknown) => {
 export let clickupServiceError = (message: string) =>
   new ServiceError(badRequestError({ message }));
 
+export let isClickUpNotFoundError = (error: unknown) =>
+  error instanceof ServiceError && error.data.upstreamStatus === 404;
+
 export let clickupApiError = (error: unknown, operation = 'request') => {
   if (error instanceof ServiceError) {
     return error;

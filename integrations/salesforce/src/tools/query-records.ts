@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createSalesforceClient } from '../lib/client';
+import { salesforceServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let queryRecords = SlateTool.create(spec, {
@@ -24,7 +25,16 @@ Example SOQL: \`SELECT Id, Name, Industry FROM Account WHERE Industry = 'Technol
 })
   .input(
     z.object({
-      soql: z.string().describe('The SOQL query string to execute'),
+      soql: z
+        .string()
+        .optional()
+        .describe(
+          'The SOQL query string to execute. Required unless nextRecordsUrl is provided'
+        ),
+      query: z
+        .string()
+        .optional()
+        .describe('Deprecated alias for soql. Prefer soql for new calls'),
       includeDeletedRecords: z
         .boolean()
         .optional()
@@ -57,13 +67,20 @@ Example SOQL: \`SELECT Id, Name, Industry FROM Account WHERE Industry = 'Technol
     });
 
     let result: any;
+    let soql = ctx.input.soql ?? ctx.input.query;
 
     if (ctx.input.nextRecordsUrl) {
       result = await client.queryMore(ctx.input.nextRecordsUrl);
-    } else if (ctx.input.includeDeletedRecords) {
-      result = await client.queryAll(ctx.input.soql);
     } else {
-      result = await client.query(ctx.input.soql);
+      if (!soql) {
+        throw salesforceServiceError(
+          'Provide soql (or the deprecated query alias) when nextRecordsUrl is not supplied.'
+        );
+      }
+
+      result = ctx.input.includeDeletedRecords
+        ? await client.queryAll(soql)
+        : await client.query(soql);
     }
 
     return {

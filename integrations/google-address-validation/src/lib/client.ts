@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { createApiServiceError, createAxios } from 'slates';
 
 let BASE_URL = 'https://addressvalidation.googleapis.com/v1';
 
@@ -164,10 +164,23 @@ export interface ProvideValidationFeedbackRequest {
 export class Client {
   private token: string;
   private authMethod: 'api_key' | 'oauth';
+  private projectId?: string;
 
-  constructor(config: { token: string; authMethod?: 'api_key' | 'oauth' }) {
+  constructor(config: {
+    token: string;
+    authMethod?: 'api_key' | 'oauth';
+    projectId?: string;
+  }) {
     this.token = config.token;
     this.authMethod = config.authMethod ?? 'api_key';
+    this.projectId = config.projectId?.trim() || undefined;
+
+    if (this.authMethod === 'oauth' && !this.projectId) {
+      throw createApiServiceError(
+        'Google Cloud project ID is required for Address Validation OAuth requests. Configure the billing-enabled quota project and try again.',
+        { reason: 'google_address_validation_quota_project_missing' }
+      );
+    }
   }
 
   private createAxiosInstance() {
@@ -176,6 +189,7 @@ export class Client {
         baseURL: BASE_URL,
         headers: {
           Authorization: `Bearer ${this.token}`,
+          'X-Goog-User-Project': this.projectId,
           'Content-Type': 'application/json'
         }
       });

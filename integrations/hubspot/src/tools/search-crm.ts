@@ -5,7 +5,9 @@ import { hubSpotActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
 
 let filterSchema = z.object({
-  propertyName: z.string().describe('Name of the property to filter on'),
+  propertyName: z
+    .string()
+    .describe('HubSpot internal property name to filter on. Use list_properties when unsure.'),
   operator: z
     .enum([
       'EQ',
@@ -23,7 +25,12 @@ let filterSchema = z.object({
       'NOT_CONTAINS_TOKEN'
     ])
     .describe('Filter operator'),
-  value: z.string().optional().describe('Value to compare against'),
+  value: z
+    .string()
+    .optional()
+    .describe(
+      'Value to compare against. ISO 8601 timestamps used with range operators are converted to Unix epoch milliseconds.'
+    ),
   values: z.array(z.string()).optional().describe('Multiple values for IN/NOT_IN operators'),
   highValue: z.string().optional().describe('Upper bound for BETWEEN operator')
 });
@@ -37,6 +44,54 @@ let sortSchema = z.object({
   direction: z.enum(['ASCENDING', 'DESCENDING']).describe('Sort direction')
 });
 
+let contactPropertyAliases: Record<string, string> = {
+  became_a_customer_date: 'hs_v2_date_entered_customer'
+};
+
+let dateRangeOperators = new Set(['LT', 'LTE', 'GT', 'GTE', 'BETWEEN']);
+let isoDateTimePattern =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/;
+
+let normalizePropertyName = (objectType: string, propertyName: string) => {
+  if (objectType !== 'contacts') {
+    return propertyName;
+  }
+
+  return contactPropertyAliases[propertyName] ?? propertyName;
+};
+
+let normalizeDateRangeValue = (operator: string, value: string | undefined) => {
+  if (!value || !dateRangeOperators.has(operator) || !isoDateTimePattern.test(value)) {
+    return value;
+  }
+
+  let epochMilliseconds = Date.parse(value);
+  return Number.isFinite(epochMilliseconds) ? String(epochMilliseconds) : value;
+};
+
+let normalizeFilterGroups = (
+  objectType: string,
+  filterGroups:
+    | Array<{
+        filters: Array<{
+          propertyName: string;
+          operator: string;
+          value?: string;
+          values?: string[];
+          highValue?: string;
+        }>;
+      }>
+    | undefined
+) =>
+  filterGroups?.map(group => ({
+    filters: group.filters.map(filter => ({
+      ...filter,
+      propertyName: normalizePropertyName(objectType, filter.propertyName),
+      value: normalizeDateRangeValue(filter.operator, filter.value),
+      highValue: normalizeDateRangeValue(filter.operator, filter.highValue)
+    }))
+  }));
+
 export let searchCrm = SlateTool.create(spec, {
   name: 'Search CRM',
   key: 'search_crm',
@@ -44,7 +99,8 @@ export let searchCrm = SlateTool.create(spec, {
   instructions: [
     'Use filterGroups for precise filtering. Multiple groups use OR logic; filters within a group use AND logic.',
     'Use query for full-text search across default searchable properties.',
-    'Specify properties to return only the fields you need.'
+    'Specify properties to return only the fields you need.',
+    'Use HubSpot internal property names from list_properties. For contacts, the Date entered Customer property is hs_v2_date_entered_customer.'
   ],
   constraints: [
     'Maximum of 10,000 results per search.',
@@ -64,7 +120,12 @@ export let searchCrm = SlateTool.create(spec, {
         .optional()
         .describe('Filter groups (OR logic between groups, AND logic within)'),
       sorts: z.array(sortSchema).optional().describe('Sort criteria'),
-      properties: z.array(z.string()).optional().describe('Properties to return in results'),
+      properties: z
+        .array(z.string())
+        .optional()
+        .describe(
+          'HubSpot internal property names to return. Use list_properties when unsure.'
+        ),
       limit: z
         .number()
         .min(1)
@@ -92,12 +153,15 @@ export let searchCrm = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new HubSpotClient(ctx.auth.token);
+    let objectType = ctx.input.objectType;
 
-    let result = await client.searchObjects(ctx.input.objectType, {
+    let result = await client.searchObjects(objectType, {
       query: ctx.input.query,
-      filterGroups: ctx.input.filterGroups,
+      filterGroups: normalizeFilterGroups(objectType, ctx.input.filterGroups),
       sorts: ctx.input.sorts,
-      properties: ctx.input.properties,
+      properties: ctx.input.properties?.map(propertyName =>
+        normalizePropertyName(objectType, propertyName)
+      ),
       limit: ctx.input.limit || 10,
       after: ctx.input.after
     });
@@ -115,7 +179,7 @@ export let searchCrm = SlateTool.create(spec, {
         total: result.total || 0,
         hasMore: results.length < (result.total || 0)
       },
-      message: `Found **${result.total || 0}** ${ctx.input.objectType} matching the search criteria (returned ${results.length})`
+      message: `Found **${result.total || 0}** ${objectType} matching the search criteria (returned ${results.length})`
     };
   })
   .build();

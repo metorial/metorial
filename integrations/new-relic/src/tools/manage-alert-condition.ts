@@ -73,7 +73,12 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
         .describe('Maximum violation duration in seconds before automatic close'),
       critical: thresholdSchema.optional().describe('Critical threshold settings'),
       warning: thresholdSchema.optional().describe('Warning threshold settings'),
-      description: z.string().optional().describe('Description for the alert condition'),
+      description: z
+        .string()
+        .trim()
+        .min(1)
+        .optional()
+        .describe('Description for the alert condition'),
       signal: z
         .object({
           aggregationDelay: z.number().optional().describe('Aggregation delay in seconds'),
@@ -164,7 +169,7 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
           enabled: result?.enabled,
           nrql: result?.nrql?.query,
           policyId: result?.policyId?.toString(),
-          description: result?.description
+          description: result?.description ?? undefined
         },
         message: `Alert condition **${result?.name}** created successfully with ID **${result?.id}**.`
       };
@@ -194,7 +199,7 @@ Supports both **static** (fixed threshold) and **baseline** (anomaly detection) 
         enabled: result?.enabled,
         nrql: result?.nrql?.query,
         policyId: result?.policyId?.toString(),
-        description: result?.description
+        description: result?.description ?? undefined
       },
       message: `Alert condition **${result?.name}** (${result?.id}) updated successfully.`
     };

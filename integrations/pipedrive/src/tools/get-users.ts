@@ -1,4 +1,4 @@
-import { SlateTool } from '@slates/provider';
+import { anyOf, SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -12,6 +12,7 @@ Returns user details including name, email, role, and active status.`,
     readOnly: true
   }
 })
+  .scopes(anyOf('users:read'))
   .input(
     z.object({
       userId: z

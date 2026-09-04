@@ -13,7 +13,6 @@ export type MicrosoftOauthScope = {
   title: string;
   description: string;
   scope: string;
-  defaultChecked?: boolean;
 };
 
 export type MicrosoftOauthDocsReference = {

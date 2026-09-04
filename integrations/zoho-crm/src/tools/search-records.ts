@@ -13,7 +13,8 @@ Use **criteria** for field-based filters, **email**/**phone** for contact lookup
   instructions: [
     'Criteria syntax: "(Field_API_Name:operator:value)" — e.g. "(Last_Name:equals:Smith)".',
     'Combine criteria with "and"/"or" — e.g. "((Last_Name:equals:Smith)and(Company:equals:Acme))".',
-    'Supported operators: equals, starts_with, contains, greater_than, less_than, between, in, not_equal.',
+    'Supported operators: equals, starts_with, in, not_equal, greater_equal, greater_than, less_equal, less_than, and between. For text fields, equals also matches values that contain the search value.',
+    'For between, separate the two values with a comma, not "and" — e.g. "(Created_Time:between:2026-07-01T00:00:00+04:00,2026-07-30T23:59:59+04:00)".',
     'Only one of criteria, email, phone, or word should be provided per request.'
   ],
   tags: {
@@ -29,7 +30,11 @@ Use **criteria** for field-based filters, **email**/**phone** for contact lookup
         .describe('Search criteria using Zoho CRM criteria syntax'),
       email: z.string().optional().describe('Search by email address'),
       phone: z.string().optional().describe('Search by phone number'),
-      word: z.string().optional().describe('Full-text keyword search'),
+      word: z
+        .string()
+        .min(2)
+        .optional()
+        .describe('Full-text keyword search (minimum 2 characters)'),
       page: z.number().optional().describe('Page number (starts at 1)'),
       perPage: z.number().optional().describe('Results per page (max 200)')
     })

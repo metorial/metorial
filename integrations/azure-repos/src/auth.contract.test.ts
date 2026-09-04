@@ -18,15 +18,4 @@ describe('azure-repos auth scope contract', () => {
       expect(sorted(offered), method.key).toEqual(sorted(expectedScopes));
     }
   });
-
-  it('does not rely on defaultChecked (CLI-only; production requests all declared scopes)', () => {
-    for (let method of methods) {
-      for (let entry of method.scopes) {
-        expect(
-          entry.defaultChecked,
-          `${method.key}/${entry.scope} must not carry defaultChecked`
-        ).toBeUndefined();
-      }
-    }
-  });
 });

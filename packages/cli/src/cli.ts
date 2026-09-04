@@ -193,6 +193,7 @@ if (isGlobalTestCommand) {
     .option('--client-id', 'OAuth client ID')
     .option('--client-secret', 'OAuth client secret')
     .option('--scopes', 'Comma-separated OAuth scopes')
+    .option('--incremental', 'Extend an existing OAuth grant with the supplied scope batch')
     .action((authMethodId: string | undefined, opts) =>
       printResult(() =>
         setupAuth({
@@ -203,7 +204,8 @@ if (isGlobalTestCommand) {
           oauthCredential: opts.oauthCredential,
           clientId: opts.clientId,
           clientSecret: opts.clientSecret,
-          scopes: opts.scopes
+          scopes: opts.scopes,
+          incremental: opts.incremental
         })
       )
     );

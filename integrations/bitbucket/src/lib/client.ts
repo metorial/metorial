@@ -118,7 +118,7 @@ export class Client {
 
   async createPullRequest(repoSlug: string, body: Record<string, any>) {
     let response = await this.api.post(
-      `/repositories/${this.params.workspace}/${repoSlug}/pullrequests`,
+      `${this.getRepositoryPath(repoSlug)}/pullrequests`,
       body
     );
     return response.data;
@@ -324,78 +324,6 @@ export class Client {
     await this.api.delete(
       `/repositories/${this.params.workspace}/${repoSlug}/refs/tags/${tagName}`
     );
-  }
-
-  // ─── Issues ───
-
-  async listIssues(
-    repoSlug: string,
-    opts?: { query?: string; page?: number; pageLen?: number; sort?: string }
-  ) {
-    let params: Record<string, string> = {};
-    if (opts?.query) params.q = opts.query;
-    if (opts?.page) params.page = String(opts.page);
-    if (opts?.pageLen) params.pagelen = String(opts.pageLen);
-    if (opts?.sort) params.sort = opts.sort;
-
-    let response = await this.api.get(
-      `/repositories/${this.params.workspace}/${repoSlug}/issues`,
-      { params }
-    );
-    return response.data;
-  }
-
-  async getIssue(repoSlug: string, issueId: number) {
-    let response = await this.api.get(
-      `/repositories/${this.params.workspace}/${repoSlug}/issues/${issueId}`
-    );
-    return response.data;
-  }
-
-  async createIssue(repoSlug: string, body: Record<string, any>) {
-    let response = await this.api.post(
-      `/repositories/${this.params.workspace}/${repoSlug}/issues`,
-      body
-    );
-    return response.data;
-  }
-
-  async updateIssue(repoSlug: string, issueId: number, body: Record<string, any>) {
-    let response = await this.api.put(
-      `/repositories/${this.params.workspace}/${repoSlug}/issues/${issueId}`,
-      body
-    );
-    return response.data;
-  }
-
-  async deleteIssue(repoSlug: string, issueId: number) {
-    await this.api.delete(
-      `/repositories/${this.params.workspace}/${repoSlug}/issues/${issueId}`
-    );
-  }
-
-  async createIssueComment(repoSlug: string, issueId: number, body: Record<string, any>) {
-    let response = await this.api.post(
-      `/repositories/${this.params.workspace}/${repoSlug}/issues/${issueId}/comments`,
-      body
-    );
-    return response.data;
-  }
-
-  async listIssueComments(
-    repoSlug: string,
-    issueId: number,
-    opts?: { page?: number; pageLen?: number }
-  ) {
-    let params: Record<string, string> = {};
-    if (opts?.page) params.page = String(opts.page);
-    if (opts?.pageLen) params.pagelen = String(opts.pageLen);
-
-    let response = await this.api.get(
-      `/repositories/${this.params.workspace}/${repoSlug}/issues/${issueId}/comments`,
-      { params }
-    );
-    return response.data;
   }
 
   // ─── Pipelines ───

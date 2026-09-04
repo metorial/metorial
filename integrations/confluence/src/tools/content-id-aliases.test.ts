@@ -2,8 +2,11 @@ import { ServiceError } from '@lowerdeck/error';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { ConfluenceClient } from '../lib/client';
+import { getAttachments } from './get-attachments';
 import { getPage } from './get-page';
 import { getPageChildren } from './get-page-children';
+import { listPages } from './list-pages';
+import { getSpace } from './list-spaces';
 import { getComments } from './manage-comments';
 
 let createCtx = (input: Record<string, unknown>) =>
@@ -63,6 +66,69 @@ describe('Confluence content ID input aliases', () => {
     await getPage.handleInvocation(createCtx(input));
 
     expect(getPageById).toHaveBeenCalledWith('canonical-page', false);
+  });
+
+  it.each([
+    ['https://example.atlassian.net/wiki/x/tRnHAQ', '29825461'],
+    ['https://example.atlassian.net/wiki/spaces/DEV/pages/29825461/Release-notes', '29825461'],
+    ['https://example.atlassian.net/wiki/pages/viewpage.action?pageId=29825461', '29825461']
+  ])('resolves a Confluence page URL for get_page', async (url, expectedPageId) => {
+    let getPageById = vi.spyOn(ConfluenceClient.prototype, 'getPageById').mockResolvedValue({
+      id: expectedPageId,
+      title: 'Release notes',
+      status: 'current'
+    } as any);
+
+    let input = getPage.inputSchema.parse({ url });
+    await getPage.handleInvocation(createCtx(input));
+
+    expect(getPageById).toHaveBeenCalledWith(expectedPageId, false);
+  });
+
+  it('accepts id for get_attachments', async () => {
+    let getContentAttachments = vi
+      .spyOn(ConfluenceClient.prototype, 'getContentAttachments')
+      .mockResolvedValue({ results: [], _links: {} } as any);
+
+    let input = getAttachments.inputSchema.parse({ id: 'page-1' });
+    await getAttachments.handleInvocation(createCtx(input));
+
+    expect(getContentAttachments).toHaveBeenCalledWith('page-1', {
+      contentType: 'page',
+      limit: 25,
+      cursor: undefined
+    });
+  });
+
+  it('accepts id for get_space', async () => {
+    let getSpaceById = vi.spyOn(ConfluenceClient.prototype, 'getSpaceById').mockResolvedValue({
+      id: 'space-1',
+      key: 'DEV',
+      name: 'Development'
+    } as any);
+
+    let input = getSpace.inputSchema.parse({ id: 'space-1' });
+    await getSpace.handleInvocation(createCtx(input));
+
+    expect(getSpaceById).toHaveBeenCalledWith('space-1');
+  });
+
+  it('caps list_pages requests at the Confluence per-request maximum', async () => {
+    let getPages = vi
+      .spyOn(ConfluenceClient.prototype, 'getPages')
+      .mockResolvedValue({ results: [], _links: {} } as any);
+
+    let input = listPages.inputSchema.parse({ limit: 1000 });
+    await listPages.handleInvocation(createCtx(input));
+
+    expect(getPages).toHaveBeenCalledWith({
+      spaceId: undefined,
+      title: undefined,
+      status: undefined,
+      limit: 250,
+      cursor: undefined,
+      sort: undefined
+    });
   });
 
   it('accepts contentId for get_page_children', async () => {
@@ -160,7 +226,10 @@ describe('Confluence content ID input aliases', () => {
   it.each([
     ['get_page', getPage],
     ['get_page_children', getPageChildren],
-    ['get_comments', getComments]
+    ['get_comments', getComments],
+    ['get_attachments', getAttachments],
+    ['get_space', getSpace],
+    ['list_pages', listPages]
   ])('keeps the %s input schema MCP-compatible', (_toolKey, tool) => {
     let schema = z.toJSONSchema(tool.inputSchema) as Record<string, unknown>;
 

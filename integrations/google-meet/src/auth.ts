@@ -54,16 +54,6 @@ export let auth = SlateAuth.create()
         scope: googleMeetScopes.spaceSettings
       },
       {
-        title: 'Drive (Read)',
-        description: 'Download recording and transcript files from Google Drive.',
-        scope: googleMeetScopes.driveReadonly
-      },
-      {
-        title: 'Drive Meet (Read)',
-        description: 'View Drive files created or edited by Google Meet.',
-        scope: googleMeetScopes.driveMeetReadonly
-      },
-      {
         title: 'User Profile',
         description: 'View basic profile information.',
         scope: googleMeetScopes.userInfoProfile

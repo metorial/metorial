@@ -101,6 +101,28 @@ describe('Slack expanded tool contract', () => {
       expect(JSON.stringify(publicMetadata)).not.toMatch(PUBLIC_COPY_LEAK_PATTERN);
     }
   });
+
+  it('accepts both Slack threadTs and the legacy messageTs for read_thread', () => {
+    let action = provider.actions.find(
+      candidate => candidate.type === 'tool' && candidate.key === 'read_thread'
+    );
+
+    expect(action?.type).toBe('tool');
+    if (!action || action.type !== 'tool') return;
+
+    expect(
+      action._inputSchema.safeParse({
+        channelId: 'C0B3P8AK5FU',
+        threadTs: '1782200123.004500'
+      }).success
+    ).toBe(true);
+    expect(
+      action._inputSchema.safeParse({
+        channelId: 'C0B3P8AK5FU',
+        messageTs: '1782200123.004500'
+      }).success
+    ).toBe(true);
+  });
 });
 
 const BOT_OAUTH_SCOPE_MANIFEST = [
@@ -176,7 +198,6 @@ const USER_OAUTH_SCOPE_MANIFEST = [
   'reminders:read',
   'reminders:write',
   'team:read',
-  'search:read',
   'search:read.public',
   'search:read.private',
   'search:read.im',
@@ -242,8 +263,11 @@ const EXPECTED_TOOL_AUTHORIZATION: Record<string, ExpectedToolAuthorization> = {
   manage_reactions: { scopes: [['reactions:read'], ['reactions:write']], authMethods: null },
   manage_pins: { scopes: [['pins:read'], ['pins:write']], authMethods: null },
   manage_files: { scopes: [['files:read'], ['files:write']], authMethods: null },
-  search_messages: { scopes: [['search:read']], authMethods: USER_AUTH_METHODS },
-  search_files: { scopes: [['search:read']], authMethods: USER_AUTH_METHODS },
+  search_messages: { scopes: [['search:read.public']], authMethods: USER_AUTH_METHODS },
+  search_files: {
+    scopes: [['search:read.public'], ['search:read.files']],
+    authMethods: USER_AUTH_METHODS
+  },
   manage_reminders: {
     scopes: [['reminders:read'], ['reminders:write']],
     authMethods: USER_AUTH_METHODS

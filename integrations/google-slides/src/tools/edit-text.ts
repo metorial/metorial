@@ -1,8 +1,46 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SlidesClient } from '../lib/client';
 import { googleSlidesActionScopes } from '../scopes';
 import { spec } from '../spec';
+
+type TextRange =
+  | { type: 'ALL' }
+  | { type: 'FIXED_RANGE'; startIndex: number; endIndex: number };
+
+let getTextRange = (input: {
+  rangeType?: 'fixed' | 'all';
+  startIndex?: number;
+  endIndex?: number;
+}): TextRange => {
+  if (input.rangeType === 'all') {
+    if (input.startIndex !== undefined || input.endIndex !== undefined) {
+      throw createApiServiceError('Omit startIndex and endIndex when rangeType is "all".', {
+        reason: 'google_slides_text_range_conflict'
+      });
+    }
+    return { type: 'ALL' };
+  }
+
+  if (input.startIndex === undefined || input.endIndex === undefined) {
+    throw createApiServiceError(
+      'startIndex and endIndex are required when rangeType is "fixed". Use rangeType "all" to target all text without calculating indexes.',
+      { reason: 'google_slides_text_range_required' }
+    );
+  }
+  if (input.endIndex <= input.startIndex) {
+    throw createApiServiceError(
+      'endIndex must be greater than startIndex. Use rangeType "all" to target all text without calculating indexes.',
+      { reason: 'google_slides_text_range_invalid' }
+    );
+  }
+
+  return {
+    type: 'FIXED_RANGE',
+    startIndex: input.startIndex,
+    endIndex: input.endIndex
+  };
+};
 
 export let editText = SlateTool.create(spec, {
   name: 'Edit Text',
@@ -11,8 +49,9 @@ export let editText = SlateTool.create(spec, {
   instructions: [
     'You need the objectId of the specific text box or shape element (not the slide ID). Use Get Presentation to find element IDs.',
     'When inserting text, specify the insertionIndex (0-based character position). Use 0 to insert at the beginning.',
-    'When deleting text, specify startIndex and endIndex for the character range to remove.',
-    'Text styling is applied to a range via startIndex/endIndex and supports font, size, color, bold, italic, underline, and links.'
+    'To delete, style, or format all text in an element, set rangeType to all and omit startIndex/endIndex. Do not guess the element text length.',
+    'For a partial delete, style, or bullet change, use rangeType fixed with startIndex and endIndex. Google Slides text indexes include an implicit trailing newline, so use indexes returned by Get Presentation.',
+    'Text styling supports font, size, color, bold, italic, underline, and links.'
   ],
   tags: {
     destructive: true,
@@ -30,6 +69,13 @@ export let editText = SlateTool.create(spec, {
         .enum(['insert', 'delete', 'style', 'bullets'])
         .describe('Text action to perform'),
 
+      rangeType: z
+        .enum(['fixed', 'all'])
+        .optional()
+        .describe(
+          'Range selection for delete, style, and bullets. Use "all" for the entire element and omit indexes; "fixed" (default) requires startIndex and endIndex.'
+        ),
+
       text: z.string().optional().describe('Text to insert (for insert action)'),
       insertionIndex: z
         .number()
@@ -38,12 +84,20 @@ export let editText = SlateTool.create(spec, {
 
       startIndex: z
         .number()
+        .int()
+        .nonnegative()
         .optional()
-        .describe('Start of the character range (for delete and style actions)'),
+        .describe(
+          'Start of a partial character range (required for delete, style, and bullets when rangeType is "fixed")'
+        ),
       endIndex: z
         .number()
+        .int()
+        .nonnegative()
         .optional()
-        .describe('End of the character range (for delete and style actions)'),
+        .describe(
+          'Exclusive end of a partial character range (required for delete, style, and bullets when rangeType is "fixed")'
+        ),
 
       bold: z.boolean().optional().describe('Set bold (for style action)'),
       italic: z.boolean().optional().describe('Set italic (for style action)'),
@@ -80,7 +134,9 @@ export let editText = SlateTool.create(spec, {
     switch (action) {
       case 'insert': {
         if (ctx.input.text === undefined) {
-          throw new Error('text is required for insert action');
+          throw createApiServiceError('text is required for insert action', {
+            reason: 'google_slides_insert_text_required'
+          });
         }
         result = await client.insertText(
           presentationId,
@@ -91,22 +147,14 @@ export let editText = SlateTool.create(spec, {
         break;
       }
       case 'delete': {
-        if (ctx.input.startIndex === undefined || ctx.input.endIndex === undefined) {
-          throw new Error('startIndex and endIndex are required for delete action');
-        }
         result = await client.deleteText(
           presentationId,
           elementObjectId,
-          ctx.input.startIndex,
-          ctx.input.endIndex
+          getTextRange(ctx.input)
         );
         break;
       }
       case 'style': {
-        if (ctx.input.startIndex === undefined || ctx.input.endIndex === undefined) {
-          throw new Error('startIndex and endIndex are required for style action');
-        }
-
         let style: any = {};
         let fields: string[] = [];
 
@@ -148,34 +196,26 @@ export let editText = SlateTool.create(spec, {
         }
 
         if (fields.length === 0) {
-          throw new Error('At least one style property must be provided for style action');
+          throw createApiServiceError(
+            'At least one style property must be provided for style action',
+            { reason: 'google_slides_text_style_required' }
+          );
         }
 
         result = await client.updateTextStyle(
           presentationId,
           elementObjectId,
           style,
-          {
-            type: 'FIXED_RANGE',
-            startIndex: ctx.input.startIndex,
-            endIndex: ctx.input.endIndex
-          },
+          getTextRange(ctx.input),
           fields.join(',')
         );
         break;
       }
       case 'bullets': {
-        if (ctx.input.startIndex === undefined || ctx.input.endIndex === undefined) {
-          throw new Error('startIndex and endIndex are required for bullets action');
-        }
         result = await client.createParagraphBullets(
           presentationId,
           elementObjectId,
-          {
-            type: 'FIXED_RANGE',
-            startIndex: ctx.input.startIndex,
-            endIndex: ctx.input.endIndex
-          },
+          getTextRange(ctx.input),
           ctx.input.bulletPreset || 'BULLET_DISC_CIRCLE_SQUARE'
         );
         break;
@@ -184,7 +224,10 @@ export let editText = SlateTool.create(spec, {
 
     let actionMessages: Record<string, string> = {
       insert: `Inserted text into element \`${elementObjectId}\`.`,
-      delete: `Deleted text from element \`${elementObjectId}\` (range ${ctx.input.startIndex}-${ctx.input.endIndex}).`,
+      delete:
+        ctx.input.rangeType === 'all'
+          ? `Deleted all text from element \`${elementObjectId}\`.`
+          : `Deleted text from element \`${elementObjectId}\` (range ${ctx.input.startIndex}-${ctx.input.endIndex}).`,
       style: `Applied text styling to element \`${elementObjectId}\`.`,
       bullets: `Applied bullet formatting to element \`${elementObjectId}\`.`
     };

@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/destatis",
+  "description": "Use five read-only tools with a personal API token to search and inspect official German statistics in Destatis GENESIS-Online, discover table and cube dimensions and value codes, and download filtered table or cube data as CSV, XLSX, HTML, or GENML files.",
+  "categories": ["data-and-analytics", "government"],
+  "skills": [
+    "find official German statistics",
+    "inspect GENESIS-Online table and cube dimensions",
+    "discover regional and statistical value codes",
+    "download flat CSV table data",
+    "download presentation tables as XLSX",
+    "download linearized cube data"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/destatis-de.svg"
+}

@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
 
+const MAX_PAGE_LIMIT = 250;
+
 export let listPages = SlateTool.create(spec, {
   name: 'List Pages',
   key: 'list_pages',
@@ -21,7 +23,9 @@ export let listPages = SlateTool.create(spec, {
         .number()
         .optional()
         .default(25)
-        .describe('Maximum number of pages to return (default 25)'),
+        .describe(
+          'Maximum number of pages to return per request (default 25, capped at 250). Use nextCursor to continue.'
+        ),
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
       sort: z.string().optional().describe('Sort order (e.g., "-modified-date", "title")')
     })
@@ -50,7 +54,7 @@ export let listPages = SlateTool.create(spec, {
       spaceId: ctx.input.spaceId,
       title: ctx.input.title,
       status: ctx.input.status,
-      limit: ctx.input.limit,
+      limit: Math.min(ctx.input.limit, MAX_PAGE_LIMIT),
       cursor: ctx.input.cursor,
       sort: ctx.input.sort
     });

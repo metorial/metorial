@@ -29,6 +29,20 @@ afterEach(() => {
 });
 
 describe('google-address-validation auth contract', () => {
+  it('marks API-key auth output so source handlers retain query-based authentication', async () => {
+    let client = await loadProviderClient();
+
+    let result = await client.getAuthOutput({
+      authenticationMethodId: 'api_key',
+      input: { apiKey: 'maps-api-key' }
+    });
+
+    expect(result.output).toEqual({
+      token: 'maps-api-key',
+      authMethod: 'api_key'
+    });
+  });
+
   it('builds the expected OAuth authorization URL', async () => {
     let client = await loadProviderClient();
     let result = await client.getAuthorizationUrl({
@@ -74,6 +88,7 @@ describe('google-address-validation auth contract', () => {
     expect(callbackResult.scopes).toEqual([googleAddressValidationScopes.cloudPlatform]);
     expect(callbackResult.output).toMatchObject({
       token: 'access-token',
+      authMethod: 'oauth',
       refreshToken: 'refresh-token'
     });
 
@@ -84,16 +99,23 @@ describe('google-address-validation auth contract', () => {
       }
     });
 
-    await client.refreshToken({
+    let refreshResult = await client.refreshToken({
       authenticationMethodId: 'oauth',
       output: {
         token: 'stale-token',
+        authMethod: 'oauth',
         refreshToken: 'refresh-token'
       },
       input: {},
       clientId: 'client-id',
       clientSecret: 'client-secret',
       scopes: [googleAddressValidationScopes.cloudPlatform]
+    });
+
+    expect(refreshResult.output).toMatchObject({
+      token: 'refreshed-token',
+      authMethod: 'oauth',
+      refreshToken: 'refresh-token'
     });
   });
 
@@ -107,14 +129,24 @@ describe('google-address-validation auth contract', () => {
         client.refreshToken({
           authenticationMethodId: 'oauth',
           output: {
-            token: 'stale-token'
+            token: 'stale-token',
+            authMethod: 'oauth'
           },
           input: {},
           clientId: 'client-id',
           clientSecret: 'client-secret',
           scopes: [googleAddressValidationScopes.cloudPlatform]
         }),
-      { code: 'internal.unexpected', kind: 'internal', status: 500 }
+      {
+        code: 'request.bad',
+        kind: 'request',
+        status: 400,
+        baggage: {
+          serviceError: {
+            reason: 'google_address_validation_refresh_token_missing'
+          }
+        }
+      }
     );
 
     expect(oauthPost).not.toHaveBeenCalled();

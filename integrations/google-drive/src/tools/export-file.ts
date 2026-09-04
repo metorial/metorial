@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let exportFileTool = SlateTool.create(spec, {
   name: 'Export File',
   key: 'export_file',
-  description: `Export a Google Workspace file (Docs, Sheets, Slides, Drawings) to a standard format such as PDF, DOCX, XLSX, CSV, or plain text. Only works with Google Workspace native formats — for regular files use the **Download File** tool.`,
+  description: `Export a Google Workspace file (Docs, Sheets, Slides, Drawings) to a standard format such as PDF, DOCX, XLSX, CSV, or plain text. Only works with Google Workspace native formats — for regular files use the **Get Download URL** tool.`,
   instructions: [
     'Common export formats: application/pdf, text/plain, text/csv, text/html, application/vnd.openxmlformats-officedocument.wordprocessingml.document (DOCX), application/vnd.openxmlformats-officedocument.spreadsheetml.sheet (XLSX), application/vnd.openxmlformats-officedocument.presentationml.presentation (PPTX).',
     'Google Docs support: PDF, DOCX, TXT, HTML, RTF, ODT, EPUB.',

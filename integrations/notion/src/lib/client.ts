@@ -1,5 +1,6 @@
 import { createApiServiceError, createAxios } from 'slates';
 import { notionApiError } from './errors';
+import { requestWithNotionRateLimitRetry } from './rate-limit';
 
 let NOTION_API_VERSION = '2022-06-28';
 
@@ -110,8 +111,12 @@ export class NotionClient {
     if (startCursor) params.start_cursor = startCursor;
     if (pageSize) params.page_size = pageSize;
 
-    let response = await this.axios.get(`/blocks/${blockId}/children`, { params });
-    return response.data;
+    return requestWithNotionRateLimitRetry(() =>
+      this.axios.get(`/blocks/${blockId}/children`, {
+        params,
+        validateStatus: status => status === 429 || (status >= 200 && status < 300)
+      })
+    );
   }
 
   async appendBlockChildren(

@@ -124,8 +124,8 @@ describe('youtube provider contract', () => {
       )
     ).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: youtubeScopes.userinfoEmail, defaultChecked: true }),
-        expect.objectContaining({ id: youtubeScopes.userinfoProfile, defaultChecked: true })
+        expect.objectContaining({ id: youtubeScopes.userinfoEmail }),
+        expect.objectContaining({ id: youtubeScopes.userinfoProfile })
       ])
     );
   });

@@ -55,7 +55,9 @@ Optionally include initial content as block children, and set an icon or cover i
   )
   .output(
     z.object({
-      pageId: z.string().describe('ID of the created page'),
+      pageId: z
+        .string()
+        .describe('ID of the created page; pass this value to Get Page or Update Page'),
       url: z.string().optional().describe('URL of the created page'),
       createdTime: z.string().optional().describe('Timestamp when the page was created'),
       parentType: z

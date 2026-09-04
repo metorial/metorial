@@ -18,7 +18,7 @@ let formatWebhook = (hook: any) => ({
 export let manageWebhooksTool = SlateTool.create(spec, {
   name: 'Manage Webhooks',
   key: 'manage_webhooks',
-  description: `List, create, get, update, or delete repository webhooks. Webhooks subscribe an external URL to Bitbucket repository events such as pushes, pull request updates, issue changes, and build status changes.`
+  description: `List, create, get, update, or delete repository webhooks. Webhooks subscribe an external URL to Bitbucket repository events such as pushes, pull request updates, and build status changes.`
 })
   .input(
     z.object({

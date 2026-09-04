@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'bitbucket',
   name: 'Bitbucket',
   description:
-    'Atlassian Bitbucket Cloud integration for managing Git repositories, pull requests, issues, CI/CD pipelines, workspaces, and more.',
+    'Atlassian Bitbucket Cloud integration for managing Git repositories, pull requests, CI/CD pipelines, workspaces, and more.',
   metadata: {},
   config,
   auth

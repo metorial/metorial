@@ -42,6 +42,16 @@ export let auth = SlateAuth.create()
         description:
           'Full access to manage Google Ads accounts, campaigns, ads, and reporting',
         scope: googleAdsScopes.adwords
+      },
+      {
+        title: 'User Email',
+        description: 'View the email address of the authenticated user',
+        scope: googleAdsScopes.userInfoEmail
+      },
+      {
+        title: 'User Profile',
+        description: 'View basic profile information of the authenticated user',
+        scope: googleAdsScopes.userInfoProfile
       }
     ],
 

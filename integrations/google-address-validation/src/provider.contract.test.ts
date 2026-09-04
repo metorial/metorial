@@ -21,6 +21,7 @@ describe('google-address-validation provider contract', () => {
     });
 
     expect(contract.actions).toHaveLength(3);
+    expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['projectId']);
 
     let expectedScopes = {
       validate_address: googleAddressValidationActionScopes.validateAddress,

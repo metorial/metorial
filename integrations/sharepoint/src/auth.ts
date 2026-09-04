@@ -148,6 +148,21 @@ let normalizeToken = (
     refreshTokenFallbackMode: 'falsy'
   });
 
+let earliestExpiresAt = (...values: (string | undefined)[]) => {
+  let expirations = values
+    .map(value => ({ value, timestamp: value ? Date.parse(value) : Number.NaN }))
+    .filter(
+      (expiration): expiration is { value: string; timestamp: number } =>
+        typeof expiration.value === 'string' && Number.isFinite(expiration.timestamp)
+    );
+
+  if (expirations.length === 0) return undefined;
+
+  return expirations.reduce((earliest, expiration) =>
+    expiration.timestamp < earliest.timestamp ? expiration : earliest
+  ).value;
+};
+
 let isSharePointResourceScope = (scope: string) =>
   /^https:\/\/[^/]+\.sharepoint\.com\/\.default$/i.test(scope);
 
@@ -303,7 +318,7 @@ let createOutput = async (
   return {
     token: graphToken.token,
     refreshToken: graphToken.refreshToken,
-    expiresAt: graphToken.expiresAt,
+    expiresAt: earliestExpiresAt(graphToken.expiresAt, sharepointToken.expiresAt),
     tenantId: normalizeTenant(tenant),
     sharepointToken: sharepointToken.token,
     sharepointRefreshToken: sharepointToken.refreshToken,
@@ -312,7 +327,36 @@ let createOutput = async (
   };
 };
 
+let requireSharePointRestAuth = (output: SharePointAuthOutput) => {
+  let sharepointToken = output.sharepointToken?.trim();
+  let sharepointHostname = output.sharepointHostname?.trim();
+  let sharepointExpiresAt = output.sharepointExpiresAt?.trim();
+  let expiresAt = sharepointExpiresAt ? Date.parse(sharepointExpiresAt) : Number.NaN;
+
+  if (
+    !sharepointToken ||
+    !sharepointHostname ||
+    !sharepointExpiresAt ||
+    !Number.isFinite(expiresAt)
+  ) {
+    throw serviceError(
+      'SharePoint REST authorization is incomplete. Grant the Office 365 SharePoint Online delegated AllSites.Manage permission, then reconnect SharePoint.',
+      'sharepoint_rest_auth_incomplete'
+    );
+  }
+
+  if (expiresAt <= Date.now()) {
+    throw serviceError(
+      'SharePoint REST authorization has expired. Refresh or reconnect SharePoint after granting the Office 365 SharePoint Online delegated AllSites.Manage permission.',
+      'sharepoint_rest_token_expired'
+    );
+  }
+
+  return { sharepointToken, sharepointHostname, sharepointExpiresAt };
+};
+
 let getProfile = async (output: SharePointAuthOutput) => {
+  let { sharepointHostname } = requireSharePointRestAuth(output);
   let user = await requestAxiosData<{
     id?: unknown;
     mail?: unknown;
@@ -326,19 +370,16 @@ let getProfile = async (output: SharePointAuthOutput) => {
 
   return {
     profile: {
-      id: typeof user.id === 'string' ? user.id : (output.sharepointHostname ?? 'sharepoint'),
+      id: typeof user.id === 'string' ? user.id : sharepointHostname,
       email:
         typeof user.mail === 'string'
           ? user.mail
           : typeof user.userPrincipalName === 'string'
             ? user.userPrincipalName
             : undefined,
-      name:
-        typeof user.displayName === 'string'
-          ? user.displayName
-          : (output.sharepointHostname ?? 'SharePoint'),
+      name: typeof user.displayName === 'string' ? user.displayName : sharepointHostname,
       tenantId: output.tenantId,
-      sharepointHostname: output.sharepointHostname
+      sharepointHostname
     }
   };
 };
@@ -419,7 +460,10 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string().describe('Microsoft Graph OAuth access token.'),
       refreshToken: z.string().optional().describe('Microsoft Graph OAuth refresh token.'),
-      expiresAt: z.string().optional().describe('Microsoft Graph token expiration time.'),
+      expiresAt: z
+        .string()
+        .optional()
+        .describe('Earliest Microsoft Graph or SharePoint REST token refresh deadline.'),
       tenantId: z.string().optional().describe('Microsoft tenant used for OAuth.'),
       sharepointToken: z
         .string()

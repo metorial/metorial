@@ -130,7 +130,7 @@ export let createBankTransfer = SlateTool.create(spec, {
   instructions: [
     'Provide fromBankAccountId or fromBankAccountCode',
     'Provide toBankAccountId or toBankAccountCode',
-    'Bank transfers cannot be deleted via the Xero Accounting API'
+    'Bank transfers cannot be modified after creation; Xero only supports creating and deleting them'
   ],
   tags: { destructive: false, readOnly: false }
 })

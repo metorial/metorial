@@ -41,10 +41,10 @@ export let getIssueTool = SlateTool.create(spec, {
           'Specific field keys to return (e.g., ["summary", "status", "assignee"]). Returns all fields if omitted.'
         ),
       expand: z
-        .array(z.string())
+        .union([z.array(z.string()), z.string()])
         .optional()
         .describe(
-          'Additional data to expand (e.g., ["changelog", "transitions", "renderedFields"]).'
+          'Additional data to expand (e.g., ["changelog", "transitions", "renderedFields"]). Pass an array; a single string is also accepted.'
         )
     })
   )
@@ -91,7 +91,7 @@ export let getIssueTool = SlateTool.create(spec, {
     let issueIdOrKey = resolveJiraIssueIdOrKey(ctx.input);
     let issue = await client.getIssue(issueIdOrKey, {
       fields: ctx.input.fields,
-      expand: ctx.input.expand
+      expand: typeof ctx.input.expand === 'string' ? [ctx.input.expand] : ctx.input.expand
     });
 
     let f = issue.fields ?? {};

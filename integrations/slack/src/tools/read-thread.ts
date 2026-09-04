@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { SlackClient } from '../lib/client';
+import { missingRequiredAlternativeError, slackServiceError } from '../lib/errors';
 import { slackActionScopes } from '../lib/scopes';
 import type { SlackMessage } from '../lib/types';
 import { spec } from '../spec';
@@ -81,6 +82,7 @@ export let readThread = SlateTool.create(spec, {
   instructions: [
     'Use this after a search or history result to expand the full context before summarizing or replying.',
     'This tool reads an existing thread; it does not search for threads or send a reply.',
+    'Provide the parent timestamp as **threadTs**; the legacy **messageTs** input is also accepted.',
     'Use **responseFormat=concise** when message text and author IDs are sufficient.'
   ],
   tags: {
@@ -92,7 +94,16 @@ export let readThread = SlateTool.create(spec, {
   .input(
     z.object({
       channelId: z.string().min(1).describe('Slack conversation ID containing the thread'),
-      messageTs: z.string().min(1).describe('Timestamp of the thread parent message'),
+      messageTs: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Legacy alias for threadTs; timestamp of the thread parent message'),
+      threadTs: z
+        .string()
+        .min(1)
+        .optional()
+        .describe('Slack timestamp of the thread parent message; provide this or messageTs'),
       cursor: z.string().optional().describe('Pagination cursor for the next page'),
       limit: z
         .number()
@@ -126,11 +137,28 @@ export let readThread = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (
+      ctx.input.messageTs &&
+      ctx.input.threadTs &&
+      ctx.input.messageTs !== ctx.input.threadTs
+    ) {
+      throw slackServiceError(
+        'messageTs and threadTs must identify the same Slack parent message when both are provided.'
+      );
+    }
+
+    let messageTs = ctx.input.threadTs ?? ctx.input.messageTs;
+    if (!messageTs) {
+      throw missingRequiredAlternativeError(
+        'Provide threadTs or messageTs to identify the Slack thread parent.'
+      );
+    }
+
     let client = new SlackClient(ctx.auth.token);
     let [result, permalink] = await Promise.all([
       client.getConversationReplies({
         channel: ctx.input.channelId,
-        ts: ctx.input.messageTs,
+        ts: messageTs,
         limit: ctx.input.limit,
         cursor: ctx.input.cursor,
         oldest: ctx.input.oldest,
@@ -139,17 +167,17 @@ export let readThread = SlateTool.create(spec, {
       }),
       client.getPermalink({
         channel: ctx.input.channelId,
-        messageTs: ctx.input.messageTs
+        messageTs
       })
     ]);
     let detailed = ctx.input.responseFormat === 'detailed';
-    let parent = result.messages.find(message => message.ts === ctx.input.messageTs);
-    let replies = result.messages.filter(message => message.ts !== ctx.input.messageTs);
+    let parent = result.messages.find(message => message.ts === messageTs);
+    let replies = result.messages.filter(message => message.ts !== messageTs);
 
     return {
       output: {
         channelId: ctx.input.channelId,
-        messageTs: ctx.input.messageTs,
+        messageTs,
         permalink,
         parent: parent ? mapThreadMessage(parent, detailed) : undefined,
         replies: replies.map(message => mapThreadMessage(message, detailed)),
@@ -157,7 +185,7 @@ export let readThread = SlateTool.create(spec, {
         hasMore: result.hasMore,
         nextCursor: result.nextCursor
       },
-      message: `Retrieved ${replies.length} repl${replies.length === 1 ? 'y' : 'ies'} from Slack thread \`${ctx.input.messageTs}\`.`
+      message: `Retrieved ${replies.length} repl${replies.length === 1 ? 'y' : 'ies'} from Slack thread \`${messageTs}\`.`
     };
   })
   .build();

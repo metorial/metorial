@@ -84,8 +84,8 @@ let guide = z.looseObject({
   current_version: z.number().int(),
   created_at: z.string(),
   updated_at: z.string(),
-  version_change_comment: z.string().optional(),
-  version_external_id: z.string().optional(),
+  version_change_comment: nullableString.optional(),
+  version_external_id: nullableString.optional(),
   version_created_at: z.string().optional(),
   references: z.array(z.unknown()).optional()
 });
@@ -110,7 +110,14 @@ let guideTopic = z
     'Use a slash-separated topic without leading or trailing slashes'
   );
 
-let clearedOrGuideTopic = z.union([z.literal(''), guideTopic]);
+// Expressed as one pattern rather than a union so the field stays a plain string in the
+// serialized tool schema.
+let clearedOrGuideTopic = z
+  .string()
+  .regex(
+    /^$|^[^/](?:.*[^/])?$/,
+    'Use a slash-separated topic without leading or trailing slashes, or an empty string to clear'
+  );
 
 let guideReference = z.union([
   z
@@ -651,7 +658,8 @@ export let motherDuckToolContracts: MotherDuckToolContract[] = [
       flight_id: z.string().optional(),
       runs: z.array(flightRun).optional(),
       count: z.number().int().optional(),
-      totalCount: z.number().int().optional()
+      totalCount: z.number().int().optional(),
+      truncated: z.boolean().optional()
     }),
     tags: readOnly
   },

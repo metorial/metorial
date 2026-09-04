@@ -1,7 +1,7 @@
 import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { confluenceServiceError } from '../lib/errors';
-import { createClient, resolveContentIdAlias } from '../lib/helpers';
+import { createClient, resolvePageIdInput } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getPage = SlateTool.create(spec, {
@@ -36,6 +36,12 @@ export let getPage = SlateTool.create(spec, {
         .describe(
           'Compatibility alias for pageId, used only when the page-specific ID fields are omitted.'
         ),
+      url: z
+        .string()
+        .optional()
+        .describe(
+          'A Confluence page URL, including a shared /wiki/x/ short URL. Used only when ID fields are omitted.'
+        ),
       includeBody: z
         .boolean()
         .optional()
@@ -62,10 +68,10 @@ export let getPage = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let pageId = resolveContentIdAlias(ctx.input);
+    let pageId = resolvePageIdInput(ctx.input);
     if (!pageId) {
       throw confluenceServiceError(
-        'Provide a pageId, contentId, page_id, content_id, or id to retrieve a page.'
+        'Provide a pageId, contentId, page_id, content_id, id, or Confluence page URL to retrieve a page.'
       );
     }
 

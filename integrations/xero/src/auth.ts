@@ -2,15 +2,110 @@ import { createAxios, SlateAuth } from '@slates/provider';
 import { z } from 'zod';
 import { xeroApiError, xeroServiceError } from './lib/errors';
 
-let LEGACY_CUSTOM_CONNECTION_SCOPES = [
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+let getAuthenticationEventId = (accessToken: string) => {
+  let segments = accessToken.split('.');
+  let payloadSegment = segments[1];
+
+  if (
+    segments.length !== 3 ||
+    !payloadSegment ||
+    !/^[A-Za-z0-9_-]+$/.test(payloadSegment) ||
+    payloadSegment.length % 4 === 1
+  ) {
+    throw xeroServiceError('Xero access token is malformed and cannot resolve a tenant.');
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(Buffer.from(payloadSegment, 'base64url').toString('utf8'));
+  } catch {
+    throw xeroServiceError('Xero access token is malformed and cannot resolve a tenant.');
+  }
+
+  if (!isRecord(payload)) {
+    throw xeroServiceError('Xero access token is malformed and cannot resolve a tenant.');
+  }
+
+  let authenticationEventId = payload.authentication_event_id;
+  if (typeof authenticationEventId !== 'string' || !authenticationEventId.trim()) {
+    throw xeroServiceError(
+      'Xero access token does not contain a non-empty authentication_event_id.'
+    );
+  }
+
+  return authenticationEventId;
+};
+
+let resolveTenantId = async (accessToken: string) => {
+  let authEventId = getAuthenticationEventId(accessToken);
+  let connectionsClient = createAxios({ baseURL: 'https://api.xero.com' });
+  let getConnections = async (params?: { authEventId: string }) => {
+    let connectionsResponse: any;
+
+    try {
+      connectionsResponse = await connectionsClient.get('/connections', {
+        ...(params ? { params } : {}),
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      throw xeroApiError(error, 'connections lookup');
+    }
+
+    let connections = connectionsResponse?.data as unknown;
+    if (!Array.isArray(connections)) {
+      throw xeroServiceError('Xero connections lookup returned an invalid response.');
+    }
+
+    return connections;
+  };
+
+  let connections = await getConnections({ authEventId });
+  if (connections.length > 1) {
+    throw xeroServiceError(
+      `Xero connections lookup returned ${connections.length} organisations for the current authentication event. Reauthorize Xero and select exactly one organisation.`
+    );
+  }
+
+  if (connections.length === 0) {
+    connections = await getConnections();
+
+    if (connections.length === 0) {
+      throw xeroServiceError(
+        'Xero connections lookup returned no authorised organisations. Reauthorize Xero and select one organisation.'
+      );
+    }
+    if (connections.length > 1) {
+      throw xeroServiceError(
+        `Xero has ${connections.length} authorised organisations, but none were newly authorised in the current authentication event. The selected organisation cannot be determined safely.`
+      );
+    }
+  }
+
+  let connection = connections[0];
+  let tenantId = isRecord(connection) ? connection.tenantId : undefined;
+  if (typeof tenantId !== 'string' || !tenantId.trim()) {
+    throw xeroServiceError('Resolved Xero connection did not include a non-empty tenantId.');
+  }
+
+  return tenantId;
+};
+
+export let LEGACY_CUSTOM_CONNECTION_SCOPES = [
   'accounting.transactions',
   'accounting.contacts',
   'accounting.settings',
   'accounting.reports.read',
+  'accounting.reports.tenninetynine.read',
   'accounting.attachments'
 ].join(' ');
 
-let GRANULAR_CUSTOM_CONNECTION_SCOPES = [
+export let GRANULAR_CUSTOM_CONNECTION_SCOPES = [
   'accounting.invoices',
   'accounting.payments',
   'accounting.banktransactions',
@@ -21,10 +116,12 @@ let GRANULAR_CUSTOM_CONNECTION_SCOPES = [
   'accounting.reports.aged.read',
   'accounting.reports.balancesheet.read',
   'accounting.reports.banksummary.read',
+  'accounting.reports.budgetsummary.read',
   'accounting.reports.executivesummary.read',
   'accounting.reports.profitandloss.read',
   'accounting.reports.trialbalance.read',
-  'accounting.reports.taxreports.read'
+  'accounting.reports.taxreports.read',
+  'accounting.reports.tenninetynine.read'
 ].join(' ');
 
 export let auth = SlateAuth.create()
@@ -54,7 +151,6 @@ export let auth = SlateAuth.create()
     ],
 
     scopes: [
-      // OpenID Connect
       { title: 'OpenID', description: 'Access to OpenID identity', scope: 'openid' },
       {
         title: 'Profile',
@@ -62,27 +158,16 @@ export let auth = SlateAuth.create()
         scope: 'profile'
       },
       { title: 'Email', description: 'Access to user email address', scope: 'email' },
-
-      // Offline access
       {
         title: 'Offline Access',
         description: 'Maintain connection and refresh tokens automatically',
         scope: 'offline_access'
       },
-
-      // Accounting - Transactions
       {
         title: 'Invoices',
         description:
           'Read and write access to invoices, credit notes, purchase orders, quotes, repeating invoices, and items',
         scope: 'accounting.invoices'
-      },
-      {
-        title: 'Invoices (Read)',
-        description:
-          'Read-only access to invoices, credit notes, purchase orders, quotes, repeating invoices, and items',
-        scope: 'accounting.invoices.read',
-        defaultChecked: false
       },
       {
         title: 'Payments',
@@ -91,22 +176,9 @@ export let auth = SlateAuth.create()
         scope: 'accounting.payments'
       },
       {
-        title: 'Payments (Read)',
-        description:
-          'Read-only access to payments, batch payments, prepayments, and overpayments',
-        scope: 'accounting.payments.read',
-        defaultChecked: false
-      },
-      {
         title: 'Bank Transactions',
         description: 'Read and write access to bank transactions and bank transfers',
         scope: 'accounting.banktransactions'
-      },
-      {
-        title: 'Bank Transactions (Read)',
-        description: 'Read-only access to bank transactions and bank transfers',
-        scope: 'accounting.banktransactions.read',
-        defaultChecked: false
       },
       {
         title: 'Manual Journals',
@@ -114,53 +186,15 @@ export let auth = SlateAuth.create()
         scope: 'accounting.manualjournals'
       },
       {
-        title: 'Manual Journals (Read)',
-        description: 'Read-only access to manual journals',
-        scope: 'accounting.manualjournals.read',
-        defaultChecked: false
-      },
-      {
-        title: 'Transactions (Legacy)',
-        description:
-          'Legacy broad transaction scope for apps created before March 2, 2026. Leave unchecked for new Xero apps.',
-        scope: 'accounting.transactions',
-        defaultChecked: false
-      },
-      {
-        title: 'Transactions (Legacy Read)',
-        description:
-          'Legacy broad transaction read scope for apps created before March 2, 2026. Leave unchecked for new Xero apps.',
-        scope: 'accounting.transactions.read',
-        defaultChecked: false
-      },
-
-      // Accounting - Contacts
-      {
         title: 'Contacts',
         description: 'Read and write access to contacts and contact groups',
         scope: 'accounting.contacts'
       },
       {
-        title: 'Contacts (Read)',
-        description: 'Read-only access to contacts and contact groups',
-        scope: 'accounting.contacts.read',
-        defaultChecked: false
-      },
-
-      // Accounting - Settings
-      {
         title: 'Settings',
         description: 'Read and write access to chart of accounts, tax rates, currencies, etc.',
         scope: 'accounting.settings'
       },
-      {
-        title: 'Settings (Read)',
-        description: 'Read-only access to chart of accounts, tax rates, currencies, etc.',
-        scope: 'accounting.settings.read',
-        defaultChecked: false
-      },
-
-      // Accounting - Reports
       {
         title: 'Aged Reports (Read)',
         description: 'Read-only access to aged payables and aged receivables reports',
@@ -175,6 +209,11 @@ export let auth = SlateAuth.create()
         title: 'Bank Summary Report (Read)',
         description: 'Read-only access to the Bank Summary report',
         scope: 'accounting.reports.banksummary.read'
+      },
+      {
+        title: 'Budget Summary Report (Read)',
+        description: 'Read-only access to the Budget Summary report',
+        scope: 'accounting.reports.budgetsummary.read'
       },
       {
         title: 'Executive Summary Report (Read)',
@@ -192,109 +231,9 @@ export let auth = SlateAuth.create()
         scope: 'accounting.reports.trialbalance.read'
       },
       {
-        title: 'Tax Reports (Read)',
-        description: 'Read-only access to GST and BAS reports',
-        scope: 'accounting.reports.taxreports.read'
-      },
-      {
-        title: 'Reports (Legacy Read)',
-        description:
-          'Legacy broad reports scope for apps created before March 2, 2026. Leave unchecked for new Xero apps.',
-        scope: 'accounting.reports.read',
-        defaultChecked: false
-      },
-
-      // Accounting - Journals
-      {
-        title: 'System Journals (Read)',
-        description:
-          'Read-only access to system-generated journal entries. This is a legacy or premium-gated Xero scope, not needed for manual journals.',
-        scope: 'accounting.journals.read',
-        defaultChecked: false
-      },
-
-      // Accounting - Attachments
-      {
-        title: 'Attachments',
-        description: 'Read and write access to file attachments',
-        scope: 'accounting.attachments'
-      },
-      {
-        title: 'Attachments (Read)',
-        description: 'Read-only access to file attachments',
-        scope: 'accounting.attachments.read',
-        defaultChecked: false
-      },
-
-      // Assets
-      {
-        title: 'Assets',
-        description: 'Read and write access to fixed assets',
-        scope: 'assets',
-        defaultChecked: false
-      },
-      {
-        title: 'Assets (Read)',
-        description: 'Read-only access to fixed assets',
-        scope: 'assets.read',
-        defaultChecked: false
-      },
-
-      // Projects
-      {
-        title: 'Projects',
-        description: 'Read and write access to projects and time tracking',
-        scope: 'projects',
-        defaultChecked: false
-      },
-      {
-        title: 'Projects (Read)',
-        description: 'Read-only access to projects and time tracking',
-        scope: 'projects.read',
-        defaultChecked: false
-      },
-
-      // Files
-      {
-        title: 'Files',
-        description: 'Read and write access to Xero Files',
-        scope: 'files',
-        defaultChecked: false
-      },
-      {
-        title: 'Files (Read)',
-        description: 'Read-only access to Xero Files',
-        scope: 'files.read',
-        defaultChecked: false
-      },
-
-      // Bank Feeds
-      {
-        title: 'Bank Feeds',
-        description:
-          'Access to the restricted Bank Feeds API for pushing statement data. Requires Xero financial-services partner access.',
-        scope: 'bankfeeds',
-        defaultChecked: false
-      },
-
-      // Payroll
-      {
-        title: 'Payroll AU',
-        description: 'Access to Australian payroll',
-        scope: 'payroll.au',
-        defaultChecked: false
-      },
-      {
-        title: 'Payroll UK',
-        description: 'Access to UK payroll',
-        scope: 'payroll.uk',
-        defaultChecked: false
-      },
-      {
-        title: 'Payroll NZ',
-        description: 'Access to New Zealand payroll',
-        scope: 'payroll.nz',
-        defaultChecked: false
+        title: '1099 Report (Read)',
+        description: 'Read-only access to 1099 reports for US organisations',
+        scope: 'accounting.reports.tenninetynine.read'
       }
     ],
 
@@ -304,7 +243,8 @@ export let auth = SlateAuth.create()
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         scope: ctx.scopes.join(' '),
-        state: ctx.state
+        state: ctx.state,
+        acr_values: 'bulk_connect:false'
       });
 
       return {
@@ -353,28 +293,7 @@ export let auth = SlateAuth.create()
         expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
       }
 
-      // Fetch tenant ID from connections endpoint
-      let connectionsClient = createAxios({ baseURL: 'https://api.xero.com' });
-      let connectionsResponse: any;
-      try {
-        connectionsResponse = await connectionsClient.get('/connections', {
-          headers: {
-            Authorization: `Bearer ${tokenData.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-      } catch (error) {
-        throw xeroApiError(error, 'connections lookup');
-      }
-
-      let connections = connectionsResponse.data as Array<{
-        id: string;
-        tenantId: string;
-        tenantName: string;
-        tenantType: string;
-      }>;
-
-      let tenantId = connections.length > 0 ? connections[0]?.tenantId : undefined;
+      let tenantId = await resolveTenantId(tokenData.access_token);
 
       return {
         output: {
@@ -428,29 +347,12 @@ export let auth = SlateAuth.create()
         expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
       }
 
-      // Re-fetch tenant ID to keep it current
-      let connectionsClient = createAxios({ baseURL: 'https://api.xero.com' });
-      let connectionsResponse: any;
-      try {
-        connectionsResponse = await connectionsClient.get('/connections', {
-          headers: {
-            Authorization: `Bearer ${tokenData.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-      } catch (error) {
-        throw xeroApiError(error, 'connections lookup');
+      let tenantId = ctx.output.tenantId;
+      if (typeof tenantId !== 'string' || !tenantId.trim()) {
+        throw xeroServiceError(
+          'Xero OAuth connection is missing its tenant ID. Reauthorize Xero.'
+        );
       }
-
-      let connections = connectionsResponse.data as Array<{
-        id: string;
-        tenantId: string;
-        tenantName: string;
-        tenantType: string;
-      }>;
-
-      let tenantId =
-        ctx.output.tenantId || (connections.length > 0 ? connections[0]?.tenantId : undefined);
 
       return {
         output: {

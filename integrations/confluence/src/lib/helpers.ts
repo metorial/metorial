@@ -26,6 +26,59 @@ export let resolveContentIdAlias = (input: {
   return selectedId?.trim() || undefined;
 };
 
+let decodeConfluenceTinyLink = (value: string) => {
+  if (!/^[A-Za-z0-9_-]+$/.test(value)) return undefined;
+
+  let base64 = value.replace(/-/g, '/').replace(/_/g, '+');
+  let decoded = Buffer.from(base64, 'base64');
+
+  while (decoded.length < 4 && base64.length < 8) {
+    base64 += 'A';
+    decoded = Buffer.from(base64, 'base64');
+  }
+
+  if (decoded.length !== 4) return undefined;
+
+  let pageId = decoded.readUInt32LE(0);
+  return pageId > 0 ? pageId.toString() : undefined;
+};
+
+let resolveConfluencePageUrl = (value: string | undefined) => {
+  if (!value?.trim()) return undefined;
+
+  try {
+    let url = new URL(value);
+    let queryPageId = url.searchParams.get('pageId')?.trim();
+    if (queryPageId && /^\d+$/.test(queryPageId)) return queryPageId;
+
+    let pathPageId = url.pathname.match(/\/pages\/(\d+)(?:\/|$)/)?.[1];
+    if (pathPageId) return pathPageId;
+
+    let tinyLink = url.pathname.match(/\/x\/([^/]+)\/?$/)?.[1];
+    return tinyLink ? decodeConfluenceTinyLink(tinyLink) : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+export let resolvePageIdInput = (input: {
+  pageId?: string;
+  contentId?: string;
+  page_id?: string;
+  content_id?: string;
+  id?: string;
+  url?: string;
+}) => {
+  let hasIdInput =
+    input.pageId !== undefined ||
+    input.contentId !== undefined ||
+    input.page_id !== undefined ||
+    input.content_id !== undefined ||
+    input.id !== undefined;
+
+  return hasIdInput ? resolveContentIdAlias(input) : resolveConfluencePageUrl(input.url);
+};
+
 export let resolveLimitAlias = (input: { limit?: number; maxResults?: number }) => {
   return input.limit ?? input.maxResults ?? 25;
 };
