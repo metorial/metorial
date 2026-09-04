@@ -3529,6 +3529,20 @@
         "typescript": "^5",
       },
     },
+    "integrations/destatis": {
+      "name": "@slates-integrations/destatis",
+      "version": "0.1.0-rc.1",
+      "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@types/node": "^20",
+        "fast-xml-parser": "^5.7.2",
+        "slates": "1.0.0-rc.17",
+        "zod": "^4.2",
+      },
+      "devDependencies": {
+        "typescript": "^5",
+      },
+    },
     "integrations/detrack": {
       "name": "@slates-integrations/detrack",
       "version": "0.2.0-rc.6",
@@ -12339,7 +12353,7 @@
     },
     "integrations/super-booble-1": {
       "name": "@slates-integrations/super-booble-1",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "dependencies": {
         "@slates-integrations/gmail": "0.2.0-rc.20",
         "@slates-integrations/google-chat": "0.1.0",
@@ -12360,7 +12374,7 @@
     },
     "integrations/super-booble-2a": {
       "name": "@slates-integrations/super-booble-2a",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@slates-integrations/google-ads": "0.2.0",
         "@slates-integrations/google-calendar": "0.2.0-rc.11",
@@ -12387,7 +12401,7 @@
     },
     "integrations/super-booble-2b": {
       "name": "@slates-integrations/super-booble-2b",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@slates-integrations/google-admin": "0.3.0",
         "@slates-integrations/google-photos": "0.2.0",
@@ -12407,7 +12421,7 @@
     },
     "integrations/super-booble-3": {
       "name": "@slates-integrations/super-booble-3",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@slates-integrations/bigquery": "0.2.0-rc.12",
         "@slates-integrations/compute-engine": "0.1.0-rc.5",
@@ -15865,6 +15879,8 @@
     "@slates-integrations/deployhq": ["@slates-integrations/deployhq@workspace:integrations/deployhq"],
 
     "@slates-integrations/desktime": ["@slates-integrations/desktime@workspace:integrations/desktime"],
+
+    "@slates-integrations/destatis": ["@slates-integrations/destatis@workspace:integrations/destatis"],
 
     "@slates-integrations/detrack": ["@slates-integrations/detrack@workspace:integrations/detrack"],
 
