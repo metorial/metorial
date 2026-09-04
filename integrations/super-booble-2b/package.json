@@ -17,11 +17,9 @@
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/oauth-google": "workspace:*",
-    "@slates/super-google-tools": "workspace:*",
     "@slates/test": "1.0.0-rc.14",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.1"
+  "version": "0.2.2"
 }

@@ -12353,7 +12353,7 @@
     },
     "integrations/super-booble-1": {
       "name": "@slates-integrations/super-booble-1",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "dependencies": {
         "@slates-integrations/gmail": "0.2.0-rc.20",
         "@slates-integrations/google-chat": "0.1.0",
@@ -12365,8 +12365,6 @@
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/oauth-google": "workspace:*",
-        "@slates/super-google-tools": "workspace:*",
         "@slates/test": "1.0.0-rc.14",
         "typescript": "^5",
         "vitest": "^3.1.2",
@@ -12374,7 +12372,7 @@
     },
     "integrations/super-booble-2a": {
       "name": "@slates-integrations/super-booble-2a",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "dependencies": {
         "@slates-integrations/google-ads": "0.2.0",
         "@slates-integrations/google-calendar": "0.2.0-rc.11",
@@ -12392,8 +12390,6 @@
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/oauth-google": "workspace:*",
-        "@slates/super-google-tools": "workspace:*",
         "@slates/test": "1.0.0-rc.14",
         "typescript": "^5",
         "vitest": "^3.1.2",
@@ -12401,7 +12397,7 @@
     },
     "integrations/super-booble-2b": {
       "name": "@slates-integrations/super-booble-2b",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "dependencies": {
         "@slates-integrations/google-admin": "0.3.0",
         "@slates-integrations/google-photos": "0.2.0",
@@ -12412,8 +12408,6 @@
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/oauth-google": "workspace:*",
-        "@slates/super-google-tools": "workspace:*",
         "@slates/test": "1.0.0-rc.14",
         "typescript": "^5",
         "vitest": "^3.1.2",
@@ -12421,7 +12415,7 @@
     },
     "integrations/super-booble-3": {
       "name": "@slates-integrations/super-booble-3",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "dependencies": {
         "@slates-integrations/bigquery": "0.2.0-rc.12",
         "@slates-integrations/compute-engine": "0.1.0-rc.5",
@@ -12436,8 +12430,6 @@
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/oauth-google": "workspace:*",
-        "@slates/super-google-tools": "workspace:*",
         "@slates/test": "1.0.0-rc.14",
         "typescript": "^5",
         "vitest": "^3.1.2",
