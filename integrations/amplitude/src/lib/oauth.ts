@@ -3,18 +3,18 @@ import { createApiServiceError, normalizeOAuthTokenResponse } from 'slates';
 import { z } from 'zod';
 
 export let amplitudeRegionSchema = z.enum(['US', 'EU']);
-export type AmplitudeMcpRegion = z.infer<typeof amplitudeRegionSchema>;
+export type AmplitudeOAuthRegion = z.infer<typeof amplitudeRegionSchema>;
 
-export let getAmplitudeMcpOrigin = (region: AmplitudeMcpRegion) =>
-  region === 'EU' ? 'https://mcp.eu.amplitude.com' : 'https://mcp.amplitude.com';
+export let getAmplitudeOAuthOrigin = (region: AmplitudeOAuthRegion) =>
+  region === 'EU' ? 'https://auth.eu.amplitude.com' : 'https://auth.amplitude.com';
 
 // Fixed provider origins prevent connection input from redirecting credentials.
 let requestAmplitudeOAuthToken = async (
-  region: AmplitudeMcpRegion,
+  region: AmplitudeOAuthRegion,
   body: URLSearchParams
 ): Promise<unknown> => {
   try {
-    let response = await fetch(`${getAmplitudeMcpOrigin(region)}/token`, {
+    let response = await fetch(`${getAmplitudeOAuthOrigin(region)}/oauth2/token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
@@ -43,7 +43,7 @@ let requestAmplitudeOAuthToken = async (
 };
 
 export let exchangeAmplitudeOAuthToken = async (
-  region: AmplitudeMcpRegion,
+  region: AmplitudeOAuthRegion,
   params: URLSearchParams,
   previousRefreshToken?: string
 ) =>

@@ -1,60 +1,52 @@
-# Amplitude Integration Specification
+# Amplitude REST Integration Specification
 
-## API-key tools
+Version: `0.2.2`. All production requests use REST APIs. Hosted MCP transport, SDK dependency, connection type, and unpublished wrappers are removed. Original 15 project-key tool IDs and compatible inputs remain intact.
 
-The existing 15 tool IDs remain available with `api_key_secret`: event ingestion, Identify/group Identify/user mapping, six Dashboard REST queries, raw event ZIP export, user profile lookup, saved chart CSV download, cohorts, taxonomy, annotations, and user deletion jobs. User profile lookup is unavailable for EU residency.
+## Authentication and regional routing
 
-Region belongs to authentication. Old connections may fall back to their previously stored configuration region. New connections choose the region once during authentication. Files are downloadable contents, with useful metadata in structured output.
+`oauth` is an ordinary authorization-code flow with PKCE S256, registered client ID, optional issued secret, callback-state/redirect/region binding, and refresh-token preservation. US endpoints are `https://auth.amplitude.com/oauth2/auth` and `/oauth2/token`; EU uses `https://auth.eu.amplitude.com`. Authorization and token requests do not contain an MCP resource parameter. Public clients use `none`; confidential clients send their configured secret in the token form body.
 
-## Official hosted MCP connection
+The existing registered client permits `mcp:read` and `offline_access`. These are provider-defined legacy scope names; the Developer API maps them to granular read permissions. Granular replacement scopes were rejected for this client during discovery. Current OAuth tools are read-only, so no write scope is requested. The HTTP endpoints are `https://developer-api.amplitude.com` and `https://developer-api.eu.amplitude.com`, never a hosted MCP endpoint.
 
-`mcp_oauth` uses `https://mcp.amplitude.com/mcp` or `https://mcp.eu.amplitude.com/mcp` with the maintained MCP SDK Streamable HTTP client. Each invocation initializes a session, performs an allowlisted call, terminates the session where supported, and closes the transport. Timeouts bound initialization, invocation, and termination.
+`api_key_secret` retains region, API key, and secret key. Legacy stored configuration region remains a fallback. An additive optional `experimentManagementKey` authorizes only the Experiment Management API with a separate Bearer header on `https://experiment.amplitude.com/api/1` or `https://experiment.eu.amplitude.com/api/1`. No third authentication method is introduced. Project keys, deployment keys, and OAuth tokens are not substituted for that management credential.
 
-The ordinary OAuth authorization-code flow uses a pre-registered client ID and PKCE S256. Public clients use token authentication `none`; confidential clients use their issued client secret. The registered client must allow the exact callback URL shown during setup. There is no runtime client registration or separate registration mode. Credentials use standard OAuth credential storage. Authentication output retains region, access/refresh token, expiry, and the token authentication method. Refresh preserves the prior refresh token when omitted. Callback state binds the PKCE verifier, authorization state, redirect URI, and region.
+## Added tool mapping
 
-The method requests `mcp:read`, `mcp:write`, and `offline_access`. Amplitude enforces project permissions and product entitlements. API-key connections cannot invoke hosted tools; OAuth connections cannot invoke project-key REST tools.
-
-## Hosted tool mapping
-
-Input schemas were captured from the authenticated official US server on 2026-09-05. Static Zod schemas preserve nested chart models, enums, field descriptions, and bounds; they never fetch executable definitions at runtime. All tools serialize as top-level JSON Schema objects. Project IDs retain the public string format and convert to numbers only for upstream context and entity search, whose authenticated schemas require numeric values.
-
-| Public tool | Official operation |
+| Public tool | REST endpoints / constraints |
 | --- | --- |
-| `get_amplitude_context` | Same name; organization/user/projects, project settings and context documents |
-| `search` | `search_amp_entities` with full search filters |
-| `get_amplitude_charts` | Same name: link, typed, definition, data, guide |
-| `query_amplitude_data` | Same name: typed chart or raw definition, yielding an edit ID |
-| `render_amplitude_chart` | Same name: saved chart or edit visualization |
-| `save_chart_edits` | Same name: persist edits with names/descriptions and destination |
-| `rename_chart` | Same name: persist saved chart name/description |
-| `get_experiments` | `use_amp_experiments`, fixed action `get` |
-| `query_experiment` | `use_amp_experiments`, fixed action `analyze` |
-| `get_flags` | `use_amp_flags`, fixed action `get` |
-| `get_deployments` | `use_amp_flags`, fixed action `list_deployments` |
-| `manage_amp_events` | Same name, `get` only: event/custom/labeled/all |
-| `get_properties` | `get_amp_taxonomy`, fixed action `properties`, all seven property surfaces |
-| `use_amplitude_chart_monitors` | Same name: alerts/config/history, subscription changes, enabled state |
-| `use_amp_dashboards` | Same name: get/create/edit/replace_properties/subscribe/edit_subscription |
-| `use_amp_notebooks` | Same name: get/create/edit |
+| `get_amplitude_context` | `GET /v1/context` and `GET /v1/projects`, paginated projects |
+| `get_amplitude_charts` | `GET /v1/projects/{project_id}/charts` or `.../charts/{chart_id}`, optional `include_definition` for single read |
+| `query_amplitude_data` | `POST .../charts/{chart_id}/query`; read-only saved chart execution, not ad-hoc authoring |
+| `get_flags` | `GET /v1/projects/{project_id}/flags` or `.../flags/{flag_id}` |
+| `manage_amp_events` | Read-only `GET /v1/projects/{project_id}/events` or `.../events/{event_id}` |
+| `get_properties` | `GET .../events/{event_id}/event-properties` or `.../user-properties` |
+| `search` | Full-text `q` on chart/event/event-property/user-property list endpoints; one surface per call |
+| `get_experiments` | Management API `GET /experiments` or `/experiments/{id}`; configuration only |
+| `get_deployments` | Management API `GET /deployments` |
 
-`manage_amp_events` exposes only read fields and a literal `get` action. The handler fixes the action and the transport independently rejects non-read event operations. Experiment/flag aliases do not expose their upstream create/update actions. Consolidated content tools are conservatively marked destructive because they can replace/remove content or subscriptions. Saving charts is a real supported upstream mutation, not a preview substitute.
+Developer list limits are 1–200 with opaque cursor strings and returned `pagination.next_cursor`/`has_more`. Chart search is capped at 10,000 matching index entries. Management API lists accept limits up to 1000 and numeric offsets. Returned provider objects are preserved; no guessed field remapping or fabricated dates are applied.
 
-## Workflows and output
+Chart query supports saved segmentation, sessions, funnels, and retention. Optional overrides are `time_range`, `timezone`, `exclude_incomplete_datapoints`, `group_by_limit`, and `time_series_limit`. Definition authoring and filter/group-by overrides are not supported. For unique-user metrics, never derive whole-period uniques by summing interval counts, even if provider metadata incorrectly marks a result additive.
 
-Discover project IDs with `get_amplitude_context` and resource IDs/names with `search`. Query exactly one typed `chart` or raw `definition`. Render the returned edit ID, then save through `save_chart_edits`; verify its returned permanent chart ID with an independent chart read. For modifications, retrieve typed parameters first, edit them, and pass the parent `chartId` with the query. Renaming updates the saved chart directly.
+The documented `time_range: { start, end }` with ISO `YYYY-MM-DD` dates currently returns Developer API HTTP 502 with detail `Request failed with status code 400` for the tested saved segmentation chart. Default-range execution and the tested timezone, scalar, and result-size options succeed; this is not evidence that all charts reject date overrides. Omitting `timeRange` uses the saved chart range. The integration preserves the upstream error and never silently retries with changed or omitted dates; changing a user-requested period requires their direction.
 
-Dashboard/notebook edits require prior readback timestamps and reject ambiguous missing edit targets. Shared-space destinations can publish and notify members. Subscription operations require an intended delivery channel and cadence. Read-only events remain separate from REST taxonomy mutations and event ingestion.
+## Unresolved requested parity
 
-Results retain provider text, structured data, links, identifiers, and pagination. Image/audio/embedded resources are downloadable files with MIME type/size metadata. MCP error results are failures, not successful responses. Credential values are never included in error messages.
+The following unpublished hosted-only tools were removed from registration rather than left as stubs or false successes: `render_amplitude_chart`, `save_chart_edits`, `rename_chart`, `query_experiment`, `use_amplitude_chart_monitors`, `use_amp_dashboards`, and `use_amp_notebooks`.
+
+The public Developer API contract has no corresponding content-write or experiment-analysis operations. Authenticated candidate chart PATCH/PUT/POST and render requests returned 404; the saved chart was confirmed unchanged. Legacy Experiment REST rejected OAuth and Basic credentials, requiring its dedicated management key instead. No browser cookie/session-token authentication is used.
+
+Direct read probes observed questionable upstream chart timestamps and unique-user aggregation hints. They remain provider data, not a reason to invent corrected response values. Provider-specific issues and fixture/entitlement gaps are tracked in the private live E2E report.
 
 ## Verification
 
-Authenticated US tools/list returned 45 official tools including save and rename. This integration exposes the requested 15 plus supporting query_amplitude_data, not every upstream tool. Verification status, account-specific restrictions, and cleanup outcomes belong to the current private live E2E report; schema capture alone is not evidence that every operation has passed. US/EU live coverage, permission failures, token refresh, mutation readbacks/cleanup, schema regressions, build, and tool-use evaluations are required completion checks.
+Schema regression tests cover every registered input as a top-level JSON Schema object. Private live E2E covers provider operations, pagination, authentication mismatch, and actual readback/cleanup. New OAuth consent, token exchange, and refresh must be verified through the normal CLI. EU account access and account entitlements remain separate verification requirements. Full requested parity is not claimed while the seven operations above lack verified REST implementations.
 
-## Official sources
+## Official evidence
 
-- [MCP tools and capabilities](https://amplitude.com/docs/amplitude-ai/amplitude-mcp)
-- [Supported remote client connection](https://amplitude.com/docs/amplitude-ai/amplitude-mcp/other-clients)
-- [US OAuth metadata](https://mcp.amplitude.com/.well-known/oauth-authorization-server)
-- [EU OAuth metadata](https://mcp.eu.amplitude.com/.well-known/oauth-authorization-server)
-- [Chart workflow](https://github.com/amplitude/mcp-marketplace/blob/main/plugins/amplitude/skills/build-charts-with-typed-params/SKILL.md)
+- [Developer API OpenAPI](https://github.com/amplitude/developer-cli/blob/main/openapi/bundled/openapi.bundled.json)
+- [Official OAuth client implementation](https://github.com/amplitude/wizard/blob/main/src/utils/oauth.ts)
+- [US issuer discovery](https://auth.amplitude.com/.well-known/openid-configuration)
+- [EU issuer discovery](https://auth.eu.amplitude.com/.well-known/openid-configuration)
+- [Experiment Management API](https://amplitude.com/docs/apis/experiment/experiment-management-api)
+- [Taxonomy API](https://amplitude.com/docs/apis/analytics/taxonomy)

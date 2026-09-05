@@ -1,13 +1,13 @@
 {
   "name": "@metorial/amplitude",
-  "description": "Ingest events, query product analytics, download raw events and saved chart CSVs, manage cohorts and taxonomy, update user properties, and handle chart annotations and user deletion requests. Connect with Amplitude MCP OAuth to discover accessible projects, search content, read event definitions and properties, and query experiment analysis. Hosted MCP inputs currently cover documented read subsets; full chart editing and content management are not yet available.",
+  "description": "Ingest events, query analytics, download raw events and saved chart CSVs, manage cohorts and taxonomy, update user properties, and handle annotations and privacy requests through Amplitude REST APIs. OAuth adds user and project discovery, saved chart reads and queries, feature flags, and tracking-plan search. Experiment configuration and deployments require an optional management API key. Chart authoring, rendering, saving, renaming, experiment statistical analysis, dashboards, notebooks, and monitors are not currently available through this integration's verified REST endpoints.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
   "skills": [
     "ingest event data",
     "query analytics dashboards",
     "analyze user retention",
     "manage behavioral cohorts",
-    "read experiment analysis",
+    "read experiment configuration",
     "export raw event data",
     "lookup user profiles",
     "manage taxonomy tracking plan",

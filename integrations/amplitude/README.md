@@ -1,113 +1,58 @@
-# <img src="https://provider-logos.metorial-cdn.com/amplitude.svg" height="20"> Amplitude
+# Amplitude
 
-Track user behavior, query product analytics, export raw events, and maintain Amplitude project data. Project API credentials enable the existing REST tools. Amplitude MCP OAuth enables chart querying, rendering, saving, and renaming, experiment discovery and analysis, tracking-plan reads, dashboards, notebooks, and chart monitors.
+Track events, query analytics, download exports, and manage project data through Amplitude REST APIs. The integration has 24 tools: the original 15 project-key tools, seven OAuth Developer API tools, and two Experiment Management API reads.
 
 ## Connections
 
-- **API Key + Secret Key** (`api_key_secret`): choose the project's US or EU region and enter its API and secret keys. Existing connections retain their stored region.
-- **Amplitude MCP OAuth** (`mcp_oauth`): configure a pre-registered OAuth client ID, choose US or EU, and authorize your Amplitude account. Supply a client secret only when Amplitude issued one for that client. Authorization uses PKCE. This connection requests `mcp:read`, `mcp:write`, and `offline_access` and refreshes expired access tokens. It does not enable the API-key REST tools.
+- **API Key + Secret Key** (`api_key_secret`): existing project-scoped Analytics, ingestion, taxonomy, cohorts, annotations, privacy, and export tools. Choose US or EU once. Optionally add an **Experiment management API key** for experiment configuration and deployments; deployment keys and project keys cannot replace it.
+- **Amplitude OAuth** (`oauth`): ordinary authorization-code OAuth with PKCE and token refresh through Amplitude's regional authentication server. Configure your registered client ID and its issued secret, if any. Public clients use PKCE without a secret. The registered callback must match the connection callback exactly.
 
-Enter the registered client ID and any issued client secret in the standard OAuth credential fields. The client must allow the callback URL shown during setup for the selected Amplitude region. Public clients use PKCE without a secret; confidential clients also send their issued secret. There is one OAuth connection method, with no runtime client registration.
+OAuth tools call `developer-api.amplitude.com` (US) or `developer-api.eu.amplitude.com` (EU) directly. There is no hosted MCP connection, MCP SDK, or protocol fallback. Amplitude's registered-client scope is still named `mcp:read`; Amplitude maps this legacy scope to Developer API read permissions. The scope name does not change the REST transport. `offline_access` enables refresh. No write scope is requested for the current read-only OAuth tools.
 
-## Hosted MCP tools
+Project-key tools already know their project and do not require OAuth context discovery. OAuth tokens do not authorize the legacy project-key or Experiment Management APIs.
 
-These 16 tools use schemas captured from Amplitude's authenticated official MCP server. They preserve provider results, identifiers, links, and downloadable files. Requested public names remain stable where Amplitude consolidated an operation into another upstream tool.
+## Added REST tools
 
-| Tool | Supported operation |
+| Tool | Supported behavior |
 | --- | --- |
-| `get_amplitude_context` | Current user, organization, and projects; optional project settings |
-| `get_amplitude_charts` | Chart links, typed parameters, raw definitions, data, or parameter guides |
-| `query_amplitude_data` | Typed or raw analytics queries; returns chart edit IDs |
-| `render_amplitude_chart` | Render a saved chart or edit |
-| `save_chart_edits` | Persist edits as saved charts and return permanent IDs |
-| `rename_chart` | Persist a saved chart's name and optional description |
-| `get_experiments` | Read experiment configuration by discovered IDs |
-| `query_experiment` | Analyze results, optionally selecting metrics, filters, and a group-by |
-| `get_flags` | Read feature flag configuration by discovered IDs or keys |
-| `get_deployments` | List Experiment deployments |
-| `search` | Search saved content, experiments, flags, events, properties, and documentation |
-| `manage_amp_events` | Read-only `get` for raw, custom, and labeled event definitions |
-| `get_properties` | Event, user, group, derived, lookup, channel, or persisted properties |
-| `use_amplitude_chart_monitors` | Alerts, configuration, history, subscriptions, and enabled state |
-| `use_amp_dashboards` | Read, create, edit, replace chart properties, and scheduled deliveries |
-| `use_amp_notebooks` | Read, create, and edit notebook content |
+| `get_amplitude_context` | Authenticated user/organization plus paginated accessible projects |
+| `get_amplitude_charts` | List/search saved charts or read one, optionally including its read-only definition |
+| `query_amplitude_data` | Execute a saved segmentation, sessions, funnel, or retention chart with optional result-size overrides; see the date-override limitation below |
+| `get_flags` | List or read feature flag configuration |
+| `manage_amp_events` | Read-only list/search/get for raw tracking-plan events |
+| `get_properties` | Paginated event or user property definitions |
+| `search` | Search charts, raw events, event properties, or user properties within one project |
+| `get_experiments` | List or read experiment configuration using the management key |
+| `get_deployments` | List Experiment deployments using the management key |
 
-Find IDs with `search` and projects with `get_amplitude_context` before calling resource-specific tools. `manage_amp_events` never accepts mutation operations. API-key `get_chart_results` downloads a saved chart's CSV; OAuth `render_amplitude_chart` renders a visualization instead.
+Use `get_amplitude_context` to obtain OAuth project IDs. List pages expose `pagination.next_cursor` and `has_more`. Chart searches stop at 10,000 matching records; narrow large searches with a name query or chart type. For event properties, obtain the exact event name with `manage_amp_events` first.
 
-## Chart and content workflows
+`query_amplitude_data` reads an existing saved chart. It does not author a new chart, create edit IDs, or persist changes. `get_chart_results` remains the project-key tool for downloadable saved-chart CSV. Never sum daily unique-user counts to produce a unique-user total across the entire period.
 
-Discover exact event/property names, build a typed chart, and call `query_amplitude_data`. Its `chartEditId` can be rendered or passed as `charts[].editId` to `save_chart_edits` with a name and description. Read the permanent saved ID separately to verify persistence. `rename_chart` changes the saved name directly; a preview URL alone is not a saved change.
+Date-override limitation: Amplitude currently rejects the documented `timeRange` input for a tested saved segmentation chart, returning HTTP 502 with an upstream HTTP 400 detail. The same chart succeeds without a date override and with the tested timezone, scalar, and result-size options. This does not establish that every chart is affected. Omitting `timeRange` uses the saved chart range; a failed request for specific dates is reported, not silently retried for a different period.
 
-Read dashboards/notebooks before editing and pass their last-modified timestamp to detect concurrent changes. Saving into shared spaces can publish content and notify members. Scheduled deliveries require the intended channel and cadence. Account permissions and product entitlements still apply; supporting an operation does not grant additional Amplitude access.
+## Requested capabilities still unavailable
 
-Sources: [official MCP guide](https://amplitude.com/docs/amplitude-ai/amplitude-mcp), [connection guide](https://amplitude.com/docs/amplitude-ai/amplitude-mcp/other-clients), and [official tool workflow examples](https://github.com/amplitude/mcp-marketplace).
+These seven requested tools are **not registered** because authenticated REST probes did not establish a working implementation:
 
-## Tools
+- `render_amplitude_chart`
+- `save_chart_edits`
+- `rename_chart`
+- `query_experiment` (statistical analysis, not configuration)
+- `use_amplitude_chart_monitors`
+- `use_amp_dashboards`
+- `use_amp_notebooks`
 
-### Delete User Data
+Their earlier unpublished hosted-MCP implementations were removed in the REST-only migration. A preview link, a read-only chart definition, or experiment configuration is not a substitute for these outcomes. Full requested parity remains incomplete until supported REST operations are available.
 
-Request deletion of user data from Amplitude for privacy compliance (GDPR/CCPA). Supports deleting a single user or multiple users in bulk. You can also check the status of pending deletion jobs.
+## Existing tools
 
-### Export Events
+The original names and compatible inputs are retained: `track_events`, `identify_user`, `query_active_users`, `query_event_segmentation`, `query_funnel`, `query_retention`, `query_sessions`, `query_user_composition`, `export_events`, `get_user_profile`, `get_chart_results`, `manage_cohorts`, `manage_taxonomy`, `manage_annotations`, and `delete_user_data`. User profile lookup is unavailable for EU residency and may require account entitlement.
 
-Export raw Amplitude event files for an uploaded-time range as a downloadable ZIP file. Structured output contains metadata such as MIME type and byte length.
+Exports and chart CSVs are downloadable files, not inline encoded content. Upstream errors include useful provider details. Credentials are region-bound and not forwarded across redirects.
 
-### Get Chart Results
-
-Fetch downloadable CSV results from a saved chart by its chart ID. This reads saved chart data; it does not discover, render, save, or rename charts.
-
-### Get User Profile
-
-Retrieve a user's profile from Amplitude, including user properties, computed user properties, and synced cohort memberships. Look up by user ID or Amplitude ID. This API is unavailable for EU projects.
-
-### Identify User
-
-Set or update user properties for a specific user without sending an event. Supports Amplitude's property operations like $set, $setOnce, $add, $append, $prepend, $unset, and $clearAll. Can also be used for group identification and user identity mapping (aliasing).
-
-### Manage Annotations
-
-Manage chart annotations in Amplitude. Annotations mark important events on time-series charts (e.g., releases, campaigns, milestones). List, create, update, or delete annotations.
-
-### Manage Cohorts
-
-List cohorts, retrieve a cohort from the discoverable cohort list, check Behavioral Cohorts Download API usage, upload static cohorts, and incrementally add or remove cohort membership.
-
-### Manage Taxonomy
-
-Manage your Amplitude tracking plan (taxonomy). Create, update, delete, and list event types, event properties, user properties, and event categories. Useful for programmatically maintaining a clean, well-documented tracking plan.
-
-### Query Active Users
-
-Retrieve active and new user counts over a specified date range. Returns time-series data showing how many users were active (performed any event) and how many were new during each interval. Supports segmentation and grouping by user properties.
-
-### Query Event Segmentation
-
-Analyze event data with segmentation, filtering, and grouping. Returns time-series or aggregate data for specific events, similar to Amplitude's Event Segmentation chart. Supports metrics like event totals, uniques, DAU, session averages, property sums/averages, and more.
-
-### Query Funnel
-
-Analyze conversion funnels to understand how users progress through a sequence of events. Returns step-by-step conversion rates and drop-off data. Supports "this order" (strict sequence) and "any order" modes, plus segmentation and grouping.
-
-### Query Retention
-
-Analyze user retention to understand how well users are retained over time after performing a starting event. Measures how many users come back to perform a return event on subsequent days/weeks/months.
-
-### Query Sessions
-
-Retrieve session metrics including session length distribution and average sessions per user over a date range. Useful for understanding user engagement depth and session patterns.
-
-### Query User Composition
-
-Analyze the distribution of a user property across your active users. Returns how many users have each value of the specified property (e.g., country breakdown, platform split, plan type distribution).
-
-### Track Events
-
-Send one or more events to Amplitude for analytics tracking with user properties, event properties, revenue data, and selected device metadata. Use the batch mode for high-volume ingestion (>1000 events/second).
+Sources: [official Developer API contract](https://github.com/amplitude/developer-cli/blob/main/openapi/bundled/openapi.bundled.json), [official OAuth implementation](https://github.com/amplitude/wizard/blob/main/src/utils/oauth.ts), [Experiment Management API](https://amplitude.com/docs/apis/experiment/experiment-management-api), and [Analytics API documentation](https://amplitude.com/docs/apis/analytics).
 
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>

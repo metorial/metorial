@@ -11,7 +11,7 @@ import { spec } from '../spec';
 export let queryActiveUsersTool = SlateTool.create(spec, {
   name: 'Query Active Users',
   key: 'query_active_users',
-  description: `Retrieve daily, weekly, or monthly active and new user counts for the project already selected by the API-key connection. Call this tool directly with dates; no project ID, event discovery, or OAuth context lookup is needed. Returns time-series data showing how many users were active (performed any event) or new during each interval. Supports segmentation and grouping by user properties. Requires the API Key + Secret Key connection, not MCP OAuth.`,
+  description: `Retrieve daily, weekly, or monthly active and new user counts for the project already selected by the API-key connection. Call this tool directly with dates; no project ID, event discovery, or OAuth context lookup is needed. Returns time-series data showing how many users were active (performed any event) or new during each interval. Supports segmentation and grouping by user properties. Requires the API Key + Secret Key connection, not OAuth.`,
   instructions: [
     'For active-user counts and trends with an API-key connection, call this tool directly. The credentials already identify the project; do not call get_amplitude_context first.'
   ],

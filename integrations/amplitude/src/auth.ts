@@ -2,15 +2,19 @@ import { createHash, randomBytes } from 'node:crypto';
 import { createApiServiceError, SlateAuth, type SlateAuthWithOauth } from 'slates';
 import { z } from 'zod';
 import {
-  type AmplitudeMcpRegion,
+  type AmplitudeOAuthRegion,
   amplitudeRegionSchema,
   exchangeAmplitudeOAuthToken,
-  getAmplitudeMcpOrigin
-} from './lib/mcp-auth';
+  getAmplitudeOAuthOrigin
+} from './lib/oauth';
 
 let amplitudeAuthOutputSchema = z.object({
   apiKey: z.string().optional().describe('Amplitude project API Key'),
   secretKey: z.string().optional().describe('Amplitude project Secret Key'),
+  experimentManagementKey: z
+    .string()
+    .optional()
+    .describe('Optional Experiment management API key'),
   token: z.string().describe('Authentication token'),
   region: amplitudeRegionSchema.optional(),
   refreshToken: z.string().optional(),
@@ -34,6 +38,13 @@ export let auth = SlateAuth.create()
         .string()
         .describe(
           'Amplitude project Secret Key. Found under Organization Settings > Projects.'
+        ),
+      experimentManagementKey: z
+        .string()
+        .min(1)
+        .optional()
+        .describe(
+          'Optional Experiment management API key from the Experiment Management API settings. Required only for get_experiments and get_deployments; this is not the project API key or deployment key.'
         )
     }),
 
@@ -43,6 +54,7 @@ export let auth = SlateAuth.create()
         output: {
           apiKey: ctx.input.apiKey,
           secretKey: ctx.input.secretKey,
+          experimentManagementKey: ctx.input.experimentManagementKey,
           token: basicToken,
           region: ctx.input.region
         }
@@ -51,8 +63,8 @@ export let auth = SlateAuth.create()
   })
   .addOauth({
     type: 'auth.oauth',
-    name: 'Amplitude MCP OAuth',
-    key: 'mcp_oauth',
+    name: 'Amplitude OAuth',
+    key: 'oauth',
     inputSchema: z.object({
       region: amplitudeRegionSchema.default('US').describe('Amplitude data residency region.')
     }),
@@ -61,11 +73,6 @@ export let auth = SlateAuth.create()
         scope: 'mcp:read',
         title: 'Read analytics',
         description: 'Read authorized Amplitude analytics and content.'
-      },
-      {
-        scope: 'mcp:write',
-        title: 'Edit analytics content',
-        description: 'Create and update authorized Amplitude analytics content.'
       },
       {
         scope: 'offline_access',
@@ -88,12 +95,11 @@ export let auth = SlateAuth.create()
         redirect_uri: ctx.redirectUri,
         state: ctx.state,
         scope: ctx.scopes.join(' '),
-        resource: `${getAmplitudeMcpOrigin(region)}/mcp`,
         code_challenge: codeChallenge,
         code_challenge_method: 'S256'
       });
       return {
-        url: `${getAmplitudeMcpOrigin(region)}/authorize?${params}`,
+        url: `${getAmplitudeOAuthOrigin(region)}/oauth2/auth?${params}`,
         callbackState: {
           codeVerifier,
           region,
@@ -130,8 +136,7 @@ export let auth = SlateAuth.create()
         client_id: ctx.clientId,
         code: ctx.code,
         redirect_uri: saved.redirectUri,
-        code_verifier: saved.codeVerifier,
-        resource: `${getAmplitudeMcpOrigin(saved.region)}/mcp`
+        code_verifier: saved.codeVerifier
       });
       if (ctx.clientSecret) params.set('client_secret', ctx.clientSecret);
       let tokens = await exchangeAmplitudeOAuthToken(saved.region, params);
@@ -161,8 +166,7 @@ export let auth = SlateAuth.create()
       let params = new URLSearchParams({
         grant_type: 'refresh_token',
         client_id: ctx.clientId,
-        refresh_token: refreshToken,
-        resource: `${getAmplitudeMcpOrigin(region)}/mcp`
+        refresh_token: refreshToken
       });
       if (ctx.clientSecret) params.set('client_secret', ctx.clientSecret);
       let tokens = await exchangeAmplitudeOAuthToken(region, params, refreshToken);
@@ -175,6 +179,6 @@ export let auth = SlateAuth.create()
       };
     }
   } satisfies SlateAuthWithOauth<
-    { region: AmplitudeMcpRegion },
+    { region: AmplitudeOAuthRegion },
     z.infer<typeof amplitudeAuthOutputSchema>
   >);
