@@ -75,7 +75,7 @@ export let createProjectTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId: ctx.auth.teamId ?? ctx.config.teamId
     });
 
     let data: any = { name: ctx.input.name };

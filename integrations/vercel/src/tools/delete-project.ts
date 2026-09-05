@@ -27,7 +27,7 @@ export let deleteProjectTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId: ctx.auth.teamId ?? ctx.config.teamId
     });
 
     await client.deleteProject(ctx.input.projectIdOrName);

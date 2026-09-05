@@ -68,7 +68,6 @@ export let scheduleDowntime = SlateTool.create(spec, {
       schedule = {};
       if (ctx.input.start) schedule.start = ctx.input.start;
       if (ctx.input.end) schedule.end = ctx.input.end;
-      if (ctx.input.timezone) schedule.timezone = ctx.input.timezone;
     }
 
     let result = await client.createDowntime({
@@ -78,6 +77,7 @@ export let scheduleDowntime = SlateTool.create(spec, {
         monitorTags: ctx.input.monitorTags
       },
       message: ctx.input.message,
+      displayTimezone: ctx.input.timezone,
       schedule
     });
 

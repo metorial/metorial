@@ -1,13 +1,13 @@
 {
   "name": "@metorial/amplitude",
-  "description": "Track user behavior, analyze engagement, and run experiments on a product analytics platform. Ingest event data via HTTP or batch APIs, query dashboard analytics including segmentation, funnels, retention, and session metrics. Export raw event data, look up user profiles, and manage behavioral cohorts. Create and manage feature flags and experiments, evaluate flag variants for users. Manage taxonomy (event types, event properties, user properties), upload lookup tables to enrich event data, and handle chart annotations. Modify user and group properties via Identify APIs, merge user identities, and manage user privacy including GDPR/CCPA deletion and data subject access requests. Provision users and permission groups via SCIM. Stream events, user updates, and cohort membership changes to external webhooks, and receive alerts when KPIs change.",
+  "description": "Ingest events, query product analytics, download raw events and saved chart CSVs, manage cohorts and taxonomy, update user properties, and handle chart annotations and user deletion requests. Connect with Amplitude MCP OAuth to discover accessible projects, search content, read event definitions and properties, and query experiment analysis. Hosted MCP inputs currently cover documented read subsets; full chart editing and content management are not yet available.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
   "skills": [
     "ingest event data",
     "query analytics dashboards",
     "analyze user retention",
     "manage behavioral cohorts",
-    "run feature experiments",
+    "read experiment analysis",
     "export raw event data",
     "lookup user profiles",
     "manage taxonomy tracking plan",

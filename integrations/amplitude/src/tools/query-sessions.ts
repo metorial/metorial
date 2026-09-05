@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
+import { dashboardDataSchema, parseResponse } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let querySessionsTool = SlateTool.create(spec, {
@@ -12,6 +13,7 @@ export let querySessionsTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       metric: z
@@ -25,16 +27,11 @@ export let querySessionsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      sessionData: z.any().describe('Session metric data from Amplitude.')
+      sessionData: z.unknown().describe('Session metric data from Amplitude.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let result: any;
     if (ctx.input.metric === 'length_distribution') {
@@ -50,7 +47,9 @@ export let querySessionsTool = SlateTool.create(spec, {
     }
 
     return {
-      output: { sessionData: result.data ?? result },
+      output: {
+        sessionData: parseResponse(dashboardDataSchema, result.data, 'analytics query')
+      },
       message: `Retrieved ${ctx.input.metric === 'length_distribution' ? 'session length distribution' : 'average sessions per user'} from **${ctx.input.start}** to **${ctx.input.end}**.`
     };
   })

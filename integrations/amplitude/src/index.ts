@@ -17,6 +17,7 @@ import {
   queryUserCompositionTool,
   trackEventsTool
 } from './tools';
+import { amplitudeHostedMcpTools } from './tools/mcp-tools';
 import { eventWebhookTrigger } from './triggers';
 
 export let provider = Slate.create({
@@ -36,7 +37,8 @@ export let provider = Slate.create({
     manageCohortsTool,
     manageTaxonomyTool,
     manageAnnotationsTool,
-    deleteUserDataTool
+    deleteUserDataTool,
+    ...amplitudeHostedMcpTools
   ],
   triggers: [eventWebhookTrigger]
 });

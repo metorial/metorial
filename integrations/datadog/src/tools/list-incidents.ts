@@ -41,13 +41,13 @@ export let listIncidents = SlateTool.create(spec, {
 
     let incidents = (result.data || []).map((inc: any) => ({
       incidentId: inc.id,
-      title: inc.attributes?.title,
-      severity: inc.attributes?.severity,
-      state: inc.attributes?.state,
-      customerImpacted: inc.attributes?.customer_impacted,
-      created: inc.attributes?.created,
-      modified: inc.attributes?.modified,
-      resolved: inc.attributes?.resolved
+      title: inc.attributes?.title ?? undefined,
+      severity: inc.attributes?.severity ?? undefined,
+      state: inc.attributes?.state ?? undefined,
+      customerImpacted: inc.attributes?.customer_impacted ?? undefined,
+      created: inc.attributes?.created ?? undefined,
+      modified: inc.attributes?.modified ?? undefined,
+      resolved: inc.attributes?.resolved ?? undefined
     }));
 
     return {

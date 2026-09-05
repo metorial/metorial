@@ -6,16 +6,17 @@ export let createClient = (
     token: string;
     apiKey?: string;
     appKey?: string;
+    site?: string;
     authMethod: 'oauth' | 'apikey';
   },
-  config: { site: string }
+  config: { site?: string }
 ): DatadogClient => {
   let authConfig: DatadogAuthConfig = {
     token: auth.token,
     apiKey: auth.apiKey,
     appKey: auth.appKey,
     authMethod: auth.authMethod,
-    site: config.site
+    site: auth.site ?? config.site ?? 'datadoghq.com'
   };
   return new DatadogClient(authConfig);
 };

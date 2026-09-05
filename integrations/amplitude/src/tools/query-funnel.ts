@@ -1,7 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
-import { amplitudeServiceError } from '../lib/errors';
+import { createAmplitudeClient } from '../lib/client';
+import { parseEvents, parseResponse, recordSchema } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let queryFunnelTool = SlateTool.create(spec, {
@@ -17,6 +17,7 @@ export let queryFunnelTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       events: z
@@ -27,7 +28,7 @@ export let queryFunnelTool = SlateTool.create(spec, {
       start: z.string().describe('Start date in YYYYMMDD format.'),
       end: z.string().describe('End date in YYYYMMDD format.'),
       mode: z
-        .enum(['ordered', 'unordered'])
+        .enum(['ordered', 'unordered', 'sequential'])
         .optional()
         .describe(
           'Funnel mode: "ordered" (this order) or "unordered" (any order). Default is "ordered".'
@@ -38,6 +39,10 @@ export let queryFunnelTool = SlateTool.create(spec, {
         .describe(
           'Conversion window as a number (in days). Users must complete the funnel within this window.'
         ),
+      userType: z
+        .enum(['active', 'new'])
+        .optional()
+        .describe('Which users to include. Defaults to active.'),
       segment: z
         .string()
         .optional()
@@ -45,60 +50,44 @@ export let queryFunnelTool = SlateTool.create(spec, {
       groupBy: z
         .string()
         .optional()
-        .describe('JSON-encoded group-by clause for funnel breakdown.')
+        .describe('User property for funnel breakdown, for example country or gp:plan.')
     })
   )
   .output(
     z.object({
-      series: z.array(z.any()).optional().describe('Funnel conversion data per step.'),
-      events: z.array(z.any()).optional().describe('Event definitions for each funnel step.'),
+      series: z.array(z.unknown()).optional().describe('Funnel conversion data per step.'),
+      events: z
+        .array(z.unknown())
+        .optional()
+        .describe('Event definitions for each funnel step.'),
       funnelData: z
-        .any()
+        .unknown()
         .optional()
         .describe('Full funnel analysis data including conversion rates.')
     })
   )
   .handleInvocation(async ctx => {
-    let parsedEvents: unknown;
-    try {
-      parsedEvents = JSON.parse(ctx.input.events);
-    } catch (error) {
-      let serviceError = amplitudeServiceError(
-        'events must be a JSON-encoded array of event objects.'
-      );
-      if (error instanceof Error) {
-        serviceError.setParent(error);
-      }
-      throw serviceError;
-    }
+    let parsedEvents = parseEvents(ctx.input.events);
 
-    if (!Array.isArray(parsedEvents)) {
-      throw amplitudeServiceError('events must be a JSON-encoded array of event objects.');
-    }
-
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let result = await client.getFunnelAnalysis({
       e: ctx.input.events,
       start: ctx.input.start,
       end: ctx.input.end,
       mode: ctx.input.mode,
-      n: ctx.input.conversionWindow,
+      n: ctx.input.userType,
+      conversionWindow: ctx.input.conversionWindow,
       segment: ctx.input.segment,
       groupBy: ctx.input.groupBy
     });
 
-    let data = result.data ?? result;
+    let data = parseResponse(z.array(recordSchema), result.data, 'funnel analysis');
 
     return {
       output: {
-        series: data.series,
-        events: data.events,
+        series: data,
+        events: data[0]?.events as unknown[] | undefined,
         funnelData: data
       },
       message: `Funnel analysis completed for **${ctx.input.start}** to **${ctx.input.end}** with ${parsedEvents.length} steps.`

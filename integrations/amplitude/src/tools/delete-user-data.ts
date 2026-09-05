@@ -1,7 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
 import { amplitudeServiceError } from '../lib/errors';
+import { parseResponse, recordSchema } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let deleteUserDataTool = SlateTool.create(spec, {
@@ -21,6 +22,7 @@ export let deleteUserDataTool = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       action: z
@@ -57,8 +59,14 @@ export let deleteUserDataTool = SlateTool.create(spec, {
         .describe('Parameters for "bulk_delete" action.'),
       statusFilter: z
         .object({
-          startDay: z.string().optional().describe('Filter jobs from this date (YYYY-MM-DD).'),
-          endDay: z.string().optional().describe('Filter jobs until this date (YYYY-MM-DD).')
+          startDay: z
+            .string()
+            .optional()
+            .describe('Required for check_status. Filter jobs from this date (YYYY-MM-DD).'),
+          endDay: z
+            .string()
+            .optional()
+            .describe('Required for check_status. Filter jobs until this date (YYYY-MM-DD).')
         })
         .optional()
         .describe('Filter parameters for "check_status" action.')
@@ -66,17 +74,15 @@ export let deleteUserDataTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      deletionResult: z.any().optional().describe('Result of the deletion request.'),
-      jobs: z.array(z.any()).optional().describe('List of deletion jobs (for "check_status").')
+      deletionResult: z.unknown().optional().describe('Result of the deletion request.'),
+      jobs: z
+        .array(z.unknown())
+        .optional()
+        .describe('List of deletion jobs (for "check_status").')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     if (ctx.input.action === 'delete') {
       if (!ctx.input.userId && ctx.input.amplitudeId === undefined) {
@@ -131,7 +137,7 @@ export let deleteUserDataTool = SlateTool.create(spec, {
     if (ctx.input.action === 'check_status') {
       let result = await client.getDeletionJobs(ctx.input.statusFilter);
       return {
-        output: { jobs: result.data ?? result },
+        output: { jobs: parseResponse(z.array(recordSchema), result, 'deletion jobs') },
         message: `Retrieved deletion job status.`
       };
     }

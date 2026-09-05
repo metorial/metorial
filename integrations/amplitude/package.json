@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@types/node": "^20",
     "slates": "1.0.0-rc.17",
     "zod": "^4.2"
@@ -18,5 +19,5 @@
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
-  "version": "0.2.0-rc.9"
+  "version": "0.2.1"
 }

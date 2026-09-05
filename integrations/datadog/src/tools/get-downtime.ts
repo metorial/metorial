@@ -37,14 +37,14 @@ export let getDowntime = SlateTool.create(spec, {
     return {
       output: {
         downtimeId: downtime.id || ctx.input.downtimeId,
-        status: downtime.attributes?.status,
-        scope: downtime.attributes?.scope,
-        message: downtime.attributes?.message,
-        monitorId: downtime.attributes?.monitor_identifier?.monitor_id,
-        monitorTags: downtime.attributes?.monitor_identifier?.monitor_tags,
-        schedule: downtime.attributes?.schedule,
-        notifyEndStates: downtime.attributes?.notify_end_states,
-        notifyEndTypes: downtime.attributes?.notify_end_types
+        status: downtime.attributes?.status ?? undefined,
+        scope: downtime.attributes?.scope ?? undefined,
+        message: downtime.attributes?.message ?? undefined,
+        monitorId: downtime.attributes?.monitor_identifier?.monitor_id ?? undefined,
+        monitorTags: downtime.attributes?.monitor_identifier?.monitor_tags ?? undefined,
+        schedule: downtime.attributes?.schedule ?? undefined,
+        notifyEndStates: downtime.attributes?.notify_end_states ?? undefined,
+        notifyEndTypes: downtime.attributes?.notify_end_types ?? undefined
       },
       message: `Retrieved downtime **${downtime.id || ctx.input.downtimeId}**`
     };

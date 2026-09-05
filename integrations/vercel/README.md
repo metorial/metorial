@@ -2,6 +2,16 @@
 
 Manage web application deployments, projects, and infrastructure on Vercel's cloud platform. Create and configure projects with build settings, framework presets, and Git repository connections. Deploy applications programmatically, promote deployments to production, and manage rolling releases. Register, transfer, and configure domains with DNS records and SSL certificates. Create and manage environment variables scoped to production, preview, or development environments. Manage team members, roles, and access groups for fine-grained RBAC. Configure Edge Config stores for ultra-low-latency key-value data at the edge. Set up log drains to forward logs to external services. Register deployment checks for custom validation before promotion. Create deploy hooks to trigger builds from external systems. Upload and manage files with Vercel Blob storage. Configure Web Application Firewall rules, rate limiting, and IP blocking. Schedule cron jobs and retrieve billing and usage information. Receive webhooks for deployment lifecycle, domain changes, project events, rolling releases, and marketplace billing activity.
 
+## Authentication
+
+OAuth uses a connectable integration from the [Vercel Integrations Console](https://vercel.com/docs/integrations/create-integration), with its client ID, client secret, and URL slug. Register the exact callback URL as the integration's Redirect URL (`http://127.0.0.1:45873/callback` for the local CLI). Existing Sign in with Vercel credentials must be replaced and reauthorized. For a Private integration, supply `teamSlug` to authorize through the owner or allowed team dashboard and select Connect Account. The public installation page returns 404 for Private integrations.
+
+Configure permissions in the Vercel console: Current User and Teams read access; Projects, Deployments, Global Project Environment Variables, Domains, and Global Config read/write access for the corresponding tools. Access is limited to the projects selected during installation. Some administrative operations, including inviting or removing team members, require an Access Token instead.
+
+The local CLI completes the installation by redirecting to Vercel's validated `next` URL after saving authentication. A hosted OAuth callback must also implement this installation completion redirect.
+
+OAuth automatically stores and uses the installation's team. Its long-lived access token does not use a refresh grant; reconnect after revocation or uninstalling the integration. Access Token authentication remains available, with optional team configuration.
+
 ## Tools
 
 ### Cancel Deployment
