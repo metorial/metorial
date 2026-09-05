@@ -1,7 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
 import { amplitudeServiceError } from '../lib/errors';
+import { parseResponse } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 let eventSchema = z.object({
@@ -23,15 +24,15 @@ let eventSchema = z.object({
       'Timestamp of the event in milliseconds since epoch. Defaults to server upload time.'
     ),
   eventProperties: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Key-value pairs of event-specific properties.'),
   userProperties: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Key-value pairs of user properties to set with this event.'),
   groups: z
-    .record(z.string(), z.any())
+    .record(z.string(), z.unknown())
     .optional()
     .describe('Groups the user belongs to (group type -> group name).'),
   appVersion: z.string().optional().describe('App version of the client.'),
@@ -68,7 +69,7 @@ let eventSchema = z.object({
 export let trackEventsTool = SlateTool.create(spec, {
   name: 'Track Events',
   key: 'track_events',
-  description: `Send one or more events to Amplitude for analytics tracking. Supports all standard Amplitude event fields including user properties, event properties, revenue data, and device metadata. Use the batch mode for high-volume ingestion (>1000 events/second).`,
+  description: `Send one or more events to Amplitude for analytics tracking with user properties, event properties, revenue data, and selected device metadata. Use the batch mode for high-volume ingestion (>1000 events/second).`,
   constraints: [
     'Each event must have at least a userId or deviceId.',
     'Maximum of 2000 events per request for HTTP V2 API.',
@@ -80,6 +81,7 @@ export let trackEventsTool = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       events: z.array(eventSchema).min(1).describe('Array of events to track.'),
@@ -92,6 +94,8 @@ export let trackEventsTool = SlateTool.create(spec, {
         ),
       minIdLength: z
         .number()
+        .int()
+        .positive()
         .optional()
         .describe('Minimum length for user_id and device_id fields. Overrides server default.')
     })
@@ -123,14 +127,9 @@ export let trackEventsTool = SlateTool.create(spec, {
       }
     }
 
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
-    let result: any;
+    let result: unknown;
     if (ctx.input.useBatchApi) {
       result = await client.batchTrackEvents(ctx.input.events, {
         minIdLength: ctx.input.minIdLength
@@ -141,13 +140,23 @@ export let trackEventsTool = SlateTool.create(spec, {
       });
     }
 
-    let eventsCount = ctx.input.events.length;
+    let accepted = parseResponse(
+      z.object({
+        code: z.literal(200),
+        events_ingested: z.number().int().nonnegative(),
+        payload_size_bytes: z.number().optional(),
+        server_upload_time: z.number().optional()
+      }),
+      result,
+      'event ingestion'
+    );
+    let eventsCount = accepted.events_ingested;
     return {
       output: {
-        code: result.code ?? 200,
-        eventsIngested: result.events_ingested ?? eventsCount,
-        payloadSizeBytes: result.payload_size_bytes,
-        serverUploadTime: result.server_upload_time
+        code: accepted.code,
+        eventsIngested: accepted.events_ingested,
+        payloadSizeBytes: accepted.payload_size_bytes,
+        serverUploadTime: accepted.server_upload_time
       },
       message: `Successfully tracked **${eventsCount}** event(s) via ${ctx.input.useBatchApi ? 'Batch' : 'HTTP V2'} API.`
     };

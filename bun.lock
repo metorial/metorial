@@ -587,7 +587,7 @@
     },
     "integrations/amplitude": {
       "name": "@slates-integrations/amplitude",
-      "version": "0.2.0-rc.9",
+      "version": "0.2.2",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -595,7 +595,7 @@
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.12",
+        "@slates/test": "1.0.0-rc.14",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -3316,7 +3316,7 @@
     },
     "integrations/datadog": {
       "name": "@slates-integrations/datadog",
-      "version": "0.2.0-rc.9",
+      "version": "0.2.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -13528,7 +13528,7 @@
     },
     "integrations/vercel": {
       "name": "@slates-integrations/vercel",
-      "version": "0.2.0-rc.9",
+      "version": "0.2.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/provider": "1.0.0-rc.18",

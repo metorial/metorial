@@ -49,6 +49,12 @@ export let postEvent = SlateTool.create(spec, {
   .output(
     z.object({
       eventId: z.number().describe('ID of the created event'),
+      eventIdString: z
+        .string()
+        .optional()
+        .describe(
+          'Exact Event ID. Pass this to get_event to avoid rounding large numeric IDs.'
+        ),
       title: z.string().describe('Event title'),
       url: z.string().optional().describe('URL of the event in Datadog'),
       status: z.string().describe('Submission status')
@@ -63,11 +69,12 @@ export let postEvent = SlateTool.create(spec, {
     return {
       output: {
         eventId: event.id,
+        eventIdString: event.id_str,
         title: event.title || ctx.input.title,
         url: event.url,
         status: result.status || 'ok'
       },
-      message: `Posted event **${ctx.input.title}** (ID: ${event.id})`
+      message: `Posted event **${ctx.input.title}** (ID: ${event.id_str ?? event.id})`
     };
   })
   .build();

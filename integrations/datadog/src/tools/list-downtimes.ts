@@ -42,13 +42,13 @@ export let listDowntimes = SlateTool.create(spec, {
 
     let downtimes = (result.data || []).map((downtime: any) => ({
       downtimeId: downtime.id,
-      status: downtime.attributes?.status,
-      scope: downtime.attributes?.scope,
-      message: downtime.attributes?.message,
-      monitorId: downtime.attributes?.monitor_identifier?.monitor_id,
-      monitorTags: downtime.attributes?.monitor_identifier?.monitor_tags,
-      created: downtime.attributes?.created,
-      modified: downtime.attributes?.modified
+      status: downtime.attributes?.status ?? undefined,
+      scope: downtime.attributes?.scope ?? undefined,
+      message: downtime.attributes?.message ?? undefined,
+      monitorId: downtime.attributes?.monitor_identifier?.monitor_id ?? undefined,
+      monitorTags: downtime.attributes?.monitor_identifier?.monitor_tags ?? undefined,
+      created: downtime.attributes?.created ?? undefined,
+      modified: downtime.attributes?.modified ?? undefined
     }));
 
     return {

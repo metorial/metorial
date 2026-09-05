@@ -39,16 +39,16 @@ export let getSlo = SlateTool.create(spec, {
     return {
       output: {
         sloId: slo.id || ctx.input.sloId,
-        name: slo.name,
-        type: slo.type,
-        description: slo.description,
-        tags: slo.tags,
-        thresholds: slo.thresholds,
-        monitorIds: slo.monitor_ids,
-        query: slo.query,
-        groups: slo.groups,
-        createdAt: slo.created_at,
-        modifiedAt: slo.modified_at
+        name: slo.name ?? undefined,
+        type: slo.type ?? undefined,
+        description: slo.description ?? undefined,
+        tags: slo.tags ?? undefined,
+        thresholds: slo.thresholds ?? undefined,
+        monitorIds: slo.monitor_ids ?? undefined,
+        query: slo.query ?? undefined,
+        groups: slo.groups ?? undefined,
+        createdAt: slo.created_at ?? undefined,
+        modifiedAt: slo.modified_at ?? undefined
       },
       message: `Retrieved SLO **${slo.name || ctx.input.sloId}**`
     };

@@ -29,6 +29,8 @@ All requests to Datadog's API must be authenticated. Requests that write data re
 
 You must use the correct site URL matching your Datadog account region.
 
+Select the site during authentication. The saved authentication retains it; tools also support the site on older connection configurations.
+
 ### 2. OAuth2 (Authorization Code Grant with PKCE)
 
 Datadog uses the OAuth 2.0 (OAuth2) Authorization Framework to allow users to securely authorize third-party applications' access to restricted Datadog resources on behalf of the user. The access that applications have is determined by scopes, which enable users to grant explicit consent for a specific set of granular permissions requested by the application.
@@ -62,6 +64,8 @@ The Logs API provides endpoints for sending logs directly to Datadog, configurin
 ### Events
 
 The Events API is used to post and retrieve events from the Datadog event stream. Events can represent deployments, alerts, or any significant occurrences in your environment.
+
+Event tools expose `eventIdString` using Datadog's exact `id_str` value. Prefer this over the legacy numeric `eventId` when retrieving an event, since large IDs exceed JavaScript's safe integer range.
 
 ### Incident Management
 

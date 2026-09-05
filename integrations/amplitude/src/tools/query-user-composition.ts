@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
+import { dashboardDataSchema, parseResponse } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let queryUserCompositionTool = SlateTool.create(spec, {
@@ -12,12 +13,13 @@ export let queryUserCompositionTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       property: z
         .string()
         .describe(
-          'User property to analyze the distribution of (e.g., "country", "platform", "plan").'
+          'User property to analyze (for example country or platform). Prefix custom properties with gp:, for example gp:plan.'
         ),
       start: z.string().describe('Start date in YYYYMMDD format.'),
       end: z.string().describe('End date in YYYYMMDD format.')
@@ -25,16 +27,11 @@ export let queryUserCompositionTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      compositionData: z.any().describe('User property distribution data.')
+      compositionData: z.unknown().describe('User property distribution data.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let result = await client.getUserComposition({
       start: ctx.input.start,
@@ -43,7 +40,9 @@ export let queryUserCompositionTool = SlateTool.create(spec, {
     });
 
     return {
-      output: { compositionData: result.data ?? result },
+      output: {
+        compositionData: parseResponse(dashboardDataSchema, result.data, 'analytics query')
+      },
       message: `Retrieved user composition for property "${ctx.input.property}" from **${ctx.input.start}** to **${ctx.input.end}**.`
     };
   })

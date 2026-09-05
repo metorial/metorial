@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
+import { dashboardDataSchema, parseResponse } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let queryRetentionTool = SlateTool.create(spec, {
@@ -16,6 +17,7 @@ export let queryRetentionTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       startEvent: z
@@ -32,6 +34,16 @@ export let queryRetentionTool = SlateTool.create(spec, {
         .enum(['n-day', 'unbounded', 'bracket'])
         .optional()
         .describe('Retention calculation mode. Default is "n-day".'),
+      brackets: z
+        .string()
+        .optional()
+        .describe(
+          'Required for bracket mode. JSON array of [start day, exclusive end day] pairs, for example [[0,5],[5,10]].'
+        ),
+      interval: z
+        .number()
+        .optional()
+        .describe('Retention interval: 1 (daily), 7 (weekly), or 30 (monthly).'),
       segment: z
         .string()
         .optional()
@@ -39,29 +51,24 @@ export let queryRetentionTool = SlateTool.create(spec, {
       groupBy: z
         .string()
         .optional()
-        .describe('JSON-encoded group-by clause for retention breakdown.')
+        .describe('User property for retention breakdown, for example country or gp:plan.')
     })
   )
   .output(
     z.object({
       series: z
-        .array(z.any())
+        .array(z.unknown())
         .optional()
         .describe('Retention percentages for each cohort/day.'),
       counts: z
-        .array(z.any())
+        .array(z.unknown())
         .optional()
         .describe('Absolute user counts for each retention period.'),
-      retentionData: z.any().optional().describe('Full retention analysis result data.')
+      retentionData: z.unknown().optional().describe('Full retention analysis result data.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let rmMap: Record<string, string> = {
       'n-day': 'n-day',
@@ -75,16 +82,17 @@ export let queryRetentionTool = SlateTool.create(spec, {
       start: ctx.input.start,
       end: ctx.input.end,
       rm: ctx.input.retentionMode ? rmMap[ctx.input.retentionMode] : undefined,
+      rb: ctx.input.brackets,
+      interval: ctx.input.interval,
       segment: ctx.input.segment,
       groupBy: ctx.input.groupBy
     });
 
-    let data = result.data ?? result;
+    let data = parseResponse(dashboardDataSchema, result.data, 'analytics query');
 
     return {
       output: {
         series: data.series,
-        counts: data.counts,
         retentionData: data
       },
       message: `Retention analysis completed from **${ctx.input.start}** to **${ctx.input.end}**.`

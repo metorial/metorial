@@ -82,13 +82,16 @@ export let manageTeamsTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId: ctx.auth.teamId ?? ctx.config.teamId
     });
 
     let { action } = ctx.input;
 
     if (action === 'list_teams') {
-      let result = await client.listTeams({ limit: ctx.input.limit });
+      // Integration tokens can read their installed team, but cannot enumerate all teams.
+      let result = ctx.auth.teamId
+        ? { teams: [await client.getTeam(ctx.auth.teamId)] }
+        : await client.listTeams({ limit: ctx.input.limit });
       let teams = (result.teams || []).map((t: any) => ({
         teamId: t.id,
         name: t.name,
