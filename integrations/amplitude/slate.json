@@ -1,6 +1,6 @@
 {
   "name": "@metorial/amplitude",
-  "description": "Ingest events, query analytics, download raw events and saved chart CSVs, manage cohorts and taxonomy, update user properties, and handle annotations and privacy requests through Amplitude REST APIs. OAuth adds user and project discovery, saved chart reads and queries, feature flags, and tracking-plan search. Experiment configuration and deployments require an optional management API key. Chart authoring, rendering, saving, renaming, experiment statistical analysis, dashboards, notebooks, and monitors are not currently available through this integration's verified REST endpoints.",
+  "description": "Ingest events, query analytics, download exports, and manage cohorts, taxonomy, user properties, annotations, and privacy requests through Amplitude REST APIs. Discover projects, events, properties, flags, and experiments; compare exposure-to-conversion funnels; create downloadable dashboard and notebook reports; and check saved-chart thresholds on demand. OAuth enables saved-chart discovery and reports. Experiment management reads require a separate management API key. Search users, inspect event history, download session replay chunks and cohort members, and query acquisition-cohort revenue lifetime value and five-minute active users using project credentials.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
   "skills": [
     "ingest event data",
@@ -12,7 +12,15 @@
     "lookup user profiles",
     "manage taxonomy tracking plan",
     "stream events via webhooks",
-    "handle user privacy requests"
+    "handle user privacy requests",
+    "compare experiment conversion funnels",
+    "create downloadable analytics reports",
+    "check chart thresholds",
+    "search users and inspect activity",
+    "download session replay recordings",
+    "export cohort membership",
+    "analyze revenue lifetime value",
+    "query real-time active users"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/amplitude.svg"
 }

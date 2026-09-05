@@ -156,12 +156,51 @@ export class AmplitudeDeveloperClient {
       { params: input }
     );
   }
+  getEventProperty(projectId: string, eventId: string, propertyName: string) {
+    return this.request(
+      'GET',
+      `/v1/projects/${encodeURIComponent(projectId)}/events/${encodeURIComponent(eventId)}/event-properties/${encodeURIComponent(propertyName)}`,
+      developerResultSchema
+    );
+  }
   listUserProperties(projectId: string, input: DeveloperPageInput = {}) {
     return this.request(
       'GET',
       `/v1/projects/${encodeURIComponent(projectId)}/user-properties`,
       developerListSchema,
       { params: input }
+    );
+  }
+  getUserProperty(projectId: string, propertyName: string) {
+    return this.request(
+      'GET',
+      `/v1/projects/${encodeURIComponent(projectId)}/user-properties/${encodeURIComponent(propertyName)}`,
+      developerResultSchema
+    );
+  }
+  async findProject(projectId: string) {
+    let cursor: string | undefined;
+    const seenCursors = new Set<string>();
+    for (let page = 0; page < 50; page++) {
+      const result = await this.listProjects({ limit: 200, cursor });
+      const project = result.data.find(item => item.id === projectId);
+      if (project) return project;
+      if (!result.pagination.has_more)
+        throw createApiServiceError(
+          `Project "${projectId}" was not found among accessible Amplitude projects.`,
+          { reason: 'amplitude_project_not_found' }
+        );
+      const nextCursor = result.pagination.next_cursor;
+      if (!nextCursor || seenCursors.has(nextCursor))
+        throw createApiServiceError('Amplitude returned invalid project pagination.', {
+          reason: 'amplitude_invalid_response'
+        });
+      seenCursors.add(nextCursor);
+      cursor = nextCursor;
+    }
+    throw createApiServiceError(
+      'Project lookup reached its 50-page limit before finding the requested project. Browse get_amplitude_context pages to confirm access and retry with an accessible project ID.',
+      { reason: 'amplitude_project_lookup_limit' }
     );
   }
   listFlags(projectId: string, input: Pick<DeveloperPageInput, 'cursor' | 'limit'> = {}) {

@@ -59,6 +59,9 @@ export const createAmplitudeExperimentClient = (ctx: {
     }
   };
   return {
+    getFlag: (id: string) => get(`/flags/${encodeURIComponent(id)}`),
+    listFlags: (params: { projectId?: string; limit?: number; cursor?: number }) =>
+      get('/flags', params),
     getExperiment: (id: string) => get(`/experiments/${encodeURIComponent(id)}`),
     listExperiments: (params: {
       key?: string;

@@ -44,7 +44,7 @@ export let auth = SlateAuth.create()
         .min(1)
         .optional()
         .describe(
-          'Optional Experiment management API key from the Experiment Management API settings. Required only for get_experiments and get_deployments; this is not the project API key or deployment key.'
+          'Optional Experiment management API key from the Experiment Management API settings. Required for get_experiments, get_deployments, and management-key flag or experiment discovery; this is not the project API key or deployment key.'
         )
     }),
 

@@ -84,10 +84,10 @@ export interface ClientConfig {
   region: AmplitudeRegion;
 }
 
-export let createAmplitudeClient = (ctx: {
+export let resolveAmplitudeConfig = (ctx: {
   auth: { apiKey?: string; secretKey?: string; token?: string; region?: AmplitudeRegion };
   config?: { region?: unknown };
-}) => {
+}): ClientConfig => {
   if (!ctx.auth.apiKey || !ctx.auth.secretKey) {
     throw amplitudeServiceError(
       'This tool requires a project API key and secret key connection.'
@@ -99,13 +99,16 @@ export let createAmplitudeClient = (ctx: {
       'Amplitude region must be US or EU. Reconnect with the correct data residency region.'
     );
   }
-  return new AmplitudeClient({
+  return {
     apiKey: ctx.auth.apiKey,
     secretKey: ctx.auth.secretKey,
     token: Buffer.from(`${ctx.auth.apiKey}:${ctx.auth.secretKey}`).toString('base64'),
     region
-  });
+  };
 };
+
+export let createAmplitudeClient = (ctx: Parameters<typeof resolveAmplitudeConfig>[0]) =>
+  new AmplitudeClient(resolveAmplitudeConfig(ctx));
 
 export class AmplitudeClient {
   private config: ClientConfig;
@@ -369,11 +372,34 @@ export class AmplitudeClient {
     return response.data;
   }
 
-  async getSessionLengthDistribution(params: { start: string; end: string }) {
+  async getSessionLengthDistribution(params: {
+    start: string;
+    end: string;
+    histogram?: {
+      unit: 'hours' | 'minutes' | 'seconds';
+      min: number;
+      max: number;
+      size?: number;
+    };
+  }) {
     validateDateRange(params.start, params.end);
     let ax = this.getAnalyticsAxios();
-    let response = await ax.get('/2/sessions/length', { params });
+    let response = await ax.get('/2/sessions/length', {
+      params: {
+        start: params.start,
+        end: params.end,
+        timeHistogramConfigBinTimeUnit: params.histogram?.unit,
+        timeHistogramConfigBinMin: params.histogram?.min,
+        timeHistogramConfigBinMax: params.histogram?.max,
+        timeHistogramConfigBinSize: params.histogram?.size
+      }
+    });
     return response.data;
+  }
+
+  async getAverageSessionLength(params: { start: string; end: string }) {
+    validateDateRange(params.start, params.end);
+    return (await this.getAnalyticsAxios().get('/2/sessions/average', { params })).data;
   }
 
   async getAverageSessionsPerUser(params: { start: string; end: string }) {
@@ -730,6 +756,26 @@ export class AmplitudeClient {
   }
 
   // --- Taxonomy API ---
+
+  async getVisibleEventUsage() {
+    const response = await this.getAnalyticsAxios().get('/2/events/list');
+    return response.data;
+  }
+
+  async getGroupProperties(groupType?: string) {
+    const response = await this.getAnalyticsAxios().get('/2/taxonomy/group-property', {
+      data: groupType === undefined ? undefined : { group_type: groupType }
+    });
+    return response.data;
+  }
+
+  async getGroupProperty(propertyName: string, groupType?: string) {
+    const response = await this.getAnalyticsAxios().get(
+      `/2/taxonomy/group-property/${encodeURIComponent(propertyName)}`,
+      { data: groupType === undefined ? undefined : { group_type: groupType } }
+    );
+    return response.data;
+  }
 
   async getEventTypes() {
     let ax = this.getAnalyticsAxios();

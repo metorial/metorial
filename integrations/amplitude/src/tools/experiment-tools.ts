@@ -4,6 +4,7 @@ import {
   createAmplitudeExperimentClient,
   experimentResultSchema
 } from '../lib/experiment-client';
+import { parseResponse } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 const pagination = {
@@ -73,14 +74,43 @@ export const getDeploymentsRestTool = SlateTool.create(spec, {
   key: 'get_deployments',
   name: 'Get Amplitude Deployments',
   description:
-    'List deployments shared by Amplitude flags and experiments. Requires an Experiment management API key on the API Key + Secret Key connection. Returns identifiers and deployment configuration; follow nextCursor for subsequent pages.',
+    'List deployments shared by Amplitude flags and experiments. Requires an Experiment management API key on the API Key + Secret Key connection. Optional projectId filters only the fetched page locally; follow nextCursor even if no deployments match this page. Returns identifiers and deployment configuration.',
   tags: { readOnly: true, destructive: false }
 })
   .authMethods(['api_key_secret'])
-  .input(z.object(pagination))
+  .input(
+    z.object({
+      ...pagination,
+      projectId: z
+        .string()
+        .regex(/^\d+$/)
+        .optional()
+        .describe(
+          'Optional project ID from a deployment or get_amplitude_context. Filters one upstream page locally and preserves its nextCursor.'
+        )
+    })
+  )
   .output(experimentResultSchema)
   .handleInvocation(async ctx => {
-    const output = await createAmplitudeExperimentClient(ctx).listDeployments(ctx.input);
+    const { projectId, ...page } = ctx.input;
+    const output = await createAmplitudeExperimentClient(ctx).listDeployments(page);
+    if (projectId !== undefined) {
+      const deployments = parseResponse(
+        z.array(
+          z
+            .object({
+              projectId: z.union([
+                z.string().regex(/^\d+$/),
+                z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)
+              ])
+            })
+            .passthrough()
+        ),
+        output.deployments,
+        'deployment project filter'
+      );
+      output.deployments = deployments.filter(item => String(item.projectId) === projectId);
+    }
     return { output, message: 'Retrieved Amplitude Experiment deployments.' };
   })
   .build();

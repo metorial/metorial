@@ -17,8 +17,11 @@ import {
   queryUserCompositionTool,
   trackEventsTool
 } from './tools';
+import { amplitudeReportTools } from './tools/analytics-reports';
 import { amplitudeDeveloperTools } from './tools/developer-tools';
 import { amplitudeExperimentTools } from './tools/experiment-tools';
+import { amplitudeProjectAnalyticsTools } from './tools/project-analytics';
+import { queryExperimentTool } from './tools/query-experiment';
 import { eventWebhookTrigger } from './triggers';
 
 export let provider = Slate.create({
@@ -40,7 +43,10 @@ export let provider = Slate.create({
     manageAnnotationsTool,
     deleteUserDataTool,
     ...amplitudeDeveloperTools,
-    ...amplitudeExperimentTools
+    ...amplitudeExperimentTools,
+    queryExperimentTool,
+    ...amplitudeReportTools,
+    ...amplitudeProjectAnalyticsTools
   ],
   triggers: [eventWebhookTrigger]
 });
