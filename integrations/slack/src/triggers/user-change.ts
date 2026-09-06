@@ -1,28 +1,46 @@
-import { SlateDefaultPollingIntervalSeconds, SlateTrigger } from 'slates';
+import { SlateTrigger } from 'slates';
 import { z } from 'zod';
-import { SlackClient } from '../lib/client';
 import { slackActionScopes } from '../lib/scopes';
 import { spec } from '../spec';
+import { slackEventsTriggerGroup } from './eventsTriggerGroup';
+
+let slackUserChangeEvent = z
+  .object({
+    type: z.literal('user_change'),
+    event_ts: z.string().optional(),
+    user: z
+      .object({
+        id: z.string(),
+        name: z.string().optional(),
+        real_name: z.string().optional(),
+        is_admin: z.boolean().optional(),
+        is_bot: z.boolean().optional(),
+        deleted: z.boolean().optional(),
+        updated: z.number().optional(),
+        profile: z
+          .object({
+            email: z.string().optional(),
+            display_name: z.string().optional(),
+            title: z.string().optional(),
+            status_text: z.string().optional(),
+            status_emoji: z.string().optional(),
+            image_192: z.string().optional()
+          })
+          .loose()
+          .optional()
+      })
+      .loose()
+  })
+  .loose();
 
 export let userChange = SlateTrigger.create(spec, {
   name: 'User Change',
   key: 'user_change',
-  description:
-    '[Polling fallback] Triggers when a user joins the workspace or when user profile/status changes. Polls the user list to detect new members and profile updates.'
+  description: "Triggers when a user's profile, status, or account state changes."
 })
   .scopes(slackActionScopes.userChange)
-  .input(
-    z.object({
-      eventType: z.enum(['joined', 'updated']).describe('Type of user event'),
-      userId: z.string().describe('User ID'),
-      name: z.string().optional().describe('Username'),
-      realName: z.string().optional().describe('Real name'),
-      email: z.string().optional().describe('Email address'),
-      isBot: z.boolean().optional().describe('Whether this is a bot'),
-      deleted: z.boolean().optional().describe('Whether the user is deactivated'),
-      updatedAt: z.number().optional().describe('Last update timestamp')
-    })
-  )
+  .triggerGroup(slackEventsTriggerGroup)
+  .input(slackUserChangeEvent)
   .output(
     z.object({
       userId: z.string().describe('User ID'),
@@ -39,98 +57,27 @@ export let userChange = SlateTrigger.create(spec, {
       avatarUrl: z.string().optional().describe('User avatar URL')
     })
   )
-  .polling({
-    options: {
-      intervalInSeconds: SlateDefaultPollingIntervalSeconds * 3
-    },
+  .matches(payload => (payload as { type?: unknown }).type === 'user_change')
+  .map(async ctx => {
+    let user = ctx.input.user;
 
-    pollEvents: async ctx => {
-      let client = new SlackClient(ctx.auth.token);
-      let state = ctx.state as { knownUsers?: Record<string, number> } | null;
-      let knownUsers = state?.knownUsers || {};
-
-      let result = await client.listUsers({ limit: 200 });
-      let inputs: Array<{
-        eventType: 'joined' | 'updated';
-        userId: string;
-        name?: string;
-        realName?: string;
-        email?: string;
-        isBot?: boolean;
-        deleted?: boolean;
-        updatedAt?: number;
-      }> = [];
-
-      let updatedKnown: Record<string, number> = {};
-
-      for (let user of result.members) {
-        let updatedTs = user.updated || 0;
-        updatedKnown[user.id] = updatedTs;
-
-        let previousTs = knownUsers[user.id];
-
-        if (previousTs === undefined) {
-          if (Object.keys(knownUsers).length > 0) {
-            inputs.push({
-              eventType: 'joined',
-              userId: user.id,
-              name: user.name,
-              realName: user.real_name,
-              email: user.profile?.email,
-              isBot: user.is_bot,
-              deleted: user.deleted,
-              updatedAt: updatedTs
-            });
-          }
-        } else if (updatedTs > previousTs) {
-          inputs.push({
-            eventType: 'updated',
-            userId: user.id,
-            name: user.name,
-            realName: user.real_name,
-            email: user.profile?.email,
-            isBot: user.is_bot,
-            deleted: user.deleted,
-            updatedAt: updatedTs
-          });
-        }
+    return {
+      type: 'user.changed',
+      id: `user-change-${user.id}-${user.updated ?? ctx.input.event_ts ?? Date.now()}`,
+      output: {
+        userId: user.id,
+        name: user.name,
+        realName: user.real_name,
+        displayName: user.profile?.display_name,
+        email: user.profile?.email,
+        title: user.profile?.title,
+        statusText: user.profile?.status_text,
+        statusEmoji: user.profile?.status_emoji,
+        isAdmin: user.is_admin,
+        isBot: user.is_bot,
+        deleted: user.deleted,
+        avatarUrl: user.profile?.image_192
       }
-
-      return {
-        inputs,
-        updatedState: {
-          knownUsers: updatedKnown
-        }
-      };
-    },
-
-    handleEvent: async ctx => {
-      let userDetails: any = {};
-      try {
-        let client = new SlackClient(ctx.auth.token);
-        userDetails = await client.getUserInfo(ctx.input.userId);
-      } catch {
-        // Couldn't fetch full user details
-      }
-
-      return {
-        type: `user.${ctx.input.eventType}`,
-        id: `user-${ctx.input.userId}-${ctx.input.eventType}-${ctx.input.updatedAt || Date.now()}`,
-        output: {
-          userId: ctx.input.userId,
-          name: ctx.input.name || userDetails.name,
-          realName: ctx.input.realName || userDetails.real_name,
-          displayName: userDetails.profile?.display_name,
-          email: ctx.input.email || userDetails.profile?.email,
-          title: userDetails.profile?.title,
-          statusText: userDetails.profile?.status_text,
-          statusEmoji: userDetails.profile?.status_emoji,
-          isAdmin: userDetails.is_admin,
-          isBot: ctx.input.isBot || userDetails.is_bot,
-          deleted: ctx.input.deleted || userDetails.deleted,
-          avatarUrl: userDetails.profile?.image_192
-        }
-      };
-    }
+    };
   })
   .build();

@@ -51,16 +51,30 @@ import {
   whoAmI
 } from './tools';
 import {
-  channelActivity,
+  appMentioned,
+  channelArchived,
+  channelCreated,
+  channelRenamed,
+  channelUnarchived,
+  memberJoinedChannel,
+  memberLeftChannel,
+  messageDeleted,
+  messageEdited,
   newFile,
   newMessage,
-  newMessageWebhook,
   newReaction,
-  userChange
+  reactionRemoved,
+  slackEventsTriggerGroup,
+  teamJoin,
+  userChange,
+  userGroupCreated,
+  userGroupMembersChanged,
+  userGroupUpdated
 } from './triggers';
 
 export let provider = Slate.create({
   spec,
+  triggerGroups: [slackEventsTriggerGroup],
   tools: [
     sendMessage,
     updateMessage,
@@ -111,5 +125,24 @@ export let provider = Slate.create({
     manageDnd,
     managePresence
   ],
-  triggers: [newMessage, newMessageWebhook, channelActivity, newReaction, newFile, userChange]
+  triggers: [
+    newMessage,
+    messageEdited,
+    messageDeleted,
+    appMentioned,
+    newReaction,
+    reactionRemoved,
+    newFile,
+    memberJoinedChannel,
+    memberLeftChannel,
+    teamJoin,
+    channelCreated,
+    channelRenamed,
+    channelArchived,
+    channelUnarchived,
+    userChange,
+    userGroupCreated,
+    userGroupUpdated,
+    userGroupMembersChanged
+  ]
 });

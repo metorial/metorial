@@ -14,9 +14,20 @@ The release is additive. These 21 established tool keys remain registered (`sear
 - `search_messages`, `search_files`
 - `manage_reminders`, `manage_user_groups`, `manage_bookmarks`, `get_team_info`
 
-The existing `new_message`, channel-activity, reaction, file, and user-change triggers are unchanged. The message-webhook trigger now answers Slack URL verification challenges synchronously and optionally verifies signed requests.
+All triggers now run on the single shared `events` trigger group instead of each owning a polling/webhook invocation directly or a dedicated single-purpose trigger group. There is no polling fallback anymore: every trigger corresponds to a real Slack Events API event type, so it fires the moment Slack delivers it rather than on the next poll interval. The triggers, grouped by file:
 
-The message-webhook trigger targets customer-owned Slack apps. Configure each app's Events Request URL with the callback instance's `webhookUrl` and provide its Signing Secret to reject missing, stale, or invalid signatures. Slack supports one Events Request URL per app, so each callback instance needs a separate Slack app. Only URL verification requests use the synchronous response path; ordinary message events retain queued callback delivery.
+- `messages.ts`: `new_message` (`message`, any subtype except edits/deletes), `message_edited` (`message_changed`), `message_deleted` (`message_deleted`)
+- `app-mention.ts`: `app_mentioned` (`app_mention`)
+- `reactions.ts`: `new_reaction` (`reaction_added`), `reaction_removed` (`reaction_removed`)
+- `files.ts`: `new_file` (`file_shared`)
+- `membership.ts`: `member_joined_channel` (`member_joined_channel`), `member_left_channel` (`member_left_channel`), `team_join` (`team_join`)
+- `channels.ts`: `channel_created` (`channel_created`), `channel_renamed` (`channel_rename`), `channel_archived` (`channel_archive`), `channel_unarchived` (`channel_unarchive`)
+- `user-change.ts`: `user_change` (`user_change`)
+- `user-groups.ts`: `user_group_created` (`subteam_created`), `user_group_updated` (`subteam_updated`), `user_group_members_changed` (`subteam_members_changed`)
+
+Deliberately not implemented: workspace-domain-change, link-shared, pin, and DND triggers - low enough value to skip for now, and (except pins) can be added later without touching the routing model. Anything Slack has no push event for (e.g. bookmarks, reminders firing) is out of scope entirely rather than falling back to polling.
+
+The `events` trigger group receives Slack's Events API through **one shared, Metorial-owned Slack app** rather than a customer-owned app per install - Slack multiplexes every subscribed workspace's events onto that single Events Request URL, so incoming events must be routed to the right install rather than trivially identified by a per-instance URL. This is configured once as a manual, global webhook registration holding two app-level secrets (the Signing Secret and an App-Level Token with the `authorizations:read` scope), set up separately from any customer's auth. Routing works by matching: each incoming event's Slack `authorizations` (read inline off the payload, or resolved via `apps.event.authorizations.list` using `event_context` when Slack omits them) is turned into a routing matcher per authorization, and every auth config's `.routingMatchers()` produces the identical matcher shape for its own install - see `src/lib/routingMatcher.ts` for the shared construction and its enterprise-Grid/org-wide-install notes. Only URL verification requests use the synchronous response path; ordinary events retain queued callback delivery. A single Slack event is delivered once per trigger group and fanned out to every trigger bound to it - each trigger's `.matches()` decides whether that particular event is relevant to it.
 
 ## Added tools
 
@@ -84,7 +95,7 @@ The auth-method keys remain stable:
 - `bot_token`: pasted bot token
 - `user_token`: pasted user token
 
-The bot OAuth method includes the existing collaboration scopes plus `canvases:read`, `canvases:write`, `lists:read`, `lists:write`, and `emoji:read`. Unused `commands`, `incoming-webhook`, and `users.profile:read` scopes are not requested; the profile tools are user-auth-only, so profile scopes live only on the user method.
+The bot OAuth method includes the existing collaboration scopes plus `canvases:read`, `canvases:write`, `lists:read`, `lists:write`, `emoji:read`, and `app_mentions:read` (needed for the `app_mentioned` trigger). Unused `commands`, `incoming-webhook`, and `users.profile:read` scopes are not requested; the profile tools are user-auth-only, so profile scopes live only on the user method.
 
 The user OAuth method requests only the granular search scopes `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`, and `search:read.users`. The legacy `search:read` scope is not requested; Slack has deprecated it and does not accept it for Marketplace-listed apps, and all search tools now use the Real-time Search API. It also includes Canvas, Lists, custom emoji, `dnd:read`, `dnd:write`, and `users:write` scopes for the added user-productivity tools.
 

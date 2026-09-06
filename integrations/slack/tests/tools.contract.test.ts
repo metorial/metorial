@@ -128,6 +128,7 @@ describe('Slack expanded tool contract', () => {
 const BOT_OAUTH_SCOPE_MANIFEST = [
   'chat:write',
   'chat:write.public',
+  'app_mentions:read',
   'channels:read',
   'channels:manage',
   'channels:history',

@@ -15,7 +15,7 @@ type SlackProfile = {
   imageUrl?: string;
 };
 
-type SlackAuthOutput = {
+export type SlackAuthOutput = {
   token: string;
   refreshToken?: string;
   expiresAt?: string;
@@ -24,6 +24,7 @@ type SlackAuthOutput = {
   teamName?: string;
   botUserId?: string;
   userId?: string;
+  enterpriseId?: string;
 };
 
 type SlackOAuthRefreshContext = {
@@ -45,6 +46,7 @@ type SlackOAuthResponse = {
   team_id?: string;
   team_name?: string;
   team?: { id?: string; name?: string };
+  enterprise?: { id?: string; name?: string };
   bot_user_id?: string;
   authed_user?: {
     id?: string;
@@ -64,6 +66,7 @@ type SlackAuthTestResponse = {
   team?: string;
   url?: string;
   bot_id?: string;
+  enterprise_id?: string;
   error?: string;
 };
 
@@ -150,7 +153,8 @@ let mergeBotOAuthOutput = (
     teamId: data.team?.id ?? previous.teamId,
     teamName: data.team?.name ?? previous.teamName,
     botUserId: data.bot_user_id ?? previous.botUserId,
-    userId: data.authed_user?.id ?? previous.userId
+    userId: data.authed_user?.id ?? previous.userId,
+    enterpriseId: data.enterprise?.id ?? previous.enterpriseId
   };
 };
 
@@ -189,7 +193,8 @@ let mergeUserOAuthOutput = (
     teamId: data.team?.id ?? data.team_id ?? previous.teamId,
     teamName: data.team?.name ?? data.team_name ?? previous.teamName,
     botUserId: previous.botUserId,
-    userId: user?.id ?? data.user_id ?? previous.userId
+    userId: user?.id ?? data.user_id ?? previous.userId,
+    enterpriseId: data.enterprise?.id ?? previous.enterpriseId
   };
 };
 
@@ -249,7 +254,8 @@ export let auth = SlateAuth.create()
       teamId: z.string().optional(),
       teamName: z.string().optional(),
       botUserId: z.string().optional(),
-      userId: z.string().optional()
+      userId: z.string().optional(),
+      enterpriseId: z.string().optional()
     })
   )
   .addOauth({
@@ -405,7 +411,8 @@ export let auth = SlateAuth.create()
           actorType: 'bot' as const,
           teamId: data.team_id,
           teamName: data.team,
-          botUserId: data.user_id
+          botUserId: data.user_id,
+          enterpriseId: data.enterprise_id
         },
         scopes: requireSlackGrantedScopes(scopes, 'Slack Bot Token')
       };
@@ -434,7 +441,8 @@ export let auth = SlateAuth.create()
           actorType: 'user' as const,
           teamId: data.team_id,
           teamName: data.team,
-          userId: data.user_id
+          userId: data.user_id,
+          enterpriseId: data.enterprise_id
         },
         scopes: requireSlackGrantedScopes(scopes, 'Slack User Token')
       };
