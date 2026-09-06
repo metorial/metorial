@@ -1,4 +1,4 @@
-import type { SlateWebhookHttpOptions, SlateWebhookHttpResponseInit } from '../action';
+import type { SlateWebhookHttpResponseInit } from '../action';
 
 export const metaWebhookHttp = {
   methods: ['GET', 'POST'],
@@ -6,7 +6,7 @@ export const metaWebhookHttp = {
     mode: 'match',
     match: [{ method: 'GET', hasQueryParam: 'hub.mode' }]
   }
-} satisfies SlateWebhookHttpOptions;
+};
 
 export let getMetaWebhookVerificationResponse = (
   request: Request,

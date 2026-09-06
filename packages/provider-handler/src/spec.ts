@@ -2,11 +2,13 @@ import { badRequestError, notFoundError, ServiceError } from '@lowerdeck/error';
 import type {
   SlateAuthenticationMethod,
   SlatesAction,
-  SlateAdapter as SlatesAdapter
+  SlateAdapter as SlatesAdapter,
+  SlatesTriggerGroup
 } from '@slates/proto';
 import {
   type Slate,
   type SlateAdapter,
+  type SlateTrigger,
   SlateDefaultPollingIntervalSeconds
 } from '@slates/provider';
 import z from 'zod';
@@ -149,18 +151,89 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
     ...base,
     type: 'action.trigger',
     capabilities: {},
-
-    invocation:
-      a.source === 'polling'
-        ? {
-            type: 'polling',
-            intervalSeconds: a.polling.intervalInSeconds ?? SlateDefaultPollingIntervalSeconds
-          }
-        : {
-            type: 'webhook',
-            autoRegistration: !!a.autoRegisterWebhook,
-            autoUnregistration: !!a.autoUnregisterWebhook,
-            http: a.http
-          }
+    triggerGroupId: a.triggerGroup.key
   };
 };
+
+export let getTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  triggerGroupId: string
+) => {
+  let group = slate.triggerGroups.find(g => g.key === triggerGroupId);
+  if (!group) {
+    throw new ServiceError(notFoundError(`trigger_group`, triggerGroupId));
+  }
+
+  return group;
+};
+
+export let getTriggersForGroup = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  triggerGroupId: string
+): SlateTrigger<ConfigType, AuthType, any, any>[] =>
+  slate.actions.filter(
+    (action): action is SlateTrigger<ConfigType, AuthType, any, any> =>
+      action.type === 'trigger' && action.triggerGroup.key === triggerGroupId
+  );
+
+export let evaluateTriggerMatches = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  triggerGroupId: string,
+  payload: unknown
+): string[] =>
+  getTriggersForGroup(slate, triggerGroupId)
+    .filter(trigger => trigger.matches(payload))
+    .map(trigger => trigger.key);
+
+export let getWebhookAutoRegistration = <ConfigType extends {}, AuthType extends {}>(
+  group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
+) => {
+  if (group.source !== 'webhook' || !group.webhook?.autoRegistration) {
+    throw new ServiceError(
+      badRequestError({
+        message: `Trigger group does not support webhook auto-registration: ${group.key}`
+      })
+    );
+  }
+
+  return group.webhook.autoRegistration;
+};
+
+export let getWebhookManualRegistration = <ConfigType extends {}, AuthType extends {}>(
+  group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
+) => {
+  if (group.source !== 'webhook' || !group.webhook?.manualRegistration) {
+    throw new ServiceError(
+      badRequestError({
+        message: `Trigger group does not support manual webhook registration: ${group.key}`
+      })
+    );
+  }
+
+  return group.webhook.manualRegistration;
+};
+
+export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
+  group: ReturnType<typeof getTriggerGroup<ConfigType, AuthType>>
+): SlatesTriggerGroup => ({
+  id: group.key,
+  name: group.name,
+  description: group.description,
+  metadata: group.metadata,
+  invocation:
+    group.source === 'polling'
+      ? {
+          type: 'polling',
+          intervalSeconds: group.polling?.intervalSeconds ?? SlateDefaultPollingIntervalSeconds
+        }
+      : {
+          type: 'webhook',
+          registration: group.webhook?.manualRegistration
+            ? {
+                mode: 'manual',
+                userConfigSchema: toJsonSchema(group.webhook.manualRegistration.userConfigSchema),
+                fullConfigSchema: toJsonSchema(group.webhook.manualRegistration.fullConfigSchema)
+              }
+            : { mode: 'auto' }
+        }
+});

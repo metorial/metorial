@@ -7,9 +7,6 @@ import {
   type SlatesMessageActionInvokeResponse,
   type SlatesMessageActionsListResponse,
   type SlatesMessageActionTriggerEventMapResponse,
-  type SlatesMessageActionTriggerWebhookHandleResponse,
-  type SlatesMessageActionTriggerWebhookRegisterResponse,
-  type SlatesMessageActionTriggerWebhookUnregisterResponse,
   type SlatesMessageAuthAuthorizationUrlGetResponse,
   type SlatesMessageAuthDefaultInputGetResponse,
   type SlatesMessageAuthInputChangedResponse,
@@ -21,6 +18,16 @@ import {
   type SlatesMessageConfigDefaultGetResponse,
   type SlatesMessageConfigSchemaGetResponse,
   type SlatesMessageProviderIdentifyResponse,
+  type SlatesMessageTriggerGroupGetResponse,
+  type SlatesMessageTriggerGroupPollingPollResponse,
+  type SlatesMessageTriggerGroupRoutingMatchersGetResponse,
+  type SlatesMessageTriggerGroupsListResponse,
+  type SlatesMessageTriggerGroupWebhookManualFinishResponse,
+  type SlatesMessageTriggerGroupWebhookManualSetupResponse,
+  type SlatesMessageTriggerGroupWebhookProcessResponse,
+  type SlatesMessageTriggerGroupWebhookRegisterResponse,
+  type SlatesMessageTriggerGroupWebhookTargetsListResponse,
+  type SlatesMessageTriggerGroupWebhookUnregisterResponse,
   type SlatesParticipant,
   type SlatesRequests,
   type SlatesResponsesByMethod
@@ -341,27 +348,70 @@ export class SlatesProtocolClient {
     });
   }
 
-  async registerTriggerWebhook(
-    actionId: string,
-    webhookBaseUrl: string
-  ): Promise<SlatesMessageActionTriggerWebhookRegisterResponse['result']> {
+  async listTriggerGroups(): Promise<SlatesMessageTriggerGroupsListResponse['result']> {
+    return this.request('slates/trigger_groups.list', {});
+  }
+
+  async getTriggerGroup(
+    triggerGroupId: string
+  ): Promise<SlatesMessageTriggerGroupGetResponse['result']> {
+    return this.request('slates/trigger_group.get', { triggerGroupId });
+  }
+
+  async listTriggerGroupWebhookTargets(d: {
+    triggerGroupId: string;
+    pageToken?: any;
+  }): Promise<SlatesMessageTriggerGroupWebhookTargetsListResponse['result']> {
     this.ensureSession();
-    return this.request('slates/action.trigger.webhook_register', {
-      actionId,
-      webhookBaseUrl
+    return this.request('slates/trigger_group.webhook.targets_list', {
+      triggerGroupId: d.triggerGroupId,
+      pageToken: d.pageToken ?? null
     });
   }
 
-  async handleTriggerWebhook(d: {
-    actionId: string;
+  async registerTriggerGroupWebhook(d: {
+    triggerGroupId: string;
+    webhookTargetIdentifier: string;
+    webhookTargetPayload: any;
+    webhookUrl: string;
+  }): Promise<SlatesMessageTriggerGroupWebhookRegisterResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/trigger_group.webhook.register', d);
+  }
+
+  async unregisterTriggerGroupWebhook(d: {
+    triggerGroupId: string;
+    webhookRegistrationIdentifier: string;
+    webhookRegistrationPayload: any;
+  }): Promise<SlatesMessageTriggerGroupWebhookUnregisterResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/trigger_group.webhook.unregister', d);
+  }
+
+  async setupTriggerGroupWebhookManually(d: {
+    triggerGroupId: string;
+    webhookUrl: string;
+  }): Promise<SlatesMessageTriggerGroupWebhookManualSetupResponse['result']> {
+    return this.request('slates/trigger_group.webhook.manual_setup', d);
+  }
+
+  async finishTriggerGroupWebhookManualSetup(d: {
+    triggerGroupId: string;
+    webhookUrl: string;
+    partialWebhookRegistrationPayload: any;
+    userWebhookRegistrationPayload: any;
+  }): Promise<SlatesMessageTriggerGroupWebhookManualFinishResponse['result']> {
+    return this.request('slates/trigger_group.webhook.manual_finish', d);
+  }
+
+  async processTriggerGroupWebhook(d: {
+    triggerGroupId: string;
     url: string;
     method: string;
     headers?: Record<string, string>;
     body?: string | Uint8Array | null;
-    state?: any;
-    registrationDetails?: any;
-  }): Promise<SlatesMessageActionTriggerWebhookHandleResponse['result']> {
-    this.ensureSession();
+    webhookRegistrationPayload: any;
+  }): Promise<SlatesMessageTriggerGroupWebhookProcessResponse['result']> {
     let encodedBody =
       typeof d.body === 'string'
         ? Buffer.from(d.body, 'utf-8').toString('base64')
@@ -369,8 +419,8 @@ export class SlatesProtocolClient {
           ? Buffer.from(d.body).toString('base64')
           : null;
 
-    return this.request('slates/action.trigger.webhook_handle', {
-      actionId: d.actionId,
+    return this.request('slates/trigger_group.webhook.process', {
+      triggerGroupId: d.triggerGroupId,
       url: d.url,
       method: d.method,
       headers: d.headers ?? {},
@@ -380,22 +430,24 @@ export class SlatesProtocolClient {
             content: encodedBody
           }
         : null,
-      state: d.state ?? null,
-      registrationDetails: d.registrationDetails ?? null
+      webhookRegistrationPayload: d.webhookRegistrationPayload
     });
   }
 
-  async unregisterTriggerWebhook(d: {
-    actionId: string;
-    webhookBaseUrl: string;
-    registrationDetails: any;
-    state?: any;
-  }): Promise<SlatesMessageActionTriggerWebhookUnregisterResponse['result']> {
+  async getTriggerGroupRoutingMatchers(
+    triggerGroupId: string
+  ): Promise<SlatesMessageTriggerGroupRoutingMatchersGetResponse['result']> {
     this.ensureSession();
-    return this.request('slates/action.trigger.webhook_unregister', {
-      actionId: d.actionId,
-      webhookBaseUrl: d.webhookBaseUrl,
-      registrationDetails: d.registrationDetails,
+    return this.request('slates/trigger_group.routing_matchers.get', { triggerGroupId });
+  }
+
+  async pollTriggerGroup(d: {
+    triggerGroupId: string;
+    state?: any;
+  }): Promise<SlatesMessageTriggerGroupPollingPollResponse['result']> {
+    this.ensureSession();
+    return this.request('slates/trigger_group.polling.poll', {
+      triggerGroupId: d.triggerGroupId,
       state: d.state ?? null
     });
   }

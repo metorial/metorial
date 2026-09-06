@@ -5,6 +5,13 @@ import { listAuth, setupAuth } from './auth';
 import { getConfig, setConfig } from './config';
 import { getProfile } from './profiles';
 import { callTool, getTool, listTools } from './tools';
+import {
+  getTrigger,
+  getTriggerGroup,
+  listTriggerGroups,
+  listTriggers,
+  pollTriggerGroup
+} from './triggers';
 
 let printHelp = () => {
   console.log(
@@ -14,6 +21,11 @@ let printHelp = () => {
       '  tools',
       '  tool <toolId>',
       '  call <toolId>',
+      '  triggers',
+      '  trigger <triggerId>',
+      '  trigger-groups',
+      '  trigger-group <triggerGroupId>',
+      '  poll <triggerGroupId>',
       '  auth list',
       '  auth setup [authMethodId]',
       '  config get',
@@ -56,6 +68,26 @@ export let startRepl = async (opts: WithProfile) => {
 
       case 'call':
         print(await callTool({ ...opts, toolId: rest[0] }));
+        break;
+
+      case 'triggers':
+        print(await listTriggers(opts));
+        break;
+
+      case 'trigger':
+        print(await getTrigger({ ...opts, triggerId: rest[0] }));
+        break;
+
+      case 'trigger-groups':
+        print(await listTriggerGroups(opts));
+        break;
+
+      case 'trigger-group':
+        print(await getTriggerGroup({ ...opts, triggerGroupId: rest[0] }));
+        break;
+
+      case 'poll':
+        print(await pollTriggerGroup({ ...opts, triggerGroupId: rest[0] }));
         break;
 
       case 'auth':

@@ -1,4 +1,4 @@
-import type { SlateTool, SlateTrigger } from '../action';
+import type { SlateTool, SlateTrigger, SlateTriggerGroup } from '../action';
 import type { SlateAdapter } from '../adapter';
 import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from './specification';
@@ -10,7 +10,8 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
       | SlateTrigger<ConfigType, AuthType, any, any>
       | SlateTool<ConfigType, AuthType, any, any>
     )[],
-    private readonly _adapters: SlateAdapter<ConfigType, AuthType>[]
+    private readonly _adapters: SlateAdapter<ConfigType, AuthType>[],
+    private readonly _triggerGroups: SlateTriggerGroup<ConfigType, AuthType>[]
   ) {}
 
   static create<ConfigType extends {}, AuthType extends {}>(params: {
@@ -18,6 +19,7 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
     triggers: SlateTrigger<ConfigType, AuthType, any, any>[];
     tools: SlateTool<ConfigType, AuthType, any, any>[];
     adapters?: SlateAdapter<ConfigType, AuthType>[];
+    triggerGroups?: SlateTriggerGroup<ConfigType, AuthType>[];
   }) {
     let adapters = params.adapters ?? [];
     let actions = [...params.triggers, ...params.tools];
@@ -47,7 +49,18 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
       }
     }
 
-    return new Slate(params.spec, actions, adapters);
+    let triggerGroups = params.triggerGroups ?? [];
+    let seenTriggerGroupKeys = new Set<string>();
+    for (let group of triggerGroups) {
+      if (seenTriggerGroupKeys.has(group.key)) {
+        throw new SlateDeclarationError(
+          `Trigger group "${group.key}" is registered more than once`
+        );
+      }
+      seenTriggerGroupKeys.add(group.key);
+    }
+
+    return new Slate(params.spec, actions, adapters, triggerGroups);
   }
 
   get spec() {
@@ -60,5 +73,9 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
 
   get adapters() {
     return this._adapters;
+  }
+
+  get triggerGroups() {
+    return this._triggerGroups;
   }
 }

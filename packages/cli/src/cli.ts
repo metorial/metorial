@@ -5,23 +5,36 @@ import {
   addOAuthCredentials,
   addProfile,
   callTool,
+  finishTriggerGroupWebhookManualSetup,
   getAuth,
   getConfig,
   getConfigSchema,
   getProfile,
   getTool,
+  getTrigger,
+  getTriggerGroup,
+  getTriggerGroupRoutingMatchers,
   listAuth,
   listOAuthCredentials,
   listProfiles,
   listTools,
+  listTriggerGroups,
+  listTriggerGroupWebhookTargets,
+  listTriggers,
+  mapTriggerEvent,
+  pollTriggerGroup,
+  processTriggerGroupWebhook,
   refreshAuth,
+  registerTriggerGroupWebhook,
   removeProfile,
   runAllIntegrationTests,
   runVitestWithProfile,
   setConfig,
   setupAuth,
   setupIntegration,
+  setupTriggerGroupWebhookManually,
   startRepl,
+  unregisterTriggerGroupWebhook,
   useProfile
 } from './commands';
 
@@ -165,6 +178,207 @@ if (isGlobalTestCommand) {
           toolId,
           input: opts.input,
           authMethodId: opts.authMethodId
+        })
+      )
+    );
+
+  cli
+    .command('triggers list')
+    .option('--profile', 'Profile ID or name')
+    .action(opts =>
+      printResult(() =>
+        listTriggers({
+          integration: integration!,
+          profile: opts.profile
+        })
+      )
+    );
+
+  cli
+    .command('triggers get [triggerId]')
+    .option('--profile', 'Profile ID or name')
+    .action((triggerId: string | undefined, opts) =>
+      printResult(() =>
+        getTrigger({
+          integration: integration!,
+          profile: opts.profile,
+          triggerId
+        })
+      )
+    );
+
+  cli
+    .command('triggers map [triggerId]')
+    .option('--profile', 'Profile ID or name')
+    .option('--input', 'JSON event input object')
+    .action((triggerId: string | undefined, opts) =>
+      printResult(() =>
+        mapTriggerEvent({
+          integration: integration!,
+          profile: opts.profile,
+          triggerId,
+          input: opts.input
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups list')
+    .option('--profile', 'Profile ID or name')
+    .action(opts =>
+      printResult(() =>
+        listTriggerGroups({
+          integration: integration!,
+          profile: opts.profile
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups get [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        getTriggerGroup({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups poll [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .option('--state', 'JSON-encoded previous poll state')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        pollTriggerGroup({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId,
+          state: opts.state
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups routing-matchers [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        getTriggerGroupRoutingMatchers({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups webhook targets [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .option('--page-token', 'JSON-encoded page token')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        listTriggerGroupWebhookTargets({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId,
+          pageToken: opts.pageToken
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups webhook register [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .option('--webhook-target-identifier', 'Webhook target identifier')
+    .option('--webhook-target-payload', 'JSON webhook target payload')
+    .option('--webhook-url', 'Webhook delivery URL')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        registerTriggerGroupWebhook({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId,
+          webhookTargetIdentifier: opts.webhookTargetIdentifier,
+          webhookTargetPayload: opts.webhookTargetPayload,
+          webhookUrl: opts.webhookUrl
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups webhook unregister [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .option('--webhook-registration-identifier', 'Webhook registration identifier')
+    .option('--webhook-registration-payload', 'JSON webhook registration payload')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        unregisterTriggerGroupWebhook({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId,
+          webhookRegistrationIdentifier: opts.webhookRegistrationIdentifier,
+          webhookRegistrationPayload: opts.webhookRegistrationPayload
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups webhook manual-setup [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .option('--webhook-url', 'Webhook delivery URL')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        setupTriggerGroupWebhookManually({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId,
+          webhookUrl: opts.webhookUrl
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups webhook manual-finish [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .option('--webhook-url', 'Webhook delivery URL')
+    .option('--partial-payload', 'JSON partial webhook registration payload')
+    .option('--user-payload', 'JSON user-supplied webhook registration payload')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        finishTriggerGroupWebhookManualSetup({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId,
+          webhookUrl: opts.webhookUrl,
+          partialWebhookRegistrationPayload: opts.partialPayload,
+          userWebhookRegistrationPayload: opts.userPayload
+        })
+      )
+    );
+
+  cli
+    .command('trigger-groups webhook process [triggerGroupId]')
+    .option('--profile', 'Profile ID or name')
+    .option('--url', 'Simulated request URL')
+    .option('--method', 'Simulated HTTP method')
+    .option('--headers', 'JSON request headers object')
+    .option('--body', 'Raw request body')
+    .option('--webhook-registration-payload', 'JSON webhook registration payload')
+    .action((triggerGroupId: string | undefined, opts) =>
+      printResult(() =>
+        processTriggerGroupWebhook({
+          integration: integration!,
+          profile: opts.profile,
+          triggerGroupId,
+          url: opts.url,
+          method: opts.method,
+          headers: opts.headers,
+          body: opts.body,
+          webhookRegistrationPayload: opts.webhookRegistrationPayload
         })
       )
     );

@@ -14,13 +14,18 @@ import {
   SlatePublicContext
 } from '@slates/provider';
 import {
+  evaluateTriggerMatches,
   getAction,
   getActionWithType,
   getAdapter,
   getAuthMethod,
+  getTriggerGroup,
+  getWebhookAutoRegistration,
+  getWebhookManualRegistration,
   mapAction,
   mapAdapter,
-  mapAuthMethod
+  mapAuthMethod,
+  mapTriggerGroup
 } from './spec';
 import { State } from './state';
 import { toJsonSchema, validate } from './validation';
@@ -793,6 +798,23 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       };
     });
 
+    manager.onRequest('slates/trigger_groups.list', async () => {
+      getContextBasic();
+
+      return {
+        triggerGroups: slate.triggerGroups.map(mapTriggerGroup)
+      };
+    });
+
+    manager.onRequest('slates/trigger_group.get', async ({ params }) => {
+      getContextBasic();
+      let triggerGroup = getTriggerGroup(slate, params.triggerGroupId);
+
+      return {
+        triggerGroup: mapTriggerGroup(triggerGroup)
+      };
+    });
+
     manager.onRequest('slates/action.tool.invoke', async ({ params }) => {
       let action = getActionWithType(slate, 'tool', params.actionId);
 
@@ -878,20 +900,309 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
             outputKeyCount: getObjectKeyCount(result.output)
           })
         },
-        () => runWithContext(context, () => action.handleEvent(context))
+        () => runWithContext(context, () => action.map(context))
       );
 
       return withRequestTraces(context, { id: res.id, type: res.type, output: res.output });
     });
 
-    manager.onRequest('slates/action.trigger.poll_events', async ({ params }) => {
+    manager.onRequest('slates/trigger_group.webhook.targets_list', async ({ params }) => {
       let ctx = getContextFull();
-      let action = getActionWithType(slate, 'trigger', params.actionId);
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let autoRegistration = getWebhookAutoRegistration(group);
 
-      if (!action.pollEvents) {
+      let context = new SlateContext(
+        ctx.config,
+        { pageToken: params.pageToken ?? null },
+        ctx.auth?.output!,
+        slate.spec,
+        logger
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'webhookTargetList',
+          message: `Listing webhook targets for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: result =>
+            `Listed ${result.targets.length} webhook target(s) for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while listing webhook targets`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name
+          },
+          onSuccess: result => ({
+            targetCount: result.targets.length,
+            hasNextPageToken: result.nextPageToken !== null
+          })
+        },
+        () => runWithContext(context, () => autoRegistration.webhookTargetList(context))
+      );
+
+      return withRequestTraces(context, {
+        targets: res.targets,
+        nextPageToken: res.nextPageToken ?? null
+      });
+    });
+
+    manager.onRequest('slates/trigger_group.webhook.register', async ({ params }) => {
+      let ctx = getContextFull();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let autoRegistration = getWebhookAutoRegistration(group);
+
+      let context = new SlateContext(
+        ctx.config,
+        {
+          webhookTargetIdentifier: params.webhookTargetIdentifier,
+          webhookTargetPayload: params.webhookTargetPayload,
+          webhookUrl: params.webhookUrl
+        },
+        ctx.auth?.output!,
+        slate.spec,
+        logger
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'webhookRegister',
+          message: `Registering webhook for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: `Registered webhook for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while registering a webhook`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name,
+            webhookTargetIdentifier: params.webhookTargetIdentifier
+          }
+        },
+        () => runWithContext(context, () => autoRegistration.webhookRegister(context))
+      );
+
+      return withRequestTraces(context, {
+        webhookRegistrationIdentifier: res.webhookRegistrationIdentifier,
+        webhookRegistrationPayload: res.webhookRegistrationPayload
+      });
+    });
+
+    manager.onRequest('slates/trigger_group.webhook.unregister', async ({ params }) => {
+      let ctx = getContextFull();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let autoRegistration = getWebhookAutoRegistration(group);
+
+      let context = new SlateContext(
+        ctx.config,
+        {
+          webhookRegistrationIdentifier: params.webhookRegistrationIdentifier,
+          webhookRegistrationPayload: params.webhookRegistrationPayload
+        },
+        ctx.auth?.output!,
+        slate.spec,
+        logger
+      );
+      await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'webhookUnregister',
+          message: `Unregistering webhook for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: `Unregistered webhook for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while unregistering a webhook`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name,
+            webhookRegistrationIdentifier: params.webhookRegistrationIdentifier
+          }
+        },
+        () => runWithContext(context, () => autoRegistration.webhookUnregister(context))
+      );
+
+      return withRequestTraces(context, {});
+    });
+
+    manager.onRequest('slates/trigger_group.webhook.manual_setup', async ({ params }) => {
+      getContextBasic();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let manualRegistration = getWebhookManualRegistration(group);
+
+      let context = new SlateContext(
+        {},
+        { webhookUrl: params.webhookUrl },
+        {},
+        slate.spec as any,
+        logger
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'webhookManualSetup',
+          message: `Building manual webhook setup for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: `Built manual webhook setup for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while building a manual webhook setup`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name
+          }
+        },
+        () => runWithContext(context, () => manualRegistration.setup(context))
+      );
+
+      return {
+        webhookSetupDocument: res.webhookSetupDocument,
+        partialWebhookRegistrationPayload: res.partialWebhookRegistrationPayload
+      };
+    });
+
+    manager.onRequest('slates/trigger_group.webhook.manual_finish', async ({ params }) => {
+      getContextBasic();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      let manualRegistration = getWebhookManualRegistration(group);
+
+      if (!manualRegistration.finish) {
         throw new ServiceError(
           badRequestError({
-            message: `Trigger action does not support polling: ${params.actionId}`
+            message: `Trigger group does not support manual webhook finish: ${params.triggerGroupId}`
+          })
+        );
+      }
+
+      let context = new SlateContext(
+        {},
+        {
+          webhookUrl: params.webhookUrl,
+          partialWebhookRegistrationPayload: params.partialWebhookRegistrationPayload,
+          userWebhookRegistrationPayload: params.userWebhookRegistrationPayload
+        },
+        {},
+        slate.spec as any,
+        logger
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'webhookManualFinish',
+          message: `Finishing manual webhook setup for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: `Finished manual webhook setup for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while finishing a manual webhook setup`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name
+          }
+        },
+        () => runWithContext(context, () => manualRegistration.finish!(context))
+      );
+
+      return withRequestTraces(context, {
+        webhookRegistrationPayload: res.webhookRegistrationPayload
+      });
+    });
+
+    manager.onRequest('slates/trigger_group.webhook.process', async ({ params }) => {
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      if (group.source !== 'webhook' || !group.webhook) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Trigger group does not support webhook processing: ${params.triggerGroupId}`
+          })
+        );
+      }
+
+      let req = new Request(params.url, {
+        method: params.method,
+        headers: params.headers,
+        body: params.body
+          ? Uint8Array.from(atob(params.body.content), c => c.charCodeAt(0))
+          : null
+      });
+
+      let context = new SlateContext(
+        {},
+        {
+          request: req,
+          webhookRegistrationPayload: params.webhookRegistrationPayload
+        },
+        {},
+        slate.spec as any,
+        logger
+      );
+      let res = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'webhookProcess',
+          message: `Processing webhook request for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: result =>
+            `Extracted ${result.events.length} event(s) from webhook request for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while processing a webhook request`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name,
+            requestMethod: params.method,
+            hasRequestBody: !!params.body
+          },
+          onSuccess: result => ({
+            eventCount: result.events.length,
+            hasResponse: result.response !== undefined
+          })
+        },
+        () => runWithContext(context, () => group.webhook!.process(context))
+      );
+
+      for (let event of res.events) {
+        if (!event.matchers) {
+          throw new ServiceError(
+            preconditionFailedError({
+              message: `Trigger group "${group.key}" process handler must return matchers for every event (return [] if there is nothing to assert)`
+            })
+          );
+        }
+      }
+
+      let response =
+        res.response === undefined
+          ? undefined
+          : await serializeWebhookHttpResponse(res.response);
+
+      return withRequestTraces(context, {
+        events: res.events.map(event => ({
+          matchers: event.matchers,
+          payload: event.payload,
+          idempotencyKey: event.idempotencyKey,
+          triggerIds: evaluateTriggerMatches(slate, group.key, event.payload)
+        })),
+        response
+      });
+    });
+
+    manager.onRequest('slates/trigger_group.routing_matchers.get', async ({ params }) => {
+      let ctx = getContextFull();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+
+      let context = new SlateContext(ctx.config, {}, ctx.auth?.output!, slate.spec, logger);
+      let matchers = await traceProviderCall(
+        {
+          component: 'action',
+          functionName: 'routingMatchers',
+          message: `Getting routing matchers for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          successMessage: result =>
+            `Retrieved ${result.length} routing matcher(s) for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while getting routing matchers`,
+          metadata: {
+            triggerGroupId: group.key,
+            triggerGroupName: group.name
+          },
+          onSuccess: result => ({
+            matcherCount: result.length
+          })
+        },
+        () => runWithContext(context, () => group.routingMatchers(context))
+      );
+
+      return withRequestTraces(context, { matchers });
+    });
+
+    manager.onRequest('slates/trigger_group.polling.poll', async ({ params }) => {
+      let ctx = getContextFull();
+      let group = getTriggerGroup(slate, params.triggerGroupId);
+      if (group.source !== 'polling' || !group.polling) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Trigger group does not support polling: ${params.triggerGroupId}`
           })
         );
       }
@@ -907,184 +1218,30 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         {
           component: 'action',
           functionName: 'pollEvents',
-          message: `Polling events for trigger ${formatEntityLabel(action.name, action.key)}`,
+          message: `Polling events for trigger group ${formatEntityLabel(group.name, group.key)}`,
           successMessage: result =>
-            `Polled ${result.inputs.length} event(s) for trigger ${formatEntityLabel(action.name, action.key)}`,
-          errorMessage: `Trigger ${formatEntityLabel(action.name, action.key)} failed while polling events`,
+            `Polled ${result.events.length} event(s) for trigger group ${formatEntityLabel(group.name, group.key)}`,
+          errorMessage: `Trigger group ${formatEntityLabel(group.name, group.key)} failed while polling events`,
           metadata: {
-            actionId: action.key,
-            actionName: action.name,
-            actionType: action.type,
+            triggerGroupId: group.key,
+            triggerGroupName: group.name,
             hasPreviousState: params.state !== null
           },
           onSuccess: result => ({
-            inputCount: result.inputs.length,
+            eventCount: result.events.length,
             hasUpdatedState: result.updatedState !== undefined
           })
         },
-        () => runWithContext(context, () => action.pollEvents!(context))
+        () => runWithContext(context, () => group.polling!.pollEvents(context))
       );
 
       return withRequestTraces(context, {
-        inputs: res.inputs,
-        updatedState: res.updatedState
-      });
-    });
-
-    manager.onRequest('slates/action.trigger.webhook_handle', async ({ params }) => {
-      let ctx = getContextFull();
-      let action = getActionWithType(slate, 'trigger', params.actionId);
-
-      if (!action.handleRequest) {
-        throw new ServiceError(
-          badRequestError({
-            message: `Trigger action does not support webhook requests: ${params.actionId}`
-          })
-        );
-      }
-
-      let req = new Request(params.url, {
-        method: params.method,
-        headers: params.headers,
-        body: params.body
-          ? Uint8Array.from(atob(params.body.content), c => c.charCodeAt(0))
-          : null
-      });
-
-      let context = new SlateContext(
-        ctx.config,
-        {
-          request: req,
-          state: params.state,
-          registrationDetails: params.registrationDetails ?? null
-        },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
-      );
-      let res = await traceProviderCall(
-        {
-          component: 'action',
-          functionName: 'handleRequest',
-          message: `Handling webhook request for trigger ${formatEntityLabel(action.name, action.key)}`,
-          successMessage: result =>
-            `Received ${result.inputs.length} webhook event(s) for trigger ${formatEntityLabel(action.name, action.key)}`,
-          errorMessage: `Trigger ${formatEntityLabel(action.name, action.key)} failed while handling a webhook request`,
-          metadata: {
-            actionId: action.key,
-            actionName: action.name,
-            actionType: action.type,
-            requestMethod: params.method,
-            hasRequestBody: !!params.body,
-            hasPreviousState: params.state !== null
-          },
-          onSuccess: result => ({
-            inputCount: result.inputs.length,
-            hasUpdatedState: result.updatedState !== undefined,
-            hasResponse: result.response !== undefined
-          })
-        },
-        () => runWithContext(context, () => action.handleRequest!(context))
-      );
-
-      let response =
-        res.response === undefined
-          ? undefined
-          : await serializeWebhookHttpResponse(res.response);
-
-      return withRequestTraces(context, {
-        inputs: res.inputs,
         updatedState: res.updatedState,
-        response
+        events: res.events.map(event => ({
+          payload: event.payload,
+          idempotencyKey: event.idempotencyKey,
+          triggerIds: evaluateTriggerMatches(slate, group.key, event.payload)
+        }))
       });
-    });
-
-    manager.onRequest('slates/action.trigger.webhook_register', async ({ params }) => {
-      let ctx = getContextFull();
-      let action = getActionWithType(slate, 'trigger', params.actionId);
-
-      if (!action.autoRegisterWebhook) {
-        throw new ServiceError(
-          badRequestError({
-            message: `Trigger action does not support webhook auto-registration: ${params.actionId}`
-          })
-        );
-      }
-
-      let context = new SlateContext(
-        ctx.config,
-        { webhookBaseUrl: params.webhookBaseUrl },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
-      );
-      let res = await traceProviderCall(
-        {
-          component: 'action',
-          functionName: 'autoRegisterWebhook',
-          message: `Registering webhook for trigger ${formatEntityLabel(action.name, action.key)}`,
-          successMessage: `Registered webhook for trigger ${formatEntityLabel(action.name, action.key)}`,
-          errorMessage: `Trigger ${formatEntityLabel(action.name, action.key)} failed while registering a webhook`,
-          metadata: {
-            actionId: action.key,
-            actionName: action.name,
-            actionType: action.type
-          },
-          onSuccess: result => ({
-            hasRegistrationDetails: result.registrationDetails !== undefined,
-            hasState: result.state !== undefined
-          })
-        },
-        () => runWithContext(context, () => action.autoRegisterWebhook!(context))
-      );
-
-      return withRequestTraces(context, {
-        registrationDetails: res.registrationDetails,
-        state: res.state
-      });
-    });
-
-    manager.onRequest('slates/action.trigger.webhook_unregister', async ({ params }) => {
-      let ctx = getContextFull();
-      let action = getActionWithType(slate, 'trigger', params.actionId);
-
-      if (!action.autoUnregisterWebhook) {
-        throw new ServiceError(
-          badRequestError({
-            message: `Trigger action does not support webhook auto-unregistration: ${params.actionId}`
-          })
-        );
-      }
-
-      let context = new SlateContext(
-        ctx.config,
-        {
-          webhookBaseUrl: params.webhookBaseUrl,
-          registrationDetails: params.registrationDetails,
-          state: params.state
-        },
-        ctx.auth?.output!,
-        slate.spec,
-        logger
-      );
-      await traceProviderCall(
-        {
-          component: 'action',
-          functionName: 'autoUnregisterWebhook',
-          message: `Unregistering webhook for trigger ${formatEntityLabel(action.name, action.key)}`,
-          successMessage: `Unregistered webhook for trigger ${formatEntityLabel(action.name, action.key)}`,
-          errorMessage: `Trigger ${formatEntityLabel(action.name, action.key)} failed while unregistering a webhook`,
-          metadata: {
-            actionId: action.key,
-            actionName: action.name,
-            actionType: action.type,
-            hasRegistrationDetails: params.registrationDetails !== null,
-            hasPreviousState: params.state !== null
-          }
-        },
-        () => runWithContext(context, () => action.autoUnregisterWebhook!(context))
-      );
-
-      return withRequestTraces(context, {});
     });
   });

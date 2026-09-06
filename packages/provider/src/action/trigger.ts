@@ -3,17 +3,11 @@ import type { SlateSpecification } from '../specification/specification';
 import {
   SlateAction,
   type SlateActionParameters,
-  type SlatePollingOptions,
   type SlateTriggerMappingHandler,
-  type SlateTriggerPollingHandler,
-  type SlateTriggerWebhookAutoRegistrationHandler,
-  type SlateTriggerWebhookAutoUnregistrationHandler,
-  type SlateTriggerWebhookRequestHandler,
-  type SlateWebhookHttpOptions
+  type SlateTriggerMatchesHandler
 } from './action';
 import { SlateActionBuilder } from './builder';
-
-export let SlateDefaultPollingIntervalSeconds = 60 * 10;
+import type { SlateTriggerGroup } from './triggerGroup';
 
 export interface SlateTriggerParameters<
   ConfigType extends {},
@@ -24,14 +18,9 @@ export interface SlateTriggerParameters<
   }
 > extends SlateActionParameters {
   type: 'trigger';
-  source: 'polling' | 'webhook';
-  polling?: SlatePollingOptions;
-  handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
-  handleRequest?: SlateTriggerWebhookRequestHandler<ConfigType, AuthType, InputType>;
-  http?: SlateWebhookHttpOptions;
-  pollEvents?: SlateTriggerPollingHandler<ConfigType, AuthType, InputType>;
-  autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
-  autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
+  triggerGroup: SlateTriggerGroup<ConfigType, AuthType>;
+  matches: SlateTriggerMatchesHandler;
+  map: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
 }
 
 export class SlateTrigger<
@@ -42,14 +31,9 @@ export class SlateTrigger<
     type: string;
   }
 > extends SlateAction<'trigger', ConfigType, AuthType, InputType, OutputType> {
-  #source: 'polling' | 'webhook';
-  #polling: SlatePollingOptions;
-  #handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
-  #handleRequest?: SlateTriggerWebhookRequestHandler<ConfigType, AuthType, InputType>;
-  #http?: SlateWebhookHttpOptions;
-  #pollEvents?: SlateTriggerPollingHandler<ConfigType, AuthType, InputType>;
-  #autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
-  #autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
+  #triggerGroup: SlateTriggerGroup<ConfigType, AuthType>;
+  #matches: SlateTriggerMatchesHandler;
+  #map: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
 
   private constructor(
     spec: SlateSpecification<ConfigType, AuthType>,
@@ -59,16 +43,9 @@ export class SlateTrigger<
   ) {
     super('trigger', spec, inputSchema, outputSchema, params);
 
-    this.#source = params.source;
-    this.#polling = params.polling || {
-      intervalInSeconds: SlateDefaultPollingIntervalSeconds
-    };
-    this.#handleEvent = params.handleEvent;
-    this.#handleRequest = params.handleRequest;
-    this.#http = params.http;
-    this.#pollEvents = params.pollEvents;
-    this.#autoRegisterWebhook = params.autoRegisterWebhook;
-    this.#autoUnregisterWebhook = params.autoUnregisterWebhook;
+    this.#triggerGroup = params.triggerGroup;
+    this.#matches = params.matches;
+    this.#map = params.map;
   }
 
   static create<ConfigType extends {}, AuthType extends {}>(
@@ -81,36 +58,16 @@ export class SlateTrigger<
     });
   }
 
-  get polling() {
-    return this.#polling;
+  get triggerGroup() {
+    return this.#triggerGroup;
   }
 
-  get source() {
-    return this.#source;
+  get matches() {
+    return this.#matches;
   }
 
-  get handleEvent() {
-    return this.#handleEvent;
-  }
-
-  get handleRequest() {
-    return this.#handleRequest;
-  }
-
-  get http() {
-    return this.#http;
-  }
-
-  get pollEvents() {
-    return this.#pollEvents;
-  }
-
-  get autoRegisterWebhook() {
-    return this.#autoRegisterWebhook;
-  }
-
-  get autoUnregisterWebhook() {
-    return this.#autoUnregisterWebhook;
+  get map() {
+    return this.#map;
   }
 }
 

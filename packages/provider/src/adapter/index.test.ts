@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { SlateTool } from '../action/tool';
+import { SlateTriggerGroup } from '../action/triggerGroup';
 import { SlateAuth } from '../auth';
 import { SlateConfig } from '../config';
 import { Slate } from '../specification/slate';
@@ -41,6 +42,16 @@ describe('SlateAdapterSpec', () => {
       }))
       .build();
 
+    let emailTriggerGroup = SlateTriggerGroup.create(spec, {
+      key: 'emails',
+      name: 'Emails'
+    })
+      .polling({
+        pollEvents: async () => ({ events: [] })
+      })
+      .routingMatchers(async () => [])
+      .build();
+
     let emailReceivedTrigger = gmailAdapterSpec
       .trigger(spec, {
         key: 'email_received',
@@ -48,13 +59,13 @@ describe('SlateAdapterSpec', () => {
       })
       .input(z.object({ messageId: z.string() }))
       .output(z.object({ type: z.literal('email.received') }))
-      .polling({
-        handleEvent: async ctx => ({
-          type: 'email.received',
-          id: ctx.input.messageId,
-          output: { type: 'email.received' as const }
-        })
-      })
+      .triggerGroup(emailTriggerGroup)
+      .matches(() => true)
+      .map(async ctx => ({
+        type: 'email.received',
+        id: ctx.input.messageId,
+        output: { type: 'email.received' as const }
+      }))
       .build();
 
     expect(sendEmailTool.adapter).toBe('gmail');
@@ -218,6 +229,16 @@ describe('SlateAdapterSpec', () => {
       }))
       .build();
 
+    let sendEmailTriggerGroup = SlateTriggerGroup.create(spec, {
+      key: 'sent_emails',
+      name: 'Sent Emails'
+    })
+      .polling({
+        pollEvents: async () => ({ events: [] })
+      })
+      .routingMatchers(async () => [])
+      .build();
+
     let sendEmailTrigger = gmailAdapterSpec
       .trigger(spec, {
         key: 'send_email',
@@ -225,13 +246,13 @@ describe('SlateAdapterSpec', () => {
       })
       .input(z.object({}))
       .output(z.object({ type: z.string() }))
-      .polling({
-        handleEvent: async () => ({
-          type: 'email.sent',
-          id: '1',
-          output: { type: 'email.sent' }
-        })
-      })
+      .triggerGroup(sendEmailTriggerGroup)
+      .matches(() => true)
+      .map(async () => ({
+        type: 'email.sent',
+        id: '1',
+        output: { type: 'email.sent' }
+      }))
       .build();
 
     expect(() =>
