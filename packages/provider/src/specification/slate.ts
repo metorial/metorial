@@ -60,6 +60,17 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
       seenTriggerGroupKeys.add(group.key);
     }
 
+    let manualWebhookTriggerGroups = triggerGroups.filter(
+      group => group.source === 'webhook' && group.webhook?.manualRegistration
+    );
+    if (manualWebhookTriggerGroups.length > 1) {
+      throw new SlateDeclarationError(
+        `Only one trigger group may use manual webhook registration, but found: ${manualWebhookTriggerGroups
+          .map(group => group.key)
+          .join(', ')}`
+      );
+    }
+
     return new Slate(params.spec, actions, adapters, triggerGroups);
   }
 
