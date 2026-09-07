@@ -6081,6 +6081,19 @@
         "typescript": "^5",
       },
     },
+    "integrations/handelsregister-ai": {
+      "name": "@slates-integrations/handelsregister-ai",
+      "version": "0.1.0",
+      "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.17",
+        "zod": "^4.2"
+      },
+      "devDependencies": {
+        "typescript": "^5"
+      }
+    },
     "integrations/handwrytten": {
       "name": "@slates-integrations/handwrytten",
       "version": "0.2.0-rc.6",
@@ -9118,6 +9131,21 @@
       },
       "devDependencies": {
         "typescript": "^5",
+      },
+    },
+    "integrations/openregister": {
+      "name": "@slates-integrations/openregister",
+      "version": "0.1.0",
+      "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.17",
+        "zod": "^4.2",
+      },
+      "devDependencies": {
+        "@slates/test": "1.0.0-rc.14",
+        "typescript": "^5",
+        "vitest": "^3.1.2",
       },
     },
     "integrations/openrouter": {
@@ -16321,6 +16349,8 @@
 
     "@slates-integrations/hackerrank-work": ["@slates-integrations/hackerrank-work@workspace:integrations/hackerrank-work"],
 
+    "@slates-integrations/handelsregister-ai": ["@slates-integrations/handelsregister-ai@workspace:integrations/handelsregister-ai"],
+
     "@slates-integrations/handwrytten": ["@slates-integrations/handwrytten@workspace:integrations/handwrytten"],
 
     "@slates-integrations/happy-scribe": ["@slates-integrations/happy-scribe@workspace:integrations/happy-scribe"],
@@ -16802,6 +16832,8 @@
     "@slates-integrations/opengraphio": ["@slates-integrations/opengraphio@workspace:integrations/opengraph-io"],
 
     "@slates-integrations/openperplex": ["@slates-integrations/openperplex@workspace:integrations/openperplex"],
+
+    "@slates-integrations/openregister": ["@slates-integrations/openregister@workspace:integrations/openregister"],
 
     "@slates-integrations/openrouter": ["@slates-integrations/openrouter@workspace:integrations/openrouter"],
 

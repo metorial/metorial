@@ -1,0 +1,14 @@
+{
+  "name": "@metorial/openregister",
+  "description": "Research German companies, people, ownership, financial statements, insolvencies, and downloadable registry documents with OpenRegister. Check API credit usage.",
+  "categories": ["data-enrichment"],
+  "skills": [
+    "search German companies",
+    "research company ownership",
+    "analyze company financials",
+    "research registry representatives",
+    "retrieve registry documents",
+    "research insolvency proceedings"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/openregister-de.svg"
+}
