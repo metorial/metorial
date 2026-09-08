@@ -102,6 +102,10 @@ export let slatesMessageActionInvokeResponse = z.object({
               type: z.literal('content'),
               encoding: z.union([z.literal('base64'), z.literal('utf-8')]),
               content: z.string()
+            }),
+            z.object({
+              type: z.literal('upload_reference'),
+              referenceId: z.string()
             })
           ])
         })

@@ -3,6 +3,7 @@ export * from './adapter';
 export * from './auth';
 export * from './config';
 export * from './controlFlow';
+export * from './hub';
 export * from './identify';
 export * from './tracing';
 
@@ -39,6 +40,7 @@ import {
   type SlatesControlFlowNotifications,
   slatesControlFlowNotificationsByMethod
 } from './controlFlow';
+import { type SlatesHubNotifications, slatesHubNotificationsByMethod } from './hub';
 import {
   type SlatesIdentifyRequests,
   type SlatesIdentifyResponses,
@@ -49,7 +51,8 @@ import {
 export type SlatesNotifications =
   | SlatesAuthNotifications
   | SlatesConfigNotifications
-  | SlatesControlFlowNotifications;
+  | SlatesControlFlowNotifications
+  | SlatesHubNotifications;
 
 export type SlatesRequests =
   | SlatesActionRequests
@@ -84,7 +87,8 @@ export let slatesRequestsByMethod = {
 export let slatesNotificationsByMethod = {
   ...slatesAuthNotificationsByMethod,
   ...slatesConfigNotificationsByMethod,
-  ...slatesControlFlowNotificationsByMethod
+  ...slatesControlFlowNotificationsByMethod,
+  ...slatesHubNotificationsByMethod
 };
 
 export type SlatesResponsesByMethod = {
