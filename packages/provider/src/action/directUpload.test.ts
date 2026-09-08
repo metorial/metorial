@@ -50,7 +50,9 @@ describe('uploadAttachmentDirect', () => {
         'content-length': '5'
       }
     });
-    expect(upload[1]!.body).toEqual(new Uint8Array([1, 2, 3, 4, 5]));
+    expect(new Uint8Array(upload[1]!.body as ArrayBuffer)).toEqual(
+      new Uint8Array([1, 2, 3, 4, 5])
+    );
     expect(upload[1]).not.toHaveProperty('duplex');
   });
 

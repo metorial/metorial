@@ -16,12 +16,15 @@ export interface SlateDirectUploadInput {
 let bufferAttachmentBody = async (
   body: SlateDirectUploadInput['body'],
   maxSizeBytes: number
-) => {
+): Promise<ArrayBuffer> => {
   if (body instanceof Uint8Array) {
     if (body.byteLength > maxSizeBytes) {
       throw new Error(`Attachment exceeds the maximum size of ${maxSizeBytes} bytes`);
     }
-    return body;
+
+    let buffered = new ArrayBuffer(body.byteLength);
+    new Uint8Array(buffered).set(body);
+    return buffered;
   }
 
   let reader = body.getReader();
@@ -41,10 +44,11 @@ let bufferAttachmentBody = async (
     chunks.push(value);
   }
 
-  let buffered = new Uint8Array(sizeBytes);
+  let buffered = new ArrayBuffer(sizeBytes);
+  let bufferedView = new Uint8Array(buffered);
   let offset = 0;
   for (let chunk of chunks) {
-    buffered.set(chunk, offset);
+    bufferedView.set(chunk, offset);
     offset += chunk.byteLength;
   }
   return buffered;
