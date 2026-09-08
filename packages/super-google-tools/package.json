@@ -1,6 +1,6 @@
 {
   "name": "@slates/super-google-tools",
-  "version": "1.0.0-rc.3",
+  "version": "1.0.0-rc.4",
   "private": true,
   "author": "Ivan Siianytsia",
   "license": "FSL 1.1",
@@ -30,7 +30,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "slates": "1.0.0-rc.19"
+    "slates": "1.0.0-rc.20"
   },
   "devDependencies": {
     "@lowerdeck/error": "^1.1.0",

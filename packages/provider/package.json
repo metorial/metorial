@@ -1,6 +1,6 @@
 {
   "name": "@slates/provider",
-  "version": "1.0.0-rc.20",
+  "version": "1.0.0-rc.21",
   "publishConfig": {
     "access": "public"
   },
