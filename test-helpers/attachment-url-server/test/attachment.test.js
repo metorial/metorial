@@ -1,23 +1,8 @@
 import assert from 'node:assert/strict';
-import { after, before, test } from 'node:test';
+import { test } from 'node:test';
 import { GET } from '../api/attachment.js';
 
-let previousToken;
-
-before(() => {
-  previousToken = process.env.ATTACHMENT_TEST_TOKEN;
-  process.env.ATTACHMENT_TEST_TOKEN = 'test-secret';
-});
-
-after(() => {
-  if (previousToken === undefined) {
-    delete process.env.ATTACHMENT_TEST_TOKEN;
-  } else {
-    process.env.ATTACHMENT_TEST_TOKEN = previousToken;
-  }
-});
-
-let request = ({ headerToken = 'test-secret', queryToken = 'test-secret', expiresAt }) =>
+let request = ({ headerToken = 'secret123', queryToken = 'secret123', expiresAt }) =>
   new Request(
     `https://example.com/api/attachment?token=${encodeURIComponent(
       queryToken

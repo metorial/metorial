@@ -186,7 +186,22 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     let hubCapabilities = new State<{
       attachments?: { directUpload?: { enabled: boolean; maxAttachmentSizeBytes?: number } };
     } | null>(null);
-    let liveInvocation = new State<SlateLiveInvocationInfo | null>(null);
+    let liveInvocation = new State<Pick<SlateLiveInvocationInfo, 'token' | 'baseUrl'> | null>(
+      null
+    );
+
+    let getLiveInvocation = (): SlateLiveInvocationInfo | null => {
+      let directUpload = hubCapabilities.get()?.attachments?.directUpload;
+      let live = liveInvocation.get();
+
+      if (!directUpload?.enabled || !live) return null;
+
+      return {
+        ...live,
+        maxAttachmentSizeBytes:
+          directUpload.maxAttachmentSizeBytes ?? DEFAULT_MAX_ATTACHMENT_SIZE_BYTES
+      };
+    };
 
     let logger = new SlateLogger(listeners);
     let providerTrace = {
@@ -366,12 +381,9 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     });
 
     manager.onNotification('slates/hub.live_invocation.set', async ({ params }) => {
-      let directUpload = hubCapabilities.get()?.attachments?.directUpload;
       liveInvocation.set({
         token: params.token,
-        baseUrl: params.baseUrl,
-        maxAttachmentSizeBytes:
-          directUpload?.maxAttachmentSizeBytes ?? DEFAULT_MAX_ATTACHMENT_SIZE_BYTES
+        baseUrl: params.baseUrl
       });
     });
 
@@ -914,7 +926,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         );
         let finalAttachments = await routeAttachmentsThroughDirectUpload(
           redacted,
-          liveInvocation.get()
+          getLiveInvocation()
         );
 
         return withRequestTraces(context, {
@@ -926,7 +938,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       if (action.isPublic) {
         getContextBasic();
-        return invoke(new SlatePublicContext(input, slate.spec, logger, liveInvocation.get()));
+        return invoke(new SlatePublicContext(input, slate.spec, logger, getLiveInvocation()));
       }
 
       let ctx = getContextFull();
@@ -937,7 +949,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           ctx.auth?.output!,
           slate.spec,
           logger,
-          liveInvocation.get()
+          getLiveInvocation()
         )
       );
     });

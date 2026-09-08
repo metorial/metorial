@@ -12,7 +12,7 @@ export let auth = SlateAuth.create()
     name: 'Attachment Server Token',
     key: 'attachment_server_token',
     inputSchema: z.object({
-      token: z.string().describe('Must match ATTACHMENT_TEST_TOKEN on the test helper.')
+      token: z.string().describe('Must match the token configured on the test helper.')
     }),
     getOutput: async ctx => ({
       output: {

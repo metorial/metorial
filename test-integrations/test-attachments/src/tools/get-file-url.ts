@@ -2,17 +2,18 @@ import { getFileUrlTool } from 'slates';
 import { spec } from '../spec';
 
 let FILE_URL_EXPIRATION_MS = 60 * 1000;
+let ATTACHMENT_SERVER_URL = 'https://attachment-url-server.vercel.app/';
 
 export let AUTHENTICATED_FILE_REFERENCE = {
   type: 'test_attachment',
   id: 'authenticated-file'
 };
 
-export let createAuthenticatedFileUrl = (baseUrl: string, token: string) => {
+export let createAuthenticatedFileUrl = (token: string) => {
   let expiresAt = new Date(Date.now() + FILE_URL_EXPIRATION_MS).toISOString();
 
   return {
-    url: new URL('/api/attachment', baseUrl).toString(),
+    url: new URL('/api/attachment', ATTACHMENT_SERVER_URL).toString(),
     expiresAt,
     headers: {
       'x-attachment-token': token
@@ -34,5 +35,5 @@ export let getFileUrl = getFileUrlTool(spec, async ctx => {
     throw new Error('Unknown attachment reference');
   }
 
-  return createAuthenticatedFileUrl(ctx.config.attachmentServerUrl, ctx.auth.token);
+  return createAuthenticatedFileUrl(ctx.auth.token);
 });

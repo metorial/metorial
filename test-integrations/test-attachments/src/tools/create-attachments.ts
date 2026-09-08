@@ -26,10 +26,7 @@ export let createAttachments = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let currentDate = new Date().toISOString();
-    let authenticatedFile = createAuthenticatedFileUrl(
-      ctx.config.attachmentServerUrl,
-      ctx.auth.token
-    );
+    let authenticatedFile = createAuthenticatedFileUrl(ctx.auth.token);
 
     await ctx.addAttachment({
       type: 'content',
