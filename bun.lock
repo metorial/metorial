@@ -14790,7 +14790,7 @@
     },
     "test-integrations/test-attachments": {
       "name": "@slates-integrations/test-attachments",
-      "version": "0.1.0-rc.9",
+      "version": "0.1.0-rc.11",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",

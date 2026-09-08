@@ -1,11 +1,12 @@
 {
   "name": "@__test__/attachments",
-  "description": "Internal test slate for exercising attachment handling. Returns two inline text attachments: a static hello-world payload and the current date.",
+  "description": "Internal test slate for exercising attachment handling through direct uploads and authenticated refreshable URL attachments.",
   "categories": ["utilities"],
   "skills": [
     "test slate attachments",
-    "return static text attachments",
-    "return current date as an attachment",
+    "exercise direct attachment uploads",
+    "exercise large attachment uploads",
+    "exercise authenticated url attachment refreshes",
     "exercise attachment persistence paths"
   ]
 }
