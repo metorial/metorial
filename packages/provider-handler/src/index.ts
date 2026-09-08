@@ -16,7 +16,7 @@ import {
   SlatePublicContext,
   uploadAttachmentDirect
 } from '@slates/provider';
-import PQueue from 'p-queue';
+import { PQueue } from './pQueue';
 import {
   getAction,
   getActionWithType,

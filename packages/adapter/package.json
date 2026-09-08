@@ -1,6 +1,6 @@
 {
   "name": "@slates/adapter",
-  "version": "1.0.0-rc.4",
+  "version": "1.0.0-rc.5",
   "publishConfig": {
     "access": "public"
   },
@@ -31,7 +31,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "@slates/provider": "1.0.0-rc.19",
+    "@slates/provider": "1.0.0-rc.20",
     "zod": "^4.2.1"
   },
   "devDependencies": {

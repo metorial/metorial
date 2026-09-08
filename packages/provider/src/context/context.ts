@@ -1,5 +1,4 @@
 import { Readable } from 'node:stream';
-import PQueue from 'p-queue';
 import {
   createBase64Attachment,
   createUrlAttachment,
@@ -9,6 +8,7 @@ import { type SlateLiveInvocationInfo, uploadAttachmentDirect } from '../action/
 import type { SlateHttpTrace } from '../axios/trace';
 import type { SlateLogger, SlateLogMessageInput } from '../logger';
 import type { SlateSpecification } from '../specification/specification';
+import { PQueue } from './pQueue';
 
 export type { SlateLiveInvocationInfo };
 
@@ -83,7 +83,14 @@ export class SlatePublicContext<InputType extends {}> {
   #attachmentsDisabled = false;
   #attachments: SlateAttachment[] = [];
   #pendingUploads: Promise<void>[] = [];
-  #uploadQueue = new PQueue({ concurrency: 10 });
+  #uploadQueue?: InstanceType<typeof PQueue>;
+
+  #getUploadQueue() {
+    if (!this.#uploadQueue) {
+      this.#uploadQueue = new PQueue({ concurrency: 10 });
+    }
+    return this.#uploadQueue;
+  }
 
   constructor(
     input: InputType,
@@ -207,7 +214,7 @@ export class SlatePublicContext<InputType extends {}> {
     }
 
     let live = this.#liveInvocation;
-    let task = this.#uploadQueue
+    let task = this.#getUploadQueue()
       .add(() =>
         uploadAttachmentDirect({
           live,
