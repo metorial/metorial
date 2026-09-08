@@ -21,13 +21,8 @@ export type SlateAddAttachmentContent =
   | Response;
 
 export type SlateAddAttachmentInput =
-  | { type: 'url'; url: string | URL }
-  | { type: 'content'; content: SlateAddAttachmentContent };
-
-export interface SlateAddAttachmentOptions {
-  mimeType?: string;
-  filename?: string;
-}
+  | { type: 'url'; url: string | URL; mimeType?: string; filename?: string }
+  | { type: 'content'; content: SlateAddAttachmentContent; mimeType?: string; filename?: string };
 
 let isBufferLike = (value: unknown): value is Buffer | Uint8Array | ArrayBuffer =>
   value instanceof Uint8Array || value instanceof ArrayBuffer;
@@ -146,12 +141,9 @@ export class SlatePublicContext<InputType extends {}> {
     this.logger.progress(message);
   }
 
-  async addAttachment(
-    input: SlateAddAttachmentInput,
-    opts: SlateAddAttachmentOptions = {}
-  ): Promise<void> {
+  async addAttachment(input: SlateAddAttachmentInput): Promise<void> {
     if (input.type === 'url') {
-      this.#attachments.push(createUrlAttachment(input.url.toString(), opts.mimeType));
+      this.#attachments.push(createUrlAttachment(input.url.toString(), input.mimeType));
       return;
     }
 
@@ -160,12 +152,15 @@ export class SlatePublicContext<InputType extends {}> {
     if (isBufferLike(content)) {
       let bytes = toUint8Array(content);
       this.#attachments.push(
-        createBase64Attachment(Buffer.from(bytes).toString('base64'), opts.mimeType)
+        createBase64Attachment(Buffer.from(bytes).toString('base64'), input.mimeType)
       );
       return;
     }
 
-    let normalized = await this.#normalizeStreamInput(content, opts);
+    let normalized = await this.#normalizeStreamInput(content, {
+      mimeType: input.mimeType,
+      filename: input.filename
+    });
     if (!normalized) return;
 
     if (!this.#liveInvocation || this.#attachmentsDisabled) {
@@ -205,7 +200,7 @@ export class SlatePublicContext<InputType extends {}> {
 
   async #normalizeStreamInput(
     input: ReadableStream<Uint8Array> | NodeJS.ReadableStream | Response,
-    opts: SlateAddAttachmentOptions
+    opts: { mimeType?: string; filename?: string }
   ): Promise<NormalizedStreamInput | null> {
     if (isResponseLike(input)) {
       if (!input.body) {
