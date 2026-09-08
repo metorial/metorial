@@ -1,6 +1,13 @@
 export interface SlateAttachmentUrlContent {
   type: 'url';
   url: string;
+  /**
+   * Forwarded to the upstream request when the hub proxies this attachment. May contain
+   * `$$MT$secret$authConfig$<path>` placeholders produced by redactUrlAttachmentSecrets() --
+   * never the raw secret values themselves.
+   */
+  headers?: Record<string, string>;
+  query?: Record<string, string>;
 }
 
 export interface SlateAttachmentInlineContent {
@@ -25,14 +32,20 @@ export interface SlateAttachment {
 
 export let createUrlAttachment = (
   url: string,
-  mimeType?: string,
-  attachmentHash?: string
+  opts: {
+    mimeType?: string;
+    attachmentHash?: string;
+    headers?: Record<string, string>;
+    query?: Record<string, string>;
+  } = {}
 ): SlateAttachment => ({
-  mimeType,
-  attachmentHash,
+  mimeType: opts.mimeType,
+  attachmentHash: opts.attachmentHash,
   content: {
     type: 'url',
-    url
+    url,
+    ...(opts.headers ? { headers: opts.headers } : {}),
+    ...(opts.query ? { query: opts.query } : {})
   }
 });
 

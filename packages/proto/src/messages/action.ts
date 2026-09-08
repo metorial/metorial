@@ -96,7 +96,9 @@ export let slatesMessageActionInvokeResponse = z.object({
           content: z.union([
             z.object({
               type: z.literal('url'),
-              url: z.string()
+              url: z.string(),
+              headers: z.record(z.string(), z.string()).optional(),
+              query: z.record(z.string(), z.string()).optional()
             }),
             z.object({
               type: z.literal('content'),

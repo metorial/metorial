@@ -5,6 +5,7 @@ import {
   type SlatesParticipant
 } from '@slates/proto';
 import {
+  redactUrlAttachmentSecrets,
   runWithContext,
   type Slate,
   type SlateAttachment,
@@ -906,8 +907,13 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           [...(res.attachments ?? []), ...contextAttachments],
           res.output
         );
-        let finalAttachments = await routeAttachmentsThroughDirectUpload(
+
+        let redacted = redactUrlAttachmentSecrets(
           merged,
+          context._getAuthConfigForRedaction()
+        );
+        let finalAttachments = await routeAttachmentsThroughDirectUpload(
+          redacted,
           liveInvocation.get()
         );
 

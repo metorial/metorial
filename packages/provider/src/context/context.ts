@@ -5,7 +5,7 @@ import {
   createUrlAttachment,
   type SlateAttachment
 } from '../action/attachment';
-import { uploadAttachmentDirect, type SlateLiveInvocationInfo } from '../action/directUpload';
+import { type SlateLiveInvocationInfo, uploadAttachmentDirect } from '../action/directUpload';
 import type { SlateHttpTrace } from '../axios/trace';
 import type { SlateLogger, SlateLogMessageInput } from '../logger';
 import type { SlateSpecification } from '../specification/specification';
@@ -21,8 +21,20 @@ export type SlateAddAttachmentContent =
   | Response;
 
 export type SlateAddAttachmentInput =
-  | { type: 'url'; url: string | URL; mimeType?: string; filename?: string }
-  | { type: 'content'; content: SlateAddAttachmentContent; mimeType?: string; filename?: string };
+  | {
+      type: 'url';
+      url: string | URL;
+      mimeType?: string;
+      filename?: string;
+      headers?: Record<string, string>;
+      query?: Record<string, string>;
+    }
+  | {
+      type: 'content';
+      content: SlateAddAttachmentContent;
+      mimeType?: string;
+      filename?: string;
+    };
 
 let isBufferLike = (value: unknown): value is Buffer | Uint8Array | ArrayBuffer =>
   value instanceof Uint8Array || value instanceof ArrayBuffer;
@@ -41,6 +53,19 @@ let isNodeReadable = (value: unknown): value is NodeJS.ReadableStream =>
 
 let isResponseLike = (value: unknown): value is Response =>
   typeof Response !== 'undefined' && value instanceof Response;
+
+let readStreamToBuffer = async (stream: ReadableStream<Uint8Array>): Promise<Buffer> => {
+  let reader = stream.getReader();
+  let chunks: Uint8Array[] = [];
+
+  while (true) {
+    let { done, value } = await reader.read();
+    if (done) break;
+    if (value) chunks.push(value);
+  }
+
+  return Buffer.concat(chunks);
+};
 
 interface NormalizedStreamInput {
   stream: ReadableStream<Uint8Array>;
@@ -143,7 +168,13 @@ export class SlatePublicContext<InputType extends {}> {
 
   async addAttachment(input: SlateAddAttachmentInput): Promise<void> {
     if (input.type === 'url') {
-      this.#attachments.push(createUrlAttachment(input.url.toString(), input.mimeType));
+      this.#attachments.push(
+        createUrlAttachment(input.url.toString(), {
+          mimeType: input.mimeType,
+          headers: input.headers,
+          query: input.query
+        })
+      );
       return;
     }
 
@@ -164,9 +195,10 @@ export class SlatePublicContext<InputType extends {}> {
     if (!normalized) return;
 
     if (!this.#liveInvocation || this.#attachmentsDisabled) {
-      this.warn({
-        message: 'Attachment dropped: direct upload is not available for this invocation.'
-      });
+      let buffer = await readStreamToBuffer(normalized.stream);
+      this.#attachments.push(
+        createBase64Attachment(buffer.toString('base64'), normalized.mimeType)
+      );
       return;
     }
 
@@ -184,9 +216,6 @@ export class SlatePublicContext<InputType extends {}> {
         this.#attachments.push(attachment);
       })
       .catch(err => {
-        // Direct upload failed or was interrupted (network error, the hub already revoked
-        // the live invocation token, ...) -- we simply don't have this attachment, and stop
-        // trying for the rest of this call rather than repeatedly failing the same way.
         this.#attachmentsDisabled = true;
         this.warn({
           message: `Attachment dropped: direct upload failed (${
@@ -234,6 +263,10 @@ export class SlatePublicContext<InputType extends {}> {
     await Promise.allSettled(this.#pendingUploads);
     return this.#attachments;
   }
+
+  _getAuthConfigForRedaction(): Record<string, unknown> | undefined {
+    return undefined;
+  }
 }
 
 export class SlateContext<
@@ -263,5 +296,9 @@ export class SlateContext<
 
   get auth() {
     return Object.freeze(this.#auth);
+  }
+
+  override _getAuthConfigForRedaction(): Record<string, unknown> | undefined {
+    return this.#auth as Record<string, unknown>;
   }
 }
