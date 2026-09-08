@@ -28,6 +28,8 @@ export type SlateAddAttachmentInput =
       filename?: string;
       headers?: Record<string, string>;
       query?: Record<string, string>;
+      refreshReference?: unknown;
+      refreshAt?: string;
     }
   | {
       type: 'content';
@@ -172,7 +174,9 @@ export class SlatePublicContext<InputType extends {}> {
         createUrlAttachment(input.url.toString(), {
           mimeType: input.mimeType,
           headers: input.headers,
-          query: input.query
+          query: input.query,
+          refreshReference: input.refreshReference,
+          refreshAt: input.refreshAt
         })
       );
       return;

@@ -1,13 +1,10 @@
 export interface SlateAttachmentUrlContent {
   type: 'url';
   url: string;
-  /**
-   * Forwarded to the upstream request when the hub proxies this attachment. May contain
-   * `$$MT$secret$authConfig$<path>` placeholders produced by redactUrlAttachmentSecrets() --
-   * never the raw secret values themselves.
-   */
   headers?: Record<string, string>;
   query?: Record<string, string>;
+  refreshReference?: unknown;
+  refreshAt?: string;
 }
 
 export interface SlateAttachmentInlineContent {
@@ -37,17 +34,29 @@ export let createUrlAttachment = (
     attachmentHash?: string;
     headers?: Record<string, string>;
     query?: Record<string, string>;
+    refreshReference?: unknown;
+    refreshAt?: string;
   } = {}
-): SlateAttachment => ({
-  mimeType: opts.mimeType,
-  attachmentHash: opts.attachmentHash,
-  content: {
-    type: 'url',
-    url,
-    ...(opts.headers ? { headers: opts.headers } : {}),
-    ...(opts.query ? { query: opts.query } : {})
+): SlateAttachment => {
+  if (opts.refreshReference !== undefined && !opts.refreshAt) {
+    throw new Error('createUrlAttachment: refreshAt is required when refreshReference is set');
   }
-});
+
+  return {
+    mimeType: opts.mimeType,
+    attachmentHash: opts.attachmentHash,
+    content: {
+      type: 'url',
+      url,
+      ...(opts.headers ? { headers: opts.headers } : {}),
+      ...(opts.query ? { query: opts.query } : {}),
+      ...(opts.refreshReference !== undefined
+        ? { refreshReference: opts.refreshReference }
+        : {}),
+      ...(opts.refreshAt ? { refreshAt: opts.refreshAt } : {})
+    }
+  };
+};
 
 export let createBase64Attachment = (
   content: string,
