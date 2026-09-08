@@ -9,10 +9,18 @@ export interface SlateAttachmentInlineContent {
   content: string;
 }
 
+export interface SlateAttachmentUploadReferenceContent {
+  type: 'upload_reference';
+  referenceId: string;
+}
+
 export interface SlateAttachment {
   mimeType?: string;
   attachmentHash?: string;
-  content: SlateAttachmentUrlContent | SlateAttachmentInlineContent;
+  content:
+    | SlateAttachmentUrlContent
+    | SlateAttachmentInlineContent
+    | SlateAttachmentUploadReferenceContent;
 }
 
 export let createUrlAttachment = (

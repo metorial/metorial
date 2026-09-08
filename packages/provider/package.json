@@ -34,6 +34,7 @@
     "@lowerdeck/error": "^1.1.0",
     "@toon-format/toon": "^2.1.0",
     "axios": "^1.13.2",
+    "p-queue": "^6.6.2",
     "zod": "^4.2.1"
   },
   "devDependencies": {

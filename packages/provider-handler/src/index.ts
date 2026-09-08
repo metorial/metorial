@@ -9,10 +9,13 @@ import {
   type Slate,
   type SlateAttachment,
   SlateContext,
+  type SlateLiveInvocationInfo,
   SlateLogger,
   type SlateLogListener,
-  SlatePublicContext
+  SlatePublicContext,
+  uploadAttachmentDirect
 } from '@slates/provider';
+import PQueue from 'p-queue';
 import {
   getAction,
   getActionWithType,
@@ -25,6 +28,57 @@ import {
 import { State } from './state';
 import { toJsonSchema, validate } from './validation';
 import { serializeWebhookHttpResponse } from './webhook';
+
+let DEFAULT_MAX_ATTACHMENT_SIZE_BYTES = 100_000_000;
+
+let routeAttachmentsThroughDirectUpload = async (
+  attachments: SlateAttachment[] | undefined,
+  live: SlateLiveInvocationInfo | null
+): Promise<SlateAttachment[] | undefined> => {
+  if (!attachments || attachments.length === 0 || !live) return attachments;
+
+  let contentEntries = attachments
+    .map((attachment, index) => ({ attachment, index }))
+    .filter(entry => entry.attachment.content.type === 'content');
+  if (contentEntries.length === 0) return attachments;
+
+  let queue = new PQueue({ concurrency: 10 });
+  let replacements = new Map<number, SlateAttachment | null>();
+
+  await Promise.all(
+    contentEntries.map(entry =>
+      queue.add(async () => {
+        try {
+          let body =
+            entry.attachment.content.type === 'content'
+              ? entry.attachment.content.encoding === 'base64'
+                ? Buffer.from(entry.attachment.content.content, 'base64')
+                : Buffer.from(entry.attachment.content.content, 'utf-8')
+              : Buffer.alloc(0);
+
+          replacements.set(
+            entry.index,
+            await uploadAttachmentDirect({
+              live,
+              mimeType: entry.attachment.mimeType,
+              body
+            })
+          );
+        } catch {
+          // Upload failed or was interrupted -- we simply don't have this attachment, not a
+          // failed tool call.
+          replacements.set(entry.index, null);
+        }
+      })
+    )
+  );
+
+  return attachments
+    .map((attachment, index) =>
+      replacements.has(index) ? replacements.get(index) : attachment
+    )
+    .filter((a): a is SlateAttachment => a != null);
+};
 
 let isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -127,6 +181,11 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     let auth = new State<{ authenticationMethodId: string; output: AuthType } | null>(null);
     let config = new State<{ value: ConfigType } | null>(null);
     let session = new State<{ id: string; state: any } | null>(null);
+
+    let hubCapabilities = new State<{
+      attachments?: { directUpload?: { enabled: boolean; maxAttachmentSizeBytes?: number } };
+    } | null>(null);
+    let liveInvocation = new State<SlateLiveInvocationInfo | null>(null);
 
     let logger = new SlateLogger(listeners);
     let providerTrace = {
@@ -298,6 +357,20 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       session.set({
         id: params.sessionId,
         state: params.state
+      });
+    });
+
+    manager.onNotification('slates/hub.capabilities.set', async ({ params }) => {
+      hubCapabilities.set(params.capabilities);
+    });
+
+    manager.onNotification('slates/hub.live_invocation.set', async ({ params }) => {
+      let directUpload = hubCapabilities.get()?.attachments?.directUpload;
+      liveInvocation.set({
+        token: params.token,
+        baseUrl: params.baseUrl,
+        maxAttachmentSizeBytes:
+          directUpload?.maxAttachmentSizeBytes ?? DEFAULT_MAX_ATTACHMENT_SIZE_BYTES
       });
     });
 
@@ -828,21 +901,38 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           () => runWithContext(context, () => action.handleInvocation(context as any))
         );
 
+        let contextAttachments = await context._finalizeAttachments();
+        let merged = mergeAttachments(
+          [...(res.attachments ?? []), ...contextAttachments],
+          res.output
+        );
+        let finalAttachments = await routeAttachmentsThroughDirectUpload(
+          merged,
+          liveInvocation.get()
+        );
+
         return withRequestTraces(context, {
           output: res.output,
           message: res.message,
-          attachments: mergeAttachments(res.attachments, res.output)
+          attachments: finalAttachments
         });
       };
 
       if (action.isPublic) {
         getContextBasic();
-        return invoke(new SlatePublicContext(input, slate.spec, logger));
+        return invoke(new SlatePublicContext(input, slate.spec, logger, liveInvocation.get()));
       }
 
       let ctx = getContextFull();
       return invoke(
-        new SlateContext(ctx.config, input, ctx.auth?.output!, slate.spec, logger)
+        new SlateContext(
+          ctx.config,
+          input,
+          ctx.auth?.output!,
+          slate.spec,
+          logger,
+          liveInvocation.get()
+        )
       );
     });
 

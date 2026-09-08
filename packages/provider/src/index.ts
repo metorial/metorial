@@ -1,5 +1,6 @@
 export * from './action';
 export * from './action/attachment';
+export * from './action/directUpload';
 export * from './adapter';
 export * from './auth';
 export * from './axios';

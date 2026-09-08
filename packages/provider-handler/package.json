@@ -34,6 +34,7 @@
     "@lowerdeck/error": "^1.1.0",
     "@slates/proto": "1.0.0-rc.15",
     "@slates/provider": "1.0.0-rc.18",
+    "p-queue": "^6.6.2",
     "zod": "^4.2.1"
   },
   "devDependencies": {
