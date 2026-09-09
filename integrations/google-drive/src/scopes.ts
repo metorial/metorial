@@ -33,7 +33,12 @@ let driveContentWrite = anyOf(
   googleDriveScopes.driveAppdata
 );
 
-let driveMetadataWrite = anyOf(googleDriveScopes.driveMetadata, googleDriveScopes.drive);
+let driveMetadataWrite = anyOf(
+  googleDriveScopes.driveMetadata,
+  googleDriveScopes.drive,
+  googleDriveScopes.driveFile,
+  googleDriveScopes.driveAppdata
+);
 
 let driveSharingWrite = anyOf(googleDriveScopes.drive, googleDriveScopes.driveFile);
 

@@ -7,14 +7,15 @@ import { spec } from '../spec';
 export let downloadFileTool = SlateTool.create(spec, {
   name: 'Get Download URL',
   key: 'download_file',
-  description: `Get a browser download URL for a **non–Google Workspace** file in Drive without transferring the file content through the tool. For Docs, Sheets, or Slides, use **Export File** instead.`,
+  description: `Get a downloadable **non–Google Workspace** file from Drive, along with its browser download URL. For Docs, Sheets, or Slides, use **Export File** instead.`,
   instructions: [
+    'Download the file using the connected Google account’s access.',
     'The returned `downloadUrl` is Google Drive’s browser download link.',
-    'Open the link in a browser signed into a Google account that has access to the file.'
+    'To use the browser link, open it while signed into a Google account that has access to the file.'
   ],
   constraints: [
     'Google Docs/Sheets/Slides (and other `application/vnd.google-apps.*` files) do not have a browser content link. Use **Export File** (e.g. `text/plain` or `application/pdf`) instead.',
-    'Google Drive permissions and owner download restrictions still apply when the link is opened.'
+    'Google Drive permissions and owner download restrictions still apply.'
   ],
   tags: {
     readOnly: true
@@ -39,9 +40,18 @@ export let downloadFileTool = SlateTool.create(spec, {
     let client = new GoogleDriveClient(ctx.auth.token);
     let file = await client.getFileDownloadLink(ctx.input.fileId);
 
+    // Drive's media URL is stable; the hub resolves the current OAuth token at download time.
+    await ctx.addAttachment({
+      type: 'url',
+      url: `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(file.fileId)}`,
+      mimeType: file.mimeType,
+      headers: { Authorization: `Bearer ${ctx.auth.token}` },
+      query: { alt: 'media', supportsAllDrives: 'true' }
+    });
+
     return {
       output: file,
-      message: `Generated a browser download link for **${file.fileName}**.${file.byteLength !== undefined ? ` Drive reports ${file.byteLength} bytes.` : ''}`
+      message: `Prepared **${file.fileName}** for download.${file.byteLength !== undefined ? ` Drive reports ${file.byteLength} bytes.` : ''}`
     };
   })
   .build();

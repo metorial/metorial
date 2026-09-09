@@ -91,7 +91,19 @@ describe('google-drive provider contract', () => {
       download_file: googleDriveActionScopes.downloadFile,
       export_file: googleDriveActionScopes.exportFile,
       get_about: googleDriveActionScopes.getAbout,
-      update_file: googleDriveActionScopes.updateFile,
+      // Scope metadata controls catalog availability before a live API call is made.
+      update_file: {
+        AND: [
+          {
+            OR: [
+              'https://www.googleapis.com/auth/drive.metadata',
+              'https://www.googleapis.com/auth/drive',
+              'https://www.googleapis.com/auth/drive.file',
+              'https://www.googleapis.com/auth/drive.appdata'
+            ]
+          }
+        ]
+      },
       copy_file: googleDriveActionScopes.copyFile,
       delete_file: googleDriveActionScopes.deleteFile,
       list_permissions: googleDriveActionScopes.listPermissions,

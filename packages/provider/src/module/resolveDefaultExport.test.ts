@@ -19,9 +19,9 @@ describe('resolveDefaultExport', () => {
   });
 
   it('unwraps nested default exports from double-bundling', () => {
-    expect(
-      resolveDefaultExport<typeof Example>({ default: { default: Example } })
-    ).toBe(Example);
+    expect(resolveDefaultExport<typeof Example>({ default: { default: Example } })).toBe(
+      Example
+    );
   });
 
   it('throws when the export is not a constructor', () => {
