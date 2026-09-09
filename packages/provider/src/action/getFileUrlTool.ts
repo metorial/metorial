@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { AuthConfigSecretRedactor } from '../auth/redact';
 import type { SlateContext } from '../context/context';
 import type { SlateSpecification } from '../specification/specification';
 import { tool } from './tool';
@@ -34,8 +35,17 @@ export let getFileUrlTool = <ConfigType extends {}, AuthType extends {}>(
   })
     .input(getFileUrlToolInputSchema)
     .output(getFileUrlToolOutputSchema)
-    .handleInvocation(async ctx => ({
-      output: await handleGetFileUrl(ctx),
-      message: 'ok'
-    }))
+    .handleInvocation(async ctx => {
+      let output = await handleGetFileUrl(ctx);
+      let redactor = new AuthConfigSecretRedactor(ctx._getAuthConfigForRedaction());
+
+      return {
+        output: {
+          ...output,
+          ...(output.headers ? { headers: redactor.redactEmbedded(output.headers) } : {}),
+          ...(output.query ? { query: redactor.redactEmbedded(output.query) } : {})
+        },
+        message: 'ok'
+      };
+    })
     .build();

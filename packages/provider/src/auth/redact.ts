@@ -8,10 +8,9 @@ import type { SlateAttachment } from '../action/attachment';
 export let AUTH_CONFIG_SECRET_PLACEHOLDER_PREFIX = '$$MT$secret$authConfig$';
 
 /**
- * Walks an auth config object and replaces any string value that exactly matches one of its
- * leaf values with a `$$MT$secret$authConfig$<path>` placeholder. Literal, whole-value
- * substitution only -- not a substring scan, and not a heuristic key-name/value-shape guess
- * like the http trace redactor in '../axios/trace'.
+ * Maps auth-config string leaves to `$$MT$secret$authConfig$<path>` placeholders.
+ * `redact` preserves whole-value substitution for HTTP traces; `redactEmbedded` also
+ * replaces embedded values in attachment credentials, terminating those placeholders with `$$`.
  */
 export class AuthConfigSecretRedactor {
   private readonly secretToPlaceholder = new Map<string, string>();
@@ -23,6 +22,29 @@ export class AuthConfigSecretRedactor {
   public redact<T>(value: T): T {
     return this.transform(value, stringValue => {
       return this.secretToPlaceholder.get(stringValue) ?? stringValue;
+    });
+  }
+
+  public redactEmbedded<T>(value: T): T {
+    if (this.secretToPlaceholder.size === 0) return value;
+
+    let pattern = new RegExp(
+      [...this.secretToPlaceholder.keys()]
+        .sort((a, b) => b.length - a.length)
+        // Escape regex metacharacters so values match literally; $& inserts the matched character.
+        .map(secret => secret.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|'),
+      'g'
+    );
+
+    return this.transform(value, stringValue => {
+      let exactPlaceholder = this.secretToPlaceholder.get(stringValue);
+      if (exactPlaceholder) return exactPlaceholder;
+
+      return stringValue.replace(
+        pattern,
+        secret => `${this.secretToPlaceholder.get(secret)}$$`
+      );
     });
   }
 
@@ -102,9 +124,11 @@ export let redactUrlAttachmentSecrets = (
       content: {
         ...attachment.content,
         headers: attachment.content.headers
-          ? redactor.redact(attachment.content.headers)
+          ? redactor.redactEmbedded(attachment.content.headers)
           : undefined,
-        query: attachment.content.query ? redactor.redact(attachment.content.query) : undefined
+        query: attachment.content.query
+          ? redactor.redactEmbedded(attachment.content.query)
+          : undefined
       }
     };
   });

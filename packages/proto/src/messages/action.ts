@@ -98,7 +98,9 @@ export let slatesMessageActionInvokeResponse = z.object({
               type: z.literal('url'),
               url: z.string(),
               headers: z.record(z.string(), z.string()).optional(),
-              query: z.record(z.string(), z.string()).optional()
+              query: z.record(z.string(), z.string()).optional(),
+              refreshReference: z.unknown().optional(),
+              refreshAt: z.string().optional()
             }),
             z.object({
               type: z.literal('content'),
