@@ -387,6 +387,15 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       });
     });
 
+    manager.onRequest('slates/provider.capabilities.get', async () => ({
+      capabilities: {
+        hub: {
+          capabilitiesNotification: true,
+          liveInvocation: true
+        }
+      }
+    }));
+
     manager.onRequest('slates/config.changed', async ({ params }) => {
       getContextBasic();
 
