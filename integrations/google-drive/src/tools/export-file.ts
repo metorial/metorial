@@ -1,4 +1,4 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GoogleDriveClient } from '../lib/client';
 import { googleDriveActionScopes } from '../scopes';
@@ -13,7 +13,7 @@ export let exportFileTool = SlateTool.create(spec, {
     'Google Docs support: PDF, DOCX, TXT, HTML, RTF, ODT, EPUB.',
     'Google Sheets support: PDF, XLSX, CSV, TSV, ODS.',
     'Google Slides support: PDF, PPTX, ODP, TXT.',
-    'The exported file is returned in the response attachments.'
+    'Returns a downloadable export and its exact byte size.'
   ],
   tags: {
     readOnly: true
@@ -32,7 +32,7 @@ export let exportFileTool = SlateTool.create(spec, {
     z.object({
       fileId: z.string(),
       exportMimeType: z.string(),
-      byteLength: z.number().describe('Byte length of the decoded export'),
+      byteLength: z.number().describe('Byte length of the exported file'),
       mimeType: z
         .string()
         .optional()
@@ -41,10 +41,17 @@ export let exportFileTool = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new GoogleDriveClient(ctx.auth.token);
-    let { contentBase64, byteLength, mimeType } = await client.exportFile(
+    let { content, byteLength, mimeType } = await client.exportFile(
       ctx.input.fileId,
       ctx.input.exportMimeType
     );
+
+    // Fetching preserves the exact byteLength contract; Response enables direct upload.
+    await ctx.addAttachment({
+      type: 'content',
+      content: new Response(new Uint8Array(content)),
+      mimeType
+    });
 
     return {
       output: {
@@ -53,7 +60,6 @@ export let exportFileTool = SlateTool.create(spec, {
         byteLength,
         mimeType
       },
-      attachments: [createBase64Attachment(contentBase64, mimeType)],
       message: `Exported file \`${ctx.input.fileId}\` as \`${ctx.input.exportMimeType}\` (${byteLength} bytes).${mimeType ? ` MIME: \`${mimeType}\`.` : ''}`
     };
   })

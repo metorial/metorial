@@ -5742,7 +5742,7 @@
     },
     "integrations/google-drive": {
       "name": "@slates-integrations/google-drive",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.21",
