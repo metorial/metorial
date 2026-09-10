@@ -1,17 +1,105 @@
+import { Readable } from 'node:stream';
+import {
+  createBase64Attachment,
+  createUrlAttachment,
+  type SlateAttachment
+} from '../action/attachment';
+import { type SlateLiveInvocationInfo, uploadAttachmentDirect } from '../action/directUpload';
 import type { SlateHttpTrace } from '../axios/trace';
 import type { SlateLogger, SlateLogMessageInput } from '../logger';
 import type { SlateSpecification } from '../specification/specification';
+import { PQueue } from './pQueue';
+
+export type { SlateLiveInvocationInfo };
+
+export type SlateAddAttachmentContent =
+  | Buffer
+  | Uint8Array
+  | ArrayBuffer
+  | ReadableStream<Uint8Array>
+  | NodeJS.ReadableStream
+  | Response;
+
+export type SlateAddAttachmentInput =
+  | {
+      type: 'url';
+      url: string | URL;
+      mimeType?: string;
+      filename?: string;
+      headers?: Record<string, string>;
+      query?: Record<string, string>;
+      refreshReference?: unknown;
+      refreshAt?: string;
+    }
+  | {
+      type: 'content';
+      content: SlateAddAttachmentContent;
+      mimeType?: string;
+      filename?: string;
+    };
+
+let isBufferLike = (value: unknown): value is Buffer | Uint8Array | ArrayBuffer =>
+  value instanceof Uint8Array || value instanceof ArrayBuffer;
+
+let toUint8Array = (value: Buffer | Uint8Array | ArrayBuffer) =>
+  value instanceof ArrayBuffer ? new Uint8Array(value) : value;
+
+let isReadableStream = (value: unknown): value is ReadableStream<Uint8Array> =>
+  typeof ReadableStream !== 'undefined' && value instanceof ReadableStream;
+
+let isNodeReadable = (value: unknown): value is NodeJS.ReadableStream =>
+  !!value &&
+  typeof value === 'object' &&
+  typeof (value as any).pipe === 'function' &&
+  typeof (value as any).on === 'function';
+
+let isResponseLike = (value: unknown): value is Response =>
+  typeof Response !== 'undefined' && value instanceof Response;
+
+let readStreamToBuffer = async (stream: ReadableStream<Uint8Array>): Promise<Buffer> => {
+  let reader = stream.getReader();
+  let chunks: Uint8Array[] = [];
+
+  while (true) {
+    let { done, value } = await reader.read();
+    if (done) break;
+    if (value) chunks.push(value);
+  }
+
+  return Buffer.concat(chunks);
+};
+
+interface NormalizedStreamInput {
+  stream: ReadableStream<Uint8Array>;
+  mimeType?: string;
+  filename?: string;
+}
 
 export class SlatePublicContext<InputType extends {}> {
   #input: InputType;
   #httpTraces: SlateHttpTrace[] = [];
 
+  #liveInvocation: SlateLiveInvocationInfo | null;
+  #attachmentsDisabled = false;
+  #attachments: SlateAttachment[] = [];
+  #pendingUploads: Promise<void>[] = [];
+  #uploadQueue?: InstanceType<typeof PQueue>;
+
+  #getUploadQueue() {
+    if (!this.#uploadQueue) {
+      this.#uploadQueue = new PQueue({ concurrency: 10 });
+    }
+    return this.#uploadQueue;
+  }
+
   constructor(
     input: InputType,
     private readonly spec: SlateSpecification<any, any>,
-    private readonly logger: SlateLogger
+    private readonly logger: SlateLogger,
+    liveInvocation: SlateLiveInvocationInfo | null = null
   ) {
     this.#input = input;
+    this.#liveInvocation = liveInvocation;
   }
 
   get specification() {
@@ -86,6 +174,110 @@ export class SlatePublicContext<InputType extends {}> {
   progress(message: SlateLogMessageInput) {
     this.logger.progress(message);
   }
+
+  async addAttachment(input: SlateAddAttachmentInput): Promise<void> {
+    if (input.type === 'url') {
+      this.#attachments.push(
+        createUrlAttachment(input.url.toString(), {
+          mimeType: input.mimeType,
+          headers: input.headers,
+          query: input.query,
+          refreshReference: input.refreshReference,
+          refreshAt: input.refreshAt
+        })
+      );
+      return;
+    }
+
+    let content = input.content;
+
+    if (isBufferLike(content)) {
+      let bytes = toUint8Array(content);
+      this.#attachments.push(
+        createBase64Attachment(Buffer.from(bytes).toString('base64'), input.mimeType)
+      );
+      return;
+    }
+
+    let normalized = await this.#normalizeStreamInput(content, {
+      mimeType: input.mimeType,
+      filename: input.filename
+    });
+    if (!normalized) return;
+
+    if (!this.#liveInvocation || this.#attachmentsDisabled) {
+      let buffer = await readStreamToBuffer(normalized.stream);
+      this.#attachments.push(
+        createBase64Attachment(buffer.toString('base64'), normalized.mimeType)
+      );
+      return;
+    }
+
+    let live = this.#liveInvocation;
+    let task = this.#getUploadQueue()
+      .add(() =>
+        uploadAttachmentDirect({
+          live,
+          mimeType: normalized.mimeType,
+          filename: normalized.filename,
+          body: normalized.stream
+        })
+      )
+      .then(attachment => {
+        this.#attachments.push(attachment);
+      })
+      .catch(err => {
+        this.#attachmentsDisabled = true;
+        this.warn({
+          message: `Attachment dropped: direct upload failed (${
+            err instanceof Error ? err.message : String(err)
+          }).`
+        });
+      });
+
+    this.#pendingUploads.push(task);
+  }
+
+  async #normalizeStreamInput(
+    input: ReadableStream<Uint8Array> | NodeJS.ReadableStream | Response,
+    opts: { mimeType?: string; filename?: string }
+  ): Promise<NormalizedStreamInput | null> {
+    if (isResponseLike(input)) {
+      if (!input.body) {
+        this.warn({ message: 'Attachment dropped: response has no body.' });
+        return null;
+      }
+      return {
+        stream: input.body,
+        mimeType: opts.mimeType ?? input.headers.get('content-type') ?? undefined,
+        filename: opts.filename
+      };
+    }
+
+    if (isReadableStream(input)) {
+      return { stream: input, mimeType: opts.mimeType, filename: opts.filename };
+    }
+
+    if (isNodeReadable(input)) {
+      return {
+        stream: Readable.toWeb(input as any) as unknown as ReadableStream<Uint8Array>,
+        mimeType: opts.mimeType,
+        filename: opts.filename
+      };
+    }
+
+    this.warn({ message: 'Attachment dropped: unsupported attachment input type.' });
+    return null;
+  }
+
+  async _finalizeAttachments(): Promise<SlateAttachment[]> {
+    await Promise.allSettled(this.#pendingUploads);
+    return this.#attachments;
+  }
+
+  _getAuthConfigForRedaction(): Record<string, unknown> | undefined {
+    return undefined;
+  }
 }
 
 export class SlateContext<
@@ -101,9 +293,10 @@ export class SlateContext<
     input: InputType,
     auth: AuthType,
     spec: SlateSpecification<ConfigType, AuthType>,
-    logger: SlateLogger
+    logger: SlateLogger,
+    liveInvocation: SlateLiveInvocationInfo | null = null
   ) {
-    super(input, spec, logger);
+    super(input, spec, logger, liveInvocation);
     this.#config = config;
     this.#auth = auth;
   }
@@ -114,5 +307,9 @@ export class SlateContext<
 
   get auth() {
     return Object.freeze(this.#auth);
+  }
+
+  override _getAuthConfigForRedaction(): Record<string, unknown> | undefined {
+    return this.#auth as Record<string, unknown>;
   }
 }

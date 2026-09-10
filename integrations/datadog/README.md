@@ -36,6 +36,8 @@ Get details for a Datadog downtime by ID, including scope, status, monitor targe
 
 Get a specific Datadog event by ID, including its title, text, tags, host, priority, and alert type.
 
+Use `eventIdString` from Post Event or List Events to preserve large event IDs exactly.
+
 ### Get Incident
 
 Get details for a Datadog incident by ID, including title, severity, state, customer impact, timestamps, and fields.

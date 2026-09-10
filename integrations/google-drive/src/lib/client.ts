@@ -509,7 +509,7 @@ export class GoogleDriveClient {
   async exportFile(
     fileId: string,
     exportMimeType: string
-  ): Promise<{ contentBase64: string; mimeType?: string; byteLength: number }> {
+  ): Promise<{ content: Buffer; mimeType?: string; byteLength: number }> {
     let meta = await this.getFileLightMeta(fileId);
     if (!meta.mimeType || !EXPORTABLE_GOOGLE_WORKSPACE_MIME_TYPES.has(meta.mimeType)) {
       let guidance =
@@ -540,7 +540,7 @@ export class GoogleDriveClient {
     let ct = response.headers['content-type'];
     let mimeType = Array.isArray(ct) ? ct[0] : ct;
     return {
-      contentBase64: buf.toString('base64'),
+      content: buf,
       mimeType: typeof mimeType === 'string' ? mimeType : undefined,
       byteLength: buf.length
     };

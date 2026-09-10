@@ -80,12 +80,12 @@ export let manageIncident = SlateTool.create(spec, {
     return {
       output: {
         incidentId: incident.id,
-        title: incident.attributes?.title,
-        customerImpacted: incident.attributes?.customer_impacted,
-        severity: incident.attributes?.severity,
-        state: incident.attributes?.state,
-        created: incident.attributes?.created,
-        modified: incident.attributes?.modified
+        title: incident.attributes?.title ?? undefined,
+        customerImpacted: incident.attributes?.customer_impacted ?? undefined,
+        severity: incident.attributes?.severity ?? undefined,
+        state: incident.attributes?.state ?? undefined,
+        created: incident.attributes?.created ?? undefined,
+        modified: incident.attributes?.modified ?? undefined
       },
       message: isCreating
         ? `Created incident **${incident.attributes?.title}** (ID: ${incident.id})`

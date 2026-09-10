@@ -1,0 +1,18 @@
+{
+  "name": "@metorial/granola",
+  "description": "Read accessible Granola meeting folders, browse meeting-note metadata, retrieve summaries and meeting context in batches, and page through complete meeting transcripts.",
+  "categories": [
+    "note-taking-and-knowledge-bases",
+    "scheduling-and-calendars",
+    "speech-recognition-and-synthesis"
+  ],
+  "skills": [
+    "list meeting folders",
+    "browse meeting notes",
+    "retrieve meeting summaries",
+    "review meeting attendees",
+    "read meeting transcripts",
+    "inspect calendar context"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/granola.svg"
+}

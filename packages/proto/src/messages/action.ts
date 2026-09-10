@@ -96,12 +96,20 @@ export let slatesMessageActionInvokeResponse = z.object({
           content: z.union([
             z.object({
               type: z.literal('url'),
-              url: z.string()
+              url: z.string(),
+              headers: z.record(z.string(), z.string()).optional(),
+              query: z.record(z.string(), z.string()).optional(),
+              refreshReference: z.unknown().optional(),
+              refreshAt: z.string().optional()
             }),
             z.object({
               type: z.literal('content'),
               encoding: z.union([z.literal('base64'), z.literal('utf-8')]),
               content: z.string()
+            }),
+            z.object({
+              type: z.literal('upload_reference'),
+              referenceId: z.string()
             })
           ])
         })

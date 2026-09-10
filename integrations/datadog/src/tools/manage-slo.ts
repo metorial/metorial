@@ -112,7 +112,7 @@ export let manageSlo = SlateTool.create(spec, {
       });
     }
 
-    let slo = result.data || result;
+    let slo = Array.isArray(result.data) ? result.data[0] : result.data || result;
 
     let thresholds = (slo.thresholds || []).map((t: any) => ({
       timeframe: t.timeframe,

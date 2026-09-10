@@ -1,7 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
 import { amplitudeServiceError } from '../lib/errors';
+import { parseResponse } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let manageCohortsTool = SlateTool.create(spec, {
@@ -9,14 +10,15 @@ export let manageCohortsTool = SlateTool.create(spec, {
   key: 'manage_cohorts',
   description: `List, retrieve, create, or update behavioral cohorts in Amplitude. Cohorts are groups of users defined by shared behavior or characteristics. Use this to list all cohorts, get details of a specific cohort, or upload/update a cohort with specific user IDs.`,
   constraints: [
-    'Maximum cohort size is 2 million users when uploading.',
+    'Maximum cohort size is 2 million users; one request accepts at most 100,000 identifiers.',
     'Uploaded cohorts use static user lists, not dynamic behavioral definitions.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       action: z
@@ -42,7 +44,9 @@ export let manageCohortsTool = SlateTool.create(spec, {
           skipSave: z
             .boolean()
             .optional()
-            .describe('Validate the upload without saving a cohort.'),
+            .describe(
+              'Validate a new upload without saving a cohort. Cannot be combined with existingCohortId.'
+            ),
           skipInvalidIds: z
             .boolean()
             .optional()
@@ -100,32 +104,43 @@ export let manageCohortsTool = SlateTool.create(spec, {
         )
         .optional()
         .describe('List of cohorts (for "list" action).'),
-      cohort: z.any().optional().describe('Cohort details (for "get" action).'),
-      usage: z.any().optional().describe('Cohort download quota usage.'),
-      uploadResult: z.any().optional().describe('Upload result (for "upload" action).'),
+      cohort: z.unknown().optional().describe('Cohort details (for "get" action).'),
+      usage: z.unknown().optional().describe('Cohort download quota usage.'),
+      uploadResult: z.unknown().optional().describe('Upload result (for "upload" action).'),
       membershipResult: z
-        .any()
+        .unknown()
         .optional()
         .describe('Membership update result (for "update_membership" action).')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     if (ctx.input.action === 'list') {
       let result = await client.listCohorts();
-      let cohorts = (result.cohorts ?? result ?? []).map((c: any) => ({
-        cohortId: c.id ?? c.cohort_id,
+      let raw = parseResponse(
+        z.object({
+          cohorts: z.array(
+            z.object({
+              id: z.string(),
+              name: z.string(),
+              description: z.string().nullish(),
+              size: z.number().nullish(),
+              lastComputed: z.union([z.string(), z.number()]).nullish(),
+              createdAt: z.union([z.string(), z.number()]).nullish()
+            })
+          )
+        }),
+        result,
+        'list cohorts'
+      );
+      let cohorts = raw.cohorts.map(c => ({
+        cohortId: c.id,
         name: c.name,
-        description: c.description,
-        size: c.size,
-        lastComputed: c.last_computed,
-        createdAt: c.created_at
+        description: c.description ?? undefined,
+        size: c.size ?? undefined,
+        lastComputed: c.lastComputed == null ? undefined : String(c.lastComputed),
+        createdAt: c.createdAt == null ? undefined : String(c.createdAt)
       }));
 
       return {
@@ -160,6 +175,13 @@ export let manageCohortsTool = SlateTool.create(spec, {
       if (!ctx.input.upload.owner) {
         throw amplitudeServiceError('upload.owner is required by Amplitude.');
       }
+      if (ctx.input.upload.skipSave && ctx.input.upload.existingCohortId) {
+        throw amplitudeServiceError(
+          'skipSave cannot be combined with existingCohortId. Validate a new upload without targeting a saved cohort.'
+        );
+      }
+      if (ctx.input.upload.ids.length > 100000)
+        throw amplitudeServiceError('A cohort upload accepts at most 100,000 identifiers.');
       if (ctx.input.upload.published === undefined) {
         throw amplitudeServiceError('upload.published is required by Amplitude.');
       }
@@ -179,6 +201,15 @@ export let manageCohortsTool = SlateTool.create(spec, {
           'membership parameters are required for "update_membership" action.'
         );
       }
+      if (
+        ctx.input.membership.memberships.reduce(
+          (count, membership) => count + membership.ids.length,
+          0
+        ) > 100000
+      )
+        throw amplitudeServiceError(
+          'A cohort membership request accepts at most 100,000 identifiers.'
+        );
       let result = await client.updateCohortMembership({
         cohortId: ctx.input.cohortId,
         memberships: ctx.input.membership.memberships,

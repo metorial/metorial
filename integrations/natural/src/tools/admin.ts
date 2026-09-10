@@ -24,13 +24,6 @@ import {
   summaryListMessage
 } from './shared';
 
-const approvalOutputSchema = z.object({
-  approvalId: z.string().optional(),
-  type: z.string().optional(),
-  status: z.string().optional(),
-  approval: rawRecordSchema
-});
-
 const failedPartyInvitationSchema = z
   .object({
     email: z.string(),

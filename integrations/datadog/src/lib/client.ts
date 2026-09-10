@@ -278,7 +278,18 @@ export class DatadogClient {
       reflowType?: string;
     }
   ): Promise<Dashboard> {
-    let body: Record<string, any> = {};
+    let current = await this.getDashboard(dashboardId);
+    let body: Record<string, any> = {
+      title: current.title,
+      layout_type: current.layout_type,
+      widgets: current.widgets,
+      description: current.description,
+      template_variables: current.template_variables ?? [],
+      notify_list: current.notify_list ?? [],
+      reflow_type: current.reflow_type,
+      template_variable_presets: current.template_variable_presets,
+      restricted_roles: current.restricted_roles
+    };
     if (dashboard.title !== undefined) body.title = dashboard.title;
     if (dashboard.layoutType !== undefined) body.layout_type = dashboard.layoutType;
     if (dashboard.widgets !== undefined) body.widgets = dashboard.widgets;
@@ -337,8 +348,8 @@ export class DatadogClient {
     return response.data;
   }
 
-  async getEvent(eventId: number): Promise<any> {
-    let response = await this.http.get(`/api/v1/events/${eventId}`, {
+  async getEvent(eventId: number | string): Promise<any> {
+    let response = await this.http.get(`/api/v1/events/${encodeURIComponent(eventId)}`, {
       headers: this.getHeaders()
     });
     return response.data;
@@ -405,8 +416,12 @@ export class DatadogClient {
       title: incident.title,
       customer_impacted: incident.customerImpacted
     };
-    if (incident.severity) attributes.severity = incident.severity;
-    if (incident.fields) attributes.fields = incident.fields;
+    if (incident.fields || incident.severity) {
+      attributes.fields = {
+        ...incident.fields,
+        ...(incident.severity && { severity: { type: 'dropdown', value: incident.severity } })
+      };
+    }
     if (incident.notificationHandles)
       attributes.notification_handles = incident.notificationHandles;
 
@@ -437,9 +452,17 @@ export class DatadogClient {
     if (updates.title !== undefined) attributes.title = updates.title;
     if (updates.customerImpacted !== undefined)
       attributes.customer_impacted = updates.customerImpacted;
-    if (updates.severity !== undefined) attributes.severity = updates.severity;
-    if (updates.state !== undefined) attributes.state = updates.state;
-    if (updates.fields) attributes.fields = updates.fields;
+    if (updates.fields || updates.severity !== undefined || updates.state !== undefined) {
+      attributes.fields = {
+        ...updates.fields,
+        ...(updates.severity !== undefined && {
+          severity: { type: 'dropdown', value: updates.severity }
+        }),
+        ...(updates.state !== undefined && {
+          state: { type: 'dropdown', value: updates.state }
+        })
+      };
+    }
 
     let body = {
       data: {
@@ -582,7 +605,17 @@ export class DatadogClient {
       groups?: string[];
     }
   ): Promise<any> {
-    let body: Record<string, any> = {};
+    let current = (await this.getSLO(sloId)).data;
+    let body: Record<string, any> = {
+      name: current.name,
+      type: current.type,
+      thresholds: current.thresholds,
+      description: current.description,
+      tags: current.tags,
+      monitor_ids: current.monitor_ids,
+      query: current.query,
+      groups: current.groups
+    };
     if (slo.name !== undefined) body.name = slo.name;
     if (slo.description !== undefined) body.description = slo.description;
     if (slo.tags) body.tags = slo.tags;
@@ -707,6 +740,7 @@ export class DatadogClient {
 
   async createDowntime(downtime: {
     message?: string;
+    displayTimezone?: string;
     monitorIdentifier: { monitorId?: number; monitorTags?: string[] };
     scope: string;
     schedule?: {
@@ -727,6 +761,7 @@ export class DatadogClient {
       monitor_identifier: {}
     };
     if (downtime.message) attributes.message = downtime.message;
+    if (downtime.displayTimezone) attributes.display_timezone = downtime.displayTimezone;
     if (downtime.monitorIdentifier.monitorId !== undefined) {
       attributes.monitor_identifier.monitor_id = downtime.monitorIdentifier.monitorId;
     }

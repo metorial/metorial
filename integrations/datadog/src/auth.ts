@@ -1,18 +1,53 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createHash, randomBytes } from 'node:crypto';
+import { createAxios, SlateAuth, type SlateAuthWithOauth } from 'slates';
 import { z } from 'zod';
 import { datadogApiError, datadogServiceError } from './lib/errors';
 
+const siteSchema = z.enum([
+  'datadoghq.com',
+  'us3.datadoghq.com',
+  'us5.datadoghq.com',
+  'datadoghq.eu',
+  'ap1.datadoghq.com',
+  'ap2.datadoghq.com',
+  'ddog-gov.com'
+]);
+
+const tokenResponseSchema = z.object({
+  access_token: z.string().min(1),
+  refresh_token: z.string().min(1).optional(),
+  expires_in: z.number().positive().finite().default(3600)
+});
+
+const parseTokenResponse = (response: unknown) => {
+  const result = tokenResponseSchema.safeParse(response);
+  if (!result.success) {
+    throw datadogServiceError('Datadog returned an invalid OAuth token response.');
+  }
+  return result.data;
+};
+
+const authOutputSchema = z.object({
+  token: z.string(),
+  apiKey: z.string().optional(),
+  appKey: z.string().optional(),
+  site: z.string().optional(),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional(),
+  authMethod: z.enum(['oauth', 'apikey']).describe('Which authentication method is in use')
+});
+
+type OAuthRefreshContext = Parameters<
+  NonNullable<
+    SlateAuthWithOauth<
+      { site?: string },
+      z.infer<typeof authOutputSchema>
+    >['handleTokenRefresh']
+  >
+>[0];
+
 export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      apiKey: z.string().optional(),
-      appKey: z.string().optional(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional(),
-      authMethod: z.enum(['oauth', 'apikey']).describe('Which authentication method is in use')
-    })
-  )
+  .output(authOutputSchema)
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth2',
@@ -80,17 +115,6 @@ export let auth = SlateAuth.create()
         scope: 'user_access_read'
       },
       {
-        title: 'User Access Invite',
-        description: 'Create users and send invitations',
-        scope: 'user_access_invite'
-      },
-      { title: 'API Keys Read', description: 'View API keys', scope: 'api_keys_read' },
-      {
-        title: 'API Keys Write',
-        description: 'Create and manage API keys',
-        scope: 'api_keys_write'
-      },
-      {
         title: 'Synthetics Read',
         description: 'View Synthetics tests and results',
         scope: 'synthetics_read'
@@ -106,70 +130,47 @@ export let auth = SlateAuth.create()
         description: 'Create, update, and delete SLOs',
         scope: 'slos_write'
       },
-      { title: 'Hosts Read', description: 'View host information', scope: 'hosts_read' },
-      {
-        title: 'APM Read',
-        description: 'Read and query APM and Trace Analytics',
-        scope: 'apm_read'
-      },
-      {
-        title: 'Security Monitoring Signals Read',
-        description: 'Read security monitoring signals',
-        scope: 'security_monitoring_signals_read'
-      },
-      {
-        title: 'Security Monitoring Rules Read',
-        description: 'Read security monitoring rules',
-        scope: 'security_monitoring_rules_read'
-      },
-      { title: 'Cases Read', description: 'View cases', scope: 'cases_read' },
-      { title: 'Cases Write', description: 'Create and manage cases', scope: 'cases_write' },
-      { title: 'Usage Read', description: 'View usage data', scope: 'usage_read' },
-      {
-        title: 'Create Webhooks',
-        description: 'Create webhook integrations',
-        scope: 'create_webhooks'
-      },
-      {
-        title: 'Manage Integrations',
-        description: 'Manage integration configurations',
-        scope: 'manage_integrations'
-      }
+      { title: 'Hosts Read', description: 'View host information', scope: 'hosts_read' }
     ],
 
     inputSchema: z.object({
-      site: z
-        .enum([
-          'datadoghq.com',
-          'us3.datadoghq.com',
-          'us5.datadoghq.com',
-          'datadoghq.eu',
-          'ap1.datadoghq.com',
-          'ap2.datadoghq.com',
-          'ddog-gov.com'
-        ])
+      site: siteSchema
         .default('datadoghq.com')
         .describe('Datadog site/region for your account')
     }),
 
     getAuthorizationUrl: async ctx => {
       let site = ctx.input.site || 'datadoghq.com';
+      let codeVerifier = randomBytes(32).toString('base64url');
       let scopeStr = ctx.scopes.join(' ');
       let params = new URLSearchParams({
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         response_type: 'code',
         state: ctx.state,
-        scope: scopeStr
+        scope: scopeStr,
+        code_challenge: createHash('sha256').update(codeVerifier).digest('base64url'),
+        code_challenge_method: 'S256'
       });
       return {
         url: `https://app.${site}/oauth2/v1/authorize?${params.toString()}`,
-        input: { site }
+        input: { site },
+        callbackState: { codeVerifier }
       };
     },
 
     handleCallback: async ctx => {
-      let site = ctx.input.site || 'datadoghq.com';
+      const domain = siteSchema.safeParse(ctx.callbackParams?.domain ?? ctx.input.site);
+      if (!domain.success) {
+        throw datadogServiceError('Datadog returned an unsupported OAuth site.');
+      }
+      let site = domain.data;
+      const verifier = z.string().min(43).max(128).safeParse(ctx.callbackState?.codeVerifier);
+      if (!verifier.success) {
+        throw datadogServiceError(
+          'Datadog OAuth callback is missing its PKCE verifier. Re-authorize the connection.'
+        );
+      }
       let http = createAxios({ baseURL: `https://api.${site}` });
 
       let response: any;
@@ -181,7 +182,8 @@ export let auth = SlateAuth.create()
             code: ctx.code,
             client_id: ctx.clientId,
             client_secret: ctx.clientSecret,
-            redirect_uri: ctx.redirectUri
+            redirect_uri: ctx.redirectUri,
+            code_verifier: verifier.data
           }).toString(),
           {
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
@@ -191,24 +193,34 @@ export let auth = SlateAuth.create()
         throw datadogApiError(error, 'OAuth token exchange');
       }
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let data = parseTokenResponse(response.data);
+      if (!data.refresh_token) {
+        throw datadogServiceError(
+          'Datadog did not return an OAuth refresh token. Re-authorize the connection.'
+        );
+      }
+      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
 
       return {
         output: {
           token: data.access_token,
           refreshToken: data.refresh_token,
           expiresAt,
+          site,
           authMethod: 'oauth' as const
         },
         input: { site }
       };
     },
 
-    handleTokenRefresh: async (ctx: any) => {
-      let site = ctx.input.site || 'datadoghq.com';
+    handleTokenRefresh: async (ctx: OAuthRefreshContext) => {
+      const domain = siteSchema.safeParse(
+        ctx.output.site ?? ctx.input.site ?? 'datadoghq.com'
+      );
+      if (!domain.success) {
+        throw datadogServiceError('Datadog OAuth connection has an unsupported site.');
+      }
+      let site = domain.data;
       let http = createAxios({ baseURL: `https://api.${site}` });
 
       if (!ctx.output.refreshToken) {
@@ -235,19 +247,19 @@ export let auth = SlateAuth.create()
         throw datadogApiError(error, 'OAuth token refresh');
       }
 
-      let data = response.data;
-      let expiresAt = data.expires_in
-        ? new Date(Date.now() + data.expires_in * 1000).toISOString()
-        : undefined;
+      let data = parseTokenResponse(response.data);
+      let expiresAt = new Date(Date.now() + data.expires_in * 1000).toISOString();
 
       return {
         output: {
+          ...ctx.output,
           token: data.access_token,
           refreshToken: data.refresh_token || ctx.output.refreshToken,
           expiresAt,
+          site,
           authMethod: 'oauth' as const
         },
-        input: ctx.input
+        input: { ...ctx.input, site }
       };
     }
   })
@@ -259,16 +271,7 @@ export let auth = SlateAuth.create()
     inputSchema: z.object({
       apiKey: z.string().describe('Datadog API key (DD-API-KEY)'),
       appKey: z.string().describe('Datadog Application key (DD-APPLICATION-KEY)'),
-      site: z
-        .enum([
-          'datadoghq.com',
-          'us3.datadoghq.com',
-          'us5.datadoghq.com',
-          'datadoghq.eu',
-          'ap1.datadoghq.com',
-          'ap2.datadoghq.com',
-          'ddog-gov.com'
-        ])
+      site: siteSchema
         .default('datadoghq.com')
         .describe('Datadog site/region for validating the keys')
     }),
@@ -279,6 +282,7 @@ export let auth = SlateAuth.create()
           token: ctx.input.apiKey,
           apiKey: ctx.input.apiKey,
           appKey: ctx.input.appKey,
+          site: ctx.input.site,
           authMethod: 'apikey' as const
         }
       };

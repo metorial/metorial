@@ -1,6 +1,6 @@
 {
   "name": "@slates/provider-handler",
-  "version": "1.0.0-rc.22",
+  "version": "1.0.0-rc.29",
   "publishConfig": {
     "access": "public"
   },
@@ -32,8 +32,9 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "@slates/proto": "1.0.0-rc.15",
-    "@slates/provider": "1.0.0-rc.18",
+    "@slates/proto": "1.0.0-rc.18",
+    "@slates/provider": "1.0.0-rc.22",
+    "p-queue": "^6.6.2",
     "zod": "^4.2.1"
   },
   "devDependencies": {

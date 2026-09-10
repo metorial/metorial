@@ -37,14 +37,14 @@ export let getIncident = SlateTool.create(spec, {
     return {
       output: {
         incidentId: incident.id || ctx.input.incidentId,
-        title: incident.attributes?.title,
-        customerImpacted: incident.attributes?.customer_impacted,
-        severity: incident.attributes?.severity,
-        state: incident.attributes?.state,
-        created: incident.attributes?.created,
-        modified: incident.attributes?.modified,
-        resolved: incident.attributes?.resolved,
-        fields: incident.attributes?.fields
+        title: incident.attributes?.title ?? undefined,
+        customerImpacted: incident.attributes?.customer_impacted ?? undefined,
+        severity: incident.attributes?.severity ?? undefined,
+        state: incident.attributes?.state ?? undefined,
+        created: incident.attributes?.created ?? undefined,
+        modified: incident.attributes?.modified ?? undefined,
+        resolved: incident.attributes?.resolved ?? undefined,
+        fields: incident.attributes?.fields ?? undefined
       },
       message: `Retrieved incident **${incident.attributes?.title || ctx.input.incidentId}**`
     };

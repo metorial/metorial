@@ -18,7 +18,7 @@ Permanently delete a file or folder from Google Drive. This action is irreversib
 
 ### Get Download URL
 
-Get a browser download URL for a regular file in Google Drive without transferring the file content through the tool. For Google Workspace files (Docs, Sheets, Slides), use the **Export File** tool instead to convert to a standard format.
+Get a downloadable file from Google Drive using the connected account’s access. The result also includes a browser download URL for use while signed into a Google account with access to the file. For Google Workspace files (Docs, Sheets, Slides), use the **Export File** tool instead to convert to a standard format.
 
 ### Export File
 

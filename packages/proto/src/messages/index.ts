@@ -3,6 +3,7 @@ export * from './adapter';
 export * from './auth';
 export * from './config';
 export * from './controlFlow';
+export * from './hub';
 export * from './identify';
 export * from './tracing';
 export * from './triggerGroup';
@@ -42,6 +43,14 @@ import {
   slatesControlFlowNotificationsByMethod
 } from './controlFlow';
 import {
+  type SlatesHubNotifications,
+  type SlatesHubRequests,
+  type SlatesHubResponses,
+  slatesHubNotificationsByMethod,
+  slatesHubRequestsByMethod,
+  slatesHubResponsesByMethod
+} from './hub';
+import {
   type SlatesIdentifyRequests,
   type SlatesIdentifyResponses,
   slatesIdentifyRequestsByMethod,
@@ -57,7 +66,8 @@ import {
 export type SlatesNotifications =
   | SlatesAuthNotifications
   | SlatesConfigNotifications
-  | SlatesControlFlowNotifications;
+  | SlatesControlFlowNotifications
+  | SlatesHubNotifications;
 
 export type SlatesRequests =
   | SlatesActionRequests
@@ -65,7 +75,9 @@ export type SlatesRequests =
   | SlatesAuthRequests
   | SlatesConfigRequests
   | SlatesIdentifyRequests
-  | SlatesTriggerGroupRequests;
+  | SlatesTriggerGroupRequests
+  | SlatesHubRequests
+  | SlatesIdentifyRequests;
 
 export type SlatesResponses =
   | SlatesActionResponses
@@ -73,7 +85,9 @@ export type SlatesResponses =
   | SlatesAuthResponses
   | SlatesConfigResponses
   | SlatesIdentifyResponses
-  | SlatesTriggerGroupResponses;
+  | SlatesTriggerGroupResponses
+  | SlatesHubResponses
+  | SlatesIdentifyResponses;
 
 export let slatesResponsesByMethod = {
   ...slatesActionResponsesByMethod,
@@ -81,7 +95,9 @@ export let slatesResponsesByMethod = {
   ...slatesAuthResponsesByMethod,
   ...slatesConfigResponsesByMethod,
   ...slatesIdentifyResponsesByMethod,
-  ...slatesTriggerGroupResponsesByMethod
+  ...slatesTriggerGroupResponsesByMethod,
+  ...slatesHubResponsesByMethod,
+  ...slatesIdentifyResponsesByMethod
 };
 
 export let slatesRequestsByMethod = {
@@ -90,13 +106,16 @@ export let slatesRequestsByMethod = {
   ...slatesAuthRequestsByMethod,
   ...slatesConfigRequestsByMethod,
   ...slatesIdentifyRequestsByMethod,
-  ...slatesTriggerGroupRequestsByMethod
+  ...slatesTriggerGroupRequestsByMethod,
+  ...slatesHubRequestsByMethod,
+  ...slatesIdentifyRequestsByMethod
 };
 
 export let slatesNotificationsByMethod = {
   ...slatesAuthNotificationsByMethod,
   ...slatesConfigNotificationsByMethod,
-  ...slatesControlFlowNotificationsByMethod
+  ...slatesControlFlowNotificationsByMethod,
+  ...slatesHubNotificationsByMethod
 };
 
 export type SlatesResponsesByMethod = {

@@ -1,17 +1,26 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
+import {
+  dashboardDataSchema,
+  numericSeriesSchema,
+  parseResponse
+} from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let queryActiveUsersTool = SlateTool.create(spec, {
   name: 'Query Active Users',
   key: 'query_active_users',
-  description: `Retrieve active and new user counts over a specified date range. Returns time-series data showing how many users were active (performed any event) and how many were new during each interval. Supports segmentation and grouping by user properties.`,
+  description: `Retrieve daily, weekly, or monthly active and new user counts for the project already selected by the API-key connection. Call this tool directly with dates; no project ID, event discovery, or OAuth context lookup is needed. Returns time-series data showing how many users were active (performed any event) or new during each interval. Supports segmentation and grouping by user properties. Requires the API Key + Secret Key connection, not OAuth.`,
+  instructions: [
+    'For active-user counts and trends with an API-key connection, call this tool directly. The credentials already identify the project; do not call get_amplitude_context first.'
+  ],
   tags: {
     destructive: false,
     readOnly: true
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       start: z.string().describe('Start date in YYYYMMDD format (e.g., "20240101").'),
@@ -19,13 +28,13 @@ export let queryActiveUsersTool = SlateTool.create(spec, {
       metric: z
         .enum(['active', 'new', 'paying', 'power'])
         .optional()
-        .describe('Metric to retrieve. Defaults to active users.'),
+        .describe(
+          'Use active or new. paying and power are unsupported legacy values. Defaults to active.'
+        ),
       interval: z
         .number()
         .optional()
-        .describe(
-          'Time interval: -300000 (real-time), 1 (daily), 7 (weekly), 30 (monthly). Default is 1.'
-        ),
+        .describe('Time interval: 1 (daily), 7 (weekly), 30 (monthly). Default is 1.'),
       segment: z.string().optional().describe('Segment definition as JSON to filter users.'),
       groupBy: z
         .string()
@@ -35,18 +44,13 @@ export let queryActiveUsersTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      series: z.array(z.any()).describe('Time series data arrays.'),
-      seriesLabels: z.array(z.any()).optional().describe('Labels for each series.'),
+      series: z.array(z.array(z.number().nullable())).describe('Time series data arrays.'),
+      seriesLabels: z.array(z.unknown()).optional().describe('Labels for each series.'),
       xValues: z.array(z.string()).optional().describe('X-axis labels (dates/times).')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let metricMap: Record<string, string> = {
       active: 'active',
@@ -64,13 +68,13 @@ export let queryActiveUsersTool = SlateTool.create(spec, {
       groupBy: ctx.input.groupBy
     });
 
-    let data = result.data ?? result;
+    let data = parseResponse(dashboardDataSchema, result.data, 'analytics query');
 
     return {
       output: {
-        series: data.series ?? [],
-        seriesLabels: data.seriesLabels ?? data.series_labels,
-        xValues: data.xValues ?? data.x_values
+        series: parseResponse(numericSeriesSchema, data.series, 'active user series'),
+        seriesLabels: data.seriesMeta,
+        xValues: data.xValues
       },
       message: `Retrieved active user data from **${ctx.input.start}** to **${ctx.input.end}**.`
     };
