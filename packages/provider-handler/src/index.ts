@@ -868,10 +868,6 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         ? slate.actions
         : slate.actions.filter(action => !action.adapter);
 
-      // A hub that hasn't announced trigger_group support can't drive
-      // triggerGroupId-shaped trigger actions (it expects the legacy
-      // per-action invocation config), so hide them rather than hand back a
-      // shape it can't use.
       if (!supportsTriggerGroups()) {
         actions = actions.filter(action => action.type !== 'trigger');
       }
