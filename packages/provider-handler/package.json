@@ -1,6 +1,6 @@
 {
   "name": "@slates/provider-handler",
-  "version": "1.0.0-rc.31",
+  "version": "1.0.0-rc.32",
   "publishConfig": {
     "access": "public"
   },
