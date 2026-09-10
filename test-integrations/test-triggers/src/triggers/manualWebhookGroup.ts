@@ -36,7 +36,7 @@ export let manualWebhookGroup = SlateTriggerGroup.create(spec, {
         webhookSetupDocument: [
           '1. In the external app, set the webhook Request URL to:',
           '',
-          `\`\`\`\n${ctx.input.webhookUrl}\`\`\``,
+          `\`\`\`\n${ctx.input.webhookUrl}\n\`\`\``,
           '',
           '2. Paste the **Signing Secret** from that app below.',
           '3. Subscribe to the events this integration should receive.'
