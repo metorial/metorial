@@ -3,7 +3,8 @@ import {
   SlateAuth,
   SlateConfig,
   SlateSpecification,
-  SlateTool
+  SlateTool,
+  SlateTriggerGroup
 } from '@slates/provider';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import { z } from 'zod';
@@ -96,18 +97,39 @@ describe('defineAdapter', () => {
       }))
       .build();
 
-    let emailReceivedTrigger = emailReceived
-      .implement(spec)
+    let emailReceivedGroup = SlateTriggerGroup.create(spec, {
+      key: 'email_received_group',
+      name: 'Email Received Group'
+    })
       .webhook({
-        handleRequest: async () => ({
-          inputs: [{ id: '1', from: 'a@example.com', subject: 'Hello' }]
-        }),
-        handleEvent: async ctx => ({
-          type: 'email.received',
-          id: ctx.input.id,
-          output: { type: 'email.received' as const, ...ctx.input }
+        autoRegistration: {
+          webhookTargetList: async () => ({ targets: [], nextPageToken: null }),
+          webhookRegister: async () => ({
+            webhookRegistrationIdentifier: 'reg-1',
+            webhookRegistrationPayload: {}
+          }),
+          webhookUnregister: async () => {}
+        },
+        process: async () => ({
+          events: [
+            {
+              matchers: [],
+              payload: { id: '1', from: 'a@example.com', subject: 'Hello' }
+            }
+          ]
         })
       })
+      .routingMatchers(async () => [])
+      .build();
+
+    let emailReceivedTrigger = emailReceived
+      .implement(spec, emailReceivedGroup)
+      .matches(() => true)
+      .map(async ctx => ({
+        type: 'email.received',
+        id: ctx.input.id,
+        output: { type: 'email.received' as const, ...ctx.input }
+      }))
       .build();
 
     expect(sendEmailTool.adapter).toBe('email');
