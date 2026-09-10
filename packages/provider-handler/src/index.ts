@@ -190,6 +190,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
     let hubCapabilities = new State<{
       attachments?: { directUpload?: { enabled: boolean; maxAttachmentSizeBytes?: number } };
+      triggers?: boolean;
     } | null>(null);
     let liveInvocation = new State<Pick<SlateLiveInvocationInfo, 'token' | 'baseUrl'> | null>(
       null
@@ -207,6 +208,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           directUpload.maxAttachmentSizeBytes ?? DEFAULT_MAX_ATTACHMENT_SIZE_BYTES
       };
     };
+
+    let supportsTriggerGroups = () => !!hubCapabilities.get()?.triggers;
 
     let logger = new SlateLogger(listeners);
     let providerTrace = {
@@ -397,6 +400,9 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         hub: {
           capabilitiesNotification: true,
           liveInvocation: true
+        },
+        provider: {
+          triggerGroups: true
         }
       }
     }));
@@ -862,6 +868,14 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         ? slate.actions
         : slate.actions.filter(action => !action.adapter);
 
+      // A hub that hasn't announced trigger_group support can't drive
+      // triggerGroupId-shaped trigger actions (it expects the legacy
+      // per-action invocation config), so hide them rather than hand back a
+      // shape it can't use.
+      if (!supportsTriggerGroups()) {
+        actions = actions.filter(action => action.type !== 'trigger');
+      }
+
       return {
         actions: actions.map(a => mapAction(slate, a))
       };
@@ -1021,6 +1035,62 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       );
 
       return withRequestTraces(context, { id: res.id, type: res.type, output: res.output });
+    });
+
+    manager.onRequest('slates/action.trigger.poll_events', async ({ params }) => {
+      getContextBasic();
+
+      if (supportsTriggerGroups()) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Legacy trigger polling is disabled once trigger_group support is announced: ${params.actionId}`
+          })
+        );
+      }
+
+      return { inputs: [], updatedState: params.state };
+    });
+
+    manager.onRequest('slates/action.trigger.webhook_handle', async ({ params }) => {
+      getContextBasic();
+
+      if (supportsTriggerGroups()) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Legacy trigger webhook handling is disabled once trigger_group support is announced: ${params.actionId}`
+          })
+        );
+      }
+
+      return { inputs: [], updatedState: params.state, response: null };
+    });
+
+    manager.onRequest('slates/action.trigger.webhook_register', async ({ params }) => {
+      getContextBasic();
+
+      if (supportsTriggerGroups()) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Legacy trigger webhook registration is disabled once trigger_group support is announced: ${params.actionId}`
+          })
+        );
+      }
+
+      return { registrationDetails: null };
+    });
+
+    manager.onRequest('slates/action.trigger.webhook_unregister', async ({ params }) => {
+      getContextBasic();
+
+      if (supportsTriggerGroups()) {
+        throw new ServiceError(
+          badRequestError({
+            message: `Legacy trigger webhook unregistration is disabled once trigger_group support is announced: ${params.actionId}`
+          })
+        );
+      }
+
+      return {};
     });
 
     manager.onRequest('slates/trigger_group.webhook.targets_list', async ({ params }) => {

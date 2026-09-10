@@ -12,7 +12,8 @@ export let slatesMessageHubCapabilitiesSetNotification = z.object({
             maxAttachmentSizeBytes: z.number().optional()
           })
         })
-        .optional()
+        .optional(),
+      triggers: z.boolean().optional()
     })
   })
 });
@@ -61,10 +62,13 @@ export let slatesMessageProviderCapabilitiesGetResponse = z.object({
     capabilities: z.object({
       hub: z
         .object({
-          // Understands slates/hub.capabilities.set
           capabilitiesNotification: z.boolean().optional(),
-          // Understands slates/hub.live_invocation.set
           liveInvocation: z.boolean().optional()
+        })
+        .optional(),
+      provider: z
+        .object({
+          triggerGroups: z.boolean().optional()
         })
         .optional()
     })

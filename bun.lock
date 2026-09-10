@@ -14539,9 +14539,9 @@
       "name": "@slates/client",
       "version": "1.0.0-rc.21",
       "dependencies": {
-        "@slates/proto": "1.0.0-rc.17",
-        "@slates/provider": "1.0.0-rc.21",
-        "@slates/provider-handler": "1.0.0-rc.28",
+        "@slates/proto": "1.0.0-rc.18",
+        "@slates/provider": "1.0.0-rc.22",
+        "@slates/provider-handler": "1.0.0-rc.29",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -14652,10 +14652,10 @@
       "version": "1.0.0-rc.19",
       "dependencies": {
         "@slates/client": "1.0.0-rc.21",
-        "@slates/proto": "1.0.0-rc.17",
+        "@slates/proto": "1.0.0-rc.18",
       },
       "devDependencies": {
-        "@slates/provider": "1.0.0-rc.21",
+        "@slates/provider": "1.0.0-rc.22",
         "@slates/tsconfig": "1.0.0-rc.1",
         "typescript": "5.8.2",
         "vitest": "^3.1.2",
@@ -21641,12 +21641,6 @@
 
     "@slates/aws-sdk-http-handler/slates": ["slates@1.0.0-rc.20", "", { "dependencies": { "@slates/provider": "1.0.0-rc.21" } }, "sha512-9HlNeBUvJmsI4VqjsALhGOIQ6ayS+qb46++7xMEArHlnD8BtdtZ74/8/yfQMudKFFL6mYVwDVDa+nS0m6F9MUg=="],
 
-    "@slates/client/@slates/proto": ["@slates/proto@1.0.0-rc.17", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-VIkLw2O9Fx+CbvdspsCQUNBbZ0wieRUDIk3NnucvTHb/FXWB0wjO+MyuHPGES8IbGsjbSb8B5DTAmAe6qKgP3g=="],
-
-    "@slates/client/@slates/provider": ["@slates/provider@1.0.0-rc.21", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-6212B+GPSJ4Tsl9f9fO+idfx3C51Kbe+udoPKkeEwYhU85F/mFFZHoonw68cwAx2o1Q++DWNbNSR2zPVT+h7Ig=="],
-
-    "@slates/client/@slates/provider-handler": ["@slates/provider-handler@1.0.0-rc.28", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/proto": "1.0.0-rc.17", "@slates/provider": "1.0.0-rc.21", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-RqiUDbHAfUOrIHi5J5F0p7nCWo6bu740iWVchThfnN+5O0FVhfiHkCdvxZkEm0FP0vFSQpCUCxsMG+SRL6oshw=="],
-
     "@slates/dynamics-commerce-recipes/slates": ["slates@1.0.0-rc.20", "", { "dependencies": { "@slates/provider": "1.0.0-rc.21" } }, "sha512-9HlNeBUvJmsI4VqjsALhGOIQ6ayS+qb46++7xMEArHlnD8BtdtZ74/8/yfQMudKFFL6mYVwDVDa+nS0m6F9MUg=="],
 
     "@slates/dynamics-finops-recipes/slates": ["slates@1.0.0-rc.20", "", { "dependencies": { "@slates/provider": "1.0.0-rc.21" } }, "sha512-9HlNeBUvJmsI4VqjsALhGOIQ6ayS+qb46++7xMEArHlnD8BtdtZ74/8/yfQMudKFFL6mYVwDVDa+nS0m6F9MUg=="],
@@ -21660,10 +21654,6 @@
     "@slates/oauth-microsoft/slates": ["slates@1.0.0-rc.20", "", { "dependencies": { "@slates/provider": "1.0.0-rc.21" } }, "sha512-9HlNeBUvJmsI4VqjsALhGOIQ6ayS+qb46++7xMEArHlnD8BtdtZ74/8/yfQMudKFFL6mYVwDVDa+nS0m6F9MUg=="],
 
     "@slates/oauth-zoho/slates": ["slates@1.0.0-rc.20", "", { "dependencies": { "@slates/provider": "1.0.0-rc.21" } }, "sha512-9HlNeBUvJmsI4VqjsALhGOIQ6ayS+qb46++7xMEArHlnD8BtdtZ74/8/yfQMudKFFL6mYVwDVDa+nS0m6F9MUg=="],
-
-    "@slates/profiles/@slates/proto": ["@slates/proto@1.0.0-rc.17", "", { "dependencies": { "@lowerdeck/emitter": "^1.0.4", "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-VIkLw2O9Fx+CbvdspsCQUNBbZ0wieRUDIk3NnucvTHb/FXWB0wjO+MyuHPGES8IbGsjbSb8B5DTAmAe6qKgP3g=="],
-
-    "@slates/profiles/@slates/provider": ["@slates/provider@1.0.0-rc.21", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-6212B+GPSJ4Tsl9f9fO+idfx3C51Kbe+udoPKkeEwYhU85F/mFFZHoonw68cwAx2o1Q++DWNbNSR2zPVT+h7Ig=="],
 
     "@slates/slack-tools/slates": ["slates@1.0.0-rc.20", "", { "dependencies": { "@slates/provider": "1.0.0-rc.21" } }, "sha512-9HlNeBUvJmsI4VqjsALhGOIQ6ayS+qb46++7xMEArHlnD8BtdtZ74/8/yfQMudKFFL6mYVwDVDa+nS0m6F9MUg=="],
 
