@@ -1,6 +1,6 @@
 {
   "name": "@slates/test",
-  "version": "1.0.0-rc.18",
+  "version": "1.0.0-rc.19",
   "publishConfig": {
     "access": "public"
   },
@@ -40,11 +40,11 @@
   },
   "dependencies": {
     "@lowerdeck/testing-tools": "latest",
-    "@slates/client": "1.0.0-rc.21",
-    "@slates/profiles": "1.0.0-rc.19"
+    "@slates/client": "1.0.0-rc.22",
+    "@slates/profiles": "1.0.0-rc.20"
   },
   "devDependencies": {
-    "@slates/provider": "1.0.0-rc.21",
+    "@slates/provider": "1.0.0-rc.23",
     "@slates/tsconfig": "1.0.0-rc.1",
     "typescript": "5.8.2",
     "vitest": "^3.1.2",
