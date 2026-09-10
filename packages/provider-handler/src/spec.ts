@@ -155,6 +155,22 @@ export let mapAction = <ConfigType extends {}, AuthType extends {}>(
   };
 };
 
+export let isMappableTrigger = <ConfigType extends {}, AuthType extends {}>(
+  action: Slate<ConfigType, AuthType>['actions'][number]
+): boolean => action.type !== 'trigger' || !!action.triggerGroup;
+
+export let getMappableAction = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  actionId: string
+) => {
+  let action = getAction(slate, actionId);
+  if (!isMappableTrigger(action)) {
+    throw new ServiceError(notFoundError(`action`, actionId));
+  }
+
+  return action;
+};
+
 export let getTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   triggerGroupId: string
@@ -173,7 +189,7 @@ export let getTriggersForGroup = <ConfigType extends {}, AuthType extends {}>(
 ): SlateTrigger<ConfigType, AuthType, any, any>[] =>
   slate.actions.filter(
     (action): action is SlateTrigger<ConfigType, AuthType, any, any> =>
-      action.type === 'trigger' && action.triggerGroup.key === triggerGroupId
+      action.type === 'trigger' && action.triggerGroup?.key === triggerGroupId
   );
 
 export let evaluateTriggerMatches = <ConfigType extends {}, AuthType extends {}>(
@@ -231,8 +247,12 @@ export let mapTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
           registration: group.webhook?.manualRegistration
             ? {
                 mode: 'manual',
-                userConfigSchema: toJsonSchema(group.webhook.manualRegistration.userConfigSchema),
-                fullConfigSchema: toJsonSchema(group.webhook.manualRegistration.fullConfigSchema)
+                userConfigSchema: toJsonSchema(
+                  group.webhook.manualRegistration.userConfigSchema
+                ),
+                fullConfigSchema: toJsonSchema(
+                  group.webhook.manualRegistration.fullConfigSchema
+                )
               }
             : { mode: 'auto' }
         }

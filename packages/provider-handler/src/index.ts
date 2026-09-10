@@ -19,13 +19,14 @@ import {
 import { PQueue } from './pQueue';
 import {
   evaluateTriggerMatches,
-  getAction,
   getActionWithType,
   getAdapter,
   getAuthMethod,
+  getMappableAction,
   getTriggerGroup,
   getWebhookAutoRegistration,
   getWebhookManualRegistration,
+  isMappableTrigger,
   mapAction,
   mapAdapter,
   mapAuthMethod,
@@ -402,7 +403,9 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           liveInvocation: true
         },
         provider: {
-          triggerGroups: true
+          triggerGroups:
+            (slate.triggerGroups?.length ?? 0) > 0 &&
+            (slate.actions ?? []).every(isMappableTrigger)
         }
       }
     }));
@@ -868,6 +871,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
         ? slate.actions
         : slate.actions.filter(action => !action.adapter);
 
+      actions = actions.filter(isMappableTrigger);
+
       if (!supportsTriggerGroups()) {
         actions = actions.filter(action => action.type !== 'trigger');
       }
@@ -896,7 +901,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
     manager.onRequest('slates/action.get', async ({ params }) => {
       getContextBasic();
-      let action = getAction(slate, params.actionId);
+      let action = getMappableAction(slate, params.actionId);
 
       return {
         action: mapAction(slate, action)
