@@ -1,4 +1,5 @@
 import type {
+  SlatesMessageHubCapabilitiesSetNotification,
   SlatesNotifications,
   SlatesParticipant,
   SlatesProtocolVersion,
@@ -9,6 +10,9 @@ import type {
 export type SlatesJsonObject = Record<string, any>;
 export type SlatesProtocolMessage = SlatesNotifications | SlatesRequests;
 export type SlatesProtocolResponse = SlatesNotifications | SlatesResponses;
+
+export type SlatesHubCapabilities =
+  SlatesMessageHubCapabilitiesSetNotification['params']['capabilities'];
 
 export interface SlatesClientState {
   protocol: SlatesProtocolVersion;
@@ -22,6 +26,7 @@ export interface SlatesClientState {
     id: string;
     state: SlatesJsonObject;
   } | null;
+  capabilities: SlatesHubCapabilities | null;
 }
 
 export interface SlatesMessageTransport {

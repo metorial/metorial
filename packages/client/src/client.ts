@@ -55,7 +55,8 @@ export class SlatesProtocolClient {
       participants: opts.participants ?? createDefaultParticipants(),
       config: opts.state?.config ?? null,
       auth: opts.state?.auth ?? null,
-      session: opts.state?.session ?? null
+      session: opts.state?.session ?? null,
+      capabilities: opts.state?.capabilities ?? null
     };
   }
 
@@ -84,6 +85,11 @@ export class SlatesProtocolClient {
     return this;
   }
 
+  setCapabilities(capabilities: SlatesClientState['capabilities']) {
+    this.state.capabilities = capabilities;
+    return this;
+  }
+
   ensureSession() {
     if (!this.state.session) {
       this.state.session = {
@@ -107,6 +113,15 @@ export class SlatesProtocolClient {
         method: 'slates/participant.set' as const,
         params: { participants: this.state.participants }
       },
+      ...(this.state.capabilities
+        ? [
+            {
+              jsonrpc: '2.0' as const,
+              method: 'slates/hub.capabilities.set' as const,
+              params: { capabilities: this.state.capabilities }
+            }
+          ]
+        : []),
       ...(this.state.config
         ? [
             {

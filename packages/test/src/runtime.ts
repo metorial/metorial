@@ -201,7 +201,10 @@ export let createLocalSlateTestClient = (opts: {
 }) =>
   createSlatesClient({
     transport: createLocalSlateTransport({ slate: opts.slate as LocalSlate }),
-    state: opts.state,
+    state: {
+      capabilities: { triggers: true },
+      ...opts.state
+    },
     participants: opts.participants
   });
 
