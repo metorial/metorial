@@ -1,7 +1,6 @@
 import { SlateTriggerGroup } from 'slates';
 import { z } from 'zod';
 import {
-  isTimestampFresh,
   TEST_SIGNATURE_HEADER,
   TEST_TIMESTAMP_HEADER,
   verifyTimestampedSignature
@@ -78,9 +77,9 @@ export let manualWebhookGroup = SlateTriggerGroup.create(spec, {
         };
       }
 
-      if (!isTimestampFresh(timestamp)) {
-        return { events: [], response: jsonResponse(401, { error: 'stale request' }) };
-      }
+      // if (!isTimestampFresh(timestamp)) {
+      //   return { events: [], response: jsonResponse(401, { error: 'stale request' }) };
+      // }
 
       let signatureValid = verifyTimestampedSignature({
         secret: registration.signingSecret,
