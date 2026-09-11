@@ -74,7 +74,8 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
   key: 'events',
   name: 'Slack Events',
   description:
-    'Receives Slack Events API deliveries and routes each event to the installed workspaces/users it is visible to.'
+    'Receives Slack Events API deliveries and routes each event to the installed workspaces/users it is visible to.',
+  eventSchema: z.object({ type: z.string() }).loose()
 })
   .webhook({
     manualRegistration: {

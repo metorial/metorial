@@ -131,11 +131,9 @@ export let provider = Slate.create({
 
   triggers: [
     newMessage,
-    newMessageWebhook,
-    channelActivity,
     newReaction,
     newFile,
-    userChange
+    userChange,
     messageEdited,
     messageDeleted,
     appMentioned,
