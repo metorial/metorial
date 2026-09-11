@@ -5,8 +5,8 @@ import type { SlateAdapterTriggerDefinition } from './trigger';
 type InferIO<T> =
   T extends SlateAdapterToolDefinition<infer I, infer O, any, any>
     ? { input: I; output: O }
-    : T extends SlateAdapterTriggerDefinition<infer I, infer O, any>
-      ? { input: I; output: O }
+    : T extends SlateAdapterTriggerDefinition<infer O, any>
+      ? { output: O }
       : never;
 
 type ByActionKey<Actions extends Record<string, { key: string }>> = {

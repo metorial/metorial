@@ -3,7 +3,6 @@ import type z from 'zod';
 import type { SlateAdapterDefinition } from './definition';
 
 export class SlateAdapterTriggerDefinition<
-  InputType extends {},
   OutputType extends {},
   Key extends string = string
 > {
@@ -11,7 +10,6 @@ export class SlateAdapterTriggerDefinition<
     private readonly adapter: SlateAdapterDefinition<any>,
     private readonly params: Omit<SlateActionParameters, 'adapter' | 'key'> & {
       key: Key;
-      input: z.ZodType<InputType>;
       output: z.ZodType<OutputType>;
     }
   ) {}
@@ -24,23 +22,19 @@ export class SlateAdapterTriggerDefinition<
     return this.params.name;
   }
 
-  get input() {
-    return this.params.input;
-  }
-
   get output() {
     return this.params.output;
   }
 
-  implement<ConfigType extends {}, AuthType extends {}>(
+  implement<ConfigType extends {}, AuthType extends {}, InputType extends {}>(
     spec: SlateSpecification<ConfigType, AuthType>,
-    triggerGroup: SlateTriggerGroup<ConfigType, AuthType>
+    triggerGroup: SlateTriggerGroup<ConfigType, AuthType, InputType>
   ) {
-    let { input, output, ...actionParams } = this.params;
+    let { output, ...actionParams } = this.params;
 
     return this.adapter
       .createTriggerBuilder(spec, actionParams)
-      .input(input)
+      .input(triggerGroup.eventSchema)
       .output(output)
       .triggerGroup(triggerGroup)
       .lockInterface();

@@ -1,4 +1,4 @@
-import type z from 'zod';
+import { z } from 'zod';
 import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from '../specification/specification';
 import type { SlateContext } from '../context';
@@ -136,30 +136,38 @@ export interface SlateTriggerGroupWebhookParameters<ConfigType extends {}, AuthT
   process: SlateWebhookProcessHandler;
 }
 
-export interface SlateTriggerGroupCreateParameters {
+export interface SlateTriggerGroupCreateParameters<InputType extends {} = Record<string, unknown>> {
   key: string;
   name: string;
   description?: string;
   metadata?: Record<string, any>;
+  eventSchema?: z.ZodType<InputType>;
 }
 
-export interface SlateTriggerGroupParameters<ConfigType extends {}, AuthType extends {}>
-  extends SlateTriggerGroupCreateParameters {
+export interface SlateTriggerGroupParameters<
+  ConfigType extends {},
+  AuthType extends {},
+  InputType extends {} = Record<string, unknown>
+> extends SlateTriggerGroupCreateParameters<InputType> {
   source: 'polling' | 'webhook';
   polling?: SlateTriggerGroupPollingParameters<ConfigType, AuthType>;
   webhook?: SlateTriggerGroupWebhookParameters<ConfigType, AuthType>;
   routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType>;
 }
 
-export class SlateTriggerGroup<ConfigType extends {}, AuthType extends {}> {
+export class SlateTriggerGroup<
+  ConfigType extends {},
+  AuthType extends {},
+  InputType extends {} = Record<string, unknown>
+> {
   private constructor(
     private readonly _spec: SlateSpecification<ConfigType, AuthType>,
-    private readonly _params: SlateTriggerGroupParameters<ConfigType, AuthType>
+    private readonly _params: SlateTriggerGroupParameters<ConfigType, AuthType, InputType>
   ) {}
 
-  static create<ConfigType extends {}, AuthType extends {}>(
+  static create<ConfigType extends {}, AuthType extends {}, InputType extends {} = Record<string, unknown>>(
     spec: SlateSpecification<ConfigType, AuthType>,
-    params: SlateTriggerGroupCreateParameters
+    params: SlateTriggerGroupCreateParameters<InputType>
   ) {
     return new SlateTriggerGroupBuilder(spec, params, p => new SlateTriggerGroup(spec, p));
   }
@@ -184,6 +192,10 @@ export class SlateTriggerGroup<ConfigType extends {}, AuthType extends {}> {
     return this._params.metadata;
   }
 
+  get eventSchema() {
+    return this._params.eventSchema ?? (z.object({}).passthrough() as z.ZodType<InputType>);
+  }
+
   get source() {
     return this._params.source;
   }
@@ -201,7 +213,11 @@ export class SlateTriggerGroup<ConfigType extends {}, AuthType extends {}> {
   }
 }
 
-export class SlateTriggerGroupBuilder<ConfigType extends {}, AuthType extends {}> {
+export class SlateTriggerGroupBuilder<
+  ConfigType extends {},
+  AuthType extends {},
+  InputType extends {} = Record<string, unknown>
+> {
   #source: 'polling' | 'webhook' | null = null;
   #polling: SlateTriggerGroupPollingParameters<ConfigType, AuthType> | null = null;
   #webhook: SlateTriggerGroupWebhookParameters<ConfigType, AuthType> | null = null;
@@ -209,16 +225,16 @@ export class SlateTriggerGroupBuilder<ConfigType extends {}, AuthType extends {}
 
   constructor(
     private readonly spec: SlateSpecification<ConfigType, AuthType>,
-    private readonly params: SlateTriggerGroupCreateParameters,
+    private readonly params: SlateTriggerGroupCreateParameters<InputType>,
     private readonly factory: (
-      params: SlateTriggerGroupParameters<ConfigType, AuthType>
-    ) => SlateTriggerGroup<ConfigType, AuthType>
+      params: SlateTriggerGroupParameters<ConfigType, AuthType, InputType>
+    ) => SlateTriggerGroup<ConfigType, AuthType, InputType>
   ) {}
 
   polling(props: {
     intervalSeconds?: number;
     pollEvents: SlateTriggerGroupPollHandler<ConfigType, AuthType>;
-  }): SlateTriggerGroupBuilder<ConfigType, AuthType> {
+  }): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
     if (this.#source) {
       throw new SlateDeclarationError('Trigger group invocation is already defined');
     }
@@ -242,7 +258,7 @@ export class SlateTriggerGroupBuilder<ConfigType extends {}, AuthType extends {}
       FullConfigSchema
     >;
     process: SlateWebhookProcessHandler;
-  }): SlateTriggerGroupBuilder<ConfigType, AuthType> {
+  }): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
     if (this.#source) {
       throw new SlateDeclarationError('Trigger group invocation is already defined');
     }
@@ -265,12 +281,12 @@ export class SlateTriggerGroupBuilder<ConfigType extends {}, AuthType extends {}
 
   routingMatchers(
     handler: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType>
-  ): SlateTriggerGroupBuilder<ConfigType, AuthType> {
+  ): SlateTriggerGroupBuilder<ConfigType, AuthType, InputType> {
     this.#routingMatchers = handler;
     return this;
   }
 
-  build(): SlateTriggerGroup<ConfigType, AuthType> {
+  build(): SlateTriggerGroup<ConfigType, AuthType, InputType> {
     if (!this.#source) {
       throw new SlateDeclarationError(
         'Trigger group invocation (polling or webhook) is not defined'
@@ -290,7 +306,11 @@ export class SlateTriggerGroupBuilder<ConfigType extends {}, AuthType extends {}
   }
 }
 
-export let triggerGroup = <ConfigType extends {}, AuthType extends {}>(
+export let triggerGroup = <
+  ConfigType extends {},
+  AuthType extends {},
+  InputType extends {} = Record<string, unknown>
+>(
   spec: SlateSpecification<ConfigType, AuthType>,
-  params: SlateTriggerGroupCreateParameters
+  params: SlateTriggerGroupCreateParameters<InputType>
 ) => SlateTriggerGroup.create(spec, params);

@@ -68,11 +68,6 @@ describe('defineAdapter', () => {
     let emailReceived = EmailAdapter.defineTrigger({
       key: 'email.received',
       name: 'Email Received',
-      input: z.object({
-        id: z.string(),
-        from: z.string(),
-        subject: z.string()
-      }),
       output: z.object({
         type: z.literal('email.received'),
         id: z.string(),
@@ -99,7 +94,12 @@ describe('defineAdapter', () => {
 
     let emailReceivedGroup = SlateTriggerGroup.create(spec, {
       key: 'email_received_group',
-      name: 'Email Received Group'
+      name: 'Email Received Group',
+      eventSchema: z.object({
+        id: z.string(),
+        from: z.string(),
+        subject: z.string()
+      })
     })
       .webhook({
         autoRegistration: {
@@ -127,8 +127,13 @@ describe('defineAdapter', () => {
       .matches(() => true)
       .map(async ctx => ({
         type: 'email.received',
-        id: ctx.input.id,
-        output: { type: 'email.received' as const, ...ctx.input }
+        id: String(ctx.input.id),
+        output: {
+          type: 'email.received' as const,
+          id: String(ctx.input.id),
+          from: String(ctx.input.from),
+          subject: String(ctx.input.subject)
+        }
       }))
       .build();
 
@@ -210,7 +215,6 @@ describe('defineAdapter', () => {
     EmailAdapter.defineTrigger({
       key: 'email.received',
       name: 'Email Received',
-      input: z.object({ id: z.string() }),
       output: z.object({ type: z.string() })
     });
 
@@ -435,10 +439,6 @@ describe('defineAdapter', () => {
     let emailReceived = EmailAdapter.defineTrigger({
       key: 'email.received',
       name: 'Email Received',
-      input: z.object({
-        id: z.string(),
-        from: z.string()
-      }),
       output: z.object({
         type: z.literal('email.received'),
         id: z.string(),
@@ -561,7 +561,6 @@ describe('defineAdapter', () => {
     let emailReceived = EmailAdapter.defineTrigger({
       key: 'email.received',
       name: 'Email Received',
-      input: z.object({}),
       output: z.object({})
     });
 

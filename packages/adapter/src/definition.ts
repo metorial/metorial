@@ -52,10 +52,10 @@ export class SlateAdapterDefinition<
     SlateAdapterCapabilityRule
   >,
   Tools extends Record<string, SlateAdapterToolDefinition<any, any, any, any>> = {},
-  Triggers extends Record<string, SlateAdapterTriggerDefinition<any, any, any>> = {}
+  Triggers extends Record<string, SlateAdapterTriggerDefinition<any, any>> = {}
 > {
   #toolDefinitions = new Map<string, SlateAdapterToolDefinition<any, any, boolean, any>>();
-  #triggerDefinitions = new Map<string, SlateAdapterTriggerDefinition<any, any, any>>();
+  #triggerDefinitions = new Map<string, SlateAdapterTriggerDefinition<any, any>>();
   #actionKeys = new Set<string>();
   #linkedTools: Tools = {} as Tools;
   #linkedTriggers: Triggers = {} as Triggers;
@@ -151,15 +151,14 @@ export class SlateAdapterDefinition<
     return definition;
   }
 
-  defineTrigger<Key extends string, InputType extends {}, OutputType extends {}>(
+  defineTrigger<Key extends string, OutputType extends {}>(
     params: Omit<SlateActionParameters, 'adapter' | 'key'> & {
       key: Key;
-      input: z.ZodType<InputType>;
       output: z.ZodType<OutputType>;
     }
-  ): SlateAdapterTriggerDefinition<InputType, OutputType, Key> {
+  ): SlateAdapterTriggerDefinition<OutputType, Key> {
     let key = this.registerActionKey(params.key, 'trigger') as Key;
-    let definition = new SlateAdapterTriggerDefinition<InputType, OutputType, Key>(this, {
+    let definition = new SlateAdapterTriggerDefinition<OutputType, Key>(this, {
       ...params,
       key
     });
@@ -169,7 +168,7 @@ export class SlateAdapterDefinition<
 
   link<
     TTools extends Record<string, SlateAdapterToolDefinition<any, any, any, any>>,
-    TTriggers extends Record<string, SlateAdapterTriggerDefinition<any, any, any>>
+    TTriggers extends Record<string, SlateAdapterTriggerDefinition<any, any>>
   >(catalog: {
     tools: TTools;
     triggers: TTriggers;
