@@ -1,6 +1,6 @@
 {
   "name": "@slates/test",
-  "version": "1.0.0-rc.19",
+  "version": "1.0.0-rc.20",
   "publishConfig": {
     "access": "public"
   },
@@ -40,8 +40,8 @@
   },
   "dependencies": {
     "@lowerdeck/testing-tools": "latest",
-    "@slates/client": "1.0.0-rc.22",
-    "@slates/profiles": "1.0.0-rc.20"
+    "@slates/client": "1.0.0-rc.23",
+    "@slates/profiles": "1.0.0-rc.21"
   },
   "devDependencies": {
     "@slates/provider": "1.0.0-rc.23",

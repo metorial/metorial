@@ -1,6 +1,6 @@
 {
   "name": "@slates/profiles",
-  "version": "1.0.0-rc.20",
+  "version": "1.0.0-rc.21",
   "publishConfig": {
     "access": "public"
   },
@@ -31,7 +31,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "@slates/client": "1.0.0-rc.22",
+    "@slates/client": "1.0.0-rc.23",
     "@slates/proto": "1.0.0-rc.19"
   },
   "devDependencies": {
