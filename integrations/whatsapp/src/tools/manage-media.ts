@@ -30,6 +30,9 @@ Use this to access media files received from incoming messages.`,
     })
   )
   .handleInvocation(async ctx => {
+    // TODO(chat adapter): when WhatsApp chat support is added, emit this as a URL
+    // attachment with a media-id refreshReference and register getFileUrlTool so the
+    // Hub refreshes the five-minute URL within the attachment's seven-day lifetime.
     let client = new Client({
       token: ctx.auth.token,
       phoneNumberId: ctx.config.phoneNumberId,

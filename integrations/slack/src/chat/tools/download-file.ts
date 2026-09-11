@@ -5,6 +5,8 @@ import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';
 import { mapSlackFile } from '../lib/mappers';
 
+let SLACK_MAX_PROXIED_ATTACHMENT_BYTES = 500 * 1024 * 1024;
+
 let providerFileReferenceSchema = z.object({
   fileId: z.string().optional(),
   url: z.string().optional()
@@ -38,6 +40,16 @@ export let chatDownloadFile = contract
         message: 'A Slack file id or private download URL is required'
       });
     }
+
+    if (file?.size !== undefined && file.size > SLACK_MAX_PROXIED_ATTACHMENT_BYTES) {
+      throw ChatErrors.attachmentTooLarge({
+        action: contract.key,
+        id: fileId,
+        max: SLACK_MAX_PROXIED_ATTACHMENT_BYTES,
+        actual: file.size
+      });
+    }
+
     let parsedUrl = new URL(url);
     if (
       parsedUrl.protocol !== 'https:' ||
@@ -57,8 +69,7 @@ export let chatDownloadFile = contract
       });
     }
 
-    let download = await client.downloadFile(url);
-    let mimeType = download.contentType ?? file?.mimetype;
+    let mimeType = file?.mimetype;
     let attachment = {
       ...(file
         ? mapSlackFile(file)
@@ -66,24 +77,21 @@ export let chatDownloadFile = contract
             type: 'file' as const,
             providerFileReference: { fileId, url }
           }),
-      mimeType,
-      size: download.contentLength
+      mimeType
     };
 
+    await ctx.addAttachment({
+      type: 'url',
+      url,
+      mimeType,
+      headers: { Authorization: `Bearer ${ctx.auth.token}` }
+    });
+
     return {
-      output: { attachment, raw: file ?? { url, contentLength: download.contentLength } },
-      attachments: [
-        {
-          content: {
-            type: 'content' as const,
-            encoding: 'base64' as const,
-            content: download.content.toString('base64')
-          },
-          mimeType,
-          attachmentHash: fileId ? `slack:file:${fileId}` : undefined
-        }
-      ],
-      message: `Downloaded ${download.contentLength} byte(s) from Slack.`
+      output: { attachment, raw: file ?? { url } },
+      message: fileId
+        ? `Prepared Slack file \`${fileId}\` for download.`
+        : 'Prepared Slack file for download.'
     };
   })
   .build();

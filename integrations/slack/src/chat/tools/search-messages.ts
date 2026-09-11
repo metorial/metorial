@@ -9,31 +9,36 @@ import { getSlackIdentity, mapSlackMessage } from '../lib/mappers';
 
 export let chatSearchMessages = contract
   .implement(spec)
-  .scopes(slackActionScopes.search)
+  .scopes(slackActionScopes.searchPublic)
   .authMethods(slackUserAuthMethods)
   .handleInvocation(async ctx => {
     let client = createSlackChatClient(ctx, { action: contract.key });
     let cursor = decodeSlackCursor(ctx.input.cursor, ctx.input.direction ?? 'backward');
-    let page = cursor.data.page ?? 1;
+
     let query = ctx.input.channelId
       ? `${ctx.input.query} in:${ctx.input.channelId}`
       : ctx.input.query;
-    let result = await client.searchMessages({
+
+    let result = await client.searchContext({
       query,
+      contentTypes: ['messages'],
+      contextChannelId: ctx.input.channelId,
       sort: 'timestamp',
       sortDir: cursor.direction === 'forward' ? 'asc' : 'desc',
-      count: ctx.input.limit ?? 100,
-      page
+      limit: ctx.input.limit ?? 100,
+      cursor: cursor.data.cursor
     });
+
     let identity = await getSlackIdentity(client);
-    let matches = result.messages.matches as any[];
+    let matches = (result.messages ?? []) as Array<Record<string, any>>;
+
     let messages = await Promise.all(
       matches.map(match =>
         mapSlackMessage(
           client,
           match.channel?.id ?? ctx.input.channelId ?? '',
           {
-            ...(match as SlackMessage),
+            ...(match as unknown as SlackMessage),
             ts: match.ts ?? '0',
             channel: match.channel?.id,
             user: typeof match.user === 'string' ? match.user : match.user?.id
@@ -42,16 +47,16 @@ export let chatSearchMessages = contract
         )
       )
     );
+
     return {
       output: {
         messages,
-        nextCursor:
-          page * (ctx.input.limit ?? 100) < result.messages.total
-            ? encodeSlackCursor(cursor.direction, { page: page + 1 })
-            : undefined,
+        nextCursor: result.nextCursor
+          ? encodeSlackCursor(cursor.direction, { cursor: result.nextCursor })
+          : undefined,
         raw: result
       },
-      message: `Found ${result.messages.total} Slack message(s).`
+      message: `Found ${messages.length} Slack message(s).`
     };
   })
   .build();
