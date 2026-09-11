@@ -1,7 +1,15 @@
 import { isServiceError } from '@lowerdeck/error';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { getMappableAction, getTriggersForGroup, isMappableTrigger, mapAction } from './spec';
+import {
+  getExposedAction,
+  getExposedActions,
+  getExposedTriggerGroups,
+  getMappableAction,
+  getTriggersForGroup,
+  isMappableTrigger,
+  mapAction
+} from './spec';
 
 let baseAction = {
   key: 'do_thing',
@@ -79,5 +87,48 @@ describe('getMappableAction', () => {
       expect(isServiceError(e)).toBe(true);
       expect((e as any).data.status).toBe(404);
     }
+  });
+});
+
+describe('adapter exposure', () => {
+  let providerTool: any = { ...toolAction, key: 'provider_tool' };
+  let adapterTool: any = { ...toolAction, key: 'adapter_tool', adapter: 'chat' };
+  let providerGroup = { key: 'provider_group', name: 'Provider Group' };
+  let adapterGroup = { key: 'adapter_group', name: 'Adapter Group' };
+  let emptyGroup = { key: 'empty_group', name: 'Empty Group' };
+  let providerTrigger: any = {
+    ...validTrigger,
+    key: 'provider_trigger',
+    triggerGroup: providerGroup
+  };
+  let adapterTrigger: any = {
+    ...validTrigger,
+    key: 'adapter_trigger',
+    adapter: 'chat',
+    triggerGroup: adapterGroup
+  };
+  let slate = {
+    actions: [providerTool, adapterTool, providerTrigger, adapterTrigger],
+    triggerGroups: [providerGroup, adapterGroup, emptyGroup]
+  } as any;
+
+  it('only exposes adapter actions when adapters are enabled', () => {
+    expect(getExposedActions(slate, false)).toEqual([providerTool, providerTrigger]);
+    expect(getExposedActions(slate, true)).toEqual([
+      providerTool,
+      adapterTool,
+      providerTrigger,
+      adapterTrigger
+    ]);
+  });
+
+  it('does not expose an adapter action directly when adapters are disabled', () => {
+    expect(() => getExposedAction(slate, 'adapter_tool', false)).toThrow();
+    expect(getExposedAction(slate, 'adapter_tool', true)).toBe(adapterTool);
+  });
+
+  it('only exposes trigger groups that contain an exposed trigger', () => {
+    expect(getExposedTriggerGroups(slate, false)).toEqual([providerGroup]);
+    expect(getExposedTriggerGroups(slate, true)).toEqual([providerGroup, adapterGroup]);
   });
 });

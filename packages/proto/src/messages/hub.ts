@@ -13,6 +13,7 @@ export let slatesMessageHubCapabilitiesSetNotification = z.object({
           })
         })
         .optional(),
+      adapters: z.boolean().optional(),
       triggers: z.boolean().optional()
     })
   })

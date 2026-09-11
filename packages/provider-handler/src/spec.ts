@@ -8,8 +8,8 @@ import type {
 import {
   type Slate,
   type SlateAdapter,
-  type SlateTrigger,
-  SlateDefaultPollingIntervalSeconds
+  SlateDefaultPollingIntervalSeconds,
+  type SlateTrigger
 } from '@slates/provider';
 import z from 'zod';
 import { toJsonSchema } from './validation';
@@ -171,6 +171,27 @@ export let getMappableAction = <ConfigType extends {}, AuthType extends {}>(
   return action;
 };
 
+export let getExposedActions = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  includeAdapterActions: boolean
+) =>
+  slate.actions.filter(
+    action => isMappableTrigger(action) && (includeAdapterActions || !action.adapter)
+  );
+
+export let getExposedAction = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  actionId: string,
+  includeAdapterActions: boolean
+) => {
+  let action = getMappableAction(slate, actionId);
+  if (action.adapter && !includeAdapterActions) {
+    throw new ServiceError(notFoundError(`action`, actionId));
+  }
+
+  return action;
+};
+
 export let getTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   triggerGroupId: string
@@ -191,6 +212,19 @@ export let getTriggersForGroup = <ConfigType extends {}, AuthType extends {}>(
     (action): action is SlateTrigger<ConfigType, AuthType, any, any> =>
       action.type === 'trigger' && action.triggerGroup?.key === triggerGroupId
   );
+
+export let getExposedTriggerGroups = <ConfigType extends {}, AuthType extends {}>(
+  slate: Slate<ConfigType, AuthType>,
+  includeAdapterActions: boolean
+) => {
+  let triggerGroupIds = new Set(
+    getExposedActions(slate, includeAdapterActions).flatMap(action =>
+      action.type === 'trigger' && action.triggerGroup ? [action.triggerGroup.key] : []
+    )
+  );
+
+  return slate.triggerGroups.filter(group => triggerGroupIds.has(group.key));
+};
 
 export let evaluateTriggerMatches = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,

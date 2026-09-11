@@ -1,4 +1,9 @@
-import { badRequestError, preconditionFailedError, ServiceError } from '@lowerdeck/error';
+import {
+  badRequestError,
+  notFoundError,
+  preconditionFailedError,
+  ServiceError
+} from '@lowerdeck/error';
 import {
   createSlatesProviderProtoHandler,
   SLATES_PROTOCOL_VERSION,
@@ -22,7 +27,9 @@ import {
   getActionWithType,
   getAdapter,
   getAuthMethod,
-  getMappableAction,
+  getExposedAction,
+  getExposedActions,
+  getExposedTriggerGroups,
   getTriggerGroup,
   getWebhookAutoRegistration,
   getWebhookManualRegistration,
@@ -191,6 +198,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
     let hubCapabilities = new State<{
       attachments?: { directUpload?: { enabled: boolean; maxAttachmentSizeBytes?: number } };
+      adapters?: boolean;
       triggers?: boolean;
     } | null>(null);
     let liveInvocation = new State<Pick<SlateLiveInvocationInfo, 'token' | 'baseUrl'> | null>(
@@ -211,6 +219,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     };
 
     let supportsTriggerGroups = () => !!hubCapabilities.get()?.triggers;
+    let supportsAdapters = () => !!hubCapabilities.get()?.adapters;
 
     let logger = new SlateLogger(listeners);
     let providerTrace = {
@@ -867,11 +876,10 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
     manager.onRequest('slates/actions.list', async ({ params }) => {
       getContextBasic();
 
-      let actions = params.includeAdapterActions
-        ? slate.actions
-        : slate.actions.filter(action => !action.adapter);
-
-      actions = actions.filter(isMappableTrigger);
+      let actions = getExposedActions(
+        slate,
+        !!params.includeAdapterActions && supportsAdapters()
+      );
 
       if (!supportsTriggerGroups()) {
         actions = actions.filter(action => action.type !== 'trigger');
@@ -886,12 +894,15 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       getContextBasic();
 
       return {
-        adapters: slate.adapters.map(mapAdapter)
+        adapters: supportsAdapters() ? slate.adapters.map(mapAdapter) : []
       };
     });
 
     manager.onRequest('slates/adapter.get', async ({ params }) => {
       getContextBasic();
+      if (!supportsAdapters()) {
+        throw new ServiceError(notFoundError(`adapter`, params.adapterId));
+      }
       let adapter = getAdapter(slate, params.adapterId);
 
       return {
@@ -901,7 +912,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
     manager.onRequest('slates/action.get', async ({ params }) => {
       getContextBasic();
-      let action = getMappableAction(slate, params.actionId);
+      let action = getExposedAction(slate, params.actionId, supportsAdapters());
 
       return {
         action: mapAction(slate, action)
@@ -912,7 +923,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       getContextBasic();
 
       return {
-        triggerGroups: slate.triggerGroups.map(mapTriggerGroup)
+        triggerGroups: getExposedTriggerGroups(slate, supportsAdapters()).map(mapTriggerGroup)
       };
     });
 
