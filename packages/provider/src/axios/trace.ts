@@ -1,4 +1,5 @@
 import type { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+import { AuthConfigSecretRedactor } from '../auth/redact';
 import type { SlatePublicContext } from '../context';
 
 export interface SlateHttpTraceTextBody {
@@ -377,10 +378,12 @@ let truncateText = (text: string) => {
   };
 };
 
-let sanitizeFreeText = (text: string) => {
+let sanitizeFreeText = (text: string, redactor?: AuthConfigSecretRedactor) => {
   if (!text) return text;
 
-  let result = text;
+  // Literal auth-config secret values are replaced first -- this catches secrets sitting
+  // under a key name the heuristics below don't recognize as secret-like.
+  let result = redactor ? redactor.redact(text) : text;
 
   result = result.replace(
     HTTP_AUTH_SCHEME_PATTERN,
@@ -406,9 +409,14 @@ let sanitizeFreeText = (text: string) => {
   return result;
 };
 
-let sanitizeScalar = (value: string) => truncateText(sanitizeFreeText(value));
+let sanitizeScalar = (value: string, redactor?: AuthConfigSecretRedactor) =>
+  truncateText(sanitizeFreeText(value, redactor));
 
-let redactStructuredValue = (value: unknown, depth = 0): unknown => {
+let redactStructuredValue = (
+  value: unknown,
+  depth = 0,
+  redactor?: AuthConfigSecretRedactor
+): unknown => {
   if (value == null) return value;
   if (depth >= STRUCTURED_DEPTH_LIMIT) return '[truncated]';
 
@@ -418,13 +426,13 @@ let redactStructuredValue = (value: unknown, depth = 0): unknown => {
     typeof value === 'boolean' ||
     typeof value === 'bigint'
   ) {
-    return typeof value === 'string' ? sanitizeFreeText(value) : value;
+    return typeof value === 'string' ? sanitizeFreeText(value, redactor) : value;
   }
 
   if (Array.isArray(value)) {
     return value
       .slice(0, STRUCTURED_ENTRY_LIMIT)
-      .map(entry => redactStructuredValue(entry, depth + 1));
+      .map(entry => redactStructuredValue(entry, depth + 1, redactor));
   }
 
   if (isRecord(value)) {
@@ -433,7 +441,9 @@ let redactStructuredValue = (value: unknown, depth = 0): unknown => {
         .slice(0, STRUCTURED_ENTRY_LIMIT)
         .map(([key, entry]) => [
           key,
-          isSecretKeyName(key) ? REDACTED_VALUE : redactStructuredValue(entry, depth + 1)
+          isSecretKeyName(key)
+            ? REDACTED_VALUE
+            : redactStructuredValue(entry, depth + 1, redactor)
         ])
     );
   }
@@ -457,7 +467,8 @@ let maybeParseJson = (text: string, contentType?: string) => {
 
 let sanitizeTextBody = (
   text: string,
-  contentType?: string
+  contentType?: string,
+  redactor?: AuthConfigSecretRedactor
 ): SlateHttpTraceTextBody | undefined => {
   if (!text) return undefined;
 
@@ -465,8 +476,8 @@ let sanitizeTextBody = (
   let parsedJson = maybeParseJson(text, normalizedContentType);
   let normalizedText =
     parsedJson !== null
-      ? JSON.stringify(redactStructuredValue(parsedJson))
-      : sanitizeFreeText(text);
+      ? JSON.stringify(redactStructuredValue(parsedJson, 0, redactor))
+      : sanitizeFreeText(text, redactor);
   let { text: truncatedText, truncated } = truncateText(normalizedText);
 
   return {
@@ -487,7 +498,8 @@ let isBinaryLike = (value: unknown) => {
 
 let serializeTextBody = (
   value: unknown,
-  contentType?: string
+  contentType?: string,
+  redactor?: AuthConfigSecretRedactor
 ): SlateHttpTraceTextBody | undefined => {
   let normalizedContentType = normalizeContentType(contentType);
 
@@ -496,19 +508,23 @@ let serializeTextBody = (
   }
 
   if (typeof value === 'string') {
-    return sanitizeTextBody(value, normalizedContentType);
+    return sanitizeTextBody(value, normalizedContentType, redactor);
   }
 
   if (value instanceof URLSearchParams) {
-    return sanitizeTextBody(value.toString(), normalizedContentType);
+    return sanitizeTextBody(value.toString(), normalizedContentType, redactor);
   }
 
   if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
-    return sanitizeTextBody(String(value), normalizedContentType);
+    return sanitizeTextBody(String(value), normalizedContentType, redactor);
   }
 
   if (Array.isArray(value) || isRecord(value)) {
-    return sanitizeTextBody(JSON.stringify(redactStructuredValue(value)), 'application/json');
+    return sanitizeTextBody(
+      JSON.stringify(redactStructuredValue(value, 0, redactor)),
+      'application/json',
+      redactor
+    );
   }
 
   return undefined;
@@ -533,18 +549,21 @@ let decodeRedactedMarker = (value: string) =>
     ? value
     : value.split(REDACTED_ENCODED).join(REDACTED_VALUE);
 
-let redactHashFragment = (hash: string) => {
+let redactHashFragment = (hash: string, redactor?: AuthConfigSecretRedactor) => {
   if (!hash?.includes('=')) return hash;
   let withoutHash = hash.startsWith('#') ? hash.slice(1) : hash;
   let redacted = withoutHash.replace(
     /(?<![A-Za-z0-9])([A-Za-z0-9][A-Za-z0-9_\-.]*)=([^&]*)/g,
-    (match, key: string, _rawValue: string) =>
-      isUrlFormSecretKeyName(key) ? `${key}=${REDACTED_VALUE}` : match
+    (match, key: string, rawValue: string) => {
+      if (isUrlFormSecretKeyName(key)) return `${key}=${REDACTED_VALUE}`;
+      let literalRedacted = redactor ? redactor.redact(rawValue) : rawValue;
+      return literalRedacted !== rawValue ? `${key}=${literalRedacted}` : match;
+    }
   );
   return redacted ? `#${redacted}` : '';
 };
 
-let sanitizeUrl = (value: string) => {
+let sanitizeUrl = (value: string, redactor?: AuthConfigSecretRedactor) => {
   if (!value) return value;
 
   try {
@@ -558,14 +577,21 @@ let sanitizeUrl = (value: string) => {
     for (let key of Array.from(url.searchParams.keys())) {
       if (isUrlFormSecretKeyName(key)) {
         url.searchParams.set(key, REDACTED_VALUE);
+        continue;
       }
+
+      // Not a secret-looking key -- still catch a literal auth-config secret value.
+      let rawValue = url.searchParams.get(key) ?? '';
+      let literalRedacted = redactor ? redactor.redact(rawValue) : rawValue;
+      if (literalRedacted !== rawValue) url.searchParams.set(key, literalRedacted);
     }
 
-    url.hash = redactHashFragment(url.hash);
+    url.hash = redactHashFragment(url.hash, redactor);
 
     return decodeRedactedMarker(url.toString());
   } catch {
-    return value.replace(
+    let text = redactor ? redactor.redact(value) : value;
+    return text.replace(
       /([?&]([^=&#]+)=)([^&#]+)/g,
       (_match, prefix: string, key: string, rawValue: string) =>
         isUrlFormSecretKeyName(key) ? `${prefix}${REDACTED_VALUE}` : `${prefix}${rawValue}`
@@ -618,9 +644,12 @@ let headerEntries = (headers: unknown): [string, string][] => {
   return [];
 };
 
-let sanitizeHeaders = (headers: unknown) => {
+let sanitizeHeaders = (headers: unknown, redactor?: AuthConfigSecretRedactor) => {
   let entries = headerEntries(headers)
-    .map(([key, value]) => [key.toLowerCase(), sanitizeScalar(value).text] as [string, string])
+    .map(
+      ([key, value]) =>
+        [key.toLowerCase(), sanitizeScalar(value, redactor).text] as [string, string]
+    )
     .filter(([key]) => isSafeHeaderName(key));
 
   if (entries.length === 0) return undefined;
@@ -668,6 +697,7 @@ export let attachHttpTraceDraft = (
 ) => {
   let traceAwareConfig = config as TraceAwareAxiosRequestConfig;
   let contentType = getContentType(config.headers);
+  let redactor = new AuthConfigSecretRedactor(context._getAuthConfigForRedaction());
 
   traceAwareConfig.__slatesHttpTraceDraft = {
     context,
@@ -675,10 +705,12 @@ export let attachHttpTraceDraft = (
     startedAtMs: Date.now(),
     request: {
       method: (config.method ?? 'GET').toUpperCase(),
-      url: sanitizeUrl(buildUrl(config.baseURL, config.url)),
-      ...(sanitizeHeaders(config.headers) ? { headers: sanitizeHeaders(config.headers) } : {}),
-      ...(serializeTextBody(config.data, contentType)
-        ? { body: serializeTextBody(config.data, contentType) }
+      url: sanitizeUrl(buildUrl(config.baseURL, config.url), redactor),
+      ...(sanitizeHeaders(config.headers, redactor)
+        ? { headers: sanitizeHeaders(config.headers, redactor) }
+        : {}),
+      ...(serializeTextBody(config.data, contentType, redactor)
+        ? { body: serializeTextBody(config.data, contentType, redactor) }
         : {})
     }
   };
@@ -703,6 +735,7 @@ export let recordHttpTraceFromResponse = (response: AxiosResponse) => {
   if (!draft) return response;
   clearTraceDraft(config, draft);
 
+  let redactor = new AuthConfigSecretRedactor(draft.context._getAuthConfigForRedaction());
   let contentType = getContentType(response.headers);
   draft.context.recordHttpTrace({
     startedAt: draft.startedAt,
@@ -711,11 +744,11 @@ export let recordHttpTraceFromResponse = (response: AxiosResponse) => {
     response: {
       status: response.status,
       ...(response.statusText ? { statusText: response.statusText } : {}),
-      ...(sanitizeHeaders(response.headers)
-        ? { headers: sanitizeHeaders(response.headers) }
+      ...(sanitizeHeaders(response.headers, redactor)
+        ? { headers: sanitizeHeaders(response.headers, redactor) }
         : {}),
-      ...(serializeTextBody(response.data, contentType)
-        ? { body: serializeTextBody(response.data, contentType) }
+      ...(serializeTextBody(response.data, contentType, redactor)
+        ? { body: serializeTextBody(response.data, contentType, redactor) }
         : {})
     }
   });
@@ -729,6 +762,7 @@ export let recordHttpTraceFromError = (error: AxiosError) => {
   if (!draft) return;
   clearTraceDraft(config, draft);
 
+  let redactor = new AuthConfigSecretRedactor(draft.context._getAuthConfigForRedaction());
   let responseContentType = getContentType(error.response?.headers);
   draft.context.recordHttpTrace({
     startedAt: draft.startedAt,
@@ -739,11 +773,11 @@ export let recordHttpTraceFromError = (error: AxiosError) => {
           response: {
             status: error.response.status,
             ...(error.response.statusText ? { statusText: error.response.statusText } : {}),
-            ...(sanitizeHeaders(error.response.headers)
-              ? { headers: sanitizeHeaders(error.response.headers) }
+            ...(sanitizeHeaders(error.response.headers, redactor)
+              ? { headers: sanitizeHeaders(error.response.headers, redactor) }
               : {}),
-            ...(serializeTextBody(error.response.data, responseContentType)
-              ? { body: serializeTextBody(error.response.data, responseContentType) }
+            ...(serializeTextBody(error.response.data, responseContentType, redactor)
+              ? { body: serializeTextBody(error.response.data, responseContentType, redactor) }
               : {})
           }
         }

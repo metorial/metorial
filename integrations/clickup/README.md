@@ -1,6 +1,10 @@
-# <img src="https://provider-logos.metorial-cdn.com/clickup.png" height="20"> Clickup
+# <img src="https://provider-logos.metorial-cdn.com/clickup.png" height="20"> ClickUp
 
-Create, update, delete, and search tasks across a hierarchical workspace structure of Spaces, Folders, and Lists. Manage task details including assignees, statuses, priorities, due dates, tags, comments, checklists, and custom fields. Track time on tasks with timers and time entries. Create and manage Goals for progress tracking. Organize workspaces by creating and managing Spaces, Folders, Lists, and Space tags. Retrieve workspace members and team information.
+Connect once to work across every ClickUp Workspace authorized for the account. Create, update, delete, and search tasks across a hierarchical structure of Spaces, Folders, and Lists. Manage task details including assignees, statuses, priorities, due dates, tags, comments, checklists, and values on existing custom fields. Track time on tasks with timers and time entries. Create and manage Goals for progress tracking. Organize Workspaces by creating and managing Spaces, Folders, Lists, and Space tags. Retrieve Workspace members.
+
+## Multi-Workspace Access
+
+Call **Get Workspaces** to discover the Workspace IDs authorized for the connection. Tools that call Workspace-scoped ClickUp endpoints require an explicit **workspaceId**, so each request selects its target Workspace. Tools that operate on a resource ID, such as a task, list, folder, Space, or Goal ID, continue to use that resource ID directly.
 
 ## Tools
 
@@ -18,7 +22,7 @@ Retrieve a single ClickUp task by its ID, including all details such as status, 
 
 ### Get Workspaces
 
-Retrieve all ClickUp workspaces (teams) accessible to the authenticated user. Useful for discovering workspace IDs and understanding account structure.
+Retrieve all ClickUp Workspaces (teams) accessible to the authenticated user. Use this tool to discover the **workspaceId** required by Workspace-scoped tools.
 
 ### Get Task Comments
 
@@ -90,11 +94,11 @@ Delete a ClickUp folder.
 
 ### Get Goals
 
-Retrieve all goals from the workspace. Optionally include completed goals.
+Retrieve all Goals from the Workspace selected by **workspaceId**. Optionally include completed Goals. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Create Goal
 
-Create a ClickUp goal in the configured workspace.
+Create a ClickUp Goal in the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Update Goal
 
@@ -122,11 +126,11 @@ Delete a ClickUp list.
 
 ### Get Spaces
 
-Retrieve all spaces in the configured ClickUp workspace, including their names, IDs, and statuses.
+Retrieve all Spaces in the Workspace selected by **workspaceId**, including their names, IDs, and statuses. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Create Space
 
-Create a ClickUp space in the configured workspace.
+Create a ClickUp Space in the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Update Space
 
@@ -154,35 +158,35 @@ Delete a tag from a ClickUp space.
 
 ### Search Tasks
 
-Search and filter tasks across the entire ClickUp workspace. Filter by status, assignee, tags, due dates, creation dates, and more. Returns paginated results. Use the **listId** parameter to scope to a specific list, or omit it to search across the workspace.
+Search and filter tasks in the Workspace selected by the required **workspaceId**. Filter by status, assignee, tags, due dates, creation dates, and more. Returns paginated results. Use **listId** to narrow the search to a specific List; **workspaceId** is still required when **listId** is supplied. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Get Time Entries
 
-Retrieve time tracking entries from the workspace. Filter by date range, assignee, or specific task/list/space. Requires the Time Tracking ClickApp to be enabled.
+Retrieve time tracking entries from the Workspace selected by **workspaceId**. Filter by date range, assignee, or specific task, List, or Space. Call **Get Workspaces** to discover authorized Workspace IDs. Requires the Time Tracking ClickApp to be enabled.
 
 ### Create Time Entry
 
-Log a completed time entry in ClickUp.
+Log a completed time entry in the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Update Time Entry
 
-Update a ClickUp time entry's task, description, start/end time, duration, assignee, tags, or billable flag.
+Update a ClickUp time entry in the Workspace selected by **workspaceId**, including its task, description, start/end time, duration, assignee, tags, or billable flag. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Delete Time Entry
 
-Delete a ClickUp time entry from the configured workspace.
+Delete a ClickUp time entry from the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Get Running Timer
 
-Retrieve the currently running ClickUp timer.
+Retrieve the currently running ClickUp timer in the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Start Timer
 
-Start a running timer in ClickUp.
+Start a running timer in the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Stop Timer
 
-Stop the currently running ClickUp timer.
+Stop the currently running ClickUp timer in the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
 
 ### Update Task
 
@@ -190,7 +194,11 @@ Update an existing ClickUp task. Modify its name, description, status, priority,
 
 ### Get Workspace Members
 
-Retrieve members for the configured workspace.
+Retrieve members for the Workspace selected by **workspaceId**. Call **Get Workspaces** to discover authorized Workspace IDs.
+
+## Webhook Triggers
+
+Task and Workspace event triggers subscribe across every Workspace authorized for the connection. Each emitted event identifies the Workspace that delivered it.
 
 ## License
 

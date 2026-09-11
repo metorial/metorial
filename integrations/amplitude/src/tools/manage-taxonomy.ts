@@ -1,7 +1,8 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
 import { amplitudeServiceError } from '../lib/errors';
+import { parseResponse, recordSchema } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let manageTaxonomyTool = SlateTool.create(spec, {
@@ -9,10 +10,11 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
   key: 'manage_taxonomy',
   description: `Manage your Amplitude tracking plan (taxonomy). Create, update, delete, and list event types, event properties, user properties, and event categories. Useful for programmatically maintaining a clean, well-documented tracking plan.`,
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       resourceType: z
@@ -34,11 +36,21 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
       userProperty: z
         .string()
         .optional()
-        .describe('User property name. Required for user_property get/update/delete.'),
+        .describe(
+          'User property name. Prefix custom properties with gp:. Required for user_property get/update/delete.'
+        ),
       categoryId: z
         .string()
         .optional()
-        .describe('Category ID. Required for event_category delete.'),
+        .describe(
+          'Category ID from the category list. Required for event_category update/delete; an alternative to categoryName for get.'
+        ),
+      categoryName: z
+        .string()
+        .optional()
+        .describe(
+          'Event category name for get. Alternatively supply categoryId from the category list.'
+        ),
       create: z
         .object({
           name: z.string().describe('Name of the resource to create.'),
@@ -85,29 +97,53 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
   .output(
     z.object({
       items: z
-        .array(z.any())
+        .array(z.unknown())
         .optional()
         .describe('List of taxonomy items (for "list" action).'),
-      item: z.any().optional().describe('Single taxonomy item (for "get" action).'),
-      result: z.any().optional().describe('Operation result (for create/update/delete).')
+      item: z.unknown().optional().describe('Single taxonomy item (for "get" action).'),
+      result: z.unknown().optional().describe('Operation result (for create/update/delete).')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let { resourceType, action } = ctx.input;
+    let parameters =
+      action === 'create'
+        ? ctx.input.create
+        : action === 'update'
+          ? ctx.input.update
+          : undefined;
+    if (
+      parameters?.type !== undefined &&
+      !['string', 'number', 'boolean', 'enum', 'any'].includes(parameters.type)
+    )
+      throw amplitudeServiceError(
+        'Property type must be string, number, boolean, enum, or any.'
+      );
+    if (
+      parameters?.regex !== undefined &&
+      parameters.type !== undefined &&
+      parameters.type !== 'string'
+    )
+      throw amplitudeServiceError('regex is only supported for string properties.');
+    if (
+      parameters?.enumValues !== undefined &&
+      parameters.type !== undefined &&
+      parameters.type !== 'enum'
+    )
+      throw amplitudeServiceError('enumValues is only supported for enum properties.');
+    if (action === 'update' && ctx.input.update && Object.keys(ctx.input.update).length === 0)
+      throw amplitudeServiceError('Provide at least one update field.');
 
     // --- Event Types ---
     if (resourceType === 'event_type') {
       if (action === 'list') {
         let result = await client.getEventTypes();
         return {
-          output: { items: result.data ?? result },
+          output: {
+            items: parseResponse(z.array(recordSchema), result.data, 'taxonomy list')
+          },
           message: 'Listed all event types.'
         };
       }
@@ -115,7 +151,7 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
         if (!ctx.input.eventType) throw amplitudeServiceError('eventType is required.');
         let result = await client.getEventType(ctx.input.eventType);
         return {
-          output: { item: result.data ?? result },
+          output: { item: parseResponse(recordSchema, result.data, 'taxonomy lookup') },
           message: `Retrieved event type "${ctx.input.eventType}".`
         };
       }
@@ -158,12 +194,26 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
 
     // --- Event Properties ---
     if (resourceType === 'event_property') {
+      if (action === 'get') {
+        if (!ctx.input.eventType || !ctx.input.eventProperty)
+          throw amplitudeServiceError('eventType and eventProperty are required.');
+        let result = await client.getEventProperty(
+          ctx.input.eventProperty,
+          ctx.input.eventType
+        );
+        return {
+          output: { item: parseResponse(recordSchema, result.data, 'taxonomy lookup') },
+          message: `Retrieved event property "${ctx.input.eventProperty}".`
+        };
+      }
       if (action === 'list') {
         if (!ctx.input.eventType)
           throw amplitudeServiceError('eventType is required to list event properties.');
         let result = await client.getEventProperties(ctx.input.eventType);
         return {
-          output: { items: result.data ?? result },
+          output: {
+            items: parseResponse(z.array(recordSchema), result.data, 'taxonomy list')
+          },
           message: `Listed event properties for "${ctx.input.eventType}".`
         };
       }
@@ -224,10 +274,20 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
 
     // --- User Properties ---
     if (resourceType === 'user_property') {
+      if (action === 'get') {
+        if (!ctx.input.userProperty) throw amplitudeServiceError('userProperty is required.');
+        let result = await client.getUserProperty(ctx.input.userProperty);
+        return {
+          output: { item: parseResponse(recordSchema, result.data, 'taxonomy lookup') },
+          message: `Retrieved user property "${ctx.input.userProperty}".`
+        };
+      }
       if (action === 'list') {
         let result = await client.getUserProperties();
         return {
-          output: { items: result.data ?? result },
+          output: {
+            items: parseResponse(z.array(recordSchema), result.data, 'taxonomy list')
+          },
           message: 'Listed all user properties.'
         };
       }
@@ -278,10 +338,46 @@ export let manageTaxonomyTool = SlateTool.create(spec, {
 
     // --- Event Categories ---
     if (resourceType === 'event_category') {
+      if (action === 'get') {
+        let name = ctx.input.categoryName;
+        if (!name && ctx.input.categoryId) {
+          let categories = await client.getEventCategories();
+          let items = parseResponse(
+            z.array(z.object({ id: z.union([z.string(), z.number()]), name: z.string() })),
+            categories.data,
+            'category list'
+          );
+          name = items.find(item => String(item.id) === ctx.input.categoryId)?.name;
+          if (!name)
+            throw amplitudeServiceError(
+              `Event category "${ctx.input.categoryId}" was not found.`
+            );
+        }
+        if (!name) throw amplitudeServiceError('categoryName or categoryId is required.');
+        let result = await client.getEventCategory(name);
+        return {
+          output: { item: parseResponse(recordSchema, result.data, 'taxonomy lookup') },
+          message: `Retrieved event category "${name}".`
+        };
+      }
+      if (action === 'update') {
+        if (!ctx.input.categoryId || !ctx.input.update?.newName)
+          throw amplitudeServiceError('categoryId and update.newName are required.');
+        let result = await client.updateEventCategory(
+          ctx.input.categoryId,
+          ctx.input.update.newName
+        );
+        return {
+          output: { result },
+          message: `Updated event category "${ctx.input.categoryId}".`
+        };
+      }
       if (action === 'list') {
         let result = await client.getEventCategories();
         return {
-          output: { items: result.data ?? result },
+          output: {
+            items: parseResponse(z.array(recordSchema), result.data, 'taxonomy list')
+          },
           message: 'Listed all event categories.'
         };
       }

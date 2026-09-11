@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClickUpClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getGoals = SlateTool.create(spec, {
   name: 'Get Goals',
   key: 'get_goals',
-  description: `Retrieve all goals from the workspace. Optionally include completed goals.`,
+  description: `Retrieve goals from the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs. Optionally include completed goals.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       includeCompleted: z.boolean().optional().describe('Include completed goals in results')
     })
   )
@@ -34,7 +36,7 @@ export let getGoals = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let goals = await client.getGoals(ctx.config.workspaceId, ctx.input.includeCompleted);
+    let goals = await client.getGoals(ctx.input.workspaceId, ctx.input.includeCompleted);
 
     return {
       output: {
@@ -57,13 +59,14 @@ export let getGoals = SlateTool.create(spec, {
 export let createGoal = SlateTool.create(spec, {
   name: 'Create Goal',
   key: 'create_goal',
-  description: `Create a new goal (objective) in the ClickUp workspace. Goals track progress through key results.`,
+  description: `Create a new goal in the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs. Goals track progress through key results.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       name: z.string().describe('Name of the goal'),
       description: z.string().optional().describe('Description of the goal'),
       dueDate: z.string().optional().describe('Due date as Unix timestamp in milliseconds'),
@@ -79,7 +82,7 @@ export let createGoal = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let goal = await client.createGoal(ctx.config.workspaceId, {
+    let goal = await client.createGoal(ctx.input.workspaceId, {
       name: ctx.input.name,
       description: ctx.input.description,
       dueDate: ctx.input.dueDate ? Number(ctx.input.dueDate) : undefined,

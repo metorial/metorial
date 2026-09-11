@@ -46,7 +46,180 @@ type AuthSetupOptions = WithProfile &
     clientSecret?: string;
     oauthCredential?: string;
     scopes?: string;
+    incremental?: boolean;
   };
+
+export type AuthSetupRuntimeDependencies = {
+  createClientContext: typeof createClientContext;
+  chooseAuthMethod: typeof chooseAuthMethod;
+  chooseScopes: typeof chooseScopes;
+  createOAuthCallbackListener: typeof createOAuthCallbackListener;
+  printBrowserUrl: typeof printBrowserUrl;
+};
+
+let authSetupRuntimeDependencies: AuthSetupRuntimeDependencies = {
+  createClientContext,
+  chooseAuthMethod,
+  chooseScopes,
+  createOAuthCallbackListener,
+  printBrowserUrl
+};
+
+export let mergeIncrementalOAuthAuthorization = (d: {
+  previousOutput: JsonObject;
+  previousScopes: string[];
+  output: JsonObject;
+  scopes: string[];
+}) => {
+  let output = { ...d.output };
+  if (
+    (d.output.refreshToken === undefined || d.output.refreshToken === null) &&
+    typeof d.previousOutput.refreshToken === 'string'
+  ) {
+    output.refreshToken = d.previousOutput.refreshToken;
+  }
+
+  return {
+    output,
+    scopes: [...new Set([...d.previousScopes, ...d.scopes])]
+  };
+};
+
+export let validateIncrementalOAuthSetup = (d: {
+  enabled?: boolean;
+  authMethodName: string;
+  previousAuth: SlatesStoredAuth | null;
+  scopes: string[];
+  inputProvided?: boolean;
+}) => {
+  if (!d.enabled) return null;
+
+  if (!d.previousAuth || d.previousAuth.authType !== 'auth.oauth') {
+    throw new Error(
+      `Incremental OAuth setup requires existing OAuth authentication for ${d.authMethodName}. Run auth setup once without --incremental first.`
+    );
+  }
+  if (d.scopes.length === 0) {
+    throw new Error(
+      'Incremental OAuth setup requires an explicit comma-separated scope batch via --scopes.'
+    );
+  }
+  if (d.inputProvided) {
+    throw new Error(
+      'Incremental OAuth setup reuses the existing authentication input. Remove --input and retry.'
+    );
+  }
+
+  return d.previousAuth;
+};
+
+export let resolveIncrementalOAuthCredentials = (d: {
+  previousAuth: SlatesStoredAuth;
+  linkedCredential: SlatesOAuthCredentialRecord | null;
+  selectedCredential?: SlatesOAuthCredentialRecord | null;
+  selectedCredentialRequested?: boolean;
+  clientId?: string;
+  clientSecret?: string;
+}) => {
+  let storedClientId = d.previousAuth.clientId;
+  let linkedClientId = d.linkedCredential?.clientId;
+  if (storedClientId && linkedClientId && storedClientId !== linkedClientId) {
+    throw new Error(
+      'The existing authentication and its saved OAuth credential use different client IDs. Reconnect before using incremental OAuth setup.'
+    );
+  }
+
+  let previousClientId = storedClientId ?? linkedClientId;
+  if (!previousClientId) {
+    throw new Error(
+      'Incremental OAuth setup cannot determine the OAuth client ID used by the existing authentication. Reconnect before using --incremental.'
+    );
+  }
+  if (d.selectedCredentialRequested && !d.selectedCredential) {
+    throw new Error(
+      'The selected OAuth credential was not found for this authentication method.'
+    );
+  }
+
+  if (
+    (d.clientId && d.clientId !== previousClientId) ||
+    (d.selectedCredential && d.selectedCredential.clientId !== previousClientId)
+  ) {
+    throw new Error(
+      'Incremental OAuth setup must use the same OAuth client ID as the existing authentication.'
+    );
+  }
+
+  let clientSecret =
+    d.clientSecret ??
+    d.selectedCredential?.clientSecret ??
+    d.linkedCredential?.clientSecret ??
+    d.previousAuth.clientSecret;
+  if (!clientSecret) {
+    throw new Error(
+      'The existing authentication does not have a reusable OAuth client secret. Supply the secret for the same client with --client-secret.'
+    );
+  }
+
+  return {
+    credential:
+      d.selectedCredential ?? (d.clientSecret === undefined ? d.linkedCredential : null),
+    clientId: previousClientId,
+    clientSecret
+  };
+};
+
+let getOAuthProfileId = (profile: JsonObject | null | undefined) => {
+  let id = profile?.id;
+  return typeof id === 'string' && id.trim() ? id : null;
+};
+
+let getOAuthProfileEmail = (profile: JsonObject | null | undefined) => {
+  let email = profile?.email;
+  return typeof email === 'string' && email.trim() ? email.trim().toLowerCase() : null;
+};
+
+export let assertOAuthProfileContinuity = (
+  previousProfile: JsonObject | null | undefined,
+  currentProfile: JsonObject | null | undefined
+) => {
+  let previousId = getOAuthProfileId(previousProfile);
+  if (previousId) {
+    if (getOAuthProfileId(currentProfile) !== previousId) {
+      throw new Error(
+        'Incremental OAuth setup returned a different Google account. The existing authentication was left unchanged.'
+      );
+    }
+    return;
+  }
+
+  let previousEmail = getOAuthProfileEmail(previousProfile);
+  if (!previousEmail) {
+    throw new Error(
+      'Incremental OAuth setup cannot verify the Google account used by the existing authentication. Reconnect before using --incremental.'
+    );
+  }
+  if (getOAuthProfileEmail(currentProfile) !== previousEmail) {
+    throw new Error(
+      'Incremental OAuth setup returned a different Google account. The existing authentication was left unchanged.'
+    );
+  }
+};
+
+export let completeIncrementalOAuthAuthorization = (d: {
+  previousAuth: SlatesStoredAuth;
+  output: JsonObject;
+  grantedScopes: string[];
+  profile: JsonObject | null | undefined;
+}) => {
+  assertOAuthProfileContinuity(d.previousAuth.profile, d.profile);
+  return mergeIncrementalOAuthAuthorization({
+    previousOutput: d.previousAuth.output,
+    previousScopes: d.previousAuth.scopes,
+    output: d.output,
+    scopes: d.grantedScopes
+  });
+};
 
 export let normalizeCallbackRedirectUriForIntegration = (
   integration: string,
@@ -268,26 +441,46 @@ let chooseOAuthCredentialsForSetup = async (opts: {
   };
 };
 
-let runAuthSetup = async (opts: AuthSetupOptions): Promise<SlatesStoredAuth> => {
-  let { store, profile, client } = await createClientContext({
+export let runAuthSetupWithDependencies = async (
+  opts: AuthSetupOptions,
+  dependencies: AuthSetupRuntimeDependencies
+): Promise<SlatesStoredAuth> => {
+  let { store, profile, client } = await dependencies.createClientContext({
     ...opts,
     autoRefresh: false
   });
   client.clearAuth();
-  let authMethod = await chooseAuthMethod({
+  let authMethod = await dependencies.chooseAuthMethod({
     client,
     authMethodId: opts.authMethodId,
     forcePrompt: !opts.authMethodId
   });
+  let scopes = parseList(opts.scopes);
+  let previousAuth = validateIncrementalOAuthSetup({
+    enabled: opts.incremental,
+    authMethodName: authMethod.name,
+    previousAuth: opts.incremental ? store.getAuth(profile.id, authMethod.id) : null,
+    scopes,
+    inputProvided: opts.input !== undefined
+  });
+  if (opts.incremental && !authMethod.capabilities.getProfile?.enabled) {
+    throw new Error(
+      'Incremental OAuth setup requires this authentication method to expose a profile for account verification.'
+    );
+  }
+  if (previousAuth) {
+    assertOAuthProfileContinuity(previousAuth.profile, previousAuth.profile);
+  }
 
   let defaultInput = authMethod.capabilities.getDefaultInput?.enabled
     ? ((await client.getDefaultAuthInput(authMethod.id)).input ?? {})
     : {};
   let authInput =
+    previousAuth?.input ??
     parseJsonObject(opts.input, 'auth input') ??
     (await promptForObjectSchema(authMethod.inputSchema, defaultInput));
 
-  if (authMethod.capabilities.handleChangedInput?.enabled) {
+  if (!previousAuth && authMethod.capabilities.handleChangedInput?.enabled) {
     authInput =
       (
         await client.updateAuthInput({
@@ -301,31 +494,46 @@ let runAuthSetup = async (opts: AuthSetupOptions): Promise<SlatesStoredAuth> => 
   let output: JsonObject;
   let finalInput = authInput;
   let callbackState: JsonObject | null = null;
-  let scopes = parseList(opts.scopes);
 
   if (authMethod.type === 'auth.oauth') {
-    let callback = await createOAuthCallbackListener();
-    let redirectUri = normalizeCallbackRedirectUriForIntegration(
-      opts.integration,
-      callback.redirectUri,
-      authMethod.id
-    );
-    console.log(`OAuth redirect URL: ${redirectUri}`);
-
-    let resolvedOAuthCredentials = await chooseOAuthCredentialsForSetup({
-      store,
-      authMethod,
-      clientId: opts.clientId,
-      clientSecret: opts.clientSecret,
-      oauthCredential: opts.oauthCredential
-    });
+    let previousOAuthCredential = previousAuth?.oauthCredentialId
+      ? store.getOAuthCredential(previousAuth.oauthCredentialId, authMethod.id)
+      : null;
+    let selectedOAuthCredential = opts.oauthCredential
+      ? store.getOAuthCredential(opts.oauthCredential, authMethod.id)
+      : null;
+    let resolvedOAuthCredentials =
+      opts.incremental && previousAuth
+        ? resolveIncrementalOAuthCredentials({
+            previousAuth,
+            linkedCredential: previousOAuthCredential,
+            selectedCredential: selectedOAuthCredential,
+            selectedCredentialRequested: opts.oauthCredential !== undefined,
+            clientId: opts.clientId,
+            clientSecret: opts.clientSecret
+          })
+        : await chooseOAuthCredentialsForSetup({
+            store,
+            authMethod,
+            clientId: opts.clientId,
+            clientSecret: opts.clientSecret,
+            oauthCredential: opts.oauthCredential
+          });
     if (!resolvedOAuthCredentials) {
       throw new Error(`Authentication method ${authMethod.id} is not OAuth.`);
     }
 
     let clientId = resolvedOAuthCredentials.clientId;
     let clientSecret = resolvedOAuthCredentials.clientSecret;
-    scopes = await chooseScopes(authMethod, scopes);
+    scopes = await dependencies.chooseScopes(authMethod, scopes);
+
+    let callback = await dependencies.createOAuthCallbackListener();
+    let redirectUri = normalizeCallbackRedirectUriForIntegration(
+      opts.integration,
+      callback.redirectUri,
+      authMethod.id
+    );
+    console.log(`OAuth redirect URL: ${redirectUri}`);
 
     let authorizationUrl = await client.getAuthorizationUrl({
       authenticationMethodId: authMethod.id,
@@ -338,9 +546,9 @@ let runAuthSetup = async (opts: AuthSetupOptions): Promise<SlatesStoredAuth> => 
     });
 
     callbackState = authorizationUrl.callbackState ?? null;
-    finalInput = authorizationUrl.input ?? authInput;
+    finalInput = previousAuth?.input ?? authorizationUrl.input ?? authInput;
 
-    printBrowserUrl(authorizationUrl.authorizationUrl);
+    dependencies.printBrowserUrl(authorizationUrl.authorizationUrl);
     let callbackResult = await callback.wait();
     if (callbackResult.state !== callback.state) {
       throw new Error('OAuth state mismatch.');
@@ -359,18 +567,27 @@ let runAuthSetup = async (opts: AuthSetupOptions): Promise<SlatesStoredAuth> => 
       callbackState: callbackState ?? undefined
     });
 
-    output = authOutput.output;
-    finalInput = authOutput.input ?? finalInput;
-    scopes = authOutput.scopes ?? scopes;
-
+    let grantedScopes = authOutput.scopes ?? scopes;
     let profileInfo = authMethod.capabilities.getProfile?.enabled
       ? await client.getAuthProfile({
           authenticationMethodId: authMethod.id,
-          output,
-          input: finalInput,
-          scopes
+          output: authOutput.output,
+          input: previousAuth?.input ?? authOutput.input ?? finalInput,
+          scopes: grantedScopes
         })
       : null;
+    let accumulatedAuthorization =
+      opts.incremental && previousAuth
+        ? completeIncrementalOAuthAuthorization({
+            previousAuth,
+            output: authOutput.output,
+            grantedScopes,
+            profile: profileInfo?.profile
+          })
+        : { output: authOutput.output, scopes: grantedScopes };
+    output = accumulatedAuthorization.output;
+    finalInput = previousAuth?.input ?? authOutput.input ?? finalInput;
+    scopes = accumulatedAuthorization.scopes;
 
     let stored = store.upsertAuth(profile.id, {
       authMethodId: authMethod.id,
@@ -419,6 +636,9 @@ let runAuthSetup = async (opts: AuthSetupOptions): Promise<SlatesStoredAuth> => 
   await store.save();
   return stored;
 };
+
+export let runAuthSetup = async (opts: AuthSetupOptions): Promise<SlatesStoredAuth> =>
+  runAuthSetupWithDependencies(opts, authSetupRuntimeDependencies);
 
 export let setupAuth = async (opts: AuthSetupOptions) => runAuthSetup(opts);
 

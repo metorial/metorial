@@ -4,7 +4,6 @@ export type HubSpotScopeDefinition = {
   title: string;
   description: string;
   scope: string;
-  defaultChecked?: boolean;
 };
 
 // These scopes are required for the baseline HubSpot tools and are sent on every
@@ -90,62 +89,52 @@ export let hubSpotOptionalOAuthScopes: HubSpotScopeDefinition[] = [
   {
     title: 'Custom Objects Read',
     description: 'Read custom objects (Enterprise)',
-    scope: 'crm.objects.custom.read',
-    defaultChecked: true
+    scope: 'crm.objects.custom.read'
   },
   {
     title: 'Custom Objects Write',
     description: 'Write custom objects (Enterprise)',
-    scope: 'crm.objects.custom.write',
-    defaultChecked: true
+    scope: 'crm.objects.custom.write'
   },
   {
     title: 'CRM Contact Schemas Write',
     description: 'Create and update contact property settings',
-    scope: 'crm.schemas.contacts.write',
-    defaultChecked: true
+    scope: 'crm.schemas.contacts.write'
   },
   {
     title: 'CRM Company Schemas Write',
     description: 'Create and update company property settings',
-    scope: 'crm.schemas.companies.write',
-    defaultChecked: true
+    scope: 'crm.schemas.companies.write'
   },
   {
     title: 'CRM Deal Schemas Write',
     description: 'Create and update deal property settings',
-    scope: 'crm.schemas.deals.write',
-    defaultChecked: true
+    scope: 'crm.schemas.deals.write'
   },
   {
     title: 'CRM Custom Schemas Read',
     description: 'Read custom object schemas (Enterprise)',
-    scope: 'crm.schemas.custom.read',
-    defaultChecked: true
+    scope: 'crm.schemas.custom.read'
   },
   {
     title: 'Order Pipelines Read',
     description: 'Read order pipelines',
-    scope: 'crm.pipelines.orders.read',
-    defaultChecked: true
+    scope: 'crm.pipelines.orders.read'
   },
   {
     title: 'Order Pipelines Write',
     description: 'Create and update order pipelines',
-    scope: 'crm.pipelines.orders.write',
-    defaultChecked: true
+    scope: 'crm.pipelines.orders.write'
   },
   {
     title: 'Sequences Read',
     description: 'Read HubSpot sales and service sequences',
-    scope: 'automation.sequences.read',
-    defaultChecked: true
+    scope: 'automation.sequences.read'
   },
   {
     title: 'Sequences Enrollments Write',
     description: 'Enroll contacts in HubSpot sales and service sequences',
-    scope: 'automation.sequences.enrollments.write',
-    defaultChecked: true
+    scope: 'automation.sequences.enrollments.write'
   }
 ];
 

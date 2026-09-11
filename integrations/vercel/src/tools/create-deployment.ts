@@ -48,12 +48,13 @@ export let createDeploymentTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new Client({
       token: ctx.auth.token,
-      teamId: ctx.config.teamId
+      teamId: ctx.auth.teamId ?? ctx.config.teamId
     });
 
     let data: any = { name: ctx.input.name };
     if (ctx.input.project) data.project = ctx.input.project;
-    if (ctx.input.target) data.target = ctx.input.target;
+    // The deployment API represents preview by omitting target.
+    if (ctx.input.target === 'production') data.target = 'production';
     if (ctx.input.redeploymentId) data.deploymentId = ctx.input.redeploymentId;
     if (ctx.input.gitSource) data.gitSource = ctx.input.gitSource;
 

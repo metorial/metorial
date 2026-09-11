@@ -26,7 +26,6 @@ import {
   GOOGLE_DRIVE_DEFAULT_PAGE_SIZE,
   GOOGLE_DRIVE_MAX_PAGE_SIZE,
   GoogleDriveClient,
-  MAX_DRIVE_DOWNLOAD_BYTES,
   normalizeGoogleDriveChangesPageSize,
   normalizeGoogleDrivePageSize,
   normalizeGoogleDrivePageToken
@@ -324,10 +323,11 @@ describe('GoogleDriveClient about information', () => {
   });
 });
 
-describe('GoogleDriveClient download guards', () => {
-  it('rejects Google Workspace downloads with a ServiceError', async () => {
+describe('GoogleDriveClient browser download links', () => {
+  it('rejects Google Workspace files with a ServiceError', async () => {
     axiosMocks.api.get.mockResolvedValue({
       data: {
+        id: 'doc-id',
         mimeType: 'application/vnd.google-apps.document',
         name: 'Native Doc'
       }
@@ -335,7 +335,7 @@ describe('GoogleDriveClient download guards', () => {
 
     let client = new GoogleDriveClient('token');
 
-    await expect(client.downloadFile('doc-id')).rejects.toMatchObject({
+    await expect(client.getFileDownloadLink('doc-id')).rejects.toMatchObject({
       data: {
         reason: 'google_workspace_download_requires_export'
       }
@@ -343,22 +343,78 @@ describe('GoogleDriveClient download guards', () => {
     expect(axiosMocks.api.get).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects files larger than the MCP-safe download limit with a ServiceError', async () => {
+  it('returns the Drive browser link without downloading file content or enforcing a size cap', async () => {
     axiosMocks.api.get.mockResolvedValue({
       data: {
-        mimeType: 'text/plain',
-        size: String(MAX_DRIVE_DOWNLOAD_BYTES + 1)
+        id: 'large-file-id',
+        name: 'archive.zip',
+        mimeType: 'application/zip',
+        size: '141688024',
+        webContentLink: 'https://drive.google.com/uc?id=large-file-id&export=download',
+        capabilities: {
+          canDownload: true
+        }
       }
     });
 
     let client = new GoogleDriveClient('token');
 
-    await expect(client.downloadFile('large-file-id')).rejects.toMatchObject({
-      data: {
-        reason: 'drive_download_too_large'
+    await expect(client.getFileDownloadLink('large-file-id')).resolves.toEqual({
+      fileId: 'large-file-id',
+      downloadUrl: 'https://drive.google.com/uc?id=large-file-id&export=download',
+      fileName: 'archive.zip',
+      mimeType: 'application/zip',
+      byteLength: 141688024
+    });
+    expect(axiosMocks.api.get).toHaveBeenCalledWith('/files/large-file-id', {
+      params: {
+        fields: 'id,name,mimeType,size,webContentLink,capabilities(canDownload)',
+        supportsAllDrives: true
       }
     });
     expect(axiosMocks.api.get).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns an actionable error when Drive restricts downloading', async () => {
+    axiosMocks.api.get.mockResolvedValue({
+      data: {
+        id: 'restricted-file-id',
+        name: 'restricted.pdf',
+        mimeType: 'application/pdf',
+        capabilities: {
+          canDownload: false
+        }
+      }
+    });
+
+    let client = new GoogleDriveClient('token');
+
+    await expect(client.getFileDownloadLink('restricted-file-id')).rejects.toMatchObject({
+      data: {
+        reason: 'google_drive_download_restricted'
+      }
+    });
+  });
+
+  it('returns an actionable error when Drive does not provide a browser link', async () => {
+    axiosMocks.api.get.mockResolvedValue({
+      data: {
+        id: 'linkless-file-id',
+        name: 'linkless.bin',
+        mimeType: 'application/octet-stream',
+        capabilities: {
+          canDownload: true
+        }
+      }
+    });
+
+    let client = new GoogleDriveClient('token');
+
+    await expect(client.getFileDownloadLink('linkless-file-id')).rejects.toMatchObject({
+      data: {
+        reason: 'google_drive_download_link_unavailable'
+      }
+    });
   });
 
   it('returns ServiceError for missing files discovered during metadata lookup', async () => {
@@ -370,7 +426,7 @@ describe('GoogleDriveClient download guards', () => {
 
     let client = new GoogleDriveClient('token');
 
-    await expect(client.downloadFile('missing-file-id')).rejects.toMatchObject({
+    await expect(client.getFileDownloadLink('missing-file-id')).rejects.toMatchObject({
       data: {
         reason: 'drive_file_not_found',
         upstreamStatus: 404
@@ -381,7 +437,7 @@ describe('GoogleDriveClient download guards', () => {
 
 describe('GoogleDriveClient export guards', () => {
   it.each([
-    ['a regular Drive file', 'text/plain', 'notes.txt', 'Use the **Download File** tool'],
+    ['a regular Drive file', 'text/plain', 'notes.txt', 'Use the **Get Download URL** tool'],
     [
       'an unsupported Google Workspace item',
       'application/vnd.google-apps.folder',

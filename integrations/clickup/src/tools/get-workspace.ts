@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClickUpClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getWorkspaces = SlateTool.create(spec, {
@@ -43,12 +44,16 @@ export let getWorkspaces = SlateTool.create(spec, {
 export let getWorkspaceMembers = SlateTool.create(spec, {
   name: 'Get Workspace Members',
   key: 'get_workspace_members',
-  description: `Retrieve all members of the configured ClickUp workspace. Returns user IDs, names, emails, and roles.`,
+  description: `Retrieve all members of the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs. Returns user IDs, names, emails, and roles.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      workspaceId: workspaceIdSchema
+    })
+  )
   .output(
     z.object({
       members: z.array(
@@ -64,7 +69,7 @@ export let getWorkspaceMembers = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let members = await client.getWorkspaceMembers(ctx.config.workspaceId);
+    let members = await client.getWorkspaceMembers(ctx.input.workspaceId);
 
     return {
       output: {

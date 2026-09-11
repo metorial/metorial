@@ -1,0 +1,12 @@
+{
+  "name": "@metorial-test-helpers/attachment-url-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx vercel dev",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

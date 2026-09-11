@@ -35,13 +35,13 @@ export let getMetricMetadata = SlateTool.create(spec, {
     return {
       output: {
         metricName: ctx.input.metricName,
-        type: metadata.type,
-        unit: metadata.unit,
-        perUnit: metadata.per_unit,
-        description: metadata.description,
-        shortName: metadata.short_name,
-        integration: metadata.integration,
-        statsdInterval: metadata.statsd_interval
+        type: metadata.type ?? undefined,
+        unit: metadata.unit ?? undefined,
+        perUnit: metadata.per_unit ?? undefined,
+        description: metadata.description ?? undefined,
+        shortName: metadata.short_name ?? undefined,
+        integration: metadata.integration ?? undefined,
+        statsdInterval: metadata.statsd_interval ?? undefined
       },
       message: `Retrieved metadata for metric **${ctx.input.metricName}**`
     };

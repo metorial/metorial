@@ -1,18 +1,20 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { ClickUpClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
 import { spec } from '../spec';
 
 export let getTimeEntries = SlateTool.create(spec, {
   name: 'Get Time Entries',
   key: 'get_time_entries',
-  description: `Retrieve time tracking entries from the workspace. Filter by date range, assignee, or specific task/list/space. Requires the Time Tracking ClickApp to be enabled.`,
+  description: `Retrieve time tracking entries from the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs. Filter by date range, assignee, or specific task/list/space. Requires the Time Tracking ClickApp to be enabled.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       startDate: z
         .string()
         .optional()
@@ -47,7 +49,7 @@ export let getTimeEntries = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let entries = await client.getTimeEntries(ctx.config.workspaceId, {
+    let entries = await client.getTimeEntries(ctx.input.workspaceId, {
       startDate: ctx.input.startDate ? Number(ctx.input.startDate) : undefined,
       endDate: ctx.input.endDate ? Number(ctx.input.endDate) : undefined,
       assignee: ctx.input.assignee,
@@ -79,13 +81,14 @@ export let getTimeEntries = SlateTool.create(spec, {
 export let createTimeEntry = SlateTool.create(spec, {
   name: 'Create Time Entry',
   key: 'create_time_entry',
-  description: `Log a completed time entry in ClickUp. Specify the start time and duration. Optionally associate it with a task.`,
+  description: `Log a completed time entry in the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs. Specify the start time and duration, and optionally associate it with a task.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       start: z.string().describe('Start time as Unix timestamp in milliseconds'),
       duration: z.number().describe('Duration in milliseconds'),
       taskId: z.string().optional().describe('Task ID to associate the entry with'),
@@ -102,7 +105,7 @@ export let createTimeEntry = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let entry = await client.createTimeEntry(ctx.config.workspaceId, {
+    let entry = await client.createTimeEntry(ctx.input.workspaceId, {
       start: Number(ctx.input.start),
       duration: ctx.input.duration,
       taskId: ctx.input.taskId,
@@ -124,13 +127,14 @@ export let createTimeEntry = SlateTool.create(spec, {
 export let updateTimeEntry = SlateTool.create(spec, {
   name: 'Update Time Entry',
   key: 'update_time_entry',
-  description: `Update a ClickUp time entry's task, description, start/end time, duration, assignee, tags, or billable flag.`,
+  description: `Update a time entry in the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs. Update its task, description, start/end time, duration, assignee, tags, or billable flag.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       timeEntryId: z.string().describe('The time entry ID to update'),
       start: z.string().optional().describe('Start time as Unix timestamp in milliseconds'),
       end: z.string().optional().describe('End time as Unix timestamp in milliseconds'),
@@ -150,7 +154,7 @@ export let updateTimeEntry = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let entry = await client.updateTimeEntry(ctx.config.workspaceId, ctx.input.timeEntryId, {
+    let entry = await client.updateTimeEntry(ctx.input.workspaceId, ctx.input.timeEntryId, {
       start: ctx.input.start ? Number(ctx.input.start) : undefined,
       end: ctx.input.end ? Number(ctx.input.end) : undefined,
       duration: ctx.input.duration,
@@ -174,13 +178,14 @@ export let updateTimeEntry = SlateTool.create(spec, {
 export let deleteTimeEntry = SlateTool.create(spec, {
   name: 'Delete Time Entry',
   key: 'delete_time_entry',
-  description: `Delete a ClickUp time entry from the configured workspace.`,
+  description: `Delete a time entry from the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs.`,
   tags: {
     destructive: true
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       timeEntryId: z.string().describe('The time entry ID to delete')
     })
   )
@@ -191,7 +196,7 @@ export let deleteTimeEntry = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    await client.deleteTimeEntry(ctx.config.workspaceId, ctx.input.timeEntryId);
+    await client.deleteTimeEntry(ctx.input.workspaceId, ctx.input.timeEntryId);
 
     return {
       output: { deleted: true },
@@ -203,13 +208,14 @@ export let deleteTimeEntry = SlateTool.create(spec, {
 export let getRunningTimer = SlateTool.create(spec, {
   name: 'Get Running Timer',
   key: 'get_running_timer',
-  description: `Retrieve the currently running ClickUp timer for the authenticated user or a specified assignee.`,
+  description: `Retrieve the currently running timer in the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs. Supports the authenticated user or a specified assignee.`,
   tags: {
     readOnly: true
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       assignee: z.string().optional().describe('User ID to retrieve a running timer for')
     })
   )
@@ -225,7 +231,7 @@ export let getRunningTimer = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let entry = await client.getRunningTimer(ctx.config.workspaceId, ctx.input.assignee);
+    let entry = await client.getRunningTimer(ctx.input.workspaceId, ctx.input.assignee);
 
     return {
       output: {
@@ -244,13 +250,14 @@ export let getRunningTimer = SlateTool.create(spec, {
 export let startTimer = SlateTool.create(spec, {
   name: 'Start Timer',
   key: 'start_timer',
-  description: `Start a running timer in ClickUp. Optionally associate it with a task.`,
+  description: `Start a running timer in the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs. Optionally associate it with a task.`,
   tags: {
     destructive: false
   }
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       taskId: z.string().optional().describe('Task ID to track time against'),
       description: z.string().optional().describe('Description of the work'),
       billable: z.boolean().optional().describe('Whether the time is billable')
@@ -264,7 +271,7 @@ export let startTimer = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let entry = await client.startTimer(ctx.config.workspaceId, {
+    let entry = await client.startTimer(ctx.input.workspaceId, {
       taskId: ctx.input.taskId,
       description: ctx.input.description,
       billable: ctx.input.billable
@@ -283,12 +290,16 @@ export let startTimer = SlateTool.create(spec, {
 export let stopTimer = SlateTool.create(spec, {
   name: 'Stop Timer',
   key: 'stop_timer',
-  description: `Stop the currently running timer in the workspace.`,
+  description: `Stop the currently running timer in the ClickUp Workspace selected by workspaceId. Call get_workspaces to discover authorized Workspace IDs.`,
   tags: {
     destructive: false
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      workspaceId: workspaceIdSchema
+    })
+  )
   .output(
     z.object({
       timeEntryId: z.string().optional(),
@@ -297,7 +308,7 @@ export let stopTimer = SlateTool.create(spec, {
   )
   .handleInvocation(async ctx => {
     let client = new ClickUpClient(ctx.auth.token);
-    let entry = await client.stopTimer(ctx.config.workspaceId);
+    let entry = await client.stopTimer(ctx.input.workspaceId);
 
     return {
       output: {

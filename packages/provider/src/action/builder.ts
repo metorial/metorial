@@ -9,17 +9,13 @@ import type {
   SlateActionParametersTrigger,
   SlateActionScopes,
   SlateActionType,
-  SlatePollingOptions,
   SlatePublicToolInvocationHandler,
   SlateToolInvocationHandler,
   SlateTriggerMappingHandler,
-  SlateTriggerPollingHandler,
-  SlateTriggerWebhookAutoRegistrationHandler,
-  SlateTriggerWebhookAutoUnregistrationHandler,
-  SlateTriggerWebhookRequestHandler,
-  SlateWebhookHttpOptions
+  SlateTriggerMatchesHandler
 } from './action';
 import { validateScopes } from './scopes';
+import type { SlateTriggerGroup } from './triggerGroup';
 
 export class SlateActionBuilder<
   Type extends SlateActionType,
@@ -39,12 +35,10 @@ export class SlateActionBuilder<
 
   #toolParams: SlateActionParametersTool<ConfigType, AuthType, InputType, OutputType> | null =
     null;
-  #triggerParams: SlateActionParametersTrigger<
-    ConfigType,
-    AuthType,
-    InputType,
-    OutputType
-  > | null = null;
+  #triggerGroup: SlateTriggerGroup<ConfigType, AuthType> | null = null;
+  #triggerMatches: SlateTriggerMatchesHandler | null = null;
+  #triggerMap: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType> | null =
+    null;
   #interfaceLocked = false;
 
   constructor(
@@ -163,47 +157,36 @@ export class SlateActionBuilder<
     return this;
   }
 
-  webhook(props: {
-    handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
-    handleRequest: SlateTriggerWebhookRequestHandler<ConfigType, AuthType, InputType>;
-    autoRegisterWebhook?: SlateTriggerWebhookAutoRegistrationHandler<ConfigType, AuthType>;
-    autoUnregisterWebhook?: SlateTriggerWebhookAutoUnregistrationHandler<ConfigType, AuthType>;
-    http?: SlateWebhookHttpOptions;
-  }): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
+  triggerGroup(
+    group: SlateTriggerGroup<ConfigType, AuthType>
+  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
     if (this.type !== 'trigger') {
-      throw new SlateDeclarationError('handleEvent can only be set for trigger actions');
+      throw new SlateDeclarationError('triggerGroup can only be set for trigger actions');
     }
 
-    this.#triggerParams = {
-      type: 'trigger',
-      source: 'webhook',
-      handleEvent: props.handleEvent,
-      handleRequest: props.handleRequest,
-      autoRegisterWebhook: props.autoRegisterWebhook,
-      autoUnregisterWebhook: props.autoUnregisterWebhook,
-      http: props.http
-    };
-
+    this.#triggerGroup = group;
     return this;
   }
 
-  polling(props: {
-    options?: SlatePollingOptions;
-    pollEvents?: SlateTriggerPollingHandler<ConfigType, AuthType, InputType>;
-    handleEvent: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>;
-  }): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
+  matches(
+    handler: SlateTriggerMatchesHandler
+  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
     if (this.type !== 'trigger') {
-      throw new SlateDeclarationError('handleEvent can only be set for trigger actions');
+      throw new SlateDeclarationError('matches can only be set for trigger actions');
     }
 
-    this.#triggerParams = {
-      type: 'trigger',
-      source: 'polling',
-      polling: props.options,
-      pollEvents: props.pollEvents,
-      handleEvent: props.handleEvent
-    };
+    this.#triggerMatches = handler;
+    return this;
+  }
 
+  map(
+    handler: SlateTriggerMappingHandler<ConfigType, AuthType, InputType, OutputType>
+  ): SlateActionBuilder<Type, ConfigType, AuthType, InputType, OutputType, Result, IsPublic> {
+    if (this.type !== 'trigger') {
+      throw new SlateDeclarationError('map can only be set for trigger actions');
+    }
+
+    this.#triggerMap = handler;
     return this;
   }
 
@@ -227,9 +210,30 @@ export class SlateActionBuilder<
     if (this.type === 'tool' && !this.#toolParams) {
       throw new SlateDeclarationError('Tool invocation handler is not defined');
     }
-    if (this.type === 'trigger' && !this.#triggerParams) {
-      throw new SlateDeclarationError('Trigger event handlers are not defined');
+    if (this.type === 'trigger' && !this.#triggerGroup) {
+      throw new SlateDeclarationError('Trigger group is not defined');
     }
+    if (this.type === 'trigger' && !this.#triggerMatches) {
+      throw new SlateDeclarationError('Trigger matches handler is not defined');
+    }
+    if (this.type === 'trigger' && !this.#triggerMap) {
+      throw new SlateDeclarationError('Trigger map handler is not defined');
+    }
+
+    let triggerParams: SlateActionParametersTrigger<
+      ConfigType,
+      AuthType,
+      InputType,
+      OutputType & { type: string }
+    > | null =
+      this.type === 'trigger'
+        ? {
+            type: 'trigger',
+            triggerGroup: this.#triggerGroup!,
+            matches: this.#triggerMatches!,
+            map: this.#triggerMap! as any
+          }
+        : null;
 
     return this.factory({
       ...this.params,
@@ -242,7 +246,7 @@ export class SlateActionBuilder<
       outputSchema: this.#outputSchema,
 
       ...this.#toolParams!,
-      ...this.#triggerParams!
+      ...(triggerParams as any)!
     }) as Result;
   }
 }

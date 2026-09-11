@@ -1,4 +1,4 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { googleAddressValidationScopes } from './scopes';
 
@@ -6,6 +6,7 @@ export let auth = SlateAuth.create()
   .output(
     z.object({
       token: z.string(),
+      authMethod: z.enum(['api_key', 'oauth']),
       refreshToken: z.string().optional(),
       expiresAt: z.string().optional()
     })
@@ -22,7 +23,8 @@ export let auth = SlateAuth.create()
     getOutput: async ctx => {
       return {
         output: {
-          token: ctx.input.apiKey
+          token: ctx.input.apiKey,
+          authMethod: 'api_key' as const
         }
       };
     }
@@ -88,6 +90,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: data.access_token,
+          authMethod: 'oauth' as const,
           refreshToken: data.refresh_token,
           expiresAt: data.expires_in
             ? new Date(Date.now() + data.expires_in * 1000).toISOString()
@@ -98,7 +101,10 @@ export let auth = SlateAuth.create()
     },
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No Google refresh token is available. Reconnect and grant offline access.',
+          { reason: 'google_address_validation_refresh_token_missing' }
+        );
       }
 
       let axiosInstance = createAxios();
@@ -113,6 +119,7 @@ export let auth = SlateAuth.create()
       return {
         output: {
           token: response.data.access_token,
+          authMethod: 'oauth' as const,
           refreshToken: ctx.output.refreshToken,
           expiresAt: response.data.expires_in
             ? new Date(Date.now() + response.data.expires_in * 1000).toISOString()

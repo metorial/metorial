@@ -1,4 +1,4 @@
-import type { SlateWebhookHttpOptions, SlateWebhookHttpResponseInit } from '../action';
+import type { SlateWebhookHttpResponseInit } from '../action';
 
 export const graphWebhookHttp = {
   methods: ['POST'],
@@ -6,7 +6,7 @@ export const graphWebhookHttp = {
     mode: 'match',
     match: [{ hasQueryParam: 'validationToken' }]
   }
-} satisfies SlateWebhookHttpOptions;
+};
 
 export let getGraphWebhookValidationResponse = (
   request: Request

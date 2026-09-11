@@ -23,8 +23,7 @@ function verifyAsanaSignature(
 export let taskChangesWebhook = SlateTrigger.create(spec, {
   name: 'Task Changes (Webhook)',
   key: 'task_changes_webhook',
-  description:
-    'Receives task added, changed, and removed events for the configured Asana project. Registers the callback automatically, completes X-Hook-Secret verification, and verifies X-Hook-Signature for signed deliveries. Complements polling triggers.'
+  description: 'Temporarily disabled while Asana trigger scoping is redesigned.'
 })
   .input(
     z.object({
@@ -57,32 +56,8 @@ export let taskChangesWebhook = SlateTrigger.create(spec, {
         match: [{ hasHeader: 'x-hook-secret' }]
       }
     },
-    autoRegisterWebhook: async ctx => {
-      if (!ctx.config.webhookProjectId) {
-        throw asanaServiceError(
-          'config.webhookProjectId is required to auto-register Asana webhooks (project GID that will receive task events).'
-        );
-      }
-
-      let client = new Client({ token: ctx.auth.token });
-      let { webhook, hookSecret } = await client.createWebhook(
-        ctx.config.webhookProjectId,
-        ctx.input.webhookBaseUrl,
-        [
-          { resource_type: 'task', action: 'added' },
-          { resource_type: 'task', action: 'changed' },
-          { resource_type: 'task', action: 'removed' },
-          { resource_type: 'task', action: 'deleted' },
-          { resource_type: 'task', action: 'undeleted' }
-        ]
-      );
-
-      return {
-        registrationDetails: {
-          webhookGid: webhook.gid,
-          hookSecret: hookSecret ?? ''
-        }
-      };
+    autoRegisterWebhook: async () => {
+      throw asanaServiceError('Asana triggers are temporarily disabled.');
     },
 
     autoUnregisterWebhook: async ctx => {

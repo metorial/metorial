@@ -16,13 +16,13 @@ Create a new file or folder in Google Drive. To create a folder, set \
 
 Permanently delete a file or folder from Google Drive. This action is irreversible. To move a file to trash instead (recoverable), use the **Update File** tool with \
 
-### Download File
+### Get Download URL
 
-Download the content of a file from Google Drive. For regular files (PDFs, images, text files, etc.), downloads the file content directly. For Google Workspace files (Docs, Sheets, Slides), use the **Export File** tool instead to convert to a standard format.
+Get a downloadable file from Google Drive using the connected account’s access. The result also includes a browser download URL for use while signed into a Google account with access to the file. For Google Workspace files (Docs, Sheets, Slides), use the **Export File** tool instead to convert to a standard format.
 
 ### Export File
 
-Export a Google Workspace file (Docs, Sheets, Slides, Drawings) to a standard format such as PDF, DOCX, XLSX, CSV, or plain text. Only works with Google Workspace native formats — for regular files use the **Download File** tool.
+Export a Google Workspace file (Docs, Sheets, Slides, Drawings) to a standard format such as PDF, DOCX, XLSX, CSV, or plain text. Only works with Google Workspace native formats — for regular files use the **Get Download URL** tool.
 
 ### Get File
 

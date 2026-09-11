@@ -87,14 +87,14 @@ export let manageDashboard = SlateTool.create(spec, {
 
     return {
       output: {
-        dashboardId: dashboard.id,
-        title: dashboard.title,
-        layoutType: dashboard.layout_type,
-        description: dashboard.description,
-        url: dashboard.url,
-        authorHandle: dashboard.author_handle,
-        createdAt: dashboard.created_at,
-        modifiedAt: dashboard.modified_at
+        dashboardId: dashboard.id ?? undefined,
+        title: dashboard.title ?? undefined,
+        layoutType: dashboard.layout_type ?? undefined,
+        description: dashboard.description ?? undefined,
+        url: dashboard.url ?? undefined,
+        authorHandle: dashboard.author_handle ?? undefined,
+        createdAt: dashboard.created_at ?? undefined,
+        modifiedAt: dashboard.modified_at ?? undefined
       },
       message: isCreating
         ? `Created dashboard **${dashboard.title}** (ID: ${dashboard.id})`

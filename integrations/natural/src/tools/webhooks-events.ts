@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { attributesOf, jsonApiBody, singleData } from '../lib/envelopes';
+import { attributesOf, jsonApiBody } from '../lib/envelopes';
 import { naturalServiceError } from '../lib/errors';
 import { paginationInputFields } from '../lib/pagination';
 import {
@@ -65,34 +65,7 @@ const naturalEventTypes = [
   'payment_request.incoming'
 ] as const;
 
-const webhookEventSchema = z.enum(['*', ...naturalEventTypes]);
 const eventTypeSchema = z.enum(naturalEventTypes);
-
-const webhookOutput = (envelope: unknown, includeSecret = false) => {
-  const base = resourceResult(envelope, 'webhookId', 'webhook');
-  const attributes = attributesOf(singleData(envelope));
-
-  return {
-    ...base,
-    signingSecret:
-      includeSecret && typeof attributes.signingSecret === 'string'
-        ? attributes.signingSecret
-        : undefined,
-    previousSecretExpiresAt:
-      includeSecret && typeof attributes.previousSecretExpiresAt === 'string'
-        ? attributes.previousSecretExpiresAt
-        : null
-  };
-};
-
-const webhookOutputSchema = z.object({
-  webhookId: z.string().optional(),
-  type: z.string().optional(),
-  status: z.string().optional(),
-  signingSecret: z.string().optional(),
-  previousSecretExpiresAt: z.string().nullable().optional(),
-  webhook: rawRecordSchema
-});
 
 export const listWebhooks = SlateTool.create(spec, {
   name: 'List Webhooks',

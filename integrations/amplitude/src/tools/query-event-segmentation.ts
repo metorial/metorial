@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
+import { dashboardDataSchema, parseResponse } from '../lib/rest-validation';
 import { spec } from '../spec';
 
 export let queryEventSegmentationTool = SlateTool.create(spec, {
@@ -16,6 +17,7 @@ export let queryEventSegmentationTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       events: z
@@ -35,10 +37,25 @@ export let queryEventSegmentationTool = SlateTool.create(spec, {
           'sums',
           'median',
           'freq',
-          'hist'
+          'hist',
+          'average',
+          'histogram',
+          'value_avg'
         ])
         .optional()
-        .describe('Aggregation metric. Default is "totals".'),
+        .describe(
+          'Aggregation metric. Defaults to uniques. avg/hist are aliases for average/histogram; median and freq are unsupported legacy values.'
+        ),
+      secondEvent: z
+        .string()
+        .optional()
+        .describe(
+          'Optional second JSON event definition, referenced as B by a custom formula.'
+        ),
+      formula: z
+        .string()
+        .optional()
+        .describe('Required for metric formula, for example UNIQUES(A)/UNIQUES(B).'),
       interval: z
         .number()
         .optional()
@@ -47,25 +64,20 @@ export let queryEventSegmentationTool = SlateTool.create(spec, {
       groupBy: z
         .string()
         .optional()
-        .describe('JSON-encoded group-by clause for breaking down results.'),
+        .describe('User property for breaking down results, for example country or gp:plan.'),
       limit: z.number().optional().describe('Maximum number of group-by values to return.')
     })
   )
   .output(
     z.object({
-      series: z.array(z.any()).describe('Time series data for the segmentation query.'),
-      seriesLabels: z.array(z.any()).optional().describe('Labels for each data series.'),
+      series: z.array(z.unknown()).describe('Time series data for the segmentation query.'),
+      seriesLabels: z.array(z.unknown()).optional().describe('Labels for each data series.'),
       xValues: z.array(z.string()).optional().describe('X-axis date/time labels.'),
-      seriesCollapsed: z.array(z.any()).optional().describe('Collapsed series totals.')
+      seriesCollapsed: z.array(z.unknown()).optional().describe('Collapsed series totals.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let result = await client.getEventSegmentation({
       e: ctx.input.events,
@@ -75,17 +87,19 @@ export let queryEventSegmentationTool = SlateTool.create(spec, {
       interval: ctx.input.interval,
       segment: ctx.input.segment,
       groupBy: ctx.input.groupBy,
-      limit: ctx.input.limit
+      limit: ctx.input.limit,
+      e2: ctx.input.secondEvent,
+      formula: ctx.input.formula
     });
 
-    let data = result.data ?? result;
+    let data = parseResponse(dashboardDataSchema, result.data, 'analytics query');
 
     return {
       output: {
-        series: data.series ?? [],
-        seriesLabels: data.seriesLabels ?? data.series_labels,
-        xValues: data.xValues ?? data.x_values,
-        seriesCollapsed: data.seriesCollapsed ?? data.series_collapsed
+        series: data.series,
+        seriesLabels: data.seriesLabels,
+        xValues: data.xValues,
+        seriesCollapsed: data.seriesCollapsed
       },
       message: `Event segmentation query completed for **${ctx.input.start}** to **${ctx.input.end}**.`
     };

@@ -6,6 +6,8 @@ export let config = SlateConfig.create(
     teamId: z
       .string()
       .optional()
-      .describe('Vercel Team ID. When provided, all API requests will be scoped to this team.')
+      .describe(
+        'Vercel Team ID for Access Token authentication. OAuth uses the team selected during installation.'
+      )
   })
 );

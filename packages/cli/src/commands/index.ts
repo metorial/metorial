@@ -4,3 +4,4 @@ export * from './profiles';
 export * from './repl';
 export * from './test';
 export * from './tools';
+export * from './triggers';

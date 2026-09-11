@@ -2,6 +2,100 @@ import { createAxios, SlateAuth } from '@slates/provider';
 import { z } from 'zod';
 import { xeroApiError, xeroServiceError } from './lib/errors';
 
+let isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+let getAuthenticationEventId = (accessToken: string) => {
+  let segments = accessToken.split('.');
+  let payloadSegment = segments[1];
+
+  if (
+    segments.length !== 3 ||
+    !payloadSegment ||
+    !/^[A-Za-z0-9_-]+$/.test(payloadSegment) ||
+    payloadSegment.length % 4 === 1
+  ) {
+    throw xeroServiceError('Xero access token is malformed and cannot resolve a tenant.');
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(Buffer.from(payloadSegment, 'base64url').toString('utf8'));
+  } catch {
+    throw xeroServiceError('Xero access token is malformed and cannot resolve a tenant.');
+  }
+
+  if (!isRecord(payload)) {
+    throw xeroServiceError('Xero access token is malformed and cannot resolve a tenant.');
+  }
+
+  let authenticationEventId = payload.authentication_event_id;
+  if (typeof authenticationEventId !== 'string' || !authenticationEventId.trim()) {
+    throw xeroServiceError(
+      'Xero access token does not contain a non-empty authentication_event_id.'
+    );
+  }
+
+  return authenticationEventId;
+};
+
+let resolveTenantId = async (accessToken: string) => {
+  let authEventId = getAuthenticationEventId(accessToken);
+  let connectionsClient = createAxios({ baseURL: 'https://api.xero.com' });
+  let getConnections = async (params?: { authEventId: string }) => {
+    let connectionsResponse: any;
+
+    try {
+      connectionsResponse = await connectionsClient.get('/connections', {
+        ...(params ? { params } : {}),
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    } catch (error) {
+      throw xeroApiError(error, 'connections lookup');
+    }
+
+    let connections = connectionsResponse?.data as unknown;
+    if (!Array.isArray(connections)) {
+      throw xeroServiceError('Xero connections lookup returned an invalid response.');
+    }
+
+    return connections;
+  };
+
+  let connections = await getConnections({ authEventId });
+  if (connections.length > 1) {
+    throw xeroServiceError(
+      `Xero connections lookup returned ${connections.length} organisations for the current authentication event. Reauthorize Xero and select exactly one organisation.`
+    );
+  }
+
+  if (connections.length === 0) {
+    connections = await getConnections();
+
+    if (connections.length === 0) {
+      throw xeroServiceError(
+        'Xero connections lookup returned no authorised organisations. Reauthorize Xero and select one organisation.'
+      );
+    }
+    if (connections.length > 1) {
+      throw xeroServiceError(
+        `Xero has ${connections.length} authorised organisations, but none were newly authorised in the current authentication event. The selected organisation cannot be determined safely.`
+      );
+    }
+  }
+
+  let connection = connections[0];
+  let tenantId = isRecord(connection) ? connection.tenantId : undefined;
+  if (typeof tenantId !== 'string' || !tenantId.trim()) {
+    throw xeroServiceError('Resolved Xero connection did not include a non-empty tenantId.');
+  }
+
+  return tenantId;
+};
+
 export let LEGACY_CUSTOM_CONNECTION_SCOPES = [
   'accounting.transactions',
   'accounting.contacts',
@@ -149,7 +243,8 @@ export let auth = SlateAuth.create()
         client_id: ctx.clientId,
         redirect_uri: ctx.redirectUri,
         scope: ctx.scopes.join(' '),
-        state: ctx.state
+        state: ctx.state,
+        acr_values: 'bulk_connect:false'
       });
 
       return {
@@ -198,28 +293,7 @@ export let auth = SlateAuth.create()
         expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
       }
 
-      // Fetch tenant ID from connections endpoint
-      let connectionsClient = createAxios({ baseURL: 'https://api.xero.com' });
-      let connectionsResponse: any;
-      try {
-        connectionsResponse = await connectionsClient.get('/connections', {
-          headers: {
-            Authorization: `Bearer ${tokenData.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-      } catch (error) {
-        throw xeroApiError(error, 'connections lookup');
-      }
-
-      let connections = connectionsResponse.data as Array<{
-        id: string;
-        tenantId: string;
-        tenantName: string;
-        tenantType: string;
-      }>;
-
-      let tenantId = connections.length > 0 ? connections[0]?.tenantId : undefined;
+      let tenantId = await resolveTenantId(tokenData.access_token);
 
       return {
         output: {
@@ -273,29 +347,12 @@ export let auth = SlateAuth.create()
         expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
       }
 
-      // Re-fetch tenant ID to keep it current
-      let connectionsClient = createAxios({ baseURL: 'https://api.xero.com' });
-      let connectionsResponse: any;
-      try {
-        connectionsResponse = await connectionsClient.get('/connections', {
-          headers: {
-            Authorization: `Bearer ${tokenData.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-      } catch (error) {
-        throw xeroApiError(error, 'connections lookup');
+      let tenantId = ctx.output.tenantId;
+      if (typeof tenantId !== 'string' || !tenantId.trim()) {
+        throw xeroServiceError(
+          'Xero OAuth connection is missing its tenant ID. Reauthorize Xero.'
+        );
       }
-
-      let connections = connectionsResponse.data as Array<{
-        id: string;
-        tenantId: string;
-        tenantName: string;
-        tenantType: string;
-      }>;
-
-      let tenantId =
-        ctx.output.tenantId || (connections.length > 0 ? connections[0]?.tenantId : undefined);
 
       return {
         output: {

@@ -120,7 +120,7 @@ export let createChart = SlateTool.create(spec, {
               sources: [range]
             }
           },
-          targetAxis: 'LEFT_AXIS'
+          targetAxis: input.chartType === 'BAR' ? 'BOTTOM_AXIS' : 'LEFT_AXIS'
         }))
       };
     }

@@ -32,6 +32,10 @@ export let listEvents = SlateTool.create(spec, {
         .array(
           z.object({
             eventId: z.number(),
+            eventIdString: z
+              .string()
+              .optional()
+              .describe('Exact Event ID to pass to get_event'),
             title: z.string(),
             text: z.string().optional(),
             dateHappened: z.number().optional(),
@@ -51,14 +55,15 @@ export let listEvents = SlateTool.create(spec, {
 
     let events = (result.events || []).map((e: any) => ({
       eventId: e.id,
+      eventIdString: e.id_str,
       title: e.title,
-      text: e.text,
-      dateHappened: e.date_happened,
-      priority: e.priority,
-      host: e.host,
-      tags: e.tags,
-      alertType: e.alert_type,
-      source: e.source
+      text: e.text ?? undefined,
+      dateHappened: e.date_happened ?? undefined,
+      priority: e.priority ?? undefined,
+      host: e.host ?? undefined,
+      tags: e.tags ?? undefined,
+      alertType: e.alert_type ?? undefined,
+      source: e.source ?? undefined
     }));
 
     return {

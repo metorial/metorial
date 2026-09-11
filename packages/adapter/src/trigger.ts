@@ -1,4 +1,4 @@
-import type { SlateActionParameters, SlateSpecification } from '@slates/provider';
+import type { SlateActionParameters, SlateSpecification, SlateTriggerGroup } from '@slates/provider';
 import type z from 'zod';
 import type { SlateAdapterDefinition } from './definition';
 
@@ -33,7 +33,8 @@ export class SlateAdapterTriggerDefinition<
   }
 
   implement<ConfigType extends {}, AuthType extends {}>(
-    spec: SlateSpecification<ConfigType, AuthType>
+    spec: SlateSpecification<ConfigType, AuthType>,
+    triggerGroup: SlateTriggerGroup<ConfigType, AuthType>
   ) {
     let { input, output, ...actionParams } = this.params;
 
@@ -41,6 +42,7 @@ export class SlateAdapterTriggerDefinition<
       .createTriggerBuilder(spec, actionParams)
       .input(input)
       .output(output)
+      .triggerGroup(triggerGroup)
       .lockInterface();
   }
 }

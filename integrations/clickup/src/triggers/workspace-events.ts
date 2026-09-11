@@ -1,6 +1,14 @@
 import { SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { ClickUpClient } from '../lib/client';
+import { workspaceIdSchema } from '../lib/schemas';
+import {
+  type ClickUpWebhookRegistrationDetails,
+  registerClickUpWebhooks,
+  resolveClickUpWebhookRegistration,
+  unregisterClickUpWebhooks,
+  verifyClickUpWebhookSignature
+} from '../lib/webhooks';
 import { spec } from '../spec';
 
 let WORKSPACE_WEBHOOK_EVENTS = [
@@ -25,10 +33,11 @@ export let workspaceEvents = SlateTrigger.create(spec, {
   name: 'Workspace Events',
   key: 'workspace_events',
   description:
-    'Triggered when workspace structure changes: spaces, folders, lists, goals, or key results are created, updated, or deleted.'
+    'Triggered across all ClickUp Workspaces authorized for the connection when spaces, folders, lists, goals, or key results are created, updated, or deleted.'
 })
   .input(
     z.object({
+      workspaceId: workspaceIdSchema,
       eventType: z.string().describe('The ClickUp webhook event type'),
       webhookId: z.string().describe('The webhook ID that triggered this event'),
       resourceId: z.string().describe('The ID of the affected resource'),
@@ -44,6 +53,7 @@ export let workspaceEvents = SlateTrigger.create(spec, {
   )
   .output(
     z.object({
+      workspaceId: workspaceIdSchema,
       resourceId: z.string(),
       resourceType: z.string(),
       resourceName: z.string().optional(),
@@ -62,25 +72,49 @@ export let workspaceEvents = SlateTrigger.create(spec, {
   .webhook({
     autoRegisterWebhook: async ctx => {
       let client = new ClickUpClient(ctx.auth.token);
-      let result = await client.createWebhook(ctx.config.workspaceId, {
+      let registrationDetails = await registerClickUpWebhooks({
+        client,
         endpoint: ctx.input.webhookBaseUrl,
         events: WORKSPACE_WEBHOOK_EVENTS
       });
 
-      return {
-        registrationDetails: {
-          webhookId: result.id ?? result.webhook?.id
-        }
-      };
+      return { registrationDetails };
     },
 
     autoUnregisterWebhook: async ctx => {
       let client = new ClickUpClient(ctx.auth.token);
-      await client.deleteWebhook(ctx.input.registrationDetails.webhookId);
+      await unregisterClickUpWebhooks({
+        client,
+        details: ctx.input.registrationDetails as ClickUpWebhookRegistrationDetails
+      });
     },
 
     handleRequest: async ctx => {
-      let body = (await ctx.request.json()) as any;
+      let rawBody = await ctx.request.text();
+      let body: any;
+      try {
+        body = JSON.parse(rawBody);
+      } catch {
+        body = {};
+      }
+
+      let registration = resolveClickUpWebhookRegistration(
+        ctx.registrationDetails as ClickUpWebhookRegistrationDetails | null,
+        body.webhook_id
+      );
+
+      if (
+        !verifyClickUpWebhookSignature({
+          secret: registration.secret,
+          payload: rawBody,
+          signature: ctx.request.headers.get('x-signature')
+        })
+      ) {
+        return {
+          inputs: [],
+          response: new Response('Invalid signature', { status: 401 })
+        };
+      }
 
       if (!body.event) {
         return { inputs: [] };
@@ -112,8 +146,9 @@ export let workspaceEvents = SlateTrigger.create(spec, {
       return {
         inputs: [
           {
+            workspaceId: registration.workspaceId,
             eventType,
-            webhookId: body.webhook_id ?? '',
+            webhookId: body.webhook_id,
             resourceId,
             resourceType,
             historyItems: body.history_items ?? [],
@@ -165,6 +200,7 @@ export let workspaceEvents = SlateTrigger.create(spec, {
         type,
         id: `${ctx.input.webhookId}-${ctx.input.resourceId}-${eventType}-${Date.now()}`,
         output: {
+          workspaceId: ctx.input.workspaceId,
           resourceId: ctx.input.resourceId,
           resourceType: ctx.input.resourceType,
           resourceName,

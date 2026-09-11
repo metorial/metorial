@@ -61,6 +61,8 @@ export interface Dashboard {
   layout_type: string;
   widgets: any[];
   template_variables?: any[];
+  template_variable_presets?: Record<string, unknown>[];
+  restricted_roles?: string[];
   is_read_only?: boolean;
   notify_list?: string[];
   reflow_type?: string;

@@ -68,7 +68,7 @@ export let deploymentEventsTrigger = SlateTrigger.create(spec, {
     autoRegisterWebhook: async ctx => {
       let client = new Client({
         token: ctx.auth.token,
-        teamId: ctx.config.teamId
+        teamId: ctx.auth.teamId ?? ctx.config.teamId
       });
 
       let result = await client.createWebhook({
@@ -87,7 +87,7 @@ export let deploymentEventsTrigger = SlateTrigger.create(spec, {
     autoUnregisterWebhook: async ctx => {
       let client = new Client({
         token: ctx.auth.token,
-        teamId: ctx.config.teamId
+        teamId: ctx.auth.teamId ?? ctx.config.teamId
       });
 
       await client.deleteWebhook(ctx.input.registrationDetails.webhookId);

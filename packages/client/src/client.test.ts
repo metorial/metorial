@@ -7,7 +7,8 @@ import {
   SlatePublicTool,
   SlateSpecification,
   SlateTool,
-  SlateTrigger
+  SlateTrigger,
+  SlateTriggerGroup
 } from '@slates/provider';
 import { rm } from 'fs/promises';
 import { createServer } from 'http';
@@ -266,6 +267,18 @@ let createTriggerTraceSlate = () => {
     auth
   });
 
+  let pollTriggerGroup = SlateTriggerGroup.create(spec, {
+    key: 'poll_group',
+    name: 'Poll Group'
+  })
+    .polling({
+      pollEvents: async () => ({
+        events: [{ payload: { id: 'poll-1' } }, { payload: { id: 'poll-2' } }]
+      })
+    })
+    .routingMatchers(async () => [])
+    .build();
+
   let pollingTrigger = SlateTrigger.create(spec, {
     key: 'poll_trigger',
     name: 'Poll Trigger'
@@ -281,19 +294,46 @@ let createTriggerTraceSlate = () => {
         value: z.string()
       })
     )
-    .polling({
-      pollEvents: async () => ({
-        inputs: [{ id: 'poll-1' }, { id: 'poll-2' }]
-      }),
-      handleEvent: async ctx => ({
-        id: ctx.input.id,
+    .triggerGroup(pollTriggerGroup)
+    .matches(() => true)
+    .map(async ctx => ({
+      id: ctx.input.id,
+      type: 'poll.event',
+      output: {
         type: 'poll.event',
-        output: {
-          type: 'poll.event',
-          value: ctx.input.id
+        value: ctx.input.id
+      }
+    }))
+    .build();
+
+  let webhookTriggerGroup = SlateTriggerGroup.create(spec, {
+    key: 'webhook_group',
+    name: 'Webhook Group'
+  })
+    .webhook({
+      manualRegistration: {
+        userConfigSchema: z.object({}),
+        fullConfigSchema: z.object({}),
+        setup: async () => ({
+          webhookSetupDocument: '',
+          partialWebhookRegistrationPayload: {}
+        })
+      },
+      process: async () => ({
+        events: [
+          { matchers: [], payload: { id: 'webhook-1' } },
+          { matchers: [], payload: { id: 'webhook-2' } }
+        ],
+        response: {
+          status: 202,
+          headers: {
+            'x-trigger-result': 'accepted'
+          },
+          body: 'accepted'
         }
       })
     })
+    .routingMatchers(async () => [])
     .build();
 
   let webhookTrigger = SlateTrigger.create(spec, {
@@ -311,32 +351,23 @@ let createTriggerTraceSlate = () => {
         value: z.string()
       })
     )
-    .webhook({
-      handleRequest: async () => ({
-        inputs: [{ id: 'webhook-1' }, { id: 'webhook-2' }],
-        response: {
-          status: 202,
-          headers: {
-            'x-trigger-result': 'accepted'
-          },
-          body: 'accepted'
-        }
-      }),
-      handleEvent: async ctx => ({
-        id: ctx.input.id,
+    .triggerGroup(webhookTriggerGroup)
+    .matches(() => true)
+    .map(async ctx => ({
+      id: ctx.input.id,
+      type: 'webhook.event',
+      output: {
         type: 'webhook.event',
-        output: {
-          type: 'webhook.event',
-          value: ctx.input.id
-        }
-      })
-    })
+        value: ctx.input.id
+      }
+    }))
     .build();
 
   return Slate.create({
     spec,
     tools: [],
-    triggers: [pollingTrigger, webhookTrigger]
+    triggers: [pollingTrigger, webhookTrigger],
+    triggerGroups: [pollTriggerGroup, webhookTriggerGroup]
   });
 };
 
@@ -699,20 +730,20 @@ describe('@slates/client local transport', () => {
 
     client.ensureSession();
 
-    await client.request('slates/action.trigger.poll_events', {
-      actionId: 'poll_trigger',
+    await client.pollTriggerGroup({
+      triggerGroupId: 'poll_group',
       state: null
     });
 
-    let webhookResult = await client.request('slates/action.trigger.webhook_handle', {
-      actionId: 'webhook_trigger',
+    let webhookResult = await client.processTriggerGroupWebhook({
+      triggerGroupId: 'webhook_group',
       url: 'https://example.com/webhook',
       method: 'POST',
       headers: {
         'content-type': 'application/json'
       },
       body: null,
-      state: null
+      webhookRegistrationPayload: null
     });
     expect(webhookResult.response).toEqual({
       status: 202,
@@ -731,24 +762,24 @@ describe('@slates/client local transport', () => {
       expect.arrayContaining([
         expect.objectContaining({
           type: 'info',
-          message: 'Polled 2 event(s) for trigger "Poll Trigger" (poll_trigger)',
+          message: 'Polled 2 event(s) for trigger group "Poll Group" (poll_group)',
           data: expect.objectContaining({
             component: 'action',
             functionName: 'pollEvents',
-            inputCount: 2,
-            actionId: 'poll_trigger'
+            eventCount: 2,
+            triggerGroupId: 'poll_group'
           })
         }),
         expect.objectContaining({
           type: 'info',
           message:
-            'Received 2 webhook event(s) for trigger "Webhook Trigger" (webhook_trigger)',
+            'Extracted 2 event(s) from webhook request for trigger group "Webhook Group" (webhook_group)',
           data: expect.objectContaining({
             component: 'action',
-            functionName: 'handleRequest',
-            inputCount: 2,
+            functionName: 'webhookProcess',
+            eventCount: 2,
             hasResponse: true,
-            actionId: 'webhook_trigger'
+            triggerGroupId: 'webhook_group'
           })
         })
       ])

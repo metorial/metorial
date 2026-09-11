@@ -1,4 +1,4 @@
-import { SlateTool } from '@slates/provider';
+import { createBase64Attachment, getBase64ByteLength, SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { FirebaseManagementClient } from '../lib/client';
 import { firebaseServiceError, missingRequiredFieldError } from '../lib/errors';
@@ -42,10 +42,19 @@ let configSchema = z.object({
     .string()
     .optional()
     .describe('Native app config artifact filename, such as google-services.json'),
-  configFileContents: z
+  configMimeType: z
     .string()
     .optional()
-    .describe('Base64-encoded native app config artifact contents')
+    .describe('MIME type of the downloadable native app config artifact'),
+  configByteLength: z
+    .number()
+    .int()
+    .nonnegative()
+    .optional()
+    .describe('Size of the downloadable native app config artifact in bytes'),
+  configDownloadAvailable: z
+    .boolean()
+    .describe('Whether a native app config file was included in the result')
 });
 
 let platforms = ['android', 'ios', 'web'] as const;
@@ -164,9 +173,46 @@ export let getFirebaseApps = SlateTool.create(spec, {
 
     if (operation === 'get_config') {
       let config = await client.getAppConfig(platform, appId);
+      let { configFileContents, ...publicConfig } = config;
+      let nativeConfigContents =
+        (platform === 'android' || platform === 'ios') &&
+        typeof configFileContents === 'string' &&
+        configFileContents.length > 0
+          ? configFileContents
+          : undefined;
+      let hasDownload = nativeConfigContents !== undefined;
+      let configFilename =
+        publicConfig.configFilename ??
+        (platform === 'android'
+          ? 'google-services.json'
+          : platform === 'ios'
+            ? 'GoogleService-Info.plist'
+            : undefined);
+      let configMimeType =
+        platform === 'android'
+          ? 'application/json'
+          : platform === 'ios'
+            ? 'application/x-plist'
+            : undefined;
+
       return {
-        output: { config },
-        message: `Retrieved ${platform} app config for **${appId}**.`
+        output: {
+          config: {
+            ...publicConfig,
+            configFilename,
+            configMimeType: hasDownload ? configMimeType : undefined,
+            configByteLength: nativeConfigContents
+              ? getBase64ByteLength(nativeConfigContents)
+              : undefined,
+            configDownloadAvailable: hasDownload
+          }
+        },
+        attachments: nativeConfigContents
+          ? [createBase64Attachment(nativeConfigContents, configMimeType)]
+          : undefined,
+        message: hasDownload
+          ? `Downloaded ${platform} app config **${configFilename}** for **${appId}**.`
+          : `Retrieved ${platform} app config for **${appId}**.`
       };
     }
 

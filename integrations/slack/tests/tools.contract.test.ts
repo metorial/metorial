@@ -167,6 +167,7 @@ const BOT_OAUTH_SCOPE_MANIFEST = [
   'app_mentions:read',
   'assistant:write',
   'chat:write.public',
+  'app_mentions:read',
   'channels:read',
   'channels:manage',
   'channels:history',
@@ -237,7 +238,6 @@ const USER_OAUTH_SCOPE_MANIFEST = [
   'reminders:read',
   'reminders:write',
   'team:read',
-  'search:read',
   'search:read.public',
   'search:read.private',
   'search:read.im',
@@ -303,8 +303,11 @@ const EXPECTED_TOOL_AUTHORIZATION: Record<string, ExpectedToolAuthorization> = {
   manage_reactions: { scopes: [['reactions:read'], ['reactions:write']], authMethods: null },
   manage_pins: { scopes: [['pins:read'], ['pins:write']], authMethods: null },
   manage_files: { scopes: [['files:read'], ['files:write']], authMethods: null },
-  search_messages: { scopes: [['search:read']], authMethods: USER_AUTH_METHODS },
-  search_files: { scopes: [['search:read']], authMethods: USER_AUTH_METHODS },
+  search_messages: { scopes: [['search:read.public']], authMethods: USER_AUTH_METHODS },
+  search_files: {
+    scopes: [['search:read.public'], ['search:read.files']],
+    authMethods: USER_AUTH_METHODS
+  },
   manage_reminders: {
     scopes: [['reminders:read'], ['reminders:write']],
     authMethods: USER_AUTH_METHODS

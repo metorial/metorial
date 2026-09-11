@@ -6,7 +6,9 @@ export let googleAnalyticsScopes = {
   analyticsManageUsers: 'https://www.googleapis.com/auth/analytics.manage.users',
   analyticsManageUsersReadonly:
     'https://www.googleapis.com/auth/analytics.manage.users.readonly',
-  openIdEmailProfile: 'openid email profile'
+  openId: 'openid',
+  email: 'email',
+  profile: 'profile'
 } as const;
 
 let analyticsDataRead = anyOf(

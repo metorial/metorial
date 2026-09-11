@@ -114,32 +114,27 @@ describe('compute-engine provider contract', () => {
       {
         title: 'Compute Engine Full Access',
         description: 'View and manage Google Compute Engine resources.',
-        id: computeEngineScopes.compute,
-        defaultChecked: true
+        id: computeEngineScopes.compute
       },
       {
         title: 'Compute Engine Read Only',
         description: 'View Google Compute Engine resources.',
-        id: computeEngineScopes.computeReadonly,
-        defaultChecked: undefined
+        id: computeEngineScopes.computeReadonly
       },
       {
         title: 'Cloud Platform Full Access',
         description: 'View and manage resources across Google Cloud services.',
-        id: computeEngineScopes.cloudPlatform,
-        defaultChecked: undefined
+        id: computeEngineScopes.cloudPlatform
       },
       {
         title: 'Google Account Profile',
         description: 'View your basic Google Account profile for connection identity.',
-        id: computeEngineScopes.userinfoProfile,
-        defaultChecked: true
+        id: computeEngineScopes.userinfoProfile
       },
       {
         title: 'Google Account Email',
         description: 'View your Google Account email address for connection identity.',
-        id: computeEngineScopes.userinfoEmail,
-        defaultChecked: true
+        id: computeEngineScopes.userinfoEmail
       }
     ]);
 

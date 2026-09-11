@@ -1,6 +1,6 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
 import { amplitudeServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
@@ -13,10 +13,11 @@ export let identifyUserTool = SlateTool.create(spec, {
     'For group identification, provide groupType and groupValue along with groupProperties.'
   ],
   tags: {
-    destructive: false,
+    destructive: true,
     readOnly: false
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       userId: z
@@ -25,7 +26,7 @@ export let identifyUserTool = SlateTool.create(spec, {
         .describe('User ID to identify. At least one of userId or deviceId is required.'),
       deviceId: z.string().optional().describe('Device ID to identify.'),
       userProperties: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe(
           'User properties to set. Supports operations like $set, $setOnce, $add, $append, $prepend, $unset, $clearAll.'
@@ -39,7 +40,7 @@ export let identifyUserTool = SlateTool.create(spec, {
         .optional()
         .describe('Group value for group identification (e.g., "Acme Corp").'),
       groupProperties: z
-        .record(z.string(), z.any())
+        .record(z.string(), z.unknown())
         .optional()
         .describe('Group properties to set when using group identification.'),
       mapToGlobalUserId: z
@@ -54,12 +55,7 @@ export let identifyUserTool = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let actions: string[] = [];
 

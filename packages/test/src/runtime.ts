@@ -65,6 +65,12 @@ export interface ExpectedSlateAction {
   description?: string;
   readOnly?: boolean;
   destructive?: boolean;
+}
+
+export interface ExpectedSlateTriggerGroup {
+  id: string;
+  name?: string;
+  description?: string;
   invocationType?: 'polling' | 'webhook';
 }
 
@@ -195,16 +201,20 @@ export let createLocalSlateTestClient = (opts: {
 }) =>
   createSlatesClient({
     transport: createLocalSlateTransport({ slate: opts.slate as LocalSlate }),
-    state: opts.state,
+    state: {
+      capabilities: { triggers: true },
+      ...opts.state
+    },
     participants: opts.participants
   });
 
 export let getSlateContract = async (client: SlatesTestClient) => {
-  let [provider, actions, authMethods, configSchema] = await Promise.all([
+  let [provider, actions, authMethods, configSchema, triggerGroups] = await Promise.all([
     client.identify(),
     client.listActions(),
     client.listAuthMethods(),
-    client.getConfigSchema()
+    client.getConfigSchema(),
+    client.listTriggerGroups()
   ]);
 
   return {
@@ -216,6 +226,7 @@ export let getSlateContract = async (client: SlatesTestClient) => {
     triggers: actions.actions.filter(
       (action: SlatesAction): action is SlatesTriggerAction => action.type === 'action.trigger'
     ),
+    triggerGroups: triggerGroups.triggerGroups,
     authMethods: authMethods.authenticationMethods,
     configSchema: configSchema.schema
   };
@@ -244,6 +255,23 @@ let expectActionMatches = (
   if (expected.destructive !== undefined) {
     expect(actual?.tags?.destructive ?? false).toBe(expected.destructive);
   }
+};
+
+let expectTriggerGroupMatches = (
+  actual: Record<string, any> | undefined,
+  expected: ExpectedSlateTriggerGroup
+) => {
+  let expect = getVitestExpect();
+  expect(actual).toBeTruthy();
+  expect(actual?.id).toBe(expected.id);
+
+  if (expected.name !== undefined) {
+    expect(actual?.name).toBe(expected.name);
+  }
+
+  if (expected.description !== undefined) {
+    expect(actual?.description).toBe(expected.description);
+  }
 
   if (expected.invocationType !== undefined) {
     expect((actual as { invocation?: { type?: string } } | undefined)?.invocation?.type).toBe(
@@ -261,9 +289,11 @@ export let expectSlateContract = async (d: {
   };
   toolIds?: string[];
   triggerIds?: string[];
+  triggerGroupIds?: string[];
   authMethodIds?: string[];
   tools?: ExpectedSlateAction[];
   triggers?: ExpectedSlateAction[];
+  triggerGroups?: ExpectedSlateTriggerGroup[];
 }) => {
   let expect = getVitestExpect();
   let contract = await getSlateContract(d.client);
@@ -288,6 +318,10 @@ export let expectSlateContract = async (d: {
     );
   }
 
+  if (d.triggerGroupIds) {
+    expect(contract.triggerGroups.map(group => group.id)).toEqual(d.triggerGroupIds);
+  }
+
   if (d.authMethodIds) {
     expect(contract.authMethods.map((method: SlateAuthenticationMethod) => method.id)).toEqual(
       d.authMethodIds
@@ -308,59 +342,70 @@ export let expectSlateContract = async (d: {
     );
   }
 
+  for (let triggerGroup of d.triggerGroups ?? []) {
+    expectTriggerGroupMatches(
+      contract.triggerGroups.find(group => group.id === triggerGroup.id),
+      triggerGroup
+    );
+  }
+
   return contract;
 };
 
-export let registerSlateTriggerWebhook = async (d: {
+export let registerSlateTriggerGroupWebhook = async (d: {
   client: SlatesTestClient;
-  triggerId: string;
-  webhookBaseUrl: string;
-}) => d.client.registerTriggerWebhook(d.triggerId, d.webhookBaseUrl);
+  triggerGroupId: string;
+  webhookTargetIdentifier: string;
+  webhookTargetPayload: any;
+  webhookUrl: string;
+}) =>
+  d.client.registerTriggerGroupWebhook({
+    triggerGroupId: d.triggerGroupId,
+    webhookTargetIdentifier: d.webhookTargetIdentifier,
+    webhookTargetPayload: d.webhookTargetPayload,
+    webhookUrl: d.webhookUrl
+  });
 
-export let pollSlateTriggerEvents = async (d: {
+export let pollSlateTriggerGroupEvents = async (d: {
   client: SlatesTestClient;
-  triggerId: string;
+  triggerGroupId: string;
   state?: any;
 }) => {
   d.client.ensureSession();
-  return d.client.request('slates/action.trigger.poll_events', {
-    actionId: d.triggerId,
+  return d.client.pollTriggerGroup({
+    triggerGroupId: d.triggerGroupId,
     state: d.state ?? null
   });
 };
 
-export let handleSlateTriggerWebhook = async (d: {
+export let processSlateTriggerGroupWebhook = async (d: {
   client: SlatesTestClient;
-  triggerId: string;
+  triggerGroupId: string;
   url: string;
   method?: string;
   headers?: Record<string, string>;
   body?: string | Uint8Array | null;
-  state?: any;
-  registrationDetails?: any;
+  webhookRegistrationPayload?: any;
 }) =>
-  d.client.handleTriggerWebhook({
-    actionId: d.triggerId,
+  d.client.processTriggerGroupWebhook({
+    triggerGroupId: d.triggerGroupId,
     url: d.url,
     method: d.method ?? 'POST',
     headers: d.headers,
     body: d.body,
-    state: d.state,
-    registrationDetails: d.registrationDetails
+    webhookRegistrationPayload: d.webhookRegistrationPayload ?? null
   });
 
-export let unregisterSlateTriggerWebhook = async (d: {
+export let unregisterSlateTriggerGroupWebhook = async (d: {
   client: SlatesTestClient;
-  triggerId: string;
-  webhookBaseUrl: string;
-  registrationDetails: any;
-  state?: any;
+  triggerGroupId: string;
+  webhookRegistrationIdentifier: string;
+  webhookRegistrationPayload: any;
 }) =>
-  d.client.unregisterTriggerWebhook({
-    actionId: d.triggerId,
-    webhookBaseUrl: d.webhookBaseUrl,
-    registrationDetails: d.registrationDetails,
-    state: d.state
+  d.client.unregisterTriggerGroupWebhook({
+    triggerGroupId: d.triggerGroupId,
+    webhookRegistrationIdentifier: d.webhookRegistrationIdentifier,
+    webhookRegistrationPayload: d.webhookRegistrationPayload
   });
 
 export let mapSlateTriggerEvent = async (d: {

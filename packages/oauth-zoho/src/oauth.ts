@@ -21,7 +21,6 @@ export type ZohoOauthScope = {
   title: string;
   description?: string;
   scope: string;
-  defaultChecked?: boolean;
 };
 
 export type ZohoOauthInput<Region extends ZohoRegion = ZohoRegion> = {

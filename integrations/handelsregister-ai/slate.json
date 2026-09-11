@@ -1,0 +1,13 @@
+{
+  "name": "@metorial/handelsregister-ai",
+  "description": "Search German companies, inspect financials, directors, ownership, publications and news, and download annual statements and official register documents.",
+  "categories": ["apis-and-http-requests", "crm-and-sales-tools"],
+  "skills": [
+    "search German companies",
+    "analyze company financials",
+    "research directors and ownership",
+    "download register documents",
+    "download annual financial statements"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/handelsregister-ai.svg"
+}

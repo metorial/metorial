@@ -10,7 +10,7 @@ Retrieve the current Firebase Remote Config template including all parameters, c
 
 ### Get Firebase Apps
 
-List Firebase Android, iOS, and Web apps in a project, retrieve a specific app, or download its SDK configuration artifact. Use this to discover app IDs, package or bundle identifiers, web config, and native google-services files.
+List Firebase Android, iOS, and Web apps in a project, retrieve a specific app, or download its SDK configuration artifact. Native Android and iOS configuration is returned as a downloadable file with filename, MIME type, and byte-size metadata; Web configuration remains structured output.
 
 ### List Users
 

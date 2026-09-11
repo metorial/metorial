@@ -24,6 +24,11 @@ export let slackBotOAuthScopes = [
     scope: 'chat:write.public'
   },
   {
+    title: 'Read App Mentions',
+    description: 'View messages that directly mention the app',
+    scope: 'app_mentions:read'
+  },
+  {
     title: 'Read Channels',
     description: 'View basic information about public channels',
     scope: 'channels:read'
@@ -334,11 +339,6 @@ export let slackUserOAuthScopes = [
     scope: 'team:read'
   },
   {
-    title: 'Search Workspace',
-    description: 'Search messages and files with user-token search APIs',
-    scope: 'search:read'
-  },
-  {
     title: 'Search Public Content',
     description: 'Search messages and channels in public conversations',
     scope: 'search:read.public'
@@ -431,7 +431,6 @@ export let slackActionScopes = {
   userGroups: allOf('usergroups:read', 'usergroups:write'),
   bookmarks: allOf('bookmarks:read', 'bookmarks:write'),
   teamInfo: anyOf('team:read'),
-  search: anyOf('search:read'),
   searchPublic: anyOf('search:read.public'),
   searchPrivate: allOf(
     'search:read.public',
@@ -440,6 +439,7 @@ export let slackActionScopes = {
     'search:read.mpim'
   ),
   searchUsers: anyOf('search:read.users'),
+  searchFiles: allOf('search:read.public', 'search:read.files'),
   userStatus: allOf('users.profile:read', 'users.profile:write'),
   userProfileWrite: anyOf('users.profile:write'),
   dndRead: anyOf('dnd:read'),
@@ -448,14 +448,16 @@ export let slackActionScopes = {
   presenceWrite: anyOf('users:write'),
   markConversationRead: anyOf('channels:write', 'groups:write', 'im:write', 'mpim:write'),
   reminders: allOf('reminders:read', 'reminders:write'),
-  messagePolling: allOf(slackConversationReadScopes, slackConversationHistoryScopes),
   messageEvents: slackConversationHistoryScopes,
-  channelActivity: slackPublicPrivateConversationReadScopes,
+  appMentionEvents: anyOf('app_mentions:read'),
+  channelEvents: slackConversationReadScopes,
+  membershipEvents: slackConversationReadScopes,
   fileEvents: anyOf('files:read'),
   reactionEvents: allOf(
     slackPublicPrivateConversationReadScopes,
     slackPublicPrivateConversationHistoryScopes,
     'reactions:read'
   ),
-  userChange: slackUserInfoScopes
+  userChange: slackUserInfoScopes,
+  userGroupEvents: anyOf('usergroups:read')
 };

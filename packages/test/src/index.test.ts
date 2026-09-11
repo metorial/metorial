@@ -6,7 +6,8 @@ import {
   SlateConfig,
   SlateSpecification,
   SlateTool,
-  SlateTrigger
+  SlateTrigger,
+  SlateTriggerGroup
 } from '@slates/provider';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
@@ -18,12 +19,12 @@ import {
   expectSlateContract,
   expectSlateError,
   expectToolCall,
-  handleSlateTriggerWebhook,
   loadSlatesRuntimeContext,
   mapSlateTriggerEvent,
-  pollSlateTriggerEvents,
-  registerSlateTriggerWebhook,
-  unregisterSlateTriggerWebhook
+  pollSlateTriggerGroupEvents,
+  processSlateTriggerGroupWebhook,
+  registerSlateTriggerGroupWebhook,
+  unregisterSlateTriggerGroupWebhook
 } from './index';
 
 (globalThis as typeof globalThis & { expect?: typeof expect }).expect = expect;
@@ -171,6 +172,64 @@ let createDemoSlate = () => {
     }))
     .build();
 
+  let webhookGroup = SlateTriggerGroup.create(spec, {
+    key: 'webhook_group',
+    name: 'Webhook Group'
+  })
+    .webhook({
+      autoRegistration: {
+        webhookTargetList: async () => ({
+          targets: [
+            {
+              webhookTargetIdentifier: 'default',
+              name: 'Default',
+              metadata: {},
+              webhookTargetPayload: {},
+              targetOwnership: 'single_user'
+            }
+          ],
+          nextPageToken: null
+        }),
+        webhookRegister: async ctx => ({
+          webhookRegistrationIdentifier: 'reg-1',
+          webhookRegistrationPayload: {
+            webhookBaseUrl: ctx.input.webhookUrl,
+            channelId: 'channel-1'
+          }
+        }),
+        webhookUnregister: async ctx => {
+          if (ctx.input.webhookRegistrationPayload?.channelId !== 'channel-1') {
+            throw new Error('Unexpected channel');
+          }
+        }
+      },
+      process: async ctx => {
+        if (ctx.input.request.headers.get('x-demo-event') === 'ignore') {
+          return { events: [] };
+        }
+
+        return {
+          events: [
+            {
+              matchers: [],
+              payload: {
+                value: (await ctx.input.request.text()) || 'empty'
+              }
+            }
+          ],
+          response: new Response(ctx.input.webhookRegistrationPayload?.channelId ?? 'missing', {
+            status: 201,
+            headers: {
+              'content-type': 'text/plain',
+              'x-demo-response': 'accepted'
+            }
+          })
+        };
+      }
+    })
+    .routingMatchers(async () => [])
+    .build();
+
   let webhookEcho = SlateTrigger.create(spec, {
     key: 'webhook_echo',
     name: 'Webhook Echo'
@@ -185,71 +244,30 @@ let createDemoSlate = () => {
         echoed: z.string()
       })
     )
-    .webhook({
-      http: {
-        methods: ['POST', 'OPTIONS'],
-        sync: {
-          mode: 'match',
-          match: [
-            {
-              method: 'POST',
-              hasHeader: 'x-demo-event'
-            },
-            {
-              formBodyField: {
-                path: 'mode',
-                equals: 'subscribe'
-              }
-            }
-          ],
-          timeoutMs: 4_000
-        }
-      },
-      autoRegisterWebhook: async ctx => ({
-        registrationDetails: {
-          webhookBaseUrl: ctx.input.webhookBaseUrl,
-          channelId: 'channel-1'
-        },
-        state: {
-          registered: true
-        }
-      }),
-      autoUnregisterWebhook: async ctx => {
-        if (ctx.input.registrationDetails?.channelId !== 'channel-1') {
-          throw new Error('Unexpected channel');
-        }
-      },
-      handleRequest: async ctx => {
-        if (ctx.request.headers.get('x-demo-event') === 'ignore') {
-          return { inputs: [] };
-        }
+    .triggerGroup(webhookGroup)
+    .matches(() => true)
+    .map(async ctx => ({
+      type: 'demo.webhook',
+      id: `webhook-${ctx.input.value}`,
+      output: {
+        echoed: ctx.input.value
+      }
+    }))
+    .build();
 
-        return {
-          inputs: [
-            {
-              value: (await ctx.request.text()) || 'empty'
-            }
-          ],
-          updatedState: {
-            lastEvent: ctx.request.headers.get('x-demo-event') ?? 'unknown'
-          },
-          response: new Response(ctx.registrationDetails?.channelId ?? 'missing', {
-            status: 201,
-            headers: {
-              'content-type': 'text/plain',
-              'x-demo-response': 'accepted'
-            }
-          })
-        };
-      },
-      handleEvent: async ctx => ({
-        type: 'demo.webhook',
-        id: `webhook-${ctx.input.value}`,
-        output: {
-          echoed: ctx.input.value
+  let pollGroup = SlateTriggerGroup.create(spec, {
+    key: 'poll_group',
+    name: 'Poll Group'
+  })
+    .polling({
+      pollEvents: async ctx => ({
+        events: ctx.input.state?.seen ? [] : [{ payload: { value: 'poll-value' } }],
+        updatedState: {
+          seen: true
         }
       })
     })
+    .routingMatchers(async () => [])
     .build();
 
   let pollEcho = SlateTrigger.create(spec, {
@@ -266,27 +284,22 @@ let createDemoSlate = () => {
         echoed: z.string()
       })
     )
-    .polling({
-      pollEvents: async ctx => ({
-        inputs: ctx.input.state?.seen ? [] : [{ value: 'poll-value' }],
-        updatedState: {
-          seen: true
-        }
-      }),
-      handleEvent: async ctx => ({
-        type: 'demo.poll',
-        id: `poll-${ctx.input.value}`,
-        output: {
-          echoed: ctx.input.value
-        }
-      })
-    })
+    .triggerGroup(pollGroup)
+    .matches(() => true)
+    .map(async ctx => ({
+      type: 'demo.poll',
+      id: `poll-${ctx.input.value}`,
+      output: {
+        echoed: ctx.input.value
+      }
+    }))
     .build();
 
   return Slate.create({
     spec,
     tools: [echo, fail, attachmentEcho, downloadLink],
-    triggers: [webhookEcho, pollEcho]
+    triggers: [webhookEcho, pollEcho],
+    triggerGroups: [webhookGroup, pollGroup]
   });
 };
 
@@ -416,6 +429,7 @@ describe('@slates/test', () => {
       },
       toolIds: ['echo', 'fail', 'attachment_echo', 'download_link'],
       triggerIds: ['webhook_echo', 'poll_echo'],
+      triggerGroupIds: ['webhook_group', 'poll_group'],
       authMethodIds: ['token_auth'],
       tools: [
         { id: 'echo', readOnly: false, destructive: false },
@@ -423,39 +437,14 @@ describe('@slates/test', () => {
         { id: 'attachment_echo', readOnly: true, destructive: false },
         { id: 'download_link', readOnly: true, destructive: false }
       ],
-      triggers: [
-        { id: 'webhook_echo', invocationType: 'webhook' },
-        { id: 'poll_echo', invocationType: 'polling' }
+      triggers: [{ id: 'webhook_echo' }, { id: 'poll_echo' }],
+      triggerGroups: [
+        { id: 'webhook_group', invocationType: 'webhook' },
+        { id: 'poll_group', invocationType: 'polling' }
       ]
     });
 
     expect(contract.configSchema.properties.prefix.type).toBe('string');
-    expect(contract.triggers.find(action => action.id === 'webhook_echo')?.invocation).toEqual(
-      {
-        type: 'webhook',
-        autoRegistration: true,
-        autoUnregistration: true,
-        http: {
-          methods: ['POST', 'OPTIONS'],
-          sync: {
-            mode: 'match',
-            match: [
-              {
-                method: 'POST',
-                hasHeader: 'x-demo-event'
-              },
-              {
-                formBodyField: {
-                  path: 'mode',
-                  equals: 'subscribe'
-                }
-              }
-            ],
-            timeoutMs: 4_000
-          }
-        }
-      }
-    );
 
     await expectToolCall({
       client,
@@ -510,46 +499,44 @@ describe('@slates/test', () => {
       }
     });
 
-    let registration = await registerSlateTriggerWebhook({
+    let registration = await registerSlateTriggerGroupWebhook({
       client,
-      triggerId: 'webhook_echo',
-      webhookBaseUrl: 'https://example.com/hooks/google-calendar'
+      triggerGroupId: 'webhook_group',
+      webhookTargetIdentifier: 'default',
+      webhookTargetPayload: {},
+      webhookUrl: 'https://example.com/hooks/google-calendar'
     });
     expect(registration).toMatchObject({
-      registrationDetails: {
+      webhookRegistrationIdentifier: 'reg-1',
+      webhookRegistrationPayload: {
         webhookBaseUrl: 'https://example.com/hooks/google-calendar',
         channelId: 'channel-1'
-      },
-      state: {
-        registered: true
       }
     });
 
-    let ignored = await handleSlateTriggerWebhook({
+    let ignored = await processSlateTriggerGroupWebhook({
       client,
-      triggerId: 'webhook_echo',
+      triggerGroupId: 'webhook_group',
       url: 'https://example.com/hooks/google-calendar',
       headers: {
         'x-demo-event': 'ignore'
-      }
+      },
+      webhookRegistrationPayload: registration.webhookRegistrationPayload
     });
-    expect(ignored.inputs).toEqual([]);
+    expect(ignored.events).toEqual([]);
 
-    let handled = await handleSlateTriggerWebhook({
+    let handled = await processSlateTriggerGroupWebhook({
       client,
-      triggerId: 'webhook_echo',
+      triggerGroupId: 'webhook_group',
       url: 'https://example.com/hooks/google-calendar',
       headers: {
         'x-demo-event': 'created'
       },
       body: 'payload-value',
-      registrationDetails: registration.registrationDetails
+      webhookRegistrationPayload: registration.webhookRegistrationPayload
     });
     expect(handled).toMatchObject({
-      inputs: [{ value: 'payload-value' }],
-      updatedState: {
-        lastEvent: 'created'
-      },
+      events: [{ matchers: [], payload: { value: 'payload-value' } }],
       response: {
         status: 201,
         headers: {
@@ -576,11 +563,11 @@ describe('@slates/test', () => {
     });
     expect(mapped.id).toBe('webhook-payload-value');
 
-    await unregisterSlateTriggerWebhook({
+    await unregisterSlateTriggerGroupWebhook({
       client,
-      triggerId: 'webhook_echo',
-      webhookBaseUrl: 'https://example.com/hooks/google-calendar',
-      registrationDetails: registration.registrationDetails
+      triggerGroupId: 'webhook_group',
+      webhookRegistrationIdentifier: registration.webhookRegistrationIdentifier,
+      webhookRegistrationPayload: registration.webhookRegistrationPayload
     });
 
     await expectSlateError(
@@ -608,12 +595,12 @@ describe('@slates/test', () => {
       }
     });
 
-    let initialPoll = await pollSlateTriggerEvents({
+    let initialPoll = await pollSlateTriggerGroupEvents({
       client,
-      triggerId: 'poll_echo'
+      triggerGroupId: 'poll_group'
     });
     expect(initialPoll).toMatchObject({
-      inputs: [{ value: 'poll-value' }],
+      events: [{ payload: { value: 'poll-value' } }],
       updatedState: {
         seen: true
       }
@@ -622,7 +609,7 @@ describe('@slates/test', () => {
     let mapped = await mapSlateTriggerEvent({
       client,
       triggerId: 'poll_echo',
-      input: initialPoll.inputs[0]!,
+      input: initialPoll.events[0]!.payload,
       type: 'demo.poll',
       output: {
         echoed: 'poll-value'
@@ -630,12 +617,12 @@ describe('@slates/test', () => {
     });
     expect(mapped.id).toBe('poll-poll-value');
 
-    let repeatedPoll = await pollSlateTriggerEvents({
+    let repeatedPoll = await pollSlateTriggerGroupEvents({
       client,
-      triggerId: 'poll_echo',
+      triggerGroupId: 'poll_group',
       state: initialPoll.updatedState
     });
-    expect(repeatedPoll.inputs).toEqual([]);
+    expect(repeatedPoll.events).toEqual([]);
     expect(repeatedPoll.updatedState).toEqual({
       seen: true
     });

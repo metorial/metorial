@@ -1,0 +1,7 @@
+[install]
+linker = "isolated"
+globalStore = true
+publicHoistPattern = ["*"]
+
+[install.cache]
+disable = false

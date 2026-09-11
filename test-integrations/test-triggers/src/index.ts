@@ -1,9 +1,20 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-import { pollTime, webhookEcho, webhookSyncEcho } from './triggers';
+import { whoami } from './tools';
+import {
+  autoWebhookCreated,
+  autoWebhookEcho,
+  autoWebhookGroup,
+  manualWebhookEcho,
+  manualWebhookGroup,
+  pollEventsGroup,
+  pollStatus,
+  pollTime
+} from './triggers';
 
 export let provider = Slate.create({
   spec,
-  tools: [],
-  triggers: [webhookEcho, webhookSyncEcho, pollTime]
+  tools: [whoami],
+  triggerGroups: [pollEventsGroup, autoWebhookGroup, manualWebhookGroup],
+  triggers: [pollTime, pollStatus, autoWebhookEcho, autoWebhookCreated, manualWebhookEcho]
 });

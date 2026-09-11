@@ -164,6 +164,54 @@ export let chooseTool = async (d: { client: SlatesProtocolClient; toolId?: strin
   return d.client.getTool(toolId);
 };
 
+export let chooseTriggerAction = async (d: {
+  client: SlatesProtocolClient;
+  triggerId?: string;
+}) => {
+  if (d.triggerId) {
+    return d.client.getTrigger(d.triggerId);
+  }
+
+  let triggers = await d.client.listTriggers();
+  if (triggers.length === 0) {
+    throw new Error('This slate does not expose any triggers.');
+  }
+
+  let triggerId = await select({
+    message: 'Choose a trigger',
+    choices: triggers.map(trigger => ({
+      name: `${trigger.name} (${trigger.id})`,
+      value: trigger.id
+    }))
+  });
+
+  return d.client.getTrigger(triggerId);
+};
+
+export let chooseTriggerGroup = async (d: {
+  client: SlatesProtocolClient;
+  triggerGroupId?: string;
+}) => {
+  if (d.triggerGroupId) {
+    return (await d.client.getTriggerGroup(d.triggerGroupId)).triggerGroup;
+  }
+
+  let groups = (await d.client.listTriggerGroups()).triggerGroups;
+  if (groups.length === 0) {
+    throw new Error('This slate does not expose any trigger groups.');
+  }
+
+  let triggerGroupId = await select({
+    message: 'Choose a trigger group',
+    choices: groups.map(group => ({
+      name: `${group.name} (${group.id})`,
+      value: group.id
+    }))
+  });
+
+  return groups.find(group => group.id === triggerGroupId)!;
+};
+
 export let chooseAuthMethod = async (d: {
   client: SlatesProtocolClient;
   authMethodId?: string;

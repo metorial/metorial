@@ -1,11 +1,13 @@
 {
   "name": "@__test__/triggers",
-  "description": "Internal test slate for exercising polling and webhook trigger flows.",
+  "description": "Internal test slate that exercises polling, auto-registered webhooks, and manually registered webhooks, including HMAC verification, routing matchers, and token auth.",
   "categories": ["utilities"],
   "skills": [
-    "receive webhook payloads and emit processed trigger events",
-    "emit the current time during polling runs",
-    "test callback trigger delivery",
+    "poll synthetic time and status events",
+    "auto-register per-channel webhooks and verify HMAC signatures",
+    "manually register a webhook URL with a signing secret",
+    "route trigger events with account and workspace matchers",
+    "answer webhook URL verification challenges",
     "run trigger integration smoke tests"
   ]
 }

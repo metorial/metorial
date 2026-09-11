@@ -1,12 +1,12 @@
 import { createBase64Attachment, SlateTool } from 'slates';
 import { z } from 'zod';
-import { AmplitudeClient } from '../lib/client';
+import { createAmplitudeClient } from '../lib/client';
 import { spec } from '../spec';
 
 export let exportEventsTool = SlateTool.create(spec, {
   name: 'Export Events',
   key: 'export_events',
-  description: `Export Amplitude raw event files for an uploaded-time range as a ZIP attachment. Use this for downstream archival, warehouse backfills, or offline inspection of raw JSON event exports.`,
+  description: `Export Amplitude raw event files for an uploaded-time range as a downloadable ZIP file. Use this for archival, warehouse backfills, or offline inspection of raw JSON event exports.`,
   constraints: [
     'The Export API returns data by server upload time, not event time.',
     'Data may take up to two hours to become available.',
@@ -18,6 +18,7 @@ export let exportEventsTool = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .authMethods(['api_key_secret'])
   .input(
     z.object({
       start: z
@@ -32,18 +33,12 @@ export let exportEventsTool = SlateTool.create(spec, {
   )
   .output(
     z.object({
-      contentType: z.string().describe('MIME type of the exported attachment.'),
-      byteLength: z.number().describe('Size of the exported ZIP attachment in bytes.'),
-      attachmentCount: z.number().describe('Number of attachments returned.')
+      contentType: z.string().describe('MIME type of the exported file.'),
+      byteLength: z.number().describe('Size of the exported ZIP file in bytes.')
     })
   )
   .handleInvocation(async ctx => {
-    let client = new AmplitudeClient({
-      apiKey: ctx.auth.apiKey,
-      secretKey: ctx.auth.secretKey,
-      token: ctx.auth.token,
-      region: ctx.config.region
-    });
+    let client = createAmplitudeClient(ctx);
 
     let result = await client.exportEvents({
       start: ctx.input.start,
@@ -53,11 +48,10 @@ export let exportEventsTool = SlateTool.create(spec, {
     return {
       output: {
         contentType: result.contentType,
-        byteLength: result.byteLength,
-        attachmentCount: 1
+        byteLength: result.byteLength
       },
       attachments: [createBase64Attachment(result.contentBase64, result.contentType)],
-      message: `Exported Amplitude events from ${ctx.input.start} to ${ctx.input.end} as a ZIP attachment.`
+      message: `Exported Amplitude events from ${ctx.input.start} to ${ctx.input.end} as a downloadable ZIP file.`
     };
   })
   .build();

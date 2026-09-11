@@ -42,14 +42,12 @@ export let auth = SlateAuth.create()
       {
         title: 'Google Account Email',
         description: 'View your Google Account email address for connection identity',
-        scope: youtubeScopes.userinfoEmail,
-        defaultChecked: true
+        scope: youtubeScopes.userinfoEmail
       },
       {
         title: 'Google Account Profile',
         description: 'View your basic Google Account profile for connection identity',
-        scope: youtubeScopes.userinfoProfile,
-        defaultChecked: true
+        scope: youtubeScopes.userinfoProfile
       },
       {
         title: 'Manage Account',
