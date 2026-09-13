@@ -2,11 +2,8 @@ import {
   bodyToAltText,
   type ChatBody,
   type ChatPart,
-  type Modal,
-  type ModalChild,
   replaceSlackShortcodesInMarkdown,
-  replaceUnicodeWithSlackShortcodes,
-  type SelectOption
+  replaceUnicodeWithSlackShortcodes
 } from '@slates/adapter-chat';
 
 type SlackBlock = Record<string, any>;
@@ -34,67 +31,6 @@ export let slackMrkdwnToMarkdown = (value: string) =>
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&');
-
-let option = (value: SelectOption, markdown = false) => ({
-  text: { type: markdown ? 'mrkdwn' : 'plain_text', text: value.label.slice(0, 75) },
-  value: value.value.slice(0, 150),
-  ...(value.description
-    ? {
-        description: {
-          type: markdown ? 'mrkdwn' : 'plain_text',
-          text: value.description.slice(0, 75)
-        }
-      }
-    : {})
-});
-
-let actionElement = (part: Extract<ChatPart, { type: 'actions' }>['children'][number]) => {
-  if (part.type === 'button') {
-    return {
-      type: 'button',
-      text: { type: 'plain_text', text: part.label.slice(0, 75), emoji: true },
-      action_id: part.id,
-      ...(part.value ? { value: part.value } : {}),
-      ...(part.style && part.style !== 'default' ? { style: part.style } : {})
-    };
-  }
-  if (part.type === 'link-button') {
-    return {
-      type: 'button',
-      text: { type: 'plain_text', text: part.label.slice(0, 75), emoji: true },
-      action_id: part.id ?? `link-${part.url.slice(0, 150)}`,
-      url: part.url,
-      ...(part.style && part.style !== 'default' ? { style: part.style } : {})
-    };
-  }
-  if (part.type === 'external-select') {
-    return {
-      type: 'external_select',
-      action_id: part.id,
-      ...(part.placeholder
-        ? { placeholder: { type: 'plain_text', text: part.placeholder.slice(0, 150) } }
-        : {}),
-      ...(part.initialOption ? { initial_option: option(part.initialOption) } : {}),
-      ...(part.minQueryLength !== undefined ? { min_query_length: part.minQueryLength } : {})
-    };
-  }
-
-  let options = part.options
-    .slice(0, part.type === 'radio-select' ? 10 : 100)
-    .map(item => option(item, part.type === 'radio-select'));
-  let initial = part.initialOption
-    ? options.find(item => item.value === part.initialOption)
-    : undefined;
-  return {
-    type: part.type === 'radio-select' ? 'radio_buttons' : 'static_select',
-    action_id: part.id,
-    options,
-    ...(part.type === 'select' && part.placeholder
-      ? { placeholder: { type: 'plain_text', text: part.placeholder.slice(0, 150) } }
-      : {}),
-    ...(initial ? { initial_option: initial } : {})
-  };
-};
 
 let tableFallback = (headers: string[], rows: string[][]) => {
   let all = [headers, ...rows];
@@ -176,20 +112,6 @@ let partBlocks = (part: ChatPart, state: { table: boolean; charts: number }): Sl
           }))
         }
       ];
-    case 'actions': {
-      let elements = part.children
-        .filter(
-          child =>
-            !('disabled' in child && child.disabled) &&
-            !(
-              (child.type === 'select' || child.type === 'radio-select') &&
-              child.options.length === 0
-            )
-        )
-        .slice(0, 25)
-        .map(actionElement);
-      return elements.length ? [{ type: 'actions', elements }] : [];
-    }
     case 'section':
       return part.children.flatMap(child => partBlocks(child, state));
     case 'card':
@@ -351,70 +273,6 @@ export let renderChatBody = (body: ChatBody) => {
   return { text: body.altText ?? bodyToAltText(body), blocks };
 };
 
-let modalInput = (child: ModalChild): SlackBlock => {
-  if (child.type === 'text' || child.type === 'fields') {
-    return partBlocks(child, { table: false, charts: 0 })[0]!;
-  }
-
-  let element: Record<string, any>;
-  if (child.type === 'text_input') {
-    element = {
-      type: 'plain_text_input',
-      action_id: child.id,
-      multiline: child.multiline ?? false,
-      ...(child.initialValue ? { initial_value: child.initialValue } : {}),
-      ...(child.maxLength ? { max_length: child.maxLength } : {})
-    };
-  } else if (child.type === 'date_input') {
-    element = {
-      type: 'datepicker',
-      action_id: child.id,
-      ...(child.initialValue && /^\d{4}-\d{2}-\d{2}$/.test(child.initialValue)
-        ? { initial_date: child.initialValue }
-        : {})
-    };
-  } else if (child.type === 'number_input') {
-    element = {
-      type: 'number_input',
-      action_id: child.id,
-      is_decimal_allowed: child.decimal ?? false,
-      ...(child.initialValue !== undefined
-        ? { initial_value: String(child.initialValue) }
-        : {}),
-      ...(child.min !== undefined ? { min_value: String(child.min) } : {}),
-      ...(child.max !== undefined ? { max_value: String(child.max) } : {})
-    };
-  } else if (child.type === 'external-select') {
-    element = actionElement(child);
-  } else {
-    element = actionElement(child);
-  }
-  if ('placeholder' in child && child.placeholder) {
-    element.placeholder = { type: 'plain_text', text: child.placeholder.slice(0, 150) };
-  }
-  return {
-    type: 'input',
-    block_id: child.id,
-    optional: child.optional ?? false,
-    label: { type: 'plain_text', text: child.label.slice(0, 2000) },
-    element
-  };
-};
-
-export let renderModal = (modal: Modal, contextId?: string) => ({
-  type: 'modal',
-  callback_id: modal.callbackId,
-  title: { type: 'plain_text', text: modal.title.slice(0, 24) },
-  submit: { type: 'plain_text', text: (modal.submitLabel ?? 'Submit').slice(0, 24) },
-  close: { type: 'plain_text', text: (modal.closeLabel ?? 'Cancel').slice(0, 24) },
-  notify_on_close: modal.notifyOnClose ?? false,
-  private_metadata:
-    contextId || modal.privateMetadata
-      ? JSON.stringify({ contextId, privateMetadata: modal.privateMetadata })
-      : undefined,
-  blocks: modal.children.slice(0, 100).map(modalInput)
-});
-
 export let parseSlackBlocks = (blocks?: any[]): ChatPart[] => {
   if (!blocks?.length) return [];
   let parts: ChatPart[] = [];
@@ -445,56 +303,6 @@ export let parseSlackBlocks = (blocks?: any[]): ChatPart[] => {
       parts.push({ type: 'image', url: block.image_url, alt: block.alt_text });
     } else if (block.type === 'divider') {
       parts.push({ type: 'divider' });
-    } else if (block.type === 'actions') {
-      let children = (block.elements ?? []).flatMap((item: any): any[] => {
-        if (item.type === 'button') {
-          return [
-            item.url
-              ? {
-                  type: 'link-button',
-                  id: item.action_id,
-                  label: item.text?.text ?? item.action_id,
-                  url: item.url,
-                  style: item.style
-                }
-              : {
-                  type: 'button',
-                  id: item.action_id,
-                  label: item.text?.text ?? item.action_id,
-                  value: item.value,
-                  style: item.style
-                }
-          ];
-        }
-        if (item.type === 'external_select') {
-          return [
-            {
-              type: 'external-select',
-              id: item.action_id,
-              label: item.placeholder?.text ?? item.action_id,
-              options: undefined,
-              minQueryLength: item.min_query_length
-            }
-          ];
-        }
-        if (item.type === 'static_select' || item.type === 'radio_buttons') {
-          return [
-            {
-              type: item.type === 'radio_buttons' ? 'radio-select' : 'select',
-              id: item.action_id,
-              label: item.placeholder?.text ?? item.action_id,
-              options: (item.options ?? []).map((entry: any) => ({
-                label: entry.text?.text ?? entry.value,
-                value: entry.value,
-                description: entry.description?.text
-              })),
-              initialOption: item.initial_option?.value
-            }
-          ];
-        }
-        return [];
-      });
-      if (children.length) parts.push({ type: 'actions', children } as ChatPart);
     } else if (
       (block.type === 'table' || block.type === 'data_table') &&
       Array.isArray(block.rows)

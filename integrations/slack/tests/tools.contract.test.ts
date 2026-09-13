@@ -68,7 +68,6 @@ const CHAT_ADAPTER_TOOL_KEYS = [
   'metorial_chat$message.get',
   'metorial_chat$message.list',
   'metorial_chat$message.search',
-  'metorial_chat$message.reply',
   'metorial_chat$message.sendEphemeral',
   'metorial_chat$message.markRead',
   'metorial_chat$reaction.add',
@@ -88,7 +87,6 @@ const CHAT_ADAPTER_TOOL_KEYS = [
   'metorial_chat$user.search',
   'metorial_chat$file.upload',
   'metorial_chat$file.download',
-  'metorial_chat$modal.open',
   'metorial_chat$command.respond',
   'metorial_chat$typing.start',
   'metorial_chat$setup.get'
@@ -110,7 +108,7 @@ describe('Slack expanded tool contract', () => {
     .map(action => action.key);
 
   it('keeps all established tools and exposes all normalized additions', () => {
-    expect(new Set(EXPECTED_TOOL_KEYS).size).toBe(78);
+    expect(new Set(EXPECTED_TOOL_KEYS).size).toBe(76);
     expect(toolKeys).toHaveLength(EXPECTED_TOOL_KEYS.length);
     expect([...toolKeys].sort()).toEqual([...EXPECTED_TOOL_KEYS].sort());
   });
@@ -368,7 +366,6 @@ const EXPECTED_TOOL_AUTHORIZATION: Record<string, ExpectedToolAuthorization> = {
     scopes: [['search:read']],
     authMethods: USER_AUTH_METHODS
   },
-  'metorial_chat$message.reply': { scopes: [['chat:write']], authMethods: null },
   'metorial_chat$message.sendEphemeral': { scopes: [['chat:write']], authMethods: null },
   'metorial_chat$message.markRead': {
     scopes: [['channels:write', 'groups:write', 'im:write', 'mpim:write']],
@@ -415,7 +412,6 @@ const EXPECTED_TOOL_AUTHORIZATION: Record<string, ExpectedToolAuthorization> = {
   },
   'metorial_chat$file.upload': { scopes: [['files:write']], authMethods: null },
   'metorial_chat$file.download': { scopes: [['files:read']], authMethods: null },
-  'metorial_chat$modal.open': { scopes: [['chat:write']], authMethods: null },
   'metorial_chat$command.respond': { scopes: [['chat:write']], authMethods: null },
   'metorial_chat$typing.start': {
     scopes: [['assistant:write']],

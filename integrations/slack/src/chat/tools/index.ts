@@ -17,7 +17,6 @@ export * from './list-threads';
 export * from './list-workspaces';
 export * from './mark-message-read';
 export * from './open-group-dm';
-export * from './open-modal';
 export * from './open-single-dm';
 export * from './remove-reaction';
 export * from './respond-to-command';

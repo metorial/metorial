@@ -19,7 +19,6 @@ import {
   chatListWorkspaces,
   chatMarkMessageRead,
   chatOpenGroupDm,
-  chatOpenModal,
   chatOpenSingleDm,
   chatRemoveReaction,
   chatRespondToCommand,
@@ -31,7 +30,6 @@ import {
   chatUploadFile
 } from './tools';
 import {
-  chatActionInvoked,
   chatCommandInvoked,
   chatMemberJoined,
   chatMemberLeft,
@@ -39,9 +37,6 @@ import {
   chatMessageDeleted,
   chatMessageReceived,
   chatMessageUpdated,
-  chatModalClosed,
-  chatModalSubmitted,
-  chatOptionsLoad,
   chatReactionAdded,
   chatReactionRemoved
 } from './triggers';
@@ -72,7 +67,6 @@ export let slackChatTools = [
   chatSearchUsers,
   chatUploadFile,
   chatDownloadFile,
-  chatOpenModal,
   chatRespondToCommand,
   chatStartTyping,
   chatGetSetup
@@ -85,10 +79,6 @@ export let slackChatTriggers = [
   chatMentionReceived,
   chatReactionAdded,
   chatReactionRemoved,
-  chatActionInvoked,
-  chatModalSubmitted,
-  chatModalClosed,
-  chatOptionsLoad,
   chatCommandInvoked,
   chatMemberJoined,
   chatMemberLeft
@@ -107,22 +97,10 @@ export let slackChatAdapter = ChatAdapter.register({
     content_charts: true,
     content_cards: true,
     content_sections: true,
-    content_actions: true,
     attachment_image: true,
     attachment_file: true,
     attachment_video: true,
     attachment_audio: true,
-    action_buttons: true,
-    action_link_buttons: true,
-    action_selects: true,
-    action_radio_selects: true,
-    action_external_selects: true,
-    action_open_modal: true,
-    modal_text_input: true,
-    modal_date_input: true,
-    modal_number_input: true,
-    modal_selects: true,
-    modal_notify_on_close: true,
     message_ephemeral_native: true,
     message_quote: false,
     message_unfurls: true,
