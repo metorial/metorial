@@ -1,14 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import {
-  actionsPartSchema,
   attachmentRefSchema,
   authorSchema,
   cardPartSchema,
   channelSchema,
   chatBodySchema,
   chatPartSchema,
-  commandAutocompleteSchema,
   commandInvokedSchema,
   commandSchema,
   cursorPageResultSchema,
@@ -48,16 +46,12 @@ describe('chat part schemas', () => {
         {
           type: 'section',
           children: [{ type: 'text', content: 'inner' }]
-        },
-        {
-          type: 'actions',
-          children: [{ type: 'button', id: 'ok', label: 'OK' }]
         }
       ]
     });
 
     expect(mixed.type).toBe('card');
-    expect(cardPartSchema.parse(mixed).children).toHaveLength(3);
+    expect(cardPartSchema.parse(mixed).children).toHaveLength(2);
   });
 
   it('rejects unknown part types and field as a top-level part', () => {
@@ -65,18 +59,6 @@ describe('chat part schemas', () => {
     expect(() =>
       chatPartSchema.parse({ type: 'field', label: 'Env', value: 'prod' })
     ).toThrow();
-  });
-
-  it('parses action children on an actions part', () => {
-    expect(
-      actionsPartSchema.parse({
-        type: 'actions',
-        children: [
-          { type: 'button', id: 'a', label: 'A', style: 'primary' },
-          { type: 'link-button', label: 'Docs', url: 'https://example.com' }
-        ]
-      }).children
-    ).toHaveLength(2);
   });
 
   it('requires parts and keeps attachments on the body', () => {
@@ -433,17 +415,6 @@ describe('slash commands', () => {
         responseToken: 'interaction-token'
       }).options?.[0]
     ).toMatchObject({ name: 'zip', value: '94107' });
-  });
-
-  it('parses command autocomplete for a focused option', () => {
-    expect(
-      commandAutocompleteSchema.parse({
-        name: 'weather',
-        optionName: 'zip',
-        query: '94',
-        options: [{ name: 'zip', value: '94', type: 'string' }]
-      })
-    ).toMatchObject({ name: 'weather', optionName: 'zip', query: '94' });
   });
 
   it('requires a command name', () => {

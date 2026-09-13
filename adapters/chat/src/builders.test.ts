@@ -1,19 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  actions,
-  body,
-  button,
-  card,
-  field,
-  fields,
-  markdown,
-  modal,
-  planToParts,
-  table,
-  text,
-  textInput
-} from './index';
-import { chatPartSchema, modalSchema } from './schema';
+import { body, card, field, fields, markdown, planToParts, table, text } from './index';
+import { chatPartSchema } from './schema';
 
 describe('builders', () => {
   it('builds schema-valid parts', () => {
@@ -22,8 +9,7 @@ describe('builders', () => {
       children: [
         markdown('Total: **$50**'),
         fields([field({ label: 'Env', value: 'prod' })]),
-        table({ headers: ['Item'], rows: [['Widget']] }),
-        actions([button({ id: 'approve', label: 'Approve', style: 'primary' })])
+        table({ headers: ['Item'], rows: [['Widget']] })
       ]
     });
 
@@ -36,16 +22,6 @@ describe('builders', () => {
     expect(body({ parts: [markdown('hi')] }).parts).toEqual([
       { type: 'markdown', markdown: 'hi' }
     ]);
-  });
-
-  it('builds a schema-valid modal', () => {
-    let built = modal({
-      title: 'Reason',
-      callbackId: 'reject',
-      children: [textInput({ id: 'reason', label: 'Reason' })]
-    });
-
-    expect(modalSchema.parse(built).callbackId).toBe('reject');
   });
 
   it('renders a plan as a card part', () => {

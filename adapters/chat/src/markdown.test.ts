@@ -74,17 +74,12 @@ describe('markdown helpers', () => {
         markdown('Hello **there**'),
         card({
           title: 'Approve?',
-          children: [
-            {
-              type: 'actions',
-              children: [{ type: 'button', id: 'ok', label: 'OK' }]
-            }
-          ]
+          children: [{ type: 'text', content: 'Ready to ship' }]
         })
       ]
     });
     expect(mixed).toContain('Hello there');
     expect(mixed).toContain('Approve?');
-    expect(mixed).toContain('[OK]');
+    expect(mixed).toContain('Ready to ship');
   });
 });

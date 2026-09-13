@@ -39,12 +39,6 @@ export let ChatAdapter = defineAdapter({
     file_upload: { tools: ['metorial_chat$file.upload'] },
     file_download: { tools: ['metorial_chat$file.download'] },
 
-    interaction_modals: { tools: ['metorial_chat$modal.open'] },
-    inbound_modal_submitted: { triggers: ['metorial_chat$modal.submitted'] },
-    inbound_modal_closed: { triggers: ['metorial_chat$modal.closed'] },
-    inbound_actions: { triggers: ['metorial_chat$action.invoked'] },
-    inbound_options_load: { triggers: ['metorial_chat$options.load'] },
-
     inbound_mention: { triggers: ['metorial_chat$mention.received'] },
 
     typing: { tools: ['metorial_chat$typing.start'] },
@@ -52,7 +46,6 @@ export let ChatAdapter = defineAdapter({
     inbound_command: { triggers: ['metorial_chat$command.invoked'] },
     command_respond: { tools: ['metorial_chat$command.respond'] },
     command_read: { tools: ['metorial_chat$command.list'] },
-    command_autocomplete: { triggers: ['metorial_chat$command.autocomplete'] },
     inbound_member_joined: { triggers: ['metorial_chat$member.joined'] },
     inbound_member_left: { triggers: ['metorial_chat$member.left'] },
 
@@ -64,25 +57,11 @@ export let ChatAdapter = defineAdapter({
     content_charts: {},
     content_cards: {},
     content_sections: {},
-    content_actions: {},
 
     attachment_image: {},
     attachment_file: {},
     attachment_video: {},
     attachment_audio: {},
-
-    action_buttons: {},
-    action_link_buttons: {},
-    action_selects: {},
-    action_radio_selects: {},
-    action_external_selects: {},
-    action_open_modal: {},
-
-    modal_text_input: {},
-    modal_date_input: {},
-    modal_number_input: {},
-    modal_selects: {},
-    modal_notify_on_close: {},
 
     message_ephemeral_native: {},
     message_quote: {},

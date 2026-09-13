@@ -1,10 +1,8 @@
 import { z } from 'zod';
 
-export let buttonStyleSchema = z.enum(['primary', 'danger', 'default']);
 export let textStyleSchema = z.enum(['plain', 'bold', 'muted']);
 export let tableAlignSchema = z.enum(['left', 'center', 'right']);
 
-export type ButtonStyle = z.infer<typeof buttonStyleSchema>;
 export type TextStyle = z.infer<typeof textStyleSchema>;
 export type TableAlign = z.infer<typeof tableAlignSchema>;
 
@@ -81,73 +79,6 @@ export let chartPartSchema = z.object({
   chart: chartDefinitionSchema
 });
 
-export let buttonPartSchema = z.object({
-  type: z.literal('button'),
-  id: z.string(),
-  label: z.string(),
-  style: buttonStyleSchema.optional(),
-  value: z.string().optional(),
-  actionType: z.enum(['action', 'modal']).optional(),
-  callbackUrl: z.string().optional(),
-  disabled: z.boolean().optional()
-});
-
-export let linkButtonPartSchema = z.object({
-  type: z.literal('link-button'),
-  id: z.string().optional(),
-  label: z.string(),
-  url: z.string(),
-  style: buttonStyleSchema.optional()
-});
-
-export let selectOptionSchema = z.object({
-  label: z.string(),
-  value: z.string(),
-  description: z.string().optional()
-});
-
-export let selectPartSchema = z.object({
-  type: z.literal('select'),
-  id: z.string(),
-  label: z.string(),
-  options: z.array(selectOptionSchema),
-  initialOption: z.string().optional(),
-  placeholder: z.string().optional(),
-  optional: z.boolean().optional()
-});
-
-export let radioSelectPartSchema = z.object({
-  type: z.literal('radio-select'),
-  id: z.string(),
-  label: z.string(),
-  options: z.array(selectOptionSchema),
-  initialOption: z.string().optional(),
-  optional: z.boolean().optional()
-});
-
-export let externalSelectPartSchema = z.object({
-  type: z.literal('external-select'),
-  id: z.string(),
-  label: z.string(),
-  minQueryLength: z.number().int().optional(),
-  initialOption: selectOptionSchema.optional(),
-  placeholder: z.string().optional(),
-  optional: z.boolean().optional()
-});
-
-export let actionChildSchema = z.discriminatedUnion('type', [
-  buttonPartSchema,
-  linkButtonPartSchema,
-  selectPartSchema,
-  radioSelectPartSchema,
-  externalSelectPartSchema
-]);
-
-export let actionsPartSchema = z.object({
-  type: z.literal('actions'),
-  children: z.array(actionChildSchema)
-});
-
 export type MarkdownPart = z.infer<typeof markdownPartSchema>;
 export type TextPart = z.infer<typeof textPartSchema>;
 export type ImagePart = z.infer<typeof imagePartSchema>;
@@ -160,14 +91,6 @@ export type PieChart = z.infer<typeof pieChartSchema>;
 export type SeriesChart = z.infer<typeof seriesChartSchema>;
 export type ChartDefinition = z.infer<typeof chartDefinitionSchema>;
 export type ChartPart = z.infer<typeof chartPartSchema>;
-export type ButtonPart = z.infer<typeof buttonPartSchema>;
-export type LinkButtonPart = z.infer<typeof linkButtonPartSchema>;
-export type SelectOption = z.infer<typeof selectOptionSchema>;
-export type SelectPart = z.infer<typeof selectPartSchema>;
-export type RadioSelectPart = z.infer<typeof radioSelectPartSchema>;
-export type ExternalSelectPart = z.infer<typeof externalSelectPartSchema>;
-export type ActionChild = z.infer<typeof actionChildSchema>;
-export type ActionsPart = z.infer<typeof actionsPartSchema>;
 
 export type SectionPart = {
   type: 'section';
@@ -191,7 +114,6 @@ export type ChatPart =
   | FieldsPart
   | TablePart
   | ChartPart
-  | ActionsPart
   | SectionPart
   | CardPart;
 
@@ -205,7 +127,6 @@ export let chatPartSchema: z.ZodType<ChatPart> = z.lazy(() =>
     fieldsPartSchema,
     tablePartSchema,
     chartPartSchema,
-    actionsPartSchema,
     sectionPartSchema,
     cardPartSchema
   ])

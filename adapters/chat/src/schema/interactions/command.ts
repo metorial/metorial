@@ -87,7 +87,7 @@ export let commandInvokedSchema = z.object({
   triggerId: z
     .string()
     .optional()
-    .describe('Pass to chat.modal.open when the user should see a modal'),
+    .describe('Short-lived provider interaction id, when one is issued'),
   responseToken: z
     .string()
     .optional()
@@ -99,19 +99,3 @@ export let commandInvokedSchema = z.object({
 });
 
 export type CommandInvoked = z.infer<typeof commandInvokedSchema>;
-
-export let commandAutocompleteSchema = z.object({
-  name: z.string(),
-  commandId: z.string().optional(),
-  subcommand: z.string().optional(),
-  subcommandGroup: z.string().optional(),
-  optionName: z.string().describe('Name of the option currently being typed'),
-  query: z.string().describe('Partial value of the focused option'),
-  options: z.array(commandOptionValueSchema).optional(),
-  author: authorSchema.optional(),
-  channelId: z.string().optional(),
-  responseToken: z.string().optional(),
-  raw: rawSchema
-});
-
-export type CommandAutocomplete = z.infer<typeof commandAutocompleteSchema>;

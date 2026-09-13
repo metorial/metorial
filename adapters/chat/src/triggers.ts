@@ -4,19 +4,9 @@ import { authorSchema } from './schema/channels/author';
 import { channelSchema } from './schema/channels/channel';
 import { threadSchema } from './schema/channels/thread';
 import { messageSchema } from './schema/content/message';
-import {
-  actionInvokedSchema,
-  modalClosedSchema,
-  modalSubmittedSchema,
-  optionsLoadSchema,
-  reactionEventSchema
-} from './schema/interactions/action';
-import {
-  commandAutocompleteSchema,
-  commandInvokedSchema,
-  commandOptionValueSchema
-} from './schema/interactions/command';
+import { commandOptionValueSchema } from './schema/interactions/command';
 import { rawSchema } from './schema/shared/raw';
+import { reactionEventSchema } from './schema/shared/reaction';
 
 export let messageReceived = ChatAdapter.defineTrigger({
   key: 'metorial_chat$message.received',
@@ -112,77 +102,6 @@ export let reactionRemoved = ChatAdapter.defineTrigger({
   })
 });
 
-export let actionInvoked = ChatAdapter.defineTrigger({
-  key: 'metorial_chat$action.invoked',
-  name: 'Action Invoked',
-  description: 'Fires when a user clicks a button or submits a select on a card.',
-  output: z.object({
-    type: z.literal('chat.action.invoked'),
-    id: z.string(),
-    actionId: z.string(),
-    value: z.string().optional(),
-    messageId: z.string(),
-    channelId: z.string(),
-    author: authorSchema,
-    triggerId: z.string().optional(),
-    selectedValues: z.record(z.string(), z.string()).optional(),
-    message: messageSchema.optional(),
-    channel: channelSchema.optional(),
-    thread: threadSchema.optional(),
-    raw: rawSchema
-  })
-});
-
-export let modalSubmitted = ChatAdapter.defineTrigger({
-  key: 'metorial_chat$modal.submitted',
-  name: 'Modal Submitted',
-  description: 'Fires when a user submits a modal form.',
-  output: z.object({
-    type: z.literal('chat.modal.submitted'),
-    id: z.string(),
-    callbackId: z.string(),
-    viewId: z.string(),
-    values: z.record(z.string(), z.unknown()),
-    author: authorSchema,
-    privateMetadata: z.string().optional(),
-    triggerId: z.string().optional(),
-    message: messageSchema.optional(),
-    channel: channelSchema.optional(),
-    thread: threadSchema.optional(),
-    raw: rawSchema
-  })
-});
-
-export let modalClosed = ChatAdapter.defineTrigger({
-  key: 'metorial_chat$modal.closed',
-  name: 'Modal Closed',
-  description: 'Fires when a user closes a modal without submitting.',
-  output: z.object({
-    type: z.literal('chat.modal.closed'),
-    id: z.string(),
-    callbackId: z.string(),
-    viewId: z.string().optional(),
-    author: authorSchema,
-    channel: channelSchema.optional(),
-    thread: threadSchema.optional(),
-    raw: rawSchema
-  })
-});
-
-export let optionsLoad = ChatAdapter.defineTrigger({
-  key: 'metorial_chat$options.load',
-  name: 'Options Load',
-  description: 'Fires when a user types into an external select.',
-  output: z.object({
-    type: z.literal('chat.options.load'),
-    id: z.string(),
-    actionId: z.string(),
-    query: z.string(),
-    minQueryLength: z.number().int().optional(),
-    raw: rawSchema
-  })
-});
-
 export let commandInvoked = ChatAdapter.defineTrigger({
   key: 'metorial_chat$command.invoked',
   name: 'Command Invoked',
@@ -204,28 +123,6 @@ export let commandInvoked = ChatAdapter.defineTrigger({
     message: messageSchema.optional(),
     channel: channelSchema.optional(),
     thread: threadSchema.optional(),
-    raw: rawSchema
-  })
-});
-
-export let commandAutocomplete = ChatAdapter.defineTrigger({
-  key: 'metorial_chat$command.autocomplete',
-  name: 'Command Autocomplete',
-  description:
-    'Fires when a user types into a slash command option that supports suggestions.',
-  output: z.object({
-    type: z.literal('chat.command.autocomplete'),
-    id: z.string(),
-    name: z.string(),
-    commandId: z.string().optional(),
-    subcommand: z.string().optional(),
-    subcommandGroup: z.string().optional(),
-    optionName: z.string(),
-    query: z.string(),
-    options: z.array(commandOptionValueSchema).optional(),
-    author: authorSchema.optional(),
-    channelId: z.string().optional(),
-    responseToken: z.string().optional(),
     raw: rawSchema
   })
 });
@@ -265,12 +162,7 @@ export let chatTriggers = {
   mentionReceived,
   reactionAdded,
   reactionRemoved,
-  actionInvoked,
-  modalSubmitted,
-  modalClosed,
-  optionsLoad,
   commandInvoked,
-  commandAutocomplete,
   memberJoined,
   memberLeft
 } as const;

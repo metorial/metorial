@@ -8,7 +8,6 @@ import { attachmentRefSchema } from './schema/content/attachment';
 import { chatBodySchema } from './schema/content/body';
 import { messageResultSchema, messageSchema, replyRefSchema } from './schema/content/message';
 import { commandSchema } from './schema/interactions/command';
-import { modalSchema } from './schema/interactions/modal';
 import { cursorPageResultSchema, cursorPageSchema } from './schema/shared/cursor';
 import { emojiInputSchema } from './schema/shared/emoji';
 import { rawSchema } from './schema/shared/raw';
@@ -405,22 +404,6 @@ export let downloadFile = ChatAdapter.defineTool({
   })
 });
 
-export let openModal = ChatAdapter.defineTool({
-  key: 'metorial_chat$modal.open',
-  name: 'Open Modal',
-  description:
-    'Open a modal form. triggerId comes from an inbound action or slash command event.',
-  input: z.object({
-    triggerId: z.string(),
-    modal: modalSchema,
-    contextId: z.string().optional()
-  }),
-  output: z.object({
-    viewId: z.string(),
-    raw: rawSchema
-  })
-});
-
 export let respondToCommand = ChatAdapter.defineTool({
   key: 'metorial_chat$command.respond',
   name: 'Respond to Command',
@@ -514,7 +497,6 @@ export let chatTools = {
   searchUsers,
   uploadFile,
   downloadFile,
-  openModal,
   respondToCommand,
   listCommands,
   startTyping,

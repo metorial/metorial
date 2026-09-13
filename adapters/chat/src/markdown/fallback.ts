@@ -81,14 +81,6 @@ export let partToAltText = (part: ChatPart): string => {
       return tablePartToAltText(part);
     case 'chart':
       return chartToAltText(part);
-    case 'actions':
-      return part.children
-        .map(child => {
-          if (child.type === 'button' || child.type === 'link-button')
-            return `[${child.label}]`;
-          return `[${child.label}]`;
-        })
-        .join(' ');
     case 'section':
       return part.children.map(partToAltText).filter(Boolean).join('\n');
     case 'card':
