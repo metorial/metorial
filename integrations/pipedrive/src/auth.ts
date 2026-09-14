@@ -163,11 +163,6 @@ export let auth = SlateAuth.create()
         scope: 'phone-integration'
       },
       {
-        title: 'Video Calls',
-        description: 'Register as video call provider and create conference links',
-        scope: 'video-calls'
-      },
-      {
         title: 'Messengers Integration',
         description: 'Register as messaging integration provider',
         scope: 'messengers-integration'
