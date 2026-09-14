@@ -26,7 +26,6 @@ describe('GoogleAdsClient API version', () => {
 
     let client = new GoogleAdsClient({
       token: 'access-token',
-      developerToken: 'developer-token',
       loginCustomerId: '123-456-7890'
     });
 
@@ -35,7 +34,6 @@ describe('GoogleAdsClient API version', () => {
       baseURL: 'https://googleads.googleapis.com/v24',
       headers: {
         Authorization: 'Bearer access-token',
-        'developer-token': 'developer-token',
         'Content-Type': 'application/json',
         'login-customer-id': '1234567890'
       }

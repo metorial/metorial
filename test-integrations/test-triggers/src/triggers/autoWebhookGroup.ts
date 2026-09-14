@@ -37,10 +37,7 @@ let AUTO_WEBHOOK_TARGETS = [
 
 let targetIdentifier = (accountId: string, channelId: string) => `${accountId}:${channelId}`;
 
-let toWebhookTarget = (
-  accountId: string,
-  target: (typeof AUTO_WEBHOOK_TARGETS)[number]
-) => ({
+let toWebhookTarget = (accountId: string, target: (typeof AUTO_WEBHOOK_TARGETS)[number]) => ({
   webhookTargetIdentifier: targetIdentifier(accountId, target.channelId),
   name: target.name,
   description: target.description,

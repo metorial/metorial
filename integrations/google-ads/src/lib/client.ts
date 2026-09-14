@@ -5,7 +5,6 @@ let BASE_URL = `https://googleads.googleapis.com/${API_VERSION}`;
 
 export interface GoogleAdsClientConfig {
   token: string;
-  developerToken: string;
   loginCustomerId?: string;
 }
 
@@ -29,7 +28,6 @@ export class GoogleAdsClient {
   constructor(config: GoogleAdsClientConfig) {
     let headers: Record<string, string> = {
       Authorization: `Bearer ${config.token}`,
-      'developer-token': config.developerToken,
       'Content-Type': 'application/json'
     };
 

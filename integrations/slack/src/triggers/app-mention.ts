@@ -35,7 +35,12 @@ export let appMentioned = SlateTrigger.create(spec, {
   )
   .matches(payload => {
     let event = payload as { type?: unknown; ts?: unknown; channel?: unknown };
-    return !!event && event.type === 'app_mention' && typeof event.ts === 'string' && typeof event.channel === 'string';
+    return (
+      !!event &&
+      event.type === 'app_mention' &&
+      typeof event.ts === 'string' &&
+      typeof event.channel === 'string'
+    );
   })
   .map(async ctx => {
     let event = ctx.input;

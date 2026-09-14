@@ -1,4 +1,8 @@
-import type { SlateActionParameters, SlateSpecification, SlateTriggerGroup } from '@slates/provider';
+import type {
+  SlateActionParameters,
+  SlateSpecification,
+  SlateTriggerGroup
+} from '@slates/provider';
 import type z from 'zod';
 import type { SlateAdapterDefinition } from './definition';
 

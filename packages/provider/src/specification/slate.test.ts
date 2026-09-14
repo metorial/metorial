@@ -97,6 +97,9 @@ describe('Slate.create', () => {
       triggerGroups: [manual, auto]
     });
 
-    expect(slate.triggerGroups.map(group => group.key)).toEqual(['manual_group', 'auto_group']);
+    expect(slate.triggerGroups.map(group => group.key)).toEqual([
+      'manual_group',
+      'auto_group'
+    ]);
   });
 });

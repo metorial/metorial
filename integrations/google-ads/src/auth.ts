@@ -15,8 +15,7 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional(),
-      developerToken: z.string()
+      expiresAt: z.string().optional()
     })
   )
   .addOauth({
@@ -55,14 +54,6 @@ export let auth = SlateAuth.create()
       }
     ],
 
-    inputSchema: z.object({
-      developerToken: z
-        .string()
-        .describe(
-          'Your Google Ads API developer token (22-character alphanumeric string from the API Center in your manager account)'
-        )
-    }),
-
     getAuthorizationUrl: async ctx => {
       let params = new URLSearchParams({
         client_id: ctx.clientId,
@@ -75,8 +66,7 @@ export let auth = SlateAuth.create()
       });
 
       return {
-        url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
-        input: ctx.input
+        url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
       };
     },
 
@@ -106,10 +96,8 @@ export let auth = SlateAuth.create()
         output: {
           token: data.access_token,
           refreshToken: data.refresh_token,
-          expiresAt,
-          developerToken: ctx.input.developerToken
+          expiresAt
         },
-        input: ctx.input,
         scopes: grantedScopes
       };
     },
@@ -141,8 +129,7 @@ export let auth = SlateAuth.create()
         output: {
           token: data.access_token,
           refreshToken: ctx.output.refreshToken,
-          expiresAt,
-          developerToken: ctx.output.developerToken
+          expiresAt
         }
       };
     },
@@ -152,9 +139,7 @@ export let auth = SlateAuth.create()
         token: string;
         refreshToken?: string;
         expiresAt?: string;
-        developerToken: string;
       };
-      input: { developerToken: string };
       scopes: string[];
     }) => {
       let response = await profileAxios.get('/oauth2/v2/userinfo', {

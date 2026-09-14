@@ -117,7 +117,12 @@ describe('test-triggers contract', () => {
       triggerIds: ['poll_time']
     });
     expect(initialPoll.events[1]).toMatchObject({
-      payload: { kind: 'status', status: 'ok', accountId: ACCOUNT_ID, workspaceId: WORKSPACE_ID },
+      payload: {
+        kind: 'status',
+        status: 'ok',
+        accountId: ACCOUNT_ID,
+        workspaceId: WORKSPACE_ID
+      },
       triggerIds: ['poll_status']
     });
 

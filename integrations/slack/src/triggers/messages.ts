@@ -79,7 +79,12 @@ export let newMessage = SlateTrigger.create(spec, {
     })
   )
   .matches(payload => {
-    let event = payload as { type?: unknown; subtype?: unknown; ts?: unknown; channel?: unknown };
+    let event = payload as {
+      type?: unknown;
+      subtype?: unknown;
+      ts?: unknown;
+      channel?: unknown;
+    };
     return (
       !!event &&
       event.type === 'message' &&

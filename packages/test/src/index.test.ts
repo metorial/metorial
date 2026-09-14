@@ -217,13 +217,16 @@ let createDemoSlate = () => {
               }
             }
           ],
-          response: new Response(ctx.input.webhookRegistrationPayload?.channelId ?? 'missing', {
-            status: 201,
-            headers: {
-              'content-type': 'text/plain',
-              'x-demo-response': 'accepted'
+          response: new Response(
+            ctx.input.webhookRegistrationPayload?.channelId ?? 'missing',
+            {
+              status: 201,
+              headers: {
+                'content-type': 'text/plain',
+                'x-demo-response': 'accepted'
+              }
             }
-          })
+          )
         };
       }
     })

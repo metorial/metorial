@@ -1,5 +1,5 @@
-import { ChatErrors, uploadFile as contract } from '@slates/adapter-chat';
 import { Buffer } from 'node:buffer';
+import { ChatErrors, uploadFile as contract } from '@slates/adapter-chat';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';

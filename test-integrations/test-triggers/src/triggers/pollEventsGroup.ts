@@ -1,7 +1,4 @@
-import {
-  SlateDefaultPollingIntervalSeconds,
-  SlateTriggerGroup
-} from 'slates';
+import { SlateDefaultPollingIntervalSeconds, SlateTriggerGroup } from 'slates';
 import { buildAccountRoutingMatchers } from '../lib/matchers';
 import { spec } from '../spec';
 

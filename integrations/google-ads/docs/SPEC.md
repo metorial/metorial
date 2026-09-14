@@ -1,4 +1,4 @@
-# Slates Specification for Google Ads
+# Google Ads Specification
 
 ## Overview
 
@@ -6,38 +6,35 @@ Google Ads is Google's online advertising platform that allows advertisers to cr
 
 ## Authentication
 
-Google Ads API utilizes the OAuth 2.0 protocol for authentication and authorization, allowing your app to access user accounts without handling login information. In addition to OAuth 2.0 credentials, a developer token is also required to make Google Ads API calls.
+The integration uses OAuth 2.0 to access the Google Ads accounts authorized by the user. API access levels belong to the Google Cloud project that owns the OAuth client ID and secret.
 
 ### Prerequisites
 
-1. **Developer Token**: A developer token is a 22-character alphanumeric string obtained from the API Center page of your Google Ads manager account. Each developer token has an access level (Test, Basic, or Standard) which determines the number of API calls and the environment (test or production) it can be used in. You need a Google Ads manager account to obtain a developer token.
+1. **Google Cloud Project**: Enable the Google Ads API and create OAuth 2.0 credentials in the project used by the application.
+2. **API Access**: Review the project's [Google Ads API Overview](https://console.cloud.google.com/apis/api/googleads.googleapis.com/overview). Test access supports test accounts only. Explorer access supports production accounts with feature restrictions; **Basic or Standard access is required for Generate Keyword Ideas**. New Basic and Standard access applications require brand verification. For Standard access, verify that the approved permissible use covers campaign management, reporting, and keyword research.
+3. **Google Ads Account Access**: The authorizing user must have access to the target Google Ads customer account. Set the optional manager customer ID when accessing client accounts through a manager account.
 
-2. **Google Cloud Project**: Enable the Google Ads API in your Google Cloud Console project and create OAuth 2.0 client IDs under "API & Services" > "Credentials".
+For managed OAuth credentials, the application operator manages API access on the OAuth project's behalf. When supplying custom OAuth credentials, use a project with the necessary Google Ads API access.
 
-### OAuth 2.0 Flows
+### OAuth 2.0 Flow
 
-The API supports two main OAuth 2.0 flows:
+Users authorize the application with its OAuth client ID and secret. The integration stores the access token, refresh token, and expiration time, and refreshes access tokens automatically.
 
-- **Web/Desktop Application Flow**: For apps that allow users to sign in and authorize your app to manage their Google Ads accounts on their behalf. Your app builds and manages the OAuth 2.0 user credentials using a Client ID, Client Secret, and Refresh Token along with the Developer Token and Login Customer ID.
-
-- **Service Account Flow**: For workflows that don't require human interaction. This requires a configuration step where the user adds a service account to their Google Ads account, and the app can then use the service account's credentials to manage the user's Google Ads account.
-
-### OAuth 2.0 Scope
-
-The scope for the Google Ads API is `https://www.googleapis.com/auth/adwords`.
+The Google Ads scope is `https://www.googleapis.com/auth/adwords`. User email and profile scopes identify the connected user.
 
 ### Required Headers
 
-When calling the Google Ads API, you need both OAuth 2.0 application credentials and a developer token. If making API calls with a Google Ads manager account, you must specify a `login-customer-id` header.
+API requests send `Authorization: Bearer <access_token>`. Requests through a manager account also send `login-customer-id` with that manager's customer ID, without hyphens.
 
 ### Token Endpoint
 
-Refresh tokens can be exchanged for access tokens at: `https://www.googleapis.com/oauth2/v3/token`
+Authorization codes and refresh tokens are exchanged at `https://oauth2.googleapis.com/token`.
 
-### Important Notes
+### Developer Token Retirement
 
-- The Google Ads API does not support simultaneous sign-in with data access request (hybrid) or domain-wide delegation of authority (2LO).
-- Your developer token needs approval to work with production Google Ads accounts but can be used immediately with a test manager account.
+Google sunset developer tokens on September 9, 2026. No developer token is requested or sent by this integration. Existing saved values are unused and do not require a credential migration or reconnection.
+
+Review access on the actual OAuth Cloud project rather than applying through the retired Google Ads API Center. See Google's [migration guide](https://developers.google.com/google-ads/api/docs/api-policy/developer-token) and [access levels](https://developers.google.com/google-ads/api/docs/api-policy/access-levels).
 
 ## Features
 
@@ -79,7 +76,7 @@ Using a manager account, you can control client accounts and run operations with
 
 ### Reach and Frequency Forecasting
 
-Plan video and display campaigns by generating reach and frequency forecasts. Developer tokens must be allowlisted specifically for the ReachPlanService, even if approved for other Google Ads API services.
+Plan video and display campaigns by generating reach and frequency forecasts. Access to ReachPlanService requires separate approval for the Google Cloud project, even if it is approved for other Google Ads API services.
 
 ## Events
 

@@ -49,7 +49,7 @@ describe('google-ads auth contract', () => {
       authenticationMethodId: 'google_oauth',
       redirectUri: 'https://example.com/callback',
       state: 'state-123',
-      input: { developerToken: 'dev-token-22charslong00' },
+      input: {},
       clientId: 'client-id',
       clientSecret: 'client-secret',
       scopes: [googleAdsScopes.adwords]
@@ -60,10 +60,13 @@ describe('google-ads auth contract', () => {
       'https://accounts.google.com/o/oauth2/v2/auth'
     );
     expect(url.searchParams.get('scope')).toBe(googleAdsScopes.adwords);
-    expect(result.input).toEqual({ developerToken: 'dev-token-22charslong00' });
+    expect(result.input ?? {}).toEqual({});
   });
 
-  it('maps callback and refresh token responses into the stored auth shape', async () => {
+  it.each([
+    {},
+    { developerToken: 'legacy-unused-token' }
+  ])('maps callback and refresh responses with legacy auth fields %j', async legacyFields => {
     let client = await loadProviderClient();
 
     oauthPost.mockResolvedValueOnce({
@@ -80,7 +83,7 @@ describe('google-ads auth contract', () => {
       code: 'auth-code',
       state: 'state-123',
       redirectUri: 'https://example.com/callback',
-      input: { developerToken: 'dev-token-22charslong00' },
+      input: {},
       clientId: 'client-id',
       clientSecret: 'client-secret',
       scopes: [googleAdsScopes.adwords]
@@ -88,9 +91,9 @@ describe('google-ads auth contract', () => {
 
     expect(callbackResult.output).toMatchObject({
       token: 'access-token',
-      refreshToken: 'refresh-token',
-      developerToken: 'dev-token-22charslong00'
+      refreshToken: 'refresh-token'
     });
+    expect(callbackResult.output).not.toHaveProperty('developerToken');
     expect(callbackResult.scopes).toEqual([googleAdsScopes.adwords, 'openid']);
     expect(Date.parse(String(callbackResult.output.expiresAt))).toBeGreaterThan(Date.now());
 
@@ -104,11 +107,11 @@ describe('google-ads auth contract', () => {
     let refreshResult = await client.refreshToken({
       authenticationMethodId: 'google_oauth',
       output: {
+        ...legacyFields,
         token: 'stale-token',
-        refreshToken: 'refresh-token',
-        developerToken: 'dev-token-22charslong00'
+        refreshToken: 'refresh-token'
       },
-      input: { developerToken: 'dev-token-22charslong00' },
+      input: {},
       clientId: 'client-id',
       clientSecret: 'client-secret',
       scopes: [googleAdsScopes.adwords]
@@ -116,9 +119,9 @@ describe('google-ads auth contract', () => {
 
     expect(refreshResult.output).toMatchObject({
       token: 'refreshed-token',
-      refreshToken: 'refresh-token',
-      developerToken: 'dev-token-22charslong00'
+      refreshToken: 'refresh-token'
     });
+    expect(refreshResult.output).not.toHaveProperty('developerToken');
     expect(Date.parse(String(refreshResult.output.expiresAt))).toBeGreaterThan(Date.now());
   });
 
@@ -130,10 +133,9 @@ describe('google-ads auth contract', () => {
         client.refreshToken({
           authenticationMethodId: 'google_oauth',
           output: {
-            token: 'stale-token',
-            developerToken: 'dev-token-22charslong00'
+            token: 'stale-token'
           },
-          input: { developerToken: 'dev-token-22charslong00' },
+          input: {},
           clientId: 'client-id',
           clientSecret: 'client-secret',
           scopes: [googleAdsScopes.adwords]
@@ -157,10 +159,9 @@ describe('google-ads auth contract', () => {
     let result = await client.getAuthProfile({
       authenticationMethodId: 'google_oauth',
       output: {
-        token: 'profile-token',
-        developerToken: 'dev-token-22charslong00'
+        token: 'profile-token'
       },
-      input: { developerToken: 'dev-token-22charslong00' },
+      input: {},
       scopes: [googleAdsScopes.adwords]
     });
 
