@@ -22,6 +22,8 @@ export type SlateAuthWithOauth<
     scope: string;
   }[];
 
+  adapters?: string[];
+
   docs?: SlateAuthDocsReference[];
 
   inputSchema?: z.ZodType<InputType>;
@@ -92,6 +94,8 @@ export type SlateAuthWithToken<InputType extends {}, OutputType extends { token?
   name: string;
   key: string;
 
+  adapters?: string[];
+
   inputSchema?: z.ZodType<InputType>;
 
   docs?: SlateAuthDocsReference[];
@@ -124,6 +128,8 @@ export type SlateAuthWithServiceAccount<InputType extends {}, OutputType extends
   name: string;
   key: string;
 
+  adapters?: string[];
+
   inputSchema?: z.ZodType<InputType>;
 
   docs?: SlateAuthDocsReference[];
@@ -155,6 +161,8 @@ export type SlateAuthWithCustomData<InputType extends {}, OutputType extends {}>
 
   name: string;
   key: string;
+
+  adapters?: string[];
 
   inputSchema?: z.ZodType<InputType>;
 

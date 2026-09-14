@@ -47,6 +47,8 @@ export let mapAuthMethod = <ConfigType extends {}, AuthType extends {}>(
         }))
       : undefined,
 
+  adapters: 'adapters' in m ? m.adapters : undefined,
+
   inputSchema: toJsonSchema(m.inputSchema ?? z.object({})),
   outputSchema: toJsonSchema(slate.spec.auth.outputSchema),
 

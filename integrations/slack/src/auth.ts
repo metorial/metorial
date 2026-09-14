@@ -262,6 +262,7 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Slack OAuth (Bot)',
     key: 'oauth',
+    adapters: ['chat'],
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -329,6 +330,7 @@ export let auth = SlateAuth.create()
     type: 'auth.oauth',
     name: 'Slack OAuth (User)',
     key: 'user_oauth',
+    adapters: [],
     docs: [
       {
         type: 'docs.auth.oauth',
@@ -396,6 +398,7 @@ export let auth = SlateAuth.create()
     type: 'auth.token',
     name: 'Bot Token',
     key: 'bot_token',
+    adapters: ['chat'],
 
     inputSchema: z.object({
       token: z.string().describe('Slack Bot Token (starts with xoxb-)')
@@ -426,6 +429,7 @@ export let auth = SlateAuth.create()
     type: 'auth.token',
     name: 'User Token',
     key: 'user_token',
+    adapters: [],
 
     inputSchema: z.object({
       token: z.string().describe('Slack User Token (starts with xoxp-)')

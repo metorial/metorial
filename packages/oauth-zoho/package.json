@@ -1,6 +1,6 @@
 {
   "name": "@slates/oauth-zoho",
-  "version": "1.0.0-rc.9",
+  "version": "1.0.0-rc.10",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +30,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "slates": "1.0.0-rc.22",
+    "slates": "1.0.0-rc.23",
     "zod": "^4.2"
   },
   "devDependencies": {
