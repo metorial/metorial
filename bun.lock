@@ -16,7 +16,7 @@
     },
     "adapters/chat": {
       "name": "@slates/adapter-chat",
-      "version": "1.0.0-rc.6",
+      "version": "1.0.0-rc.7",
       "dependencies": {
         "@slates/adapter": "1.0.0-rc.7",
         "@slates/provider": "1.0.0-rc.23",
@@ -9735,7 +9735,7 @@
     },
     "integrations/pipedrive": {
       "name": "@slates-integrations/pipedrive",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/provider": "1.0.0-rc.18",
@@ -11772,10 +11772,10 @@
     },
     "integrations/slack": {
       "name": "@slates-integrations/slack",
-      "version": "0.3.10",
+      "version": "0.3.11",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/adapter-chat": "1.0.0-rc.6",
+        "@slates/adapter-chat": "1.0.0-rc.7",
         "@slates/slack-tools": "1.0.0-rc.13",
         "@types/node": "^20",
         "slates": "1.0.0-rc.22",
