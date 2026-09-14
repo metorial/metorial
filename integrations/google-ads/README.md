@@ -2,6 +2,14 @@
 
 Create, manage, and optimize advertising campaigns across Google Search, Display Network, YouTube, and Shopping. Configure ad groups, keywords, bidding strategies, audience targeting, and geographic targeting. Track and import conversions including offline and enhanced conversions. Generate reporting and analytics using Google Ads Query Language (GAQL). Plan keywords with historical metrics and forecasts. Manage account hierarchies and multi-account operations. Receive lead form webhook data from campaigns.
 
+## Setup
+
+Authorize with Google OAuth credentials from a Cloud project with the Google Ads API enabled. API access is managed on that project: Test access supports test accounts, while production accounts require Explorer, Basic, or Standard access. Generate Keyword Ideas requires Basic or Standard access. New Basic and Standard applications require brand verification.
+
+Developer tokens are no longer needed. If using custom OAuth credentials, check access on the project that owns those credentials. If accessing client accounts through a manager account, configure the manager customer ID.
+
+See the [setup specification](./docs/SPEC.md#authentication) and Google's [API access levels](https://developers.google.com/google-ads/api/docs/api-policy/access-levels).
+
 ## Tools
 
 ### Generate Keyword Ideas

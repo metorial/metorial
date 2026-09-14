@@ -139,8 +139,10 @@ export let finishTriggerGroupWebhookManualSetup = async (
     triggerGroupId: group.id,
     webhookUrl,
     partialWebhookRegistrationPayload:
-      parseJsonObject(opts.partialWebhookRegistrationPayload, 'partial registration payload') ??
-      {},
+      parseJsonObject(
+        opts.partialWebhookRegistrationPayload,
+        'partial registration payload'
+      ) ?? {},
     userWebhookRegistrationPayload:
       parseJsonObject(opts.userWebhookRegistrationPayload, 'user registration payload') ?? {}
   });

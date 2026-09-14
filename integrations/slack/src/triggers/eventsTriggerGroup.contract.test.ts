@@ -103,7 +103,9 @@ describe('Slack events trigger group contract', () => {
     }
   ];
 
-  it.each(signatureRejectionCases)('rejects $name with a 401 and no events', async ({ headers }) => {
+  it.each(signatureRejectionCases)('rejects $name with a 401 and no events', async ({
+    headers
+  }) => {
     let body = JSON.stringify({ type: 'event_callback' });
     let result = await processWebhook({ body, headers });
 
@@ -116,7 +118,13 @@ describe('Slack events trigger group contract', () => {
       type: 'event_callback',
       event_id: 'Ev123',
       team_id: 'T123',
-      event: { type: 'message', channel: 'C123', user: 'U999', text: 'hello', ts: '1710000000.0001' },
+      event: {
+        type: 'message',
+        channel: 'C123',
+        user: 'U999',
+        text: 'hello',
+        ts: '1710000000.0001'
+      },
       authorizations: [{ team_id: 'T123', is_bot: true }]
     });
 
@@ -139,14 +147,25 @@ describe('Slack events trigger group contract', () => {
     let body = JSON.stringify({
       type: 'event_callback',
       team_id: 'T123',
-      event: { type: 'message', channel: 'C123', user: 'U555', text: 'hi', ts: '1710000000.0002' },
+      event: {
+        type: 'message',
+        channel: 'C123',
+        user: 'U555',
+        text: 'hi',
+        ts: '1710000000.0002'
+      },
       authorizations: [{ team_id: 'T123', user_id: 'U555', is_bot: false }]
     });
 
     let result = await processWebhook({ body, headers: signSlackRequest(body) });
     expect(result.events).toHaveLength(1);
     expect(result.events[0]!.matchers).toEqual([
-      { installType: 'user', enterpriseId: SLACK_NO_ENTERPRISE, teamId: 'T123', userId: 'U555' }
+      {
+        installType: 'user',
+        enterpriseId: SLACK_NO_ENTERPRISE,
+        teamId: 'T123',
+        userId: 'U555'
+      }
     ]);
 
     let routingMatchers = await createSlackTestClient({
@@ -159,7 +178,13 @@ describe('Slack events trigger group contract', () => {
     let body = JSON.stringify({
       type: 'event_callback',
       team_id: 'T123',
-      event: { type: 'message', channel: 'C123', user: 'U555', text: 'hi', ts: '1710000000.0003' },
+      event: {
+        type: 'message',
+        channel: 'C123',
+        user: 'U555',
+        text: 'hi',
+        ts: '1710000000.0003'
+      },
       authorizations: [{ team_id: 'T123', enterprise_id: 'E123', is_bot: true }]
     });
 
@@ -169,7 +194,12 @@ describe('Slack events trigger group contract', () => {
     ]);
 
     let routingMatchers = await createSlackTestClient({
-      output: { token: 'xoxb-test-token', actorType: 'bot', teamId: 'T123', enterpriseId: 'E123' }
+      output: {
+        token: 'xoxb-test-token',
+        actorType: 'bot',
+        teamId: 'T123',
+        enterpriseId: 'E123'
+      }
     }).getTriggerGroupRoutingMatchers('events');
     expect(routingMatchers.matchers).toEqual(result.events[0]!.matchers);
   });
@@ -223,7 +253,13 @@ describe('Slack events trigger group contract', () => {
     let body = JSON.stringify({
       type: 'event_callback',
       team_id: 'T123',
-      event: { type: 'app_mention', channel: 'C456', user: 'U777', text: '<@BOT> hi', ts: '1710000003.0001' },
+      event: {
+        type: 'app_mention',
+        channel: 'C456',
+        user: 'U777',
+        text: '<@BOT> hi',
+        ts: '1710000003.0001'
+      },
       authorizations: [{ team_id: 'T123', is_bot: true }]
     });
 
@@ -246,7 +282,11 @@ describe('Slack events trigger group contract', () => {
     });
 
     expect(mapped.id).toBe('C456-1710000003.0001');
-    expect(mapped.output).toMatchObject({ channelId: 'C456', userId: 'U777', text: '<@BOT> hi' });
+    expect(mapped.output).toMatchObject({
+      channelId: 'C456',
+      userId: 'U777',
+      text: '<@BOT> hi'
+    });
   });
 
   it('routes and maps a team_join event to the team_join trigger', async () => {
@@ -255,7 +295,12 @@ describe('Slack events trigger group contract', () => {
       team_id: 'T123',
       event: {
         type: 'team_join',
-        user: { id: 'U888', team_id: 'T123', name: 'newbie', profile: { email: 'newbie@example.com' } }
+        user: {
+          id: 'U888',
+          team_id: 'T123',
+          name: 'newbie',
+          profile: { email: 'newbie@example.com' }
+        }
       },
       authorizations: [{ team_id: 'T123', is_bot: true }]
     });
@@ -278,6 +323,10 @@ describe('Slack events trigger group contract', () => {
       input: result.events[0]!.payload
     });
 
-    expect(mapped.output).toMatchObject({ userId: 'U888', name: 'newbie', email: 'newbie@example.com' });
+    expect(mapped.output).toMatchObject({
+      userId: 'U888',
+      name: 'newbie',
+      email: 'newbie@example.com'
+    });
   });
 });

@@ -1,4 +1,9 @@
-import { SlateAuth, SlateConfig, SlateSpecification, SlateTriggerGroup } from '@slates/provider';
+import {
+  SlateAuth,
+  SlateConfig,
+  SlateSpecification,
+  SlateTriggerGroup
+} from '@slates/provider';
 import { z } from 'zod';
 import type { Author } from './schema/channels/author';
 import type { Channel } from './schema/channels/channel';
@@ -92,8 +97,7 @@ export let stubAllTools = (spec: ReturnType<typeof createTestSpec>) =>
 export let stubAllTriggers = (spec: ReturnType<typeof createTestSpec>) =>
   Object.values(chatTriggers).map(definition => {
     let triggerGroup = createStubTriggerGroup(spec);
-    return (
-    definition
+    return definition
       .implement(spec as any, triggerGroup)
       .matches(() => true)
       .map(async () => {
@@ -104,8 +108,7 @@ export let stubAllTriggers = (spec: ReturnType<typeof createTestSpec>) =>
           output
         };
       })
-      .build()
-    );
+      .build();
   });
 
 let stubOutput = (key: string): any => {

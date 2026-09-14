@@ -20,8 +20,7 @@ let createToolTestClient = () =>
       auth: {
         authenticationMethodId: 'google_oauth',
         output: {
-          token: 'access-token',
-          developerToken: 'developer-token'
+          token: 'access-token'
         }
       }
     }

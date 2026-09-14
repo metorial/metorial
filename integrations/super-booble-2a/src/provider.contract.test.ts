@@ -4,7 +4,7 @@ import {
   expectSlateContract
 } from '@slates/test';
 import { describe, expect, it } from 'vitest';
-import { superGoogle2AAuthOutputSchema, superGoogle2AOAuthInputSchema } from './auth';
+import { auth, superGoogle2AAuthOutputSchema } from './auth';
 import { superGoogle2AConfigSchema } from './config';
 import { inventory, provider, tools } from './index';
 import { restrictedP1Scopes, superGoogle2AVerificationScopeEnvelope } from './scope-envelope';
@@ -381,11 +381,7 @@ describe('super-booble-2a provider contract', () => {
     expect(Object.keys(configSchema.properties ?? {})).toEqual(['loginCustomerId']);
     expect(configSchema.required ?? []).toEqual([]);
 
-    expect(superGoogle2AOAuthInputSchema.parse({ developerToken: 'developer-token' })).toEqual(
-      {
-        developerToken: 'developer-token'
-      }
-    );
+    expect(auth.authStack[0]?.inputSchema).toBeUndefined();
     expect(
       superGoogle2AAuthOutputSchema.parse({
         token: 'access-token',
@@ -398,9 +394,13 @@ describe('super-booble-2a provider contract', () => {
       token: 'access-token',
       refreshToken: 'refresh-token',
       expiresAt: '2030-01-01T00:00:00.000Z',
-      authMethod: 'oauth',
-      developerToken: 'developer-token'
+      authMethod: 'oauth'
     });
+
+    expect(
+      superGoogle2AAuthOutputSchema.safeParse({ token: 'access-token', authMethod: 'oauth' })
+        .success
+    ).toBe(true);
 
     let client = createLocalSlateTestClient({ slate: provider });
     let oauth = await client.getAuthMethod('google_oauth');

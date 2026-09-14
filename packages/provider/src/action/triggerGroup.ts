@@ -1,7 +1,7 @@
 import { z } from 'zod';
+import type { SlateContext } from '../context';
 import { SlateDeclarationError } from '../error';
 import type { SlateSpecification } from '../specification/specification';
-import type { SlateContext } from '../context';
 import type { SlateWebhookHttpResponseInit } from './action';
 
 export let SlateDefaultPollingIntervalSeconds = 60 * 10;
@@ -19,9 +19,10 @@ export interface SlateWebhookTarget {
   targetOwnership: SlateWebhookTargetOwnership;
 }
 
-export type SlateTriggerGroupRoutingMatchersHandler<ConfigType extends {}, AuthType extends {}> = (
-  context: SlateContext<ConfigType, AuthType, {}>
-) => Promise<SlateTriggerRoutingMatcher[]>;
+export type SlateTriggerGroupRoutingMatchersHandler<
+  ConfigType extends {},
+  AuthType extends {}
+> = (context: SlateContext<ConfigType, AuthType, {}>) => Promise<SlateTriggerRoutingMatcher[]>;
 
 export type SlateTriggerGroupPollHandler<ConfigType extends {}, AuthType extends {}> = (
   context: SlateContext<ConfigType, AuthType, { state: any | null }>
@@ -63,13 +64,12 @@ export type SlateWebhookUnregisterHandler<ConfigType extends {}, AuthType extend
   >
 ) => Promise<unknown>;
 
-export type SlateWebhookManualSetupHandler<FullConfigSchema extends z.ZodType<any> = z.ZodType<any>> =
-  (
-    context: SlateContext<{}, {}, { webhookUrl: string }>
-  ) => Promise<{
-    webhookSetupDocument: string;
-    partialWebhookRegistrationPayload: Partial<z.infer<FullConfigSchema>>;
-  }>;
+export type SlateWebhookManualSetupHandler<
+  FullConfigSchema extends z.ZodType<any> = z.ZodType<any>
+> = (context: SlateContext<{}, {}, { webhookUrl: string }>) => Promise<{
+  webhookSetupDocument: string;
+  partialWebhookRegistrationPayload: Partial<z.infer<FullConfigSchema>>;
+}>;
 
 export type SlateWebhookManualFinishHandler<
   UserConfigSchema extends z.ZodType<any> = z.ZodType<any>,
@@ -106,7 +106,10 @@ export type SlateWebhookProcessHandler = (
   response?: Response | SlateWebhookHttpResponseInit;
 }>;
 
-export interface SlateTriggerGroupPollingParameters<ConfigType extends {}, AuthType extends {}> {
+export interface SlateTriggerGroupPollingParameters<
+  ConfigType extends {},
+  AuthType extends {}
+> {
   intervalSeconds: number;
   pollEvents: SlateTriggerGroupPollHandler<ConfigType, AuthType>;
 }
@@ -130,13 +133,18 @@ export interface SlateTriggerGroupWebhookManualRegistrationParameters<
   finish?: SlateWebhookManualFinishHandler<UserConfigSchema, FullConfigSchema>;
 }
 
-export interface SlateTriggerGroupWebhookParameters<ConfigType extends {}, AuthType extends {}> {
+export interface SlateTriggerGroupWebhookParameters<
+  ConfigType extends {},
+  AuthType extends {}
+> {
   autoRegistration?: SlateTriggerGroupWebhookAutoRegistrationParameters<ConfigType, AuthType>;
   manualRegistration?: SlateTriggerGroupWebhookManualRegistrationParameters<any, any>;
   process: SlateWebhookProcessHandler;
 }
 
-export interface SlateTriggerGroupCreateParameters<InputType extends {} = Record<string, unknown>> {
+export interface SlateTriggerGroupCreateParameters<
+  InputType extends {} = Record<string, unknown>
+> {
   key: string;
   name: string;
   description?: string;
@@ -165,7 +173,11 @@ export class SlateTriggerGroup<
     private readonly _params: SlateTriggerGroupParameters<ConfigType, AuthType, InputType>
   ) {}
 
-  static create<ConfigType extends {}, AuthType extends {}, InputType extends {} = Record<string, unknown>>(
+  static create<
+    ConfigType extends {},
+    AuthType extends {},
+    InputType extends {} = Record<string, unknown>
+  >(
     spec: SlateSpecification<ConfigType, AuthType>,
     params: SlateTriggerGroupCreateParameters<InputType>
   ) {
@@ -221,7 +233,8 @@ export class SlateTriggerGroupBuilder<
   #source: 'polling' | 'webhook' | null = null;
   #polling: SlateTriggerGroupPollingParameters<ConfigType, AuthType> | null = null;
   #webhook: SlateTriggerGroupWebhookParameters<ConfigType, AuthType> | null = null;
-  #routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType> | null = null;
+  #routingMatchers: SlateTriggerGroupRoutingMatchersHandler<ConfigType, AuthType> | null =
+    null;
 
   constructor(
     private readonly spec: SlateSpecification<ConfigType, AuthType>,
@@ -252,7 +265,10 @@ export class SlateTriggerGroupBuilder<
     UserConfigSchema extends z.ZodType<any> = z.ZodType<any>,
     FullConfigSchema extends z.ZodType<any> = z.ZodType<any>
   >(props: {
-    autoRegistration?: SlateTriggerGroupWebhookAutoRegistrationParameters<ConfigType, AuthType>;
+    autoRegistration?: SlateTriggerGroupWebhookAutoRegistrationParameters<
+      ConfigType,
+      AuthType
+    >;
     manualRegistration?: SlateTriggerGroupWebhookManualRegistrationParameters<
       UserConfigSchema,
       FullConfigSchema
