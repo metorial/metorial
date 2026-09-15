@@ -3,7 +3,12 @@ import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { slackEventsTriggerGroup } from '../../triggers/eventsTriggerGroup';
-import { getEventId, getSlackIdentity, mapSlackAuthor, mapSlackChannel } from '../lib/mappers';
+import {
+  getEventId,
+  getSlackIdentity,
+  hydrateSlackChannel,
+  mapSlackAuthor
+} from '../lib/mappers';
 
 export let chatCommandInvoked = contract
   .implement(spec, slackEventsTriggerGroup)
@@ -28,7 +33,12 @@ export let chatCommandInvoked = contract
       triggerId: payload.trigger_id,
       responseToken: payload.response_url,
       channel: rawChannel
-        ? mapSlackChannel(rawChannel, identity.team_id ?? payload.team_id)
+        ? await hydrateSlackChannel(
+            client,
+            rawChannel,
+            identity,
+            identity.team_id ?? payload.team_id
+          )
         : undefined,
       raw: payload
     };

@@ -3,7 +3,7 @@ import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';
 import { decodeSlackCursor, encodeSlackCursor } from '../lib/cursors';
-import { getSlackIdentity, mapSlackChannel } from '../lib/mappers';
+import { getSlackIdentity, hydrateSlackChannel } from '../lib/mappers';
 
 let channelTypes = (type?: string) => {
   if (type === 'public' || type === 'shared' || type === 'announcement' || type === 'forum')
@@ -29,8 +29,13 @@ export let chatListChannels = contract
       }),
       getSlackIdentity(client)
     ]);
-    let channels = result.channels
-      .map(channel => mapSlackChannel(channel, identity.team_id))
+    let channels = (
+      await Promise.all(
+        result.channels.map(channel =>
+          hydrateSlackChannel(client, channel, identity, identity.team_id)
+        )
+      )
+    )
       .filter(
         channel => !ctx.input.workspaceId || channel.workspaceId === ctx.input.workspaceId
       )

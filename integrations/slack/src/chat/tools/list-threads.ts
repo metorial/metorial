@@ -3,7 +3,7 @@ import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';
 import { decodeSlackCursor, encodeSlackCursor } from '../lib/cursors';
-import { getSlackIdentity, mapSlackChannel, mapSlackThread } from '../lib/mappers';
+import { getSlackIdentity, hydrateSlackChannel, mapSlackThread } from '../lib/mappers';
 
 export let chatListThreads = contract
   .implement(spec)
@@ -38,7 +38,9 @@ export let chatListThreads = contract
     return {
       output: {
         threads,
-        channel: rawChannel ? mapSlackChannel(rawChannel, identity.team_id) : undefined,
+        channel: rawChannel
+          ? await hydrateSlackChannel(client, rawChannel, identity, identity.team_id)
+          : undefined,
         nextCursor: history.nextCursor
           ? encodeSlackCursor('backward', { cursor: history.nextCursor })
           : undefined,

@@ -86,7 +86,7 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
         webhookSetupDocument: [
           '1. In your Slack app config, open **Event Subscriptions** and set the Request URL to:',
           '',
-          `\`\`\`\n${ctx.input.webhookUrl}\`\`\``,
+          `\`\`\`\n${ctx.input.webhookUrl}\n\`\`\``,
           '',
           '2. Subscribe to the bot/user events this integration needs.',
           '3. Open **Basic Information**, copy the **Signing Secret**, and enter it here.',

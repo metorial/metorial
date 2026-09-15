@@ -5,7 +5,7 @@ import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';
 import {
   getSlackIdentity,
-  mapSlackChannel,
+  hydrateSlackChannel,
   mapSlackFile,
   mapSlackThread
 } from '../lib/mappers';
@@ -59,7 +59,9 @@ export let chatUploadFile = contract
           ...mapSlackFile(raw),
           clientReferenceId: ctx.input.clientReferenceId
         },
-        channel: rawChannel ? mapSlackChannel(rawChannel, identity.team_id) : undefined,
+        channel: rawChannel
+          ? await hydrateSlackChannel(client, rawChannel, identity, identity.team_id)
+          : undefined,
         thread: ctx.input.threadId
           ? mapSlackThread(ctx.input.channelId, ctx.input.threadId)
           : undefined,

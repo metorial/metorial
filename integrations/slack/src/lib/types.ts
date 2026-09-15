@@ -44,6 +44,7 @@ export interface SlackScheduledMessage {
 
 export interface SlackConversation {
   id: string;
+  user?: string;
   name?: string;
   is_channel?: boolean;
   is_group?: boolean;

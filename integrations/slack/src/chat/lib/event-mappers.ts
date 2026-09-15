@@ -3,8 +3,8 @@ import type { SlackClient } from '../../lib/client';
 import type { SlackMessage } from '../../lib/types';
 import {
   getSlackIdentity,
+  hydrateSlackChannel,
   mapSlackAuthor,
-  mapSlackChannel,
   mapSlackMessage,
   mapSlackThread
 } from './mappers';
@@ -33,7 +33,12 @@ export let mapMessageEvent = async (
     ...message,
     channelId,
     channel: rawChannel
-      ? mapSlackChannel(rawChannel, identity.team_id ?? envelope.team_id)
+      ? await hydrateSlackChannel(
+          client,
+          rawChannel,
+          identity,
+          identity.team_id ?? envelope.team_id
+        )
       : undefined,
     thread: threadTs
       ? mapSlackThread(channelId, threadTs, slackMessage, message.permalink)
@@ -80,7 +85,12 @@ export let mapReactionEvent = async (
     author: mapSlackAuthor(user, identity, { user: event.user }),
     message,
     channel: rawChannel
-      ? mapSlackChannel(rawChannel, identity.team_id ?? envelope.team_id)
+      ? await hydrateSlackChannel(
+          client,
+          rawChannel,
+          identity,
+          identity.team_id ?? envelope.team_id
+        )
       : undefined,
     thread: threadTs
       ? mapSlackThread(channelId, threadTs, rawMessage, message?.permalink)
@@ -103,7 +113,12 @@ export let hydrateMemberEvent = async (
     channelId: event.channel,
     author: mapSlackAuthor(user, identity, { user: event.user }),
     channel: rawChannel
-      ? mapSlackChannel(rawChannel, identity.team_id ?? envelope.team_id)
+      ? await hydrateSlackChannel(
+          client,
+          rawChannel,
+          identity,
+          identity.team_id ?? envelope.team_id
+        )
       : undefined,
     raw: envelope
   };

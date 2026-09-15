@@ -2,7 +2,7 @@ import { getChannel as contract } from '@slates/adapter-chat';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';
-import { getSlackIdentity, mapSlackChannel } from '../lib/mappers';
+import { getSlackIdentity, hydrateSlackChannel } from '../lib/mappers';
 
 export let chatGetChannel = contract
   .implement(spec)
@@ -14,7 +14,10 @@ export let chatGetChannel = contract
       getSlackIdentity(client)
     ]);
     return {
-      output: { channel: mapSlackChannel(raw, identity.team_id), raw },
+      output: {
+        channel: await hydrateSlackChannel(client, raw, identity, identity.team_id),
+        raw
+      },
       message: `Retrieved Slack conversation \`${ctx.input.channelId}\`.`
     };
   })

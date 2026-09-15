@@ -6,7 +6,7 @@ import { createSlackChatClient } from '../lib/client';
 import { decodeSlackCursor, encodeSlackCursor } from '../lib/cursors';
 import {
   getSlackIdentity,
-  mapSlackChannel,
+  hydrateSlackChannel,
   mapSlackMessage,
   mapSlackThread
 } from '../lib/mappers';
@@ -56,7 +56,9 @@ export let chatListMessages = contract
       output: {
         messages,
         nextCursor,
-        channel: rawChannel ? mapSlackChannel(rawChannel, identity.team_id) : undefined,
+        channel: rawChannel
+          ? await hydrateSlackChannel(client, rawChannel, identity, identity.team_id)
+          : undefined,
         thread: ctx.input.threadId
           ? mapSlackThread(ctx.input.channelId, ctx.input.threadId, rawMessages[0])
           : undefined,

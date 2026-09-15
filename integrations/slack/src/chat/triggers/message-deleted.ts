@@ -3,7 +3,12 @@ import { SlackClient } from '../../lib/client';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { slackEventsTriggerGroup } from '../../triggers/eventsTriggerGroup';
-import { getEventId, getSlackIdentity, mapSlackChannel, mapSlackThread } from '../lib/mappers';
+import {
+  getEventId,
+  getSlackIdentity,
+  hydrateSlackChannel,
+  mapSlackThread
+} from '../lib/mappers';
 
 export let chatMessageDeleted = contract
   .implement(spec, slackEventsTriggerGroup)
@@ -27,7 +32,9 @@ export let chatMessageDeleted = contract
       channelId: event.channel,
       messageId: event.deleted_ts ?? previous.ts,
       threadId: previous.thread_ts,
-      channel: rawChannel ? mapSlackChannel(rawChannel, identity.team_id) : undefined,
+      channel: rawChannel
+        ? await hydrateSlackChannel(client, rawChannel, identity, identity.team_id)
+        : undefined,
       thread: previous.thread_ts
         ? mapSlackThread(event.channel, previous.thread_ts, previous)
         : undefined,

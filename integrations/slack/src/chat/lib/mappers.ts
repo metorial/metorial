@@ -68,7 +68,11 @@ export let mapSlackAuthor = (
   };
 };
 
-export let mapSlackChannel = (channel: SlackConversation, workspaceId?: string): Channel => ({
+export let mapSlackChannel = (
+  channel: SlackConversation,
+  workspaceId?: string,
+  recipient?: Author
+): Channel => ({
   id: channel.id,
   workspaceId,
   type: channel.is_im
@@ -89,12 +93,37 @@ export let mapSlackChannel = (channel: SlackConversation, workspaceId?: string):
       : channel.is_group
         ? 'private_channel'
         : 'public_channel',
-  name: channel.name,
+  name: channel.is_im
+    ? (recipient?.fullName ?? recipient?.userName ?? recipient?.userId ?? channel.name)
+    : channel.name,
   topic: channel.topic?.value,
   subject: channel.purpose?.value,
+  hasAccess: channel.is_member ?? true,
+  recipient: channel.is_im ? recipient : undefined,
   memberCount: channel.num_members,
   raw: channel
 });
+
+export let hydrateSlackChannel = async (
+  client: SlackClient,
+  channel: SlackConversation,
+  identity: SlackAuthIdentity,
+  workspaceId?: string,
+  recipientId?: string
+): Promise<Channel> => {
+  let dmRecipientId = channel.user ?? recipientId;
+  let hydratedChannel = recipientId
+    ? { ...channel, is_im: true, user: dmRecipientId }
+    : channel;
+
+  if (!hydratedChannel.is_im || !dmRecipientId) {
+    return mapSlackChannel(hydratedChannel, workspaceId);
+  }
+
+  let user = await client.getUserInfo(dmRecipientId).catch(() => undefined);
+  let recipient = mapSlackAuthor(user, identity, { user: dmRecipientId });
+  return mapSlackChannel(hydratedChannel, workspaceId, recipient);
+};
 
 export let mapSlackThread = (
   channelId: string,
@@ -206,8 +235,9 @@ export let hydrateSlackMessageResult = async (
     }),
     client.getConversationInfo(channelId).catch(() => undefined)
   ]);
+  let identity = options.identity ?? (await getSlackIdentity(client));
   let channel = rawChannel
-    ? mapSlackChannel(rawChannel, options.identity?.team_id)
+    ? await hydrateSlackChannel(client, rawChannel, identity, identity.team_id)
     : undefined;
   let threadTs =
     message.thread_ts ?? (message.reply_count !== undefined ? message.ts : undefined);

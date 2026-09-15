@@ -2,7 +2,7 @@ import { getThread as contract } from '@slates/adapter-chat';
 import { slackActionScopes } from '../../lib/scopes';
 import { spec } from '../../spec';
 import { createSlackChatClient } from '../lib/client';
-import { getSlackIdentity, mapSlackChannel, mapSlackThread } from '../lib/mappers';
+import { getSlackIdentity, hydrateSlackChannel, mapSlackThread } from '../lib/mappers';
 
 export let chatGetThread = contract
   .implement(spec)
@@ -29,7 +29,9 @@ export let chatGetThread = contract
     return {
       output: {
         thread: mapSlackThread(ctx.input.channelId, ctx.input.threadId, root, permalink),
-        channel: rawChannel ? mapSlackChannel(rawChannel, identity.team_id) : undefined,
+        channel: rawChannel
+          ? await hydrateSlackChannel(client, rawChannel, identity, identity.team_id)
+          : undefined,
         raw: replies
       },
       message: `Retrieved Slack thread \`${ctx.input.threadId}\`.`
