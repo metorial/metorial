@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { SheetsClient } from '../lib/client';
 import { googleSheetsActionScopes } from '../scopes';
@@ -58,7 +58,7 @@ export let manageProtectedRanges = SlateTool.create(spec, {
 
     if (input.action === 'add') {
       if (input.sheetId === undefined)
-        throw new Error('sheetId is required for adding protection');
+        throw createApiServiceError('sheetId is required for adding protection');
 
       let range: Record<string, any> = { sheetId: input.sheetId };
       if (input.startRowIndex !== undefined) range.startRowIndex = input.startRowIndex;
@@ -94,7 +94,7 @@ export let manageProtectedRanges = SlateTool.create(spec, {
 
     if (input.action === 'delete') {
       if (input.protectedRangeId === undefined)
-        throw new Error('protectedRangeId is required for deleting protection');
+        throw createApiServiceError('protectedRangeId is required for deleting protection');
 
       await client.batchUpdate(input.spreadsheetId, [
         { deleteProtectedRange: { protectedRangeId: input.protectedRangeId } }
@@ -109,6 +109,6 @@ export let manageProtectedRanges = SlateTool.create(spec, {
       };
     }
 
-    throw new Error(`Unknown action: ${input.action}`);
+    throw createApiServiceError(`Unknown action: ${input.action}`);
   })
   .build();

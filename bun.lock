@@ -5827,7 +5827,7 @@
     },
     "integrations/google-sheets": {
       "name": "@slates-integrations/google-sheets",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",
@@ -21231,6 +21231,8 @@
     "@slates-integrations/super-booble-1/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
 
     "@slates-integrations/super-booble-1/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
+
+    "@slates-integrations/super-booble-2a/@slates-integrations/google-sheets": ["@slates-integrations/google-sheets@0.2.0", "", { "dependencies": { "@types/node": "^20", "slates": "1.0.0-rc.17", "zod": "^4.2" } }, "sha512-0edmk/zYlX9lVg/y9DX5cmqSzztDxmRDjeF+JcCzD7y03KTZwfEvU788p08YD7jdf+ZNmgICSLUgcURJEXBo3g=="],
 
     "@slates-integrations/super-booble-2a/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
 
