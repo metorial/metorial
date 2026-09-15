@@ -11775,7 +11775,7 @@
       "version": "0.3.13",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/adapter-chat": "1.0.0-rc.8",
+        "@slates/adapter-chat": "1.0.0-rc.9",
         "@slates/slack-tools": "1.0.0-rc.14",
         "@types/node": "^20",
         "slates": "1.0.0-rc.23",
