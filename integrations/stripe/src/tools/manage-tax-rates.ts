@@ -37,8 +37,14 @@ export let manageTaxRates = SlateTool.create(spec, {
       action: z.enum(['create', 'get', 'update', 'list']).describe('Operation to perform'),
       taxRateId: z.string().optional().describe('Tax Rate ID (required for get/update)'),
       displayName: z.string().optional().describe('Customer-visible tax rate name'),
-      percentage: z.number().optional().describe('Tax percentage out of 100'),
-      inclusive: z.boolean().optional().describe('Whether the tax is inclusive'),
+      percentage: z
+        .number()
+        .optional()
+        .describe('Tax percentage out of 100 (create only; immutable afterward)'),
+      inclusive: z
+        .boolean()
+        .optional()
+        .describe('Whether the tax is inclusive (create only; immutable afterward)'),
       active: z.boolean().optional().describe('Whether the tax rate is active'),
       country: z.string().optional().describe('Two-letter country code'),
       state: z.string().optional().describe('Subdivision code without country prefix'),
@@ -46,7 +52,7 @@ export let manageTaxRates = SlateTool.create(spec, {
       taxType: z.string().optional().describe('High-level tax type, such as vat or sales_tax'),
       description: z.string().optional().describe('Internal description'),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )

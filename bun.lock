@@ -18,8 +18,8 @@
       "name": "@slates/adapter-chat",
       "version": "1.0.0-rc.8",
       "dependencies": {
-        "@slates/adapter": "1.0.0-rc.7",
-        "@slates/provider": "1.0.0-rc.23",
+        "@slates/adapter": "1.0.0-rc.8",
+        "@slates/provider": "1.0.0-rc.24",
         "mdast-util-to-string": "^4.0.0",
         "remark-gfm": "^4.0.0",
         "remark-parse": "^11.0.0",
@@ -11772,17 +11772,17 @@
     },
     "integrations/slack": {
       "name": "@slates-integrations/slack",
-      "version": "0.3.11",
+      "version": "0.3.12",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/adapter-chat": "1.0.0-rc.7",
-        "@slates/slack-tools": "1.0.0-rc.13",
+        "@slates/adapter-chat": "1.0.0-rc.8",
+        "@slates/slack-tools": "1.0.0-rc.14",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.20",
+        "@slates/test": "1.0.0-rc.21",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -12330,15 +12330,17 @@
     },
     "integrations/stripe": {
       "name": "@slates-integrations/stripe",
-      "version": "0.2.0-rc.9",
+      "version": "0.3.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/provider": "1.0.0-rc.18",
+        "@slates/provider": "1.0.0-rc.24",
         "@types/node": "^20",
         "zod": "^4.2",
       },
       "devDependencies": {
+        "@slates/test": "1.0.0-rc.21",
         "typescript": "^5",
+        "vitest": "^3.1.2",
       },
     },
     "integrations/studio-by-ai21-labs": {
@@ -14492,7 +14494,7 @@
       "name": "@slates/adapter",
       "version": "1.0.0-rc.8",
       "dependencies": {
-        "@slates/provider": "1.0.0-rc.23",
+        "@slates/provider": "1.0.0-rc.24",
         "zod": "^4.2.1",
       },
       "devDependencies": {
@@ -14509,7 +14511,7 @@
         "@smithy/querystring-builder": "^4.2.14",
         "@smithy/types": "^4.14.1",
         "axios": "^1.13.2",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -14524,9 +14526,9 @@
       "bin": "./src/cli.ts",
       "dependencies": {
         "@inquirer/prompts": "^7.4.0",
-        "@slates/client": "1.0.0-rc.23",
-        "@slates/oauth-microsoft": "1.0.0-rc.10",
-        "@slates/profiles": "1.0.0-rc.21",
+        "@slates/client": "1.0.0-rc.24",
+        "@slates/oauth-microsoft": "1.0.0-rc.11",
+        "@slates/profiles": "1.0.0-rc.22",
         "sade": "^1.8.1",
       },
       "devDependencies": {
@@ -14539,9 +14541,9 @@
       "name": "@slates/client",
       "version": "1.0.0-rc.24",
       "dependencies": {
-        "@slates/proto": "1.0.0-rc.19",
-        "@slates/provider": "1.0.0-rc.23",
-        "@slates/provider-handler": "1.0.0-rc.32",
+        "@slates/proto": "1.0.0-rc.20",
+        "@slates/provider": "1.0.0-rc.24",
+        "@slates/provider-handler": "1.0.0-rc.34",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -14554,7 +14556,7 @@
       "version": "1.0.0-rc.11",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14568,7 +14570,7 @@
       "version": "1.0.0-rc.7",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14582,8 +14584,8 @@
       "version": "1.0.0-rc.10",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/tool-recipes": "1.0.0-rc.9",
-        "slates": "1.0.0-rc.22",
+        "@slates/tool-recipes": "1.0.0-rc.10",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14597,7 +14599,7 @@
       "version": "1.0.0-rc.11",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14610,7 +14612,7 @@
       "name": "@slates/oauth-google",
       "version": "1.0.5",
       "dependencies": {
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14624,7 +14626,7 @@
       "name": "@slates/oauth-microsoft",
       "version": "1.0.0-rc.11",
       "dependencies": {
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -14637,7 +14639,7 @@
       "name": "@slates/oauth-zoho",
       "version": "1.0.0-rc.10",
       "dependencies": {
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14651,11 +14653,11 @@
       "name": "@slates/profiles",
       "version": "1.0.0-rc.22",
       "dependencies": {
-        "@slates/client": "1.0.0-rc.23",
-        "@slates/proto": "1.0.0-rc.19",
+        "@slates/client": "1.0.0-rc.24",
+        "@slates/proto": "1.0.0-rc.20",
       },
       "devDependencies": {
-        "@slates/provider": "1.0.0-rc.23",
+        "@slates/provider": "1.0.0-rc.24",
         "@slates/tsconfig": "1.0.0-rc.1",
         "typescript": "5.8.2",
         "vitest": "^3.1.2",
@@ -14701,8 +14703,8 @@
       "version": "1.0.0-rc.34",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/proto": "1.0.0-rc.19",
-        "@slates/provider": "1.0.0-rc.23",
+        "@slates/proto": "1.0.0-rc.20",
+        "@slates/provider": "1.0.0-rc.24",
         "p-queue": "^6.6.2",
         "zod": "^4.2.1",
       },
@@ -14718,7 +14720,7 @@
       "version": "1.0.0-rc.14",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14759,11 +14761,11 @@
       "version": "1.0.0-rc.21",
       "dependencies": {
         "@lowerdeck/testing-tools": "latest",
-        "@slates/client": "1.0.0-rc.23",
-        "@slates/profiles": "1.0.0-rc.21",
+        "@slates/client": "1.0.0-rc.24",
+        "@slates/profiles": "1.0.0-rc.22",
       },
       "devDependencies": {
-        "@slates/provider": "1.0.0-rc.23",
+        "@slates/provider": "1.0.0-rc.24",
         "@slates/tsconfig": "1.0.0-rc.1",
         "typescript": "5.8.2",
         "vitest": "^3.1.2",
@@ -14774,7 +14776,7 @@
       "name": "@slates/tool-recipes",
       "version": "1.0.0-rc.10",
       "dependencies": {
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14795,7 +14797,7 @@
       "version": "0.1.0-rc.17",
       "dependencies": {
         "@types/node": "^20",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14808,7 +14810,7 @@
       "version": "0.1.0-rc.14",
       "dependencies": {
         "@types/node": "^20",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14821,7 +14823,7 @@
       "version": "0.1.0-rc.13",
       "dependencies": {
         "@types/node": "^20",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14834,7 +14836,7 @@
       "version": "0.1.0-rc.14",
       "dependencies": {
         "@types/node": "^20",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14847,7 +14849,7 @@
       "version": "0.1.0-rc.13",
       "dependencies": {
         "@types/node": "^20",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14860,7 +14862,7 @@
       "version": "0.1.0-rc.13",
       "dependencies": {
         "@types/node": "^20",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14873,11 +14875,11 @@
       "version": "0.1.0-rc.19",
       "dependencies": {
         "@types/node": "^20",
-        "slates": "1.0.0-rc.22",
+        "slates": "1.0.0-rc.23",
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.20",
+        "@slates/test": "1.0.0-rc.21",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -21211,8 +21213,6 @@
     "@slates-integrations/strava/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
     "@slates-integrations/streamtime/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
-
-    "@slates-integrations/stripe/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
     "@slates-integrations/studio-by-ai21-labs/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 

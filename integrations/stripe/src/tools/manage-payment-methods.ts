@@ -50,7 +50,13 @@ export let managePaymentMethods = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('After attach, set as customer invoice default payment method'),
-      limit: z.number().optional().describe('Max results (for list_customer)'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results (for list_customer)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )

@@ -2,6 +2,7 @@ export * from './create-billing-portal-session';
 export * from './create-checkout-session';
 export * from './create-payment-link';
 export * from './create-refund';
+export * from './get-account';
 export * from './get-balance';
 export * from './manage-coupons';
 export * from './manage-customers';

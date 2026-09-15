@@ -1,6 +1,8 @@
 import { createAxios } from '@slates/provider';
 import { stripeApiError } from './errors';
 
+export const STRIPE_API_VERSION = '2026-08-26.dahlia';
+
 export interface StripeClientConfig {
   token: string;
   stripeAccountId?: string;
@@ -12,7 +14,8 @@ export class StripeClient {
   constructor(config: StripeClientConfig) {
     let headers: Record<string, string> = {
       Authorization: `Bearer ${config.token}`,
-      'Content-Type': 'application/x-www-form-urlencoded'
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Stripe-Version': STRIPE_API_VERSION
     };
 
     if (config.stripeAccountId) {
@@ -39,7 +42,9 @@ export class StripeClient {
     for (let [key, value] of Object.entries(params)) {
       if (value === undefined || value === null) continue;
       let fullKey = prefix ? `${prefix}[${key}]` : key;
-      if (typeof value === 'object' && !Array.isArray(value)) {
+      if (typeof value === 'object' && Object.keys(value).length === 0) {
+        parts.push(`${encodeURIComponent(fullKey)}=`);
+      } else if (typeof value === 'object' && !Array.isArray(value)) {
         parts.push(this.encodeParams(value, fullKey));
       } else if (Array.isArray(value)) {
         for (let i = 0; i < value.length; i++) {
@@ -74,6 +79,34 @@ export class StripeClient {
   private async del<T = any>(path: string): Promise<T> {
     let response = await this.axios.delete(path);
     return response.data;
+  }
+
+  async getAccount() {
+    return this.get('/account');
+  }
+
+  async expireCheckoutSession(sessionId: string) {
+    return this.post(`/checkout/sessions/${sessionId}/expire`);
+  }
+
+  async updatePaymentLink(paymentLinkId: string, params: Record<string, unknown>) {
+    return this.post(`/payment_links/${paymentLinkId}`, params);
+  }
+
+  async getPromotionCode(promotionCodeId: string) {
+    return this.get(`/promotion_codes/${promotionCodeId}`);
+  }
+
+  async updatePromotionCode(promotionCodeId: string, params: Record<string, unknown>) {
+    return this.post(`/promotion_codes/${promotionCodeId}`, params);
+  }
+
+  async deleteInvoice(invoiceId: string) {
+    return this.del(`/invoices/${invoiceId}`);
+  }
+
+  async listInvoiceLines(invoiceId: string, params: Record<string, unknown>) {
+    return this.get(`/invoices/${invoiceId}/lines`, params);
   }
 
   // --- Customers ---
@@ -373,7 +406,7 @@ export class StripeClient {
   // --- Webhook Endpoints ---
 
   async createWebhookEndpoint(params: Record<string, any>) {
-    return this.post('/webhook_endpoints', params);
+    return this.post('/webhook_endpoints', { ...params, api_version: STRIPE_API_VERSION });
   }
 
   async deleteWebhookEndpoint(webhookEndpointId: string) {

@@ -7,10 +7,10 @@ import { spec } from '../spec';
 export let manageInvoices = SlateTool.create(spec, {
   name: 'Manage Invoices',
   key: 'manage_invoices',
-  description: `Create, retrieve, update, finalize, send, pay, or void invoices. Supports adding line items, applying discounts, and managing the full invoice lifecycle from draft to paid or voided.`,
+  description: `Create, retrieve, update, finalize, send, pay, or void invoices. Supports adding and listing line items, deleting drafts, and managing the full invoice lifecycle from draft to paid or voided.`,
   instructions: [
     'Invoices start as draft. Finalize them to lock the amount and generate a payment page, then send or pay.',
-    'Use addLineItem action to add items before finalizing.'
+    'Use add_line_item action to add items before finalizing.'
   ],
   tags: {
     destructive: false,
@@ -29,6 +29,8 @@ export let manageInvoices = SlateTool.create(spec, {
           'pay',
           'void',
           'add_line_item',
+          'list_line_items',
+          'delete',
           'list'
         ])
         .describe('Operation to perform'),
@@ -69,7 +71,7 @@ export let manageInvoices = SlateTool.create(spec, {
       // For pay action
       paymentMethodId: z.string().optional().describe('Payment method to use for paying'),
       // For list
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination'),
       statusFilter: z
         .enum(['draft', 'open', 'paid', 'uncollectible', 'void'])
@@ -79,6 +81,20 @@ export let manageInvoices = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      deleted: z.boolean().optional(),
+      invoiceItemId: z.string().optional().describe('Created invoice item ID'),
+      lineItems: z
+        .array(
+          z.object({
+            lineItemId: z.string(),
+            description: z.string().nullable(),
+            amount: z.number(),
+            currency: z.string(),
+            quantity: z.number().nullable(),
+            priceId: z.string().nullable()
+          })
+        )
+        .optional(),
       invoiceId: z.string().optional().describe('Invoice ID'),
       customerId: z.string().optional().nullable().describe('Customer ID'),
       status: z
@@ -221,34 +237,64 @@ export let manageInvoices = SlateTool.create(spec, {
       };
     }
 
+    if (action === 'delete') {
+      if (!ctx.input.invoiceId) throw stripeServiceError('invoiceId is required for delete.');
+      const result = await client.deleteInvoice(ctx.input.invoiceId);
+      return {
+        output: { invoiceId: result.id, deleted: result.deleted },
+        message: `Deleted draft invoice **${result.id}**`
+      };
+    }
+    if (action === 'list_line_items') {
+      if (!ctx.input.invoiceId)
+        throw stripeServiceError('invoiceId is required for list_line_items.');
+      const result = await client.listInvoiceLines(ctx.input.invoiceId, {
+        limit: ctx.input.limit,
+        starting_after: ctx.input.startingAfter
+      });
+      return {
+        output: {
+          invoiceId: ctx.input.invoiceId,
+          lineItems: result.data.map((line: any) => ({
+            lineItemId: line.id,
+            description: line.description,
+            amount: line.amount,
+            currency: line.currency,
+            quantity: line.quantity,
+            priceId: line.pricing?.price_details?.price ?? line.price?.id ?? null
+          })),
+          hasMore: result.has_more
+        },
+        message: `Found **${result.data.length}** invoice line item(s)`
+      };
+    }
     if (action === 'add_line_item') {
       if (!ctx.input.invoiceId)
-        throw stripeServiceError('invoiceId is required for add_line_item action');
-
-      let params: Record<string, any> = { invoice: ctx.input.invoiceId };
+        throw stripeServiceError('invoiceId is required for add_line_item.');
+      if (Boolean(ctx.input.lineItemPriceId) === (ctx.input.lineItemAmount !== undefined)) {
+        throw stripeServiceError('Provide exactly one of lineItemPriceId or lineItemAmount.');
+      }
+      const invoice = await client.getInvoice(ctx.input.invoiceId);
+      const params: Record<string, unknown> = {
+        invoice: invoice.id,
+        customer: invoice.customer,
+        description: ctx.input.lineItemDescription
+      };
       if (ctx.input.lineItemPriceId) {
-        params.price = ctx.input.lineItemPriceId;
-        if (ctx.input.lineItemQuantity) params.quantity = ctx.input.lineItemQuantity;
-      } else if (ctx.input.lineItemAmount !== undefined) {
-        params.amount = ctx.input.lineItemAmount;
-        params.currency = ctx.input.lineItemCurrency || 'usd';
-        if (ctx.input.lineItemDescription) params.description = ctx.input.lineItemDescription;
+        params.pricing = { price: ctx.input.lineItemPriceId };
+        params.quantity = ctx.input.lineItemQuantity;
       } else {
-        // Fetch invoice to get customer for invoice item
-        let inv = await client.getInvoice(ctx.input.invoiceId);
-        params.customer = inv.customer;
+        if (ctx.input.lineItemQuantity !== undefined)
+          throw stripeServiceError(
+            'lineItemQuantity requires lineItemPriceId; lineItemAmount is the total amount.'
+          );
+        params.amount = ctx.input.lineItemAmount;
+        params.currency = ctx.input.lineItemCurrency ?? invoice.currency;
       }
-
-      // Fetch invoice to get customer for the invoice item
-      if (!params.customer) {
-        let inv = await client.getInvoice(ctx.input.invoiceId);
-        params.customer = inv.customer;
-      }
-
-      await client.createInvoiceItem(params);
-      let inv = await client.getInvoice(ctx.input.invoiceId);
+      const item = await client.createInvoiceItem(params);
+      const inv = await client.getInvoice(invoice.id);
       return {
-        output: mapInvoice(inv),
+        output: { ...mapInvoice(inv), invoiceItemId: item.id },
         message: `Added line item to invoice **${inv.id}** — new total: ${inv.total} ${inv.currency?.toUpperCase()}`
       };
     }

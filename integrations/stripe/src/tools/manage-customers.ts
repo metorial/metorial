@@ -56,6 +56,9 @@ export let manageCustomers = SlateTool.create(spec, {
       paymentMethodId: z.string().optional().describe('Default payment method ID to set'),
       limit: z
         .number()
+        .int()
+        .min(1)
+        .max(100)
         .optional()
         .describe('Max number of results to return (for list, default 10)'),
       startingAfter: z
@@ -142,6 +145,7 @@ export let manageCustomers = SlateTool.create(spec, {
           name: customer.name,
           phone: customer.phone,
           description: customer.description,
+          deleted: customer.deleted,
           created: customer.created
         },
         message: `Created customer **${customer.name || customer.email || customer.id}**`
@@ -159,6 +163,7 @@ export let manageCustomers = SlateTool.create(spec, {
           name: customer.name,
           phone: customer.phone,
           description: customer.description,
+          deleted: customer.deleted,
           created: customer.created
         },
         message: `Retrieved customer **${customer.name || customer.email || customer.id}**`
@@ -188,6 +193,23 @@ export let manageCustomers = SlateTool.create(spec, {
         };
       }
 
+      if (ctx.input.shipping) {
+        params.shipping = {
+          name: ctx.input.shipping.name,
+          phone: ctx.input.shipping.phone,
+          address: ctx.input.shipping.address
+            ? {
+                line1: ctx.input.shipping.address.line1,
+                line2: ctx.input.shipping.address.line2,
+                city: ctx.input.shipping.address.city,
+                state: ctx.input.shipping.address.state,
+                postal_code: ctx.input.shipping.address.postalCode,
+                country: ctx.input.shipping.address.country
+              }
+            : undefined
+        };
+      }
+
       let customer = await client.updateCustomer(ctx.input.customerId, params);
       return {
         output: {
@@ -196,6 +218,7 @@ export let manageCustomers = SlateTool.create(spec, {
           name: customer.name,
           phone: customer.phone,
           description: customer.description,
+          deleted: customer.deleted,
           created: customer.created
         },
         message: `Updated customer **${customer.name || customer.email || customer.id}**`

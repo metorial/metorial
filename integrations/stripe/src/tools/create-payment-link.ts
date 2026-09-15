@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let createPaymentLink = SlateTool.create(spec, {
   name: 'Create Payment Link',
   key: 'create_payment_link',
-  description: `Create a shareable Stripe Payment Link for accepting one-time or recurring payments without building a custom checkout page. Also retrieve or list existing payment links.`,
+  description: `Create a shareable Stripe Payment Link for accepting one-time or recurring payments without building a custom checkout page. Also retrieve, list, or update existing payment links, including deactivating them.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -15,8 +15,12 @@ export let createPaymentLink = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      action: z.enum(['create', 'get', 'list']).describe('Operation to perform'),
+      action: z.enum(['create', 'get', 'update', 'list']).describe('Operation to perform'),
       paymentLinkId: z.string().optional().describe('Payment link ID (for get)'),
+      active: z
+        .boolean()
+        .optional()
+        .describe('Set false on update to deactivate a payment link'),
       lineItems: z
         .array(
           z.object({
@@ -28,7 +32,7 @@ export let createPaymentLink = SlateTool.create(spec, {
         .describe('Line items for the payment link (required for create)'),
       allowPromotionCodes: z.boolean().optional().describe('Whether to allow promotion codes'),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -66,7 +70,7 @@ export let createPaymentLink = SlateTool.create(spec, {
       let params: Record<string, any> = {
         line_items: ctx.input.lineItems.map(item => ({
           price: item.priceId,
-          quantity: item.quantity || 1
+          quantity: item.quantity ?? 1
         }))
       };
       if (ctx.input.allowPromotionCodes !== undefined)
@@ -84,10 +88,17 @@ export let createPaymentLink = SlateTool.create(spec, {
       };
     }
 
-    if (action === 'get') {
+    if (action === 'get' || action === 'update') {
       if (!ctx.input.paymentLinkId)
         throw stripeServiceError('paymentLinkId is required for get action');
-      let link = await client.getPaymentLink(ctx.input.paymentLinkId);
+      let link =
+        action === 'update'
+          ? await client.updatePaymentLink(ctx.input.paymentLinkId, {
+              active: ctx.input.active,
+              metadata: ctx.input.metadata,
+              allow_promotion_codes: ctx.input.allowPromotionCodes
+            })
+          : await client.getPaymentLink(ctx.input.paymentLinkId);
       return {
         output: {
           paymentLinkId: link.id,

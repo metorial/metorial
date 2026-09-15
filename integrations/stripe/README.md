@@ -1,8 +1,40 @@
 # <img src="https://provider-logos.metorial-cdn.com/stripe.svg" height="20"> Stripe
 
-Process payments, manage subscriptions, and handle invoices. Create and manage customers, payment methods, and product catalogs. Issue refunds, handle disputes, and submit chargeback evidence. Create checkout sessions and payment links. Manage connected accounts and platform fund flows via Stripe Connect. Configure payouts to bank accounts and debit cards. Apply coupons and promotion codes to subscriptions and invoices. Calculate and collect taxes automatically. Access balance information and transaction history. Upload files for dispute evidence and identity verification. Create and manage virtual and physical payment cards via Issuing. Receive real-time webhook notifications for payment, subscription, invoice, and account events.
+Manage Stripe customers, payments, recurring subscriptions, invoices, products, prices, refunds, disputes, payouts, coupons, and manual tax rates. Create Checkout and Billing Portal sessions and payment links. Inspect account identity, balances, and transaction history, and receive verified webhook events.
+
+Uses Stripe API `2026-08-26.dahlia`. Authenticate with an API key or Stripe Connect OAuth (`read_write`). Restricted API keys need permissions for the resources used; account identity requires account read access. The optional connected-account target applies the Stripe-Account header to tool calls.
+
+Subscription `pause`/`resume` control payment collection. Use returned subscription item IDs to update an existing item. Individual billing periods are returned for each item; the legacy summary is omitted for mixed periods.
+
+Checkout supports `expire`; payment links support `update` with `active=false`; invoices support `list_line_items` and draft `delete`. Promotion codes support get/update and deactivation. Prices are archived with update, and cannot be deleted.
+
+This integration does not currently expose Stripe Issuing, Treasury, Radar rules, file uploads, Connect transfers, or automatic tax calculation.
+
+## Events
+
+Receive payment (including disputes), customer and legacy source, subscription,
+invoice, Checkout (including asynchronous payment), and payout events. One endpoint
+is created automatically for the connection's effective Stripe account and test/live
+mode and shared by subscribers in the same tenant. Optional connected-account
+configuration applies to events as well as tools; this does not subscribe to every
+account on a Connect platform.
+
+Credentials need account and balance read access for identity discovery and webhook
+endpoint management access. Endpoint payloads use API `2026-08-26.dahlia`. Deliveries
+require a valid endpoint signature within five minutes. Event IDs identify retries;
+delivery order is not guaranteed. Customer source deletion does not mean the customer
+was deleted. Subscription periods are reported per item; a summary is present only
+when all items share the same period and the item list is complete.
+
+Removing the final subscriber requests endpoint deletion. The current callback runtime
+can omit the connection state needed for deletion, so verify removal in Stripe and
+remove any leftover endpoint there. These events require a new automatic registration.
 
 ## Tools
+
+### Get Account
+
+Identify the account in use and inspect payment and payout readiness.
 
 ### Create Checkout Session
 
@@ -22,7 +54,7 @@ Issue a full or partial refund on a charge or PaymentIntent. Optionally specify 
 
 ### Get Balance
 
-Retrieve your Stripe account balance across available, pending, and reserved states. Also list balance transactions to see a detailed ledger of funds movements.
+Retrieve your Stripe account balance across available and pending states. Also list balance transactions to see a detailed ledger of funds movements.
 
 ### Manage Coupons
 
@@ -38,7 +70,7 @@ Retrieve, list, update, or close disputes (chargebacks). Submit evidence to figh
 
 ### Manage Invoices
 
-Create, retrieve, update, finalize, send, pay, or void invoices. Supports adding line items, applying discounts, and managing the full invoice lifecycle from draft to paid or voided.
+Create, retrieve, update, finalize, send, pay, or void invoices. Supports adding and listing line items, deleting drafts, and managing the full invoice lifecycle from draft to paid or voided.
 
 ### Manage Payment Intents
 

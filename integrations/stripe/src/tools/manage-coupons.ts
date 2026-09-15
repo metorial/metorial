@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let manageCoupons = SlateTool.create(spec, {
   name: 'Manage Coupons',
   key: 'manage_coupons',
-  description: `Create, retrieve, update, delete, or list coupons and promotion codes. Coupons define discount rules (percentage or fixed amount), and promotion codes are customer-facing codes that apply coupons.`,
+  description: `Create, retrieve, update, delete, or list coupons; create, retrieve, update, or list promotion codes. Promotion codes can be deactivated with update and active=false. Coupons define discount rules (percentage or fixed amount), and promotion codes are customer-facing codes that apply coupons.`,
   instructions: [
     'Provide either percentOff or amountOff (with currency), not both.',
     'Use duration to control how long the discount applies: once, repeating (with durationInMonths), or forever.'
@@ -47,9 +47,14 @@ export let manageCoupons = SlateTool.create(spec, {
       name: z.string().optional().describe('Coupon display name'),
       // Promotion code fields
       code: z.string().optional().describe('Customer-facing promotion code string'),
-      active: z.boolean().optional().describe('Whether the coupon/promotion code is active'),
+      active: z
+        .boolean()
+        .optional()
+        .describe(
+          'Whether the promotion code is active (create/update only for promotion_code)'
+        ),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -103,6 +108,12 @@ export let manageCoupons = SlateTool.create(spec, {
 
     if (resource === 'coupon') {
       if (action === 'create') {
+        if ((ctx.input.percentOff !== undefined) === (ctx.input.amountOff !== undefined))
+          throw stripeServiceError('Provide exactly one of percentOff or amountOff.');
+        if (ctx.input.amountOff !== undefined && !ctx.input.currency)
+          throw stripeServiceError('currency is required with amountOff.');
+        if (ctx.input.duration === 'repeating' && ctx.input.durationInMonths === undefined)
+          throw stripeServiceError('durationInMonths is required for repeating coupons.');
         let params: Record<string, any> = {};
         if (ctx.input.percentOff !== undefined) params.percent_off = ctx.input.percentOff;
         if (ctx.input.amountOff !== undefined) params.amount_off = ctx.input.amountOff;
@@ -203,7 +214,9 @@ export let manageCoupons = SlateTool.create(spec, {
     if (action === 'create') {
       if (!ctx.input.couponId)
         throw stripeServiceError('couponId is required for promotion code creation');
-      let params: Record<string, any> = { coupon: ctx.input.couponId };
+      let params: Record<string, any> = {
+        promotion: { type: 'coupon', coupon: ctx.input.couponId }
+      };
       if (ctx.input.code) params.code = ctx.input.code;
       if (ctx.input.active !== undefined) params.active = ctx.input.active;
       if (ctx.input.maxRedemptions !== undefined)
@@ -215,10 +228,44 @@ export let manageCoupons = SlateTool.create(spec, {
         output: {
           promotionCodeId: promo.id,
           code: promo.code,
-          couponId: promo.coupon?.id || promo.coupon,
+          couponId:
+            promo.promotion?.coupon?.id ||
+            promo.promotion?.coupon ||
+            promo.coupon?.id ||
+            promo.coupon,
           promotionActive: promo.active
         },
         message: `Created promotion code **${promo.code}** (${promo.id})`
+      };
+    }
+
+    if (action === 'delete') {
+      throw stripeServiceError(
+        'Stripe promotion codes cannot be deleted. Use update with active=false.'
+      );
+    }
+    if (action === 'get' || action === 'update') {
+      if (!ctx.input.promotionCodeId)
+        throw stripeServiceError('promotionCodeId is required for get/update.');
+      let promo =
+        action === 'get'
+          ? await client.getPromotionCode(ctx.input.promotionCodeId)
+          : await client.updatePromotionCode(ctx.input.promotionCodeId, {
+              active: ctx.input.active,
+              metadata: ctx.input.metadata
+            });
+      return {
+        output: {
+          promotionCodeId: promo.id,
+          code: promo.code,
+          couponId:
+            promo.promotion?.coupon?.id ||
+            promo.promotion?.coupon ||
+            promo.coupon?.id ||
+            promo.coupon,
+          promotionActive: promo.active
+        },
+        message: `Promotion code **${promo.code}**: ${promo.active ? 'active' : 'inactive'}`
       };
     }
 
@@ -235,7 +282,7 @@ export let manageCoupons = SlateTool.create(spec, {
         promotionCodes: result.data.map((p: any) => ({
           promotionCodeId: p.id,
           code: p.code,
-          couponId: p.coupon?.id || p.coupon,
+          couponId: p.promotion?.coupon?.id || p.promotion?.coupon || p.coupon?.id || p.coupon,
           active: p.active
         })),
         hasMore: result.has_more

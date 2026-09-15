@@ -1,9 +1,11 @@
 import { createAxios, SlateAuth } from '@slates/provider';
 import { z } from 'zod';
+import { STRIPE_API_VERSION } from './lib/client';
 import { stripeApiError, stripeServiceError } from './lib/errors';
 
 let stripeAxios = createAxios({
-  baseURL: 'https://api.stripe.com'
+  baseURL: 'https://api.stripe.com',
+  headers: { 'Stripe-Version': STRIPE_API_VERSION }
 });
 
 let connectAxios = createAxios({
@@ -40,7 +42,11 @@ export let auth = SlateAuth.create()
     name: 'API Key',
     key: 'api_key',
     inputSchema: z.object({
-      token: z.string().describe('Stripe secret API key (starts with sk_live_ or sk_test_)')
+      token: z
+        .string()
+        .describe(
+          'Stripe secret or restricted API key (sk_live_, sk_test_, rk_live_, or rk_test_); restricted keys need account read and permissions for the tools used'
+        )
     }),
     getOutput: async ctx => {
       return {
@@ -77,11 +83,6 @@ export let auth = SlateAuth.create()
         title: 'Read & Write',
         description: 'Full read and write access to the connected Stripe account',
         scope: 'read_write'
-      },
-      {
-        title: 'Read Only',
-        description: 'Read-only access to the connected Stripe account',
-        scope: 'read_only'
       }
     ],
     getAuthorizationUrl: async ctx => {

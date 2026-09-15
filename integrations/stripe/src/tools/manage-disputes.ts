@@ -17,6 +17,8 @@ export let manageDisputes = SlateTool.create(spec, {
     z.object({
       action: z.enum(['get', 'update', 'close', 'list']).describe('Operation to perform'),
       disputeId: z.string().optional().describe('Dispute ID (required for get/update/close)'),
+      paymentIntentId: z.string().optional().describe('Filter list by PaymentIntent ID'),
+      chargeId: z.string().optional().describe('Filter list by charge ID'),
       evidence: z
         .object({
           customerName: z.string().optional().describe('Customer name'),
@@ -35,9 +37,11 @@ export let manageDisputes = SlateTool.create(spec, {
       submitEvidence: z
         .boolean()
         .optional()
-        .describe('If true, submit the evidence and close the dispute for review'),
+        .describe(
+          'If true, submit evidence to the bank. Defaults to false to stage evidence for later submission'
+        ),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -54,6 +58,8 @@ export let manageDisputes = SlateTool.create(spec, {
           'Dispute status (warning_needs_response, warning_under_review, warning_closed, needs_response, under_review, won, lost)'
         ),
       reason: z.string().optional().describe('Dispute reason'),
+      evidenceSubmissionCount: z.number().optional(),
+      evidenceDueBy: z.number().nullable().optional(),
       created: z.number().optional().describe('Creation timestamp'),
       disputes: z
         .array(
@@ -87,6 +93,8 @@ export let manageDisputes = SlateTool.create(spec, {
       currency: d.currency,
       status: d.status,
       reason: d.reason,
+      evidenceSubmissionCount: d.evidence_details?.submission_count,
+      evidenceDueBy: d.evidence_details?.due_by ?? null,
       created: d.created
     });
 
@@ -123,7 +131,7 @@ export let manageDisputes = SlateTool.create(spec, {
           params.evidence.shipping_carrier = ctx.input.evidence.shippingCarrier;
       }
 
-      if (ctx.input.submitEvidence) params.submit = true;
+      params.submit = ctx.input.submitEvidence ?? false;
       if (ctx.input.metadata) params.metadata = ctx.input.metadata;
 
       let dispute = await client.updateDispute(ctx.input.disputeId, params);
@@ -148,6 +156,8 @@ export let manageDisputes = SlateTool.create(spec, {
     if (ctx.input.limit) params.limit = ctx.input.limit;
     if (ctx.input.startingAfter) params.starting_after = ctx.input.startingAfter;
 
+    if (ctx.input.paymentIntentId) params.payment_intent = ctx.input.paymentIntentId;
+    if (ctx.input.chargeId) params.charge = ctx.input.chargeId;
     let result = await client.listDisputes(params);
     return {
       output: {

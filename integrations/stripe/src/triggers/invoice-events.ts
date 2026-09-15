@@ -1,7 +1,9 @@
 import { SlateTrigger } from '@slates/provider';
 import { z } from 'zod';
-import { StripeClient } from '../lib/client';
 import { spec } from '../spec';
+import { invoiceEventSchema, referenceId } from './event-schemas';
+import { matchesStripeEvent } from './event-types';
+import { stripeEvents } from './events-trigger-group';
 
 export let invoiceEvents = SlateTrigger.create(spec, {
   name: 'Invoice Events',
@@ -9,15 +11,8 @@ export let invoiceEvents = SlateTrigger.create(spec, {
   description:
     'Triggered when invoice lifecycle events occur, including creation, finalization, payment success/failure, voiding, and overdue status.'
 })
-  .input(
-    z.object({
-      eventId: z.string().describe('Stripe event ID'),
-      eventType: z.string().describe('Event type (e.g., invoice.paid)'),
-      resourceId: z.string().describe('Invoice ID'),
-      resource: z.any().describe('Full invoice object from the event'),
-      created: z.number().describe('Event creation timestamp')
-    })
-  )
+  .triggerGroup(stripeEvents)
+  .input(invoiceEventSchema)
   .output(
     z.object({
       invoiceId: z.string().describe('Invoice ID'),
@@ -40,88 +35,26 @@ export let invoiceEvents = SlateTrigger.create(spec, {
       created: z.number().optional().describe('Invoice creation timestamp')
     })
   )
-  .webhook({
-    autoRegisterWebhook: async ctx => {
-      let client = new StripeClient({
-        token: ctx.auth.token,
-        stripeAccountId: ctx.config.stripeAccountId
-      });
-
-      let result = await client.createWebhookEndpoint({
-        url: ctx.input.webhookBaseUrl,
-        enabled_events: [
-          'invoice.created',
-          'invoice.finalized',
-          'invoice.paid',
-          'invoice.payment_failed',
-          'invoice.payment_succeeded',
-          'invoice.sent',
-          'invoice.updated',
-          'invoice.voided',
-          'invoice.marked_uncollectible',
-          'invoice.overdue',
-          'invoice.payment_action_required'
-        ]
-      });
-
-      return {
-        registrationDetails: {
-          webhookEndpointId: result.id,
-          secret: result.secret
-        }
-      };
-    },
-
-    autoUnregisterWebhook: async ctx => {
-      let client = new StripeClient({
-        token: ctx.auth.token,
-        stripeAccountId: ctx.config.stripeAccountId
-      });
-
-      await client.deleteWebhookEndpoint(ctx.input.registrationDetails.webhookEndpointId);
-    },
-
-    handleRequest: async ctx => {
-      let body: any = await ctx.request.json();
-
-      if (!body?.type || !body.data?.object) {
-        return { inputs: [] };
+  .matches(payload => matchesStripeEvent('invoice', payload))
+  .map(async ctx => {
+    let resource = ctx.input.data.object;
+    return {
+      type: ctx.input.type,
+      id: ctx.input.id,
+      output: {
+        invoiceId: resource.id,
+        customerId: referenceId(resource.customer) ?? null,
+        subscriptionId:
+          referenceId(resource.parent?.subscription_details?.subscription) ?? null,
+        status: resource.status,
+        total: resource.total,
+        amountDue: resource.amount_due,
+        amountPaid: resource.amount_paid,
+        currency: resource.currency,
+        hostedInvoiceUrl: resource.hosted_invoice_url || null,
+        invoicePdf: resource.invoice_pdf || null,
+        created: resource.created
       }
-
-      let obj = body.data.object;
-
-      return {
-        inputs: [
-          {
-            eventId: body.id,
-            eventType: body.type,
-            resourceId: obj.id,
-            resource: obj,
-            created: body.created
-          }
-        ]
-      };
-    },
-
-    handleEvent: async ctx => {
-      let { resource } = ctx.input;
-      return {
-        type: ctx.input.eventType,
-        id: ctx.input.eventId,
-        output: {
-          invoiceId: ctx.input.resourceId,
-          customerId: resource.customer,
-          subscriptionId: resource.subscription || null,
-          status: resource.status,
-          total: resource.total,
-          amountDue: resource.amount_due,
-          amountPaid: resource.amount_paid,
-          currency: resource.currency,
-          hostedInvoiceUrl: resource.hosted_invoice_url || null,
-          invoicePdf: resource.invoice_pdf || null,
-          created: resource.created
-        }
-      };
-    }
+    };
   })
   .build();
