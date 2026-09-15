@@ -35,7 +35,8 @@ export let dummyAuthor: Author = {
 
 export let dummyChannel: Channel = {
   id: 'C1',
-  type: 'public'
+  type: 'public',
+  hasAccess: true
 };
 
 export let dummyThread: Thread = {

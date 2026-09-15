@@ -107,7 +107,7 @@ describe('workspace and channel', () => {
       })
     ).toMatchObject({ id: 'T123', name: 'Acme' });
 
-    expect(channelSchema.parse({ id: 'C1', type: 'public' }).workspaceId).toBeUndefined();
+    expect(channelSchema.parse({ id: 'C1', type: 'public' }).hasAccess).toBeUndefined();
     expect(
       channelSchema.parse({ id: 'C1', type: 'dm', workspaceId: 'T123' }).workspaceId
     ).toBe('T123');
@@ -145,6 +145,26 @@ describe('workspace and channel', () => {
         isMe: false
       })
     ).toThrow();
+  });
+
+  it('parses channel access and DM recipients', () => {
+    expect(
+      channelSchema.parse({
+        id: 'D1',
+        type: 'dm',
+        hasAccess: false,
+        recipient: {
+          userId: 'U1',
+          userName: 'ada',
+          fullName: 'Ada Lovelace',
+          type: 'user',
+          isMe: false
+        }
+      })
+    ).toMatchObject({
+      hasAccess: false,
+      recipient: { userId: 'U1', fullName: 'Ada Lovelace' }
+    });
   });
 
   it('parses guest authors, provider types, and raw payloads', () => {

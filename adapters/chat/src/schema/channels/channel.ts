@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { chatContextSchema } from '../shared/context';
 import { rawSchema } from '../shared/raw';
+import { authorSchema } from './author';
 
 export let channelTypeSchema = z.enum([
   'public',
@@ -23,6 +24,8 @@ export let channelSchema = z.object({
   name: z.string().optional(),
   topic: z.string().optional(),
   subject: z.string().optional(),
+  hasAccess: z.boolean().optional(),
+  recipient: authorSchema.optional(),
   context: chatContextSchema.optional(),
   permalink: z.string().optional(),
   memberCount: z.number().optional(),
