@@ -11772,7 +11772,7 @@
     },
     "integrations/slack": {
       "name": "@slates-integrations/slack",
-      "version": "0.3.12",
+      "version": "0.3.13",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/adapter-chat": "1.0.0-rc.8",
