@@ -23,10 +23,10 @@ export let managePayouts = SlateTool.create(spec, {
       method: z.enum(['standard', 'instant']).optional().describe('Payout method'),
       destination: z.string().optional().describe('Bank account or card ID to send payout to'),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination'),
       statusFilter: z
-        .enum(['pending', 'paid', 'failed', 'canceled'])
+        .enum(['pending', 'in_transit', 'paid', 'failed', 'canceled'])
         .optional()
         .describe('Filter by status (for list)')
     })

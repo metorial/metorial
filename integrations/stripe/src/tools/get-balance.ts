@@ -12,7 +12,7 @@ let balanceAmountSchema = z.object({
 export let getBalance = SlateTool.create(spec, {
   name: 'Get Balance',
   key: 'get_balance',
-  description: `Retrieve your Stripe account balance across available, pending, and reserved states. Also list balance transactions to see a detailed ledger of funds movements.`,
+  description: `Retrieve your Stripe account balance across available and pending states. Also list balance transactions to see a detailed ledger of funds movements.`,
   tags: {
     destructive: false,
     readOnly: true
@@ -27,7 +27,13 @@ export let getBalance = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Balance transaction ID (for get_transaction)'),
-      limit: z.number().optional().describe('Max results (for list_transactions)'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results (for list_transactions)'),
       startingAfter: z.string().optional().describe('Cursor for pagination'),
       type: z
         .string()

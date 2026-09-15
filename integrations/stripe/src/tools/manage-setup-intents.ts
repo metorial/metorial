@@ -69,7 +69,7 @@ export let manageSetupIntents = SlateTool.create(spec, {
         .optional()
         .describe('Reason for cancellation'),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -112,6 +112,10 @@ export let manageSetupIntents = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      if (ctx.input.automaticPaymentMethods && ctx.input.paymentMethodTypes)
+        throw stripeServiceError(
+          'Provide paymentMethodTypes or enable automaticPaymentMethods, not both.'
+        );
       let params: Record<string, any> = {};
       if (ctx.input.customerId) params.customer = ctx.input.customerId;
       if (ctx.input.paymentMethodId) params.payment_method = ctx.input.paymentMethodId;

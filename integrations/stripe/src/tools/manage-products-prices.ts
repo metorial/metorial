@@ -44,12 +44,28 @@ export let manageProductsPrices = SlateTool.create(spec, {
         })
         .optional()
         .describe('Recurring pricing configuration (omit for one-time prices)'),
+      tiersMode: z
+        .enum(['graduated', 'volume'])
+        .optional()
+        .describe('Required for tiered prices'),
+      tiers: z
+        .array(
+          z.object({
+            upTo: z
+              .union([z.number().int().positive(), z.literal('inf')])
+              .describe('Upper quantity bound or inf for the final tier'),
+            unitAmount: z.number().int().nonnegative().optional(),
+            flatAmount: z.number().int().nonnegative().optional()
+          })
+        )
+        .optional()
+        .describe('Required for tiered prices; omit unitAmount at the top level'),
       billingScheme: z
         .enum(['per_unit', 'tiered'])
         .optional()
         .describe('How to compute the price'),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -197,11 +213,25 @@ export let manageProductsPrices = SlateTool.create(spec, {
       };
     }
 
+    if (action === 'delete') {
+      throw stripeServiceError(
+        'Stripe prices cannot be deleted. Use update with active=false to archive a price.'
+      );
+    }
+
     // Price operations
     if (action === 'create') {
       if (!ctx.input.productId)
         throw stripeServiceError('productId is required for price creation');
-      if (ctx.input.unitAmount === undefined)
+      if (ctx.input.billingScheme === 'tiered') {
+        if (!ctx.input.tiers?.length || !ctx.input.tiersMode)
+          throw stripeServiceError('Tiered prices require tiers and tiersMode.');
+        if (ctx.input.unitAmount !== undefined)
+          throw stripeServiceError('Omit unitAmount for tiered prices; set amounts in tiers.');
+      } else if (ctx.input.tiers || ctx.input.tiersMode) {
+        throw stripeServiceError('tiers and tiersMode require billingScheme=tiered.');
+      }
+      if (ctx.input.billingScheme !== 'tiered' && ctx.input.unitAmount === undefined)
         throw stripeServiceError('unitAmount is required for price creation');
       if (!ctx.input.currency)
         throw stripeServiceError('currency is required for price creation');
@@ -217,6 +247,13 @@ export let manageProductsPrices = SlateTool.create(spec, {
           interval_count: ctx.input.recurring.intervalCount
         };
       }
+      if (ctx.input.tiers)
+        params.tiers = ctx.input.tiers.map(tier => ({
+          up_to: tier.upTo,
+          unit_amount: tier.unitAmount,
+          flat_amount: tier.flatAmount
+        }));
+      if (ctx.input.tiersMode) params.tiers_mode = ctx.input.tiersMode;
       if (ctx.input.billingScheme) params.billing_scheme = ctx.input.billingScheme;
       if (ctx.input.active !== undefined) params.active = ctx.input.active;
       if (ctx.input.metadata) params.metadata = ctx.input.metadata;

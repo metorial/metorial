@@ -2,6 +2,7 @@ import { SlateTool } from '@slates/provider';
 import { z } from 'zod';
 import { StripeClient } from '../lib/client';
 import { stripeServiceError } from '../lib/errors';
+import { mapSubscriptionPeriods, subscriptionItemSchema } from '../lib/subscriptions';
 import { spec } from '../spec';
 
 export let manageSubscriptions = SlateTool.create(spec, {
@@ -10,6 +11,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
   description: `Create, retrieve, update, cancel, pause, or resume subscriptions. Subscriptions handle recurring billing with support for trials, multiple items, proration, and various billing cycles.`,
   instructions: [
     'A subscription requires a customer and at least one price (via items). Use priceId to specify which price to subscribe the customer to.',
+    'pause/resume pause and resume payment collection; they do not change the subscription status to paused.',
     'Use cancelAtPeriodEnd=true to cancel at end of current period instead of immediately.'
   ],
   tags: {
@@ -34,7 +36,14 @@ export let manageSubscriptions = SlateTool.create(spec, {
       items: z
         .array(
           z.object({
-            priceId: z.string().describe('Price ID'),
+            priceId: z.string().optional().describe('Price ID; required for new items'),
+            subscriptionItemId: z
+              .string()
+              .optional()
+              .describe(
+                'Existing item ID from get; required to change an existing item instead of adding another'
+              ),
+            deleted: z.boolean().optional().describe('Remove this existing item on update'),
             quantity: z.number().optional().describe('Quantity')
           })
         )
@@ -57,7 +66,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
         .optional()
         .describe('How to handle proration'),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination'),
       status: z
         .enum([
@@ -77,6 +86,11 @@ export let manageSubscriptions = SlateTool.create(spec, {
   )
   .output(
     z.object({
+      items: z
+        .array(subscriptionItemSchema)
+        .optional()
+        .describe('Subscription item IDs and individual billing periods'),
+      itemsHasMore: z.boolean().optional(),
       subscriptionId: z.string().optional().describe('Subscription ID'),
       customerId: z.string().optional().describe('Customer ID'),
       status: z.string().optional().describe('Subscription status'),
@@ -95,7 +109,9 @@ export let manageSubscriptions = SlateTool.create(spec, {
             subscriptionId: z.string(),
             customerId: z.string(),
             status: z.string(),
-            currentPeriodEnd: z.number(),
+            currentPeriodEnd: z.number().optional(),
+            items: z.array(subscriptionItemSchema).optional(),
+            itemsHasMore: z.boolean().optional(),
             created: z.number()
           })
         )
@@ -111,6 +127,24 @@ export let manageSubscriptions = SlateTool.create(spec, {
     });
 
     let { action } = ctx.input;
+    if (ctx.input.couponId && ctx.input.promotionCodeId) {
+      throw stripeServiceError('Provide either couponId or promotionCodeId, not both.');
+    }
+    if (action === 'create' || action === 'update') {
+      if (ctx.input.items?.length === 0) throw stripeServiceError('items must not be empty.');
+      for (const item of ctx.input.items ?? []) {
+        if (action === 'create' && (item.subscriptionItemId || item.deleted)) {
+          throw stripeServiceError(
+            'Existing item IDs and deleted are only supported for update.'
+          );
+        }
+        if (!item.subscriptionItemId && (!item.priceId || item.deleted)) {
+          throw stripeServiceError(
+            'New items require priceId; deleted items require subscriptionItemId.'
+          );
+        }
+      }
+    }
 
     if (action === 'create') {
       if (!ctx.input.customerId)
@@ -128,11 +162,17 @@ export let manageSubscriptions = SlateTool.create(spec, {
         throw stripeServiceError('priceId or items is required for create action');
       }
 
+      if (ctx.input.cancelAtPeriodEnd !== undefined)
+        params.cancel_at_period_end = ctx.input.cancelAtPeriodEnd;
+      if (ctx.input.prorationBehavior) params.proration_behavior = ctx.input.prorationBehavior;
       if (ctx.input.trialPeriodDays !== undefined)
         params.trial_period_days = ctx.input.trialPeriodDays;
       if (ctx.input.trialEnd) params.trial_end = ctx.input.trialEnd;
-      if (ctx.input.couponId) params.coupon = ctx.input.couponId;
-      if (ctx.input.promotionCodeId) params.promotion_code = ctx.input.promotionCodeId;
+      if (ctx.input.couponId || ctx.input.promotionCodeId) {
+        params.discounts = [
+          { coupon: ctx.input.couponId, promotion_code: ctx.input.promotionCodeId }
+        ];
+      }
       if (ctx.input.defaultPaymentMethodId)
         params.default_payment_method = ctx.input.defaultPaymentMethodId;
       if (ctx.input.metadata) params.metadata = ctx.input.metadata;
@@ -143,8 +183,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
           subscriptionId: sub.id,
           customerId: sub.customer,
           status: sub.status,
-          currentPeriodStart: sub.current_period_start,
-          currentPeriodEnd: sub.current_period_end,
+          ...mapSubscriptionPeriods(sub),
           cancelAtPeriodEnd: sub.cancel_at_period_end,
           trialStart: sub.trial_start,
           trialEnd: sub.trial_end,
@@ -163,8 +202,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
           subscriptionId: sub.id,
           customerId: sub.customer,
           status: sub.status,
-          currentPeriodStart: sub.current_period_start,
-          currentPeriodEnd: sub.current_period_end,
+          ...mapSubscriptionPeriods(sub),
           cancelAtPeriodEnd: sub.cancel_at_period_end,
           trialStart: sub.trial_start,
           trialEnd: sub.trial_end,
@@ -181,14 +219,20 @@ export let manageSubscriptions = SlateTool.create(spec, {
 
       if (ctx.input.items) {
         params.items = ctx.input.items.map(item => ({
+          id: item.subscriptionItemId,
+          deleted: item.deleted,
           price: item.priceId,
           quantity: item.quantity
         }));
       }
+      if (!ctx.input.items && ctx.input.priceId) params.items = [{ price: ctx.input.priceId }];
       if (ctx.input.cancelAtPeriodEnd !== undefined)
         params.cancel_at_period_end = ctx.input.cancelAtPeriodEnd;
-      if (ctx.input.couponId) params.coupon = ctx.input.couponId;
-      if (ctx.input.promotionCodeId) params.promotion_code = ctx.input.promotionCodeId;
+      if (ctx.input.couponId || ctx.input.promotionCodeId) {
+        params.discounts = [
+          { coupon: ctx.input.couponId, promotion_code: ctx.input.promotionCodeId }
+        ];
+      }
       if (ctx.input.defaultPaymentMethodId)
         params.default_payment_method = ctx.input.defaultPaymentMethodId;
       if (ctx.input.prorationBehavior) params.proration_behavior = ctx.input.prorationBehavior;
@@ -201,8 +245,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
           subscriptionId: sub.id,
           customerId: sub.customer,
           status: sub.status,
-          currentPeriodStart: sub.current_period_start,
-          currentPeriodEnd: sub.current_period_end,
+          ...mapSubscriptionPeriods(sub),
           cancelAtPeriodEnd: sub.cancel_at_period_end,
           trialStart: sub.trial_start,
           trialEnd: sub.trial_end,
@@ -225,7 +268,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
             subscriptionId: sub.id,
             customerId: sub.customer,
             status: sub.status,
-            currentPeriodEnd: sub.current_period_end,
+            ...mapSubscriptionPeriods(sub),
             cancelAtPeriodEnd: sub.cancel_at_period_end,
             created: sub.created
           },
@@ -257,7 +300,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
           status: sub.status,
           created: sub.created
         },
-        message: `Paused subscription **${sub.id}**`
+        message: `Paused payment collection for subscription **${sub.id}**`
       };
     }
 
@@ -272,7 +315,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
           status: sub.status,
           created: sub.created
         },
-        message: `Resumed subscription **${sub.id}**`
+        message: `Resumed payment collection for subscription **${sub.id}**`
       };
     }
 
@@ -290,7 +333,7 @@ export let manageSubscriptions = SlateTool.create(spec, {
           subscriptionId: s.id,
           customerId: s.customer,
           status: s.status,
-          currentPeriodEnd: s.current_period_end,
+          ...mapSubscriptionPeriods(s),
           created: s.created
         })),
         hasMore: result.has_more

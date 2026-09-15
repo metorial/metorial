@@ -5,6 +5,7 @@ import {
   createCheckoutSession,
   createPaymentLink,
   createRefund,
+  getAccount,
   getBalance,
   manageCoupons,
   manageCustomers,
@@ -27,6 +28,7 @@ import {
   payoutEvents,
   subscriptionEvents
 } from './triggers';
+import { stripeEvents } from './triggers/events-trigger-group';
 
 export let provider = Slate.create({
   spec,
@@ -40,6 +42,7 @@ export let provider = Slate.create({
     createCheckoutSession,
     createPaymentLink,
     managePayouts,
+    getAccount,
     getBalance,
     manageCoupons,
     manageDisputes,
@@ -49,6 +52,7 @@ export let provider = Slate.create({
     createBillingPortalSession,
     manageTaxRates
   ],
+  triggerGroups: [stripeEvents],
   triggers: [
     paymentEvents,
     subscriptionEvents,

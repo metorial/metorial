@@ -1,150 +1,110 @@
-# Slates Specification for Stripe
+# Stripe integration specification
 
-## Overview
+## API and authentication
 
-Stripe is a payment processing and financial infrastructure platform that provides APIs for accepting payments, managing subscriptions and billing, sending payouts, handling invoices, and building financial workflows. Stripe provides a unified set of REST APIs for accepting payments, managing billing and subscriptions, sending payouts, and building financial workflows.
+Requests and newly registered webhooks use Stripe API `2026-08-26.dahlia`.
+The client sends form-encoded nested parameters to `https://api.stripe.com/v1`.
+Empty objects and arrays encode as empty values, allowing documented field clearing.
+Provider errors use the shared ServiceError adapter and retain Stripe error details.
 
-## Authentication
+- API key auth accepts secret or restricted keys. Restricted keys need resource permissions corresponding to the operations used, including account read access for profile discovery.
+- Stripe Connect OAuth requests only `read_write`. Stripe accepts a single access level per authorization; `read_only` is restricted to legacy Connect extensions and is not requested.
+- Authorization uses `https://connect.stripe.com/oauth/authorize`; callback and refresh use `https://connect.stripe.com/oauth/token`. Refresh preserves the previous refresh token and connected account ID if omitted by Stripe. Stripe Connect access tokens do not have a documented expiry duration, so none is invented.
+- OAuth access tokens already identify the connected account. Optional `stripeAccountId` config deliberately targets another connected account using the Stripe-Account header for platform API keys; it is not required at setup.
+- `get_account` identifies the effective tool account. Profile discovery identifies the authenticating account before optional tool targeting.
 
-Stripe supports two primary authentication methods:
+## Tools
 
-### 1. API Keys
+| Tool | Supported operations |
+| --- | --- |
+| get_account | Effective account identity and readiness |
+| manage_customers | Create, get, update including shipping, delete, email-filtered list |
+| manage_payment_intents | Create, get, update, confirm with return URL, capture, cancel, list |
+| manage_subscriptions | Create, get, update targeted items, cancel now/at period end, pause/resume collection, list |
+| manage_invoices | Create, get, update, finalize, send, pay, void, add/list line items, delete draft, list |
+| manage_products_prices | Product CRUD/list; price create/get/update/list, including tiered pricing; archive using active=false |
+| create_refund | Create full/partial refund, get, list |
+| create_checkout_session | Create hosted session, get, expire, customer-filtered list |
+| create_payment_link | Create, get, update/deactivate, list |
+| manage_payouts | Create, get, list including in_transit filter |
+| get_balance | Available/pending balances; list/get balance transactions |
+| manage_coupons | Coupon CRUD/list; promotion-code create/get/update/list; deactivate using active=false |
+| manage_disputes | Get, stage or submit evidence, close, list by charge or PaymentIntent |
+| search_charges | Get, filtered list; this is not Stripe Search syntax |
+| manage_setup_intents | Create, get, confirm, cancel, list |
+| manage_payment_methods | Get, customer get/list, attach, detach, set invoice default on attach |
+| create_billing_portal_session | Create session with optional configuration, locale and connected-account branding |
+| manage_tax_rates | Create/get/update/list manual rates; archive using active=false |
 
-The Stripe API uses API keys to authenticate requests. API keys are passed via HTTP Basic Auth as the username (with an empty password) or as a Bearer token in the `Authorization` header.
+List limits are 1–100 and use startingAfter cursors. Outputs expose IDs and hasMore.
+Subscriptions expose item IDs and item billing periods. Legacy top-level periods remain for uniform periods and older webhook payloads; mixed periods omit the summary.
+Subscription discount inputs map to discounts entries. Promotion-code creation maps to promotion[type]=coupon and promotion[coupon]. Invoice item prices map to pricing[price].
+Dispute evidence defaults to staging; only submitEvidence=true submits to the bank.
+Invoice PDF and hosted invoice URLs are provider metadata; there is no dedicated file-download operation.
 
-After you create a Stripe account, we generate two pairs of API keys—a publishable client-side key and a secret server-side key—for both testing in a sandbox and in live modes.
+## Webhooks
 
-There are three types of API keys:
+One automatic `events` trigger group owns the six existing triggers:
+`payment_events`, `customer_events`, `subscription_events`, `invoice_events`,
+`checkout_events`, and `payout_events`. Exact event lists are defined together in
+`src/triggers/event-types.ts`; the endpoint subscribes to their union, without a wildcard.
+Payment events include disputes, and Checkout includes asynchronous payment outcomes.
 
-- **Secret keys** (prefix `sk_live_` or `sk_test_`): Full access to the API. Used server-side only. All API requests must be made over HTTPS.
-- **Publishable keys** (prefix `pk_live_` or `pk_test_`): Used in client-side code (e.g., Stripe.js) for tokenizing payment information. Limited to specific safe operations.
-- **Restricted keys** (prefix `rk_live_` or `rk_test_`): For each resource you want the new key to access, select the appropriate permission: None, Read, or Write. Created in the Dashboard with granular, per-resource permissions. Instead of using secret API keys with broad access, you can create restricted API keys to assign specific privileges to people and systems. For example, you can give your invoicing system the ability to manage invoices and nothing else.
+Targets are discovered using `/account` and `/balance` with the effective connection
+credentials/config. The stable target ID combines account ID and test/live mode;
+`multi_user` ownership allows subscriptions to share one endpoint within a tenant.
+Registration revalidates the target and creates an account-scoped endpoint with the
+pinned API version. Registration payloads contain `endpointId`, `signingSecret`,
+`accountId`, and `livemode`; secrets are never included in target metadata or outputs.
+Restricted credentials require account/balance read and webhook-management permissions.
 
-The API key you use to authenticate the request determines whether the request is live mode or test mode.
+Processing validates the saved registration, verifies Stripe-Signature v1 over the
+original raw body, enforces a five-minute timestamp window, and validates the event
+envelope without removing snapshot fields. It emits `{ accountId, livemode }` routing
+matchers and the Stripe event ID as the idempotency key. An event account, when non-null, must
+match the registered account; account-scoped events with a missing or null account belong to that endpoint's
+registered account. Other accounts, modes, and unsupported event types are acknowledged
+without routing. Invalid signatures/bodies return 400, unsupported methods 405, invalid
+registration data 500, and accepted or ignored deliveries 200.
 
-Example:
+Triggers select exact event types and object types before mapping validated snapshots.
+Expandable references map to IDs. Customer source events derive the customer ID from
+the customer reference, and source deletion does not report customer deletion.
+Invoice subscription IDs use `parent.subscription_details.subscription`. Subscription
+periods use current item-level fields only; summary periods require a complete item
+list with uniform periods. No legacy handlers, registration payloads, or old API field
+fallbacks remain in the webhook path. Tool behavior is unchanged.
 
-```
-curl https://api.stripe.com/v1/charges \
-  -u sk_test_YOUR_SECRET_KEY:
-```
+Unregister uses the saved endpoint ID even when the runtime registration identifier is
+empty, validates account/mode, and ignores only an upstream 404. Other failures propagate.
+The callback runtime currently omits connection state on unregister, so provider-side
+cleanup must be verified separately. No credentials are stored to bypass this limitation.
 
-### 2. OAuth 2.0 (Stripe Connect)
+## Boundaries
 
-Used for platforms that need to act on behalf of connected Stripe accounts. On Stripe's website, the user provides the necessary information for connecting to your platform. The user is redirected to your site, along with an authorization code. Your site then makes a request to Stripe's OAuth token endpoint to complete the connection and fetch the user's account ID.
+This is a practical payments and billing surface, not the whole Stripe API. Credit notes, invoice previews, subscription schedules, true paused-subscription resumption, customer tax IDs, Connect account discovery/transfers, file uploads/downloads, Issuing, Treasury, and Radar administration are not exposed.
 
-- **Authorization URL**: `https://connect.stripe.com/oauth/authorize`
-- **Token URL**: `https://connect.stripe.com/oauth/token`
-- **Scopes**: `read_write` (full access) or `read_only` (read-only access). The scope parameter dictates what your platform can do on behalf of the connected account, with read_only being the default.
-- Required parameters: `response_type=code`, `client_id` (your platform's Connect Client ID), `scope`, and `redirect_uri`.
-- To prevent CSRF attacks, add the state parameter, passing along a unique token as the value. We'll include the state you gave us when we redirect the user back to your site. Your site should confirm the state parameter hasn't been modified.
-- After authorization, exchange the authorization code for the connected account's `stripe_user_id`, which is then used via the `Stripe-Account` header on API calls.
+## Verification
 
-### 3. OAuth 2.0 (Stripe Apps)
+Private live scenarios are in tests/integrations/stripe/tools.e2e.ts and require a test-mode API key. The shared profile downloaded on 2026-09-14 was empty, so provider acceptance remains unverified. Schema compatibility and local webhook authentication have package tests. Local SDK webhook contract tests cover malicious signatures, stale deliveries, invalid envelopes, account/mode isolation, category selection, and callback registration/mapping contracts. Stripe cannot emit adversarial deliveries, and the private tools harness does not drive callback lifecycle. Stubbed registration calls prove local contracts only; they do not prove provider acceptance. Live callback delivery and cleanup require a test-mode Stripe account and an enabled Metorial callback environment.
 
-For Stripe Apps distributed via the App Marketplace. Your callback URL receives an OAuth authorization code parameter that your backend needs to exchange for an API access token and the refresh token. This authorization code is one-time use only and valid only for 5 minutes, in which your backend needs to exchange the code for the access token.
+### Documented webhook unit tests
 
-- Token endpoint: `POST https://api.stripe.com/v1/oauth/token`
-- Access tokens expire in 1 hour and must be refreshed using the refresh token.
-- Scope is `stripe_apps` and permissions are defined in the app manifest.
+User-requested payload tests in `src/webhooks.payloads.test.ts` cover all 51 registered
+event types plus card, bank-account, and attached-Source variants. Each parameterized
+case links its concrete Stripe payload example. Fixtures contain reduced example
+fields; lifecycle overrides are explicitly adapted examples, not live captures.
+The inventory is independent of production event lists, and each case verifies the
+signed receive path, selected trigger, routing matcher, event ID, and complete output.
+The null-account regression covers Stripe's documented nullable Event.account field.
 
-## Features
+## Sources
 
-### Payment Processing
-
-Create and manage one-time charges and payments. Supports card payments, bank transfers, digital wallets, and dozens of regional payment methods across multiple currencies. Use PaymentIntents to orchestrate the full payment lifecycle including authorization, capture, and confirmation. Save payment methods for future use via SetupIntents.
-
-### Subscriptions & Recurring Billing
-
-Create and manage subscription plans with flexible billing cycles. Handle upgrades, downgrades, trials, pausing, and cancellations. Supports metered/usage-based billing. Automatically generates invoices for subscription cycles and handles failed payment retries.
-
-### Invoicing
-
-Create, send, and manage invoices programmatically. Supports draft, finalized, paid, void, and uncollectible states. Invoices can be sent directly to customers with hosted payment pages or used for manual/offline billing.
-
-### Customer Management
-
-Create and manage customer records including contact information, payment methods, and billing settings. Attach multiple payment methods to a customer. Track customer balance and credit.
-
-### Products & Prices
-
-Define a product catalog with associated prices. Supports one-time and recurring pricing models, tiered pricing, and multiple currencies per product.
-
-### Connect (Platform & Marketplace)
-
-Build platforms and marketplaces where your users can accept payments. Manage connected accounts (Standard, Express, or Custom), handle onboarding, and control fund flows. Split payments between platform and connected accounts. Manage payouts to connected accounts.
-
-### Payouts
-
-Transfer funds from your Stripe balance to external bank accounts or debit cards. Configure automatic or manual payout schedules.
-
-### Refunds & Disputes
-
-Issue full or partial refunds on payments. Manage charge disputes (chargebacks) including submitting evidence.
-
-### Checkout & Payment Links
-
-Create hosted checkout sessions or shareable payment links for accepting one-time or recurring payments without building a custom payment form.
-
-### Coupons & Promotions
-
-Create discount coupons and promotion codes that can be applied to invoices, subscriptions, or checkout sessions. Supports percentage-based and fixed-amount discounts with configurable duration and redemption limits.
-
-### Reporting & Balance
-
-Access your Stripe balance information, view balance transactions, and generate financial reports. Track funds across available, pending, and reserved states.
-
-### Fraud Prevention (Radar)
-
-Built-in machine-learning fraud detection. Create custom rules to block, allow, or review payments based on risk signals.
-
-### Tax
-
-Automatically calculate and collect taxes on transactions. Supports tax rates, tax IDs, and tax reporting.
-
-### Billing Portal
-
-Provide customers with a self-service portal to manage their subscriptions, payment methods, and billing history.
-
-### File Uploads
-
-Upload files (e.g., dispute evidence, identity documents) to Stripe for use with various API resources.
-
-### Issuing
-
-Create and manage virtual and physical payment cards programmatically. Control spending with real-time authorization rules.
-
-### Treasury
-
-Provide financial accounts (store-of-value) with features like fund management, money movement, and account details for building embedded banking experiences.
-
-## Events
-
-Stripe webhooks are HTTP callbacks that deliver real-time notifications about events in your Stripe account. When a customer completes a payment, disputes a charge, or a subscription trial ends, Stripe sends an HTTP POST request to your configured endpoint with detailed event data.
-
-Set up event destinations to receive events from Stripe that you can direct to a webhook endpoint or other listening service, such as Amazon EventBridge. Stripe generates over 200 different webhook event types. Events follow the naming pattern `resource.action` (e.g., `charge.succeeded`). You can register and create one endpoint to handle several different event types at the same time, or set up individual endpoints for specific events.
-
-Webhook endpoints are configured via the Stripe Dashboard or the API. Each endpoint receives a signing secret used to verify event authenticity. Events can be received as snapshot events (containing the full object state) or thin events (containing only the object ID).
-
-### Event Categories
-
-- **Account Events**: Account status changes, capability updates, and external account modifications.
-- **Balance Events**: Occurs whenever your Stripe balance has been updated (e.g., when a charge is available to be paid out).
-- **Charge Events**: Charge creation, capture, success, failure, refund, and dispute lifecycle events.
-- **Checkout Events**: Checkout session completion and expiration.
-- **Customer Events**: Customer creation, update, deletion, and changes to sources, subscriptions, and payment methods.
-- **Dispute Events**: Dispute creation, updates, closure, and fund management.
-- **Invoice Events**: Invoice creation, finalization, payment success/failure, voiding, and becoming overdue.
-- **Payment Intent Events**: PaymentIntent creation, success, failure, cancellation, and events requiring further action.
-- **Payment Method Events**: Attachment, detachment, and update of payment methods.
-- **Payout Events**: Payout creation, success, failure, and cancellation.
-- **Price & Product Events**: Price and product creation, updates, and deletions.
-- **Subscription Events**: Occurs whenever a customer is signed up for a new plan. Occurs whenever a customer's subscription ends. Occurs whenever a customer's subscription is paused. Also includes trial expiration, pending updates, and resumption.
-- **Setup Intent Events**: Setup intent success, failure, and cancellation.
-- **Transfer Events**: Transfer creation, update, and reversal.
-- **Radar / Fraud Events**: Early fraud warnings created and updated.
-- **Billing Meter Events**: Meter creation, update, deactivation, and reactivation.
-- **Issuing Events**: Card creation, authorization, and transaction events.
-- **Tax Events**: Tax settings and registration changes.
-- **Identity Events**: Verification session events.
-- **Application Events**: Authorization and deauthorization of connected applications.
+- [Versioning](https://docs.stripe.com/api/versioning)
+- [Official OpenAPI](https://github.com/stripe/openapi/blob/master/openapi/spec3.json)
+- [Connect OAuth](https://docs.stripe.com/connect/oauth-reference)
+- [Subscriptions](https://docs.stripe.com/api/subscriptions)
+- [Invoice items](https://docs.stripe.com/api/invoiceitems/create)
+- [Promotion codes](https://docs.stripe.com/api/promotion_codes/create)
+- [Disputes](https://docs.stripe.com/api/disputes/update)
+- [Webhook signatures](https://docs.stripe.com/webhooks/signature)

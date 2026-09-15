@@ -19,7 +19,7 @@ export let searchCharges = SlateTool.create(spec, {
       chargeId: z.string().optional().describe('Charge ID (for get)'),
       customerId: z.string().optional().describe('Filter by customer ID'),
       paymentIntentId: z.string().optional().describe('Filter by PaymentIntent ID'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )

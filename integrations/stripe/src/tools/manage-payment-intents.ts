@@ -35,7 +35,7 @@ export let managePaymentIntents = SlateTool.create(spec, {
       paymentMethodId: z.string().optional().describe('Payment method ID to use'),
       description: z.string().optional().describe('Description of the payment'),
       captureMethod: z
-        .enum(['automatic', 'manual'])
+        .enum(['automatic', 'automatic_async', 'manual'])
         .optional()
         .describe('Whether to auto-capture or require explicit capture'),
       confirmationMethod: z
@@ -43,10 +43,21 @@ export let managePaymentIntents = SlateTool.create(spec, {
         .optional()
         .describe('How to confirm the PaymentIntent'),
       receiptEmail: z.string().optional().describe('Email address to send the receipt to'),
+      paymentMethodTypes: z
+        .array(z.string())
+        .optional()
+        .describe('Allowed payment method types for create, for example card'),
+      returnUrl: z.string().optional().describe('Return URL for redirect-based confirmation'),
+      statementDescriptorSuffix: z
+        .string()
+        .optional()
+        .describe('Card statement descriptor suffix for create/update'),
       statementDescriptor: z
         .string()
         .optional()
-        .describe('Statement descriptor for the charge (max 22 chars)'),
+        .describe(
+          'Non-card statement descriptor (max 22 chars); use statementDescriptorSuffix for card payments'
+        ),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
       amountToCapture: z
         .number()
@@ -56,7 +67,13 @@ export let managePaymentIntents = SlateTool.create(spec, {
         .enum(['duplicate', 'fraudulent', 'requested_by_customer', 'abandoned'])
         .optional()
         .describe('Reason for cancellation'),
-      limit: z.number().optional().describe('Max results to return (for list)'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Max results to return (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -119,8 +136,12 @@ export let managePaymentIntents = SlateTool.create(spec, {
       if (ctx.input.receiptEmail) params.receipt_email = ctx.input.receiptEmail;
       if (ctx.input.statementDescriptor)
         params.statement_descriptor = ctx.input.statementDescriptor;
+      if (ctx.input.statementDescriptorSuffix)
+        params.statement_descriptor_suffix = ctx.input.statementDescriptorSuffix;
       if (ctx.input.metadata) params.metadata = ctx.input.metadata;
 
+      if (ctx.input.paymentMethodTypes)
+        params.payment_method_types = ctx.input.paymentMethodTypes;
       let pi = await client.createPaymentIntent(params);
       return {
         output: {
@@ -164,6 +185,8 @@ export let managePaymentIntents = SlateTool.create(spec, {
       if (ctx.input.paymentMethodId) params.payment_method = ctx.input.paymentMethodId;
       if (ctx.input.description) params.description = ctx.input.description;
       if (ctx.input.receiptEmail) params.receipt_email = ctx.input.receiptEmail;
+      if (ctx.input.statementDescriptorSuffix)
+        params.statement_descriptor_suffix = ctx.input.statementDescriptorSuffix;
       if (ctx.input.metadata) params.metadata = ctx.input.metadata;
 
       let pi = await client.updatePaymentIntent(ctx.input.paymentIntentId, params);
@@ -186,6 +209,7 @@ export let managePaymentIntents = SlateTool.create(spec, {
         throw stripeServiceError('paymentIntentId is required for confirm action');
       let params: Record<string, any> = {};
       if (ctx.input.paymentMethodId) params.payment_method = ctx.input.paymentMethodId;
+      if (ctx.input.returnUrl) params.return_url = ctx.input.returnUrl;
       let pi = await client.confirmPaymentIntent(ctx.input.paymentIntentId, params);
       return {
         output: {

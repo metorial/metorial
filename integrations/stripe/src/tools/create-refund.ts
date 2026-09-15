@@ -32,7 +32,7 @@ export let createRefund = SlateTool.create(spec, {
         .optional()
         .describe('Reason for the refund'),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -74,6 +74,9 @@ export let createRefund = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      if (Boolean(ctx.input.chargeId) === Boolean(ctx.input.paymentIntentId)) {
+        throw stripeServiceError('Provide exactly one of chargeId or paymentIntentId.');
+      }
       let params: Record<string, any> = {};
       if (ctx.input.chargeId) params.charge = ctx.input.chargeId;
       if (ctx.input.paymentIntentId) params.payment_intent = ctx.input.paymentIntentId;

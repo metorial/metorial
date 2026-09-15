@@ -7,7 +7,7 @@ import { spec } from '../spec';
 export let createCheckoutSession = SlateTool.create(spec, {
   name: 'Create Checkout Session',
   key: 'create_checkout_session',
-  description: `Create a hosted Stripe Checkout session or retrieve an existing one. Checkout provides a pre-built, optimized payment page for one-time payments and subscriptions. Returns a URL to redirect the customer to.`,
+  description: `Create a hosted Stripe Checkout session or retrieve, list, or expire existing sessions. Checkout provides a pre-built, optimized payment page for one-time payments and subscriptions. Returns a URL to redirect the customer to.`,
   tags: {
     destructive: false,
     readOnly: false
@@ -15,8 +15,8 @@ export let createCheckoutSession = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      action: z.enum(['create', 'get', 'list']).describe('Operation to perform'),
-      sessionId: z.string().optional().describe('Session ID (for get)'),
+      action: z.enum(['create', 'get', 'expire', 'list']).describe('Operation to perform'),
+      sessionId: z.string().optional().describe('Session ID (for get/expire)'),
       mode: z
         .enum(['payment', 'subscription', 'setup'])
         .optional()
@@ -39,7 +39,7 @@ export let createCheckoutSession = SlateTool.create(spec, {
         .describe('Line items for the checkout session'),
       allowPromotionCodes: z.boolean().optional().describe('Whether to allow promotion codes'),
       metadata: z.record(z.string(), z.string()).optional().describe('Key-value metadata'),
-      limit: z.number().optional().describe('Max results (for list)'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (for list)'),
       startingAfter: z.string().optional().describe('Cursor for pagination')
     })
   )
@@ -53,6 +53,8 @@ export let createCheckoutSession = SlateTool.create(spec, {
         .describe('Checkout page URL (redirect customer here)'),
       status: z.string().optional().nullable().describe('Session status'),
       mode: z.string().optional().describe('Checkout mode'),
+      paymentIntentId: z.string().nullable().optional().describe('Related PaymentIntent ID'),
+      subscriptionId: z.string().nullable().optional().describe('Related subscription ID'),
       paymentStatus: z.string().optional().describe('Payment status'),
       customerId: z.string().optional().nullable().describe('Customer ID'),
       amountTotal: z
@@ -85,6 +87,12 @@ export let createCheckoutSession = SlateTool.create(spec, {
     let { action } = ctx.input;
 
     if (action === 'create') {
+      if (ctx.input.customerId && ctx.input.customerEmail)
+        throw stripeServiceError('Provide customerId or customerEmail, not both.');
+      if (ctx.input.mode === 'setup' && ctx.input.lineItems?.length)
+        throw stripeServiceError('Setup mode does not accept lineItems.');
+      if (ctx.input.mode !== 'setup' && !ctx.input.lineItems?.length)
+        throw stripeServiceError('lineItems are required for payment/subscription mode.');
       if (!ctx.input.mode) throw stripeServiceError('mode is required for create action');
       if (!ctx.input.successUrl)
         throw stripeServiceError('successUrl is required for create action');
@@ -103,7 +111,7 @@ export let createCheckoutSession = SlateTool.create(spec, {
       if (ctx.input.lineItems) {
         params.line_items = ctx.input.lineItems.map(item => ({
           price: item.priceId,
-          quantity: item.quantity || 1
+          quantity: item.quantity ?? 1
         }));
       }
 
@@ -115,6 +123,8 @@ export let createCheckoutSession = SlateTool.create(spec, {
           status: session.status,
           mode: session.mode,
           paymentStatus: session.payment_status,
+          paymentIntentId: session.payment_intent,
+          subscriptionId: session.subscription,
           customerId: session.customer,
           amountTotal: session.amount_total,
           currency: session.currency
@@ -123,10 +133,13 @@ export let createCheckoutSession = SlateTool.create(spec, {
       };
     }
 
-    if (action === 'get') {
+    if (action === 'get' || action === 'expire') {
       if (!ctx.input.sessionId)
         throw stripeServiceError('sessionId is required for get action');
-      let session = await client.getCheckoutSession(ctx.input.sessionId);
+      let session =
+        action === 'expire'
+          ? await client.expireCheckoutSession(ctx.input.sessionId)
+          : await client.getCheckoutSession(ctx.input.sessionId);
       return {
         output: {
           sessionId: session.id,
@@ -134,6 +147,8 @@ export let createCheckoutSession = SlateTool.create(spec, {
           status: session.status,
           mode: session.mode,
           paymentStatus: session.payment_status,
+          paymentIntentId: session.payment_intent,
+          subscriptionId: session.subscription,
           customerId: session.customer,
           amountTotal: session.amount_total,
           currency: session.currency
@@ -147,6 +162,7 @@ export let createCheckoutSession = SlateTool.create(spec, {
     if (ctx.input.limit) params.limit = ctx.input.limit;
     if (ctx.input.startingAfter) params.starting_after = ctx.input.startingAfter;
 
+    if (ctx.input.customerId) params.customer = ctx.input.customerId;
     let result = await client.listCheckoutSessions(params);
     return {
       output: {

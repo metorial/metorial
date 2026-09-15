@@ -1,7 +1,10 @@
 import { SlateTrigger } from '@slates/provider';
 import { z } from 'zod';
-import { StripeClient } from '../lib/client';
+import { subscriptionItemSchema } from '../lib/subscriptions';
 import { spec } from '../spec';
+import { referenceId, subscriptionEventSchema } from './event-schemas';
+import { matchesStripeEvent } from './event-types';
+import { stripeEvents } from './events-trigger-group';
 
 export let subscriptionEvents = SlateTrigger.create(spec, {
   name: 'Subscription Events',
@@ -9,17 +12,12 @@ export let subscriptionEvents = SlateTrigger.create(spec, {
   description:
     'Triggered when subscription lifecycle events occur, including creation, updates, cancellation, trial expiration, pausing, and resumption.'
 })
-  .input(
-    z.object({
-      eventId: z.string().describe('Stripe event ID'),
-      eventType: z.string().describe('Event type (e.g., customer.subscription.created)'),
-      resourceId: z.string().describe('Subscription ID'),
-      resource: z.any().describe('Full subscription object from the event'),
-      created: z.number().describe('Event creation timestamp')
-    })
-  )
+  .triggerGroup(stripeEvents)
+  .input(subscriptionEventSchema)
   .output(
     z.object({
+      items: z.array(subscriptionItemSchema).optional(),
+      itemsHasMore: z.boolean().optional(),
       subscriptionId: z.string().describe('Subscription ID'),
       customerId: z.string().describe('Customer ID'),
       status: z.string().describe('Subscription status'),
@@ -35,84 +33,44 @@ export let subscriptionEvents = SlateTrigger.create(spec, {
       created: z.number().optional().describe('Subscription creation timestamp')
     })
   )
-  .webhook({
-    autoRegisterWebhook: async ctx => {
-      let client = new StripeClient({
-        token: ctx.auth.token,
-        stripeAccountId: ctx.config.stripeAccountId
-      });
-
-      let result = await client.createWebhookEndpoint({
-        url: ctx.input.webhookBaseUrl,
-        enabled_events: [
-          'customer.subscription.created',
-          'customer.subscription.updated',
-          'customer.subscription.deleted',
-          'customer.subscription.paused',
-          'customer.subscription.resumed',
-          'customer.subscription.trial_will_end',
-          'customer.subscription.pending_update_applied',
-          'customer.subscription.pending_update_expired'
-        ]
-      });
-
-      return {
-        registrationDetails: {
-          webhookEndpointId: result.id,
-          secret: result.secret
-        }
-      };
-    },
-
-    autoUnregisterWebhook: async ctx => {
-      let client = new StripeClient({
-        token: ctx.auth.token,
-        stripeAccountId: ctx.config.stripeAccountId
-      });
-
-      await client.deleteWebhookEndpoint(ctx.input.registrationDetails.webhookEndpointId);
-    },
-
-    handleRequest: async ctx => {
-      let body: any = await ctx.request.json();
-
-      if (!body?.type || !body.data?.object) {
-        return { inputs: [] };
+  .matches(payload => matchesStripeEvent('subscription', payload))
+  .map(async ctx => {
+    let resource = ctx.input.data.object;
+    const items = resource.items.data;
+    const first = items[0];
+    const sharedPeriod =
+      !resource.items.has_more &&
+      first &&
+      items.every(
+        item =>
+          item.current_period_start === first.current_period_start &&
+          item.current_period_end === first.current_period_end
+      )
+        ? first
+        : undefined;
+    return {
+      type: ctx.input.type,
+      id: ctx.input.id,
+      output: {
+        subscriptionId: resource.id,
+        customerId: referenceId(resource.customer),
+        status: resource.status,
+        items: items.map(item => ({
+          subscriptionItemId: item.id,
+          priceId: referenceId(item.price),
+          quantity: item.quantity ?? undefined,
+          currentPeriodStart: item.current_period_start,
+          currentPeriodEnd: item.current_period_end
+        })),
+        itemsHasMore: resource.items.has_more,
+        currentPeriodStart: sharedPeriod?.current_period_start,
+        currentPeriodEnd: sharedPeriod?.current_period_end,
+        cancelAtPeriodEnd: resource.cancel_at_period_end,
+        canceledAt: resource.canceled_at || null,
+        trialStart: resource.trial_start || null,
+        trialEnd: resource.trial_end || null,
+        created: resource.created
       }
-
-      let obj = body.data.object;
-
-      return {
-        inputs: [
-          {
-            eventId: body.id,
-            eventType: body.type,
-            resourceId: obj.id,
-            resource: obj,
-            created: body.created
-          }
-        ]
-      };
-    },
-
-    handleEvent: async ctx => {
-      let { resource } = ctx.input;
-      return {
-        type: ctx.input.eventType,
-        id: ctx.input.eventId,
-        output: {
-          subscriptionId: ctx.input.resourceId,
-          customerId: resource.customer,
-          status: resource.status,
-          currentPeriodStart: resource.current_period_start,
-          currentPeriodEnd: resource.current_period_end,
-          cancelAtPeriodEnd: resource.cancel_at_period_end,
-          canceledAt: resource.canceled_at || null,
-          trialStart: resource.trial_start || null,
-          trialEnd: resource.trial_end || null,
-          created: resource.created
-        }
-      };
-    }
+    };
   })
   .build();

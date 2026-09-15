@@ -15,6 +15,14 @@
     },
     "typecheck": {
       "dependsOn": ["^typecheck"]
+    },
+    "@slates-integrations/super-booble-2a#build": {
+      "dependsOn": [
+        "^build",
+        "@slates/oauth-google#build",
+        "@slates/super-google-tools#build"
+      ],
+      "outputs": ["dist/**"]
     }
   }
 }

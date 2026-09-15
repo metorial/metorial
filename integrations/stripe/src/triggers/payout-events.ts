@@ -1,7 +1,9 @@
 import { SlateTrigger } from '@slates/provider';
 import { z } from 'zod';
-import { StripeClient } from '../lib/client';
 import { spec } from '../spec';
+import { payoutEventSchema } from './event-schemas';
+import { matchesStripeEvent } from './event-types';
+import { stripeEvents } from './events-trigger-group';
 
 export let payoutEvents = SlateTrigger.create(spec, {
   name: 'Payout Events',
@@ -9,15 +11,8 @@ export let payoutEvents = SlateTrigger.create(spec, {
   description:
     'Triggered when payout events occur, including creation, success, failure, and cancellation of transfers to your bank account or debit card.'
 })
-  .input(
-    z.object({
-      eventId: z.string().describe('Stripe event ID'),
-      eventType: z.string().describe('Event type (e.g., payout.paid)'),
-      resourceId: z.string().describe('Payout ID'),
-      resource: z.any().describe('Full payout object from the event'),
-      created: z.number().describe('Event creation timestamp')
-    })
-  )
+  .triggerGroup(stripeEvents)
+  .input(payoutEventSchema)
   .output(
     z.object({
       payoutId: z.string().describe('Payout ID'),
@@ -34,80 +29,22 @@ export let payoutEvents = SlateTrigger.create(spec, {
       created: z.number().optional().describe('Payout creation timestamp')
     })
   )
-  .webhook({
-    autoRegisterWebhook: async ctx => {
-      let client = new StripeClient({
-        token: ctx.auth.token,
-        stripeAccountId: ctx.config.stripeAccountId
-      });
-
-      let result = await client.createWebhookEndpoint({
-        url: ctx.input.webhookBaseUrl,
-        enabled_events: [
-          'payout.created',
-          'payout.paid',
-          'payout.failed',
-          'payout.canceled',
-          'payout.updated',
-          'payout.reconciliation_completed'
-        ]
-      });
-
-      return {
-        registrationDetails: {
-          webhookEndpointId: result.id,
-          secret: result.secret
-        }
-      };
-    },
-
-    autoUnregisterWebhook: async ctx => {
-      let client = new StripeClient({
-        token: ctx.auth.token,
-        stripeAccountId: ctx.config.stripeAccountId
-      });
-
-      await client.deleteWebhookEndpoint(ctx.input.registrationDetails.webhookEndpointId);
-    },
-
-    handleRequest: async ctx => {
-      let body: any = await ctx.request.json();
-
-      if (!body?.type || !body.data?.object) {
-        return { inputs: [] };
+  .matches(payload => matchesStripeEvent('payout', payload))
+  .map(async ctx => {
+    let resource = ctx.input.data.object;
+    return {
+      type: ctx.input.type,
+      id: ctx.input.id,
+      output: {
+        payoutId: resource.id,
+        amount: resource.amount,
+        currency: resource.currency,
+        status: resource.status,
+        method: resource.method,
+        arrivalDate: resource.arrival_date,
+        failureMessage: resource.failure_message || null,
+        created: resource.created
       }
-
-      let obj = body.data.object;
-
-      return {
-        inputs: [
-          {
-            eventId: body.id,
-            eventType: body.type,
-            resourceId: obj.id,
-            resource: obj,
-            created: body.created
-          }
-        ]
-      };
-    },
-
-    handleEvent: async ctx => {
-      let { resource } = ctx.input;
-      return {
-        type: ctx.input.eventType,
-        id: ctx.input.eventId,
-        output: {
-          payoutId: ctx.input.resourceId,
-          amount: resource.amount,
-          currency: resource.currency,
-          status: resource.status,
-          method: resource.method,
-          arrivalDate: resource.arrival_date,
-          failureMessage: resource.failure_message || null,
-          created: resource.created
-        }
-      };
-    }
+    };
   })
   .build();

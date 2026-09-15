@@ -30,7 +30,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "slates": "1.0.0-rc.23"
+    "slates": "1.0.0-rc.17"
   },
   "devDependencies": {
     "@lowerdeck/error": "^1.1.0",
