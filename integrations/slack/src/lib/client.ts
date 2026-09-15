@@ -781,7 +781,9 @@ export class SlackClient {
         headers: {
           'Content-Type': params.contentType ?? 'application/octet-stream'
         },
-        body: params.content
+        // Buffer's backing store may be ArrayBufferLike, which is not accepted by
+        // the DOM fetch types. Copy it into an ArrayBuffer-backed Uint8Array.
+        body: new Uint8Array(params.content).buffer
       });
     } catch {
       throw slackServiceError('Slack file upload failed before Slack accepted the content');
