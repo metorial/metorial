@@ -56,7 +56,10 @@ export class SlatesProtocolClient {
       config: opts.state?.config ?? null,
       auth: opts.state?.auth ?? null,
       session: opts.state?.session ?? null,
-      capabilities: opts.state?.capabilities ?? null
+      capabilities:
+        opts.state && 'capabilities' in opts.state
+          ? (opts.state.capabilities ?? null)
+          : { triggers: true }
     };
   }
 

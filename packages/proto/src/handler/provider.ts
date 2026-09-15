@@ -88,6 +88,8 @@ export class SlatesProviderProtoHandlerManager {
 
       let impl = this.#implMap.get(input.method);
       if (!impl) {
+        if (!('id' in input) || input.id === undefined) return;
+
         return {
           jsonrpc: '2.0' as const,
           id: (input as any).id,

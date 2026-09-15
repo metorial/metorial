@@ -90,6 +90,37 @@ describe('SlatesProviderProtoHandlerManager', () => {
     });
   });
 
+  it('ignores unknown notifications instead of returning a JSON-RPC error', async () => {
+    let manager = await createSlatesProviderProtoHandler(async () => {}).run();
+
+    let response = await SlatesProviderProtoHandlerManager.handleInput(manager, {
+      jsonrpc: '2.0',
+      method: 'slates/hub.capabilities.set',
+      params: { capabilities: { triggers: true } }
+    } as any);
+
+    expect(response).toBeUndefined();
+  });
+
+  it('returns slate errors for unknown requests', async () => {
+    let manager = await createSlatesProviderProtoHandler(async () => {}).run();
+
+    let response = await SlatesProviderProtoHandlerManager.handleInput(manager, {
+      jsonrpc: '2.0',
+      id: 'req_unknown',
+      method: 'slates/does.not.exist',
+      params: {}
+    } as any);
+
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 'req_unknown',
+      error: {
+        code: 'resource.not_found'
+      }
+    });
+  });
+
   it('returns slate errors for protocol validation failures', async () => {
     let manager = await createSlatesProviderProtoHandler(async () => {}).run();
 
