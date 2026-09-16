@@ -11,10 +11,6 @@ export const stripeRegistrationSchema = stripeTargetSchema.extend({
   endpointId: z.string().regex(/^we_[a-zA-Z0-9]+$/),
   signingSecret: z.string().startsWith('whsec_').min(7)
 });
-export const stripeRoutingMatcher = (target: z.infer<typeof stripeTargetSchema>) => ({
-  accountId: target.accountId,
-  livemode: target.livemode
-});
 export const stripeTargetIdentifier = (target: z.infer<typeof stripeTargetSchema>) =>
   `${target.accountId}:${target.livemode ? 'live' : 'test'}`;
 
@@ -80,7 +76,7 @@ export const processStripeWebhook = async (input: {
     events: [
       {
         payload: event.data,
-        matchers: [stripeRoutingMatcher(target)],
+        matchers: [],
         idempotencyKey: event.data.id
       }
     ],

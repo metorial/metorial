@@ -74,16 +74,7 @@ import {
   updatePullRequestBranch,
   updateRepository
 } from './tools';
-import {
-  issueCommentTrigger,
-  issuesTrigger,
-  pullRequestReviewTrigger,
-  pullRequestTrigger,
-  pushTrigger,
-  releaseTrigger,
-  starTrigger,
-  workflowRunTrigger
-} from './triggers';
+import { githubTriggers, repositoryEvents } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -161,14 +152,6 @@ export let provider = Slate.create({
     projectsWrite,
     subIssueWrite
   ],
-  triggers: [
-    pushTrigger,
-    pullRequestTrigger,
-    pullRequestReviewTrigger,
-    issuesTrigger,
-    issueCommentTrigger,
-    workflowRunTrigger,
-    releaseTrigger,
-    starTrigger
-  ]
+  triggerGroups: [repositoryEvents],
+  triggers: githubTriggers
 });

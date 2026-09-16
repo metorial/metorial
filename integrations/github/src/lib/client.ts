@@ -4,7 +4,9 @@ import {
   createApiServiceError,
   createAxios,
   getResponseHeaderValue,
-  requestAxios
+  requestAxios,
+  type SlateAxiosErrorOptions,
+  SlateError
 } from 'slates';
 
 export interface GitHubClientConfig {
@@ -28,6 +30,42 @@ export interface GitHubRestResult<T> {
   data: T;
   linkHeader?: string;
 }
+
+export const GITHUB_RATE_LIMITED_CODE = 'rate_limited';
+
+// GitHub signals primary rate limits with 403/429 plus x-ratelimit-remaining: 0 and secondary
+// limits with retry-after: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
+// GitHub's 403 body carries no machine code, so the shared axios inference would classify a
+// rate-limited 403 as permission.denied; the headers are only visible on the raw axios error.
+let isGitHubRateLimitResponse = (
+  response: { status?: unknown; headers?: unknown } | undefined
+) => {
+  let status = Number(response?.status);
+  if (status === 429) return true;
+  if (status !== 403) return false;
+  return (
+    getResponseHeaderValue(response?.headers, 'x-ratelimit-remaining') === '0' ||
+    getResponseHeaderValue(response?.headers, 'retry-after') !== undefined
+  );
+};
+
+export const githubAxiosErrorMapping: SlateAxiosErrorOptions = {
+  mapAxiosError: error =>
+    isGitHubRateLimitResponse(error.response)
+      ? {
+          code: 'upstream.rate_limited',
+          retryable: true,
+          upstream: { code: GITHUB_RATE_LIMITED_CODE }
+        }
+      : undefined
+};
+
+// Runtime axios instances reject with SlateError (the response interceptor consumes the raw
+// axios error), so classification reads the normalized code set by githubAxiosErrorMapping.
+let extractGitHubUpstreamCode = (error: unknown): string | undefined =>
+  SlateError.is(error) && error.data.code === 'upstream.rate_limited'
+    ? GITHUB_RATE_LIMITED_CODE
+    : undefined;
 
 export interface GitHubCursorPageInfo {
   hasNextPage: boolean;
@@ -117,6 +155,7 @@ export class GitHubClient {
 
     this.http = createAxios({
       baseURL: this.apiBaseUrl,
+      errorMapping: githubAxiosErrorMapping,
       headers: {
         Authorization: `Bearer ${config.token}`,
         Accept: 'application/vnd.github+json',
@@ -190,7 +229,8 @@ export class GitHubClient {
           providerLabel: 'GitHub',
           operation,
           reason: options.reason,
-          nestedKeys: ['errors']
+          nestedKeys: ['errors'],
+          extractUpstreamCode: extractGitHubUpstreamCode
         })
     );
   }

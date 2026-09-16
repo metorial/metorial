@@ -8,7 +8,6 @@ import { enabledStripeEvents } from './event-types';
 import {
   processStripeWebhook,
   stripeRegistrationSchema,
-  stripeRoutingMatcher,
   stripeTargetIdentifier,
   stripeTargetSchema
 } from './webhook';
@@ -54,7 +53,7 @@ export const stripeEvents = triggerGroup(spec, {
             {
               webhookTargetIdentifier: stripeTargetIdentifier(target),
               name: `${target.accountId} (${target.livemode ? 'live' : 'test'})`,
-              metadata: stripeRoutingMatcher(target),
+              metadata: { ...target },
               webhookTargetPayload: target,
               targetOwnership: 'multi_user' as const
             }
@@ -119,7 +118,6 @@ export const stripeEvents = triggerGroup(spec, {
     },
     process: ctx => processStripeWebhook(ctx.input)
   })
-  .routingMatchers(async ctx => [
-    stripeRoutingMatcher(await resolveTarget(connectionClient(ctx.auth, ctx.config)))
-  ])
+  // Automatic targets route through subscriptions; the SDK still requires this handler.
+  .routingMatchers(async () => [])
   .build();

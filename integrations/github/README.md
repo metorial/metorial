@@ -100,6 +100,87 @@ Search across GitHub for repositories, code, issues/pull requests, or users usin
 
 Update settings of an existing GitHub repository. Modify name, description, visibility, feature toggles (issues, wiki, projects), default branch, and archive status.
 
+## Repository events
+
+Enable callbacks on a connection to set up repository events automatically, including
+connections created through a portal. There are no repository settings to fill in.
+Discovery pages through repositories visible to the connection and checks webhook
+access for each one. Personal and organization repositories are supported on
+GitHub.com and the GitHub Enterprise instance selected during authentication.
+Connections in the same tenant share a repository webhook.
+
+The account must be able to manage repository webhooks (repository admin or a
+custom role granting webhook management). OAuth and classic personal access tokens
+need `admin:repo_hook` (or a scope granting equivalent access, such as `repo`) plus
+repository access. Fine-grained tokens need **Webhooks: read and write**. Organization
+policies, SSO authorization, and the token's repository selection still apply.
+No OAuth scopes are added automatically.
+
+Discovery is bounded so it stays well inside GitHub's API rate limits: each scan
+reads up to 1,000 repositories (10 pages of 100, ordered by full name). Repositories
+where the account is an admin are eligible without extra requests; archived
+repositories are skipped. Repositories where the account is not an admin are checked
+for webhook access (custom roles), at most 50 per scan; further non-admin repositories
+are skipped and a warning is logged. Repositories that deny webhook access are skipped.
+Rate limits (detected from GitHub's rate-limit headers), invalid credentials, and
+service failures are surfaced. The read-only access check cannot distinguish a
+fine-grained token with only webhook read permission from one with write permission;
+GitHub validates write access during hook creation and any failure is reported.
+
+The callback runtime rescans active connections every 15 minutes for repositories
+created or authorized later. Removing the last callback using a repository removes
+its hook with connection credentials; failed cleanup remains retryable.
+
+### Supported events
+
+| Area | Event names |
+| --- | --- |
+| Code and repositories | `push`, `create`, `delete`, `repository`, `fork`, `star` |
+| Issues and collaboration | `issues`, `issue_comment`, `pull_request`, `pull_request_review`, `pull_request_review_comment`, `pull_request_review_thread`, `discussion`, `discussion_comment` |
+| CI and checks | `workflow_run`, `workflow_job`, `check_run`, `check_suite`, `status` |
+| Delivery | `release`, `deployment`, `deployment_status` |
+| Security | `dependabot_alert` |
+
+Each event has a separate trigger. Repository hooks receive `created` and
+`completed` check-run actions and only `completed` check-suite actions. A merged
+pull request has action `closed` and `payload.pull_request.merged: true`.
+`issue_comment` includes conversation comments on both issues and pull requests;
+`pull_request_review_comment` covers comments on a diff. Branch and tag deletions
+can have no head commit. Discussions and Dependabot events require those features
+to be available and enabled. Older Enterprise versions may not support every
+event; unsupported registration is reported rather than reducing coverage.
+
+### Event output
+
+Every callback contains `deliveryId`, `event`, `action` (or `null` when absent),
+and the complete GitHub `payload`, including additional and nested provider
+fields. For example, an issue update has this shape (payload abbreviated):
+
+```json
+{
+  "deliveryId": "72d3162e-cc78-11e3-81ab-4c9367dc0958",
+  "event": "issues",
+  "action": "edited",
+  "payload": {
+    "action": "edited",
+    "repository": { "id": 42, "full_name": "octocat/hello-world" },
+    "issue": { "id": 101, "number": 1, "title": "Updated title" },
+    "changes": { "title": { "from": "Original title" } }
+  }
+}
+```
+
+The callback ID is the delivery ID. Its type is the event name plus action
+(`issues.edited`), or just the event name (`push`). SHA-256 signatures and saved
+repository/hook identities (hook ID and installation-target headers, repository ID
+in the payload) are checked before events are accepted. Rejected or ignored
+deliveries are logged with a reason code and delivery headers only, never the
+payload or secret. Valid pings are acknowledged without callbacks. Redeliveries
+retain their delivery IDs.
+
+See [GitHub's event reference](https://docs.github.com/en/webhooks/webhook-events-and-payloads)
+for provider payloads and event availability.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

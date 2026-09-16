@@ -359,73 +359,99 @@ In addition to the REST API, GitHub provides a GraphQL API (v4) that allows more
 
 ## Events
 
-Webhooks provide a way for notifications to be delivered to an external web server whenever certain events occur on GitHub. Webhooks let you subscribe to events happening in a software system and automatically receive a delivery of data to your server whenever those events occur.
+The integration implements one automatically managed repository event source with
+23 separate event triggers. Its setup, event catalog, permission requirements,
+and output examples are documented in [Repository events](../README.md#repository-events).
 
-You can create webhooks in a repository to subscribe to events that occur in that repository. You can create webhooks to subscribe to events that occur in a specific repository, organization, GitHub Marketplace account, GitHub Sponsors account, or GitHub App.
+### Configuration and lifecycle
 
-Webhooks are configured with a payload URL, content type (JSON or form), and an optional secret for signature verification. The webhook signature header is the HMAC hex digest of the request body, generated using the SHA-256 hash function and the secret as the HMAC key.
+Connection configuration is empty. Callback enablement starts automatic discovery,
+including for portal-created instances. Discovery uses `GET /user/repos` with 100
+repositories per page ordered by full name. Because the runtime starts every
+15-minute rediscovery with a null page token and keeps no state between cycles,
+conditional requests cannot reduce cost; discovery is bounded instead. The page
+token is `{ page, probes }` and is validated: at most 10 pages (1,000 repositories)
+are scanned per cycle, and at most 50 non-admin repositories per cycle are probed
+with `GET /repos/{owner}/{repo}/hooks` for webhook access (custom roles). Admin
+repositories (`permissions.admin`) are eligible without a probe; archived repositories
+are skipped; non-admin repositories beyond the probe budget are skipped. Reaching
+either limit logs a warning (`github_webhook_probe_limit`, `github_webhook_page_limit`).
+Worst case per connection per cycle is 60 requests. Discovery deduplicates repository
+IDs per page and preserves the next page token even when no repositories on a page
+qualify. The runtime deduplicates stable targets across pages and connections.
+Resource-level 403/404 responses are skipped; rate limits are recognised from GitHub's
+`x-ratelimit-remaining`/`retry-after` headers (429, or 403 with those headers) and
+propagate together with authentication errors and other service failures. Read access
+does not prove fine-grained token write access; creation reports missing write
+permissions. No manual target-selection or webhook configuration is exposed.
 
-### Code & Repository Events
+A target is identified by its normalized GitHub instance URL and immutable repository
+ID. Registration resolves its current name and checks identity before creating an
+active JSON hook with a random secret, TLS verification, and the exact event catalog.
+Connections in the same tenant share the target. Cleanup uses the saved hook ID and
+checks repository identity before deletion. A DELETE 404 is accepted only after an
+authorized paginated hooks list confirms absence. Repository lookup 404 remains
+retryable because it can indicate lost access to a private repository.
 
-- **Push:** Triggered when commits are pushed to a branch or tag.
-- **Create / Delete:** Triggered when a branch or tag is created or deleted.
-- **Repository:** Triggered when a repository is created, deleted, archived, made public/private, or transferred.
-- **Fork:** Triggered when a repository is forked.
-- **Release:** Triggered when a release is published, edited, or deleted (including pre-releases).
-- **Commit Comment:** Triggered when a comment is made on a commit.
+The companion hub changes rescan active automatic subscriptions every 15 minutes,
+continue empty discovery pages, initialize cleanup with connection auth/config, and
+keep provider cleanup failures retryable. Shared hooks remain until the last callback
+is removed. No provider-specific behavior is added to the hub. Deploy those runtime
+changes alongside this integration for lifecycle behavior; SDK tests alone do not
+prove deployed runtime cleanup or delivery.
 
-### Pull Request Events
+### Event contract
 
-- **Pull Request:** Triggered for activity on pull requests (opened, closed, merged, assigned, labeled, review requested, etc.). Configurable by action type.
-- **Pull Request Review:** Triggered when a review is submitted, edited, or dismissed.
-- **Pull Request Review Comment:** Triggered for comments on a pull request diff.
-- **Pull Request Review Thread:** Triggered when a comment thread on a pull request is resolved or unresolved.
+Every trigger exposes `{ deliveryId, event, action, payload }`. The event name
+matches GitHub's header, action is a string or `null`, and payload is the complete
+GitHub JSON object. Typed resource schemas preserve additional fields, including
+nested fields. Mapping uses the delivery snapshot without authenticated lookups.
+The callback ID is the delivery ID; its type is `event.action` or `event` when
+there is no action. A merge is `pull_request.closed` with
+`payload.pull_request.merged === true`, not a separate action.
 
-### Issue Events
+Incoming requests require POST, a valid SHA-256 signature over the original
+body, a GUID delivery ID, a matching `X-GitHub-Hook-ID`, installation-target
+headers naming the saved repository, and a payload `repository.id` equal to the
+saved repository. Malformed or unauthenticated requests are rejected. Every rejected
+or ignored delivery is logged with a reason code (`github_webhook_*`) and the event,
+delivery, and hook headers; payloads and secrets are never logged. Valid pings and
+unsupported event families are acknowledged without callbacks. Repeated deliveries
+use the same idempotency key; GitHub does not supply a signed delivery timestamp.
 
-- **Issues:** Triggered for issue activity (opened, edited, closed, assigned, labeled, etc.).
-- **Issue Comment:** Triggered when a comment is created, edited, or deleted on an issue or pull request.
-- **Label:** Triggered when a label is created, edited, or deleted.
-- **Milestone:** Triggered when a milestone is created, closed, edited, or deleted.
+Repository hooks support only `created`/`completed` check runs and `completed`
+check suites. Repository creation across an organization cannot be observed by a
+hook attached to an existing repository. Discussions and Dependabot depend on
+repository feature availability. Unsupported events on older Enterprise versions
+cause registration errors; coverage is never silently reduced.
 
-### CI/CD and Checks Events
+### Verification
 
-- **Check Run / Check Suite:** Triggered for check run and check suite lifecycle events (created, completed, rerequested).
-- **Workflow Job:** Triggered when a GitHub Actions workflow job is queued, in progress, or completed.
-- **Workflow Run:** Triggered when a workflow run is requested, completed, or in progress.
-- **Deployment / Deployment Status:** Triggered when a deployment is created or its status changes.
-- **Status:** Triggered when the status of a commit changes.
+SDK contract tests live in the enterprise repository next to the live suite
+(`tests/integrations/github/triggers*.test.ts`, run with `bun run triggers:test -- github`),
+not in this package. They exercise all event families, payload preservation, request
+verification, target discovery (including the page and probe limits), registration,
+and cleanup. A second suite sweeps all 169 GitHub-recorded payload examples for the
+23 implemented families, vendored verbatim from `octokit/webhooks` at a pinned commit
+(`tests/integrations/github/__fixtures__/octokit-webhooks`), through verification, selection, and mapping
+with deep equality. That repository is unmaintained and its successor
+(`octokit/openapi-webhooks`) publishes GitHub's OpenAPI schemas rather than example
+deliveries, so the examples are real but dated (last updated 2024-10); they prove the
+schemas accept recorded shapes. A third suite covers the current contract: it checks
+every event schema against a pinned structural skeleton of GitHub's OpenAPI webhook
+description (`tests/integrations/github/__fixtures__/github-openapi-webhooks`, generated by
+`scripts/github-webhook-schema-skeleton.ts` at the repo root) for all 114 operations
+GitHub's description marks as deliverable to repository hooks (a per-event flag, so it
+includes the app-only check actions the trigger descriptions exclude; checking them can
+only make the schemas looser), asserting the schemas are never stricter than GitHub:
+every field required here is required by GitHub, every null GitHub may send is
+accepted, and every JSON type or enum value GitHub may send parses. Local negative
+tests are needed because GitHub cannot
+send intentionally forged signatures or invalid repository identities. Private live
+coverage creates, reads back, and deletes a real hook on a disposable repository.
+This lifecycle check uses a non-resolving receiver URL and does not claim to verify
+end-to-end callback delivery.
 
-### Organization and Team Events
-
-- **Organization:** Triggered for organization-level events (member added/removed, renamed, etc.).
-- **Team:** Triggered when a team is created, deleted, edited, or has members/repos added/removed.
-- **Membership:** Triggered when a user is added to or removed from a team.
-- **Member:** Triggered when a collaborator is added to a repository.
-
-### Security Events
-
-- **Code Scanning Alert:** Triggered when a code scanning alert is created, fixed, or dismissed.
-- **Secret Scanning Alert:** Triggered when a secret scanning alert is created, resolved, or reopened.
-- **Dependabot Alert:** Triggered for Dependabot vulnerability alert activity.
-- **Repository Vulnerability Alert:** Triggered when a security vulnerability is detected.
-
-### Discussion Events
-
-- **Discussion:** Triggered for GitHub Discussions activity (created, edited, answered, etc.).
-- **Discussion Comment:** Triggered when a comment on a discussion is created, edited, or deleted.
-
-### Project Events
-
-- **Projects V2 Item:** Triggered when an item in a GitHub Project is created, edited, or deleted.
-
-### Other Events
-
-- **Star:** Triggered when a repository is starred or unstarred.
-- **Watch:** Triggered when a user watches a repository.
-- **Wiki (Gollum):** Triggered when a wiki page is created or updated.
-- **Page Build:** Triggered when a GitHub Pages site is built.
-- **Package:** Triggered when a package is published or updated in GitHub Packages.
-- **Sponsorship:** Triggered for GitHub Sponsors activity.
-- **Marketplace Purchase:** Triggered for GitHub Marketplace purchase activity.
-- **Ping:** A special event sent when a webhook is first created to verify the connection.
+Provider references: [repository webhook API](https://docs.github.com/en/rest/repos/webhooks),
+[event payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads),
+and [signature verification](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries).

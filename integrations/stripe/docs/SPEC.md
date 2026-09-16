@@ -60,8 +60,10 @@ Restricted credentials require account/balance read and webhook-management permi
 
 Processing validates the saved registration, verifies Stripe-Signature v1 over the
 original raw body, enforces a five-minute timestamp window, and validates the event
-envelope without removing snapshot fields. It emits `{ accountId, livemode }` routing
-matchers and the Stripe event ID as the idempotency key. An event account, when non-null, must
+envelope without removing snapshot fields. Events route through automatic target
+subscriptions. The SDK-required routing handler and emitted `matchers` return empty
+arrays; no connection identity lookup is needed for routing matchers. The Stripe
+event ID is the idempotency key. An event account, when non-null, must
 match the registered account; account-scoped events with a missing or null account belong to that endpoint's
 registered account. Other accounts, modes, and unsupported event types are acknowledged
 without routing. Invalid signatures/bodies return 400, unsupported methods 405, invalid
@@ -86,16 +88,17 @@ This is a practical payments and billing surface, not the whole Stripe API. Cred
 
 ## Verification
 
-Private live scenarios are in tests/integrations/stripe/tools.e2e.ts and require a test-mode API key. The shared profile downloaded on 2026-09-14 was empty, so provider acceptance remains unverified. Schema compatibility and local webhook authentication have package tests. Local SDK webhook contract tests cover malicious signatures, stale deliveries, invalid envelopes, account/mode isolation, category selection, and callback registration/mapping contracts. Stripe cannot emit adversarial deliveries, and the private tools harness does not drive callback lifecycle. Stubbed registration calls prove local contracts only; they do not prove provider acceptance. Live callback delivery and cleanup require a test-mode Stripe account and an enabled Metorial callback environment.
+Private live scenarios are in tests/integrations/stripe/tools.e2e.ts and require a test-mode API key. The shared profile downloaded on 2026-09-14 was empty, so provider acceptance remains unverified. Schema compatibility has package tests. Local SDK webhook contract tests live in the enterprise repository at tests/integrations/stripe/triggers.test.ts (run with `bun run triggers:test -- stripe`) and cover malicious signatures, stale deliveries, invalid envelopes, account/mode isolation, category selection, and callback registration/mapping contracts. Stripe cannot emit adversarial deliveries, and the private tools harness does not drive callback lifecycle. Stubbed registration calls prove local contracts only; they do not prove provider acceptance. Live callback delivery and cleanup require a test-mode Stripe account and an enabled Metorial callback environment.
 
 ### Documented webhook unit tests
 
-User-requested payload tests in `src/webhooks.payloads.test.ts` cover all 51 registered
+Payload tests in `tests/integrations/stripe/triggers.payloads.test.ts` (enterprise
+repository) cover all 51 registered
 event types plus card, bank-account, and attached-Source variants. Each parameterized
 case links its concrete Stripe payload example. Fixtures contain reduced example
 fields; lifecycle overrides are explicitly adapted examples, not live captures.
 The inventory is independent of production event lists, and each case verifies the
-signed receive path, selected trigger, routing matcher, event ID, and complete output.
+signed receive path, selected trigger, empty matcher array, event ID, and complete output.
 The null-account regression covers Stripe's documented nullable Event.account field.
 
 ## Sources
