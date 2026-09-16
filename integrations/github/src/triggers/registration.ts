@@ -182,7 +182,8 @@ export const listGitHubWebhookTargets = async (auth: Auth, pageToken: unknown, l
   }
   return {
     targets,
-    nextPageToken: hasNext && page < MAX_DISCOVERY_PAGES ? { page: page + 1, probes } : null
+    nextPageToken: hasNext && page < MAX_DISCOVERY_PAGES ? { page: page + 1, probes } : null,
+    isPartial: unprobed > 0 || (hasNext && page >= MAX_DISCOVERY_PAGES)
   };
 };
 

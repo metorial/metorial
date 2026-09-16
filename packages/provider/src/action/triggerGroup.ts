@@ -36,6 +36,8 @@ export type SlateWebhookTargetListHandler<ConfigType extends {}, AuthType extend
 ) => Promise<{
   targets: SlateWebhookTarget[];
   nextPageToken: any | null;
+  // Set when targets were skipped for a limit rather than exhausted by pagination.
+  isPartial?: boolean;
 }>;
 
 export type SlateWebhookRegisterHandler<ConfigType extends {}, AuthType extends {}> = (

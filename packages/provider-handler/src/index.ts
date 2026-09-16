@@ -1139,7 +1139,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
 
       return withRequestTraces(context, {
         targets: res.targets,
-        nextPageToken: res.nextPageToken ?? null
+        nextPageToken: res.nextPageToken ?? null,
+        isPartial: res.isPartial ?? false
       });
     });
 

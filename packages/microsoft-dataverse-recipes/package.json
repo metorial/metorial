@@ -1,6 +1,6 @@
 {
   "name": "@slates/microsoft-dataverse-recipes",
-  "version": "1.0.0-rc.11",
+  "version": "1.0.0-rc.12",
   "publishConfig": {
     "access": "public"
   },
@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "slates": "1.0.0-rc.23",
+    "slates": "1.0.0-rc.24",
     "zod": "^4.2"
   },
   "devDependencies": {

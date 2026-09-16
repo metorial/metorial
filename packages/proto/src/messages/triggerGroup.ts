@@ -96,7 +96,8 @@ export let slatesMessageTriggerGroupWebhookTargetsListResponse = z.object({
   id: z.string(),
   result: withRequestTraces({
     targets: z.array(slatesWebhookTarget),
-    nextPageToken: z.any().nullable()
+    nextPageToken: z.any().nullable(),
+    isPartial: z.boolean().optional()
   })
 });
 
