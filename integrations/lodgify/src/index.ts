@@ -2,42 +2,68 @@ import { Slate } from 'slates';
 import { spec } from './spec';
 import {
   createBooking,
+  createBookingQuote,
+  createEnquiry,
   getAvailability,
   getBooking,
+  getEnquiry,
+  getMessageThread,
   getProperty,
   getQuote,
   getRates,
   listBookings,
+  listDeletedProperties,
+  listExternalBookings,
+  listInbox,
+  listPaymentSettings,
   listProperties,
+  listRateAddons,
+  manageBookingStay,
+  manageBookingTrash,
   managePaymentLink,
+  manageReplyStatus,
+  requestBookingPayment,
   sendMessage,
   updateAvailability,
+  updateBooking,
   updateBookingStatus,
+  updateEnquiryStatus,
+  updateKeyCodes,
   updateRates
 } from './tools';
-import {
-  availabilityChanges,
-  bookingChanges,
-  guestMessageReceived,
-  rateChanges
-} from './triggers';
 
 export let provider = Slate.create({
   spec,
   tools: [
     listProperties,
     getProperty,
+    listDeletedProperties,
+    listPaymentSettings,
+    listRateAddons,
     listBookings,
     getBooking,
     createBooking,
+    updateBooking,
     updateBookingStatus,
+    manageBookingTrash,
+    manageBookingStay,
+    updateKeyCodes,
+    listExternalBookings,
+    requestBookingPayment,
+    listInbox,
+    createEnquiry,
+    getEnquiry,
+    updateEnquiryStatus,
+    manageReplyStatus,
     getAvailability,
     updateAvailability,
     getRates,
     updateRates,
     getQuote,
+    createBookingQuote,
     managePaymentLink,
-    sendMessage
+    sendMessage,
+    getMessageThread
   ],
-  triggers: [bookingChanges, availabilityChanges, rateChanges, guestMessageReceived]
+  triggers: []
 });

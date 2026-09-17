@@ -1,4 +1,4 @@
-Let me get more details on the API reference to understand all available features.# Slates Specification for Lodgify
+# Slates Specification for Lodgify
 
 ## Overview
 
@@ -24,50 +24,32 @@ There is no OAuth2 flow; authentication is solely via API key.
 
 ### Property Management
 
-You can create, edit, or remove property listings programmatically, which is useful when managing multiple listings on various platforms. This includes retrieving property details, room types, images, and amenities.
+Properties are read-only over the API. You can list properties, page through them, retrieve a single property's details, list its room types, list the rate add-ons available for a stay, and list the payment options a property has configured, which Lodgify describes as relevant when creating a booking. There is also a listing of properties deleted since a given date, which returns bare property IDs rather than full records. Creating, editing, and deleting properties is only possible in the Lodgify dashboard.
 
 ### Reservations & Bookings
 
-The API lets you pull booking data directly into your dashboard, so you don't need to log into Lodgify every time a guest books. You can create new bookings, update booking statuses (open, booked, tentative, declined), and retrieve reservation details including guest information and transaction data.
+The API lets you pull booking data directly into your dashboard, so you don't need to log into Lodgify every time a guest books. You can create new bookings, update their details, change booking statuses (booked, open via the `reopen` transition, tentative, declined), record actual check-in and check-out times, set the door key codes for each room type, list the channel-side bookings linked to a Lodgify booking, and move bookings to the trash or restore them. Trashing is a soft delete and is reversible. Booking creation returns only the new booking's ID, so fetching the full record is a separate call.
+
+### Enquiries & Inbox
+
+Enquiries are pre-booking guest requests and sit alongside bookings in Lodgify's inbox. You can create an enquiry, retrieve it, decline it, reopen it, and trash or recover it. A separate inbox listing returns bookings and enquiries together, filtered by status, property, or period. An existing enquiry can be upgraded into a booking, which preserves the enquiry's message history. Both bookings and enquiries can be marked as replied or not replied, individually or in a batch.
 
 ### Availability & Calendar Management
 
-The API allows you to read or modify booking calendars, keeping your availability accurate on all connected booking sites. You can query availability for specific date ranges and properties, and update availability periods.
+The API allows you to read or modify booking calendars, keeping your availability accurate on all connected booking sites. You can query availability for a whole property or a single room type over a date range, optionally including the booking details behind each period. Writes are made per room type and per period, and set the number of available units rather than a simple available flag, so multi-unit properties are addressable. Minimum-stay rules are part of pricing rather than availability.
 
 ### Rates & Pricing
 
-You can update prices, set seasonal rates, or apply discounts, giving you more control over your pricing strategy without logging into the platform daily. Rate management covers room type rates for specified date periods.
+You can update prices and set seasonal rates, giving you more control over your pricing strategy without logging into the platform daily. Rate management covers room type rates for specified date periods, with a nightly price plus optional minimum stay, maximum stay, and per-additional-guest pricing. Pricing is nightly only; there are no weekly or monthly rate fields. Note that a rate period's end date is exclusive on write, while the end date on the rates calendar read is inclusive, and that overlapping rate periods are rejected.
 
 ### Quotes & Payment Links
 
-You can create quotes for bookings and generate payment links. The typical flow involves creating a booking, then creating a quote for that booking, and optionally generating a payment link. Quotes include pricing breakdowns with fees and taxes.
+You can calculate a quote for a prospective stay, create a quote for an existing booking, and generate payment links. The typical flow is creating a booking, then creating a quote for that booking, then generating a payment link. Quotes include pricing breakdowns with fees and taxes. A property quote is calculated per rate plan, so it returns one entry per applicable plan. Creating a payment link accepts an amount only — the currency comes from the booking — and confirms success rather than returning the link, so the link is fetched separately. You can also send a guest a payment request derived from the booking's existing quote or payment schedule.
 
 ### Guest Communication
 
-The API can automate messages like booking confirmations or check-in instructions, ensuring a consistent and timely guest experience. You can receive and manage guest messages associated with bookings or enquiries.
-
-### Webhook Management
-
-You can subscribe to events by providing a target URL, list active webhooks, and unsubscribe by webhook ID. Webhooks are managed entirely through the API.
+The API can automate messages like booking confirmations or check-in instructions, ensuring a consistent and timely guest experience. You can send a message on a booking or an enquiry, optionally notifying the guest, and supply an idempotency key so a retried send does not duplicate the message. You can also read a full message thread, including each message's delivery status, channel, and attachments, and whether the thread is closed to further replies.
 
 ## Events
 
-Lodgify supports webhooks that allow you to receive real-time notifications when certain events occur. You subscribe to a given event by providing a target URL (must be unique). The target URL should return a 200 OK; otherwise Lodgify will retry delivery up to 10 times.
-
-Webhook payloads can be verified using a signature found in the `ms-signature` request header (format: `sha256=SIGNATURE`). Lodgify generates a unique secret key for each webhook endpoint, returned only at creation time.
-
-### Booking Changes
-
-Fires when a booking is created, updated, or its status changes (e.g., to booked, open, declined, tentative). Events include booking created, booking updated, and status changes to booked, open, declined, or tentative. The payload includes full booking details (property, dates, guest info, room types, source, currency, etc.).
-
-### Availability Changes
-
-Triggered when the availability for a property changes. The payload includes the property ID, affected room type IDs, start/end dates, and the source of the change.
-
-### Rate Changes
-
-Triggered when rates change for a property. The payload includes the property ID and the affected room type IDs.
-
-### Guest Messages
-
-Triggered when a new guest message is received in any thread belonging to the user. A thread could be associated with a booking or an enquiry.
+This integration does not expose event triggers. Lodgify's own webhook endpoints are not covered here.
