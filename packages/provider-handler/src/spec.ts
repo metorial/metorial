@@ -70,7 +70,7 @@ export let getAction = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   actionId: string
 ) => {
-  let action = slate.actions.find(m => m.key === actionId);
+  let action = (slate.actions ?? []).find(m => m.key === actionId);
   if (!action) {
     throw new ServiceError(notFoundError(`action`, actionId));
   }
@@ -82,7 +82,7 @@ export let getAdapter = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   adapterId: string
 ) => {
-  let adapter = slate.adapters.find(m => m.id === adapterId);
+  let adapter = (slate.adapters ?? []).find(m => m.id === adapterId);
   if (!adapter) {
     throw new ServiceError(notFoundError(`adapter`, adapterId));
   }
@@ -95,7 +95,7 @@ export let mapAdapter = <ConfigType extends {}, AuthType extends {}>(
 ): SlatesAdapter => ({
   id: adapter.id,
   name: adapter.name,
-  capabilities: adapter.capabilities
+  capabilities: adapter.capabilities ?? []
 });
 
 export let getActionWithType = <
@@ -177,7 +177,7 @@ export let getExposedActions = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   includeAdapterActions: boolean
 ) =>
-  slate.actions.filter(
+  (slate.actions ?? []).filter(
     action => isMappableTrigger(action) && (includeAdapterActions || !action.adapter)
   );
 
@@ -198,7 +198,7 @@ export let getTriggerGroup = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   triggerGroupId: string
 ) => {
-  let group = slate.triggerGroups.find(g => g.key === triggerGroupId);
+  let group = (slate.triggerGroups ?? []).find(g => g.key === triggerGroupId);
   if (!group) {
     throw new ServiceError(notFoundError(`trigger_group`, triggerGroupId));
   }
@@ -210,7 +210,7 @@ export let getTriggersForGroup = <ConfigType extends {}, AuthType extends {}>(
   slate: Slate<ConfigType, AuthType>,
   triggerGroupId: string
 ): SlateTrigger<ConfigType, AuthType, any, any>[] =>
-  slate.actions.filter(
+  (slate.actions ?? []).filter(
     (action): action is SlateTrigger<ConfigType, AuthType, any, any> =>
       action.type === 'trigger' && action.triggerGroup?.key === triggerGroupId
   );
@@ -225,7 +225,7 @@ export let getExposedTriggerGroups = <ConfigType extends {}, AuthType extends {}
     )
   );
 
-  return slate.triggerGroups.filter(group => triggerGroupIds.has(group.key));
+  return (slate.triggerGroups ?? []).filter(group => triggerGroupIds.has(group.key));
 };
 
 export let evaluateTriggerMatches = <ConfigType extends {}, AuthType extends {}>(

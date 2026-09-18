@@ -158,4 +158,59 @@ describe('adapter capability exposure', () => {
       }
     });
   });
+
+  it('returns empty adapter and trigger group lists for older slates that omit those collections', async () => {
+    let manager = await createProviderHandler(
+      {
+        spec: { key: 'legacy', name: 'Legacy' },
+        actions: [
+          {
+            key: 'provider_tool',
+            type: 'tool',
+            name: 'Action',
+            description: undefined,
+            instructions: undefined,
+            constraints: undefined,
+            tags: [],
+            metadata: {},
+            scopes: [],
+            authMethods: [],
+            docs: [],
+            inputSchema: z.object({}),
+            outputSchema: z.object({}),
+            isPublic: false
+          }
+        ]
+      } as any,
+      []
+    ).run();
+
+    await SlatesProviderProtoHandlerManager.handleInput(manager, {
+      jsonrpc: '2.0',
+      method: 'slates/hello',
+      params: { protocol: SLATES_PROTOCOL_VERSION }
+    });
+    await SlatesProviderProtoHandlerManager.handleInput(manager, {
+      jsonrpc: '2.0',
+      method: 'slates/participant.set',
+      params: { participants: [] }
+    });
+    await SlatesProviderProtoHandlerManager.handleInput(manager, {
+      jsonrpc: '2.0',
+      method: 'slates/hub.capabilities.set',
+      params: { capabilities: { adapters: true, triggers: true } }
+    });
+
+    expect(await request(manager, 'slates/adapters.list')).toMatchObject({
+      result: { adapters: [] }
+    });
+    expect(await request(manager, 'slates/trigger_groups.list')).toMatchObject({
+      result: { triggerGroups: [] }
+    });
+    expect(
+      await request(manager, 'slates/actions.list', { includeAdapterActions: true })
+    ).toMatchObject({
+      result: { actions: [{ id: 'provider_tool' }] }
+    });
+  });
 });

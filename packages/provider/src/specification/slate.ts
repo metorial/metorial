@@ -34,7 +34,7 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
       }
       seenAdapterIds.add(adapter.id);
 
-      for (let action of adapter.actions) {
+      for (let action of adapter.actions ?? []) {
         let existing = seenActionKeys.get(action.key);
         if (existing && existing !== action) {
           throw new SlateDeclarationError(
@@ -79,14 +79,14 @@ export class Slate<ConfigType extends {}, AuthType extends {}> {
   }
 
   get actions() {
-    return this._actions;
+    return this._actions ?? [];
   }
 
   get adapters() {
-    return this._adapters;
+    return this._adapters ?? [];
   }
 
   get triggerGroups() {
-    return this._triggerGroups;
+    return this._triggerGroups ?? [];
   }
 }

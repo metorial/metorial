@@ -102,4 +102,18 @@ describe('Slate.create', () => {
       'auto_group'
     ]);
   });
+
+  it('treats omitted adapters, trigger groups, and adapter actions as empty collections', () => {
+    let spec = createTestSpec();
+    let slate = Slate.create({
+      spec,
+      tools: [],
+      triggers: [],
+      adapters: [{ id: 'legacy' } as any]
+    });
+
+    expect(slate.adapters).toHaveLength(1);
+    expect(slate.actions).toEqual([]);
+    expect(slate.triggerGroups).toEqual([]);
+  });
 });

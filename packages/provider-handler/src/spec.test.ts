@@ -8,7 +8,8 @@ import {
   getMappableAction,
   getTriggersForGroup,
   isMappableTrigger,
-  mapAction
+  mapAction,
+  mapAdapter
 } from './spec';
 
 let baseAction = {
@@ -130,5 +131,17 @@ describe('adapter exposure', () => {
   it('only exposes trigger groups that contain an exposed trigger', () => {
     expect(getExposedTriggerGroups(slate, false)).toEqual([providerGroup]);
     expect(getExposedTriggerGroups(slate, true)).toEqual([providerGroup, adapterGroup]);
+  });
+
+  it('treats missing adapters and trigger groups as empty collections', () => {
+    let legacySlate = { actions: [providerTool, providerTrigger] } as any;
+
+    expect(getExposedActions(legacySlate, true)).toEqual([providerTool, providerTrigger]);
+    expect(getExposedTriggerGroups(legacySlate, true)).toEqual([]);
+    expect(mapAdapter({ id: 'chat', name: 'Chat' } as any)).toEqual({
+      id: 'chat',
+      name: 'Chat',
+      capabilities: []
+    });
   });
 });

@@ -894,7 +894,7 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
       getContextBasic();
 
       return {
-        adapters: supportsAdapters() ? slate.adapters.map(mapAdapter) : []
+        adapters: supportsAdapters() ? (slate.adapters ?? []).map(mapAdapter) : []
       };
     });
 
