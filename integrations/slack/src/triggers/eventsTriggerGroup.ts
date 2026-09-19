@@ -94,6 +94,7 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
           '',
           `\`\`\`\n${ctx.input.webhookUrl}\n\`\`\``,
           '',
+          `> NOTE: Slack will not be able to complete the URL verification until you finish this setup. Once you enter the Signing Secret and App-Level Token below and save the configuration, the URL verification will succeed.`,
           '2. Subscribe to the bot/user events this integration needs.',
           '3. Open **Basic Information**, copy the **Signing Secret**, and enter it here.',
           '4. Under **App-Level Tokens**, generate a token with the `authorizations:read` scope and enter it here.'
