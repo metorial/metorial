@@ -6,7 +6,7 @@ let createManager = async (
   process: () => Promise<{
     events: any[];
     response?: { status?: number; body?: string };
-    skipped?: { reason: string; message?: string };
+    skipped?: { reason: string };
   }>
 ) => {
   let webhookGroup = {
@@ -74,14 +74,14 @@ describe('slates/trigger_group.webhook.process', () => {
     let manager = await createManager(async () => ({
       events: [],
       response: { status: 401, body: 'Invalid webhook signature.' },
-      skipped: { reason: 'invalid_signature', message: 'Invalid webhook signature.' }
+      skipped: { reason: 'invalid_signature' }
     }));
 
     expect(await processWebhook(manager)).toMatchObject({
       result: {
         events: [],
         response: { status: 401 },
-        skipped: { reason: 'invalid_signature', message: 'Invalid webhook signature.' }
+        skipped: { reason: 'invalid_signature' }
       }
     });
   });

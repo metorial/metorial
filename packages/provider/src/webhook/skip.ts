@@ -2,10 +2,9 @@ import type { SlateWebhookHttpResponseInit, SlateWebhookSkipped } from '../actio
 
 export let skipWebhook = (
   reason: string,
-  message?: string,
   response?: Response | SlateWebhookHttpResponseInit
 ) => ({
   events: [],
-  skipped: { reason, message } satisfies SlateWebhookSkipped,
+  skipped: { reason } satisfies SlateWebhookSkipped,
   response: response ?? { status: 200, body: '' }
 });

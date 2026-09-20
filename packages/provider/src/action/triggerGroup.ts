@@ -111,7 +111,6 @@ export type SlateWebhookProcessHandler = (
 
 export interface SlateWebhookSkipped {
   reason: string;
-  message?: string;
 }
 
 export interface SlateTriggerGroupPollingParameters<

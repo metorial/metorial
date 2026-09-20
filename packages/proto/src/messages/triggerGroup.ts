@@ -15,8 +15,7 @@ let slatesTriggerGroupWebhookEvent = z.object({
 });
 
 export let slatesTriggerGroupWebhookSkipped = z.object({
-  reason: z.string(),
-  message: z.string().optional()
+  reason: z.string()
 });
 
 export type SlatesTriggerGroupWebhookSkipped = z.infer<

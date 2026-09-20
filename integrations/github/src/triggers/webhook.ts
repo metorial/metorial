@@ -35,7 +35,7 @@ export const processGitHubWebhook = async (ctx: WebhookContext) => {
     const entry = { message: body, reason, status, ...details };
     if (status >= 400) ctx.warn(entry);
     else ctx.info(entry);
-    return skipWebhook(reason, body || undefined, { status, body, ...response });
+    return skipWebhook(reason, { status, body, ...response });
   };
 
   const registration = githubRegistrationSchema.safeParse(
