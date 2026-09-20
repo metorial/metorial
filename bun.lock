@@ -19,7 +19,7 @@
       "version": "1.0.0-rc.10",
       "dependencies": {
         "@slates/adapter": "1.0.0-rc.9",
-        "@slates/provider": "1.0.0-rc.25",
+        "@slates/provider": "1.0.0-rc.26",
         "mdast-util-to-string": "^4.0.0",
         "remark-gfm": "^4.0.0",
         "remark-parse": "^11.0.0",
@@ -5401,11 +5401,11 @@
     },
     "integrations/github": {
       "name": "@slates-integrations/github",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -7646,7 +7646,7 @@
     },
     "integrations/lodgify": {
       "name": "@slates-integrations/lodgify",
-      "version": "0.2.0-rc.6",
+      "version": "0.4.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",
@@ -11773,7 +11773,7 @@
     },
     "integrations/slack": {
       "name": "@slates-integrations/slack",
-      "version": "0.3.13",
+      "version": "0.3.14",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/adapter-chat": "1.0.0-rc.9",
@@ -14495,7 +14495,7 @@
       "name": "@slates/adapter",
       "version": "1.0.0-rc.9",
       "dependencies": {
-        "@slates/provider": "1.0.0-rc.25",
+        "@slates/provider": "1.0.0-rc.26",
         "zod": "^4.2.1",
       },
       "devDependencies": {
@@ -14512,7 +14512,7 @@
         "@smithy/querystring-builder": "^4.2.14",
         "@smithy/types": "^4.14.1",
         "axios": "^1.13.2",
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -14542,9 +14542,9 @@
       "name": "@slates/client",
       "version": "1.0.0-rc.25",
       "dependencies": {
-        "@slates/proto": "1.0.0-rc.21",
-        "@slates/provider": "1.0.0-rc.25",
-        "@slates/provider-handler": "1.0.0-rc.35",
+        "@slates/proto": "1.0.0-rc.22",
+        "@slates/provider": "1.0.0-rc.26",
+        "@slates/provider-handler": "1.0.0-rc.36",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -14557,7 +14557,7 @@
       "version": "1.0.0-rc.12",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14571,7 +14571,7 @@
       "version": "1.0.0-rc.8",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14586,7 +14586,7 @@
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/tool-recipes": "1.0.0-rc.11",
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14600,7 +14600,7 @@
       "version": "1.0.0-rc.12",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14613,7 +14613,7 @@
       "name": "@slates/oauth-google",
       "version": "1.0.6",
       "dependencies": {
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14627,7 +14627,7 @@
       "name": "@slates/oauth-microsoft",
       "version": "1.0.0-rc.12",
       "dependencies": {
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -14640,7 +14640,7 @@
       "name": "@slates/oauth-zoho",
       "version": "1.0.0-rc.11",
       "dependencies": {
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14655,10 +14655,10 @@
       "version": "1.0.0-rc.23",
       "dependencies": {
         "@slates/client": "1.0.0-rc.25",
-        "@slates/proto": "1.0.0-rc.21",
+        "@slates/proto": "1.0.0-rc.22",
       },
       "devDependencies": {
-        "@slates/provider": "1.0.0-rc.25",
+        "@slates/provider": "1.0.0-rc.26",
         "@slates/tsconfig": "1.0.0-rc.1",
         "typescript": "5.8.2",
         "vitest": "^3.1.2",
@@ -14667,7 +14667,7 @@
     },
     "packages/proto": {
       "name": "@slates/proto",
-      "version": "1.0.0-rc.21",
+      "version": "1.0.0-rc.22",
       "dependencies": {
         "@lowerdeck/emitter": "^1.0.4",
         "@lowerdeck/error": "^1.1.0",
@@ -14684,7 +14684,7 @@
     },
     "packages/provider": {
       "name": "@slates/provider",
-      "version": "1.0.0-rc.25",
+      "version": "1.0.0-rc.26",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@toon-format/toon": "^2.1.0",
@@ -14701,11 +14701,11 @@
     },
     "packages/provider-handler": {
       "name": "@slates/provider-handler",
-      "version": "1.0.0-rc.35",
+      "version": "1.0.0-rc.36",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/proto": "1.0.0-rc.21",
-        "@slates/provider": "1.0.0-rc.25",
+        "@slates/proto": "1.0.0-rc.22",
+        "@slates/provider": "1.0.0-rc.26",
         "p-queue": "^6.6.2",
         "zod": "^4.2.1",
       },
@@ -14721,7 +14721,7 @@
       "version": "1.0.0-rc.15",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -14732,9 +14732,9 @@
     },
     "packages/slates": {
       "name": "slates",
-      "version": "1.0.0-rc.24",
+      "version": "1.0.0-rc.25",
       "dependencies": {
-        "@slates/provider": "1.0.0-rc.25",
+        "@slates/provider": "1.0.0-rc.26",
       },
       "devDependencies": {
         "@slates/tsconfig": "1.0.0-rc.1",
@@ -14747,7 +14747,7 @@
       "name": "@slates/super-google-tools",
       "version": "1.0.0-rc.7",
       "dependencies": {
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
       },
       "devDependencies": {
         "@lowerdeck/error": "^1.1.0",
@@ -14766,7 +14766,7 @@
         "@slates/profiles": "1.0.0-rc.23",
       },
       "devDependencies": {
-        "@slates/provider": "1.0.0-rc.25",
+        "@slates/provider": "1.0.0-rc.26",
         "@slates/tsconfig": "1.0.0-rc.1",
         "typescript": "5.8.2",
         "vitest": "^3.1.2",
@@ -14777,7 +14777,7 @@
       "name": "@slates/tool-recipes",
       "version": "1.0.0-rc.11",
       "dependencies": {
-        "slates": "1.0.0-rc.24",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {

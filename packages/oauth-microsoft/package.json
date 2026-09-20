@@ -31,7 +31,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "slates": "1.0.0-rc.24"
+    "slates": "1.0.0-rc.25"
   },
   "devDependencies": {
     "@types/node": "^20",

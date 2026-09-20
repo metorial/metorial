@@ -31,7 +31,7 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "@slates/provider": "1.0.0-rc.25",
+    "@slates/provider": "1.0.0-rc.26",
     "zod": "^4.2.1"
   },
   "devDependencies": {

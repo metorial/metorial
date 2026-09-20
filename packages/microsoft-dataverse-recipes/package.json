@@ -33,7 +33,7 @@
   },
   "dependencies": {
     "@lowerdeck/error": "^1.1.0",
-    "slates": "1.0.0-rc.24",
+    "slates": "1.0.0-rc.25",
     "zod": "^4.2"
   },
   "devDependencies": {
