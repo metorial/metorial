@@ -29,6 +29,10 @@
       "type": "string",
       "description": "Ignored by the registry; the published version always comes from package.json."
     },
+    "networkIsolation": {
+      "type": "boolean",
+      "description": "Enables network isolation for the deployed slate. Disabled by default."
+    },
     "timeout": {
       "type": "integer",
       "minimum": 1,

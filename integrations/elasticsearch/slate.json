@@ -14,5 +14,6 @@
     "manage users and roles",
     "configure watcher alerts"
   ],
+  "networkIsolation": true,
   "logoUrl": "https://provider-logos.metorial-cdn.com/elasticsearch.svg"
 }
