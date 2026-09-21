@@ -14,6 +14,14 @@ let slatesTriggerGroupWebhookEvent = z.object({
   triggerIds: z.array(z.string())
 });
 
+export let slatesTriggerGroupWebhookSkipped = z.object({
+  reason: z.string()
+});
+
+export type SlatesTriggerGroupWebhookSkipped = z.infer<
+  typeof slatesTriggerGroupWebhookSkipped
+>;
+
 let slatesTriggerGroupPollEvent = z.object({
   payload: z.record(z.string(), z.any()),
   idempotencyKey: z.string().optional(),
@@ -257,7 +265,8 @@ export let slatesMessageTriggerGroupWebhookProcessResponse = z.object({
   id: z.string(),
   result: withRequestTraces({
     events: z.array(slatesTriggerGroupWebhookEvent),
-    response: slatesWebhookHttpResponse.nullable().optional()
+    response: slatesWebhookHttpResponse.nullable().optional(),
+    skipped: slatesTriggerGroupWebhookSkipped.nullable().optional()
   })
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "@slates/profiles",
-  "version": "1.0.0-rc.23",
+  "version": "1.0.0-rc.24",
   "publishConfig": {
     "access": "public"
   },
@@ -31,11 +31,11 @@
     "biome:check": "biome check --write src"
   },
   "dependencies": {
-    "@slates/client": "1.0.0-rc.25",
-    "@slates/proto": "1.0.0-rc.21"
+    "@slates/client": "1.0.0-rc.26",
+    "@slates/proto": "1.0.0-rc.22"
   },
   "devDependencies": {
-    "@slates/provider": "1.0.0-rc.25",
+    "@slates/provider": "1.0.0-rc.26",
     "@slates/tsconfig": "1.0.0-rc.1",
     "typescript": "5.8.2",
     "vitest": "^3.1.2",

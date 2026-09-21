@@ -1,4 +1,4 @@
-import { verifyHmacSignature } from 'slates';
+import { skipWebhook, verifyHmacSignature } from 'slates';
 import { z } from 'zod';
 import { githubEventSchemas, isGitHubEventName } from './event-schemas';
 import { githubRegistrationSchema } from './registration';
@@ -35,7 +35,7 @@ export const processGitHubWebhook = async (ctx: WebhookContext) => {
     const entry = { message: body, reason, status, ...details };
     if (status >= 400) ctx.warn(entry);
     else ctx.info(entry);
-    return { events: [], response: { status, body, ...response } };
+    return skipWebhook(reason, { status, body, ...response });
   };
 
   const registration = githubRegistrationSchema.safeParse(
@@ -92,9 +92,14 @@ export const processGitHubWebhook = async (ctx: WebhookContext) => {
     return reject(403, 'github_webhook_repository_mismatch', 'Repository identity mismatch.');
   if (event === 'ping') {
     const ping = z.object({ hook_id: z.literal(registration.data.hookId) }).safeParse(body);
-    return ping.success
-      ? reject(200, 'github_webhook_ping', '')
-      : reject(400, 'github_webhook_ping_invalid', 'Invalid webhook ping.');
+    if (!ping.success)
+      return reject(400, 'github_webhook_ping_invalid', 'Invalid webhook ping.');
+    ctx.info({
+      message: 'Webhook ping acknowledged.',
+      reason: 'github_webhook_ping',
+      ...details
+    });
+    return { events: [], response: { status: 200, body: '' } };
   }
   if (!isGitHubEventName(event)) return reject(200, 'github_webhook_event_unsupported', '');
   const parsed = githubEventSchemas[event].safeParse(body);

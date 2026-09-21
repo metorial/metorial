@@ -1337,7 +1337,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           },
           onSuccess: result => ({
             eventCount: result.events.length,
-            hasResponse: result.response !== undefined
+            hasResponse: result.response !== undefined,
+            skipped: !!result.skipped
           })
         },
         () => runWithContext(context, () => group.webhook!.process(context))
@@ -1365,7 +1366,8 @@ export let createProviderHandler = <ConfigType extends {}, AuthType extends {}>(
           idempotencyKey: event.idempotencyKey,
           triggerIds: evaluateTriggerMatches(slate, group.key, event.payload)
         })),
-        response
+        response,
+        skipped: res.skipped ?? null
       });
     });
 

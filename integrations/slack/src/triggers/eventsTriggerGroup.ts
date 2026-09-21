@@ -1,5 +1,5 @@
 import type { SlateTriggerRoutingMatcher } from 'slates';
-import { createAxios, triggerGroup, verifyHmacSignature } from 'slates';
+import { createAxios, skipWebhook, triggerGroup, verifyHmacSignature } from 'slates';
 import { z } from 'zod';
 import {
   buildSlackBotRoutingMatcher,
@@ -117,17 +117,20 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
 
       if (!timestamp || !signature) {
         ctx.warn({ message: 'Rejected Slack webhook: missing signature headers' });
-        return {
-          events: [],
-          response: jsonResponse(401, { error: 'missing signature headers' })
-        };
+        return skipWebhook(
+          'slack_webhook_signature_missing',
+          jsonResponse(401, { error: 'missing signature headers' })
+        );
       }
 
       // Reject stale requests - also guards against replaying a captured request indefinitely.
       let ageSeconds = Math.abs(Date.now() / 1000 - Number(timestamp));
       if (!Number.isFinite(ageSeconds) || ageSeconds > 60 * 5) {
         ctx.warn({ message: 'Rejected Slack webhook: stale request', ageSeconds });
-        return { events: [], response: jsonResponse(401, { error: 'stale request' }) };
+        return skipWebhook(
+          'slack_webhook_request_stale',
+          jsonResponse(401, { error: 'stale request' })
+        );
       }
 
       let signatureValid = verifyHmacSignature({
@@ -141,7 +144,10 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
 
       if (!signatureValid) {
         ctx.warn({ message: 'Rejected Slack webhook: invalid signature' });
-        return { events: [], response: jsonResponse(401, { error: 'invalid signature' }) };
+        return skipWebhook(
+          'slack_webhook_signature_invalid',
+          jsonResponse(401, { error: 'invalid signature' })
+        );
       }
 
       let parsed: unknown;
@@ -152,7 +158,10 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
           message: 'Rejected Slack webhook: body is not valid JSON',
           error: err instanceof Error ? err.message : String(err)
         });
-        return { events: [], response: jsonResponse(400, { error: 'invalid json' }) };
+        return skipWebhook(
+          'slack_webhook_json_invalid',
+          jsonResponse(400, { error: 'invalid json' })
+        );
       }
 
       let envelope = slackEventEnvelope.safeParse(parsed);
@@ -164,10 +173,10 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
             message: issue.message
           }))
         });
-        return {
-          events: [],
-          response: jsonResponse(200, { ok: false, reason: 'unrecognized_envelope' })
-        };
+        return skipWebhook(
+          'slack_webhook_unrecognized_envelope',
+          jsonResponse(200, { ok: false, reason: 'unrecognized_envelope' })
+        );
       }
 
       let body = envelope.data;
@@ -178,10 +187,10 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
 
       if (body.type !== 'event_callback' || !body.event) {
         ctx.info({ message: 'Ignored Slack webhook: not an event_callback', type: body.type });
-        return {
-          events: [],
-          response: jsonResponse(200, { ok: true, reason: 'ignored_event_type' })
-        };
+        return skipWebhook(
+          'slack_webhook_ignored_event_type',
+          jsonResponse(200, { ok: true, reason: 'ignored_event_type' })
+        );
       }
 
       let authorizations = await resolveAuthorizations(body, config.appToken);
@@ -213,10 +222,10 @@ export let slackEventsTriggerGroup = triggerGroup(spec, {
           eventType: body.event.type,
           authorizationCount: authorizations.length
         });
-        return {
-          events: [],
-          response: jsonResponse(200, { ok: true, reason: 'no_matching_authorization' })
-        };
+        return skipWebhook(
+          'slack_webhook_no_matching_authorization',
+          jsonResponse(200, { ok: true, reason: 'no_matching_authorization' })
+        );
       }
 
       return {

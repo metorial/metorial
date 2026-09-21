@@ -106,7 +106,12 @@ export type SlateWebhookProcessHandler = (
     idempotencyKey?: string;
   }[];
   response?: Response | SlateWebhookHttpResponseInit;
+  skipped?: SlateWebhookSkipped;
 }>;
+
+export interface SlateWebhookSkipped {
+  reason: string;
+}
 
 export interface SlateTriggerGroupPollingParameters<
   ConfigType extends {},
