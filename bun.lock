@@ -5409,7 +5409,7 @@
         "zod": "^4.2",
       },
       "devDependencies": {
-        "@slates/test": "1.0.0-rc.22",
+        "@slates/test": "1.0.0-rc.23",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -14523,13 +14523,13 @@
     },
     "packages/cli": {
       "name": "@slates/cli",
-      "version": "1.0.8",
+      "version": "1.0.9",
       "bin": "./src/cli.ts",
       "dependencies": {
         "@inquirer/prompts": "^7.4.0",
-        "@slates/client": "1.0.0-rc.25",
+        "@slates/client": "1.0.0-rc.26",
         "@slates/oauth-microsoft": "1.0.0-rc.12",
-        "@slates/profiles": "1.0.0-rc.23",
+        "@slates/profiles": "1.0.0-rc.24",
         "sade": "^1.8.1",
       },
       "devDependencies": {
@@ -14540,7 +14540,7 @@
     },
     "packages/client": {
       "name": "@slates/client",
-      "version": "1.0.0-rc.25",
+      "version": "1.0.0-rc.26",
       "dependencies": {
         "@slates/proto": "1.0.0-rc.22",
         "@slates/provider": "1.0.0-rc.26",
@@ -14652,9 +14652,9 @@
     },
     "packages/profiles": {
       "name": "@slates/profiles",
-      "version": "1.0.0-rc.23",
+      "version": "1.0.0-rc.24",
       "dependencies": {
-        "@slates/client": "1.0.0-rc.25",
+        "@slates/client": "1.0.0-rc.26",
         "@slates/proto": "1.0.0-rc.22",
       },
       "devDependencies": {
@@ -14759,11 +14759,11 @@
     },
     "packages/test": {
       "name": "@slates/test",
-      "version": "1.0.0-rc.22",
+      "version": "1.0.0-rc.23",
       "dependencies": {
         "@lowerdeck/testing-tools": "latest",
-        "@slates/client": "1.0.0-rc.25",
-        "@slates/profiles": "1.0.0-rc.23",
+        "@slates/client": "1.0.0-rc.26",
+        "@slates/profiles": "1.0.0-rc.24",
       },
       "devDependencies": {
         "@slates/provider": "1.0.0-rc.26",

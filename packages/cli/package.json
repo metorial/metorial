@@ -1,6 +1,6 @@
 {
   "name": "@slates/cli",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "publishConfig": {
     "access": "public"
   },
@@ -25,9 +25,9 @@
   },
   "dependencies": {
     "@inquirer/prompts": "^7.4.0",
-    "@slates/client": "1.0.0-rc.25",
+    "@slates/client": "1.0.0-rc.26",
     "@slates/oauth-microsoft": "1.0.0-rc.12",
-    "@slates/profiles": "1.0.0-rc.23",
+    "@slates/profiles": "1.0.0-rc.24",
     "sade": "^1.8.1"
   },
   "devDependencies": {
