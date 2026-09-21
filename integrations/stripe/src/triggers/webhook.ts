@@ -1,4 +1,4 @@
-import { verifyHmacSignature } from '@slates/provider';
+import { skipWebhook, verifyHmacSignature } from '@slates/provider';
 import { z } from 'zod';
 import { stripeEventEnvelopeSchema } from './event-schemas';
 import { enabledStripeEvents } from './event-types';
@@ -21,13 +21,19 @@ export const processStripeWebhook = async (input: {
   request: Request;
   webhookRegistrationPayload: unknown;
 }) => {
-  const empty = (status: number) => ({ events: [], response: { status, body: '' } });
   const registration = stripeRegistrationSchema.safeParse(input.webhookRegistrationPayload);
-  if (!registration.success) return empty(500);
-  if (input.request.method !== 'POST') return empty(405);
+  if (!registration.success)
+    return skipWebhook('stripe_webhook_registration_invalid', { status: 500, body: '' });
+  if (input.request.method !== 'POST')
+    return skipWebhook('stripe_webhook_method_invalid', {
+      status: 405,
+      body: '',
+      headers: { Allow: 'POST' }
+    });
 
   const header = input.request.headers.get('stripe-signature');
-  if (!header) return empty(400);
+  if (!header)
+    return skipWebhook('stripe_webhook_signature_missing', { status: 400, body: '' });
   const parts = header.split(',').map(part => part.trim().split('='));
   const timestamps = parts.filter(([key]) => key === 't');
   const timestamp = timestamps[0]?.[1];
@@ -39,7 +45,7 @@ export const processStripeWebhook = async (input: {
     !Number.isSafeInteger(seconds) ||
     Math.abs(Date.now() / 1000 - seconds) > SIGNATURE_TOLERANCE_SECONDS
   )
-    return empty(400);
+    return skipWebhook('stripe_webhook_timestamp_invalid', { status: 400, body: '' });
 
   const raw = await input.request.text();
   const valid = parts.some(
@@ -54,23 +60,26 @@ export const processStripeWebhook = async (input: {
         digest: 'hex'
       })
   );
-  if (!valid) return empty(400);
+  if (!valid)
+    return skipWebhook('stripe_webhook_signature_invalid', { status: 400, body: '' });
 
   let body: unknown;
   try {
     body = JSON.parse(raw);
   } catch {
-    return empty(400);
+    return skipWebhook('stripe_webhook_json_invalid', { status: 400, body: '' });
   }
   const event = stripeEventEnvelopeSchema.safeParse(body);
-  if (!event.success) return empty(400);
+  if (!event.success)
+    return skipWebhook('stripe_webhook_envelope_invalid', { status: 400, body: '' });
   const target = registration.data;
   if (
     event.data.livemode !== target.livemode ||
-    (typeof event.data.account === 'string' && event.data.account !== target.accountId) ||
-    !supportedEvents.has(event.data.type)
+    (typeof event.data.account === 'string' && event.data.account !== target.accountId)
   )
-    return empty(200);
+    return skipWebhook('stripe_webhook_target_mismatch', { status: 200, body: '' });
+  if (!supportedEvents.has(event.data.type))
+    return skipWebhook('stripe_webhook_event_unsupported', { status: 200, body: '' });
 
   return {
     events: [
