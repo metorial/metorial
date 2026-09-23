@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/google-drive.svg" height="20"> Google Drive
 
-Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Read label definitions and search files by label. Browse the Drive apps installed for your account. Monitor recently modified files with periodic checks. Store app-specific data in a hidden per-user folder.
+Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Read label definitions and search files by label. Browse the Drive apps installed for your account. Store app-specific data in a hidden per-user folder.
 
 ## Authentication
 
@@ -8,9 +8,7 @@ Use **OAuth** for Drive access and to read the label definitions your organizati
 
 ## Events
 
-Enable **Recent File Activity** to check files every 15 minutes. Each check searches a 30-minute modification window across My Drive files and shared-drive files the connected user has accessed. It emits `file.recently_modified` with the file ID, name, MIME type, current trash state, modification time, and available parent, link, and last-modifier details. For example, a file may produce `{"fileId":"abc123","fileName":"Plan","mimeType":"application/vnd.google-apps.document","trashed":false,"modifiedTime":"2026-09-23T10:00:00.000Z"}`.
-
-The event ID and deduplication key combine the file ID, modification time, and current trash state. This is a recent-file snapshot, so it cannot report permanent deletions, loss of access, or when a file was moved to trash. It does not scan every file in every shared drive, and changes during an extended polling outage may fall outside the window. For complete change history, use **List Changes** with a saved page token. See [Drive shared-drive search](https://developers.google.com/workspace/drive/api/guides/enable-shareddrives), [Drive file search](https://developers.google.com/workspace/drive/api/guides/ref-search-terms), and [Drive changes](https://developers.google.com/workspace/drive/api/guides/manage-changes).
+This integration does not currently expose event triggers.
 
 ## Tools
 

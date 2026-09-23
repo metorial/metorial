@@ -5489,7 +5489,7 @@
     },
     "integrations/gmail": {
       "name": "@slates-integrations/gmail",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/google-people-recipes": "1.0.0-rc.11",
@@ -5712,7 +5712,7 @@
     },
     "integrations/google-contacts": {
       "name": "@slates-integrations/google-contacts",
-      "version": "0.2.3",
+      "version": "0.2.4",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@slates/google-people-recipes": "1.0.0-rc.11",
@@ -5729,7 +5729,7 @@
     },
     "integrations/google-docs": {
       "name": "@slates-integrations/google-docs",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.25",
@@ -5743,7 +5743,7 @@
     },
     "integrations/google-drive": {
       "name": "@slates-integrations/google-drive",
-      "version": "0.2.11",
+      "version": "0.2.12",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.25",
@@ -5828,7 +5828,7 @@
     },
     "integrations/google-sheets": {
       "name": "@slates-integrations/google-sheets",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.25",
@@ -12397,14 +12397,14 @@
     },
     "integrations/super-booble-1": {
       "name": "@slates-integrations/super-booble-1",
-      "version": "0.4.6",
+      "version": "0.4.7",
       "dependencies": {
-        "@slates-integrations/gmail": "0.2.3",
+        "@slates-integrations/gmail": "0.2.4",
         "@slates-integrations/google-chat": "0.1.4",
-        "@slates-integrations/google-contacts": "0.2.3",
-        "@slates-integrations/google-docs": "0.2.0",
-        "@slates-integrations/google-drive": "0.2.11",
-        "@slates-integrations/google-sheets": "0.2.2",
+        "@slates-integrations/google-contacts": "0.2.4",
+        "@slates-integrations/google-docs": "0.2.1",
+        "@slates-integrations/google-drive": "0.2.12",
+        "@slates-integrations/google-sheets": "0.2.3",
         "@types/node": "^20",
         "slates": "1.0.0-rc.25",
         "zod": "^4.2",

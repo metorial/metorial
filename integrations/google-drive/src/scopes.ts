@@ -110,6 +110,5 @@ export let googleDriveActionScopes = {
   listDriveApps: driveAppsList,
   getDriveApp: driveAppsGet,
   listDriveLabels: driveLabelsRead,
-  getDriveLabel: driveLabelsRead,
-  recentFileActivity: driveAnyScopeRead
+  getDriveLabel: driveLabelsRead
 } as const;

@@ -41,7 +41,7 @@ export let auth = SlateAuth.create()
       {
         title: 'Drive (App Files)',
         description:
-          'Access only to files created or opened by the app; used for deleting spreadsheets and push notifications',
+          'Access only to files created or opened by the app; used for deleting spreadsheets',
         scope: googleSheetsScopes.driveFile
       },
       {

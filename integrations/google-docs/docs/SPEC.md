@@ -130,18 +130,4 @@ For example, if you're an HR manager, you might use the same template for offer 
 
 ## Events
 
-The `document_changed` event checks [Google Drive files.list](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list) every 15 minutes for native Google Docs files modified within the preceding 30 minutes. Enable document change events for a connected Google account. The overlapping window is deduplicated by document ID plus `modifiedTime`; mapped event IDs use those same values. The event type is `document.created` when [the File resource](https://developers.google.com/workspace/drive/api/reference/rest/v3/files) reports equal `createdTime` and `modifiedTime`, otherwise `document.modified`.
-
-The output contains `documentId`, `documentName`, `changeType`, `modifiedTime`, and, when available, `webViewLink` and `lastModifiedBy`:
-
-```json
-{
-  "documentId": "1AbC...",
-  "documentName": "Quarterly plan",
-  "changeType": "modified",
-  "modifiedTime": "2026-09-23T10:10:00.000Z",
-  "webViewLink": "https://docs.google.com/document/d/1AbC.../edit"
-}
-```
-
-The event reports the latest visible file state. It cannot report deleted files, files no longer accessible to the account, or every intermediate edit. A polling gap longer than 30 minutes can miss changes. The account's existing Drive access determines which documents appear.
+This integration does not currently expose event triggers.

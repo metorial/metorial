@@ -31,7 +31,6 @@ import {
   updateSharedDriveTool,
   uploadFileTool
 } from './tools';
-import { recentFileActivityTrigger, recentFileEvents } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -66,6 +65,5 @@ export let provider = Slate.create({
     listDriveLabelsTool,
     getDriveLabelTool
   ],
-  triggerGroups: [recentFileEvents],
-  triggers: [recentFileActivityTrigger]
+  triggers: []
 });

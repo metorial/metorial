@@ -38,19 +38,7 @@ Replaces the full body of an existing native Google Docs document from Markdown 
 
 ## Events
 
-Enable document change events for a connected Google account to use `document_changed`. It checks Google Drive every 15 minutes for Google Docs files modified in the previous 30 minutes, including newly created files. An event includes the document ID, name, change type (`created` or `modified`), modification time, link, and last modifying user when Google provides them:
-
-```json
-{
-  "documentId": "1AbC...",
-  "documentName": "Quarterly plan",
-  "changeType": "modified",
-  "modifiedTime": "2026-09-23T10:10:00.000Z",
-  "webViewLink": "https://docs.google.com/document/d/1AbC.../edit"
-}
-```
-
-The event ID and duplicate key use the document ID and modification time, so overlapping checks do not repeat the same change. A new file is classified as `created` when Google reports equal creation and modification times. This detects the latest file state, not every intermediate edit. Deletions, access removals, and changes missed after a polling gap longer than 30 minutes are not detected. Results are limited to files visible to the connection's existing Drive access. See [Google Drive files.list](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list) and the [File resource](https://developers.google.com/workspace/drive/api/reference/rest/v3/files).
+This integration does not currently expose event triggers.
 
 ## License
 

@@ -8,12 +8,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates-integrations/gmail": "0.2.3",
+    "@slates-integrations/gmail": "0.2.4",
     "@slates-integrations/google-chat": "0.1.4",
-    "@slates-integrations/google-contacts": "0.2.3",
-    "@slates-integrations/google-docs": "0.2.0",
-    "@slates-integrations/google-drive": "0.2.11",
-    "@slates-integrations/google-sheets": "0.2.2",
+    "@slates-integrations/google-contacts": "0.2.4",
+    "@slates-integrations/google-docs": "0.2.1",
+    "@slates-integrations/google-drive": "0.2.12",
+    "@slates-integrations/google-sheets": "0.2.3",
     "@types/node": "^20",
     "slates": "1.0.0-rc.25",
     "zod": "^4.2"
@@ -35,5 +35,5 @@
       "optional": true
     }
   },
-  "version": "0.4.6"
+  "version": "0.4.7"
 }

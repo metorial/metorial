@@ -86,18 +86,4 @@ Google Workspace users can utilize the API to list and search domain profiles an
 
 ## Events
 
-Enable **Contact Modified** to poll the People API's `people/me/connections` list. This emits a `contact.modified` event for each contact whose `CONTACT` source `updateTime` falls within the past hour. Checks run at least 15 minutes apart. Each response page is read, including pages after one with no recent contact. The event ID and deduplication key are the contact resource name plus that source update time; repeated checks of one version are deduplicated for 24 hours.
-
-The event output contains the contact fields returned by Google and `changeType: "modified"`. For example:
-
-```json
-{
-  "resourceName": "people/c123",
-  "etag": "etag-value",
-  "names": [{ "displayName": "Alex Example" }],
-  "emailAddresses": [{ "value": "alex@example.com" }],
-  "changeType": "modified"
-}
-```
-
-The full list does not say whether a contact was created or edited. Deletions are not reported; Google includes deletion tombstones only for requests with a saved sync token. There is no Google People webhook to configure. See the [connections list API](https://developers.google.com/people/api/rest/v1/people.connections/list) and [Person source metadata](https://developers.google.com/people/api/rest/v1/people#Source).
+This integration does not currently expose event triggers.

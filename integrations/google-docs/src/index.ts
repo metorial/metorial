@@ -10,7 +10,6 @@ import {
   mergeTemplate,
   updateDocumentMarkdown
 } from './tools';
-import { documentChanged, documentChanges } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -24,6 +23,5 @@ export let provider = Slate.create({
     manageNamedRanges,
     updateDocumentMarkdown
   ],
-  triggerGroups: [documentChanges],
-  triggers: [documentChanged]
+  triggers: []
 });

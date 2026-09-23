@@ -41,6 +41,5 @@ export let googleContactsActionScopes = {
     googleContactsScopes.userInfoProfile
   ),
   manageContactPhoto: anyOf(googleContactsScopes.contacts),
-  batchModifyContacts: anyOf(googleContactsScopes.contacts),
-  contactModified: anyOf(googleContactsScopes.contacts, googleContactsScopes.contactsReadonly)
+  batchModifyContacts: anyOf(googleContactsScopes.contacts)
 } as const;

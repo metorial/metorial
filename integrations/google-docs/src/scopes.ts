@@ -25,11 +25,6 @@ let docsWrite = anyOf(
 );
 
 let driveWrite = anyOf(googleDocsScopes.drive, googleDocsScopes.driveFile);
-let driveRead = anyOf(
-  googleDocsScopes.drive,
-  googleDocsScopes.driveReadonly,
-  googleDocsScopes.driveFile
-);
 
 export let googleDocsActionScopes = {
   createDocument: docsWrite,
@@ -39,6 +34,5 @@ export let googleDocsActionScopes = {
   updateDocumentMarkdown: driveWrite,
   mergeTemplate: docsWrite,
   listDocuments: docsRead,
-  manageNamedRanges: docsWrite,
-  documentChanged: driveRead
+  manageNamedRanges: docsWrite
 } as const;

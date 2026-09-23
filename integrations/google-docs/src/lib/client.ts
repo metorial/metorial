@@ -630,7 +630,7 @@ export class GoogleDocsClient {
     return response.data;
   }
 
-  // Drive API methods for file management and watching
+  // Drive API methods for file management
   async getDriveFile(fileId: string): Promise<DriveFile> {
     let response = await this.driveAxios.get(`/files/${fileId}`, {
       params: {

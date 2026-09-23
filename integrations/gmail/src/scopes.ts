@@ -50,7 +50,6 @@ export let gmailActionScopes = {
   listGoogleContacts: anyOf(gmailScopes.contactsReadonly),
   searchGoogleContacts: anyOf(gmailScopes.contactsReadonly),
   getGoogleContact: anyOf(gmailScopes.contactsReadonly),
-  newMessage: gmailReadBody,
   // users.messages.import and users.messages.insert accept the same three scopes.
   importMessage: anyOf(gmailScopes.fullMail, gmailScopes.gmailModify, gmailScopes.gmailInsert),
   insertMessage: anyOf(gmailScopes.fullMail, gmailScopes.gmailModify, gmailScopes.gmailInsert)

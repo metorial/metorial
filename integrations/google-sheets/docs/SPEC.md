@@ -39,7 +39,7 @@ Sheets API scopes are applied to a spreadsheet file and cannot be limited to a s
 - `https://www.googleapis.com/auth/spreadsheets.readonly` — Read-only access to all spreadsheets.
 - `https://www.googleapis.com/auth/drive.file` — Access only to files created or opened by the app.
 
-The restricted broad Drive scopes (`drive`, `drive.readonly`) are not requested by this integration. Connections that granted them previously keep working; new connections use `drive.file`, so Drive-level operations (deleting spreadsheets, change-notification watches) apply only to files created or opened through this connection.
+The restricted broad Drive scopes (`drive`, `drive.readonly`) are not requested by this integration. Connections that granted them previously keep working; new connections use `drive.file`, so Drive-level operations such as deleting spreadsheets apply only to files created or opened through this connection.
 
 ## Features
 
@@ -99,6 +99,4 @@ Perform multiple distinct update operations (formatting, adding sheets, creating
 
 ## Events
 
-**Spreadsheet Changed** (`spreadsheet_changed`) checks the Drive `files.list` endpoint every 15 minutes for Google Sheets files whose `modifiedTime` is in the previous 20 minutes. Enable the event on a connection with Google Drive access. The event type is `spreadsheet.update`, and the event ID is the spreadsheet ID plus the Drive modification time. The output keeps the spreadsheet ID, URL, title, modification time, optional last modifying user, and sheet tab titles. For example, a file modified at 10:00 may produce `{ "spreadsheetId": "abc123", "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/abc123", "title": "Budget", "modifiedTime": "2026-09-23T10:00:00.000Z", "sheetTitles": ["Sheet1"] }`.
-
-This is a current-file check, so several edits between checks can produce one event, and deleted files cannot be found. It does not provide notification channel IDs or changed-field details. Files already modified within the lookback window may produce an event on the first check. `drive.file` access is limited to files created or opened with the connected app; broader existing Drive grants can see more. Google documents the [`files.list` query and paging contract](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list), [`modifiedTime` metadata](https://developers.google.com/workspace/drive/api/reference/rest/v3/files), and [file search syntax](https://developers.google.com/workspace/drive/api/guides/search-files).
+This integration does not currently expose event triggers.

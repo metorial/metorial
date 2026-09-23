@@ -1,6 +1,6 @@
 {
   "name": "@google/google-drive",
-  "description": "Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Read label definitions and search files by label. Browse the Drive apps installed for your account. Monitor recently modified files with periodic checks. Store app-specific data in a hidden per-user folder.",
+  "description": "Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Read label definitions and search files by label. Browse the Drive apps installed for your account. Store app-specific data in a hidden per-user folder.",
   "categories": ["apis-and-http-requests", "document-processing", "email-and-messaging"],
   "skills": [
     "upload and download files",
@@ -12,7 +12,7 @@
     "manage comments and replies",
     "read label definitions and search files by label",
     "browse installed Drive apps",
-    "monitor file changes",
+    "list file changes",
     "create and organize folders"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/google-drive.svg",

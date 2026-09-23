@@ -74,9 +74,7 @@ Creates, updates, deletes, or gets multiple Google contacts in one People API re
 
 ## Events
 
-Enable **Contact Modified** to receive `contact.modified` events for contacts Google reports as modified during the past hour. Checks run at least 15 minutes apart. A newly created contact can appear as `contact.modified`; deleted contacts cannot be detected by this event. Each event includes the contact's resource name, available contact fields, and `changeType: "modified"`.
-
-Events use the contact resource name and Google's source update time as their stable ID. Repeated checks of the same contact version have the same ID and are deduplicated for 24 hours. See the [People API connections list](https://developers.google.com/people/api/rest/v1/people.connections/list) and [source update time](https://developers.google.com/people/api/rest/v1/people#Source) references.
+This integration does not currently expose event triggers.
 
 ## License
 

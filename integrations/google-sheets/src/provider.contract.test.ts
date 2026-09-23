@@ -34,7 +34,8 @@ describe('google-sheets provider contract', () => {
         'create_filter_view',
         'merge_cells'
       ],
-      triggerIds: ['spreadsheet_changed'],
+      triggerIds: [],
+      triggerGroupIds: [],
       authMethodIds: ['oauth', 'api_key', 'service_account'],
       tools: [
         { id: 'create_spreadsheet', readOnly: false, destructive: false },
@@ -55,10 +56,10 @@ describe('google-sheets provider contract', () => {
         { id: 'create_filter_view', readOnly: false, destructive: false },
         { id: 'merge_cells', readOnly: false, destructive: false }
       ],
-      triggers: [{ id: 'spreadsheet_changed' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(18);
+    expect(contract.actions).toHaveLength(17);
 
     let expectedScopes = {
       create_spreadsheet: googleSheetsActionScopes.createSpreadsheet,
@@ -77,8 +78,7 @@ describe('google-sheets provider contract', () => {
       manage_protected_ranges: googleSheetsActionScopes.manageProtectedRanges,
       manage_named_ranges: googleSheetsActionScopes.manageNamedRanges,
       create_filter_view: googleSheetsActionScopes.createFilterView,
-      merge_cells: googleSheetsActionScopes.mergeCells,
-      spreadsheet_changed: googleSheetsActionScopes.spreadsheetChanged
+      merge_cells: googleSheetsActionScopes.mergeCells
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

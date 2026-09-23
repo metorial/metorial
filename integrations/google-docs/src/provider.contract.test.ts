@@ -8,7 +8,7 @@ import { provider } from './index';
 import { googleDocsActionScopes, googleDocsScopes } from './scopes';
 
 describe('google-docs provider contract', () => {
-  it('advertises document tools and the current document change trigger', async () => {
+  it('advertises document tools without triggers', async () => {
     let client = createLocalSlateTestClient({ slate: provider });
     let contract = await expectSlateContract({
       client,
@@ -28,8 +28,8 @@ describe('google-docs provider contract', () => {
         'manage_named_ranges',
         'update_document_markdown'
       ],
-      triggerIds: ['document_changed'],
-      triggerGroupIds: ['document_changes'],
+      triggerIds: [],
+      triggerGroupIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'create_document', readOnly: false, destructive: false },
@@ -41,10 +41,10 @@ describe('google-docs provider contract', () => {
         { id: 'manage_named_ranges', readOnly: false, destructive: true },
         { id: 'update_document_markdown', readOnly: false, destructive: true }
       ],
-      triggers: [{ id: 'document_changed' }]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(9);
+    expect(contract.actions).toHaveLength(8);
 
     let expectedScopes = {
       create_document: googleDocsActionScopes.createDocument,
@@ -54,8 +54,7 @@ describe('google-docs provider contract', () => {
       merge_template: googleDocsActionScopes.mergeTemplate,
       list_documents: googleDocsActionScopes.listDocuments,
       manage_named_ranges: googleDocsActionScopes.manageNamedRanges,
-      update_document_markdown: googleDocsActionScopes.updateDocumentMarkdown,
-      document_changed: googleDocsActionScopes.documentChanged
+      update_document_markdown: googleDocsActionScopes.updateDocumentMarkdown
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

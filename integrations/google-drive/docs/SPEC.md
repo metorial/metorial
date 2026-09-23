@@ -100,6 +100,4 @@ Applications can store per-user configuration or data in a hidden app-specific f
 
 ## Events
 
-The **Recent File Activity** event checks [Drive file search](https://developers.google.com/workspace/drive/api/guides/ref-search-terms) every 15 minutes for My Drive files and shared-drive files the connected user has accessed, with a `modifiedTime` in the last 30 minutes. It emits `file.recently_modified`. The output contains `fileId`, `fileName`, `mimeType`, current `trashed` state, and `modifiedTime`, plus available `parents`, `webViewLink`, and last-modifier fields. A file might yield `{"fileId":"abc123","fileName":"Plan","mimeType":"application/vnd.google-apps.document","trashed":false,"modifiedTime":"2026-09-23T10:00:00.000Z"}`.
-
-Event IDs and duplicate suppression use file ID, modification time, and current trash state. This current-file snapshot does not report permanent deletions, lost access, the time a file moved to trash, or every intermediate change. The default [user corpus](https://developers.google.com/workspace/drive/api/guides/enable-shareddrives) does not scan every file in every shared drive. A long polling outage can move changes outside the 30-minute window. For complete history, call `list_changes` and persist its [page token](https://developers.google.com/workspace/drive/api/guides/manage-changes).
+This integration does not currently expose event triggers.

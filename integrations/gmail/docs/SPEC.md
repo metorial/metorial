@@ -94,10 +94,4 @@ To add a message to an existing thread, Gmail requires the `threadId`, `Referenc
 
 ## Events
 
-### New Message
-
-Enable the **New Message** event for a connected mailbox. Polling runs every 15 minutes and searches the previous hour with Gmail's `after:` query, including Spam and Trash. Each result is checked against Gmail's `internalDate` so its mailbox creation time falls within the window. The immutable message ID is the event ID and deduplication key. The event type is `message.added`.
-
-The output contains `messageId`, `threadId`, `labelIds`, `internalDate` (epoch milliseconds), and available `from`, `to`, `subject`, `snippet`, and `date` fields. For example: `{ "messageId": "18abc123", "threadId": "18abc100", "labelIds": ["INBOX"], "internalDate": "1727000000000", "subject": "Invoice" }`.
-
-The one-hour overlap tolerates ordinary polling delays. Messages deleted before a poll, added during a delay longer than an hour, or imported with a historical internal date can be missed. Deletions and label changes are not emitted. See [Gmail search and filtering](https://developers.google.com/workspace/gmail/api/guides/filtering), [list messages](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list), and the [Message resource](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages).
+This integration does not currently expose event triggers.

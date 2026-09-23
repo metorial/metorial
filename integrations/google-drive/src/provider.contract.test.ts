@@ -17,7 +17,7 @@ describe('google-drive provider contract', () => {
         id: 'google-drive',
         name: 'Google Drive',
         description:
-          'Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Apply and read custom labels on files. Monitor recently modified files with periodic checks. Store app-specific data in a hidden per-user folder.'
+          'Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Apply and read custom labels on files. Store app-specific data in a hidden per-user folder.'
       },
       toolIds: [
         'search_files',
@@ -50,6 +50,8 @@ describe('google-drive provider contract', () => {
         'list_drive_labels',
         'get_drive_label'
       ],
+      triggerIds: [],
+      triggerGroupIds: [],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'search_files', readOnly: true, destructive: false },
@@ -84,7 +86,7 @@ describe('google-drive provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(30);
+    expect(contract.actions).toHaveLength(29);
 
     let expectedScopes = {
       search_files: googleDriveActionScopes.searchFiles,
