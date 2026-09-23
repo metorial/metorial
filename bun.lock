@@ -4143,7 +4143,7 @@
     },
     "integrations/elasticsearch": {
       "name": "@slates-integrations/elasticsearch",
-      "version": "0.2.0-rc.15",
+      "version": "0.2.0",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
