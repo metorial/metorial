@@ -12,7 +12,6 @@ export let superGoogle1RestrictedScopes = [
   'https://www.googleapis.com/auth/gmail.insert',
   'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/gmail.settings.basic',
-  'https://www.googleapis.com/auth/gmail.settings.sharing',
   'https://www.googleapis.com/auth/drive',
   'https://www.googleapis.com/auth/drive.readonly',
   'https://www.googleapis.com/auth/drive.metadata',
@@ -32,7 +31,6 @@ export let superGoogle1SensitiveScopes = [
   'https://www.googleapis.com/auth/drive.appdata',
   'https://www.googleapis.com/auth/drive.photos.readonly',
   'https://www.googleapis.com/auth/drive.apps.readonly',
-  'https://www.googleapis.com/auth/drive.labels',
   'https://www.googleapis.com/auth/drive.labels.readonly',
   'https://www.googleapis.com/auth/chat.messages.create',
   'https://www.googleapis.com/auth/chat.messages.reactions',
@@ -89,10 +87,6 @@ let superGoogle1ScopeCopy: Record<SuperGoogle1Scope, { title: string; descriptio
     'https://www.googleapis.com/auth/gmail.settings.basic': describe(
       'Gmail basic settings',
       'View and manage basic Gmail settings, filters, and vacation responses.'
-    ),
-    'https://www.googleapis.com/auth/gmail.settings.sharing': describe(
-      'Gmail sharing settings',
-      'Manage sensitive Gmail settings such as forwarding addresses, send-as aliases, and delegates.'
     ),
     'https://www.googleapis.com/auth/drive': describe(
       'Google Drive',
@@ -153,10 +147,6 @@ let superGoogle1ScopeCopy: Record<SuperGoogle1Scope, { title: string; descriptio
     'https://www.googleapis.com/auth/drive.apps.readonly': describe(
       'Drive apps read',
       'View the Drive apps installed for the connected account.'
-    ),
-    'https://www.googleapis.com/auth/drive.labels': describe(
-      'Drive labels',
-      'View and manage Drive label taxonomies.'
     ),
     'https://www.googleapis.com/auth/drive.labels.readonly': describe(
       'Drive labels read',
@@ -232,8 +222,6 @@ let superGoogle1ScopeCopy: Record<SuperGoogle1Scope, { title: string; descriptio
     )
   };
 
-// The consent screen requests the complete P1 project declaration, including scopes that
-// back planned tools, so the verified consent matches the Console declaration exactly.
 export let superGoogle1OAuthScopes = [
   ...superGoogle1RestrictedScopes,
   ...superGoogle1SensitiveScopes
@@ -246,25 +234,3 @@ export let superGoogle1ProfileScopes = new Set([
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile'
 ]);
-
-export let superGoogle1SupplementalToolScopes = new Map([
-  ['manage_space', 'https://www.googleapis.com/auth/chat.delete']
-]);
-
-// Requested and declared for planned tools; referenced by no retained tool clause today.
-export let superGoogle1FutureToolScopes = [
-  'https://www.googleapis.com/auth/gmail.insert',
-  'https://www.googleapis.com/auth/gmail.settings.sharing',
-  'https://www.googleapis.com/auth/contacts.other.readonly',
-  'https://www.googleapis.com/auth/chat.admin.spaces.readonly',
-  'https://www.googleapis.com/auth/chat.customemojis',
-  'https://www.googleapis.com/auth/chat.customemojis.readonly',
-  'https://www.googleapis.com/auth/chat.users.sections',
-  'https://www.googleapis.com/auth/chat.users.sections.readonly',
-  'https://www.googleapis.com/auth/chat.users.readstate',
-  'https://www.googleapis.com/auth/chat.users.readstate.readonly',
-  'https://www.googleapis.com/auth/chat.users.spacesettings',
-  'https://www.googleapis.com/auth/drive.apps.readonly',
-  'https://www.googleapis.com/auth/drive.labels',
-  'https://www.googleapis.com/auth/drive.labels.readonly'
-] as const;

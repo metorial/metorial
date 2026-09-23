@@ -21,7 +21,7 @@ import {
   updateContact,
   updateContactGroup
 } from './tools';
-import { contactChanged, inboundWebhook } from './triggers';
+import { contactModifications, contactModified } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -46,5 +46,6 @@ export let provider = Slate.create({
     manageContactPhoto,
     batchModifyContacts
   ],
-  triggers: [inboundWebhook, contactChanged]
+  triggerGroups: [contactModifications],
+  triggers: [contactModified]
 });

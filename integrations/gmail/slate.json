@@ -1,6 +1,6 @@
 {
   "name": "@google/gmail",
-  "description": "Send, read, and search email messages with support for recipients, attachments, and HTML content. Create, update, and send drafts. Manage conversation threads and organize messages with labels. Search mailboxes using Gmail query syntax (from, to, subject, date, attachment filters). Configure mail settings including forwarding rules, filters, vacation responders, signatures, aliases, and delegates. Import and insert messages for migration. Sync mailbox changes incrementally via history API. Subscribe to mailbox change notifications via push notifications.",
+  "description": "Send, read, and search email messages with support for recipients, attachments, and HTML content. Create, update, and send drafts. Manage conversation threads and organize messages with labels. Search mailboxes using Gmail query syntax (from, to, subject, date, attachment filters). Manage filters and vacation responders, update signatures and existing send-as aliases, and view forwarding settings. Import and insert messages for migration. Sync mailbox changes incrementally via history API. Subscribe to mailbox change notifications via push notifications.",
   "categories": ["email-and-messaging"],
   "skills": [
     "send email messages",

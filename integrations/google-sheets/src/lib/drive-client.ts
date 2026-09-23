@@ -1,5 +1,11 @@
 import { createAxios } from 'slates';
 
+export interface DriveSpreadsheetFile {
+  id: string;
+  modifiedTime: string;
+  lastModifyingUser?: { emailAddress?: string; displayName?: string };
+}
+
 export class DriveClient {
   private axios: ReturnType<typeof createAxios>;
 
@@ -12,26 +18,20 @@ export class DriveClient {
     });
   }
 
-  async watchFile(fileId: string, webhookUrl: string, channelId: string, expiration?: number) {
-    let body: Record<string, any> = {
-      id: channelId,
-      type: 'web_hook',
-      address: webhookUrl
-    };
-
-    if (expiration) {
-      body.expiration = expiration;
-    }
-
-    let response = await this.axios.post(`/files/${fileId}/watch`, body);
-    return response.data;
-  }
-
-  async stopChannel(channelId: string, resourceId: string) {
-    await this.axios.post('/channels/stop', {
-      id: channelId,
-      resourceId
+  async listModifiedSpreadsheets(since: string, pageToken?: string) {
+    let response = await this.axios.get('/files', {
+      params: {
+        q: `mimeType = 'application/vnd.google-apps.spreadsheet' and trashed = false and modifiedTime > '${since}'`,
+        fields:
+          'nextPageToken,files(id,modifiedTime,lastModifyingUser(emailAddress,displayName))',
+        pageSize: 1000,
+        pageToken
+      }
     });
+    return response.data as {
+      files?: DriveSpreadsheetFile[];
+      nextPageToken?: string;
+    };
   }
 
   async getFile(fileId: string, fields?: string) {

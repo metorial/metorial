@@ -72,6 +72,12 @@ Updates or deletes the photo for a contact in the authenticated user's Google Co
 
 Creates, updates, deletes, or gets multiple Google contacts in one People API request. Create, update, and get accept up to 200 contacts; delete accepts up to 500.
 
+## Events
+
+Enable **Contact Modified** to receive `contact.modified` events for contacts Google reports as modified during the past hour. Checks run at least 15 minutes apart. A newly created contact can appear as `contact.modified`; deleted contacts cannot be detected by this event. Each event includes the contact's resource name, available contact fields, and `changeType: "modified"`.
+
+Events use the contact resource name and Google's source update time as their stable ID. Repeated checks of the same contact version have the same ID and are deduplicated for 24 hours. See the [People API connections list](https://developers.google.com/people/api/rest/v1/people.connections/list) and [source update time](https://developers.google.com/people/api/rest/v1/people#Source) references.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

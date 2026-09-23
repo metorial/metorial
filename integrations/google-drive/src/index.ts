@@ -11,9 +11,13 @@ import {
   downloadFileTool,
   exportFileTool,
   getAboutTool,
+  getDriveAppTool,
+  getDriveLabelTool,
   getFileTool,
   listChangesTool,
   listCommentsTool,
+  listDriveAppsTool,
+  listDriveLabelsTool,
   listPermissionsTool,
   listRevisionsTool,
   listSharedDrivesTool,
@@ -27,7 +31,7 @@ import {
   updateSharedDriveTool,
   uploadFileTool
 } from './tools';
-import { fileChangesTrigger, inboundWebhook } from './triggers';
+import { recentFileActivityTrigger, recentFileEvents } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -56,7 +60,12 @@ export let provider = Slate.create({
     createSharedDriveTool,
     updateSharedDriveTool,
     deleteSharedDriveTool,
-    listChangesTool
+    listChangesTool,
+    listDriveAppsTool,
+    getDriveAppTool,
+    listDriveLabelsTool,
+    getDriveLabelTool
   ],
-  triggers: [inboundWebhook, fileChangesTrigger]
+  triggerGroups: [recentFileEvents],
+  triggers: [recentFileActivityTrigger]
 });

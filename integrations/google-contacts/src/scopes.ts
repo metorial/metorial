@@ -24,16 +24,12 @@ export let googleContactsActionScopes = {
   ),
   getContactGroup: anyOf(googleContactsScopes.contacts, googleContactsScopes.contactsReadonly),
   modifyGroupMembers: anyOf(googleContactsScopes.contacts),
-  listOtherContacts: anyOf(
-    googleContactsScopes.contacts,
-    googleContactsScopes.contactsReadonly,
-    googleContactsScopes.contactsOtherReadonly
-  ),
-  searchOtherContacts: anyOf(
-    googleContactsScopes.contacts,
-    googleContactsScopes.contactsReadonly,
-    googleContactsScopes.contactsOtherReadonly
-  ),
+  // Google documents contacts.other.readonly as the only authorization scope for
+  // otherContacts.list and otherContacts.search:
+  // https://developers.google.com/people/api/rest/v1/otherContacts/list#authorization-scopes
+  // https://developers.google.com/people/api/rest/v1/otherContacts/search#authorization-scopes
+  listOtherContacts: anyOf(googleContactsScopes.contactsOtherReadonly),
+  searchOtherContacts: anyOf(googleContactsScopes.contactsOtherReadonly),
   copyOtherContact: allOf(
     googleContactsScopes.contacts,
     googleContactsScopes.contactsOtherReadonly
@@ -46,6 +42,5 @@ export let googleContactsActionScopes = {
   ),
   manageContactPhoto: anyOf(googleContactsScopes.contacts),
   batchModifyContacts: anyOf(googleContactsScopes.contacts),
-  inboundWebhook: anyOf(googleContactsScopes.contactsReadonly, googleContactsScopes.contacts),
-  contactChanged: anyOf(googleContactsScopes.contacts, googleContactsScopes.contactsReadonly)
+  contactModified: anyOf(googleContactsScopes.contacts, googleContactsScopes.contactsReadonly)
 } as const;

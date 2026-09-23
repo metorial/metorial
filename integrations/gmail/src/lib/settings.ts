@@ -1,4 +1,4 @@
-import type { ImapSettings, PopSettings } from './client';
+import type { AutoForwardingSettings, ImapSettings, PopSettings } from './client';
 
 // Gmail can return *Unspecified enum placeholders from the settings read
 // endpoints but rejects them on update. The merge helpers below combine the
@@ -31,3 +31,9 @@ export let mergePopSettingsUpdate = (
     ...(disposition !== 'dispositionUnspecified' ? { disposition } : {})
   };
 };
+
+export let mapAutoForwardingSettings = (settings: AutoForwardingSettings) => ({
+  enabled: settings.enabled ?? false,
+  emailAddress: settings.emailAddress,
+  disposition: settings.disposition
+});

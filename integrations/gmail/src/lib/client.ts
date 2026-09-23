@@ -63,21 +63,6 @@ export interface GmailDraft {
   message: GmailMessage;
 }
 
-export interface HistoryRecord {
-  id: string;
-  messages?: Array<{ id: string; threadId: string }>;
-  messagesAdded?: Array<{ message: { id: string; threadId: string; labelIds?: string[] } }>;
-  messagesDeleted?: Array<{ message: { id: string; threadId: string; labelIds?: string[] } }>;
-  labelsAdded?: Array<{
-    message: { id: string; threadId: string; labelIds?: string[] };
-    labelIds: string[];
-  }>;
-  labelsRemoved?: Array<{
-    message: { id: string; threadId: string; labelIds?: string[] };
-    labelIds: string[];
-  }>;
-}
-
 export interface VacationSettings {
   enableAutoReply: boolean;
   responseSubject?: string;
@@ -123,6 +108,19 @@ export interface PopSettings {
 
 export interface LanguageSettings {
   displayLanguage: string;
+}
+
+export type AutoForwardingDisposition =
+  | 'dispositionUnspecified'
+  | 'leaveInInbox'
+  | 'archive'
+  | 'trash'
+  | 'markRead';
+
+export interface AutoForwardingSettings {
+  enabled?: boolean;
+  emailAddress?: string;
+  disposition?: AutoForwardingDisposition;
 }
 
 export class Client {
@@ -570,32 +568,6 @@ export class Client {
     });
   }
 
-  // ── History ──
-
-  async listHistory(params: {
-    startHistoryId: string;
-    labelId?: string;
-    historyTypes?: string[];
-    maxResults?: number;
-    pageToken?: string;
-  }): Promise<{ history: HistoryRecord[]; nextPageToken?: string; historyId: string }> {
-    let response = await gmailAxios.get(`users/${this.userId}/history`, {
-      headers: this.headers(),
-      params: {
-        startHistoryId: params.startHistoryId,
-        labelId: params.labelId,
-        historyTypes: params.historyTypes,
-        maxResults: params.maxResults || 100,
-        pageToken: params.pageToken
-      }
-    });
-    return {
-      history: response.data.history || [],
-      nextPageToken: response.data.nextPageToken,
-      historyId: response.data.historyId
-    };
-  }
-
   // ── Settings ──
 
   async getVacationSettings(): Promise<VacationSettings> {
@@ -736,6 +708,13 @@ export class Client {
         headers: this.headers()
       }
     );
+    return response.data;
+  }
+
+  async getAutoForwarding(): Promise<AutoForwardingSettings> {
+    let response = await gmailAxios.get(`users/${this.userId}/settings/autoForwarding`, {
+      headers: this.headers()
+    });
     return response.data;
   }
 }

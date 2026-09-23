@@ -130,29 +130,18 @@ For example, if you're an HR manager, you might use the same template for offer 
 
 ## Events
 
-The Google Docs API does not support webhooks or push notifications directly. The official Google Docs API does not have built-in webhook functionality. The search results do not contain any specific information about webhooks for the Google Docs API.
+The `document_changed` event checks [Google Drive files.list](https://developers.google.com/workspace/drive/api/reference/rest/v3/files/list) every 15 minutes for native Google Docs files modified within the preceding 30 minutes. Enable document change events for a connected Google account. The overlapping window is deduplicated by document ID plus `modifiedTime`; mapped event IDs use those same values. The event type is `document.created` when [the File resource](https://developers.google.com/workspace/drive/api/reference/rest/v3/files) reports equal `createdTime` and `modifiedTime`, otherwise `document.modified`.
 
-However, the Google Drive API allows you to watch for changes on the source files such as Google Sheets, Google Docs, or Google Slides, and the push notifications can be built into a web app.
+The output contains `documentId`, `documentName`, `changeType`, `modifiedTime`, and, when available, `webViewLink` and `lastModifiedBy`:
 
-### File Change Notifications (via Google Drive API)
+```json
+{
+  "documentId": "1AbC...",
+  "documentName": "Quarterly plan",
+  "changeType": "modified",
+  "modifiedTime": "2026-09-23T10:10:00.000Z",
+  "webViewLink": "https://docs.google.com/document/d/1AbC.../edit"
+}
+```
 
-The Google Drive API provides push notifications that let you monitor changes in resources. You can use this feature to improve the performance of your application. It lets you eliminate the extra network and compute costs involved with polling resources to determine if they have changed.
-
-To receive notifications when a Google Doc changes:
-
-1. Set up a webhook endpoint (HTTPS with valid SSL certificate)
-2. Currently, the Google Drive API supports notifications for changes to the files and changes methods.
-3. Use the Drive API `watch` method to subscribe to file changes
-4. Notifications include file metadata changes but require additional API calls to retrieve actual content changes
-
-**Configuration options:**
-
-- `address`: HTTPS webhook callback URL
-- `token`: Optional verification token for message routing
-- `expiration`: Channel expiration time (must be renewed)
-
-**Limitations:**
-
-- Requires Google Drive API scope in addition to Docs API scopes
-- Notifications indicate that a change occurred but don't include document content
-- Channels expire and must be renewed periodically
+The event reports the latest visible file state. It cannot report deleted files, files no longer accessible to the account, or every intermediate edit. A polling gap longer than 30 minutes can miss changes. The account's existing Drive access determines which documents appear.

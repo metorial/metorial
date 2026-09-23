@@ -9,7 +9,7 @@ import { provider } from './index';
 import { googleDriveActionScopes } from './scopes';
 
 describe('google-drive provider contract', () => {
-  it('exposes the expected provider, tool, trigger, and auth surface', async () => {
+  it('exposes the expected provider, tool, and auth surface', async () => {
     let client = createLocalSlateTestClient({ slate: provider });
     let contract = await expectSlateContract({
       client,
@@ -17,7 +17,7 @@ describe('google-drive provider contract', () => {
         id: 'google-drive',
         name: 'Google Drive',
         description:
-          'Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Apply and read custom labels on files. Monitor file and folder changes via push notifications or webhook subscriptions. Store app-specific data in a hidden per-user folder.'
+          'Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Apply and read custom labels on files. Monitor recently modified files with periodic checks. Store app-specific data in a hidden per-user folder.'
       },
       toolIds: [
         'search_files',
@@ -44,9 +44,12 @@ describe('google-drive provider contract', () => {
         'create_shared_drive',
         'update_shared_drive',
         'delete_shared_drive',
-        'list_changes'
+        'list_changes',
+        'list_drive_apps',
+        'get_drive_app',
+        'list_drive_labels',
+        'get_drive_label'
       ],
-      triggerIds: ['inbound_webhook', 'file_changes'],
       authMethodIds: ['oauth'],
       tools: [
         { id: 'search_files', readOnly: true, destructive: false },
@@ -73,15 +76,15 @@ describe('google-drive provider contract', () => {
         { id: 'create_shared_drive', readOnly: false, destructive: false },
         { id: 'update_shared_drive', readOnly: false, destructive: false },
         { id: 'delete_shared_drive', readOnly: false, destructive: true },
-        { id: 'list_changes', readOnly: true, destructive: false }
-      ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'file_changes', invocationType: 'polling' }
+        { id: 'list_changes', readOnly: true, destructive: false },
+        { id: 'list_drive_apps', readOnly: true, destructive: false },
+        { id: 'get_drive_app', readOnly: true, destructive: false },
+        { id: 'list_drive_labels', readOnly: true, destructive: false },
+        { id: 'get_drive_label', readOnly: true, destructive: false }
       ]
     });
 
-    expect(contract.actions).toHaveLength(27);
+    expect(contract.actions).toHaveLength(30);
 
     let expectedScopes = {
       search_files: googleDriveActionScopes.searchFiles,
@@ -121,8 +124,21 @@ describe('google-drive provider contract', () => {
       update_shared_drive: googleDriveActionScopes.updateSharedDrive,
       delete_shared_drive: googleDriveActionScopes.deleteSharedDrive,
       list_changes: googleDriveActionScopes.listChanges,
-      inbound_webhook: googleDriveActionScopes.inboundWebhook,
-      file_changes: googleDriveActionScopes.fileChanges
+      list_drive_apps: {
+        AND: [{ OR: ['https://www.googleapis.com/auth/drive.apps.readonly'] }]
+      },
+      get_drive_app: googleDriveActionScopes.getDriveApp,
+      list_drive_labels: {
+        AND: [
+          {
+            OR: [
+              'https://www.googleapis.com/auth/drive.labels.readonly',
+              'https://www.googleapis.com/auth/drive.labels'
+            ]
+          }
+        ]
+      },
+      get_drive_label: googleDriveActionScopes.getDriveLabel
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {
@@ -139,6 +155,11 @@ describe('google-drive provider contract', () => {
     );
     expect(scopeTitles.has('Full Access')).toBe(true);
     expect(scopeTitles.has('User Email')).toBe(true);
+    let scopeIds = new Set((oauth.authenticationMethod.scopes ?? []).map(scope => scope.id));
+    expect(scopeIds.has('https://www.googleapis.com/auth/drive.apps.readonly')).toBe(true);
+    expect(scopeIds.has('https://www.googleapis.com/auth/drive.labels')).toBe(false);
+    expect(scopeIds.has('https://www.googleapis.com/auth/drive.labels.readonly')).toBe(true);
+    expect(scopeIds.has('https://www.googleapis.com/auth/drive.admin.labels')).toBe(false);
   });
 });
 

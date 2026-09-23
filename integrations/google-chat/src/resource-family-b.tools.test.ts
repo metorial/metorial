@@ -131,7 +131,10 @@ describe('google-chat resource tool family B', () => {
     }
 
     expect(JSON.stringify(manageSpace.scopes)).toContain(googleChatScopes.spacesReadonly);
-    expect(JSON.stringify(manageSpace.scopes)).not.toContain(googleChatScopes.delete);
+    // chat.delete unlocks only the delete action, so it must stay an OR alternative
+    // rather than an AND clause that would gate create/setup/get/update on it.
+    expect(manageSpace.scopes?.AND).toHaveLength(1);
+    expect(manageSpace.scopes?.AND[0]?.OR).toContain(googleChatScopes.delete);
     expect(JSON.stringify(manageMember.scopes)).toContain(googleChatScopes.membershipsApp);
     expect(getAttachment.authMethods).toEqual(['service_account']);
     expect(JSON.stringify(getAttachment.scopes)).toContain(googleChatScopes.bot);

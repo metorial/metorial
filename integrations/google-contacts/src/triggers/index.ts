@@ -1,2 +1,2 @@
-export { contactChanged } from './contact-changed';
-export * from './inbound-webhook';
+export { contactModifications } from './contact-modifications-trigger-group';
+export { contactModified } from './contact-modified';

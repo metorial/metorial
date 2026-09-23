@@ -1,6 +1,14 @@
 # <img src="https://provider-logos.metorial-cdn.com/gmail.svg" height="20"> Gmail
 
-Send, read, and search email messages with support for recipients, attachments, and HTML content. Create, update, and send drafts. Manage conversation threads and organize messages with labels. Search mailboxes using Gmail query syntax (from, to, subject, date, attachment filters). Configure mail settings including forwarding rules, filters, vacation responders, signatures, aliases, and delegates. Optionally look up Google Contacts through the People API when the profile grants Contacts read-only access. The OAuth surface also exposes the Google Other Contacts read-only scope for consent-screen coverage. Import and insert messages for migration. Sync mailbox changes incrementally via history API. Subscribe to mailbox change notifications via push notifications.
+Send, read, and search email messages with support for recipients, attachments, and HTML content. Create, update, and send drafts. Manage conversation threads and organize messages with labels. Search mailboxes using Gmail query syntax (from, to, subject, date, attachment filters). Manage filters and vacation responders, update signatures and existing send-as aliases, and view forwarding settings. Optionally look up Google Contacts through the People API when the profile grants Contacts read-only access. The OAuth surface also exposes the Google Other Contacts read-only scope for consent-screen coverage. Import and insert messages for migration. Detect recently dated messages by polling the mailbox.
+
+## Events
+
+### New Message
+
+Enable the **New Message** event to check the connected mailbox every 15 minutes. It searches for messages dated within the past hour, including messages in Spam and Trash. Each event has type `message.added` and uses Gmail's immutable message ID for event identity and deduplication. The output includes `messageId`, `threadId`, `labelIds`, `internalDate` (epoch milliseconds), and available sender, recipient, subject, snippet, and Date header fields.
+
+For example, an event can contain `messageId: "18abc123"`, `threadId: "18abc100"`, `internalDate: "1727000000000"`, and `subject: "Invoice"`. Messages deleted before the next check, added during a polling delay longer than an hour, or imported with a historical internal date can be missed. Deletions and label changes are not emitted. See [Gmail message search](https://developers.google.com/workspace/gmail/api/guides/filtering) and the [Message resource](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages).
 
 ## Tools
 

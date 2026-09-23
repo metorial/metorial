@@ -40,8 +40,6 @@ export let googleSheetsActionScopes = {
   createPivotTable: spreadsheetDataWrite,
   createFilterView: spreadsheetDataWrite,
   spreadsheetChanged: anyOf(
-    googleSheetsScopes.spreadsheets,
-    googleSheetsScopes.spreadsheetsReadonly,
     googleSheetsScopes.driveReadonly,
     googleSheetsScopes.drive,
     googleSheetsScopes.driveFile

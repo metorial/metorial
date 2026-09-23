@@ -75,12 +75,6 @@ export let auth = SlateAuth.create()
         scope: gmailScopes.gmailSettingsBasic
       },
       {
-        title: 'Sharing Settings',
-        description:
-          'Manage sensitive mail settings including forwarding rules and aliases. Restricted to service accounts with domain-wide delegation.',
-        scope: gmailScopes.gmailSettingsSharing
-      },
-      {
         title: 'Google Contacts (Read-only)',
         description: 'See and download your Google Contacts for address lookup.',
         scope: gmailScopes.contactsReadonly

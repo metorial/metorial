@@ -1,2 +1,2 @@
-export * from './inbound-webhook';
-export * from './mailbox-changes';
+export * from './messages-group';
+export * from './new-message';

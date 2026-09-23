@@ -47,9 +47,17 @@ export let listOtherContacts = SlateTool.create(spec, {
     z.object({
       pageSize: z
         .number()
+        .int()
+        .min(0)
+        .max(1000)
         .optional()
-        .describe('Maximum number of contacts to return (default 100)'),
-      pageToken: z.string().optional().describe('Token for fetching the next page')
+        .describe(
+          'Maximum number of contacts to return per page, 0-1000 (omitted or 0 uses 100)'
+        ),
+      pageToken: z
+        .string()
+        .optional()
+        .describe('nextPageToken from a previous list_other_contacts response')
     })
   )
   .output(

@@ -55,7 +55,7 @@ describe('google-sheets provider contract', () => {
         { id: 'create_filter_view', readOnly: false, destructive: false },
         { id: 'merge_cells', readOnly: false, destructive: false }
       ],
-      triggers: [{ id: 'spreadsheet_changed', invocationType: 'webhook' }]
+      triggers: [{ id: 'spreadsheet_changed' }]
     });
 
     expect(contract.actions).toHaveLength(18);

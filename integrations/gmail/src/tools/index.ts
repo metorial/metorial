@@ -5,6 +5,7 @@ export * from './get-attachment';
 export * from './get-google-contact';
 export * from './get-message';
 export * from './get-profile';
+export * from './insert-message';
 export * from './list-google-contacts';
 export * from './manage-draft';
 export * from './manage-labels';

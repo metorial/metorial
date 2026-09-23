@@ -2,6 +2,8 @@ export * from './copy-file';
 export * from './create-file';
 export * from './delete-file';
 export * from './download-file';
+export * from './drive-apps';
+export * from './drive-labels';
 export * from './export-file';
 export * from './get-about';
 export * from './get-file';

@@ -1,6 +1,12 @@
 # <img src="https://provider-logos.metorial-cdn.com/google-sheets.svg" height="20"> Google Sheets
 
-Create, read, and update spreadsheets and their cell data. Read and write values to individual cells, ranges, or multiple ranges using A1 notation or named ranges. Apply cell formatting including text styles, backgrounds, borders, number formats, and conditional formatting. Manage sheets (tabs) within a spreadsheet—add, delete, copy, rename, and reorder them. Create and manage embedded charts, pivot tables, filter views, data validation rules, protected ranges, named ranges, and merged cells. Perform batch operations to apply multiple updates atomically. Monitor spreadsheet changes via Google Drive push notifications.
+Create, read, and update spreadsheets and their cell data. Read and write values to individual cells, ranges, or multiple ranges using A1 notation or named ranges. Apply cell formatting including text styles, backgrounds, borders, number formats, and conditional formatting. Manage sheets (tabs) within a spreadsheet—add, delete, copy, rename, and reorder them. Create and manage embedded charts, pivot tables, filter views, data validation rules, protected ranges, named ranges, and merged cells. Perform batch operations to apply multiple updates atomically. Monitor recent spreadsheet modifications through Google Drive.
+
+## Events
+
+Enable **Spreadsheet Changed** to check Google Drive for recently modified Google Sheets files accessible to the connection. Checks run every 15 minutes and cover a 20-minute lookback. The event type is `spreadsheet.update`; its ID combines the file ID and Drive modification time, so overlapping checks do not create duplicate events. Each event includes the spreadsheet ID and URL, current title, Drive modification time, last modifying user when available, and sheet tab titles. For example: `{ "spreadsheetId": "abc123", "spreadsheetUrl": "https://docs.google.com/spreadsheets/d/abc123", "title": "Budget", "modifiedTime": "2026-09-23T10:00:00.000Z", "sheetTitles": ["Sheet1"] }`.
+
+This detects the latest modification within the lookback window, not every edit. It does not report changes to deleted files or the specific fields changed. Files already modified within the lookback window can appear when the event is first enabled. Google Drive access is required; the `drive.file` scope covers files created or opened with the connected app. See [Google Drive file search](https://developers.google.com/workspace/drive/api/guides/search-files) and the [file metadata reference](https://developers.google.com/workspace/drive/api/reference/rest/v3/files).
 
 ## Tools
 

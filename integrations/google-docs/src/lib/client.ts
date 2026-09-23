@@ -542,7 +542,7 @@ export interface WriteControl {
   targetRevisionId?: string;
 }
 
-// Drive API types for watching files
+// Drive API file metadata
 export interface DriveFile {
   id: string;
   name: string;
@@ -558,35 +558,6 @@ export interface DriveUser {
   displayName?: string;
   emailAddress?: string;
   photoLink?: string;
-}
-
-export interface DriveWatchChannel {
-  kind: string;
-  id: string;
-  resourceId: string;
-  resourceUri: string;
-  expiration: string;
-}
-
-export interface DriveChangeList {
-  kind: string;
-  nextPageToken?: string;
-  newStartPageToken?: string;
-  changes: DriveChange[];
-}
-
-export interface DriveChange {
-  kind: string;
-  changeType: string;
-  time: string;
-  removed: boolean;
-  fileId?: string;
-  file?: DriveFile;
-}
-
-export interface DriveStartPageTokenResponse {
-  kind: string;
-  startPageToken: string;
 }
 
 export const GOOGLE_DOCS_MIME_TYPE = 'application/vnd.google-apps.document';
@@ -764,61 +735,6 @@ export class GoogleDocsClient {
         reason: 'google_docs_markdown_update_failed'
       });
     }
-  }
-
-  async watchFile(
-    fileId: string,
-    webhookUrl: string,
-    channelId: string,
-    expiration?: number
-  ): Promise<DriveWatchChannel> {
-    let body: Record<string, unknown> = {
-      id: channelId,
-      type: 'web_hook',
-      address: webhookUrl
-    };
-
-    if (expiration) {
-      body.expiration = expiration;
-    }
-
-    let response = await this.driveAxios.post(`/files/${fileId}/watch`, body, {
-      headers: this.getAuthHeaders()
-    });
-    return response.data;
-  }
-
-  async stopWatchChannel(channelId: string, resourceId: string): Promise<void> {
-    await this.driveAxios.post(
-      '/channels/stop',
-      {
-        id: channelId,
-        resourceId
-      },
-      {
-        headers: this.getAuthHeaders()
-      }
-    );
-  }
-
-  async getStartPageToken(): Promise<string> {
-    let response = await this.driveAxios.get('/changes/startPageToken', {
-      headers: this.getAuthHeaders()
-    });
-    return response.data.startPageToken;
-  }
-
-  async listChanges(pageToken: string, pageSize: number = 100): Promise<DriveChangeList> {
-    let response = await this.driveAxios.get('/changes', {
-      params: {
-        pageToken,
-        pageSize,
-        fields:
-          'kind,nextPageToken,newStartPageToken,changes(kind,changeType,time,removed,fileId,file(id,name,mimeType,modifiedTime,createdTime,owners,lastModifyingUser,webViewLink))'
-      },
-      headers: this.getAuthHeaders()
-    });
-    return response.data;
   }
 
   // Helper methods for common operations

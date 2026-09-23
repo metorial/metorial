@@ -8,6 +8,8 @@ import {
   getGoogleContact,
   getMessage,
   getProfile,
+  importMessage,
+  insertMessage,
   listGoogleContacts,
   manageDraft,
   manageLabels,
@@ -18,7 +20,7 @@ import {
   searchMessages,
   sendEmail
 } from './tools';
-import { inboundWebhook, mailboxChanges } from './triggers';
+import { messagesGroup, newMessage } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -38,7 +40,10 @@ export let provider = Slate.create({
     getAttachment.build(),
     listGoogleContacts,
     searchGoogleContacts,
-    getGoogleContact
+    getGoogleContact,
+    importMessage.build(),
+    insertMessage.build()
   ],
-  triggers: [inboundWebhook, mailboxChanges.build()]
+  triggerGroups: [messagesGroup],
+  triggers: [newMessage]
 });

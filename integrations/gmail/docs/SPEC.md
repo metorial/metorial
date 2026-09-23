@@ -1,4 +1,4 @@
-# Slates Specification for Gmail
+# Gmail Integration Specification
 
 ## Overview
 
@@ -20,11 +20,9 @@ Gmail API uses **OAuth 2.0** exclusively for authentication and authorization.
 - Authorization endpoint: `https://accounts.google.com/o/oauth2/v2/auth`
 - Token endpoint: `https://oauth2.googleapis.com/token`
 
-### Authentication Methods
+### Authentication Method
 
 **User OAuth 2.0 (Authorization Code Flow):** Used for accessing a user's own Gmail account. The user is redirected to Google's consent screen, grants permission, and the app receives an authorization code to exchange for access and refresh tokens.
-
-**Service Accounts with Domain-Wide Delegation:** As an administrator, you can use domain-wide delegation to allow internal and third-party apps to access your users' Google Workspace data, bypassing end user consent. Service accounts with domain-wide delegation only work with Google Workspace (formerly G Suite) accounts. A service account uses a private cryptographic key to create a signed JSON Web Token (JWT). This JWT is exchanged for an access token without any human interaction.
 
 ### Scopes
 
@@ -39,7 +37,6 @@ Gmail API offers granular scopes to limit access:
 | `https://www.googleapis.com/auth/gmail.labels`            | Create, read, update, and delete labels only (non-sensitive)                                                                                   |
 | `https://www.googleapis.com/auth/gmail.insert`            | Insert and import messages only (restricted)                                                                                                   |
 | `https://www.googleapis.com/auth/gmail.settings.basic`    | Manage basic mail settings (restricted)                                                                                                        |
-| `https://www.googleapis.com/auth/gmail.settings.sharing`  | Manage sensitive mail settings including forwarding rules and aliases; restricted to service accounts with domain-wide delegation (restricted) |
 | `https://www.googleapis.com/auth/contacts.readonly`       | Optional read-only access to Google Contacts through the People API                                                                            |
 | `https://www.googleapis.com/auth/contacts.other.readonly` | Optional read-only access to contact info automatically saved in "Other contacts"                                                              |
 | `https://mail.google.com/`                                | Full access including permanent deletion of threads and messages (restricted)                                                                  |
@@ -76,21 +73,16 @@ Labels are a mechanism for organizing messages and threads. For example, the lab
 
 Manage various mailbox settings programmatically:
 
-- **Aliases and Signatures:** Manage send-as aliases and email signatures.
-- **Forwarding:** Configure email forwarding addresses and rules.
+- **Aliases and Signatures:** List existing send-as aliases and update their display name, reply-to address, and signature.
+- **Forwarding:** View forwarding addresses and auto-forwarding status.
 - **Filters:** Create and manage mail filters that automatically label, archive, or forward incoming mail.
 - **Vacation Responder:** Enable, configure, and disable auto-reply/vacation messages.
 - **POP and IMAP settings:** `manage_settings` can read and update POP/IMAP access, IMAP expunge behavior and folder-size limits, and the post-fetch POP disposition. Updates first read the current settings and preserve fields omitted by the caller. Fields whose current value is a Google `*Unspecified` enum placeholder (`expungeBehaviorUnspecified`, `accessWindowUnspecified`, `dispositionUnspecified`) are omitted from the update request instead of being echoed back, since Gmail can reject them with a 400.
-- **Delegates:** A Gmail user can grant mailbox access to another user in the same Google Workspace organization. Delegate management is restricted to service accounts with domain-wide delegation.
 - **Language settings:** `manage_settings` can read or set the Gmail display language using an RFC 3066 language tag.
 
 ### S/MIME Certificates
 
 Manage S/MIME certificates for send-as aliases, enabling encrypted email communication. Certificates can be inserted, listed, retrieved, and deleted.
-
-### Mailbox History and Sync
-
-Retrieve a history of changes made to the mailbox since a given point in time (identified by a history ID). This enables efficient incremental sync of a mailbox without re-fetching all data, useful for building mail clients or sync tools.
 
 ### Message Import and Insert
 
@@ -98,14 +90,10 @@ Import messages into the mailbox (similar to receiving via SMTP) or insert messa
 
 ## Events
 
-The Gmail API uses the Cloud Pub/Sub API to deliver push notifications. This allows notification using a variety of methods including webhooks and polling on a single subscription endpoint.
+### New Message
 
-### Mailbox Change Notifications
+Enable the **New Message** event for a connected mailbox. Polling runs every 15 minutes and searches the previous hour with Gmail's `after:` query, including Spam and Trash. Each result is checked against Gmail's `internalDate` so its mailbox creation time falls within the window. The immutable message ID is the event ID and deduplication key. The event type is `message.added`.
 
-Subscribe to changes on a user's mailbox by calling the `watch` endpoint with a Google Cloud Pub/Sub topic. To configure Gmail accounts to send notifications, call watch on the Gmail user mailbox and provide the topic name and any other options in your watch request, such as labels to filter on.
+The output contains `messageId`, `threadId`, `labelIds`, `internalDate` (epoch milliseconds), and available `from`, `to`, `subject`, `snippet`, and `date` fields. For example: `{ "messageId": "18abc123", "threadId": "18abc100", "labelIds": ["INBOX"], "internalDate": "1727000000000", "subject": "Invoice" }`.
 
-- **Label filtering:** Notifications can be scoped to specific labels (e.g., only INBOX or UNREAD) using `labelIds` and `labelFilterAction` (include or exclude).
-- **Notification payload:** The notification payload contains the email address and the new mailbox history ID for the user. The actual change details must then be fetched via the history API.
-- **Watch renewal:** Watch subscriptions expire after 7 days and must be renewed by calling `watch` again.
-- Each Gmail user being watched has a maximum notification rate of 1 event per second. Any user notifications exceeding that rate will be dropped.
-- **Setup requirements:** Requires creating a Cloud Pub/Sub topic in Google Cloud, granting publish permissions to `gmail-api-push@system.gserviceaccount.com`, and configuring a push or pull subscription on the topic.
+The one-hour overlap tolerates ordinary polling delays. Messages deleted before a poll, added during a delay longer than an hour, or imported with a historical internal date can be missed. Deletions and label changes are not emitted. See [Gmail search and filtering](https://developers.google.com/workspace/gmail/api/guides/filtering), [list messages](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list), and the [Message resource](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages).

@@ -8,6 +8,11 @@ export let googleDriveScopes = {
   driveMetadata: 'https://www.googleapis.com/auth/drive.metadata',
   driveMetadataReadonly: 'https://www.googleapis.com/auth/drive.metadata.readonly',
   drivePhotosReadonly: 'https://www.googleapis.com/auth/drive.photos.readonly',
+  driveAppsReadonly: 'https://www.googleapis.com/auth/drive.apps.readonly',
+  driveLabels: 'https://www.googleapis.com/auth/drive.labels',
+  driveLabelsReadonly: 'https://www.googleapis.com/auth/drive.labels.readonly',
+  // Legacy Google Docs scope that apps.get still documents as accepted.
+  docs: 'https://www.googleapis.com/auth/docs',
   userInfoProfile: 'https://www.googleapis.com/auth/userinfo.profile',
   userInfoEmail: 'https://www.googleapis.com/auth/userinfo.email'
 } as const;
@@ -55,6 +60,27 @@ let driveAnyScopeRead = anyOf(
   googleDriveScopes.driveReadonly
 );
 
+// apps.list documents drive.apps.readonly as its only accepted scope.
+let driveAppsList = anyOf(googleDriveScopes.driveAppsReadonly);
+
+// apps.get accepts drive.apps.readonly plus every file-level Drive scope.
+let driveAppsGet = anyOf(
+  googleDriveScopes.driveAppsReadonly,
+  googleDriveScopes.drive,
+  googleDriveScopes.driveReadonly,
+  googleDriveScopes.driveFile,
+  googleDriveScopes.driveAppdata,
+  googleDriveScopes.driveMetadata,
+  googleDriveScopes.driveMetadataReadonly,
+  googleDriveScopes.docs
+);
+
+// Drive Labels API v2 labels.list / labels.get. Accept existing write grants for reads.
+let driveLabelsRead = anyOf(
+  googleDriveScopes.driveLabelsReadonly,
+  googleDriveScopes.driveLabels
+);
+
 export let googleDriveActionScopes = {
   searchFiles: driveMetadataRead,
   getFile: driveContentRead,
@@ -81,6 +107,9 @@ export let googleDriveActionScopes = {
   createSharedDrive: driveContentWrite,
   updateSharedDrive: driveContentWrite,
   deleteSharedDrive: driveContentWrite,
-  fileChanges: driveContentRead,
-  inboundWebhook: driveContentRead
+  listDriveApps: driveAppsList,
+  getDriveApp: driveAppsGet,
+  listDriveLabels: driveLabelsRead,
+  getDriveLabel: driveLabelsRead,
+  recentFileActivity: driveAnyScopeRead
 } as const;

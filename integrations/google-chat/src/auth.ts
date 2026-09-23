@@ -226,6 +226,33 @@ export let auth = SlateAuth.create()
         scope: googleChatScopes.messageReactions
       },
       {
+        title: 'Read State',
+        description: 'View and mark Google Chat spaces as read or unread.',
+        scope: googleChatScopes.usersReadstate
+      },
+      {
+        title: 'Space Notification Settings',
+        description: 'View and change notification and mute settings for Google Chat spaces.',
+        scope: googleChatScopes.usersSpacesettings
+      },
+      {
+        title: 'Sidebar Sections',
+        description:
+          'View, create, update, and delete Google Chat sidebar sections and move conversations between them.',
+        scope: googleChatScopes.usersSections
+      },
+      {
+        title: 'Custom Emoji',
+        description: 'View, create, and delete custom emoji in Google Chat.',
+        scope: googleChatScopes.customEmojis
+      },
+      {
+        title: 'Admin Space Search (Read Only)',
+        description:
+          'Search all Google Chat spaces in the organization with Google Workspace administrator privileges.',
+        scope: googleChatScopes.adminSpacesReadonly
+      },
+      {
         title: 'Google Account Email',
         description: 'View the Google Account email address for connection identity.',
         scope: googleChatScopes.userInfoEmail
