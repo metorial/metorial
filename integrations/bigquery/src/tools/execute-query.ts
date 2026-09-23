@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
 import { bigQueryServiceError } from '../lib/errors';
+import { bigQueryActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 let queryParameterSchema = z.object({
@@ -45,6 +46,7 @@ Parameterized queries are supported for safe value interpolation. You can option
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       query: z.string().describe('GoogleSQL query to execute'),

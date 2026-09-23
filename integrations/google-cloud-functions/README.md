@@ -51,3 +51,11 @@ This integration is licensed under the [FSL-1.1](https://github.com/metorial/met
 <div align="center">
   <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
 </div>
+
+## OAuth consent
+
+New connections request `cloud-platform`, `userinfo.profile`, `userinfo.email`. Tool gates retain provider-supported legacy grants for existing connections.
+
+Cloud Functions v2 list/get functions, runtime listing, source download URL generation, and function-change polling require `cloud-platform`; `cloud-platform.read-only` is not accepted by these endpoints. Operation status also accepts the legacy `cloudfunctions` scope. IAM permissions still control which resources and operations the account can access.
+
+References: [list functions](https://docs.cloud.google.com/functions/docs/reference/rest/v2/projects.locations.functions/list), [list runtimes](https://docs.cloud.google.com/functions/docs/reference/rest/v2/projects.locations.runtimes/list), [get operation](https://docs.cloud.google.com/functions/docs/reference/rest/v2/projects.locations.operations/get), [generate download URL](https://docs.cloud.google.com/functions/docs/reference/rest/v2/projects.locations.functions/generateDownloadUrl).

@@ -58,6 +58,11 @@ describe('google-cloud-storage provider contract', () => {
 
     let oauth = await client.getAuthMethod('oauth');
     expect(oauth.authenticationMethod.type).toBe('auth.oauth');
+    expect((oauth.authenticationMethod.scopes ?? []).map(scope => scope.id)).toEqual([
+      'https://www.googleapis.com/auth/devstorage.full_control',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/userinfo.email'
+    ]);
     expect(oauth.authenticationMethod.capabilities.handleTokenRefresh?.enabled).toBe(true);
     expect(oauth.authenticationMethod.capabilities.getProfile?.enabled).toBe(true);
   });

@@ -74,6 +74,8 @@ export let googleAdminActionScopes = {
     googleAdminScopes.adminDirectoryGroup,
     googleAdminScopes.adminDirectoryGroupReadonly
   ),
+  getGroupSettings: anyOf(googleAdminScopes.appsGroupsSettings),
+  updateGroupSettings: anyOf(googleAdminScopes.appsGroupsSettings),
   manageGroupMembers: anyOf(
     googleAdminScopes.adminDirectoryGroupMember,
     googleAdminScopes.adminDirectoryGroupMemberReadonly

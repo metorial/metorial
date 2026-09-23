@@ -9,7 +9,6 @@ export type SuperGoogle2ASourceIntegration =
   | 'google-meet'
   | 'google-contacts'
   | 'google-tasks'
-  | 'google-ads'
   | 'google-search-console'
   | 'google-tag-manager';
 
@@ -113,6 +112,8 @@ export let superGoogle2AToolManifest = [
     'delete_event',
     'quick_add_event',
     'list_calendars',
+    'get_calendar',
+    'list_calendar_sharing',
     'manage_calendar',
     'find_free_busy',
     'manage_sharing',
@@ -177,23 +178,6 @@ export let superGoogle2AToolManifest = [
     'move_task',
     'clear_completed_tasks'
   ]),
-  {
-    sourceIntegration: 'google-ads',
-    sourceKey: 'list_accounts',
-    exposedKey: 'ads_list_accounts'
-  },
-  ...include('google-ads', [
-    'search_reports',
-    'manage_campaigns',
-    'manage_ad_groups',
-    'manage_ads',
-    'manage_keywords',
-    'manage_bidding_strategies',
-    'manage_conversion_actions',
-    'generate_keyword_ideas',
-    'upload_offline_conversions',
-    'manage_audience_lists'
-  ]),
   ...include('google-search-console', [
     'query_search_analytics',
     'list_sites',
@@ -207,6 +191,7 @@ export let superGoogle2AToolManifest = [
     exposedKey: 'tag_manager_list_accounts'
   },
   ...include('google-tag-manager', [
+    'update_account',
     'manage_container',
     'manage_workspace',
     'manage_tag',

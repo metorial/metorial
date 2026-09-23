@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
 import { bigQueryServiceError } from '../lib/errors';
+import { bigQueryActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 let modelSummarySchema = z.object({
@@ -53,6 +54,7 @@ export let listModels = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset to list models from'),
@@ -98,6 +100,7 @@ export let getModel = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset containing the model'),
@@ -131,6 +134,7 @@ export let updateModel = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset containing the model'),
@@ -183,6 +187,7 @@ export let deleteModel = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset containing the model'),

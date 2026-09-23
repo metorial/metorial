@@ -8,6 +8,10 @@ Manage Google Tag Manager accounts, containers, workspaces, tags, triggers, vari
 
 Lists GTM accounts you have access to, optionally including their containers. Use this to discover account and container IDs needed for other operations.
 
+### Update Account
+
+Change an account's display name or anonymous data sharing setting. Other account properties are preserved.
+
 ### Manage Container
 
 Create, retrieve, update, or delete a GTM container. Can also retrieve the container's tagging snippet for website installation.

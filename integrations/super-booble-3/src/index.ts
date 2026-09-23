@@ -3,6 +3,7 @@ import { Slate } from 'slates';
 import { superGoogle3Manifest } from './manifest';
 import { superGoogle3Sources } from './sources';
 import { spec } from './spec';
+import { getCurrentUser } from './tools/get-current-user';
 
 let imported = importSuperGoogleTools({
   spec,
@@ -11,7 +12,7 @@ let imported = importSuperGoogleTools({
   authMethodKey: 'google_oauth'
 });
 
-export let tools = imported.tools;
+export let tools = [...imported.tools, getCurrentUser];
 export let toolInventory = imported.inventory;
 
 export let provider = Slate.create({

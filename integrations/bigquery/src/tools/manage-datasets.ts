@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
+import { bigQueryActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let listDatasets = SlateTool.create(spec, {
@@ -11,6 +12,7 @@ export let listDatasets = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       maxResults: z.number().optional().describe('Maximum number of datasets to return'),
@@ -79,6 +81,7 @@ export let getDataset = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       datasetId: z.string().describe('ID of the dataset to retrieve')
@@ -136,6 +139,7 @@ export let createDataset = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('Unique ID for the new dataset'),
@@ -204,6 +208,7 @@ export let updateDataset = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('ID of the dataset to update'),
@@ -262,6 +267,7 @@ export let deleteDataset = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('ID of the dataset to delete'),

@@ -113,6 +113,12 @@ describe('youtube provider contract', () => {
     expect(scopeTitles.has('Upload Videos')).toBe(true);
     expect(
       (oauth.authenticationMethod.scopes ?? []).some(
+        scope =>
+          scope.id === 'https://www.googleapis.com/auth/youtube.channel-memberships.creator'
+      )
+    ).toBe(false);
+    expect(
+      (oauth.authenticationMethod.scopes ?? []).some(
         scope => scope.id === youtubeScopes.youtubeUpload
       )
     ).toBe(true);

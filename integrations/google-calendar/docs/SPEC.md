@@ -62,6 +62,8 @@ Create, read, update, and delete events on any accessible calendar. Events conta
 
 Calendars are collections of events, each with associated metadata such as description or default time zone. You can create secondary calendars, update calendar properties, and delete calendars.
 
+`get_calendar` retrieves a calendar's properties by ID (including `primary`) through [Calendars: get](https://developers.google.com/workspace/calendar/api/v3/reference/calendars/get). It returns the title, description, location, time zone, owner when present, and supported conferencing types. The method accepts the full Calendar scope, Calendar read-only scope, app-created calendar scope, or either calendar-properties scope.
+
 ### Calendar List Management
 
 The calendar list represents all calendars on a user's calendar list in the Calendar UI. You can add (subscribe to) or remove calendars from a user's list, and customize per-user display properties like color and visibility. The `manage_calendar` tool's additive `update_subscription` action patches `colorId`, `hidden`, `selected`, and `summaryOverride` for an already-subscribed calendar.
@@ -69,6 +71,8 @@ The calendar list represents all calendars on a user's calendar list in the Cale
 ### Access Control (Sharing)
 
 Manage sharing permissions (ACLs) on calendars. You can grant or revoke access for specific users or groups, with roles such as reader, writer, or owner. This controls who can view or edit a calendar.
+
+`list_calendar_sharing` reads the [Acl: list](https://developers.google.com/workspace/calendar/api/v3/reference/acl/list) endpoint using the full Calendar scope or either ACL scope. It accepts `maxResults` (1–250), `pageToken`, and `showDeleted`, and returns a page of rules plus `nextPageToken`. `manage_sharing` retains its existing list, grant, update, and revoke actions.
 
 ### Free/Busy Queries
 

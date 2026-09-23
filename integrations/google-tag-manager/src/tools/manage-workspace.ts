@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let workspaceOutputSchema = z.object({
@@ -87,6 +87,7 @@ export let manageWorkspace = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_workspace', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, containerId, workspaceId } = ctx.input;
 
@@ -100,7 +101,8 @@ export let manageWorkspace = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a workspace');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating a workspace');
       let workspace = await client.createWorkspace(accountId, containerId, {
         name: ctx.input.name,
         description: ctx.input.description
@@ -112,7 +114,7 @@ export let manageWorkspace = SlateTool.create(spec, {
     }
 
     if (!workspaceId)
-      throw new Error(
+      throw createApiServiceError(
         'workspaceId is required for get, update, delete, sync, and status actions'
       );
 

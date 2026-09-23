@@ -10,8 +10,7 @@ export let addMemberTool = SlateTool.create(spec, {
   key: 'add_member',
   description: `Add a member to a Google Meet space. Members can join the meeting without knocking. Optionally assign a role like COHOST to give them organizer-level control.`,
   instructions: [
-    'Uses the v2beta API endpoint for member management.',
-    'Provide either the user resource name or email address to identify the member.'
+    'Provide the member email address. The Google Meet API requires email when creating a member.'
   ],
   tags: {
     destructive: false,
@@ -23,7 +22,10 @@ export let addMemberTool = SlateTool.create(spec, {
     z.object({
       spaceName: z.string().describe('Space resource name (e.g., "spaces/abc123")'),
       email: z.string().optional().describe('Email address of the user to add'),
-      user: z.string().optional().describe('User resource name (e.g., "users/123456")'),
+      user: z
+        .string()
+        .optional()
+        .describe('Legacy user resource name. An email address is required to add a member.'),
       role: z
         .enum(['COHOST'])
         .optional()
@@ -41,15 +43,14 @@ export let addMemberTool = SlateTool.create(spec, {
   .handleInvocation(async ctx => {
     let client = new MeetClient({ token: ctx.auth.token });
 
-    if (!ctx.input.email && !ctx.input.user) {
+    if (!ctx.input.email) {
       throw googleMeetServiceError(
-        'Provide either an email address or user resource name when adding a Google Meet space member.'
+        'Provide an email address when adding a Google Meet space member. The API no longer accepts a user resource name alone.'
       );
     }
 
     let member = await client.createMember(ctx.input.spaceName, {
       email: ctx.input.email,
-      user: ctx.input.user,
       role: ctx.input.role
     });
 
@@ -69,7 +70,6 @@ export let getMemberTool = SlateTool.create(spec, {
   name: 'Get Space Member',
   key: 'get_member',
   description: `Retrieve a configured member from a Google Meet space. Use this after listing or adding members to inspect the exact user resource and assigned role.`,
-  instructions: ['Uses the v2beta API endpoint for member management.'],
   tags: {
     destructive: false,
     readOnly: true

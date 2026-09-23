@@ -1,7 +1,7 @@
 import { badRequestError, ServiceError } from '@lowerdeck/error';
 import { createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
-import { googleContactsScopes } from './scopes';
+import { getMyProfilePersonFields, googleContactsScopes } from './scopes';
 
 let googleAxios = createAxios({
   baseURL: 'https://oauth2.googleapis.com'
@@ -19,7 +19,8 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      scopes: z.array(z.string()).optional()
     })
   )
   .addOauth({
@@ -59,6 +60,11 @@ export let auth = SlateAuth.create()
         title: 'Directory (Read-only)',
         description: "See and download your organization's Google Workspace directory.",
         scope: googleContactsScopes.directoryReadonly
+      },
+      {
+        title: 'User Email',
+        description: 'See your primary Google Account email address.',
+        scope: googleContactsScopes.userInfoEmail
       },
       {
         title: 'User Profile',
@@ -110,16 +116,23 @@ export let auth = SlateAuth.create()
         output: {
           token: data.access_token,
           refreshToken: data.refresh_token,
-          expiresAt
+          expiresAt,
+          scopes: grantedScopes ?? ctx.scopes
         },
         scopes: grantedScopes
       };
     },
 
     handleTokenRefresh: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        scopes?: string[];
+      };
       clientId: string;
       clientSecret: string;
+      scopes: string[];
     }) => {
       if (!ctx.output.refreshToken) {
         throw googleContactsServiceError('No refresh token available');
@@ -142,24 +155,34 @@ export let auth = SlateAuth.create()
       let expiresAt = data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : undefined;
+      let grantedScopes =
+        typeof data.scope === 'string' ? data.scope.split(' ').filter(Boolean) : undefined;
 
       return {
         output: {
           token: data.access_token,
           refreshToken: ctx.output.refreshToken,
-          expiresAt
+          expiresAt,
+          scopes: grantedScopes ?? ctx.output.scopes ?? ctx.scopes
         }
       };
     },
 
     getProfile: async (ctx: {
-      output: { token: string; refreshToken?: string; expiresAt?: string };
+      output: {
+        token: string;
+        refreshToken?: string;
+        expiresAt?: string;
+        scopes?: string[];
+      };
       input: {};
       scopes: string[];
     }) => {
       let response = await peopleAxios.get('people/me', {
         params: {
-          personFields: 'names,emailAddresses,photos'
+          personFields:
+            getMyProfilePersonFields(ctx.output.scopes ?? ctx.scopes, false) ||
+            'names,emailAddresses,photos'
         },
         headers: {
           Authorization: `Bearer ${ctx.output.token}`

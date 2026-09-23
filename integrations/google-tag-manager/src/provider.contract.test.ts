@@ -16,6 +16,7 @@ describe('google-tag-manager provider contract', () => {
       },
       toolIds: [
         'list_accounts',
+        'update_account',
         'manage_container',
         'manage_workspace',
         'manage_tag',
@@ -30,6 +31,7 @@ describe('google-tag-manager provider contract', () => {
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'list_accounts', readOnly: true, destructive: false },
+        { id: 'update_account', readOnly: false, destructive: false },
         { id: 'manage_container', readOnly: false, destructive: false },
         { id: 'manage_workspace', readOnly: false, destructive: false },
         { id: 'manage_tag', readOnly: false, destructive: false },
@@ -47,11 +49,12 @@ describe('google-tag-manager provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(13);
+    expect(contract.actions).toHaveLength(14);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
       list_accounts: googleTagManagerActionScopes.listAccounts,
+      update_account: googleTagManagerActionScopes.updateAccount,
       manage_container: googleTagManagerActionScopes.manageContainer,
       manage_workspace: googleTagManagerActionScopes.manageWorkspace,
       manage_tag: googleTagManagerActionScopes.manageTag,

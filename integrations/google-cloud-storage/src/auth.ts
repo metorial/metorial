@@ -37,24 +37,9 @@ export let auth = SlateAuth.create()
 
     scopes: [
       {
-        title: 'Read Only',
-        description: 'Read data and list buckets',
-        scope: googleCloudStorageScopes.devstorageReadOnly
-      },
-      {
-        title: 'Read Write',
-        description: 'Read and modify data, but not metadata like IAM policies',
-        scope: googleCloudStorageScopes.devstorageReadWrite
-      },
-      {
         title: 'Full Control',
         description: 'Full control over data, including modifying IAM policies',
         scope: googleCloudStorageScopes.devstorageFullControl
-      },
-      {
-        title: 'Cloud Platform',
-        description: 'View and manage data across all Google Cloud services',
-        scope: googleCloudStorageScopes.cloudPlatform
       },
       {
         title: 'User Profile',

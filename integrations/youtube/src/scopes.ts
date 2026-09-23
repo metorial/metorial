@@ -7,8 +7,6 @@ export let youtubeScopes = {
   youtubeReadonly: 'https://www.googleapis.com/auth/youtube.readonly',
   youtubeForceSsl: 'https://www.googleapis.com/auth/youtube.force-ssl',
   youtubeUpload: 'https://www.googleapis.com/auth/youtube.upload',
-  youtubeChannelMembershipsCreator:
-    'https://www.googleapis.com/auth/youtube.channel-memberships.creator',
   youtubepartner: 'https://www.googleapis.com/auth/youtubepartner',
   youtubepartnerChannelAudit: 'https://www.googleapis.com/auth/youtubepartner-channel-audit'
 } as const;

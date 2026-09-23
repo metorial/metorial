@@ -8,16 +8,15 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates-integrations/google-ads": "0.2.1",
-    "@slates-integrations/google-calendar": "0.2.0-rc.11",
-    "@slates-integrations/google-contacts": "0.2.0-rc.12",
+    "@slates-integrations/google-calendar": "0.2.0",
+    "@slates-integrations/google-contacts": "0.2.5",
     "@slates-integrations/google-docs": "0.2.0-rc.12",
     "@slates-integrations/google-forms": "0.2.0-rc.11",
-    "@slates-integrations/google-meet": "0.2.0",
+    "@slates-integrations/google-meet": "0.2.1",
     "@slates-integrations/google-search-console": "0.2.0-rc.10",
     "@slates-integrations/google-sheets": "0.2.0",
     "@slates-integrations/google-slides": "0.2.1",
-    "@slates-integrations/google-tag-manager": "0.2.0-rc.10",
+    "@slates-integrations/google-tag-manager": "0.2.0",
     "@slates-integrations/google-tasks": "0.2.0-rc.12",
     "@types/node": "^20",
     "slates": "1.0.0-rc.17",
@@ -40,5 +39,5 @@
       "optional": true
     }
   },
-  "version": "0.2.4"
+  "version": "0.2.7"
 }

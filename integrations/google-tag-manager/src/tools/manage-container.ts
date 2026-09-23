@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let containerOutputSchema = z.object({
@@ -68,11 +68,13 @@ export let manageContainer = SlateTool.create(spec, {
   )
   .output(containerOutputSchema)
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_container', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, containerId } = ctx.input;
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a container');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating a container');
 
       let container = await client.createContainer(accountId, {
         name: ctx.input.name,
@@ -88,7 +90,9 @@ export let manageContainer = SlateTool.create(spec, {
     }
 
     if (!containerId)
-      throw new Error('containerId is required for get, update, and delete actions');
+      throw createApiServiceError(
+        'containerId is required for get, update, and delete actions'
+      );
 
     if (action === 'get') {
       let container = await client.getContainer(accountId, containerId);

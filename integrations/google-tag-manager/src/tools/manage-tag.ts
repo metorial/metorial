@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let parameterSchema = z
@@ -94,6 +94,7 @@ export let manageTag = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_tag', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, containerId, workspaceId, tagId } = ctx.input;
 
@@ -107,8 +108,8 @@ export let manageTag = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a tag');
-      if (!ctx.input.type) throw new Error('Type is required for creating a tag');
+      if (!ctx.input.name) throw createApiServiceError('Name is required for creating a tag');
+      if (!ctx.input.type) throw createApiServiceError('Type is required for creating a tag');
 
       let tagData: Record<string, unknown> = {
         name: ctx.input.name,
@@ -130,7 +131,9 @@ export let manageTag = SlateTool.create(spec, {
     }
 
     if (!tagId)
-      throw new Error('tagId is required for get, update, delete, and revert actions');
+      throw createApiServiceError(
+        'tagId is required for get, update, delete, and revert actions'
+      );
 
     if (action === 'get') {
       let tag = await client.getTag(accountId, containerId, workspaceId, tagId);

@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let parameterSchema = z.object({
@@ -97,6 +97,7 @@ export let manageTrigger = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_trigger', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, containerId, workspaceId, triggerId } = ctx.input;
 
@@ -110,8 +111,10 @@ export let manageTrigger = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a trigger');
-      if (!ctx.input.type) throw new Error('Type is required for creating a trigger');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating a trigger');
+      if (!ctx.input.type)
+        throw createApiServiceError('Type is required for creating a trigger');
 
       let triggerData: Record<string, unknown> = {
         name: ctx.input.name,
@@ -138,7 +141,7 @@ export let manageTrigger = SlateTool.create(spec, {
     }
 
     if (!triggerId)
-      throw new Error('triggerId is required for get, update, and delete actions');
+      throw createApiServiceError('triggerId is required for get, update, and delete actions');
 
     if (action === 'get') {
       let trigger = await client.getTrigger(accountId, containerId, workspaceId, triggerId);

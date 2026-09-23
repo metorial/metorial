@@ -4,6 +4,7 @@
 // YouTube, and Workspace Admin scopes live in the separate P2B project (super-booble-2b).
 // Google Analytics was removed from this super app on 2026-09-03: its consent page hung for every
 // analytics.* scope on the test Workspace tenant; use the standalone integration instead.
+// Google Ads was removed on 2026-09-23 to avoid API access applications and allowlists.
 export let superGoogle2AVerificationScopeList = [
   'https://www.googleapis.com/auth/meetings.space.created',
   'https://www.googleapis.com/auth/meetings.space.readonly',
@@ -31,7 +32,6 @@ export let superGoogle2AVerificationScopeList = [
   'https://www.googleapis.com/auth/directory.readonly',
   'https://www.googleapis.com/auth/tasks',
   'https://www.googleapis.com/auth/tasks.readonly',
-  'https://www.googleapis.com/auth/adwords',
   'https://www.googleapis.com/auth/webmasters',
   'https://www.googleapis.com/auth/webmasters.readonly',
   'https://www.googleapis.com/auth/tagmanager.readonly',

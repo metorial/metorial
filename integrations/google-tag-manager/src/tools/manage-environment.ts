@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let environmentOutputSchema = z.object({
@@ -66,6 +66,7 @@ export let manageEnvironment = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_environment', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, containerId, environmentId } = ctx.input;
 
@@ -79,7 +80,8 @@ export let manageEnvironment = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating an environment');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating an environment');
 
       let environment = await client.createEnvironment(accountId, containerId, {
         name: ctx.input.name,
@@ -95,7 +97,7 @@ export let manageEnvironment = SlateTool.create(spec, {
     }
 
     if (!environmentId)
-      throw new Error(
+      throw createApiServiceError(
         'environmentId is required for get, update, delete, and reauthorize actions'
       );
 

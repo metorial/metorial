@@ -117,16 +117,6 @@ describe('compute-engine provider contract', () => {
         id: computeEngineScopes.compute
       },
       {
-        title: 'Compute Engine Read Only',
-        description: 'View Google Compute Engine resources.',
-        id: computeEngineScopes.computeReadonly
-      },
-      {
-        title: 'Cloud Platform Full Access',
-        description: 'View and manage resources across Google Cloud services.',
-        id: computeEngineScopes.cloudPlatform
-      },
-      {
         title: 'Google Account Profile',
         description: 'View your basic Google Account profile for connection identity.',
         id: computeEngineScopes.userinfoProfile

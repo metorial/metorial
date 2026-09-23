@@ -13,6 +13,7 @@ import {
   executeQuery,
   executeSqlReadonly,
   exportData,
+  getCurrentUser,
   getDataset,
   getJob,
   getModel,
@@ -35,6 +36,7 @@ import { datasetUpdated, inboundWebhook, jobCompleted } from './triggers';
 export let provider = Slate.create({
   spec,
   tools: [
+    getCurrentUser,
     executeQuery,
     executeSqlReadonly,
     listDatasets,

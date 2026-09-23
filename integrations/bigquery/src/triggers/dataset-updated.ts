@@ -1,6 +1,7 @@
 import { SlateDefaultPollingIntervalSeconds, SlateTrigger } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
+import { bigQueryServiceError } from '../lib/errors';
 import { spec } from '../spec';
 
 export let datasetUpdated = SlateTrigger.create(spec, {
@@ -38,6 +39,11 @@ export let datasetUpdated = SlateTrigger.create(spec, {
     },
 
     pollEvents: async ctx => {
+      if (!ctx.config.projectId) {
+        throw bigQueryServiceError(
+          'Set projectId in the connection configuration before polling BigQuery datasets.'
+        );
+      }
       let client = new BigQueryClient({
         token: ctx.auth.token,
         projectId: ctx.config.projectId,

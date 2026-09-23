@@ -72,26 +72,6 @@ export let auth = SlateAuth.create()
         scope: 'https://www.googleapis.com/auth/bigquery'
       },
       {
-        title: 'BigQuery Insert Data',
-        description: 'Insert data into Google BigQuery',
-        scope: 'https://www.googleapis.com/auth/bigquery.insertdata'
-      },
-      {
-        title: 'BigQuery Read Only',
-        description: 'View your data in Google BigQuery',
-        scope: 'https://www.googleapis.com/auth/bigquery.readonly'
-      },
-      {
-        title: 'Cloud Platform Full Access',
-        description: 'View and manage your data across Google Cloud Platform services',
-        scope: 'https://www.googleapis.com/auth/cloud-platform'
-      },
-      {
-        title: 'Cloud Platform Read Only',
-        description: 'View your data across Google Cloud Platform services',
-        scope: 'https://www.googleapis.com/auth/cloud-platform.read-only'
-      },
-      {
         title: 'Google Account Email',
         description: 'View your Google Account email address for connection identity',
         scope: 'https://www.googleapis.com/auth/userinfo.email'
@@ -229,8 +209,7 @@ export let auth = SlateAuth.create()
         let header = { alg: 'RS256', typ: 'JWT' };
         let payload = {
           iss: clientEmail,
-          scope:
-            'https://www.googleapis.com/auth/bigquery https://www.googleapis.com/auth/cloud-platform',
+          scope: 'https://www.googleapis.com/auth/bigquery',
           aud: 'https://oauth2.googleapis.com/token',
           iat: now,
           exp: now + 3600
@@ -300,7 +279,8 @@ export let auth = SlateAuth.create()
           output: {
             token: data.access_token,
             expiresAt: expiresAtFrom(data.expires_in)
-          }
+          },
+          scopes: ['https://www.googleapis.com/auth/bigquery']
         };
       } catch (error) {
         throw bigQueryOAuthError('service account token exchange', error);

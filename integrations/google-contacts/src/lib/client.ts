@@ -78,11 +78,11 @@ export class Client {
     }
   }
 
-  async getMyProfile() {
+  async getMyProfile(personFields: string) {
     try {
       let response = await api.get('people/me', {
         params: {
-          personFields: 'names,emailAddresses,photos,organizations,phoneNumbers,biographies'
+          personFields
         },
         headers: this.headers
       });

@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let versionHeaderSchema = z.object({
@@ -84,11 +84,13 @@ export let manageVersion = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_version', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, containerId, workspaceId, versionId } = ctx.input;
 
     if (action === 'create') {
-      if (!workspaceId) throw new Error('workspaceId is required for creating a version');
+      if (!workspaceId)
+        throw createApiServiceError('workspaceId is required for creating a version');
 
       let result = await client.createVersion(accountId, containerId, workspaceId, {
         name: ctx.input.name,
@@ -167,7 +169,9 @@ export let manageVersion = SlateTool.create(spec, {
     }
 
     if (!versionId)
-      throw new Error('versionId is required for get, publish, and delete actions');
+      throw createApiServiceError(
+        'versionId is required for get, publish, and delete actions'
+      );
 
     if (action === 'get') {
       let version = await client.getVersion(accountId, containerId, versionId);

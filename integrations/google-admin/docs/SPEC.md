@@ -79,7 +79,7 @@ Create, update, delete, and list groups within the organization. Manage group me
 
 ### Group Settings
 
-Configure detailed group behavior such as who can post, who can join, message moderation policies, and email delivery settings. This is handled through the separate Groups Settings API.
+Use `get_group_settings` and `update_group_settings` to read and change group access, posting, and message moderation policies through the Groups Settings API. Partial updates change only the supplied fields.
 
 ### Organizational Unit Management
 

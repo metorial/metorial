@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let folderOutputSchema = z.object({
@@ -71,6 +71,7 @@ export let manageFolder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_folder', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, containerId, workspaceId, folderId } = ctx.input;
 
@@ -84,7 +85,8 @@ export let manageFolder = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a folder');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating a folder');
       let folder = await client.createFolder(accountId, containerId, workspaceId, {
         name: ctx.input.name,
         notes: ctx.input.notes
@@ -96,7 +98,7 @@ export let manageFolder = SlateTool.create(spec, {
     }
 
     if (!folderId)
-      throw new Error(
+      throw createApiServiceError(
         'folderId is required for get, update, delete, list_entities, and move_entities actions'
       );
 

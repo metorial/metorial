@@ -38,7 +38,7 @@ Applications must use OAuth 2.0 to authorize requests to the Tag Manager API. Va
 
 ### Account Management
 
-The Google Tag Manager API grants authorized users access to Google Tag Manager configuration data, allowing management of accounts, containers, workspaces, tags, triggers, and other related entities. Users can list and update GTM accounts they have access to.
+The Google Tag Manager API grants authorized users access to Google Tag Manager configuration data, allowing management of accounts, containers, workspaces, tags, triggers, and other related entities. Users can list accounts and update an account's display name or anonymous data sharing setting. Account updates require `tagmanager.manage.accounts` and use the current fingerprint to avoid overwriting concurrent changes.
 
 ### Container Management
 

@@ -30,11 +30,6 @@ export let auth = SlateAuth.create()
 
     scopes: [
       {
-        title: 'Cloud Platform',
-        description: 'Full access to Google Cloud Platform resources including Cloud Vision',
-        scope: googleCloudVisionScopes.cloudPlatform
-      },
-      {
         title: 'Cloud Vision',
         description: 'Access to Google Cloud Vision API',
         scope: googleCloudVisionScopes.cloudVision

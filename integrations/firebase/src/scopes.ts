@@ -1,4 +1,4 @@
-import { anyOf } from '@slates/provider';
+import { allOf, anyOf } from '@slates/provider';
 
 export let firebaseScopes = {
   cloudPlatform: 'https://www.googleapis.com/auth/cloud-platform',
@@ -9,7 +9,10 @@ export let firebaseScopes = {
 
 let firestoreOrAdmin = anyOf(firebaseScopes.cloudPlatform);
 
-let realtimeOrCloud = anyOf(firebaseScopes.firebaseDatabase, firebaseScopes.cloudPlatform);
+let realtimeOrCloud = allOf(
+  firebaseScopes.userInfoEmail,
+  anyOf(firebaseScopes.firebaseDatabase, firebaseScopes.cloudPlatform)
+);
 
 export let firebaseActionScopes = {
   manageFirestoreDocument: firestoreOrAdmin,

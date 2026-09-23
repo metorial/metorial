@@ -1,6 +1,6 @@
 {
   "name": "@booble/super-booble-2a",
-  "description": "Use one G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ OAuth connection for Docs, Sheets, Slides, Forms, Calendar, Meet, Contacts, Tasks, Ads, Search Console, and Tag Manager workflows.",
+  "description": "Use one G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ OAuth connection for Docs, Sheets, Slides, Forms, Calendar, Meet, Contacts, Tasks, Search Console, and Tag Manager workflows.",
   "categories": [
     "productivity",
     "scheduling-and-calendars",
@@ -14,7 +14,6 @@
     "create and configure G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Meet spaces",
     "inspect Meet participants, recordings, transcripts, and smart notes",
     "manage contacts and tasks",
-    "analyze G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Ads campaigns and accounts",
     "manage Search Console and Tag Manager"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg"

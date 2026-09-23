@@ -6,9 +6,7 @@ import { provider, toolInventory, tools } from './index';
 import { superGoogle3Manifest } from './manifest';
 import {
   restrictedP1Scopes,
-  superGoogle3FutureToolScopes,
   superGoogle3OAuthScopes,
-  superGoogle3ProfileScopes,
   superGoogle3ScopeEnvelope,
   superGoogle3Scopes
 } from './scopes';
@@ -50,15 +48,20 @@ let isScopeExpressionSatisfied = (expression: unknown, granted: Set<string>): bo
 };
 
 describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ 3 provider contract', () => {
-  it('imports the exhaustive 114-tool source inventory with two aliases and no omissions', () => {
-    expect(sourceTools.size).toBe(114);
-    expect(superGoogle3Manifest).toHaveLength(114);
-    expect(provider.actions).toHaveLength(114);
-    expect(tools).toHaveLength(114);
+  it('exposes all 115 source capabilities with identity supplied by a shared recipe', () => {
+    expect(sourceTools.size).toBe(115);
+    expect(superGoogle3Manifest).toHaveLength(115);
+    expect(provider.actions).toHaveLength(115);
+    expect(tools).toHaveLength(115);
     expect(toolInventory).toMatchObject({
-      sourceToolCount: 114,
+      sourceToolCount: 115,
       importedToolCount: 114,
-      omitted: []
+      omitted: [
+        expect.objectContaining({
+          sourceIntegration: 'bigquery',
+          sourceKey: 'get_current_user'
+        })
+      ]
     });
     expect(toolInventory.renamed).toEqual([
       expect.objectContaining({
@@ -94,7 +97,7 @@ describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬�
 
   it('keeps aggregate keys and production IDs unique and below the platform limit', () => {
     let keys = tools.map(tool => tool.key);
-    expect(new Set(keys).size).toBe(114);
+    expect(new Set(keys).size).toBe(115);
     expect(keys).not.toContain('get_operation');
     expect(keys).toContain('functions_get_operation');
     expect(keys).toContain('speech_get_operation');
@@ -155,7 +158,7 @@ describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬�
       input: {}
     } as any);
 
-    let error = await invocation.catch(error => error);
+    let error = await invocation.catch((error: unknown) => error);
     expect(error).toMatchObject({
       data: { reason: 'super_google_source_config' }
     });
@@ -190,43 +193,77 @@ describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬�
     expect(() => auth.outputSchema.parse({ token: 'access-token' })).toThrow();
   });
 
-  it('requests the complete P3 declaration in Console order, future scopes included', () => {
-    let declaredScopes: string[] = superGoogle3OAuthScopes.map(scope => scope.scope);
-    let granted = new Set(declaredScopes);
+  it('requests only Cloud, Realtime Database and identity scopes, each backed by a tool', () => {
+    let declaredScopes = superGoogle3OAuthScopes.map(scope => scope.scope);
+    let granted = new Set<string>(declaredScopes);
     let p1Restricted = new Set<string>(restrictedP1Scopes);
 
-    expect(declaredScopes).toEqual([...superGoogle3ScopeEnvelope]);
-    expect(declaredScopes).toHaveLength(14);
-    expect(new Set(declaredScopes).size).toBe(declaredScopes.length);
-    expect(granted.has(superGoogle3Scopes.cloudPlatform)).toBe(true);
+    expect(declaredScopes).toEqual([
+      'https://www.googleapis.com/auth/cloud-platform',
+      'https://www.googleapis.com/auth/firebase.database',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile'
+    ]);
+    expect(declaredScopes).toEqual(superGoogle3ScopeEnvelope);
+    let mentionedByTools = new Set(tools.flatMap(tool => collectScopeValues(tool.scopes)));
     for (let descriptor of superGoogle3OAuthScopes) {
       expect(descriptor.title.trim().length, descriptor.scope).toBeGreaterThan(0);
       expect(descriptor.description.trim().length, descriptor.scope).toBeGreaterThan(0);
+      expect(mentionedByTools.has(descriptor.scope), descriptor.scope).toBe(true);
+      expect(p1Restricted.has(descriptor.scope), descriptor.scope).toBe(false);
     }
-
     for (let tool of tools) {
+      expect(tool.scopes, `Missing scope gate for ${tool.key}`).toBeDefined();
       expect(isScopeExpressionSatisfied(tool.scopes, granted), tool.key).toBe(true);
     }
+  });
 
-    // Every requested scope is used by a retained tool, the profile lookup, or is explicitly
-    // listed as a future-tool scope; nothing restricted may be requested.
-    let mentionedByTools = new Set(tools.flatMap(tool => collectScopeValues(tool.scopes)));
-    let accounted = new Set<string>([
-      ...mentionedByTools,
-      ...superGoogle3ProfileScopes,
-      ...superGoogle3FutureToolScopes
-    ]);
-    for (let scope of declaredScopes) {
-      expect(accounted.has(scope), `Unaccounted declared scope ${scope}`).toBe(true);
-      expect(p1Restricted.has(scope), scope).toBe(false);
+  it('exposes identity without requiring a Cloud project and requires both identity scopes', () => {
+    let identity = tools.find(tool => tool.key === 'get_current_user');
+    expect(identity).toBeDefined();
+    expect(identity?.authMethods).toEqual(['google_oauth']);
+    expect(identity?.tags).toMatchObject({ readOnly: true, destructive: false });
+    expect(identity?.inputSchema.parse({})).toEqual({});
+    expect(
+      isScopeExpressionSatisfied(
+        identity?.scopes,
+        new Set([superGoogle3Scopes.userinfoEmail, superGoogle3Scopes.userinfoProfile])
+      )
+    ).toBe(true);
+    for (let scope of Object.values(superGoogle3Scopes)) {
+      expect(isScopeExpressionSatisfied(identity?.scopes, new Set([scope])), scope).toBe(
+        false
+      );
     }
-    for (let scope of superGoogle3FutureToolScopes) {
-      expect(granted.has(scope), scope).toBe(true);
-      expect(
-        mentionedByTools.has(scope),
-        `Future scope is already used by a tool and should leave the future list: ${scope}`
-      ).toBe(false);
+  });
+
+  it('preserves narrow BigQuery grants without allowing read-only grants to submit jobs', () => {
+    let canUse = (key: string, ...scopes: string[]) => {
+      let tool = tools.find(tool => tool.key === key);
+      expect(tool, key).toBeDefined();
+      return isScopeExpressionSatisfied(tool?.scopes, new Set(scopes));
+    };
+    let prefix = 'https://www.googleapis.com/auth/';
+    for (let scope of ['bigquery.readonly', 'cloud-platform.read-only']) {
+      expect(canUse('read_table_data', `${prefix}${scope}`)).toBe(true);
+      for (let key of [
+        'execute_query',
+        'execute_sql_readonly',
+        'create_table',
+        'insert_rows'
+      ]) {
+        expect(canUse(key, `${prefix}${scope}`), key).toBe(false);
+      }
     }
+    expect(canUse('insert_rows', `${prefix}bigquery.insertdata`)).toBe(true);
+    expect(canUse('read_table_data', `${prefix}bigquery.insertdata`)).toBe(false);
+    expect(canUse('list_functions', `${prefix}cloud-platform.read-only`)).toBe(false);
+    expect(canUse('get_function', `${prefix}cloud-platform.read-only`)).toBe(false);
+    expect(canUse('manage_realtime_data', `${prefix}firebase.database`)).toBe(false);
+    expect(canUse('manage_realtime_data', `${prefix}cloud-platform`)).toBe(false);
+    expect(
+      canUse('manage_realtime_data', `${prefix}firebase.database`, `${prefix}userinfo.email`)
+    ).toBe(true);
   });
 });
 

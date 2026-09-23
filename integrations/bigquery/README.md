@@ -51,3 +51,13 @@ This integration is licensed under the [FSL-1.1](https://github.com/metorial/met
 <div align="center">
   <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
 </div>
+
+## OAuth consent
+
+New connections request `bigquery`, `userinfo.email`, `userinfo.profile`. Tool gates retain provider-supported legacy grants for existing connections.
+
+`get_current_user` returns the live OAuth Google account, requires both identity scopes, and works without `projectId`. Service-account connections retain the 28 BigQuery data and job tools; they do not expose a user identity.
+
+BigQuery data and metadata reads accept `bigquery`, `cloud-platform`, `bigquery.readonly`, or `cloud-platform.read-only`. Mutations and job submissions require `bigquery` or `cloud-platform`, including `execute_sql_readonly`: SELECT-only SQL still creates a job. Streaming `insert_rows` also accepts `bigquery.insertdata`. Set `projectId` before using any data or job tool.
+
+Scope references: [models.get](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/models/get), [routines.get](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/routines/get), [jobs.query](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/jobs/query), [tabledata.insertAll](https://docs.cloud.google.com/bigquery/docs/reference/rest/v2/tabledata/insertAll).

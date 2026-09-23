@@ -138,3 +138,5 @@ Cloud Functions can be configured to trigger on various Firebase events and call
 - **Firebase Alerts Triggers**: You can trigger functions in response to alert events emitted by these sources, including Crashlytics, Performance Monitoring, and App Distribution.
 
 Note: Cloud Functions triggers require deploying function code to Firebase; they are not traditional webhook subscription endpoints. Firestore does not support a streaming/SSE protocol equivalent to the Realtime Database.
+
+Realtime Database tool authorization requires `userinfo.email` together with `firebase.database` or `cloud-platform`. OAuth continues to request the dedicated database permission while the alternative remains unverified for the direct user-OAuth REST path.

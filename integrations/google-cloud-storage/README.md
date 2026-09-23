@@ -59,3 +59,7 @@ This integration is licensed under the [FSL-1.1](https://github.com/metorial/met
 <div align="center">
   <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
 </div>
+
+## OAuth consent
+
+New connections request `devstorage.full_control`, `userinfo.profile`, `userinfo.email`. Tool gates retain provider-supported legacy grants for existing connections.

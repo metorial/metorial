@@ -5,8 +5,32 @@ export let googleContactsScopes = {
   contactsReadonly: 'https://www.googleapis.com/auth/contacts.readonly',
   contactsOtherReadonly: 'https://www.googleapis.com/auth/contacts.other.readonly',
   directoryReadonly: 'https://www.googleapis.com/auth/directory.readonly',
+  userInfoEmail: 'https://www.googleapis.com/auth/userinfo.email',
   userInfoProfile: 'https://www.googleapis.com/auth/userinfo.profile'
 } as const;
+
+export let getMyProfilePersonFields = (scopes?: readonly string[], includeExtended = true) => {
+  // Older connections did not persist granted scopes. Preserve their existing request.
+  if (
+    !scopes ||
+    scopes.includes(googleContactsScopes.contacts) ||
+    scopes.includes(googleContactsScopes.contactsReadonly)
+  ) {
+    return includeExtended
+      ? 'names,emailAddresses,photos,organizations,phoneNumbers,biographies'
+      : 'names,emailAddresses,photos';
+  }
+
+  let fields: string[] = [];
+  if (scopes.includes(googleContactsScopes.userInfoProfile)) {
+    fields.push('names', 'photos');
+  }
+  if (scopes.includes(googleContactsScopes.userInfoEmail)) {
+    fields.push('emailAddresses');
+  }
+
+  return fields.join(',');
+};
 
 export let googleContactsActionScopes = {
   createContact: anyOf(googleContactsScopes.contacts),
@@ -38,6 +62,7 @@ export let googleContactsActionScopes = {
   getMyProfile: anyOf(
     googleContactsScopes.contacts,
     googleContactsScopes.contactsReadonly,
+    googleContactsScopes.userInfoEmail,
     googleContactsScopes.userInfoProfile
   ),
   manageContactPhoto: anyOf(googleContactsScopes.contacts),

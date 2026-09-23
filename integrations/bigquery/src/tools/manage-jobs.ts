@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
+import { bigQueryActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let listJobs = SlateTool.create(spec, {
@@ -11,6 +12,7 @@ export let listJobs = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       stateFilter: z
@@ -103,6 +105,7 @@ export let getJob = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       jobId: z.string().describe('Job ID to retrieve'),
@@ -162,6 +165,7 @@ export let cancelJob = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       jobId: z.string().describe('Job ID to cancel'),

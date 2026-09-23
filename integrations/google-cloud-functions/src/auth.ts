@@ -42,11 +42,6 @@ export let auth = SlateAuth.create()
         scope: googleCloudFunctionsScopes.cloudPlatform
       },
       {
-        title: 'Cloud Platform Read-Only',
-        description: 'Read-only access to Google Cloud resources',
-        scope: googleCloudFunctionsScopes.cloudPlatformReadonly
-      },
-      {
         title: 'User Profile',
         description: 'View your basic profile information',
         scope: googleCloudFunctionsScopes.userinfoProfile

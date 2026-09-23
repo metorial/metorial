@@ -1,5 +1,4 @@
 import type { SuperGoogleToolSource } from '@slates/super-google-tools';
-import { provider as googleAdsProvider } from '@slates-integrations/google-ads';
 import { provider as googleCalendarProvider } from '@slates-integrations/google-calendar';
 import { provider as googleContactsProvider } from '@slates-integrations/google-contacts';
 import { provider as googleDocsProvider } from '@slates-integrations/google-docs';
@@ -20,7 +19,6 @@ export let superGoogle2ASources = [
   { integration: 'google-meet', provider: googleMeetProvider },
   { integration: 'google-contacts', provider: googleContactsProvider },
   { integration: 'google-tasks', provider: googleTasksProvider },
-  { integration: 'google-ads', provider: googleAdsProvider },
   { integration: 'google-search-console', provider: googleSearchConsoleProvider },
   { integration: 'google-tag-manager', provider: googleTagManagerProvider }
 ] satisfies SuperGoogleToolSource[];

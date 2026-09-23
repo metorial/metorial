@@ -5,6 +5,7 @@ import {
   deleteUser,
   getActivityReports,
   getCustomerInfo,
+  getGroupSettings,
   getUsageReports,
   getUser,
   listGroups,
@@ -21,6 +22,7 @@ import {
   manageRoles,
   manageUserAliases,
   transferData,
+  updateGroupSettings,
   updateUser
 } from './tools';
 import { activityEvents, userChanges } from './triggers';
@@ -36,6 +38,8 @@ export let provider = Slate.create({
     manageUserAliases,
     listGroups,
     manageGroup,
+    getGroupSettings,
+    updateGroupSettings,
     manageGroupMembers,
     manageOrgUnits,
     manageRoles,

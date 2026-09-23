@@ -62,7 +62,7 @@ Updates an existing contact's data. You must provide the contact's resource name
 
 ### Get My Profile
 
-Retrieves the authenticated Google user's People profile, including names, email addresses, photos, organizations, phone numbers, and biographies.
+Retrieves the authenticated Google user's People profile. The fields returned depend on the granted scopes: `userinfo.email` provides the primary email address, `userinfo.profile` provides available name and photo details, and contacts grants retain the full profile request, including organizations, phone numbers, and biographies.
 
 ### Manage Contact Photo
 

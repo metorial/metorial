@@ -18,14 +18,6 @@ export let superGoogle2BActionSpecificToolScopes = [
   }
 ] as const;
 
-// Declared and requested for planned tools or as narrower alternatives; referenced by no
-// retained tool clause today. Kept explicit so the contract test can account for every
-// requested scope.
-export let superGoogle2BFutureToolScopes = [
-  'https://www.googleapis.com/auth/youtube.channel-memberships.creator',
-  'https://www.googleapis.com/auth/apps.groups.settings'
-] as const;
-
 let describe = (title: string, description: string) => ({ title, description });
 
 // Typed against the envelope so a missing or extra entry fails compilation.
@@ -64,10 +56,6 @@ let superGoogle2BScopeCopy: Record<
   'https://www.googleapis.com/auth/youtube.force-ssl': describe(
     'YouTube force SSL',
     'Manage YouTube data that requires secure authorized access, including comments and captions.'
-  ),
-  'https://www.googleapis.com/auth/youtube.channel-memberships.creator': describe(
-    'YouTube channel memberships',
-    'List the members of the connected YouTube channel.'
   ),
   'https://www.googleapis.com/auth/youtubepartner': describe(
     'YouTube partner',
@@ -203,8 +191,7 @@ let superGoogle2BScopeCopy: Record<
   )
 };
 
-// The consent screen requests the complete P2B project declaration in Console order, future-tool
-// scopes included, so the consent screen matches the verified declaration exactly.
+// The consent screen requests the complete P2B project declaration in Console order.
 export let superGoogle2BScopes = superGoogle2BVerificationScopeList.map(scope => ({
   ...superGoogle2BScopeCopy[scope],
   scope

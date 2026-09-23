@@ -1,4 +1,4 @@
-import { createAxios, SlateAuth } from 'slates';
+import { createApiServiceError, createAxios, SlateAuth } from 'slates';
 import { z } from 'zod';
 import { googleTagManagerScopes } from './scopes';
 
@@ -15,7 +15,8 @@ export let auth = SlateAuth.create()
     z.object({
       token: z.string(),
       refreshToken: z.string().optional(),
-      expiresAt: z.string().optional()
+      expiresAt: z.string().optional(),
+      grantedScopes: z.array(z.string()).optional()
     })
   )
   .addOauth({
@@ -128,7 +129,8 @@ export let auth = SlateAuth.create()
         output: {
           token: data.access_token,
           refreshToken: data.refresh_token,
-          expiresAt
+          expiresAt,
+          grantedScopes: grantedScopes ?? ctx.scopes
         },
         scopes: grantedScopes
       };
@@ -136,7 +138,10 @@ export let auth = SlateAuth.create()
 
     handleTokenRefresh: async (ctx: any) => {
       if (!ctx.output.refreshToken) {
-        throw new Error('No refresh token available');
+        throw createApiServiceError(
+          'No Google refresh token is available. Reconnect Google Tag Manager to restore offline access.',
+          { reason: 'google_tag_manager_missing_refresh_token' }
+        );
       }
 
       let response = await googleOAuthAxios.post(
@@ -158,12 +163,17 @@ export let auth = SlateAuth.create()
       let expiresAt = data.expires_in
         ? new Date(Date.now() + data.expires_in * 1000).toISOString()
         : undefined;
+      let grantedScopes =
+        typeof data.scope === 'string'
+          ? data.scope.split(' ').filter(Boolean)
+          : ctx.output.grantedScopes;
 
       return {
         output: {
           token: data.access_token,
           refreshToken: ctx.output.refreshToken,
-          expiresAt
+          expiresAt,
+          grantedScopes
         }
       };
     },

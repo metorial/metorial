@@ -8,21 +8,23 @@ export let googleMeetScopes = {
   userInfoEmail: 'https://www.googleapis.com/auth/userinfo.email'
 } as const;
 
-let meetSpaceRead = anyOf(
+let meetSpaceRead = anyOf(googleMeetScopes.spaceReadonly, googleMeetScopes.spaceCreated);
+
+let meetSpaceMutate = anyOf(googleMeetScopes.spaceCreated, googleMeetScopes.spaceSettings);
+
+let meetSpaceGet = anyOf(
   googleMeetScopes.spaceReadonly,
   googleMeetScopes.spaceCreated,
   googleMeetScopes.spaceSettings
 );
 
-let meetSpaceMutate = anyOf(googleMeetScopes.spaceCreated, googleMeetScopes.spaceSettings);
-
 let meetMembership = anyOf(googleMeetScopes.spaceCreated);
 
 export let googleMeetActionScopes = {
   createSpace: anyOf(googleMeetScopes.spaceCreated),
-  getSpace: meetSpaceRead,
+  getSpace: meetSpaceGet,
   updateSpace: meetSpaceMutate,
-  endActiveConference: meetSpaceMutate,
+  endActiveConference: anyOf(googleMeetScopes.spaceCreated),
   addMember: meetMembership,
   getMember: meetSpaceRead,
   listMembers: meetSpaceRead,

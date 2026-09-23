@@ -48,7 +48,6 @@ Google APIs support various OAuth 2.0 flows tailored to different application ty
 | `https://www.googleapis.com/auth/youtube.readonly`                    | View your YouTube account                                                                                 |
 | `https://www.googleapis.com/auth/youtube.force-ssl`                   | See, edit, and permanently delete your YouTube videos, ratings, comments, and captions                    |
 | `https://www.googleapis.com/auth/youtube.upload`                      | Manage your YouTube videos                                                                                |
-| `https://www.googleapis.com/auth/youtube.channel-memberships.creator` | See a list of your current active channel members, their current level, and when they became a member     |
 | `https://www.googleapis.com/auth/youtubepartner`                      | View and manage your assets and associated content on YouTube                                             |
 | `https://www.googleapis.com/auth/youtubepartner-channel-audit`        | View private information of your YouTube channel relevant during the audit process with a YouTube partner |
 

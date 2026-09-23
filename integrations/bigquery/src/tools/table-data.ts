@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
 import { bigQueryServiceError } from '../lib/errors';
+import { bigQueryActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let readTableData = SlateTool.create(spec, {
@@ -12,6 +13,7 @@ export let readTableData = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset containing the table'),
@@ -79,6 +81,7 @@ export let insertRows = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.insertRows)
   .input(
     z.object({
       datasetId: z.string().describe('Target dataset'),
@@ -175,6 +178,7 @@ export let copyTable = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       sourceDatasetId: z.string().describe('Source dataset'),

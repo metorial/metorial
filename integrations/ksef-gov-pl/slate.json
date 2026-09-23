@@ -1,0 +1,13 @@
+{
+  "name": "@metorial/ksef-gov-pl",
+  "description": "Search and download invoices from Poland's National e-Invoice System (KSeF), submit FA(3) XML invoices, inspect online submission sessions, and download official UPO receipts.",
+  "categories": ["accounting-and-finance", "government"],
+  "skills": [
+    "search electronic invoices",
+    "download invoice XML",
+    "submit FA(3) invoices",
+    "track invoice processing",
+    "download UPO receipts"
+  ],
+  "logoUrl": "https://provider-logos.metorial-cdn.com/skef-pl.png"
+}

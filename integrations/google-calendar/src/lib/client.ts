@@ -63,7 +63,9 @@ export interface Calendar {
   description?: string;
   location?: string;
   timeZone?: string;
-  conferenceProperties?: any;
+  dataOwner?: string;
+  etag?: string;
+  conferenceProperties?: { allowedConferenceSolutionTypes?: string[] };
 }
 
 export interface CalendarListEntry {
@@ -351,8 +353,17 @@ export class GoogleCalendarClient {
 
   // ACLs
 
-  async listAcl(calendarId: string): Promise<{ items: AclRule[] }> {
-    let response = await this.api.get(`/calendars/${encodeURIComponent(calendarId)}/acl`);
+  async listAcl(
+    calendarId: string,
+    params?: {
+      maxResults?: number;
+      pageToken?: string;
+      showDeleted?: boolean;
+    }
+  ): Promise<{ items: AclRule[]; nextPageToken?: string; nextSyncToken?: string }> {
+    let response = await this.api.get(`/calendars/${encodeURIComponent(calendarId)}/acl`, {
+      params
+    });
     return response.data;
   }
 

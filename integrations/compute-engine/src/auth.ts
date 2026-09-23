@@ -173,16 +173,6 @@ export let auth = SlateAuth.create()
         scope: computeEngineScopes.compute
       },
       {
-        title: 'Compute Engine Read Only',
-        description: 'View Google Compute Engine resources.',
-        scope: computeEngineScopes.computeReadonly
-      },
-      {
-        title: 'Cloud Platform Full Access',
-        description: 'View and manage resources across Google Cloud services.',
-        scope: computeEngineScopes.cloudPlatform
-      },
-      {
         title: 'Google Account Profile',
         description: 'View your basic Google Account profile for connection identity.',
         scope: computeEngineScopes.userinfoProfile

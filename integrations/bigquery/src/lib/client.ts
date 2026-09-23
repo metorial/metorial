@@ -6,7 +6,12 @@ export class BigQueryClient {
   private projectId: string;
   private location: string;
 
-  constructor(config: { token: string; projectId: string; location: string }) {
+  constructor(config: { token: string; projectId?: string; location: string }) {
+    if (!config.projectId) {
+      throw bigQueryServiceError(
+        'Set projectId in the connection configuration before using BigQuery data or job tools.'
+      );
+    }
     this.projectId = config.projectId;
     this.location = config.location;
     this.http = createAxios({

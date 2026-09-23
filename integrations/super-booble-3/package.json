@@ -8,17 +8,19 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates-integrations/bigquery": "0.2.0-rc.12",
-    "@slates-integrations/compute-engine": "0.1.0-rc.5",
-    "@slates-integrations/firebase": "0.2.0",
+    "@slates-integrations/bigquery": "0.2.0",
+    "@slates-integrations/compute-engine": "0.2.0",
+    "@slates-integrations/firebase": "0.2.1",
     "@slates-integrations/google-address-validation": "0.2.0",
-    "@slates-integrations/google-cloud-functions": "0.2.0-rc.10",
+    "@slates-integrations/google-cloud-functions": "0.2.0",
     "@slates-integrations/google-cloud-speech": "0.2.0-rc.11",
-    "@slates-integrations/google-cloud-storage": "0.2.0",
-    "@slates-integrations/google-cloud-vision": "0.2.0-rc.10",
+    "@slates-integrations/google-cloud-storage": "0.2.1",
+    "@slates-integrations/google-cloud-vision": "0.2.0",
     "@types/node": "^20",
     "slates": "1.0.0-rc.17",
-    "zod": "^4.2"
+    "zod": "^4.2",
+    "@slates/google-identity-recipes": "1.0.0",
+    "@slates/tool-recipes": "1.0.0-rc.11"
   },
   "devDependencies": {
     "@slates/test": "1.0.0-rc.14",
@@ -37,5 +39,5 @@
       "optional": true
     }
   },
-  "version": "0.2.2"
+  "version": "0.2.3"
 }

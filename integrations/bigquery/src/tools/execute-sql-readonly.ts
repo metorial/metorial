@@ -2,6 +2,7 @@ import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
 import { bigQueryServiceError } from '../lib/errors';
+import { bigQueryActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 let queryParameterSchema = z.object({
@@ -63,6 +64,7 @@ export let executeSqlReadonly = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       query: z.string().describe('Single read-only SELECT statement in GoogleSQL'),

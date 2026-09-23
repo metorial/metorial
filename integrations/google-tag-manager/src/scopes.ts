@@ -1,4 +1,4 @@
-import { anyOf } from 'slates';
+import { anyOf, createApiServiceError } from 'slates';
 
 export let googleTagManagerScopes = {
   readonly: 'https://www.googleapis.com/auth/tagmanager.readonly',
@@ -12,42 +12,94 @@ export let googleTagManagerScopes = {
   userInfoEmail: 'https://www.googleapis.com/auth/userinfo.email'
 } as const;
 
-let gtmRead = anyOf(
+export let gtmAccountReadScopes = [
   googleTagManagerScopes.readonly,
   googleTagManagerScopes.editContainers,
-  googleTagManagerScopes.editContainerVersions,
-  googleTagManagerScopes.manageAccounts,
-  googleTagManagerScopes.publish,
-  googleTagManagerScopes.deleteContainers,
-  googleTagManagerScopes.manageUsers
-);
-
-let gtmWorkspaceEdit = anyOf(
-  googleTagManagerScopes.editContainers,
   googleTagManagerScopes.manageAccounts
-);
+];
+
+export let gtmContainerReadScopes = [
+  googleTagManagerScopes.readonly,
+  googleTagManagerScopes.editContainers
+];
+
+export let gtmVersionReadScopes = [
+  ...gtmContainerReadScopes,
+  googleTagManagerScopes.editContainerVersions
+];
+
+// Older connections have no persisted grant list. Let Google decide in that case.
+export let requireGtmScopes = (
+  auth: { grantedScopes?: string[]; scopes?: string[] },
+  action: string,
+  allowedScopes: readonly string[]
+) => {
+  let grantedScopes = auth.grantedScopes ?? auth.scopes;
+  if (!grantedScopes || allowedScopes.some(scope => grantedScopes.includes(scope))) {
+    return;
+  }
+
+  throw createApiServiceError(
+    `The ${action} action requires ${allowedScopes.join(' or ')}. Reconnect Google Tag Manager with the required scope.`,
+    { reason: 'google_tag_manager_missing_scope' }
+  );
+};
+
+export let requireGtmToolActionScope = (
+  auth: { grantedScopes?: string[]; scopes?: string[] },
+  tool: string,
+  action: string
+) => {
+  if (tool === 'manage_container' && action === 'delete') {
+    return requireGtmScopes(auth, `${tool} ${action}`, [
+      googleTagManagerScopes.deleteContainers
+    ]);
+  }
+  if (tool === 'manage_environment' && action === 'reauthorize') {
+    return requireGtmScopes(auth, `${tool} ${action}`, [googleTagManagerScopes.publish]);
+  }
+  if (tool === 'manage_version') {
+    if (action === 'publish') {
+      return requireGtmScopes(auth, `${tool} ${action}`, [googleTagManagerScopes.publish]);
+    }
+    if (action === 'create' || action === 'delete') {
+      return requireGtmScopes(auth, `${tool} ${action}`, [
+        googleTagManagerScopes.editContainerVersions
+      ]);
+    }
+    return requireGtmScopes(
+      auth,
+      `${tool} ${action}`,
+      action === 'get' || action === 'list' ? gtmVersionReadScopes : gtmContainerReadScopes
+    );
+  }
+  if (tool === 'manage_user_permission') {
+    return requireGtmScopes(auth, `${tool} ${action}`, [googleTagManagerScopes.manageUsers]);
+  }
+  if (
+    action === 'get' ||
+    action === 'list' ||
+    action === 'status' ||
+    action === 'list_entities'
+  ) {
+    return requireGtmScopes(auth, `${tool} ${action}`, gtmContainerReadScopes);
+  }
+  return requireGtmScopes(auth, `${tool} ${action}`, [googleTagManagerScopes.editContainers]);
+};
 
 export let googleTagManagerActionScopes = {
-  listAccounts: gtmRead,
-  manageContainer: anyOf(
-    googleTagManagerScopes.readonly,
-    googleTagManagerScopes.editContainers,
-    googleTagManagerScopes.deleteContainers,
-    googleTagManagerScopes.manageAccounts
-  ),
-  manageWorkspace: gtmWorkspaceEdit,
-  manageTag: gtmWorkspaceEdit,
-  manageTrigger: gtmWorkspaceEdit,
-  manageVariable: gtmWorkspaceEdit,
-  manageFolder: gtmWorkspaceEdit,
-  manageEnvironment: gtmWorkspaceEdit,
-  manageVersion: anyOf(
-    googleTagManagerScopes.readonly,
-    googleTagManagerScopes.editContainerVersions,
-    googleTagManagerScopes.publish
-  ),
+  listAccounts: anyOf(...gtmAccountReadScopes),
+  updateAccount: anyOf(googleTagManagerScopes.manageAccounts),
+  manageContainer: anyOf(...gtmContainerReadScopes, googleTagManagerScopes.deleteContainers),
+  manageWorkspace: anyOf(...gtmContainerReadScopes),
+  manageTag: anyOf(...gtmContainerReadScopes),
+  manageTrigger: anyOf(...gtmContainerReadScopes),
+  manageVariable: anyOf(...gtmContainerReadScopes),
+  manageFolder: anyOf(...gtmContainerReadScopes),
+  manageEnvironment: anyOf(...gtmContainerReadScopes, googleTagManagerScopes.publish),
+  manageVersion: anyOf(...gtmVersionReadScopes, googleTagManagerScopes.publish),
   manageUserPermission: anyOf(googleTagManagerScopes.manageUsers),
-  workspaceChanged: gtmRead,
-  versionPublished: gtmRead,
-  inboundWebhook: gtmRead
+  workspaceChanged: anyOf(...gtmContainerReadScopes),
+  versionPublished: anyOf(...gtmContainerReadScopes),
+  inboundWebhook: anyOf(...gtmContainerReadScopes)
 } as const;

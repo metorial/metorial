@@ -10,7 +10,6 @@ import { inventory, provider, tools } from './index';
 import { restrictedP1Scopes, superGoogle2BVerificationScopeEnvelope } from './scope-envelope';
 import {
   superGoogle2BActionSpecificToolScopes,
-  superGoogle2BFutureToolScopes,
   superGoogle2BProfileScopes,
   superGoogle2BScopes,
   superGoogle2BScopeValues
@@ -61,13 +60,13 @@ let getSourceConsentScopes = () => {
 };
 
 describe('super-booble-2b provider contract', () => {
-  it('accounts for all 63 source tools and exposes exactly 63 unique tools', async () => {
+  it('accounts for all 65 source tools and exposes exactly 65 unique tools', async () => {
     let expectedKeys = superGoogle2BIncludedToolManifest.map(entry => entry.exposedKey);
     let actualKeys = tools.map(tool => tool.key);
 
-    expect(inventory.sourceToolCount).toBe(63);
-    expect(inventory.importedToolCount).toBe(63);
-    expect(expectedKeys).toHaveLength(63);
+    expect(inventory.sourceToolCount).toBe(65);
+    expect(inventory.importedToolCount).toBe(65);
+    expect(expectedKeys).toHaveLength(65);
     expect(actualKeys).toEqual(expectedKeys);
     expect(new Set(actualKeys).size).toBe(actualKeys.length);
 
@@ -83,7 +82,7 @@ describe('super-booble-2b provider contract', () => {
       authMethodIds: ['google_oauth']
     });
 
-    expect(contract.actions).toHaveLength(63);
+    expect(contract.actions).toHaveLength(65);
   });
 
   it('imports only the four low-value sources, with no aliases and no omissions', () => {
@@ -101,7 +100,14 @@ describe('super-booble-2b provider contract', () => {
     expect(inventory.omitted).toEqual([]);
 
     let keys = new Set(tools.map(tool => tool.key));
-    for (let key of ['list_albums', 'get_channel', 'query_analytics', 'list_users']) {
+    for (let key of [
+      'list_albums',
+      'get_channel',
+      'query_analytics',
+      'list_users',
+      'get_group_settings',
+      'update_group_settings'
+    ]) {
       expect(keys.has(key), key).toBe(true);
     }
     // manage_alerts is not registered by google-admin (Alert Center is service-account-only).
@@ -165,7 +171,7 @@ describe('super-booble-2b provider contract', () => {
     let requestedScopes = new Set(superGoogle2BScopeValues);
     let profileScopes = new Set<string>(superGoogle2BProfileScopes);
 
-    expect(superGoogle2BScopes).toHaveLength(42);
+    expect(superGoogle2BScopes).toHaveLength(41);
     expect(requestedScopes.size).toBe(superGoogle2BScopes.length);
     // One project per super app: the consent request is the project declaration.
     expect(superGoogle2BScopeValues).toEqual([...superGoogle2BVerificationScopeEnvelope]);
@@ -212,15 +218,14 @@ describe('super-booble-2b provider contract', () => {
       ).toBe(true);
     }
 
-    // Every requested scope is used by a retained tool, the profile lookup, or is explicitly
-    // listed as a future-tool scope; nothing restricted may be requested.
-    let futureScopes = new Set<string>(superGoogle2BFutureToolScopes);
+    // Every requested scope is used by a retained tool or the profile lookup;
+    // nothing restricted may be requested.
     for (let requestedScope of requestedScopes) {
       let usedByTool = tools.some(tool =>
         getMentionedScopes(getToolScopeExpression(tool)).includes(requestedScope)
       );
       expect(
-        usedByTool || profileScopes.has(requestedScope) || futureScopes.has(requestedScope),
+        usedByTool || profileScopes.has(requestedScope),
         `Unaccounted requested scope ${requestedScope}`
       ).toBe(true);
       expect(
@@ -228,17 +233,15 @@ describe('super-booble-2b provider contract', () => {
         `Restricted P1 scope entered P2B: ${requestedScope}`
       ).toBe(false);
     }
-    for (let scope of futureScopes) {
-      expect(requestedScopes.has(scope), scope).toBe(true);
-      expect(
-        tools.some(tool => getMentionedScopes(getToolScopeExpression(tool)).includes(scope)),
-        `Future scope is already used by a tool and should leave the future list: ${scope}`
-      ).toBe(false);
-    }
   });
 
   it('mirrors the P2B Console declaration and keeps every restricted scope out of it', () => {
-    expect(superGoogle2BVerificationScopeEnvelope.size).toBe(42);
+    expect(superGoogle2BVerificationScopeEnvelope.size).toBe(41);
+    expect(
+      superGoogle2BVerificationScopeEnvelope.has(
+        'https://www.googleapis.com/auth/youtube.channel-memberships.creator'
+      )
+    ).toBe(false);
     expect(
       superGoogle2BVerificationScopeEnvelope.has('https://www.googleapis.com/auth/apps.alerts')
     ).toBe(false);

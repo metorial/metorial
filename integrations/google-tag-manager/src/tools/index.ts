@@ -8,3 +8,4 @@ export * from './manage-user-permission';
 export * from './manage-variable';
 export * from './manage-version';
 export * from './manage-workspace';
+export * from './update-account';

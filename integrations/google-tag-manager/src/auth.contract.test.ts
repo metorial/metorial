@@ -89,7 +89,8 @@ describe('google-tag-manager auth contract', () => {
 
     expect(callbackResult.output).toMatchObject({
       token: 'access-token',
-      refreshToken: 'refresh-token'
+      refreshToken: 'refresh-token',
+      grantedScopes: [googleTagManagerScopes.readonly, googleTagManagerScopes.userInfoEmail]
     });
     expect(callbackResult.scopes).toEqual([
       googleTagManagerScopes.readonly,
@@ -108,7 +109,8 @@ describe('google-tag-manager auth contract', () => {
       authenticationMethodId: 'google_oauth',
       output: {
         token: 'stale-token',
-        refreshToken: 'refresh-token'
+        refreshToken: 'refresh-token',
+        grantedScopes: [googleTagManagerScopes.readonly]
       },
       input: {},
       clientId: 'client-id',
@@ -118,7 +120,8 @@ describe('google-tag-manager auth contract', () => {
 
     expect(refreshResult.output).toMatchObject({
       token: 'refreshed-token',
-      refreshToken: 'refresh-token'
+      refreshToken: 'refresh-token',
+      grantedScopes: [googleTagManagerScopes.readonly]
     });
     expect(Date.parse(String(refreshResult.output.expiresAt))).toBeGreaterThan(Date.now());
   });
@@ -138,7 +141,12 @@ describe('google-tag-manager auth contract', () => {
           clientSecret: 'client-secret',
           scopes: [googleTagManagerScopes.readonly]
         }),
-      { code: 'internal.unexpected', kind: 'internal', status: 500 }
+      {
+        code: 'request.bad',
+        kind: 'request',
+        status: 400,
+        baggage: { serviceError: { reason: 'google_tag_manager_missing_refresh_token' } }
+      }
     );
   });
 

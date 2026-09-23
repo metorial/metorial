@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAxios } from 'slates';
 import type {
   FolderEntitiesResponse,
   GtmAccount,
@@ -82,11 +82,40 @@ export class GtmClient {
     return response.data;
   }
 
-  async updateAccount(accountId: string, data: Partial<GtmAccount>): Promise<GtmAccount> {
-    let response = await gtmAxios.put(`/accounts/${accountId}`, data, {
-      headers: this.getHeaders()
-    });
-    return response.data;
+  async updateAccount(
+    accountId: string,
+    data: Pick<GtmAccount, 'name' | 'shareData'>
+  ): Promise<GtmAccount> {
+    try {
+      let existing = await this.getAccount(accountId);
+      if (!existing.fingerprint) {
+        throw createApiServiceError(
+          'Google Tag Manager did not return an account fingerprint. Read the account again before retrying the update.',
+          { reason: 'google_tag_manager_account_fingerprint_missing' }
+        );
+      }
+      let payload = this.compactObject({
+        ...this.pickDefined(existing, [
+          'path',
+          'accountId',
+          'name',
+          'shareData',
+          'fingerprint'
+        ]),
+        ...this.compactObject(data)
+      });
+      let response = await gtmAxios.put(`/accounts/${accountId}`, payload, {
+        headers: this.getHeaders(),
+        params: { fingerprint: existing.fingerprint }
+      });
+      return response.data;
+    } catch (error) {
+      throw buildApiServiceError(error, {
+        providerLabel: 'Google Tag Manager',
+        operation: 'account update',
+        reason: 'google_tag_manager_update_account'
+      });
+    }
   }
 
   // ========== Containers ==========

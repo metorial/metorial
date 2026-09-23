@@ -89,15 +89,15 @@ export class MeetClient {
     );
   }
 
-  // --- Members (v2beta) ---
+  // --- Members ---
 
   async createMember(
     spaceName: string,
-    member: { user?: string; email?: string; role?: string }
+    member: { email: string; role?: string }
   ): Promise<Member> {
     let parent = spaceName.startsWith('spaces/') ? spaceName : `spaces/${spaceName}`;
     return await this.request('create member', () =>
-      meetAxios.post(`/v2beta/${parent}/members`, member, {
+      meetAxios.post(`/v2/${parent}/members`, member, {
         headers: this.headers
       })
     );
@@ -105,7 +105,7 @@ export class MeetClient {
 
   async getMember(memberName: string): Promise<Member> {
     return await this.request('get member', () =>
-      meetAxios.get(`/v2beta/${memberName}`, { headers: this.headers })
+      meetAxios.get(`/v2/${memberName}`, { headers: this.headers })
     );
   }
 
@@ -122,7 +122,7 @@ export class MeetClient {
     let response = await this.request<{ members?: Member[]; nextPageToken?: string }>(
       'list members',
       () =>
-        meetAxios.get(`/v2beta/${parent}/members`, {
+        meetAxios.get(`/v2/${parent}/members`, {
           headers: this.headers,
           params
         })
@@ -135,7 +135,7 @@ export class MeetClient {
 
   async deleteMember(memberName: string): Promise<void> {
     await this.request('delete member', () =>
-      meetAxios.delete(`/v2beta/${memberName}`, { headers: this.headers })
+      meetAxios.delete(`/v2/${memberName}`, { headers: this.headers })
     );
   }
 

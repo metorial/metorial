@@ -23,6 +23,8 @@ describe('google-admin provider contract', () => {
         'manage_user_aliases',
         'list_groups',
         'manage_group',
+        'get_group_settings',
+        'update_group_settings',
         'manage_group_members',
         'manage_org_units',
         'manage_roles',
@@ -47,6 +49,8 @@ describe('google-admin provider contract', () => {
         { id: 'manage_user_aliases', readOnly: false, destructive: false },
         { id: 'list_groups', readOnly: true, destructive: false },
         { id: 'manage_group', readOnly: false, destructive: false },
+        { id: 'get_group_settings', readOnly: true, destructive: false },
+        { id: 'update_group_settings', readOnly: false, destructive: false },
         { id: 'manage_group_members', readOnly: false, destructive: false },
         { id: 'manage_org_units', readOnly: false, destructive: false },
         { id: 'manage_roles', readOnly: false, destructive: false },
@@ -66,7 +70,7 @@ describe('google-admin provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(22);
+    expect(contract.actions).toHaveLength(24);
     expect(Object.keys(contract.configSchema.properties ?? {}).sort()).toEqual([
       'customerId',
       'domain'
@@ -81,6 +85,8 @@ describe('google-admin provider contract', () => {
       manage_user_aliases: googleAdminActionScopes.manageUserAliases,
       list_groups: googleAdminActionScopes.listGroups,
       manage_group: googleAdminActionScopes.manageGroup,
+      get_group_settings: googleAdminActionScopes.getGroupSettings,
+      update_group_settings: googleAdminActionScopes.updateGroupSettings,
       manage_group_members: googleAdminActionScopes.manageGroupMembers,
       manage_org_units: googleAdminActionScopes.manageOrgUnits,
       manage_roles: googleAdminActionScopes.manageRoles,
@@ -114,6 +120,7 @@ describe('google-admin provider contract', () => {
       (oauth.authenticationMethod.scopes ?? []).map((scope: { title?: string }) => scope.title)
     );
     expect(scopeTitles.has('Users (Read Only)')).toBe(true);
+    expect(scopeTitles.has('Groups Settings')).toBe(true);
     expect(scopeTitles.has('Data Transfer')).toBe(true);
   });
 });

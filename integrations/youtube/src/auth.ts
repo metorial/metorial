@@ -71,12 +71,6 @@ export let auth = SlateAuth.create()
         scope: youtubeScopes.youtubeUpload
       },
       {
-        title: 'Memberships',
-        description:
-          'See a list of your current active channel members, their current level, and when they became a member',
-        scope: youtubeScopes.youtubeChannelMembershipsCreator
-      },
-      {
         title: 'Partner',
         description: 'View and manage your assets and associated content on YouTube',
         scope: youtubeScopes.youtubepartner

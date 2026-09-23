@@ -337,8 +337,8 @@ export class Client {
     return response.data;
   }
 
-  async updateGroupSettings(groupEmail: string, settings: Record<string, any>) {
-    let response = await groupsSettingsApi.put(
+  async updateGroupSettings(groupEmail: string, settings: Record<string, string>) {
+    let response = await groupsSettingsApi.patch(
       `/${encodeURIComponent(groupEmail)}`,
       settings,
       {

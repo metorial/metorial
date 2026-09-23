@@ -48,7 +48,7 @@ Create meeting spaces to connect users over video, and retrieve meeting spaces b
 
 A space member is a user configured to have a role in the meeting space. These users can join the meeting space without requesting permission ("knocking"). While meeting organizers can automatically enter the meeting space, additional members can be configured to join without knocking. Members can be configured to have a role such as COHOST, which gives them the same abilities to manage the meeting as the meeting organizer.
 
-- Space member methods are available through the Google Workspace Developer Preview v2beta endpoint.
+- Space member methods are generally available through the Google Meet REST API v2 endpoint. Creating a member requires an email address; a user resource name alone is insufficient.
 - Create, list, get, and delete members from a meeting space.
 
 ### Conference Records
@@ -102,7 +102,7 @@ Receive events when a transcript starts, ends, or a file is generated for a conf
 
 ### Smart Notes Events
 
-Receive events when a smart note starts, ends, or a file is generated for a conference (Developer Preview).
+Google supports smart-note lifecycle events in its generally available API. This integration currently provides smart-note retrieval tools; it does not expose smart-note event triggers.
 
 ### Important Considerations
 

@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
+import { bigQueryActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let exportData = SlateTool.create(spec, {
@@ -16,6 +17,7 @@ export let exportData = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('Source dataset'),

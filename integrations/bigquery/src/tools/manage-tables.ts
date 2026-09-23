@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { BigQueryClient } from '../lib/client';
+import { bigQueryActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 let fieldSchema: z.ZodType<any> = z.lazy(() =>
@@ -23,6 +24,7 @@ export let listTables = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset to list tables from'),
@@ -88,6 +90,7 @@ export let getTable = SlateTool.create(spec, {
     readOnly: true
   }
 })
+  .scopes(bigQueryActionScopes.read)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset containing the table'),
@@ -167,6 +170,7 @@ export let createTable = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset to create the table in'),
@@ -296,6 +300,7 @@ export let updateTable = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset containing the table'),
@@ -359,6 +364,7 @@ export let deleteTable = SlateTool.create(spec, {
     readOnly: false
   }
 })
+  .scopes(bigQueryActionScopes.write)
   .input(
     z.object({
       datasetId: z.string().describe('Dataset containing the table'),

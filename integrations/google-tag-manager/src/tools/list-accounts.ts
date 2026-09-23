@@ -1,7 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import {
+  googleTagManagerActionScopes,
+  gtmContainerReadScopes,
+  requireGtmScopes
+} from '../scopes';
 import { spec } from '../spec';
 
 let accountSchema = z.object({
@@ -64,6 +68,9 @@ export let listAccounts = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    if (ctx.input.includeContainers) {
+      requireGtmScopes(ctx.auth, 'list_accounts with containers', gtmContainerReadScopes);
+    }
     let client = new GtmClient(ctx.auth.token);
 
     let accounts: Array<{

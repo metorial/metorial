@@ -24,6 +24,7 @@ Register your application using the Google API Console. Google provides a client
 | `https://www.googleapis.com/auth/contacts.readonly`       | See and download your contacts.                                                     |
 | `https://www.googleapis.com/auth/contacts.other.readonly` | See and download contact info automatically saved in "Other contacts".              |
 | `https://www.googleapis.com/auth/directory.readonly`      | See and download your organization's Google Workspace directory.                    |
+| `https://www.googleapis.com/auth/userinfo.email`          | See your primary Google Account email address.                                      |
 | `https://www.googleapis.com/auth/userinfo.profile`        | See your personal info, including any personal info you've made publicly available. |
 
 Apps that request access to scopes categorized as sensitive or restricted must complete Google's OAuth app verification before being granted access.
@@ -82,7 +83,7 @@ Google Workspace users can utilize the API to list and search domain profiles an
 
 ### Profile Information
 
-`get_my_profile` retrieves the authenticated user through `people.get` with `people/me`, requesting names, email addresses, photos, organizations, phone numbers, and biographies. It is read-only and accepts the `contacts`, `contacts.readonly`, or `userinfo.profile` OAuth scope. The general People API can also retrieve public Google profile data without OAuth when the requested fields are public.
+`get_my_profile` retrieves the authenticated user through `people.get` with `people/me`. It is read-only and accepts the `contacts`, `contacts.readonly`, `userinfo.email`, or `userinfo.profile` OAuth scope. With contacts grants it requests names, email addresses, photos, organizations, phone numbers, and biographies. With only `userinfo.profile`, it requests names and photos; with only `userinfo.email`, it requests email addresses. Fields Google does not provide remain absent. The general People API can also retrieve public Google profile data without OAuth when the requested fields are public.
 
 ## Events
 

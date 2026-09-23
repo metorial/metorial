@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let containerAccessSchema = z.object({
@@ -81,6 +81,7 @@ export let manageUserPermission = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_user_permission', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, permissionId } = ctx.input;
 
@@ -98,7 +99,7 @@ export let manageUserPermission = SlateTool.create(spec, {
 
     if (action === 'create') {
       if (!ctx.input.emailAddress)
-        throw new Error('emailAddress is required for creating a user permission');
+        throw createApiServiceError('emailAddress is required for creating a user permission');
 
       let permissionData: {
         emailAddress: string;
@@ -128,7 +129,9 @@ export let manageUserPermission = SlateTool.create(spec, {
     }
 
     if (!permissionId)
-      throw new Error('permissionId is required for get, update, and delete actions');
+      throw createApiServiceError(
+        'permissionId is required for get, update, and delete actions'
+      );
 
     if (action === 'get') {
       let permission = await client.getUserPermission(accountId, permissionId);

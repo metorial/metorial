@@ -10,7 +10,6 @@ import { inventory, provider, tools } from './index';
 import { restrictedP1Scopes, superGoogle2AVerificationScopeEnvelope } from './scope-envelope';
 import {
   superGoogle2AActionSpecificToolScopes,
-  superGoogle2AFutureToolScopes,
   superGoogle2AProfileScopes,
   superGoogle2AScopes,
   superGoogle2AScopeValues
@@ -61,13 +60,13 @@ let getSourceConsentScopes = () => {
 };
 
 describe('super-booble-2a provider contract', () => {
-  it('accounts for all 136 source tools and exposes exactly 136 unique tools', async () => {
+  it('accounts for all 128 source tools and exposes exactly 128 unique tools', async () => {
     let expectedKeys = superGoogle2AIncludedToolManifest.map(entry => entry.exposedKey);
     let actualKeys = tools.map(tool => tool.key);
 
-    expect(inventory.sourceToolCount).toBe(136);
-    expect(inventory.importedToolCount).toBe(136);
-    expect(expectedKeys).toHaveLength(136);
+    expect(inventory.sourceToolCount).toBe(128);
+    expect(inventory.importedToolCount).toBe(128);
+    expect(expectedKeys).toHaveLength(128);
     expect(actualKeys).toEqual(expectedKeys);
     expect(new Set(actualKeys).size).toBe(actualKeys.length);
 
@@ -83,10 +82,10 @@ describe('super-booble-2a provider contract', () => {
       authMethodIds: ['google_oauth']
     });
 
-    expect(contract.actions).toHaveLength(136);
+    expect(contract.actions).toHaveLength(128);
   });
 
-  it('imports only the eleven high-value sources and none of the super-booble-2b or removed families', () => {
+  it('imports only the ten high-value sources and none of the super-booble-2b or removed families', () => {
     let sources = new Set(
       superGoogle2AIncludedToolManifest.map(entry => entry.sourceIntegration)
     );
@@ -100,7 +99,6 @@ describe('super-booble-2a provider contract', () => {
         'google-meet',
         'google-contacts',
         'google-tasks',
-        'google-ads',
         'google-search-console',
         'google-tag-manager'
       ].sort()
@@ -111,6 +109,17 @@ describe('super-booble-2a provider contract', () => {
 
     let keys = new Set(tools.map(tool => tool.key));
     for (let key of [
+      'ads_list_accounts',
+      'search_reports',
+      'manage_campaigns',
+      'manage_ad_groups',
+      'manage_ads',
+      'manage_keywords',
+      'manage_bidding_strategies',
+      'manage_conversion_actions',
+      'generate_keyword_ideas',
+      'upload_offline_conversions',
+      'manage_audience_lists',
       'list_courses',
       'list_albums',
       'get_channel',
@@ -126,14 +135,9 @@ describe('super-booble-2a provider contract', () => {
     expect(keys.has('create_event')).toBe(true);
   });
 
-  it('aliases all six colliding tools without favoring either source', () => {
+  it('preserves all five remaining aliases for stable public tool keys', () => {
     expect(inventory.renamed).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({
-          sourceIntegration: 'google-ads',
-          sourceKey: 'list_accounts',
-          exposedKey: 'ads_list_accounts'
-        }),
         expect.objectContaining({
           sourceIntegration: 'google-tag-manager',
           sourceKey: 'list_accounts',
@@ -161,7 +165,7 @@ describe('super-booble-2a provider contract', () => {
         })
       ])
     );
-    expect(inventory.renamed).toHaveLength(6);
+    expect(inventory.renamed).toHaveLength(5);
   });
 
   it('includes the drive.file-backed Docs and Sheets tools and omits nothing', () => {
@@ -243,7 +247,8 @@ describe('super-booble-2a provider contract', () => {
     let requestedScopes = new Set(superGoogle2AScopeValues);
     let profileScopes = new Set<string>(superGoogle2AProfileScopes);
 
-    expect(superGoogle2AScopes).toHaveLength(48);
+    expect(superGoogle2AScopes).toHaveLength(47);
+    expect(requestedScopes.has('https://www.googleapis.com/auth/adwords')).toBe(false);
     expect(requestedScopes.size).toBe(superGoogle2AScopes.length);
     // One project per super app: the consent request is the project declaration.
     expect(superGoogle2AScopeValues).toEqual([...superGoogle2AVerificationScopeEnvelope]);
@@ -295,38 +300,26 @@ describe('super-booble-2a provider contract', () => {
       ).toBe(true);
     }
 
-    // Every requested scope is used by a retained tool, the profile lookup, or is explicitly
-    // listed as a future-tool scope; nothing restricted may be requested.
-    let futureScopes = new Set<string>(superGoogle2AFutureToolScopes);
+    // Every requested scope must be supported by an imported tool, including identity scopes.
+    // Metadata coverage alone does not prove upstream authorization; live suites cover behavior.
     for (let requestedScope of requestedScopes) {
       let usedByTool = tools.some(tool =>
         getMentionedScopes(getToolScopeExpression(tool)).includes(requestedScope)
       );
-      expect(
-        usedByTool || profileScopes.has(requestedScope) || futureScopes.has(requestedScope),
-        `Unaccounted requested scope ${requestedScope}`
-      ).toBe(true);
+      expect(usedByTool, `Unused requested scope ${requestedScope}`).toBe(true);
       expect(
         restrictedP1Scopes.has(requestedScope),
         `Restricted P1 scope entered P2A: ${requestedScope}`
       ).toBe(false);
     }
-    for (let scope of futureScopes) {
-      expect(requestedScopes.has(scope), scope).toBe(true);
-      expect(
-        tools.some(tool => getMentionedScopes(getToolScopeExpression(tool)).includes(scope)),
-        `Future scope is already used by a tool and should leave the future list: ${scope}`
-      ).toBe(false);
-    }
   });
 
   it('mirrors the P2A Console declaration and keeps every restricted scope out of it', () => {
-    expect(superGoogle2AVerificationScopeEnvelope.size).toBe(48);
+    expect(superGoogle2AVerificationScopeEnvelope.size).toBe(47);
     for (let scope of [
       'https://www.googleapis.com/auth/meetings.space.created',
       'https://www.googleapis.com/auth/drive.file',
-      'https://www.googleapis.com/auth/documents',
-      'https://www.googleapis.com/auth/adwords'
+      'https://www.googleapis.com/auth/documents'
     ]) {
       expect(superGoogle2AVerificationScopeEnvelope.has(scope), scope).toBe(true);
     }
@@ -375,10 +368,35 @@ describe('super-booble-2a provider contract', () => {
     }
   });
 
+  it('supports the narrow grants for calendar reads, account updates, and identity', () => {
+    for (let [key, scope] of [
+      ['get_calendar', 'calendar.calendars.readonly'],
+      ['list_calendar_sharing', 'calendar.acls.readonly'],
+      ['update_account', 'tagmanager.manage.accounts'],
+      ['get_my_profile', 'userinfo.email']
+    ]) {
+      let tool = tools.find(candidate => candidate.key === key);
+      expect(tool, key).toBeDefined();
+      expect(
+        satisfiesScopeExpression(
+          tool ? getToolScopeExpression(tool) : undefined,
+          new Set([`https://www.googleapis.com/auth/${scope}`])
+        ),
+        `${key} should accept ${scope} without an additional grant`
+      ).toBe(true);
+    }
+
+    for (let key of ['get_calendar', 'list_calendar_sharing', 'get_my_profile']) {
+      expect(tools.find(tool => tool.key === key)?.parameters.tags?.readOnly, key).toBe(true);
+    }
+    expect(tools.find(tool => tool.key === 'update_account')?.parameters.tags?.readOnly).toBe(
+      false
+    );
+  });
+
   it('preserves compatible optional config and OAuth credential shapes', async () => {
     let configSchema = superGoogle2AConfigSchema.toJSONSchema();
-    // propertyId / measurementId left with Google Analytics; only the Ads manager ID remains.
-    expect(Object.keys(configSchema.properties ?? {})).toEqual(['loginCustomerId']);
+    expect(Object.keys(configSchema.properties ?? {})).toEqual([]);
     expect(configSchema.required ?? []).toEqual([]);
 
     expect(auth.authStack[0]?.inputSchema).toBeUndefined();
@@ -401,6 +419,14 @@ describe('super-booble-2a provider contract', () => {
       superGoogle2AAuthOutputSchema.safeParse({ token: 'access-token', authMethod: 'oauth' })
         .success
     ).toBe(true);
+
+    expect(
+      superGoogle2AAuthOutputSchema.parse({
+        token: 'access-token',
+        authMethod: 'oauth',
+        scopes: ['https://www.googleapis.com/auth/userinfo.email']
+      }).scopes
+    ).toEqual(['https://www.googleapis.com/auth/userinfo.email']);
 
     let client = createLocalSlateTestClient({ slate: provider });
     let oauth = await client.getAuthMethod('google_oauth');

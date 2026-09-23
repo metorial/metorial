@@ -20,6 +20,10 @@ Query the free/busy availability for one or more calendars over a given time ran
 
 Retrieve the available calendar and event color definitions used in Google Calendar. Returns color IDs with their background and foreground hex values. Use these IDs when setting colors on events or calendars.
 
+### Get Calendar
+
+Retrieve a calendar's properties, including its title, description, time zone, and conferencing options. Use **"primary"** as the calendarId for the user's primary calendar.
+
 ### Get Event
 
 Retrieve the full details of a specific event by its ID, including attendees, recurrence, conference data, and all metadata.
@@ -27,6 +31,10 @@ Retrieve the full details of a specific event by its ID, including attendees, re
 ### List Calendars
 
 List all calendars on the user's calendar list, including their primary calendar, subscribed calendars, and shared calendars. Returns calendar metadata including access role, color, and visibility settings.
+
+### List Calendar Sharing
+
+List a calendar's sharing rules, including roles and user, group, domain, or public scopes. Supports paging through large access lists.
 
 ### List Events
 

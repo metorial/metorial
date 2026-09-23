@@ -24,8 +24,10 @@ describe('google-calendar provider contract', () => {
         'delete_event',
         'quick_add_event',
         'list_calendars',
+        'get_calendar',
         'manage_calendar',
         'find_free_busy',
+        'list_calendar_sharing',
         'manage_sharing',
         'get_colors',
         'get_settings'
@@ -42,8 +44,10 @@ describe('google-calendar provider contract', () => {
         { id: 'delete_event', readOnly: false, destructive: true },
         { id: 'quick_add_event', readOnly: false, destructive: false },
         { id: 'list_calendars', readOnly: true, destructive: false },
+        { id: 'get_calendar', readOnly: true, destructive: false },
         { id: 'manage_calendar', readOnly: false, destructive: true },
         { id: 'find_free_busy', readOnly: true, destructive: false },
+        { id: 'list_calendar_sharing', readOnly: true, destructive: false },
         { id: 'manage_sharing', readOnly: false, destructive: true },
         { id: 'get_colors', readOnly: true, destructive: false },
         { id: 'get_settings', readOnly: true, destructive: false }
@@ -54,7 +58,7 @@ describe('google-calendar provider contract', () => {
       ]
     });
 
-    expect(contract.actions).toHaveLength(16);
+    expect(contract.actions).toHaveLength(18);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -67,8 +71,10 @@ describe('google-calendar provider contract', () => {
       delete_event: googleCalendarActionScopes.deleteEvent,
       quick_add_event: googleCalendarActionScopes.quickAddEvent,
       list_calendars: googleCalendarActionScopes.listCalendars,
+      get_calendar: googleCalendarActionScopes.getCalendar,
       manage_calendar: googleCalendarActionScopes.manageCalendar,
       find_free_busy: googleCalendarActionScopes.findFreeBusy,
+      list_calendar_sharing: googleCalendarActionScopes.listCalendarSharing,
       manage_sharing: googleCalendarActionScopes.manageSharing,
       get_colors: googleCalendarActionScopes.getColors,
       get_settings: googleCalendarActionScopes.getSettings,

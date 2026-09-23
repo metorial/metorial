@@ -71,6 +71,8 @@ export let superGoogle2BToolManifest = [
     'manage_user_aliases',
     'list_groups',
     'manage_group',
+    'get_group_settings',
+    'update_group_settings',
     'manage_group_members',
     'manage_org_units',
     'manage_roles',

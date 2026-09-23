@@ -42,6 +42,13 @@ export let superGoogle3Manifest: SuperGoogleToolManifestEntry[] = [
   include('compute-engine', 'list_commitment_reservations'),
   include('compute-engine', 'get_zone_operation'),
 
+  {
+    sourceIntegration: 'bigquery',
+    sourceKey: 'get_current_user',
+    status: 'omitted',
+    reason:
+      'Exposed directly through the shared Google identity recipe without project configuration.'
+  },
   include('bigquery', 'execute_query'),
   include('bigquery', 'execute_sql_readonly'),
   include('bigquery', 'list_datasets'),

@@ -28,14 +28,6 @@ export let superGoogle2AActionSpecificToolScopes = [
   }
 ] as const;
 
-// Declared and requested for planned tools or as narrower alternatives; referenced by no
-// retained tool clause today. Kept explicit so the contract test can account for every
-// requested scope.
-export let superGoogle2AFutureToolScopes = [
-  'https://www.googleapis.com/auth/calendar.calendars.readonly',
-  'https://www.googleapis.com/auth/calendar.acls.readonly'
-] as const;
-
 let describe = (title: string, description: string) => ({ title, description });
 
 // Typed against the envelope so a missing or extra entry fails compilation.
@@ -147,10 +139,6 @@ let superGoogle2AScopeCopy: Record<
     'Google Tasks read',
     'View task lists and tasks.'
   ),
-  'https://www.googleapis.com/auth/adwords': describe(
-    'Google Ads',
-    'Read and manage authorized Google Ads accounts.'
-  ),
   'https://www.googleapis.com/auth/webmasters': describe(
     'Search Console',
     'Read and manage Search Console sites and sitemaps.'
@@ -237,8 +225,7 @@ let superGoogle2AScopeCopy: Record<
   )
 };
 
-// The consent screen requests the complete P2A project declaration in Console order, future-tool
-// scopes included, so the consent screen matches the verified declaration exactly.
+// The consent screen requests the complete P2A project declaration in Console order.
 export let superGoogle2AScopes = superGoogle2AVerificationScopeList.map(scope => ({
   ...superGoogle2AScopeCopy[scope],
   scope

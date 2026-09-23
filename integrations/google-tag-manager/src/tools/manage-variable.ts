@@ -1,7 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GtmClient } from '../lib/client';
-import { googleTagManagerActionScopes } from '../scopes';
+import { googleTagManagerActionScopes, requireGtmToolActionScope } from '../scopes';
 import { spec } from '../spec';
 
 let parameterSchema = z.object({
@@ -100,6 +100,7 @@ export let manageVariable = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    requireGtmToolActionScope(ctx.auth, 'manage_variable', ctx.input.action);
     let client = new GtmClient(ctx.auth.token);
     let { action, accountId, containerId, workspaceId, variableId } = ctx.input;
     let category = ctx.input.variableCategory || 'custom';
@@ -117,7 +118,7 @@ export let manageVariable = SlateTool.create(spec, {
 
       if (action === 'create') {
         if (!ctx.input.builtInTypes || ctx.input.builtInTypes.length === 0) {
-          throw new Error('builtInTypes is required to enable built-in variables');
+          throw createApiServiceError('builtInTypes is required to enable built-in variables');
         }
         let enabled = await client.enableBuiltInVariables(
           accountId,
@@ -133,7 +134,9 @@ export let manageVariable = SlateTool.create(spec, {
 
       if (action === 'delete') {
         if (!ctx.input.builtInTypes || ctx.input.builtInTypes.length === 0) {
-          throw new Error('builtInTypes is required to disable built-in variables');
+          throw createApiServiceError(
+            'builtInTypes is required to disable built-in variables'
+          );
         }
         await client.disableBuiltInVariables(
           accountId,
@@ -147,7 +150,7 @@ export let manageVariable = SlateTool.create(spec, {
         };
       }
 
-      throw new Error(
+      throw createApiServiceError(
         `Action "${action}" is not supported for built-in variables. Use "list", "create" (enable), or "delete" (disable).`
       );
     }
@@ -163,8 +166,10 @@ export let manageVariable = SlateTool.create(spec, {
     }
 
     if (action === 'create') {
-      if (!ctx.input.name) throw new Error('Name is required for creating a variable');
-      if (!ctx.input.type) throw new Error('Type is required for creating a variable');
+      if (!ctx.input.name)
+        throw createApiServiceError('Name is required for creating a variable');
+      if (!ctx.input.type)
+        throw createApiServiceError('Type is required for creating a variable');
 
       let varData: Record<string, unknown> = {
         name: ctx.input.name,
@@ -182,7 +187,9 @@ export let manageVariable = SlateTool.create(spec, {
     }
 
     if (!variableId)
-      throw new Error('variableId is required for get, update, and delete actions');
+      throw createApiServiceError(
+        'variableId is required for get, update, and delete actions'
+      );
 
     if (action === 'get') {
       let variable = await client.getVariable(accountId, containerId, workspaceId, variableId);

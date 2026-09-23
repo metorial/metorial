@@ -6,6 +6,7 @@
 // its consent page hangs for Workspace tenants with Classroom off; use the standalone integration.
 // apps.alerts is absent: the Alert Center API is service-account-only and the Console rejects
 // the scope as invalid for a user OAuth client.
+// youtube.channel-memberships.creator is absent: its API requires channel-level allowlisting.
 export let superGoogle2BVerificationScopeList = [
   'https://www.googleapis.com/auth/photoslibrary.appendonly',
   'https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata',
@@ -15,7 +16,6 @@ export let superGoogle2BVerificationScopeList = [
   'https://www.googleapis.com/auth/youtube.readonly',
   'https://www.googleapis.com/auth/youtube.upload',
   'https://www.googleapis.com/auth/youtube.force-ssl',
-  'https://www.googleapis.com/auth/youtube.channel-memberships.creator',
   'https://www.googleapis.com/auth/youtubepartner',
   'https://www.googleapis.com/auth/youtubepartner-channel-audit',
   'https://www.googleapis.com/auth/yt-analytics.readonly',

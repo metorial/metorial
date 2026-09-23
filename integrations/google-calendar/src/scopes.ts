@@ -82,6 +82,13 @@ export let googleCalendarActionScopes = {
     googleCalendarScopes.calendarCalendarList,
     googleCalendarScopes.calendarCalendarListReadonly
   ),
+  getCalendar: anyOf(
+    googleCalendarScopes.calendar,
+    googleCalendarScopes.calendarReadonly,
+    googleCalendarScopes.calendarAppCreated,
+    googleCalendarScopes.calendarCalendars,
+    googleCalendarScopes.calendarCalendarsReadonly
+  ),
   manageCalendar: allOf(
     [
       googleCalendarScopes.calendar,
@@ -97,6 +104,11 @@ export let googleCalendarActionScopes = {
     googleCalendarScopes.calendarFreebusy
   ),
   manageSharing: anyOf(googleCalendarScopes.calendar, googleCalendarScopes.calendarAcls),
+  listCalendarSharing: anyOf(
+    googleCalendarScopes.calendar,
+    googleCalendarScopes.calendarAcls,
+    googleCalendarScopes.calendarAclsReadonly
+  ),
   getColors: anyOf(
     googleCalendarScopes.calendar,
     googleCalendarScopes.calendarReadonly,
