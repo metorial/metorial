@@ -25,7 +25,8 @@ export let manageSettings = SlateTool.create(spec, {
     'Use **action** "list_forwarding" to list forwarding addresses.',
     'Use **action** "get_auto_forwarding" to check whether all incoming mail is automatically forwarded, and to which address.',
     'Use **action** "list_send_as" to list send-as aliases and their signatures.',
-    'Use **action** "update_send_as" to update a send-as alias display name, reply-to, or signature.'
+    'Use **action** "update_send_as" to update a send-as alias display name, reply-to, or signature.',
+    'update_send_as can only update the primary address (isPrimary in list_send_as): Gmail allows updates to other send-as addresses only from domain-wide delegated service accounts, not from a user sign-in.'
   ],
   tags: {
     readOnly: false
@@ -140,7 +141,7 @@ export let manageSettings = SlateTool.create(spec, {
       sendAsEmail: z
         .string()
         .optional()
-        .describe('Send-as email address (for update_send_as).'),
+        .describe('Send-as email address (for update_send_as); must be the primary address.'),
       displayName: z.string().optional().describe('Display name for send-as alias.'),
       replyToAddress: z.string().optional().describe('Reply-to address for send-as alias.'),
       signature: z.string().optional().describe('HTML email signature for send-as alias.')
@@ -457,9 +458,11 @@ export let manageSettings = SlateTool.create(spec, {
       let autoForwarding = mapAutoForwardingSettings(settings);
       return {
         output: { autoForwarding },
-        message: autoForwarding.enabled
-          ? `Auto-forwarding is **enabled** to **${autoForwarding.emailAddress}**.`
-          : 'Auto-forwarding is **disabled**.'
+        message: !autoForwarding.enabled
+          ? 'Auto-forwarding is **disabled**.'
+          : autoForwarding.emailAddress
+            ? `Auto-forwarding is **enabled** to **${autoForwarding.emailAddress}**.`
+            : 'Auto-forwarding is **enabled**; Gmail did not return the forwarding address.'
       };
     }
 

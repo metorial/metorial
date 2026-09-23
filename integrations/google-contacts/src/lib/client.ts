@@ -10,9 +10,7 @@ let api = axios.create({
   baseURL: 'https://people.googleapis.com/v1/'
 });
 
-// Preserve the existing zero-as-default behavior and Google's search cap.
-let OTHER_CONTACTS_LIST_DEFAULT_PAGE_SIZE = 100;
-let OTHER_CONTACTS_SEARCH_DEFAULT_PAGE_SIZE = 30;
+// Pause between the empty-query warmup and the real search; Google's search cache is lazy.
 let OTHER_CONTACTS_SEARCH_WARMUP_DELAY_MS = 1000;
 
 let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -267,7 +265,7 @@ export class Client {
     try {
       let response = await api.get('otherContacts', {
         params: {
-          pageSize: pageSize || OTHER_CONTACTS_LIST_DEFAULT_PAGE_SIZE,
+          pageSize: pageSize || 100,
           pageToken,
           readMask: READONLY_PERSON_FIELDS
         },
@@ -304,7 +302,8 @@ export class Client {
         params: {
           query,
           readMask: READONLY_PERSON_FIELDS,
-          pageSize: Math.min(pageSize || OTHER_CONTACTS_SEARCH_DEFAULT_PAGE_SIZE, 30)
+          // Google caps search pageSize at 30 itself; default to that cap instead of 10.
+          pageSize: pageSize || 30
         },
         headers: this.headers
       });
@@ -315,17 +314,21 @@ export class Client {
   }
 
   async copyOtherContactToMyContacts(resourceName: string) {
-    let response = await api.post(
-      `${resourceName}:copyOtherContactToMyContactsGroup`,
-      {
-        copyMask: READONLY_PERSON_FIELDS,
-        readMask: DEFAULT_PERSON_FIELDS
-      },
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    try {
+      let response = await api.post(
+        `${resourceName}:copyOtherContactToMyContactsGroup`,
+        {
+          copyMask: READONLY_PERSON_FIELDS,
+          readMask: DEFAULT_PERSON_FIELDS
+        },
+        {
+          headers: this.headers
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'copy other contact to my contacts');
+    }
   }
 
   // ---- Directory ----

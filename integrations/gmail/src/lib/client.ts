@@ -1,5 +1,6 @@
-import { createAxios } from 'slates';
-import { buildMimeMessage, encodeBase64Url } from './mime';
+import { Buffer } from 'node:buffer';
+import { createAxios, pickDefined } from 'slates';
+import { buildMimeMessage, encodeBase64Url, encodeMimeMessage } from './mime';
 
 let gmailAxios = createAxios({
   baseURL: 'https://gmail.googleapis.com/gmail/v1/'
@@ -33,6 +34,25 @@ export interface GmailMessage {
   payload: MessagePart;
   sizeEstimate: number;
   raw?: string;
+}
+
+export interface InsertedGmailMessage {
+  id: string;
+  threadId?: string;
+  labelIds?: string[];
+  sizeEstimate?: number;
+  internalDate?: string;
+}
+
+export type InternalDateSource = 'receivedTime' | 'dateHeader';
+
+export interface MessageInsertionParams {
+  /** base64url-encoded RFC 822 message. */
+  raw: string;
+  labelIds?: string[];
+  threadId?: string;
+  internalDateSource?: InternalDateSource;
+  deleted?: boolean;
 }
 
 export interface GmailThread {
@@ -202,8 +222,7 @@ export class Client {
     references?: string;
     attachments?: Array<{ filename: string; mimeType: string; content: string }>;
   }): Promise<GmailMessage> {
-    let raw = buildMimeMessage(params);
-    let encoded = encodeBase64Url(raw);
+    let encoded = encodeMimeMessage(buildMimeMessage(params));
 
     let payload: Record<string, string> = { raw: encoded };
     if (params.threadId) {
@@ -221,6 +240,43 @@ export class Client {
       `users/${this.userId}/messages/send`,
       { raw: encodeBase64Url(raw) },
       { headers: this.headers() }
+    );
+    return response.data;
+  }
+
+  async importMessage(
+    params: MessageInsertionParams & {
+      neverMarkSpam?: boolean;
+      processForCalendar?: boolean;
+    }
+  ): Promise<InsertedGmailMessage> {
+    let response = await gmailAxios.post(
+      `users/${this.userId}/messages/import`,
+      pickDefined({ raw: params.raw, labelIds: params.labelIds, threadId: params.threadId }),
+      {
+        headers: this.headers(),
+        params: pickDefined({
+          internalDateSource: params.internalDateSource,
+          neverMarkSpam: params.neverMarkSpam,
+          processForCalendar: params.processForCalendar,
+          deleted: params.deleted
+        })
+      }
+    );
+    return response.data;
+  }
+
+  async insertMessage(params: MessageInsertionParams): Promise<InsertedGmailMessage> {
+    let response = await gmailAxios.post(
+      `users/${this.userId}/messages`,
+      pickDefined({ raw: params.raw, labelIds: params.labelIds, threadId: params.threadId }),
+      {
+        headers: this.headers(),
+        params: pickDefined({
+          internalDateSource: params.internalDateSource,
+          deleted: params.deleted
+        })
+      }
     );
     return response.data;
   }
@@ -505,8 +561,7 @@ export class Client {
     isHtml?: boolean;
     threadId?: string;
   }): Promise<GmailDraft> {
-    let raw = buildMimeMessage(params);
-    let encoded = encodeBase64Url(raw);
+    let encoded = encodeMimeMessage(buildMimeMessage(params));
 
     let payload: Record<string, any> = {
       message: { raw: encoded }
@@ -533,8 +588,7 @@ export class Client {
       threadId?: string;
     }
   ): Promise<GmailDraft> {
-    let raw = buildMimeMessage(params);
-    let encoded = encodeBase64Url(raw);
+    let encoded = encodeMimeMessage(buildMimeMessage(params));
 
     let payload: Record<string, any> = {
       message: { raw: encoded }
@@ -728,6 +782,19 @@ export let extractHeader = (message: GmailMessage, headerName: string): string |
   return header?.value;
 };
 
+// Gmail returns text part bytes in the charset the part declares; decode with it,
+// falling back to UTF-8 when the charset is missing or unknown.
+let decodePartText = (part: MessagePart, data: string) => {
+  let contentType = part.headers?.find(header => header.name.toLowerCase() === 'content-type');
+  let charset = contentType?.value.match(/charset="?([^";\s]+)"?/i)?.[1];
+  let bytes = Buffer.from(data, 'base64url');
+  try {
+    return new TextDecoder(charset ?? 'utf-8').decode(bytes);
+  } catch {
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+};
+
 export let extractBody = (payload?: MessagePart): { text?: string; html?: string } => {
   let result: { text?: string; html?: string } = {};
 
@@ -736,9 +803,9 @@ export let extractBody = (payload?: MessagePart): { text?: string; html?: string
   }
 
   if (payload.mimeType === 'text/plain' && payload.body?.data) {
-    result.text = atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+    result.text = decodePartText(payload, payload.body.data);
   } else if (payload.mimeType === 'text/html' && payload.body?.data) {
-    result.html = atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+    result.html = decodePartText(payload, payload.body.data);
   }
 
   if (payload.parts) {

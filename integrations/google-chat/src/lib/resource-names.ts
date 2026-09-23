@@ -76,7 +76,7 @@ export let resolveGoogleChatThreadName = (threadId: string | undefined, parent: 
   if (new RegExp(`^spaces/${segmentPattern}/threads/${segmentPattern}$`).test(resolved)) {
     if (!resolved.startsWith(`${parent}/threads/`)) {
       throw googleChatValidationError(
-        'threadId must belong to the same conversation as conversationId.'
+        `The thread ${resolved} does not belong to ${parent}; pass a thread from the same space.`
       );
     }
     return resolved;

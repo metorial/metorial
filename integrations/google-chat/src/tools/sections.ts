@@ -1,4 +1,4 @@
-import { pickDefined, SlateTool } from 'slates';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GoogleChatClient } from '../lib/client';
 import { googleChatValidationError } from '../lib/errors';
@@ -441,7 +441,13 @@ export let moveSectionItem = SlateTool.create(spec, {
         operation: 'move section item'
       }
     );
-    let item = mapSectionItem(response.sectionItem ?? { name: itemName });
+    if (!response.sectionItem) {
+      throw createApiServiceError(
+        'Google Chat moved the section item but returned no sectionItem; call list_section_items to see its new name.',
+        { reason: 'google_chat_unexpected_response' }
+      );
+    }
+    let item = mapSectionItem(response.sectionItem);
 
     return {
       output: { item },

@@ -1,13 +1,8 @@
 import { Buffer } from 'node:buffer';
-import { createApiServiceError, createAxios, pickDefined } from 'slates';
-import { buildMimeMessage, hasMimeHeaderBodySeparator } from './mime';
+import { createApiServiceError } from 'slates';
+import { buildMimeMessage, encodeMimeMessage, hasMimeHeaderBodySeparator } from './mime';
 
-let gmailInsertionAxios = createAxios({
-  baseURL: 'https://gmail.googleapis.com/gmail/v1/'
-});
-
-export type RawMessageEncoding = 'text' | 'base64url' | 'base64';
-export type InternalDateSource = 'receivedTime' | 'dateHeader';
+export type RawMessageEncoding = 'text' | 'base64';
 
 export interface MessageContentInput {
   raw?: string;
@@ -19,58 +14,75 @@ export interface MessageContentInput {
   body?: string;
   isHtml?: boolean;
   date?: string;
-}
-
-export interface InsertedGmailMessage {
-  id: string;
-  threadId?: string;
-  labelIds?: string[];
-  sizeEstimate?: number;
-  internalDate?: string;
+  inReplyTo?: string;
+  references?: string;
 }
 
 let invalid = (message: string) =>
   createApiServiceError(message, { reason: 'gmail_invalid_message_content' });
 
-let hasHeaderLine = (text: string) => /^[!-9;-~]+:/.test(text);
+// The message must start with a header field (RFC 5322 field name, then a colon):
+// leading whitespace or blank lines would leave Gmail an empty header block.
+let startsWithHeaderLine = (text: string) => /^[!-9;-~]+:/.test(text);
+
+let isRfc822Message = (text: string) =>
+  startsWithHeaderLine(text) && hasMimeHeaderBodySeparator(text);
+
+// Standard or URL-safe base64 alphabet, with or without trailing padding.
+let base64Pattern = /^[A-Za-z0-9+/_-]+={0,2}$/;
 
 let rawToBase64Url = (raw: string, encoding: RawMessageEncoding) => {
   if (encoding === 'text') {
-    if (!hasMimeHeaderBodySeparator(raw) || !hasHeaderLine(raw.trimStart())) {
+    if (!isRfc822Message(raw)) {
       throw invalid(
-        'raw must be a complete RFC 822 message: header lines such as From, To, and Subject, a blank line, then the body.'
+        'raw must be a complete RFC 822 message starting with its first header line (no leading blank lines or spaces): header lines such as From, To, and Subject, a blank line, then the body.'
       );
     }
     return Buffer.from(raw, 'utf8').toString('base64url');
   }
 
   let normalized = raw.replace(/\s/g, '');
-  let pattern = encoding === 'base64url' ? /^[A-Za-z0-9_-]+={0,2}$/ : /^[A-Za-z0-9+/]+={0,2}$/;
-  if (!normalized || !pattern.test(normalized)) {
-    throw invalid(`raw is not valid ${encoding} content.`);
+  if (
+    !normalized ||
+    !base64Pattern.test(normalized) ||
+    normalized.replace(/=+$/, '').length % 4 === 1
+  ) {
+    throw invalid('raw is not valid base64 content.');
   }
-  let bytes = Buffer.from(normalized, encoding === 'base64url' ? 'base64url' : 'base64');
-  if (!hasMimeHeaderBodySeparator(bytes.toString('latin1'))) {
+  // Buffer base64 decoding accepts both the standard and URL-safe alphabets.
+  let bytes = Buffer.from(normalized, 'base64');
+  if (!isRfc822Message(bytes.toString('latin1'))) {
     throw invalid(
-      'The decoded raw content is not an RFC 822 message: it needs header lines, a blank line, then the body.'
+      'The decoded raw content is not an RFC 822 message: it must start with header lines, then a blank line, then the body.'
     );
   }
   return bytes.toString('base64url');
 };
 
-let headerSafe = (value: string, field: string) => {
-  if (/[\r\n]/.test(value)) {
+let headerSafe = <T extends string | undefined>(value: T, field: string): T => {
+  if (value !== undefined && /[\r\n]/.test(value)) {
     throw invalid(`${field} must not contain line breaks.`);
   }
   return value;
 };
+
+let structuredFields = [
+  'from',
+  'to',
+  'cc',
+  'subject',
+  'body',
+  'isHtml',
+  'date',
+  'inReplyTo',
+  'references'
+] as const;
 
 /**
  * Returns the base64url-encoded RFC 822 message for the Gmail `raw` field, from
  * either raw content or structured fields built with the shared MIME builder.
  */
 export let buildRawMessageForInsertion = (input: MessageContentInput) => {
-  let structuredFields = ['from', 'to', 'cc', 'subject', 'body', 'isHtml', 'date'] as const;
   let usedStructured = structuredFields.filter(field => input[field] !== undefined);
 
   if (input.raw !== undefined) {
@@ -106,63 +118,10 @@ export let buildRawMessageForInsertion = (input: MessageContentInput) => {
     cc: input.cc?.map(address => headerSafe(address, 'cc')),
     subject: headerSafe(input.subject, 'subject'),
     body: input.body,
-    isHtml: input.isHtml
+    isHtml: input.isHtml,
+    inReplyTo: headerSafe(input.inReplyTo, 'inReplyTo'),
+    references: headerSafe(input.references, 'references')
   });
   let headers = [`From: ${headerSafe(input.from, 'from')}`, `Date: ${date.toUTCString()}`];
-  return Buffer.from(`${headers.join('\r\n')}\r\n${mime}`, 'utf8').toString('base64url');
+  return encodeMimeMessage(`${headers.join('\r\n')}\r\n${mime}`);
 };
-
-let postMessage = async (
-  path: string,
-  token: string,
-  body: { raw: string; labelIds?: string[]; threadId?: string },
-  params: Record<string, unknown>
-): Promise<InsertedGmailMessage> => {
-  let response = await gmailInsertionAxios.post(path, pickDefined(body), {
-    headers: { Authorization: `Bearer ${token}` },
-    params: pickDefined(params)
-  });
-  return response.data;
-};
-
-export let importGmailMessage = (params: {
-  token: string;
-  userId: string;
-  raw: string;
-  labelIds?: string[];
-  threadId?: string;
-  internalDateSource?: InternalDateSource;
-  neverMarkSpam?: boolean;
-  processForCalendar?: boolean;
-  deleted?: boolean;
-}) =>
-  postMessage(
-    `users/${encodeURIComponent(params.userId)}/messages/import`,
-    params.token,
-    { raw: params.raw, labelIds: params.labelIds, threadId: params.threadId },
-    {
-      internalDateSource: params.internalDateSource,
-      neverMarkSpam: params.neverMarkSpam,
-      processForCalendar: params.processForCalendar,
-      deleted: params.deleted
-    }
-  );
-
-export let insertGmailMessage = (params: {
-  token: string;
-  userId: string;
-  raw: string;
-  labelIds?: string[];
-  threadId?: string;
-  internalDateSource?: InternalDateSource;
-  deleted?: boolean;
-}) =>
-  postMessage(
-    `users/${encodeURIComponent(params.userId)}/messages`,
-    params.token,
-    { raw: params.raw, labelIds: params.labelIds, threadId: params.threadId },
-    {
-      internalDateSource: params.internalDateSource,
-      deleted: params.deleted
-    }
-  );

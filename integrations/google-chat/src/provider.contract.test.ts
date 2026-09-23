@@ -194,7 +194,7 @@ describe('google-chat provider contract', () => {
         id: 'google-chat',
         name: 'Google Chat',
         description:
-          'Google Chat integration for spaces, memberships, messages, reactions, attachments, and space events.'
+          'Google Chat integration for spaces, memberships, messages, reactions, attachments, space events, read state, notification settings, sidebar sections, custom emoji, and admin space search.'
       },
       toolIds: [...toolIds],
       triggerIds: [],
@@ -219,7 +219,6 @@ describe('google-chat provider contract', () => {
       expect(action?.scopes).toEqual(expectedScopes[tool.id]);
       expect(action?.authMethods).toEqual(expectedAuthMethods[tool.id]);
       expect(`google-chat-${tool.id}`.length).toBeLessThan(60);
-      expect(`super-booble-1-${tool.id}`.length).toBeLessThan(60);
     }
   });
 

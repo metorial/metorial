@@ -45,8 +45,7 @@ let notificationSettingOutputSchema = z.object({
 
 let notificationConstraints = [
   "Reads and changes only the signed-in user's own settings.",
-  'Requires a Google Workspace account with access to Google Chat.',
-  'Google documents this Chat API as part of the Google Workspace Developer Preview Program; projects outside the program receive an error.'
+  'Requires a Google Workspace account with access to Google Chat.'
 ];
 
 let settingPath = (spaceName: string) => `users/me/${spaceName}/spaceNotificationSetting`;

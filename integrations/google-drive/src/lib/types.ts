@@ -80,7 +80,7 @@ export interface SharedDrive {
   createdTime?: string;
   hidden?: boolean;
   capabilities?: Record<string, boolean>;
-  restrictions?: Record<string, boolean>;
+  restrictions?: Record<string, unknown>;
 }
 
 export interface DriveChange {

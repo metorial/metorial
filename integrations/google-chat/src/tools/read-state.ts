@@ -14,6 +14,8 @@ type GoogleChatReadState = {
   lastReadTime?: string;
 };
 
+let MARK_AS_READ_LEAD_MS = 24 * 60 * 60 * 1000;
+
 let spaceInput = z
   .string()
   .trim()
@@ -124,11 +126,7 @@ export let getThreadReadState = SlateTool.create(spec, {
       ctx.input.space ?? threadSpace,
       ctx.config.defaultSpace
     );
-    if (threadSpace && threadSpace !== spaceName) {
-      throw googleChatValidationError(
-        `thread belongs to ${threadSpace}, but space is ${spaceName}; pass a thread from the same space or omit space.`
-      );
-    }
+    // Rejects a canonical thread name that belongs to a different space.
     let threadName = resolveGoogleChatThreadName(threadInput, spaceName);
     if (!threadName) throw googleChatValidationError('thread is required.');
 
@@ -173,11 +171,11 @@ export let updateSpaceReadState = SlateTool.create(spec, {
       markAsRead: z
         .boolean()
         .optional()
-        .describe('true marks the space read up to now; cannot be combined with lastReadTime'),
-      lastReadTime: z
-        .string()
-        .trim()
-        .min(1)
+        .describe(
+          'true marks the space read up to its latest message (thread replies keep their own thread read state); cannot be combined with lastReadTime'
+        ),
+      lastReadTime: z.iso
+        .datetime({ offset: true })
         .optional()
         .describe(
           'RFC 3339 timestamp to set as the last-read time, e.g. 2026-01-01T00:00:00Z; messages after it become unread'
@@ -204,10 +202,10 @@ export let updateSpaceReadState = SlateTool.create(spec, {
     if (markAsRead === undefined && lastReadTime === undefined) {
       throw googleChatValidationError('Provide markAsRead=true or a lastReadTime.');
     }
-    let timestamp = lastReadTime ?? new Date().toISOString();
-    if (Number.isNaN(Date.parse(timestamp))) {
-      throw googleChatValidationError('lastReadTime must be an RFC 3339 timestamp.');
-    }
+    // users.spaces.updateSpaceReadState: "To mark the space as read, set lastReadTime to
+    // any value later (larger) than the latest message create time. The lastReadTime is
+    // coerced to match the latest message create time." A day ahead absorbs clock skew.
+    let timestamp = lastReadTime ?? new Date(Date.now() + MARK_AS_READ_LEAD_MS).toISOString();
 
     let spaceName = resolveGoogleChatSpaceName(ctx.input.space, ctx.config.defaultSpace);
     let path = spaceReadStatePath(spaceName);
@@ -222,7 +220,9 @@ export let updateSpaceReadState = SlateTool.create(spec, {
 
     return {
       output: { spaceName, ...readState },
-      message: `Set the last-read time for \`${spaceName}\` to ${readState.lastReadTime ?? timestamp}.`
+      message: markAsRead
+        ? `Marked \`${spaceName}\` as read${readState.lastReadTime ? ` (last read ${readState.lastReadTime})` : ''}.`
+        : `Set the last-read time for \`${spaceName}\` to ${readState.lastReadTime ?? timestamp}.`
     };
   })
   .build();

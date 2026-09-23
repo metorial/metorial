@@ -2,7 +2,7 @@
 
 ## Overview
 
-Google Chat is Google Workspace's team messaging service. This integration exposes 13 tools for messages, spaces, memberships, reactions, direct messages, attachments, and space events. It has no triggers.
+Google Chat is Google Workspace's team messaging service. This integration exposes 26 tools for messages, spaces, memberships, reactions, direct messages, attachments, space events, the signed-in user's read state, space notification settings, sidebar sections, custom emoji, and organization-wide admin space search. It has no triggers.
 
 ## Tool surface
 
@@ -10,7 +10,7 @@ Google Chat is Google Workspace's team messaging service. This integration expos
 |---|---|---|
 | `send_message` | User OAuth or Chat app | `spaces.messages.create`, including thread replies and uploaded attachment tokens |
 | `list_messages` | User OAuth | `spaces.messages.list` with thread/time filtering, `createTime ASC`/`DESC` ordering, and pagination |
-| `search_messages` | User OAuth | Developer Preview `POST /v1/spaces/-/messages:search`, with a `spaces.messages.list` keyword fallback when preview access is unavailable |
+| `search_messages` | User OAuth | `POST /v1/spaces/-/messages:search`, with a `spaces.messages.list` keyword fallback when the search API is unavailable for the account or project |
 | `search_conversations` | User OAuth or Chat app | `spaces.list`, followed by client-side name matching on each returned page |
 | `manage_space` | User OAuth | Create, setup, get, update, and delete space workflows |
 | `manage_member` | User OAuth | Add, get, list, update, and remove memberships |
@@ -21,8 +21,21 @@ Google Chat is Google Workspace's team messaging service. This integration expos
 | `download_attachment` | User OAuth or Chat app | `media.download`; returns a downloadable file |
 | `upload_attachment` | User OAuth or Chat app | Multipart `media.upload`; returns an upload token, not a posted message |
 | `list_space_events` | User OAuth | List events or get one event by ID |
+| `get_space_read_state` | User OAuth | `users.spaces.getSpaceReadState` for `users/me` |
+| `get_thread_read_state` | User OAuth | `users.spaces.threads.getThreadReadState` for `users/me` |
+| `update_space_read_state` | User OAuth | `users.spaces.updateSpaceReadState`; `markAsRead=true` sends a future `lastReadTime` that Google coerces to the latest message, or an explicit RFC 3339 `lastReadTime` marks later messages unread |
+| `get_space_notification_setting` | User OAuth | `users.spaces.spaceNotificationSetting.get` |
+| `update_space_notification_setting` | User OAuth | `users.spaces.spaceNotificationSetting.patch` for notification and mute settings |
+| `list_sections` | User OAuth | `users.sections.list` for the signed-in user's sidebar |
+| `list_section_items` | User OAuth | `users.sections.items.list`, including the `-` section wildcard with a space filter |
+| `manage_section` | User OAuth | Create, update (rename), reposition, and delete custom sections |
+| `move_section_item` | User OAuth | `users.sections.items.move` into another section |
+| `list_custom_emojis` | User OAuth | `customEmojis.list`, optionally filtered by creator |
+| `get_custom_emoji` | User OAuth | `customEmojis.get` by resource name or `:shortcode:` |
+| `manage_custom_emoji` | User OAuth | `customEmojis.create` from base64 image bytes, or `customEmojis.delete` |
+| `search_spaces_admin` | User OAuth (Workspace admin) | `spaces.search` with `useAdminAccess=true` and a caller-supplied admin query |
 
-The four official-named core tools are `send_message`, `list_messages`, `search_messages`, and `search_conversations`. Custom emoji, sidebar sections, read state, notification settings, and import-mode completion are intentionally outside the selected surface.
+The four official-named core tools are `send_message`, `list_messages`, `search_messages`, and `search_conversations`. Read state, notification settings, sidebar sections, and custom emoji tools always act on the signed-in user (`users/me`) and change only that user's own view; custom emoji tools additionally require an organization where custom emoji are enabled. `search_spaces_admin` requires a Workspace administrator with the Manage Chat and spaces conversations privilege; its `query` must include `customer = "customers/my_customer" AND spaceType = "SPACE"`, and its instructions list the documented filter fields and operators. Import-mode completion is intentionally outside the selected surface.
 
 ## Authentication
 
@@ -36,9 +49,11 @@ The consent surface contains:
 - `chat.spaces`, `chat.spaces.readonly`, and the separate `chat.delete` scope
 - `chat.memberships`, `chat.memberships.readonly`, and `chat.memberships.app`
 - `chat.messages.reactions`
+- `chat.users.readstate`, `chat.users.spacesettings`, `chat.users.sections`, and `chat.customemojis`
+- `chat.admin.spaces.readonly`
 - `userinfo.email` and `userinfo.profile`
 
-The default consent selects `chat.messages`, `userinfo.email`, and `userinfo.profile`. Other scopes are explicit opt-ins. Consolidated tools use relaxed `anyOf` static gates and document the per-action scope Google actually enforces in their instructions: `manage_space` accepts `chat.spaces` or `chat.spaces.readonly` (get works read-only; create/setup/update need `chat.spaces`; delete additionally needs `chat.delete` or Google returns 403). `manage_message` accepts a message read scope so `action=get` works with read-only grants, while update/delete need `chat.messages`. `manage_member` accepts `chat.memberships` or `chat.memberships.app`; the app scope is required only for adding or removing the calling Chat app itself. `list_space_events` accepts any one message, reaction, membership, or space read scope because Google enforces the scope per requested `eventTypes` family.
+Connections request every scope declared on the OAuth method. Consolidated tools use relaxed `anyOf` static gates and document the per-action scope Google actually enforces in their instructions: `manage_space` accepts `chat.spaces`, `chat.spaces.readonly`, or `chat.delete` (get works read-only; create/setup/update need `chat.spaces`; delete needs `chat.delete`, and without it the tool reports that the connection must be reauthorized). `manage_message` accepts a message read scope so `action=get` works with read-only grants, while update/delete need `chat.messages`. `manage_member` accepts `chat.memberships` or `chat.memberships.app`; the app scope is required only for adding or removing the calling Chat app itself. `list_space_events` accepts any one message, reaction, membership, or space read scope because Google enforces the scope per requested `eventTypes` family. Read-only tools for read state, sections, and custom emoji also accept the matching `.readonly` scope; their write tools require the full scope. `search_spaces_admin` accepts `chat.admin.spaces.readonly` or `chat.admin.spaces`.
 
 ### Chat app service account
 
@@ -48,11 +63,11 @@ The Google Cloud project must have a configured Chat app, and that app must be i
 
 ## Search behavior
 
-`search_messages` first calls the Google Workspace Developer Preview endpoint exactly: `POST https://chat.googleapis.com/v1/spaces/-/messages:search`. That primary path depends on Workspace tenant eligibility, OAuth user access, and the Chat API Developer Preview being enabled for the project/account. Provider search exclusions still apply, including omitted private, blocked-user, app-authored, app-DM, and muted-space results described by Google.
+`search_messages` first calls the generally available endpoint exactly: `POST https://chat.googleapis.com/v1/spaces/-/messages:search`. That primary path depends on Workspace tenant eligibility and OAuth user access. Provider search exclusions still apply, including omitted private, blocked-user, app-authored, app-DM, and muted-space results described by Google.
 
-When the search endpoint fails with HTTP 403/`PERMISSION_DENIED` or 404 (tenant or project not enrolled in the Developer Preview), the tool falls back to `spaces.messages.list` plus client-side case-insensitive keyword matching. The fallback requires `conversationId` to scope the list; without it the tool throws a `ServiceError` that explains the Developer Preview requirement and advises passing `conversationId`. Fallback semantics are weaker: it scans a single conversation (up to 5 pages of 50 messages, newest first), matches keywords and quoted phrases against message text, and applies only the `createTime` filters that `spaces.messages.list` supports — other structured search filters and relevance ordering are dropped. The output `searchMethod` field and the human-readable message state which path served each request.
+When the search endpoint fails with HTTP 403/`PERMISSION_DENIED` or 404 (the search API is unavailable for the tenant or project), the tool falls back to `spaces.messages.list` plus client-side case-insensitive keyword matching. The fallback requires `conversationId` to scope the list; without it the tool throws a `ServiceError` that explains the search API is unavailable and advises passing `conversationId`. Fallback semantics are weaker: it scans a single conversation (up to 5 pages of 50 messages, newest first), matches keywords and quoted phrases against message text, and applies only the `createTime` filters that `spaces.messages.list` supports — other structured search filters and relevance ordering are dropped. The output `searchMethod` field and the human-readable message state which path served each request.
 
-`search_conversations` does not use the newer Developer Preview `spaces.search` API, which now supports non-admin searches with user authentication. It calls stable `spaces.list` with an optional `spaceType` filter and then performs a case-insensitive substring match against `displayName` and the resource name on the current page. The output preserves `nextPageToken`; an empty result page does not prove that later pages contain no match.
+`search_conversations` does not use the non-admin `spaces.search` method, which only searches named spaces (`spaceType = "SPACE"`) and returns an empty response without a `displayName` clause. It calls `spaces.list` with an optional `spaceType` filter and then performs a case-insensitive substring match against `displayName` and the resource name on the current page. The output preserves `nextPageToken`; an empty result page does not prove that later pages contain no match.
 
 ## Attachment workflow
 
@@ -69,4 +84,4 @@ Google Drive download flow.
 
 ## Live verification boundary
 
-The private E2E scaffold defines manual scenarios for all 13 tools. A real run requires both a fully consented user OAuth profile and a Chat app service-account profile, a Workspace tenant where the app can be installed, a disposable member fixture, existing OAuth/app direct-message fixtures, and stable user/app attachment fixtures. Developer Preview access exercises the primary `messages.search` path; without it, `search_messages` exercises its `spaces.messages.list` fallback instead. Until those profiles and fixtures are provisioned, the suite remains explicitly skipped rather than claiming live provider coverage.
+The private E2E suite defines scenarios for all 26 tools. A real run requires both a fully consented user OAuth profile and a Chat app service-account profile, a Workspace tenant where the app can be installed, a disposable member fixture, existing OAuth/app direct-message fixtures, and stable user/app attachment fixtures. Where the search API is available the suite exercises the primary `messages.search` path; otherwise `search_messages` exercises its `spaces.messages.list` fallback instead. The read state, notification setting, section, and custom emoji scenarios need their user scopes, and `search_spaces_admin` runs only for a Workspace administrator profile. Scenarios whose profile, scope, or fixture is missing skip individually rather than claiming live provider coverage.

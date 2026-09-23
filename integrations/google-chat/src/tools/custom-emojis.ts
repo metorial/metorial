@@ -1,13 +1,14 @@
-import { Buffer } from 'node:buffer';
 import { pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
+import { decodeGoogleChatBase64 } from '../lib/base64';
 import { GoogleChatClient } from '../lib/client';
 import { googleChatValidationError } from '../lib/errors';
 import { resolveGoogleChatCustomEmojiName } from '../lib/resource-names';
 import { googleChatActionAuthMethods, googleChatActionScopes } from '../scopes';
 import { spec } from '../spec';
 
-export let GOOGLE_CHAT_CUSTOM_EMOJI_MAX_BYTES = 256 * 1024;
+// Google requires custom emoji images to be under 256 KB.
+export let GOOGLE_CHAT_CUSTOM_EMOJI_MAX_BYTES = 256 * 1024 - 1;
 
 type GoogleChatCustomEmoji = {
   name?: string;
@@ -166,18 +167,6 @@ export let getCustomEmoji = SlateTool.create(spec, {
 let emojiNamePattern = /^:[a-z0-9]+(?:[-_][a-z0-9]+)*:$/;
 let emojiFilenamePattern = /\.(png|jpe?g|gif)$/i;
 
-let decodeEmojiImage = (value: string) => {
-  let normalized = value.trim().replace(/\s/g, '');
-  if (
-    !normalized ||
-    normalized.length % 4 === 1 ||
-    !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)
-  ) {
-    throw googleChatValidationError('imageBase64 must be valid base64-encoded image bytes.');
-  }
-  return Buffer.from(normalized, 'base64');
-};
-
 let manageCustomEmojiActions = ['create', 'delete'] as const;
 
 export let manageCustomEmoji = SlateTool.create(spec, {
@@ -279,13 +268,11 @@ export let manageCustomEmoji = SlateTool.create(spec, {
       throw googleChatValidationError('imageBase64 is required when action is create.');
     }
 
-    let bytes = decodeEmojiImage(imageBase64);
-    if (bytes.byteLength === 0) {
-      throw googleChatValidationError('The custom emoji image is empty.');
-    }
-    if (bytes.byteLength >= GOOGLE_CHAT_CUSTOM_EMOJI_MAX_BYTES) {
-      throw googleChatValidationError('Custom emoji images must be under 256 KB.');
-    }
+    let image = decodeGoogleChatBase64(imageBase64, {
+      field: 'imageBase64',
+      maxBytes: GOOGLE_CHAT_CUSTOM_EMOJI_MAX_BYTES,
+      tooLargeMessage: 'Custom emoji images must be under 256 KB.'
+    });
 
     let created = mapCustomEmoji(
       await client.request<GoogleChatCustomEmoji>('customEmojis', {
@@ -293,7 +280,7 @@ export let manageCustomEmoji = SlateTool.create(spec, {
         data: {
           emojiName,
           payload: {
-            fileContent: bytes.toString('base64'),
+            fileContent: image.toString('base64'),
             filename
           }
         },

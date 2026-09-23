@@ -36,7 +36,7 @@ let otherContactSchema = z.object({
 export let searchOtherContacts = SlateTool.create(spec, {
   name: 'Search Other Contacts',
   key: 'search_other_contacts',
-  description: `Searches "Other contacts" by name, email, or phone number using prefix matching. Other contacts are automatically saved by Google from interactions and are read-only. Refreshes Google's search cache before querying so recent interactions are included. Returns at most 30 results with no pagination. Requires the \`contacts.other.readonly\` scope.`,
+  description: `Searches "Other contacts" by name, email, or phone number using prefix matching. Other contacts are automatically saved by Google from interactions and are read-only. Sends a cache warmup request before querying; very recent interactions may take a moment to appear. Returns at most 30 results with no pagination. Requires the \`contacts.other.readonly\` scope.`,
   tags: {
     destructive: false,
     readOnly: true

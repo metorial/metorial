@@ -1,6 +1,6 @@
 # <img src="https://provider-logos.metorial-cdn.com/gmail.svg" height="20"> Gmail
 
-Send, read, and search email messages with support for recipients, attachments, and HTML content. Create, update, and send drafts. Manage conversation threads and organize messages with labels. Search mailboxes using Gmail query syntax (from, to, subject, date, attachment filters). Manage filters and vacation responders, update signatures and existing send-as aliases, and view forwarding settings. Optionally look up Google Contacts through the People API when the profile grants Contacts read-only access. The OAuth surface also exposes the Google Other Contacts read-only scope for consent-screen coverage. Import and insert messages for migration. Detect recently dated messages by polling the mailbox.
+Send, read, and search email messages with support for recipients, attachments, and HTML content. Create, update, and send drafts. Manage conversation threads and organize messages with labels. Search mailboxes using Gmail query syntax (from, to, subject, date, attachment filters). Manage filters and vacation responders, update the primary address's display name and signature, and view send-as aliases, forwarding addresses, and auto-forwarding status. Optionally look up Google Contacts through the People API when the profile grants Contacts read-only access. The OAuth surface also exposes the Google Other Contacts read-only scope for consent-screen coverage. Import and insert messages for migration. Detect recently dated messages by polling the mailbox.
 
 ## Events
 
@@ -28,6 +28,14 @@ Retrieve detailed Google Contacts information for a People API resource name. Re
 
 List the authenticated user's Google Contacts with pagination support. Requires the optional Google Contacts read-only OAuth scope.
 
+### Import Message
+
+Import an email into the mailbox as if it arrived by normal delivery, with Gmail's standard spam, category, and filter processing. Accepts a complete RFC 822 message (plain text or base64) or structured from, to, subject, and body fields, plus optional reply headers and a thread ID to join an existing conversation. Does not send the message.
+
+### Insert Message
+
+Insert an email directly into the mailbox, like IMAP APPEND, without Gmail's scanning or classification; the message gets only the labels you choose. Accepts the same raw or structured message content as Import Message. Does not send the message.
+
 ### Manage Draft
 
 Create, update, send, list, get, or delete email drafts. Drafts can be composed with recipients, subject, body, and then sent when ready.
@@ -38,7 +46,7 @@ List, create, update, get, or delete Gmail labels. Labels organize messages and 
 
 ### Manage Settings
 
-View and manage Gmail settings including vacation responder (auto-reply), mail filters, forwarding addresses, and send-as aliases with signatures.
+View and manage Gmail settings including vacation responder (auto-reply), IMAP, POP, display language, mail filters, forwarding addresses, auto-forwarding status, and send-as aliases with signatures. Only the primary address's display name, reply-to address, and signature can be updated.
 
 ### Manage Thread
 

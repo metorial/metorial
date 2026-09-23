@@ -32,6 +32,8 @@ The following scopes are available:
 | `https://www.googleapis.com/auth/drive.metadata`          | Read/write access to file metadata only                | Sensitive     |
 | `https://www.googleapis.com/auth/drive.metadata.readonly` | Read-only access to file metadata                      | Sensitive     |
 | `https://www.googleapis.com/auth/drive.photos.readonly`   | Read-only access to photos and videos in Google Photos | Sensitive     |
+| `https://www.googleapis.com/auth/drive.apps.readonly`     | View apps authorized to access your Drive              | Sensitive     |
+| `https://www.googleapis.com/auth/drive.labels.readonly`   | View and use Drive labels                              | Non-sensitive |
 | `https://www.googleapis.com/auth/drive.scripts`           | Access to Apps Script project files                    | Sensitive     |
 
 Restricted scopes provide wide access to Google user data and require restricted scope OAuth App Verification. The `drive.file` scope is a non-sensitive scope that allows users to choose which files they want to share with your application.
@@ -76,7 +78,7 @@ Track and manage the revision history of files. You can list, get, update, and d
 
 ### Labels
 
-Apply labels to Drive files, set label field values, read label field values on files, and search for files using label metadata terms defined by the custom label taxonomy.
+Read the label definitions (fields and selection choices) the organization makes available to the user, and search for files using label metadata terms defined by the custom label taxonomy. Applying labels to files and managing label definitions are not supported.
 
 ### Shortcuts
 

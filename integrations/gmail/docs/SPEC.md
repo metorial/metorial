@@ -73,7 +73,7 @@ Labels are a mechanism for organizing messages and threads. For example, the lab
 
 Manage various mailbox settings programmatically:
 
-- **Aliases and Signatures:** List existing send-as aliases and update their display name, reply-to address, and signature.
+- **Aliases and Signatures:** List send-as aliases and update the primary address's display name, reply-to address, and signature. Gmail only allows domain-wide delegated service accounts to update send-as addresses other than the primary one, so with user OAuth `update_send_as` works on the primary address only (see [users.settings.sendAs.update](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.settings.sendAs/update)).
 - **Forwarding:** View forwarding addresses and auto-forwarding status.
 - **Filters:** Create and manage mail filters that automatically label, archive, or forward incoming mail.
 - **Vacation Responder:** Enable, configure, and disable auto-reply/vacation messages.
@@ -87,6 +87,10 @@ Manage S/MIME certificates for send-as aliases, enabling encrypted email communi
 ### Message Import and Insert
 
 Import messages into the mailbox (similar to receiving via SMTP) or insert messages directly (placing them in the mailbox without sending). This is useful for migration scenarios.
+
+`import_message` applies Gmail's standard scanning and classification (spam, categories, filters); `insert_message` stores the message as given with only the requested labels. Both accept either a complete RFC 822 message in `raw` (`rawEncoding` `text`, the default, or `base64` in the standard or URL-safe alphabet, padding optional) or structured `from`, `to`, `cc`, `subject`, `body`, `isHtml`, `date`, `inReplyTo`, and `references` fields, never both. A raw message must start with its first header line and contain a blank line between headers and body. Non-ASCII subjects are RFC 2047 encoded, and non-ASCII bodies are sent as base64-encoded UTF-8.
+
+To add a message to an existing thread, Gmail requires the `threadId`, `References` and `In-Reply-To` headers that follow RFC 2822, and a matching `Subject` (see the [Message resource](https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages#Message)). In raw mode those headers must be part of the raw message.
 
 ## Events
 

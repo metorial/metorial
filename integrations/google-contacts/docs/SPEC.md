@@ -72,7 +72,8 @@ Key actions include creating, deleting, getting, listing, and updating contact g
 
 The API allows managing "Other contacts" by copying them to the user's contact group, listing, and searching them. "Other contacts" are contacts automatically saved by Google from interactions.
 
-- Other contacts are read-only and only names, emailAddresses, and phoneNumbers fields are returned. Requires the `contacts.other.readonly` scope.
+- Other contacts are read-only; this integration returns names, email addresses, and phone numbers. Requires the `contacts.other.readonly` scope.
+- Searching other contacts uses prefix matching and sends a cache warmup request first, because Google updates the search cache lazily; very recent interactions may take a moment to appear. Search returns at most 30 results with no pagination.
 - Copying an Other Contact to "My Contacts" requires both the `contacts.other.readonly` and `contacts` scopes.
 
 ### Directory Access (Google Workspace)

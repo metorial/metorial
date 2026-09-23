@@ -97,7 +97,7 @@ let viewSchema = z
   .enum(['LABEL_VIEW_BASIC', 'LABEL_VIEW_FULL'])
   .optional()
   .describe(
-    'LABEL_VIEW_FULL (default) returns fields, lifecycle, and capabilities; LABEL_VIEW_BASIC returns only the ID, revision, type, and title'
+    'LABEL_VIEW_FULL (default) returns fields, lifecycle, and capabilities; LABEL_VIEW_BASIC returns only the ID, revision, type, title, and description'
   );
 
 let languageCodeSchema = z
@@ -111,9 +111,9 @@ export let listDriveLabelsTool = SlateTool.create(spec, {
   name: 'List Drive Labels',
   key: 'list_drive_labels',
   description:
-    "List the Google Drive label definitions (taxonomies) the user can see, including each label's fields and selection choices. Use the returned field query keys to search or apply labels on files.",
+    "List the Google Drive label definitions (taxonomies) the user can see, including each label's fields and selection choices. Use the returned field query keys in a Drive search query to find files by label.",
   instructions: [
-    'Set publishedOnly to true to return only published revisions; by default the latest (possibly draft) revision of labels you can edit is returned.',
+    'Set publishedOnly to true to return only the current published revision of each label; by default the current revision is returned, which might not be published.',
     'minimumRole limits results to labels where the user has at least that role (READER by default).',
     'Pagination: reuse the same filters with nextPageToken.'
   ],
@@ -129,18 +129,12 @@ export let listDriveLabelsTool = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe(
-          'true returns only published revisions; false (the default) returns the latest revision, which may be an unpublished draft'
+          'true returns only the current published revisions; false (the default) returns the current revisions, which might not be published'
         ),
       minimumRole: z
-        .enum(['READER', 'APPLIER', 'ORGANIZER', 'EDITOR'])
+        .enum(['READER', 'APPLIER', 'ORGANIZER'])
         .optional()
         .describe('Only return labels where the user has at least this role'),
-      customer: z
-        .string()
-        .trim()
-        .min(1)
-        .optional()
-        .describe('Customer to scope the request to, e.g. customers/abcd1234'),
       view: viewSchema,
       languageCode: languageCodeSchema,
       pageSize: z
@@ -164,7 +158,6 @@ export let listDriveLabelsTool = SlateTool.create(spec, {
     let result = await client.listLabels({
       publishedOnly: ctx.input.publishedOnly,
       minimumRole: ctx.input.minimumRole,
-      customer: ctx.input.customer,
       view: ctx.input.view ?? 'LABEL_VIEW_FULL',
       languageCode: ctx.input.languageCode,
       pageSize: ctx.input.pageSize,

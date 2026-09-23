@@ -264,7 +264,7 @@ describe('google-chat core A tool family', () => {
     });
   });
 
-  it('uses the official Developer Preview messages.search endpoint and exact body fields', async () => {
+  it('uses the official messages.search endpoint and exact body fields', async () => {
     requestSpy.mockResolvedValueOnce({
       results: [
         {
@@ -359,7 +359,7 @@ describe('google-chat core A tool family', () => {
       searchMethod: 'list_fallback'
     });
     expect(result.message).toContain('spaces.messages.list fallback');
-    expect(result.message).toContain('Developer Preview');
+    expect(result.message).toContain('unavailable for this account or project');
   });
 
   it('falls back on the interceptor-normalized 404 shape that live requests produce', async () => {
@@ -388,7 +388,7 @@ describe('google-chat core A tool family', () => {
     expect(result.output).toMatchObject({ searchMethod: 'list_fallback' });
   });
 
-  it('explains the Developer Preview requirement when the fallback lacks a conversationId', async () => {
+  it('explains the search API requirement when the fallback lacks a conversationId', async () => {
     requestSpy.mockRejectedValueOnce(
       createApiServiceError('Google Chat API search messages failed: HTTP 404 Not Found', {
         reason: 'google_chat_api_error',
@@ -398,11 +398,11 @@ describe('google-chat core A tool family', () => {
 
     await expect(
       searchMessages.handleInvocation(createContext({ query: 'release' }))
-    ).rejects.toThrow(/Developer Preview.*conversationId/s);
+    ).rejects.toThrow(/unavailable for this account or project.*conversationId/s);
     expect(requestSpy).toHaveBeenCalledTimes(1);
   });
 
-  it('rethrows search API errors that are not preview-availability failures', async () => {
+  it('rethrows search API errors that are not availability failures', async () => {
     requestSpy.mockRejectedValueOnce(
       createApiServiceError(
         'Google Chat API search messages failed: HTTP 500: backend error',

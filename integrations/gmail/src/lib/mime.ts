@@ -1,3 +1,64 @@
+import { Buffer } from 'node:buffer';
+
+// Every non-ASCII UTF-16 code unit encodes to more than one UTF-8 byte.
+let isAscii = (value: string) => Buffer.byteLength(value, 'utf8') === value.length;
+
+// RFC 2047 limits header lines holding encoded-words to 76 characters. `=?UTF-8?B?`
+// + `?=` is 12 characters. A continuation line (leading space) leaves 63 base64
+// characters (45 bytes); the first line also carries the `Subject: ` name, leaving
+// 55 characters (39 bytes). Both are rounded down to whole 3-byte chunks.
+const maxFirstEncodedWordBytes = 39;
+const maxEncodedWordBytes = 45;
+
+/**
+ * Encodes a non-ASCII header value as RFC 2047 `B` encoded-words, folded onto
+ * continuation lines. ASCII values are returned unchanged.
+ */
+export let encodeMimeHeaderValue = (value: string): string => {
+  if (isAscii(value)) {
+    return value;
+  }
+
+  let words: string[] = [];
+  let chunk = '';
+  let chunkBytes = 0;
+  for (let character of value) {
+    let characterBytes = Buffer.byteLength(character, 'utf8');
+    let limit = words.length === 0 ? maxFirstEncodedWordBytes : maxEncodedWordBytes;
+    if (chunk && chunkBytes + characterBytes > limit) {
+      words.push(chunk);
+      chunk = '';
+      chunkBytes = 0;
+    }
+    chunk += character;
+    chunkBytes += characterBytes;
+  }
+  if (chunk) {
+    words.push(chunk);
+  }
+
+  return words
+    .map(word => `=?UTF-8?B?${Buffer.from(word, 'utf8').toString('base64')}?=`)
+    .join('\r\n ');
+};
+
+/**
+ * Returns the body lines for a text part. ASCII bodies are kept as-is (7bit);
+ * non-ASCII bodies are UTF-8 encoded as base64 with 76-character lines so the
+ * part is transported intact.
+ */
+let buildTextPartBody = (body: string): { transferEncoding?: string; lines: string[] } => {
+  if (isAscii(body)) {
+    return { lines: [body] };
+  }
+
+  let encoded = Buffer.from(body, 'utf8').toString('base64');
+  return {
+    transferEncoding: 'base64',
+    lines: encoded.match(/.{1,76}/g) ?? []
+  };
+};
+
 export let buildMimeMessage = (params: {
   to: string[];
   cc?: string[];
@@ -24,7 +85,7 @@ export let buildMimeMessage = (params: {
   if (params.bcc && params.bcc.length > 0) {
     lines.push(`Bcc: ${params.bcc.join(', ')}`);
   }
-  lines.push(`Subject: ${params.subject}`);
+  lines.push(`Subject: ${encodeMimeHeaderValue(params.subject)}`);
 
   if (params.inReplyTo) {
     lines.push(`In-Reply-To: ${params.inReplyTo}`);
@@ -45,17 +106,17 @@ export let buildMimeMessage = (params: {
   let contentType = params.isHtml
     ? 'text/html; charset="UTF-8"'
     : 'text/plain; charset="UTF-8"';
+  let textPart = buildTextPartBody(params.body);
 
-  if (hasAttachments) {
-    lines.push(`Content-Type: ${contentType}`);
-    lines.push('');
-    lines.push(params.body);
-  } else {
+  if (!hasAttachments) {
     lines.push('MIME-Version: 1.0');
-    lines.push(`Content-Type: ${contentType}`);
-    lines.push('');
-    lines.push(params.body);
   }
+  lines.push(`Content-Type: ${contentType}`);
+  if (textPart.transferEncoding) {
+    lines.push(`Content-Transfer-Encoding: ${textPart.transferEncoding}`);
+  }
+  lines.push('');
+  lines.push(...textPart.lines);
 
   if (hasAttachments && params.attachments) {
     for (let attachment of params.attachments) {
@@ -72,6 +133,12 @@ export let buildMimeMessage = (params: {
   return lines.join('\r\n');
 };
 
+/** Encodes a MIME message built as a Unicode string as UTF-8 base64url for Gmail `raw`. */
+export let encodeMimeMessage = (mime: string): string =>
+  Buffer.from(mime, 'utf8').toString('base64url');
+
+// Byte-preserving: `str` is a binary string (one char per byte), as returned by
+// decodeBase64Url for messages that are re-sent unchanged.
 export let encodeBase64Url = (str: string): string => {
   return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 };

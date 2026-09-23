@@ -1,11 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
-import {
-  buildRawMessageForInsertion,
-  type InsertedGmailMessage,
-  importGmailMessage,
-  insertGmailMessage
-} from '../lib/message-insertion';
+import { Client, type InsertedGmailMessage } from '../lib/client';
+import { buildRawMessageForInsertion } from '../lib/message-insertion';
 import { gmailActionScopes } from '../scopes';
 import { spec } from '../spec';
 
@@ -15,12 +11,14 @@ let messageContentFields = {
     .min(1)
     .optional()
     .describe(
-      'Complete RFC 822 message (headers, blank line, body). Use this or the structured fields from/to/subject/body.'
+      'Complete RFC 822 message: header lines starting on the first line, a blank line, then the body. Use this or the structured fields from/to/subject/body.'
     ),
   rawEncoding: z
-    .enum(['text', 'base64url', 'base64'])
+    .enum(['text', 'base64'])
     .optional()
-    .describe('Encoding of raw: text (default, encoded for you), base64url, or base64'),
+    .describe(
+      'Encoding of raw: text (default; the message as plain text, encoded for you) or base64 (standard or URL-safe alphabet, padding optional)'
+    ),
   from: z
     .string()
     .trim()
@@ -44,6 +42,22 @@ let messageContentFields = {
     .min(1)
     .optional()
     .describe('Date header for a structured message (ISO 8601); defaults to now'),
+  inReplyTo: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe(
+      'In-Reply-To header for a structured message: the Message-ID of the message being replied to, e.g. "<abc123@mail.example.com>"'
+    ),
+  references: z
+    .string()
+    .trim()
+    .min(1)
+    .optional()
+    .describe(
+      'References header for a structured message: space-separated Message-IDs of earlier messages in the conversation'
+    ),
   labelIds: z
     .array(z.string().trim().min(1))
     .optional()
@@ -56,13 +70,7 @@ let messageContentFields = {
     .min(1)
     .optional()
     .describe(
-      'Existing thread to add the message to; the message also needs matching References or In-Reply-To headers and Subject'
-    ),
-  internalDateSource: z
-    .enum(['receivedTime', 'dateHeader'])
-    .optional()
-    .describe(
-      "Where Gmail's internal date comes from: receivedTime (now) or dateHeader (the message's Date header, when valid)"
+      'Existing thread to add the message to. Gmail only threads it when the message also has References and In-Reply-To headers (inReplyTo and references for a structured message, or in the raw message itself) and a matching Subject'
     ),
   deleted: z
     .boolean()
@@ -96,8 +104,14 @@ let sharedConstraints = [
   'The message is sent inline in the request. Gmail recommends its media upload flow for content over 5 MB, so keep messages under 5 MB; use a mail client or migration tool for larger messages.'
 ];
 
+let internalDateSourceField = (description: string) =>
+  z.enum(['receivedTime', 'dateHeader']).optional().describe(description);
+
 let contentInstructions =
   'Provide either **raw** (a full RFC 822 message) or the structured fields **from**, **to**, **subject**, and **body**; the tool builds and encodes the message.';
+
+let threadingInstructions =
+  'To add the message to an existing conversation, set **threadId** together with **inReplyTo** and **references** (or the matching In-Reply-To and References headers in raw), and keep the Subject the same as the thread.';
 
 export let importMessage = SlateTool.create(spec, {
   name: 'Import Message',
@@ -106,6 +120,7 @@ export let importMessage = SlateTool.create(spec, {
     "Import an email into the user's Gmail mailbox as if it arrived by normal delivery: Gmail runs its standard scanning and classification (spam, categories, filters), like receiving over SMTP. Use this for migrating mail into Gmail. Does not send the message. Use insert_message instead to store a message exactly as given without scanning.",
   instructions: [
     contentInstructions,
+    threadingInstructions,
     'Set neverMarkSpam to true to keep Gmail from classifying the message as spam.',
     "Set processForCalendar to true to add meeting invitations in the message to the user's Google Calendar.",
     'Add "INBOX" (and "UNREAD") to labelIds for the message to appear in the inbox.'
@@ -123,7 +138,7 @@ export let importMessage = SlateTool.create(spec, {
   .input(
     z.object({
       ...messageContentFields,
-      internalDateSource: messageContentFields.internalDateSource.describe(
+      internalDateSource: internalDateSourceField(
         "Where Gmail's internal date comes from: dateHeader (default for import; the message's Date header, when valid) or receivedTime (now)"
       ),
       neverMarkSpam: z
@@ -139,9 +154,11 @@ export let importMessage = SlateTool.create(spec, {
   .output(insertedMessageOutput)
   .handleInvocation(async ctx => {
     let raw = buildRawMessageForInsertion(ctx.input);
-    let message = await importGmailMessage({
+    let client = new Client({
       token: ctx.auth.token,
-      userId: ctx.config.userId,
+      userId: ctx.config.userId
+    });
+    let message = await client.importMessage({
       raw,
       labelIds: ctx.input.labelIds,
       threadId: ctx.input.threadId,
@@ -165,6 +182,7 @@ export let insertMessage = SlateTool.create(spec, {
     "Insert an email directly into the user's Gmail mailbox, like IMAP APPEND, bypassing most of Gmail's scanning and classification so the message is stored exactly as given with only the labels you choose. Does not send the message. Use import_message instead when the message should be treated like normal incoming mail.",
   instructions: [
     contentInstructions,
+    threadingInstructions,
     'Inserted messages get only the labels in labelIds; add "INBOX" (and "UNREAD") for the message to appear in the inbox.'
   ],
   constraints: [
@@ -180,7 +198,7 @@ export let insertMessage = SlateTool.create(spec, {
   .input(
     z.object({
       ...messageContentFields,
-      internalDateSource: messageContentFields.internalDateSource.describe(
+      internalDateSource: internalDateSourceField(
         "Where Gmail's internal date comes from: receivedTime (default for insert; now) or dateHeader (the message's Date header, when valid)"
       )
     })
@@ -188,9 +206,11 @@ export let insertMessage = SlateTool.create(spec, {
   .output(insertedMessageOutput)
   .handleInvocation(async ctx => {
     let raw = buildRawMessageForInsertion(ctx.input);
-    let message = await insertGmailMessage({
+    let client = new Client({
       token: ctx.auth.token,
-      userId: ctx.config.userId,
+      userId: ctx.config.userId
+    });
+    let message = await client.insertMessage({
       raw,
       labelIds: ctx.input.labelIds,
       threadId: ctx.input.threadId,

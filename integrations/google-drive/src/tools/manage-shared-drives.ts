@@ -10,7 +10,23 @@ let sharedDriveSchema = z.object({
   createdTime: z.string().optional(),
   hidden: z.boolean().optional(),
   capabilities: z.record(z.string(), z.boolean()).optional(),
-  restrictions: z.record(z.string(), z.boolean()).optional()
+  // Drive v3 drives.restrictions: boolean flags plus the downloadRestriction object.
+  // Loose so restriction fields Google adds later do not fail output validation.
+  restrictions: z
+    .looseObject({
+      adminManagedRestrictions: z.boolean().optional(),
+      copyRequiresWriterPermission: z.boolean().optional(),
+      domainUsersOnly: z.boolean().optional(),
+      driveMembersOnly: z.boolean().optional(),
+      sharingFoldersRequiresOrganizerPermission: z.boolean().optional(),
+      downloadRestriction: z
+        .looseObject({
+          restrictedForReaders: z.boolean().optional(),
+          restrictedForWriters: z.boolean().optional()
+        })
+        .optional()
+    })
+    .optional()
 });
 
 export let listSharedDrivesTool = SlateTool.create(spec, {

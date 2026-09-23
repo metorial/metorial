@@ -1,10 +1,10 @@
 import { createApiServiceError, createAxios, pickDefined } from 'slates';
 
-export let GOOGLE_DRIVE_LABELS_API_BASE_URL = 'https://drivelabels.googleapis.com/v2';
+let GOOGLE_DRIVE_LABELS_API_BASE_URL = 'https://drivelabels.googleapis.com/v2';
 export let GOOGLE_DRIVE_LABELS_MAX_PAGE_SIZE = 200;
 
-export type DriveLabelView = 'LABEL_VIEW_BASIC' | 'LABEL_VIEW_FULL';
-export type DriveLabelRole = 'READER' | 'APPLIER' | 'ORGANIZER' | 'EDITOR';
+type DriveLabelView = 'LABEL_VIEW_BASIC' | 'LABEL_VIEW_FULL';
+type DriveLabelRole = 'READER' | 'APPLIER' | 'ORGANIZER';
 
 export interface DriveLabelChoice {
   choiceId?: string;
@@ -84,7 +84,7 @@ let mapField = (raw: any): DriveLabelField => ({
     : undefined
 });
 
-export let mapDriveLabel = (raw: any): DriveLabel => {
+let mapDriveLabel = (raw: any): DriveLabel => {
   let labelName = typeof raw?.name === 'string' ? raw.name : '';
   if (!labelName) {
     throw createApiServiceError(
@@ -174,7 +174,6 @@ export class GoogleDriveLabelsClient {
 
   async listLabels(params: {
     publishedOnly?: boolean;
-    customer?: string;
     languageCode?: string;
     minimumRole?: DriveLabelRole;
     view?: DriveLabelView;
