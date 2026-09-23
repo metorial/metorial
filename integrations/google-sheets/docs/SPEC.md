@@ -39,7 +39,7 @@ Sheets API scopes are applied to a spreadsheet file and cannot be limited to a s
 - `https://www.googleapis.com/auth/spreadsheets.readonly` — Read-only access to all spreadsheets.
 - `https://www.googleapis.com/auth/drive.file` — Access only to files created or opened by the app.
 
-The restricted broad Drive scopes (`drive`, `drive.readonly`) are not requested by this integration. Connections that granted them previously keep working; new connections use `drive.file`, so Drive-level operations (deleting spreadsheets, change-notification watches) apply only to files created or opened through this connection.
+The restricted broad Drive scopes (`drive`, `drive.readonly`) are not requested by this integration. Connections that granted them previously keep working; new connections use `drive.file`, so Drive-level operations such as deleting spreadsheets apply only to files created or opened through this connection.
 
 ## Features
 
@@ -99,19 +99,4 @@ Perform multiple distinct update operations (formatting, adding sheets, creating
 
 ## Events
 
-The Google Sheets API itself does not provide native webhook or push notification support. However, file-level change notifications can be achieved through the **Google Drive API's push notifications** mechanism.
-
-### File Change Notifications (via Google Drive API)
-
-To request push notifications, you must set up a notification channel for each resource you want to monitor. After your notification channels are set up, the Google Drive API informs your application when any watched resource changes.
-
-- You register a webhook URL using the Drive API's `files.watch` method on a specific spreadsheet's file ID.
-- When a watched resource changes, your application receives a notification message as an HTTPS POST request to the specified URL. The notification includes headers with details about the change, such as: `X-Goog-Resource-State` (e.g., add, remove, update) and `X-Goog-Changed` (e.g., content, parents, children, permissions).
-- For the Google Drive API, the maximum expiration time is 86400 seconds (1 day) for the files resource and 604800 seconds (1 week) for changes. Channels must be renewed before expiration.
-- These methods don't provide information regarding the actual change that was made. While it does include the fileId in the change item, it also doesn't specify who made the change or at what time it was made. You must call the Sheets API separately to fetch the updated data.
-- The webhook receiver URL must be HTTPS and the domain must be verified in the Google Cloud Console.
-- Requires Drive API scopes (e.g., `https://www.googleapis.com/auth/drive` or `https://www.googleapis.com/auth/drive.readonly`).
-
-### Drive-Wide Change Notifications (via Google Drive API)
-
-Subscribes to changes for a user. Using the `changes.watch` method, you can monitor all changes across a user's Drive (including spreadsheets). This provides broader coverage but requires filtering to identify relevant spreadsheet changes. Same expiration and domain verification constraints apply as above.
+This integration does not currently expose event triggers.

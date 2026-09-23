@@ -5,9 +5,7 @@ export let superGoogle1ConfigSchema = z.object({
   userId: z
     .string()
     .default('me')
-    .describe(
-      'Gmail user ID. Use "me" for the authenticated user, or specify a full email address for delegated access.'
-    ),
+    .describe('Gmail user ID. Use "me" or the authenticated user\'s full email address.'),
   defaultSpace: z
     .string()
     .trim()

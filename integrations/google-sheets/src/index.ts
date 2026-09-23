@@ -19,7 +19,6 @@ import {
   updateSpreadsheet,
   writeCells
 } from './tools';
-import { spreadsheetChanged } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -42,5 +41,5 @@ export let provider = Slate.create({
     createFilterView,
     mergeCells
   ],
-  triggers: [spreadsheetChanged]
+  triggers: []
 });

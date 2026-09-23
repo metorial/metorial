@@ -1,16 +1,20 @@
 {
   "name": "@booble/super-booble-1",
-  "description": "Work across Gmail, G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Drive, Drive-backed G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Docs and Sheets operations, and G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Chat through one G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ OAuth connection. Search and manage mail and contacts, organize and share Drive files, import and list native G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Docs, delete spreadsheets, and manage Chat spaces, messages, members, reactions, and downloadable uploads.",
+  "description": "Work across Gmail, G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Drive, Drive-backed G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Docs and Sheets operations, and G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Chat through one G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ OAuth connection. Search and manage mail, look up contacts and other contacts, import mail into the mailbox, organize and share Drive files, browse Drive apps, read Drive label definitions, import and list native G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Docs, delete spreadsheets, and manage Chat spaces, messages, members, reactions, sidebar sections, read state, notification settings, custom emoji, and downloadable uploads.",
   "categories": ["email-and-messaging", "document-processing"],
   "skills": [
     "send and search Gmail messages",
     "manage Gmail drafts, labels, threads, and settings",
-    "find G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ contacts",
+    "import and insert messages into a Gmail mailbox",
+    "look up G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ contacts and other contacts",
     "upload, organize, share, and export Drive files",
     "manage Drive permissions, comments, revisions, and shared drives",
+    "browse Drive apps and read Drive label definitions",
     "create, replace, and list native G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Docs",
     "delete G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Sheets spreadsheets",
     "manage G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Chat spaces, messages, members, and reactions",
+    "organize Chat sidebar sections, read state, notification settings, and custom emoji",
+    "search Chat spaces across an organization as an administrator",
     "download and upload G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ Chat files"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/google.svg",

@@ -10,6 +10,11 @@ let api = axios.create({
   baseURL: 'https://people.googleapis.com/v1/'
 });
 
+// Pause between the empty-query warmup and the real search; Google's search cache is lazy.
+let OTHER_CONTACTS_SEARCH_WARMUP_DELAY_MS = 1000;
+
+let wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export class Client {
   private headers: Record<string, string>;
 
@@ -257,41 +262,73 @@ export class Client {
   // ---- Other Contacts ----
 
   async listOtherContacts(pageSize?: number, pageToken?: string) {
-    let response = await api.get('otherContacts', {
-      params: {
-        pageSize: pageSize || 100,
-        pageToken,
-        readMask: READONLY_PERSON_FIELDS
-      },
-      headers: this.headers
-    });
-    return response.data;
+    try {
+      let response = await api.get('otherContacts', {
+        params: {
+          pageSize: pageSize || 100,
+          pageToken,
+          readMask: READONLY_PERSON_FIELDS
+        },
+        headers: this.headers
+      });
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'list other contacts');
+    }
   }
 
   async searchOtherContacts(query: string, pageSize?: number) {
-    let response = await api.get('otherContacts:search', {
-      params: {
-        query,
-        readMask: READONLY_PERSON_FIELDS,
-        pageSize: pageSize || 30
-      },
-      headers: this.headers
-    });
-    return response.data;
+    // otherContacts.search reads a lazily updated cache. Google documents sending a
+    // warmup request with an empty query first, then searching after a short pause:
+    // https://developers.google.com/people/v1/other-contacts
+    let warmedUp = false;
+    try {
+      await api.get('otherContacts:search', {
+        params: { query: '', readMask: READONLY_PERSON_FIELDS },
+        headers: this.headers
+      });
+      warmedUp = true;
+    } catch {
+      // The warmup only refreshes the cache. Any persistent failure (auth, scope,
+      // quota) is reported by the real search request below.
+    }
+
+    if (warmedUp) {
+      await wait(OTHER_CONTACTS_SEARCH_WARMUP_DELAY_MS);
+    }
+
+    try {
+      let response = await api.get('otherContacts:search', {
+        params: {
+          query,
+          readMask: READONLY_PERSON_FIELDS,
+          // Google caps search pageSize at 30 itself; default to that cap instead of 10.
+          pageSize: pageSize || 30
+        },
+        headers: this.headers
+      });
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'search other contacts');
+    }
   }
 
   async copyOtherContactToMyContacts(resourceName: string) {
-    let response = await api.post(
-      `${resourceName}:copyOtherContactToMyContactsGroup`,
-      {
-        copyMask: READONLY_PERSON_FIELDS,
-        readMask: DEFAULT_PERSON_FIELDS
-      },
-      {
-        headers: this.headers
-      }
-    );
-    return response.data;
+    try {
+      let response = await api.post(
+        `${resourceName}:copyOtherContactToMyContactsGroup`,
+        {
+          copyMask: READONLY_PERSON_FIELDS,
+          readMask: DEFAULT_PERSON_FIELDS
+        },
+        {
+          headers: this.headers
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw googlePeopleApiError(error, 'copy other contact to my contacts');
+    }
   }
 
   // ---- Directory ----

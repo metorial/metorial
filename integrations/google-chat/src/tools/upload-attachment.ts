@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { SlateTool } from 'slates';
 import { z } from 'zod';
+import { decodeGoogleChatBase64 } from '../lib/base64';
 import { GOOGLE_CHAT_API_ORIGIN, GoogleChatClient } from '../lib/client';
 import { googleChatValidationError } from '../lib/errors';
 import { resolveGoogleChatSpaceName } from '../lib/resource-names';
@@ -8,33 +9,6 @@ import { googleChatActionAuthMethods, googleChatActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let GOOGLE_CHAT_MAX_ATTACHMENT_BYTES = 200 * 1024 * 1024;
-
-export let decodeGoogleChatAttachmentBase64 = (value: string) => {
-  let normalized = value.trim().replace(/\s/g, '');
-  if (
-    !normalized ||
-    normalized.length % 4 === 1 ||
-    !/^[A-Za-z0-9+/]*={0,2}$/.test(normalized)
-  ) {
-    throw googleChatValidationError(
-      'contentBase64 must be valid base64-encoded file content.'
-    );
-  }
-
-  let bytes = Buffer.from(normalized, 'base64');
-  let canonical = bytes.toString('base64').replace(/=+$/, '');
-  if (bytes.length === 0 || canonical !== normalized.replace(/=+$/, '')) {
-    throw googleChatValidationError(
-      bytes.length === 0
-        ? 'contentBase64 must contain at least one byte.'
-        : 'contentBase64 must be valid base64-encoded file content.'
-    );
-  }
-  if (bytes.byteLength > GOOGLE_CHAT_MAX_ATTACHMENT_BYTES) {
-    throw googleChatValidationError('Google Chat attachment uploads are limited to 200 MB.');
-  }
-  return bytes;
-};
 
 export type UploadAttachmentInput = {
   space?: string;
@@ -57,7 +31,11 @@ export let buildUploadAttachmentRequest = (
   if (!mimeType || /[\r\n]/.test(mimeType)) {
     throw googleChatValidationError('mimeType must be a valid single-line MIME type.');
   }
-  let bytes = decodeGoogleChatAttachmentBase64(input.contentBase64);
+  let bytes = decodeGoogleChatBase64(input.contentBase64, {
+    field: 'contentBase64',
+    maxBytes: GOOGLE_CHAT_MAX_ATTACHMENT_BYTES,
+    tooLargeMessage: 'Google Chat attachment uploads are limited to 200 MB.'
+  });
   let metadataPart = Buffer.from(
     `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify({ filename })}\r\n--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`
   );

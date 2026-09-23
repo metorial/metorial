@@ -1,6 +1,7 @@
 import { importSuperGoogleTools } from '@slates/super-google-tools';
 import { provider as gmailProvider } from '@slates-integrations/gmail';
 import { provider as googleChatProvider } from '@slates-integrations/google-chat';
+import { provider as googleContactsProvider } from '@slates-integrations/google-contacts';
 import { provider as googleDocsProvider } from '@slates-integrations/google-docs';
 import { provider as googleDriveProvider } from '@slates-integrations/google-drive';
 import { provider as googleSheetsProvider } from '@slates-integrations/google-sheets';
@@ -15,7 +16,8 @@ let composition = importSuperGoogleTools({
     { integration: 'google-drive', provider: googleDriveProvider },
     { integration: 'google-docs', provider: googleDocsProvider },
     { integration: 'google-sheets', provider: googleSheetsProvider },
-    { integration: 'google-chat', provider: googleChatProvider }
+    { integration: 'google-chat', provider: googleChatProvider },
+    { integration: 'google-contacts', provider: googleContactsProvider }
   ],
   manifest: superGoogle1ToolManifest,
   authMethodKey: 'oauth'

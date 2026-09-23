@@ -38,12 +38,5 @@ export let googleSheetsActionScopes = {
   setDataValidation: spreadsheetDataWrite,
   createChart: spreadsheetDataWrite,
   createPivotTable: spreadsheetDataWrite,
-  createFilterView: spreadsheetDataWrite,
-  spreadsheetChanged: anyOf(
-    googleSheetsScopes.spreadsheets,
-    googleSheetsScopes.spreadsheetsReadonly,
-    googleSheetsScopes.driveReadonly,
-    googleSheetsScopes.drive,
-    googleSheetsScopes.driveFile
-  )
+  createFilterView: spreadsheetDataWrite
 } as const;

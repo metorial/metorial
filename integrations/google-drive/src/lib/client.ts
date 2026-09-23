@@ -2,6 +2,8 @@ import { createApiServiceError, createAxios } from 'slates';
 import type {
   ChangeListResponse,
   CommentListResponse,
+  DriveApp,
+  DriveAppListResponse,
   DriveChange,
   DriveComment,
   DriveFile,
@@ -177,6 +179,36 @@ let mapSharedDrive = (raw: any): SharedDrive => ({
   hidden: raw.hidden,
   capabilities: raw.capabilities,
   restrictions: raw.restrictions
+});
+
+let mapDriveApp = (raw: any): DriveApp => ({
+  appId: raw.id,
+  name: raw.name,
+  objectType: raw.objectType || undefined,
+  shortDescription: raw.shortDescription || undefined,
+  longDescription: raw.longDescription || undefined,
+  productId: raw.productId || undefined,
+  productUrl: raw.productUrl || undefined,
+  installed: raw.installed,
+  authorized: raw.authorized,
+  useByDefault: raw.useByDefault,
+  hasDriveWideScope: raw.hasDriveWideScope,
+  supportsCreate: raw.supportsCreate,
+  supportsImport: raw.supportsImport,
+  supportsMultiOpen: raw.supportsMultiOpen,
+  supportsOfflineCreate: raw.supportsOfflineCreate,
+  primaryMimeTypes: raw.primaryMimeTypes,
+  secondaryMimeTypes: raw.secondaryMimeTypes,
+  primaryFileExtensions: raw.primaryFileExtensions,
+  secondaryFileExtensions: raw.secondaryFileExtensions,
+  openUrlTemplate: raw.openUrlTemplate || undefined,
+  createUrl: raw.createUrl || undefined,
+  createInFolderTemplate: raw.createInFolderTemplate || undefined,
+  icons: raw.icons?.map((icon: any) => ({
+    size: icon.size,
+    category: icon.category,
+    iconUrl: icon.iconUrl
+  }))
 });
 
 let mapChange = (raw: any): DriveChange => ({
@@ -1052,5 +1084,33 @@ export class GoogleDriveClient {
       storageQuotaLimit: response.data.storageQuota?.limit,
       storageQuotaUsage: response.data.storageQuota?.usage
     };
+  }
+
+  // ---- Apps ----
+
+  async listApps(params: {
+    appFilterExtensions?: string[];
+    appFilterMimeTypes?: string[];
+    languageCode?: string;
+  }): Promise<DriveAppListResponse> {
+    let requestParams: Record<string, string> = {};
+    if (params.appFilterExtensions?.length) {
+      requestParams.appFilterExtensions = params.appFilterExtensions.join(',');
+    }
+    if (params.appFilterMimeTypes?.length) {
+      requestParams.appFilterMimeTypes = params.appFilterMimeTypes.join(',');
+    }
+    if (params.languageCode) requestParams.languageCode = params.languageCode;
+
+    let response = await this.api.get('/apps', { params: requestParams });
+    return {
+      apps: (response.data.items || []).map(mapDriveApp),
+      defaultAppIds: response.data.defaultAppIds || []
+    };
+  }
+
+  async getApp(appId: string): Promise<DriveApp> {
+    let response = await this.api.get(`/apps/${encodeURIComponent(appId)}`);
+    return mapDriveApp(response.data);
   }
 }

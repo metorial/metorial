@@ -36,6 +36,10 @@ Replaces placeholder text in a Google Docs document with dynamic values. Useful 
 
 Replaces the full body of an existing native Google Docs document from Markdown while preserving its Drive file ID and sharing settings.
 
+## Events
+
+This integration does not currently expose event triggers.
+
 ## License
 
 This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).

@@ -32,9 +32,12 @@ describe('gmail provider contract', () => {
         'get_attachment',
         'list_google_contacts',
         'search_google_contacts',
-        'get_google_contact'
+        'get_google_contact',
+        'import_message',
+        'insert_message'
       ],
-      triggerIds: ['inbound_webhook', 'mailbox_changes'],
+      triggerIds: [],
+      triggerGroupIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'send_email', readOnly: false, destructive: false },
@@ -52,12 +55,11 @@ describe('gmail provider contract', () => {
         { id: 'get_attachment', readOnly: true, destructive: false },
         { id: 'list_google_contacts', readOnly: true, destructive: false },
         { id: 'search_google_contacts', readOnly: true, destructive: false },
-        { id: 'get_google_contact', readOnly: true, destructive: false }
+        { id: 'get_google_contact', readOnly: true, destructive: false },
+        { id: 'import_message', readOnly: false, destructive: false },
+        { id: 'insert_message', readOnly: false, destructive: false }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'mailbox_changes', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
     expect(contract.actions).toHaveLength(18);
@@ -80,18 +82,22 @@ describe('gmail provider contract', () => {
       list_google_contacts: gmailActionScopes.listGoogleContacts,
       search_google_contacts: gmailActionScopes.searchGoogleContacts,
       get_google_contact: gmailActionScopes.getGoogleContact,
-      mailbox_changes: gmailActionScopes.mailboxChanges
+      import_message: {
+        AND: [{ OR: [gmailScopes.fullMail, gmailScopes.gmailModify, gmailScopes.gmailInsert] }]
+      },
+      insert_message: {
+        AND: [{ OR: [gmailScopes.fullMail, gmailScopes.gmailModify, gmailScopes.gmailInsert] }]
+      }
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {
       expect(contract.actions.find(action => action.id === actionId)?.scopes).toEqual(scopes);
     }
-    expect(
-      contract.actions.find(action => action.id === 'inbound_webhook')?.scopes
-    ).toBeUndefined();
-
     let oauth = await client.getAuthMethod('google_oauth');
     expect(oauth.authenticationMethod.type).toBe('auth.oauth');
+    expect((oauth.authenticationMethod.scopes ?? []).map(scope => scope.id)).not.toContain(
+      'https://www.googleapis.com/auth/gmail.settings.sharing'
+    );
     expect(oauth.authenticationMethod.capabilities.handleTokenRefresh?.enabled).toBe(true);
     expect(oauth.authenticationMethod.capabilities.getProfile?.enabled).toBe(true);
 

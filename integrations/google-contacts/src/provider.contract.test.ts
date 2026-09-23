@@ -33,7 +33,7 @@ describe('google-contacts provider contract', () => {
         'manage_contact_photo',
         'batch_modify_contacts'
       ],
-      triggerIds: ['inbound_webhook', 'contact_changed'],
+      triggerIds: [],
       authMethodIds: ['google_oauth', 'api_key'],
       tools: [
         { id: 'create_contact', readOnly: false, destructive: false },
@@ -56,13 +56,11 @@ describe('google-contacts provider contract', () => {
         { id: 'manage_contact_photo', readOnly: false, destructive: true },
         { id: 'batch_modify_contacts', readOnly: false, destructive: true }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'contact_changed', invocationType: 'polling' }
-      ]
+      triggerGroupIds: [],
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(21);
+    expect(contract.actions).toHaveLength(19);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual([]);
 
     let expectedScopes = {
@@ -78,15 +76,17 @@ describe('google-contacts provider contract', () => {
       list_contact_groups: googleContactsActionScopes.listContactGroups,
       get_contact_group: googleContactsActionScopes.getContactGroup,
       modify_group_members: googleContactsActionScopes.modifyGroupMembers,
-      list_other_contacts: googleContactsActionScopes.listOtherContacts,
-      search_other_contacts: googleContactsActionScopes.searchOtherContacts,
+      list_other_contacts: {
+        AND: [{ OR: ['https://www.googleapis.com/auth/contacts.other.readonly'] }]
+      },
+      search_other_contacts: {
+        AND: [{ OR: ['https://www.googleapis.com/auth/contacts.other.readonly'] }]
+      },
       copy_other_contact: googleContactsActionScopes.copyOtherContact,
       search_directory: googleContactsActionScopes.searchDirectory,
       get_my_profile: googleContactsActionScopes.getMyProfile,
       manage_contact_photo: googleContactsActionScopes.manageContactPhoto,
-      batch_modify_contacts: googleContactsActionScopes.batchModifyContacts,
-      inbound_webhook: googleContactsActionScopes.inboundWebhook,
-      contact_changed: googleContactsActionScopes.contactChanged
+      batch_modify_contacts: googleContactsActionScopes.batchModifyContacts
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

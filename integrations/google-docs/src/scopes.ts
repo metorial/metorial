@@ -34,7 +34,5 @@ export let googleDocsActionScopes = {
   updateDocumentMarkdown: driveWrite,
   mergeTemplate: docsWrite,
   listDocuments: docsRead,
-  manageNamedRanges: docsWrite,
-  documentChanged: docsRead,
-  inboundWebhook: docsRead
+  manageNamedRanges: docsWrite
 } as const;

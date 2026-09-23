@@ -1,6 +1,10 @@
 # <img src="https://provider-logos.metorial-cdn.com/google-sheets.svg" height="20"> Google Sheets
 
-Create, read, and update spreadsheets and their cell data. Read and write values to individual cells, ranges, or multiple ranges using A1 notation or named ranges. Apply cell formatting including text styles, backgrounds, borders, number formats, and conditional formatting. Manage sheets (tabs) within a spreadsheet—add, delete, copy, rename, and reorder them. Create and manage embedded charts, pivot tables, filter views, data validation rules, protected ranges, named ranges, and merged cells. Perform batch operations to apply multiple updates atomically. Monitor spreadsheet changes via Google Drive push notifications.
+Create, read, and update spreadsheets and their cell data. Read and write values to individual cells, ranges, or multiple ranges using A1 notation or named ranges. Apply cell formatting including text styles, backgrounds, borders, number formats, and conditional formatting. Manage sheets (tabs) within a spreadsheet—add, delete, copy, rename, and reorder them. Create and manage embedded charts, pivot tables, filter views, data validation rules, protected ranges, named ranges, and merged cells. Perform batch operations to apply multiple updates atomically.
+
+## Events
+
+This integration does not currently expose event triggers.
 
 ## Tools
 

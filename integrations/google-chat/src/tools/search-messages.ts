@@ -61,7 +61,7 @@ export let buildSearchMessagesFallbackPlan = (
 ): SearchMessagesFallbackPlan => {
   if (!input.conversationId?.trim()) {
     throw createApiServiceError(
-      'Google Chat messages:search is unavailable for this account because it requires Google Workspace Developer Preview enrollment. Provide conversationId so the tool can fall back to searching one conversation through spaces.messages.list.',
+      'Google Chat messages:search is unavailable for this account or project. Provide conversationId so the tool can fall back to searching one conversation through spaces.messages.list.',
       { reason: 'google_chat_search_preview_unavailable' }
     );
   }
@@ -151,9 +151,9 @@ export let searchMessages = SlateTool.create(spec, {
   name: 'Search Messages',
   key: 'search_messages',
   description:
-    'Search messages across Google Chat using the Developer Preview messages.search API, including keyword and provider-supported message filters. When the search API is unavailable (HTTP 403/404 without Developer Preview enrollment), the tool falls back to spaces.messages.list on one conversation with client-side keyword matching.',
+    'Search messages across Google Chat using the messages.search API, including keyword and provider-supported message filters. When the search API is unavailable for the account or project (HTTP 403/404), the tool falls back to spaces.messages.list on one conversation with client-side keyword matching.',
   constraints: [
-    'The primary path uses a Google Workspace Developer Preview API and requires user OAuth.',
+    'The primary search API path requires user OAuth.',
     'Google Chat search omits private messages, app-authored messages in spaces or group chats, Chat app direct messages, messages from blocked users, and messages in muted spaces.',
     'The list fallback requires conversationId, searches only that single conversation, matches keywords and quoted phrases case-insensitively against message text, and applies only the createTime filters supported by spaces.messages.list; other structured filters and relevance ordering are not applied.'
   ],
@@ -185,7 +185,7 @@ export let searchMessages = SlateTool.create(spec, {
         .enum(['createTime desc', 'relevance desc'])
         .optional()
         .describe(
-          'Sort by newest first (default) or descending relevance; the list fallback always returns newest first'
+          'Sort by newest first (default) or descending relevance (relevance ordering is a Google Developer Preview feature and may be rejected); the list fallback always returns newest first'
         ),
       pageSize: z
         .number()
@@ -212,7 +212,7 @@ export let searchMessages = SlateTool.create(spec, {
       searchMethod: z
         .enum(['search_api', 'list_fallback'])
         .describe(
-          'Which path served the request: the Developer Preview search API or the spaces.messages.list keyword fallback'
+          'Which path served the request: the messages.search API or the spaces.messages.list keyword fallback'
         )
     })
   )
@@ -241,7 +241,7 @@ export let searchMessages = SlateTool.create(spec, {
           returnedCount: fallback.messages.length,
           searchMethod: 'list_fallback' as const
         },
-        message: `Found **${fallback.messages.length}** message(s) via the spaces.messages.list fallback in \`${fallback.plan.parent}\` because the Google Chat search API is unavailable without Developer Preview access. Fallback semantics are weaker than the search API: single conversation, case-insensitive text-contains keyword matching over up to ${SEARCH_MESSAGES_FALLBACK_MAX_PAGES * SEARCH_MESSAGES_FALLBACK_PAGE_SIZE} recent messages, and only createTime filters supported by spaces.messages.list.`
+        message: `Found **${fallback.messages.length}** message(s) via the spaces.messages.list fallback in \`${fallback.plan.parent}\` because the Google Chat search API is unavailable for this account or project. Fallback semantics are weaker than the search API: single conversation, case-insensitive text-contains keyword matching over up to ${SEARCH_MESSAGES_FALLBACK_MAX_PAGES * SEARCH_MESSAGES_FALLBACK_PAGE_SIZE} recent messages, and only createTime filters supported by spaces.messages.list.`
       };
     }
 

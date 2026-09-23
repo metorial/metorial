@@ -1,14 +1,18 @@
 import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
-import { mergeImapSettingsUpdate, mergePopSettingsUpdate } from '../lib/settings';
+import {
+  mapAutoForwardingSettings,
+  mergeImapSettingsUpdate,
+  mergePopSettingsUpdate
+} from '../lib/settings';
 import { gmailActionScopes } from '../scopes';
 import { spec } from '../spec';
 
 export let manageSettings = SlateTool.create(spec, {
   name: 'Manage Settings',
   key: 'manage_settings',
-  description: `View and manage Gmail settings including vacation responder (auto-reply), IMAP, POP, display language, mail filters, forwarding addresses, and send-as aliases with signatures.`,
+  description: `View and manage Gmail settings including vacation responder (auto-reply), IMAP, POP, display language, mail filters, forwarding addresses, auto-forwarding status, and send-as aliases with signatures.`,
   instructions: [
     'Use **action** "get_vacation" to check current vacation responder settings.',
     'Use **action** "update_vacation" to enable/disable or configure the vacation responder.',
@@ -19,8 +23,10 @@ export let manageSettings = SlateTool.create(spec, {
     'Use **action** "create_filter" to create a new mail filter with criteria and actions.',
     'Use **action** "delete_filter" to remove a mail filter.',
     'Use **action** "list_forwarding" to list forwarding addresses.',
+    'Use **action** "get_auto_forwarding" to check whether all incoming mail is automatically forwarded, and to which address.',
     'Use **action** "list_send_as" to list send-as aliases and their signatures.',
-    'Use **action** "update_send_as" to update a send-as alias display name, reply-to, or signature.'
+    'Use **action** "update_send_as" to update a send-as alias display name, reply-to, or signature.',
+    'update_send_as can only update the primary address (isPrimary in list_send_as): Gmail allows updates to other send-as addresses only from domain-wide delegated service accounts, not from a user sign-in.'
   ],
   tags: {
     readOnly: false
@@ -43,6 +49,7 @@ export let manageSettings = SlateTool.create(spec, {
           'create_filter',
           'delete_filter',
           'list_forwarding',
+          'get_auto_forwarding',
           'list_send_as',
           'update_send_as'
         ])
@@ -134,7 +141,7 @@ export let manageSettings = SlateTool.create(spec, {
       sendAsEmail: z
         .string()
         .optional()
-        .describe('Send-as email address (for update_send_as).'),
+        .describe('Send-as email address (for update_send_as); must be the primary address.'),
       displayName: z.string().optional().describe('Display name for send-as alias.'),
       replyToAddress: z.string().optional().describe('Reply-to address for send-as alias.'),
       signature: z.string().optional().describe('HTML email signature for send-as alias.')
@@ -234,6 +241,15 @@ export let manageSettings = SlateTool.create(spec, {
         )
         .optional()
         .describe('Forwarding addresses.'),
+
+      autoForwarding: z
+        .object({
+          enabled: z.boolean(),
+          emailAddress: z.string().optional(),
+          disposition: z.string().optional()
+        })
+        .optional()
+        .describe('Auto-forwarding settings.'),
 
       sendAsAliases: z
         .array(
@@ -434,6 +450,19 @@ export let manageSettings = SlateTool.create(spec, {
       return {
         output: { forwardingAddresses: addresses },
         message: `Found **${addresses.length}** forwarding addresses.`
+      };
+    }
+
+    if (action === 'get_auto_forwarding') {
+      let settings = await client.getAutoForwarding();
+      let autoForwarding = mapAutoForwardingSettings(settings);
+      return {
+        output: { autoForwarding },
+        message: !autoForwarding.enabled
+          ? 'Auto-forwarding is **disabled**.'
+          : autoForwarding.emailAddress
+            ? `Auto-forwarding is **enabled** to **${autoForwarding.emailAddress}**.`
+            : 'Auto-forwarding is **enabled**; Gmail did not return the forwarding address.'
       };
     }
 

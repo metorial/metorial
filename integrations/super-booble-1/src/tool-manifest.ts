@@ -1,6 +1,28 @@
-import type { SuperGoogleToolManifestEntry } from '@slates/super-google-tools';
+import type {
+  SuperGoogleOmittedToolManifestEntry,
+  SuperGoogleToolManifestEntry
+} from '@slates/super-google-tools';
 
-export let superGoogle1ToolManifest = [
+let omitGoogleContactsTool = (
+  sourceKey: string,
+  reason: string
+): SuperGoogleOmittedToolManifestEntry => ({
+  sourceIntegration: 'google-contacts',
+  sourceKey,
+  status: 'omitted',
+  reason
+});
+
+let contactsWriteReason =
+  'Changing saved contacts or contact groups needs the contacts scope, which is outside the aggregate OAuth scope set.';
+
+let contactsReadDuplicateReason = (gmailToolKey: string) =>
+  `Saved contacts are already covered by the Gmail ${gmailToolKey} tool under contacts.readonly.`;
+
+let contactGroupsReadReason =
+  'Contact groups are left out to keep the aggregate focused on contact lookup; the contact group write tools are outside the aggregate OAuth scope set.';
+
+export let superGoogle1ToolManifest: SuperGoogleToolManifestEntry[] = [
   { sourceIntegration: 'gmail', sourceKey: 'send_email' },
   { sourceIntegration: 'gmail', sourceKey: 'forward_message' },
   {
@@ -21,6 +43,8 @@ export let superGoogle1ToolManifest = [
   { sourceIntegration: 'gmail', sourceKey: 'list_google_contacts' },
   { sourceIntegration: 'gmail', sourceKey: 'search_google_contacts' },
   { sourceIntegration: 'gmail', sourceKey: 'get_google_contact' },
+  { sourceIntegration: 'gmail', sourceKey: 'import_message' },
+  { sourceIntegration: 'gmail', sourceKey: 'insert_message' },
 
   { sourceIntegration: 'google-drive', sourceKey: 'search_files' },
   { sourceIntegration: 'google-drive', sourceKey: 'get_file' },
@@ -47,6 +71,10 @@ export let superGoogle1ToolManifest = [
   { sourceIntegration: 'google-drive', sourceKey: 'update_shared_drive' },
   { sourceIntegration: 'google-drive', sourceKey: 'delete_shared_drive' },
   { sourceIntegration: 'google-drive', sourceKey: 'list_changes' },
+  { sourceIntegration: 'google-drive', sourceKey: 'list_drive_apps' },
+  { sourceIntegration: 'google-drive', sourceKey: 'get_drive_app' },
+  { sourceIntegration: 'google-drive', sourceKey: 'list_drive_labels' },
+  { sourceIntegration: 'google-drive', sourceKey: 'get_drive_label' },
 
   {
     sourceIntegration: 'google-docs',
@@ -227,12 +255,57 @@ export let superGoogle1ToolManifest = [
     sourceKey: 'get_attachment',
     status: 'omitted',
     reason:
-      'This source tool is service-account-only and requires chat.bot, which is outside the aggregate user OAuth scope set.'
+      'This source tool needs a Google Chat app service account (chat.bot), which is outside the aggregate OAuth scope set.'
   },
   { sourceIntegration: 'google-chat', sourceKey: 'download_attachment' },
   { sourceIntegration: 'google-chat', sourceKey: 'upload_attachment' },
-  { sourceIntegration: 'google-chat', sourceKey: 'list_space_events' }
-] satisfies SuperGoogleToolManifestEntry[];
+  { sourceIntegration: 'google-chat', sourceKey: 'list_space_events' },
+  { sourceIntegration: 'google-chat', sourceKey: 'get_space_read_state' },
+  { sourceIntegration: 'google-chat', sourceKey: 'get_thread_read_state' },
+  { sourceIntegration: 'google-chat', sourceKey: 'update_space_read_state' },
+  { sourceIntegration: 'google-chat', sourceKey: 'get_space_notification_setting' },
+  { sourceIntegration: 'google-chat', sourceKey: 'update_space_notification_setting' },
+  { sourceIntegration: 'google-chat', sourceKey: 'list_sections' },
+  { sourceIntegration: 'google-chat', sourceKey: 'list_section_items' },
+  { sourceIntegration: 'google-chat', sourceKey: 'manage_section' },
+  { sourceIntegration: 'google-chat', sourceKey: 'move_section_item' },
+  { sourceIntegration: 'google-chat', sourceKey: 'list_custom_emojis' },
+  { sourceIntegration: 'google-chat', sourceKey: 'get_custom_emoji' },
+  { sourceIntegration: 'google-chat', sourceKey: 'manage_custom_emoji' },
+  { sourceIntegration: 'google-chat', sourceKey: 'search_spaces_admin' },
+
+  omitGoogleContactsTool('create_contact', contactsWriteReason),
+  omitGoogleContactsTool('get_contact', contactsReadDuplicateReason('get_google_contact')),
+  omitGoogleContactsTool('update_contact', contactsWriteReason),
+  omitGoogleContactsTool('delete_contact', contactsWriteReason),
+  omitGoogleContactsTool('list_contacts', contactsReadDuplicateReason('list_google_contacts')),
+  omitGoogleContactsTool(
+    'search_contacts',
+    contactsReadDuplicateReason('search_google_contacts')
+  ),
+  omitGoogleContactsTool('create_contact_group', contactsWriteReason),
+  omitGoogleContactsTool('update_contact_group', contactsWriteReason),
+  omitGoogleContactsTool('delete_contact_group', contactsWriteReason),
+  omitGoogleContactsTool('list_contact_groups', contactGroupsReadReason),
+  omitGoogleContactsTool('get_contact_group', contactGroupsReadReason),
+  omitGoogleContactsTool('modify_group_members', contactsWriteReason),
+  { sourceIntegration: 'google-contacts', sourceKey: 'list_other_contacts' },
+  { sourceIntegration: 'google-contacts', sourceKey: 'search_other_contacts' },
+  omitGoogleContactsTool(
+    'copy_other_contact',
+    'Copying an other contact into My Contacts needs the contacts scope, which is outside the aggregate OAuth scope set.'
+  ),
+  omitGoogleContactsTool(
+    'search_directory',
+    'Directory search needs directory.readonly, which is outside the aggregate OAuth scope set.'
+  ),
+  omitGoogleContactsTool(
+    'get_my_profile',
+    'Left out to keep the aggregate focused; the account email is available through the Gmail get_profile tool.'
+  ),
+  omitGoogleContactsTool('manage_contact_photo', contactsWriteReason),
+  omitGoogleContactsTool('batch_modify_contacts', contactsWriteReason)
+];
 
 export let superGoogle1ExpectedToolKeys = superGoogle1ToolManifest.flatMap(entry =>
   entry.status === 'omitted' ? [] : [entry.exposedKey ?? entry.sourceKey]

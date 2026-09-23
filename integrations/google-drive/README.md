@@ -1,6 +1,14 @@
 # <img src="https://provider-logos.metorial-cdn.com/google-drive.svg" height="20"> Google Drive
 
-Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Apply and read custom labels on files. Monitor file and folder changes via push notifications or webhook subscriptions. Store app-specific data in a hidden per-user folder.
+Upload, download, create, copy, move, rename, trash, and permanently delete files and folders in Google Drive. Search for files using complex queries filtering by name, MIME type, owner, modification date, labels, and other metadata. Share files and folders with specific users, groups, or domains with role-based permissions (owner, writer, commenter, reader). Manage shared drives and their members. Export Google Workspace files (Docs, Sheets, Slides) to standard formats like PDF, DOCX, and XLSX. Track file revision history and restore earlier versions. Create, read, update, and delete threaded comments and replies on files. Read label definitions and search files by label. Browse the Drive apps installed for your account. Store app-specific data in a hidden per-user folder.
+
+## Authentication
+
+Use **OAuth** for Drive access and to read the label definitions your organization makes available to you, including unpublished revisions of labels you can edit. Label definitions are read-only through this connection.
+
+## Events
+
+This integration does not currently expose event triggers.
 
 ## Tools
 
@@ -24,6 +32,14 @@ Get a downloadable file from Google Drive using the connected account’s access
 
 Export a Google Workspace file (Docs, Sheets, Slides, Drawings) to a standard format such as PDF, DOCX, XLSX, CSV, or plain text. Only works with Google Workspace native formats — for regular files use the **Get Download URL** tool.
 
+### Get Drive App
+
+Get details about one Google Drive app by ID, including the file types it opens, whether it is installed and authorized, and its open and create URL templates.
+
+### Get Drive Label
+
+Get one Google Drive label definition by ID or resource name, including its fields, selection choices, lifecycle state, and what you can do with it. Append `@published`, `@latest`, or `@{revisionId}` to read a specific revision.
+
 ### Get File
 
 Retrieve detailed metadata for a specific file or folder by its ID. Returns comprehensive information including name, MIME type, size, ownership, timestamps, sharing status, and links.
@@ -31,6 +47,14 @@ Retrieve detailed metadata for a specific file or folder by its ID. Returns comp
 ### List Comments
 
 List all comments on a file, including threaded replies. Shows comment content, author, timestamps, and resolution status.
+
+### List Drive Apps
+
+List the Google Drive apps installed for your account, including the file types each app opens. Optionally filter by file extension or MIME type.
+
+### List Drive Labels
+
+List the Google Drive label definitions you can see, including each label's fields and selection choices. Use the returned field query keys in a Drive search query to find files by label.
 
 ### List Permissions
 

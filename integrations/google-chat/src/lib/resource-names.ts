@@ -76,7 +76,7 @@ export let resolveGoogleChatThreadName = (threadId: string | undefined, parent: 
   if (new RegExp(`^spaces/${segmentPattern}/threads/${segmentPattern}$`).test(resolved)) {
     if (!resolved.startsWith(`${parent}/threads/`)) {
       throw googleChatValidationError(
-        'threadId must belong to the same conversation as conversationId.'
+        `The thread ${resolved} does not belong to ${parent}; pass a thread from the same space.`
       );
     }
     return resolved;
@@ -139,3 +139,56 @@ export let resolveGoogleChatSpaceEventName = (event: string | undefined, space?:
     new RegExp(`^spaces/${segmentPattern}/spaceEvents/${segmentPattern}$`),
     'Google Chat space event'
   );
+
+let resolveSectionId = (value: string) => {
+  if (value === '-') return value;
+  return resolveSegment(value, 'Google Chat section ID');
+};
+
+/**
+ * Resolves a sidebar section for the calling user. Accepts a bare section ID
+ * (including system IDs such as default-spaces) or users/{user}/sections/{section}.
+ */
+export let resolveGoogleChatSectionName = (section: string | undefined) => {
+  let resolved = section?.trim();
+  if (!resolved) throw googleChatValidationError('Google Chat section is required.');
+  if (new RegExp(`^users/${segmentPattern}/sections/${segmentPattern}$`).test(resolved)) {
+    return resolved;
+  }
+  return `users/me/sections/${resolveSectionId(resolved)}`;
+};
+
+export let resolveGoogleChatSectionItemName = (item: string | undefined, section?: string) => {
+  let resolved = item?.trim();
+  if (!resolved) throw googleChatValidationError('Google Chat section item is required.');
+  if (
+    new RegExp(
+      `^users/${segmentPattern}/sections/${segmentPattern}/items/${segmentPattern}$`
+    ).test(resolved)
+  ) {
+    return resolved;
+  }
+  if (!section?.trim()) {
+    throw googleChatValidationError(
+      'section is required when item is a bare section item ID; pass the full users/{user}/sections/{section}/items/{item} name instead.'
+    );
+  }
+  let sectionName = resolveGoogleChatSectionName(section);
+  if (sectionName.endsWith('/sections/-')) {
+    throw googleChatValidationError(
+      'Use a specific section, not the "-" wildcard, to address a section item.'
+    );
+  }
+  return `${sectionName}/items/${resolveSegment(resolved, 'Google Chat section item ID')}`;
+};
+
+/**
+ * Resolves a custom emoji. Accepts customEmojis/{id}, a :emoji-name: alias, or a bare ID.
+ */
+export let resolveGoogleChatCustomEmojiName = (emoji: string | undefined) => {
+  let resolved = emoji?.trim();
+  if (!resolved) throw googleChatValidationError('Google Chat custom emoji is required.');
+  if (new RegExp(`^customEmojis/${segmentPattern}$`).test(resolved)) return resolved;
+  if (/^:[a-z0-9_-]+:$/.test(resolved)) return `customEmojis/${resolved}`;
+  return `customEmojis/${resolveSegment(resolved, 'Google Chat custom emoji ID')}`;
+};

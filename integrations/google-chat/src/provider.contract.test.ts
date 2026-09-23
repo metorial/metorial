@@ -21,7 +21,20 @@ const toolContracts = [
   { id: 'get_attachment', readOnly: true, destructive: false },
   { id: 'download_attachment', readOnly: true, destructive: false },
   { id: 'upload_attachment', readOnly: false, destructive: false },
-  { id: 'list_space_events', readOnly: true, destructive: false }
+  { id: 'list_space_events', readOnly: true, destructive: false },
+  { id: 'get_space_read_state', readOnly: true, destructive: false },
+  { id: 'get_thread_read_state', readOnly: true, destructive: false },
+  { id: 'update_space_read_state', readOnly: false, destructive: false },
+  { id: 'get_space_notification_setting', readOnly: true, destructive: false },
+  { id: 'update_space_notification_setting', readOnly: false, destructive: false },
+  { id: 'list_sections', readOnly: true, destructive: false },
+  { id: 'list_section_items', readOnly: true, destructive: false },
+  { id: 'manage_section', readOnly: false, destructive: true },
+  { id: 'move_section_item', readOnly: false, destructive: false },
+  { id: 'list_custom_emojis', readOnly: true, destructive: false },
+  { id: 'get_custom_emoji', readOnly: true, destructive: false },
+  { id: 'manage_custom_emoji', readOnly: false, destructive: true },
+  { id: 'search_spaces_admin', readOnly: true, destructive: false }
 ] as const;
 
 const toolIds = toolContracts.map(tool => tool.id);
@@ -48,7 +61,11 @@ const expectedScopes = {
     ]
   },
   manage_space: {
-    AND: [{ OR: [googleChatScopes.spaces, googleChatScopes.spacesReadonly] }]
+    AND: [
+      {
+        OR: [googleChatScopes.spaces, googleChatScopes.spacesReadonly, googleChatScopes.delete]
+      }
+    ]
   },
   manage_member: {
     AND: [{ OR: [googleChatScopes.memberships, googleChatScopes.membershipsApp] }]
@@ -109,6 +126,33 @@ const expectedScopes = {
         ]
       }
     ]
+  },
+  get_space_read_state: {
+    AND: [{ OR: [googleChatScopes.usersReadstateReadonly, googleChatScopes.usersReadstate] }]
+  },
+  get_thread_read_state: {
+    AND: [{ OR: [googleChatScopes.usersReadstateReadonly, googleChatScopes.usersReadstate] }]
+  },
+  update_space_read_state: { AND: [{ OR: [googleChatScopes.usersReadstate] }] },
+  get_space_notification_setting: { AND: [{ OR: [googleChatScopes.usersSpacesettings] }] },
+  update_space_notification_setting: { AND: [{ OR: [googleChatScopes.usersSpacesettings] }] },
+  list_sections: {
+    AND: [{ OR: [googleChatScopes.usersSectionsReadonly, googleChatScopes.usersSections] }]
+  },
+  list_section_items: {
+    AND: [{ OR: [googleChatScopes.usersSectionsReadonly, googleChatScopes.usersSections] }]
+  },
+  manage_section: { AND: [{ OR: [googleChatScopes.usersSections] }] },
+  move_section_item: { AND: [{ OR: [googleChatScopes.usersSections] }] },
+  list_custom_emojis: {
+    AND: [{ OR: [googleChatScopes.customEmojisReadonly, googleChatScopes.customEmojis] }]
+  },
+  get_custom_emoji: {
+    AND: [{ OR: [googleChatScopes.customEmojisReadonly, googleChatScopes.customEmojis] }]
+  },
+  manage_custom_emoji: { AND: [{ OR: [googleChatScopes.customEmojis] }] },
+  search_spaces_admin: {
+    AND: [{ OR: [googleChatScopes.adminSpacesReadonly, googleChatScopes.adminSpaces] }]
   }
 } as const;
 
@@ -125,11 +169,24 @@ const expectedAuthMethods = {
   get_attachment: ['service_account'],
   download_attachment: ['oauth', 'service_account'],
   upload_attachment: ['oauth', 'service_account'],
-  list_space_events: ['oauth']
+  list_space_events: ['oauth'],
+  get_space_read_state: ['oauth'],
+  get_thread_read_state: ['oauth'],
+  update_space_read_state: ['oauth'],
+  get_space_notification_setting: ['oauth'],
+  update_space_notification_setting: ['oauth'],
+  list_sections: ['oauth'],
+  list_section_items: ['oauth'],
+  manage_section: ['oauth'],
+  move_section_item: ['oauth'],
+  list_custom_emojis: ['oauth'],
+  get_custom_emoji: ['oauth'],
+  manage_custom_emoji: ['oauth'],
+  search_spaces_admin: ['oauth']
 } as const;
 
 describe('google-chat provider contract', () => {
-  it('exposes the exact 13-tool surface with tags, scopes, auth gating, and config', async () => {
+  it('exposes the exact 26-tool surface with tags, scopes, auth gating, and config', async () => {
     let client = createLocalSlateTestClient({ slate: provider });
     let contract = await expectSlateContract({
       client,
@@ -137,7 +194,7 @@ describe('google-chat provider contract', () => {
         id: 'google-chat',
         name: 'Google Chat',
         description:
-          'Google Chat integration for spaces, memberships, messages, reactions, attachments, and space events.'
+          'Google Chat integration for spaces, memberships, messages, reactions, attachments, space events, read state, notification settings, sidebar sections, custom emoji, and admin space search.'
       },
       toolIds: [...toolIds],
       triggerIds: [],
@@ -145,9 +202,9 @@ describe('google-chat provider contract', () => {
       tools: [...toolContracts]
     });
 
-    expect(contract.actions).toHaveLength(13);
+    expect(contract.actions).toHaveLength(26);
     expect(tools.map(tool => tool.key)).toEqual(toolIds);
-    expect(new Set(tools.map(tool => tool.key)).size).toBe(13);
+    expect(new Set(tools.map(tool => tool.key)).size).toBe(26);
     expect(provider.actions.map(action => action.key)).toEqual(toolIds);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['defaultSpace']);
     expect(contract.configSchema.required ?? []).toEqual([]);
@@ -182,6 +239,11 @@ describe('google-chat provider contract', () => {
       googleChatScopes.membershipsReadonly,
       googleChatScopes.membershipsApp,
       googleChatScopes.messageReactions,
+      googleChatScopes.usersReadstate,
+      googleChatScopes.usersSpacesettings,
+      googleChatScopes.usersSections,
+      googleChatScopes.customEmojis,
+      googleChatScopes.adminSpacesReadonly,
       googleChatScopes.userInfoEmail,
       googleChatScopes.userInfoProfile
     ]);
@@ -208,7 +270,20 @@ describe('google-chat provider contract', () => {
       getAttachment: expectedScopes.get_attachment,
       downloadAttachment: expectedScopes.download_attachment,
       uploadAttachment: expectedScopes.upload_attachment,
-      listSpaceEvents: expectedScopes.list_space_events
+      listSpaceEvents: expectedScopes.list_space_events,
+      getSpaceReadState: expectedScopes.get_space_read_state,
+      getThreadReadState: expectedScopes.get_thread_read_state,
+      updateSpaceReadState: expectedScopes.update_space_read_state,
+      getSpaceNotificationSetting: expectedScopes.get_space_notification_setting,
+      updateSpaceNotificationSetting: expectedScopes.update_space_notification_setting,
+      listSections: expectedScopes.list_sections,
+      listSectionItems: expectedScopes.list_section_items,
+      manageSection: expectedScopes.manage_section,
+      moveSectionItem: expectedScopes.move_section_item,
+      listCustomEmojis: expectedScopes.list_custom_emojis,
+      getCustomEmoji: expectedScopes.get_custom_emoji,
+      manageCustomEmoji: expectedScopes.manage_custom_emoji,
+      searchSpacesAdmin: expectedScopes.search_spaces_admin
     });
     expect(googleChatActionAuthMethods).toEqual({
       sendMessage: expectedAuthMethods.send_message,
@@ -223,7 +298,20 @@ describe('google-chat provider contract', () => {
       getAttachment: expectedAuthMethods.get_attachment,
       downloadAttachment: expectedAuthMethods.download_attachment,
       uploadAttachment: expectedAuthMethods.upload_attachment,
-      listSpaceEvents: expectedAuthMethods.list_space_events
+      listSpaceEvents: expectedAuthMethods.list_space_events,
+      getSpaceReadState: expectedAuthMethods.get_space_read_state,
+      getThreadReadState: expectedAuthMethods.get_thread_read_state,
+      updateSpaceReadState: expectedAuthMethods.update_space_read_state,
+      getSpaceNotificationSetting: expectedAuthMethods.get_space_notification_setting,
+      updateSpaceNotificationSetting: expectedAuthMethods.update_space_notification_setting,
+      listSections: expectedAuthMethods.list_sections,
+      listSectionItems: expectedAuthMethods.list_section_items,
+      manageSection: expectedAuthMethods.manage_section,
+      moveSectionItem: expectedAuthMethods.move_section_item,
+      listCustomEmojis: expectedAuthMethods.list_custom_emojis,
+      getCustomEmoji: expectedAuthMethods.get_custom_emoji,
+      manageCustomEmoji: expectedAuthMethods.manage_custom_emoji,
+      searchSpacesAdmin: expectedAuthMethods.search_spaces_admin
     });
   });
 });

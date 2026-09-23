@@ -10,7 +10,6 @@ import {
   mergeTemplate,
   updateDocumentMarkdown
 } from './tools';
-import { documentChanged, inboundWebhook } from './triggers';
 
 export let provider = Slate.create({
   spec,
@@ -24,5 +23,5 @@ export let provider = Slate.create({
     manageNamedRanges,
     updateDocumentMarkdown
   ],
-  triggers: [inboundWebhook, documentChanged]
+  triggers: []
 });

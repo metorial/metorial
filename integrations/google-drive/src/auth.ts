@@ -72,6 +72,16 @@ export let auth = SlateAuth.create()
         scope: googleDriveScopes.drivePhotosReadonly
       },
       {
+        title: 'Drive Apps (Read Only)',
+        description: 'View the Google Drive apps installed for your account',
+        scope: googleDriveScopes.driveAppsReadonly
+      },
+      {
+        title: 'Drive Labels (Read Only)',
+        description: 'View Google Drive label definitions',
+        scope: googleDriveScopes.driveLabelsReadonly
+      },
+      {
         title: 'User Profile',
         description: 'View your basic profile info (name, email, photo)',
         scope: googleDriveScopes.userInfoProfile

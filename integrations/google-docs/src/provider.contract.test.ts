@@ -8,7 +8,7 @@ import { provider } from './index';
 import { googleDocsActionScopes, googleDocsScopes } from './scopes';
 
 describe('google-docs provider contract', () => {
-  it('preserves the existing surface and exposes the Markdown conversion tools', async () => {
+  it('advertises document tools without triggers', async () => {
     let client = createLocalSlateTestClient({ slate: provider });
     let contract = await expectSlateContract({
       client,
@@ -28,7 +28,8 @@ describe('google-docs provider contract', () => {
         'manage_named_ranges',
         'update_document_markdown'
       ],
-      triggerIds: ['inbound_webhook', 'document_changed'],
+      triggerIds: [],
+      triggerGroupIds: [],
       authMethodIds: ['google_oauth'],
       tools: [
         { id: 'create_document', readOnly: false, destructive: false },
@@ -40,13 +41,10 @@ describe('google-docs provider contract', () => {
         { id: 'manage_named_ranges', readOnly: false, destructive: true },
         { id: 'update_document_markdown', readOnly: false, destructive: true }
       ],
-      triggers: [
-        { id: 'inbound_webhook', invocationType: 'webhook' },
-        { id: 'document_changed', invocationType: 'polling' }
-      ]
+      triggers: []
     });
 
-    expect(contract.actions).toHaveLength(10);
+    expect(contract.actions).toHaveLength(8);
 
     let expectedScopes = {
       create_document: googleDocsActionScopes.createDocument,
@@ -56,9 +54,7 @@ describe('google-docs provider contract', () => {
       merge_template: googleDocsActionScopes.mergeTemplate,
       list_documents: googleDocsActionScopes.listDocuments,
       manage_named_ranges: googleDocsActionScopes.manageNamedRanges,
-      update_document_markdown: googleDocsActionScopes.updateDocumentMarkdown,
-      inbound_webhook: googleDocsActionScopes.inboundWebhook,
-      document_changed: googleDocsActionScopes.documentChanged
+      update_document_markdown: googleDocsActionScopes.updateDocumentMarkdown
     };
 
     for (let [actionId, scopes] of Object.entries(expectedScopes)) {

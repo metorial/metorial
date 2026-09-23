@@ -8,23 +8,24 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slates-integrations/gmail": "0.2.0-rc.20",
-    "@slates-integrations/google-chat": "0.1.0",
-    "@slates-integrations/google-docs": "0.2.0-rc.12",
-    "@slates-integrations/google-drive": "0.2.1",
-    "@slates-integrations/google-sheets": "0.2.0-rc.15",
+    "@slates-integrations/gmail": "0.2.4",
+    "@slates-integrations/google-chat": "0.1.4",
+    "@slates-integrations/google-contacts": "0.2.4",
+    "@slates-integrations/google-docs": "0.2.1",
+    "@slates-integrations/google-drive": "0.2.12",
+    "@slates-integrations/google-sheets": "0.2.3",
     "@types/node": "^20",
-    "slates": "1.0.0-rc.17",
+    "slates": "1.0.0-rc.25",
     "zod": "^4.2"
   },
   "devDependencies": {
-    "@slates/test": "1.0.0-rc.14",
+    "@slates/test": "1.0.0-rc.23",
     "typescript": "^5",
     "vitest": "^3.1.2"
   },
   "peerDependencies": {
-    "@slates/oauth-google": "1.0.0",
-    "@slates/super-google-tools": "1.0.0-rc.1"
+    "@slates/oauth-google": "1.0.6",
+    "@slates/super-google-tools": "1.0.0-rc.7"
   },
   "peerDependenciesMeta": {
     "@slates/oauth-google": {
@@ -34,5 +35,5 @@
       "optional": true
     }
   },
-  "version": "0.3.2"
+  "version": "0.4.7"
 }

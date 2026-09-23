@@ -5,8 +5,6 @@ let docsClientMocks = vi.hoisted(() => ({
   getDocument: vi.fn(),
   batchUpdate: vi.fn(),
   listDriveFiles: vi.fn(),
-  getStartPageToken: vi.fn(),
-  listChanges: vi.fn(),
   tokens: [] as string[]
 }));
 
@@ -31,14 +29,6 @@ vi.mock('./lib/client', () => ({
     listDriveFiles(...args: unknown[]) {
       return docsClientMocks.listDriveFiles(...args);
     }
-
-    getStartPageToken(...args: unknown[]) {
-      return docsClientMocks.getStartPageToken(...args);
-    }
-
-    listChanges(...args: unknown[]) {
-      return docsClientMocks.listChanges(...args);
-    }
   }
 }));
 
@@ -62,8 +52,6 @@ let resetDocsClientMocks = () => {
   docsClientMocks.getDocument.mockReset();
   docsClientMocks.batchUpdate.mockReset();
   docsClientMocks.listDriveFiles.mockReset();
-  docsClientMocks.getStartPageToken.mockReset();
-  docsClientMocks.listChanges.mockReset();
   docsClientMocks.tokens.splice(0);
 };
 

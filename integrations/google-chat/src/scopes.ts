@@ -12,6 +12,15 @@ export let googleChatScopes = {
   membershipsReadonly: 'https://www.googleapis.com/auth/chat.memberships.readonly',
   membershipsApp: 'https://www.googleapis.com/auth/chat.memberships.app',
   messageReactions: 'https://www.googleapis.com/auth/chat.messages.reactions',
+  usersReadstate: 'https://www.googleapis.com/auth/chat.users.readstate',
+  usersReadstateReadonly: 'https://www.googleapis.com/auth/chat.users.readstate.readonly',
+  usersSpacesettings: 'https://www.googleapis.com/auth/chat.users.spacesettings',
+  usersSections: 'https://www.googleapis.com/auth/chat.users.sections',
+  usersSectionsReadonly: 'https://www.googleapis.com/auth/chat.users.sections.readonly',
+  customEmojis: 'https://www.googleapis.com/auth/chat.customemojis',
+  customEmojisReadonly: 'https://www.googleapis.com/auth/chat.customemojis.readonly',
+  adminSpaces: 'https://www.googleapis.com/auth/chat.admin.spaces',
+  adminSpacesReadonly: 'https://www.googleapis.com/auth/chat.admin.spaces.readonly',
   userInfoEmail: 'https://www.googleapis.com/auth/userinfo.email',
   userInfoProfile: 'https://www.googleapis.com/auth/userinfo.profile'
 } as const;
@@ -33,10 +42,32 @@ export let googleChatScopeClauses = {
     googleChatScopes.spacesReadonly,
     googleChatScopes.bot
   ),
-  spaceManage: anyOf(googleChatScopes.spaces, googleChatScopes.spacesReadonly),
+  // manage_space covers several spaces.* methods with different requirements:
+  // create/setup/update need chat.spaces, get accepts chat.spaces or
+  // chat.spaces.readonly, and delete (spaces.delete, user auth) needs chat.delete.
+  // Clauses gate the whole tool, so this OR lists every scope that unlocks at
+  // least one action; the delete action reports a missing chat.delete grant at
+  // runtime instead of blocking the other actions.
+  spaceManage: anyOf(
+    googleChatScopes.spaces,
+    googleChatScopes.spacesReadonly,
+    googleChatScopes.delete
+  ),
   membershipManage: anyOf(googleChatScopes.memberships, googleChatScopes.membershipsApp),
   reactionWrite: anyOf(googleChatScopes.messageReactions, googleChatScopes.messages),
   appAttachmentRead: anyOf(googleChatScopes.bot),
+  readStateRead: anyOf(
+    googleChatScopes.usersReadstateReadonly,
+    googleChatScopes.usersReadstate
+  ),
+  readStateWrite: anyOf(googleChatScopes.usersReadstate),
+  spaceNotificationSetting: anyOf(googleChatScopes.usersSpacesettings),
+  sectionRead: anyOf(googleChatScopes.usersSectionsReadonly, googleChatScopes.usersSections),
+  sectionWrite: anyOf(googleChatScopes.usersSections),
+  customEmojiRead: anyOf(googleChatScopes.customEmojisReadonly, googleChatScopes.customEmojis),
+  customEmojiWrite: anyOf(googleChatScopes.customEmojis),
+  // spaces.search with useAdminAccess=true accepts only the admin space scopes.
+  adminSpaceSearch: anyOf(googleChatScopes.adminSpacesReadonly, googleChatScopes.adminSpaces),
   spaceEventRead: anyOf(
     googleChatScopes.messages,
     googleChatScopes.messagesReadonly,
@@ -61,7 +92,20 @@ export let googleChatActionScopes = {
   getAttachment: googleChatScopeClauses.appAttachmentRead,
   downloadAttachment: googleChatScopeClauses.messageReadAsUserOrApp,
   uploadAttachment: googleChatScopeClauses.messageCreate,
-  listSpaceEvents: googleChatScopeClauses.spaceEventRead
+  listSpaceEvents: googleChatScopeClauses.spaceEventRead,
+  getSpaceReadState: googleChatScopeClauses.readStateRead,
+  getThreadReadState: googleChatScopeClauses.readStateRead,
+  updateSpaceReadState: googleChatScopeClauses.readStateWrite,
+  getSpaceNotificationSetting: googleChatScopeClauses.spaceNotificationSetting,
+  updateSpaceNotificationSetting: googleChatScopeClauses.spaceNotificationSetting,
+  listSections: googleChatScopeClauses.sectionRead,
+  listSectionItems: googleChatScopeClauses.sectionRead,
+  manageSection: googleChatScopeClauses.sectionWrite,
+  moveSectionItem: googleChatScopeClauses.sectionWrite,
+  listCustomEmojis: googleChatScopeClauses.customEmojiRead,
+  getCustomEmoji: googleChatScopeClauses.customEmojiRead,
+  manageCustomEmoji: googleChatScopeClauses.customEmojiWrite,
+  searchSpacesAdmin: googleChatScopeClauses.adminSpaceSearch
 } as const;
 
 export let googleChatActionAuthMethods = {
@@ -77,5 +121,20 @@ export let googleChatActionAuthMethods = {
   getAttachment: ['service_account'],
   downloadAttachment: ['oauth', 'service_account'],
   uploadAttachment: ['oauth', 'service_account'],
-  listSpaceEvents: ['oauth']
+  listSpaceEvents: ['oauth'],
+  // Read state, notification settings, sections, custom emoji, and admin space
+  // search support user authentication only.
+  getSpaceReadState: ['oauth'],
+  getThreadReadState: ['oauth'],
+  updateSpaceReadState: ['oauth'],
+  getSpaceNotificationSetting: ['oauth'],
+  updateSpaceNotificationSetting: ['oauth'],
+  listSections: ['oauth'],
+  listSectionItems: ['oauth'],
+  manageSection: ['oauth'],
+  moveSectionItem: ['oauth'],
+  listCustomEmojis: ['oauth'],
+  getCustomEmoji: ['oauth'],
+  manageCustomEmoji: ['oauth'],
+  searchSpacesAdmin: ['oauth']
 };

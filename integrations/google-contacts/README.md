@@ -34,7 +34,7 @@ Lists the authenticated user's contacts with pagination support. Returns contact
 
 ### List Other Contacts
 
-Lists contacts automatically saved in "Other contacts" by Google from interactions. These are read-only and only include names, email addresses, and phone numbers. Requires the \
+Lists contacts automatically saved in "Other contacts" by Google from interactions. These are read-only and only include names, email addresses, and phone numbers. Requires the `contacts.other.readonly` scope.
 
 ### Create Contact Group
 
@@ -54,7 +54,7 @@ Searches the Google Workspace domain directory for profiles and contacts matchin
 
 ### Search Other Contacts
 
-Searches "Other contacts" by name, email, or phone number. Other contacts are automatically saved by Google from interactions and are read-only. Requires the \
+Searches "Other contacts" by name, email, or phone number using prefix matching. Other contacts are automatically saved by Google from interactions and are read-only. Sends a cache warmup request before querying; very recent interactions may take a moment to appear. Returns at most 30 results with no pagination. Requires the `contacts.other.readonly` scope.
 
 ### Update Contact
 
@@ -71,6 +71,10 @@ Updates or deletes the photo for a contact in the authenticated user's Google Co
 ### Batch Modify Contacts
 
 Creates, updates, deletes, or gets multiple Google contacts in one People API request. Create, update, and get accept up to 200 contacts; delete accepts up to 500.
+
+## Events
+
+This integration does not currently expose event triggers.
 
 ## License
 

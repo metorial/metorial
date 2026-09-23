@@ -1,4 +1,5 @@
-import { pickDefined, SlateTool } from 'slates';
+import { isServiceError } from '@lowerdeck/error';
+import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { GoogleChatClient } from '../lib/client';
 import { googleChatValidationError } from '../lib/errors';
@@ -327,6 +328,14 @@ export let buildManageSpaceRequest = (
   };
 };
 
+let isInsufficientScopeError = (error: unknown) => {
+  if (!isServiceError(error)) return false;
+  let status = error.data.upstreamStatus;
+  if (status !== 403 && status !== '403') return false;
+  let text = `${error.message} ${typeof error.data.message === 'string' ? error.data.message : ''}`;
+  return /insufficient authentication scopes|ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(text);
+};
+
 export let manageSpace = SlateTool.create(spec, {
   name: 'Manage Space',
   key: 'manage_space',
@@ -337,7 +346,7 @@ export let manageSpace = SlateTool.create(spec, {
     'Use **action** "setup" to create a named space, group chat, or direct message together with initialMembers. Needs the chat.spaces scope.',
     'Use **action** "get" to retrieve one space; the read-only chat.spaces.readonly scope is sufficient.',
     'Use **action** "update" to patch displayName, spaceType (GROUP_CHAT to SPACE only), space details, or history state. Needs the chat.spaces scope. description and guidelines must be supplied together because Google replaces the complete spaceDetails object.',
-    'Use **action** "delete" to irreversibly delete a space. Google additionally requires the separate Chat delete scope (chat.delete) and returns HTTP 403 without it.'
+    'Use **action** "delete" to irreversibly delete a space. Google requires the separate Chat delete scope (chat.delete); without that grant the tool reports that the connection must be reauthorized.'
   ],
   constraints: ['Deleting a Google Chat space is irreversible.'],
   tags: {
@@ -431,10 +440,24 @@ export let manageSpace = SlateTool.create(spec, {
     let client = new GoogleChatClient(ctx.auth.token);
 
     if (request.action === 'delete') {
-      await client.request<Record<string, never>>(request.path, {
-        method: request.method,
-        operation: 'delete space'
-      });
+      try {
+        await client.request<Record<string, never>>(request.path, {
+          method: request.method,
+          operation: 'delete space'
+        });
+      } catch (error) {
+        if (isInsufficientScopeError(error)) {
+          throw createApiServiceError(
+            'Deleting a space requires the chat.delete scope, which this connection has not granted. Reconnect this account and approve the permission to delete conversations and spaces, then retry.',
+            {
+              reason: 'google_chat_missing_delete_scope',
+              upstreamStatus: 403,
+              parent: error
+            }
+          );
+        }
+        throw error;
+      }
       return {
         output: {
           action: request.action,

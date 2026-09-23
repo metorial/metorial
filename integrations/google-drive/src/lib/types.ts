@@ -80,7 +80,7 @@ export interface SharedDrive {
   createdTime?: string;
   hidden?: boolean;
   capabilities?: Record<string, boolean>;
-  restrictions?: Record<string, boolean>;
+  restrictions?: Record<string, unknown>;
 }
 
 export interface DriveChange {
@@ -128,4 +128,41 @@ export interface RevisionListResponse {
 export interface SharedDriveListResponse {
   drives: SharedDrive[];
   nextPageToken?: string;
+}
+
+export interface DriveAppIcon {
+  size?: number;
+  category?: string;
+  iconUrl?: string;
+}
+
+export interface DriveApp {
+  appId: string;
+  name?: string;
+  objectType?: string;
+  shortDescription?: string;
+  longDescription?: string;
+  productId?: string;
+  productUrl?: string;
+  installed?: boolean;
+  authorized?: boolean;
+  useByDefault?: boolean;
+  hasDriveWideScope?: boolean;
+  supportsCreate?: boolean;
+  supportsImport?: boolean;
+  supportsMultiOpen?: boolean;
+  supportsOfflineCreate?: boolean;
+  primaryMimeTypes?: string[];
+  secondaryMimeTypes?: string[];
+  primaryFileExtensions?: string[];
+  secondaryFileExtensions?: string[];
+  openUrlTemplate?: string;
+  createUrl?: string;
+  createInFolderTemplate?: string;
+  icons?: DriveAppIcon[];
+}
+
+export interface DriveAppListResponse {
+  apps: DriveApp[];
+  defaultAppIds: string[];
 }

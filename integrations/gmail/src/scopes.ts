@@ -8,7 +8,6 @@ export let gmailScopes = {
   gmailLabels: 'https://www.googleapis.com/auth/gmail.labels',
   gmailInsert: 'https://www.googleapis.com/auth/gmail.insert',
   gmailSettingsBasic: 'https://www.googleapis.com/auth/gmail.settings.basic',
-  gmailSettingsSharing: 'https://www.googleapis.com/auth/gmail.settings.sharing',
   contactsReadonly: 'https://www.googleapis.com/auth/contacts.readonly',
   contactsOtherReadonly: 'https://www.googleapis.com/auth/contacts.other.readonly',
   fullMail: 'https://mail.google.com/',
@@ -17,12 +16,6 @@ export let gmailScopes = {
 } as const;
 
 let gmailReadBody = anyOf(
-  gmailScopes.gmailReadonly,
-  gmailScopes.gmailModify,
-  gmailScopes.fullMail
-);
-
-let gmailHistory = anyOf(
   gmailScopes.gmailReadonly,
   gmailScopes.gmailModify,
   gmailScopes.fullMail
@@ -57,5 +50,7 @@ export let gmailActionScopes = {
   listGoogleContacts: anyOf(gmailScopes.contactsReadonly),
   searchGoogleContacts: anyOf(gmailScopes.contactsReadonly),
   getGoogleContact: anyOf(gmailScopes.contactsReadonly),
-  mailboxChanges: gmailHistory
+  // users.messages.import and users.messages.insert accept the same three scopes.
+  importMessage: anyOf(gmailScopes.fullMail, gmailScopes.gmailModify, gmailScopes.gmailInsert),
+  insertMessage: anyOf(gmailScopes.fullMail, gmailScopes.gmailModify, gmailScopes.gmailInsert)
 } as const;
