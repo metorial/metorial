@@ -23,6 +23,22 @@
         "@slates/super-google-tools#build"
       ],
       "outputs": ["dist/**"]
+    },
+    "@slates-integrations/super-booble-2b#build": {
+      "dependsOn": [
+        "^build",
+        "@slates/oauth-google#build",
+        "@slates/super-google-tools#build"
+      ],
+      "outputs": ["dist/**"]
+    },
+    "@slates-integrations/super-booble-3#build": {
+      "dependsOn": [
+        "^build",
+        "@slates/oauth-google#build",
+        "@slates/super-google-tools#build"
+      ],
+      "outputs": ["dist/**"]
     }
   }
 }
