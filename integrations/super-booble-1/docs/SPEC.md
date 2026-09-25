@@ -2,4 +2,4 @@
 
 Work across Gmail, Google Drive, Drive-backed Google Docs and Sheets operations, and Google Chat through one Google OAuth connection.
 
-User OAuth requests 39 scopes from the project declaration. Drive label definitions shared with the user can be read using drive.labels.readonly. Label definition management is not exposed.
+User OAuth requests 38 scopes from the project declaration. Drive label definitions shared with the user can be read using drive.labels.readonly. Label definition management is not exposed.

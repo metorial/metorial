@@ -246,7 +246,6 @@ export let superGoogle1ToolManifest: SuperGoogleToolManifestEntry[] = [
   },
   { sourceIntegration: 'google-chat', sourceKey: 'search_conversations' },
   { sourceIntegration: 'google-chat', sourceKey: 'manage_space' },
-  { sourceIntegration: 'google-chat', sourceKey: 'manage_member' },
   { sourceIntegration: 'google-chat', sourceKey: 'manage_message' },
   { sourceIntegration: 'google-chat', sourceKey: 'manage_reaction' },
   { sourceIntegration: 'google-chat', sourceKey: 'find_direct_message' },

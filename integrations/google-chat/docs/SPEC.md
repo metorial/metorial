@@ -2,7 +2,7 @@
 
 ## Overview
 
-Google Chat is Google Workspace's team messaging service. This integration exposes 26 tools for messages, spaces, memberships, reactions, direct messages, attachments, space events, the signed-in user's read state, space notification settings, sidebar sections, custom emoji, and organization-wide admin space search. It has no triggers.
+Google Chat is Google Workspace's team messaging service. This integration exposes 25 tools for messages, spaces, memberships, reactions, direct messages, attachments, space events, the signed-in user's read state, space notification settings, sidebar sections, custom emoji, and organization-wide admin space search. It has no triggers.
 
 ## Tool surface
 
@@ -13,7 +13,6 @@ Google Chat is Google Workspace's team messaging service. This integration expos
 | `search_messages` | User OAuth | `POST /v1/spaces/-/messages:search`, with a `spaces.messages.list` keyword fallback when the search API is unavailable for the account or project |
 | `search_conversations` | User OAuth or Chat app | `spaces.list`, followed by client-side name matching on each returned page |
 | `manage_space` | User OAuth | Create, setup, get, update, and delete space workflows |
-| `manage_member` | User OAuth | Add, get, list, update, and remove memberships |
 | `manage_message` | User OAuth or Chat app | Get, patch, and delete messages; apps can mutate only app-authored messages |
 | `manage_reaction` | User OAuth | Create, list, and delete reactions |
 | `find_direct_message` | User OAuth or Chat app | `spaces.findDirectMessage` |
@@ -47,13 +46,13 @@ The consent surface contains:
 
 - `chat.messages`, `chat.messages.readonly`, and `chat.messages.create`
 - `chat.spaces`, `chat.spaces.readonly`, and the separate `chat.delete` scope
-- `chat.memberships`, `chat.memberships.readonly`, and `chat.memberships.app`
+- `chat.memberships` and `chat.memberships.readonly`
 - `chat.messages.reactions`
 - `chat.users.readstate`, `chat.users.spacesettings`, `chat.users.sections`, and `chat.customemojis`
 - `chat.admin.spaces.readonly`
 - `userinfo.email` and `userinfo.profile`
 
-Connections request every scope declared on the OAuth method. Consolidated tools use relaxed `anyOf` static gates and document the per-action scope Google actually enforces in their instructions: `manage_space` accepts `chat.spaces`, `chat.spaces.readonly`, or `chat.delete` (get works read-only; create/setup/update need `chat.spaces`; delete needs `chat.delete`, and without it the tool reports that the connection must be reauthorized). `manage_message` accepts a message read scope so `action=get` works with read-only grants, while update/delete need `chat.messages`. `manage_member` accepts `chat.memberships` or `chat.memberships.app`; the app scope is required only for adding or removing the calling Chat app itself. `list_space_events` accepts any one message, reaction, membership, or space read scope because Google enforces the scope per requested `eventTypes` family. Read-only tools for read state, sections, and custom emoji also accept the matching `.readonly` scope; their write tools require the full scope. `search_spaces_admin` accepts `chat.admin.spaces.readonly` or `chat.admin.spaces`.
+Connections request every scope declared on the OAuth method. Consolidated tools use relaxed `anyOf` static gates and document the per-action scope Google actually enforces in their instructions: `manage_space` accepts `chat.spaces`, `chat.spaces.readonly`, or `chat.delete` (get works read-only; create/setup/update need `chat.spaces`; delete needs `chat.delete`, and without it the tool reports that the connection must be reauthorized). `manage_message` accepts a message read scope so `action=get` works with read-only grants, while update/delete need `chat.messages`. `list_space_events` accepts any one message, reaction, membership, or space read scope because Google enforces the scope per requested `eventTypes` family. Read-only tools for read state, sections, and custom emoji also accept the matching `.readonly` scope; their write tools require the full scope. `search_spaces_admin` accepts `chat.admin.spaces.readonly` or `chat.admin.spaces`.
 
 ### Chat app service account
 
@@ -84,4 +83,4 @@ Google Drive download flow.
 
 ## Live verification boundary
 
-The private E2E suite defines scenarios for all 26 tools. A real run requires both a fully consented user OAuth profile and a Chat app service-account profile, a Workspace tenant where the app can be installed, a disposable member fixture, existing OAuth/app direct-message fixtures, and stable user/app attachment fixtures. Where the search API is available the suite exercises the primary `messages.search` path; otherwise `search_messages` exercises its `spaces.messages.list` fallback instead. The read state, notification setting, section, and custom emoji scenarios need their user scopes, and `search_spaces_admin` runs only for a Workspace administrator profile. Scenarios whose profile, scope, or fixture is missing skip individually rather than claiming live provider coverage.
+The private E2E suite defines scenarios for all 25 tools. A real run requires both a fully consented user OAuth profile and a Chat app service-account profile, a Workspace tenant where the app can be installed, a disposable member fixture, existing OAuth/app direct-message fixtures, and stable user/app attachment fixtures. Where the search API is available the suite exercises the primary `messages.search` path; otherwise `search_messages` exercises its `spaces.messages.list` fallback instead. The read state, notification setting, section, and custom emoji scenarios need their user scopes, and `search_spaces_admin` runs only for a Workspace administrator profile. Scenarios whose profile, scope, or fixture is missing skip individually rather than claiming live provider coverage.

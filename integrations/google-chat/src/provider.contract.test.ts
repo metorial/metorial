@@ -14,7 +14,6 @@ const toolContracts = [
   { id: 'search_messages', readOnly: true, destructive: false },
   { id: 'search_conversations', readOnly: true, destructive: false },
   { id: 'manage_space', readOnly: false, destructive: true },
-  { id: 'manage_member', readOnly: false, destructive: true },
   { id: 'manage_message', readOnly: false, destructive: true },
   { id: 'manage_reaction', readOnly: false, destructive: true },
   { id: 'find_direct_message', readOnly: true, destructive: false },
@@ -66,9 +65,6 @@ const expectedScopes = {
         OR: [googleChatScopes.spaces, googleChatScopes.spacesReadonly, googleChatScopes.delete]
       }
     ]
-  },
-  manage_member: {
-    AND: [{ OR: [googleChatScopes.memberships, googleChatScopes.membershipsApp] }]
   },
   manage_message: {
     AND: [
@@ -162,7 +158,6 @@ const expectedAuthMethods = {
   search_messages: ['oauth'],
   search_conversations: ['oauth', 'service_account'],
   manage_space: ['oauth'],
-  manage_member: ['oauth'],
   manage_message: ['oauth', 'service_account'],
   manage_reaction: ['oauth'],
   find_direct_message: ['oauth', 'service_account'],
@@ -186,7 +181,7 @@ const expectedAuthMethods = {
 } as const;
 
 describe('google-chat provider contract', () => {
-  it('exposes the exact 26-tool surface with tags, scopes, auth gating, and config', async () => {
+  it('exposes the exact 25-tool surface with tags, scopes, auth gating, and config', async () => {
     let client = createLocalSlateTestClient({ slate: provider });
     let contract = await expectSlateContract({
       client,
@@ -202,9 +197,9 @@ describe('google-chat provider contract', () => {
       tools: [...toolContracts]
     });
 
-    expect(contract.actions).toHaveLength(26);
+    expect(contract.actions).toHaveLength(25);
     expect(tools.map(tool => tool.key)).toEqual(toolIds);
-    expect(new Set(tools.map(tool => tool.key)).size).toBe(26);
+    expect(new Set(tools.map(tool => tool.key)).size).toBe(25);
     expect(provider.actions.map(action => action.key)).toEqual(toolIds);
     expect(Object.keys(contract.configSchema.properties ?? {})).toEqual(['defaultSpace']);
     expect(contract.configSchema.required ?? []).toEqual([]);
@@ -237,7 +232,6 @@ describe('google-chat provider contract', () => {
       googleChatScopes.delete,
       googleChatScopes.memberships,
       googleChatScopes.membershipsReadonly,
-      googleChatScopes.membershipsApp,
       googleChatScopes.messageReactions,
       googleChatScopes.usersReadstate,
       googleChatScopes.usersSpacesettings,
@@ -263,7 +257,6 @@ describe('google-chat provider contract', () => {
       searchMessages: expectedScopes.search_messages,
       searchConversations: expectedScopes.search_conversations,
       manageSpace: expectedScopes.manage_space,
-      manageMember: expectedScopes.manage_member,
       manageMessage: expectedScopes.manage_message,
       manageReaction: expectedScopes.manage_reaction,
       findDirectMessage: expectedScopes.find_direct_message,
@@ -291,7 +284,6 @@ describe('google-chat provider contract', () => {
       searchMessages: expectedAuthMethods.search_messages,
       searchConversations: expectedAuthMethods.search_conversations,
       manageSpace: expectedAuthMethods.manage_space,
-      manageMember: expectedAuthMethods.manage_member,
       manageMessage: expectedAuthMethods.manage_message,
       manageReaction: expectedAuthMethods.manage_reaction,
       findDirectMessage: expectedAuthMethods.find_direct_message,

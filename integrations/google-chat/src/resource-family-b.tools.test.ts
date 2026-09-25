@@ -15,7 +15,6 @@ import {
 import { buildFindDirectMessageRequest, findDirectMessage } from './tools/find-direct-message';
 import { buildGetAttachmentRequest, getAttachment } from './tools/get-attachment';
 import { buildListSpaceEventsRequest, listSpaceEvents } from './tools/list-space-events';
-import { buildManageMemberRequest, manageMember } from './tools/manage-member';
 import {
   buildManageReactionRequest,
   manageReaction,
@@ -26,7 +25,6 @@ import { buildUploadAttachmentRequest, uploadAttachment } from './tools/upload-a
 
 let familyBTools = [
   manageSpace,
-  manageMember,
   manageReaction,
   findDirectMessage,
   getAttachment,
@@ -40,13 +38,6 @@ let expectedContracts = [
     tool: manageSpace,
     scopes: googleChatActionScopes.manageSpace,
     authMethods: googleChatActionAuthMethods.manageSpace,
-    readOnly: false,
-    destructive: true
-  },
-  {
-    tool: manageMember,
-    scopes: googleChatActionScopes.manageMember,
-    authMethods: googleChatActionAuthMethods.manageMember,
     readOnly: false,
     destructive: true
   },
@@ -112,7 +103,6 @@ describe('google-chat resource tool family B', () => {
   it('exports exact keys with compatible object schemas, scopes, auth methods, and tags', () => {
     expect(familyBTools.map(tool => tool.key)).toEqual([
       'manage_space',
-      'manage_member',
       'manage_reaction',
       'find_direct_message',
       'get_attachment',
@@ -135,7 +125,6 @@ describe('google-chat resource tool family B', () => {
     // rather than an AND clause that would gate create/setup/get/update on it.
     expect(manageSpace.scopes?.AND).toHaveLength(1);
     expect(manageSpace.scopes?.AND[0]?.OR).toContain(googleChatScopes.delete);
-    expect(JSON.stringify(manageMember.scopes)).toContain(googleChatScopes.membershipsApp);
     expect(getAttachment.authMethods).toEqual(['service_account']);
     expect(JSON.stringify(getAttachment.scopes)).toContain(googleChatScopes.bot);
     expect(uploadAttachment.authMethods).toEqual(['oauth', 'service_account']);
@@ -234,97 +223,6 @@ describe('google-chat resource tool family B', () => {
       path: 'spaces/AAAA',
       method: 'delete',
       spaceName: 'spaces/AAAA'
-    });
-  });
-
-  it('builds all spaces.members requests with explicit role patching', () => {
-    expect(
-      buildManageMemberRequest({
-        action: 'add',
-        space: 'AAAA',
-        memberType: 'app',
-        member: 'app'
-      })
-    ).toEqual({
-      action: 'add',
-      path: 'spaces/AAAA/members',
-      method: 'post',
-      data: { member: { name: 'users/app', type: 'BOT' } }
-    });
-    expect(
-      buildManageMemberRequest({
-        action: 'add',
-        space: 'AAAA',
-        memberType: 'user',
-        member: 'person@example.com',
-        role: 'ROLE_MANAGER'
-      })
-    ).toEqual({
-      action: 'add',
-      path: 'spaces/AAAA/members',
-      method: 'post',
-      data: {
-        member: { name: 'users/person@example.com', type: 'HUMAN' },
-        role: 'ROLE_MANAGER'
-      }
-    });
-    expect(
-      buildManageMemberRequest({
-        action: 'list',
-        space: 'AAAA',
-        pageSize: 50,
-        pageToken: 'page-1',
-        filter: 'member.type = "HUMAN"',
-        showGroups: true,
-        showInvited: true
-      })
-    ).toEqual({
-      action: 'list',
-      path: 'spaces/AAAA/members',
-      method: 'get',
-      params: {
-        pageSize: 50,
-        pageToken: 'page-1',
-        filter: 'member.type = "HUMAN"',
-        showGroups: true,
-        showInvited: true
-      }
-    });
-    expect(
-      buildManageMemberRequest({
-        action: 'get',
-        space: 'AAAA',
-        membership: 'member-1'
-      })
-    ).toMatchObject({
-      path: 'spaces/AAAA/members/member-1',
-      method: 'get'
-    });
-    expect(
-      buildManageMemberRequest({
-        action: 'update',
-        membership: 'spaces/AAAA/members/member-1',
-        role: 'ROLE_ASSISTANT_MANAGER'
-      })
-    ).toEqual({
-      action: 'update',
-      path: 'spaces/AAAA/members/member-1',
-      method: 'patch',
-      params: { updateMask: 'role' },
-      data: {
-        name: 'spaces/AAAA/members/member-1',
-        role: 'ROLE_ASSISTANT_MANAGER'
-      },
-      membershipName: 'spaces/AAAA/members/member-1'
-    });
-    expect(
-      buildManageMemberRequest({
-        action: 'remove',
-        membership: 'spaces/AAAA/members/member-1'
-      })
-    ).toMatchObject({
-      path: 'spaces/AAAA/members/member-1',
-      method: 'delete'
     });
   });
 
@@ -557,28 +455,6 @@ describe('google-chat resource tool family B', () => {
           { memberType: 'user', member: 'one@example.com' },
           { memberType: 'user', member: 'two@example.com' }
         ]
-      })
-    ).toThrow(ServiceError);
-    expect(() =>
-      buildManageMemberRequest({
-        action: 'update',
-        membership: 'spaces/AAAA/members/member-1'
-      })
-    ).toThrow(ServiceError);
-    expect(() =>
-      buildManageMemberRequest({
-        action: 'add',
-        space: 'AAAA',
-        memberType: 'app',
-        member: 'other-app'
-      })
-    ).toThrow(ServiceError);
-    expect(() =>
-      buildManageMemberRequest({
-        action: 'add',
-        space: 'AAAA',
-        memberType: 'group',
-        member: 'group@example.com'
       })
     ).toThrow(ServiceError);
     expect(() =>

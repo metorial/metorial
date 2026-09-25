@@ -38,7 +38,6 @@ export let superGoogle1SensitiveScopes = [
   'https://www.googleapis.com/auth/chat.spaces.readonly',
   'https://www.googleapis.com/auth/chat.memberships',
   'https://www.googleapis.com/auth/chat.memberships.readonly',
-  'https://www.googleapis.com/auth/chat.memberships.app',
   'https://www.googleapis.com/auth/chat.customemojis',
   'https://www.googleapis.com/auth/chat.customemojis.readonly',
   'https://www.googleapis.com/auth/chat.users.sections',
@@ -175,10 +174,6 @@ let superGoogle1ScopeCopy: Record<SuperGoogle1Scope, { title: string; descriptio
     'https://www.googleapis.com/auth/chat.memberships.readonly': describe(
       'Google Chat memberships read',
       'View membership in Google Chat spaces.'
-    ),
-    'https://www.googleapis.com/auth/chat.memberships.app': describe(
-      'Google Chat app membership',
-      'Add and remove this connection as a member of Google Chat spaces.'
     ),
     'https://www.googleapis.com/auth/chat.customemojis': describe(
       'Google Chat custom emoji',

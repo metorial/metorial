@@ -52,19 +52,19 @@ let readOnlyOAuthGrant: ReadonlySet<string> = new Set(
 );
 
 describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬̓e̸̗̮͘ 1 provider contract', () => {
-  it('exposes the exact 78-tool manifest without triggers', () => {
+  it('exposes the exact 77-tool manifest without triggers', () => {
     expect(sourceToolsFor('gmail')).toHaveLength(18);
     expect(sourceToolsFor('google-drive')).toHaveLength(29);
     expect(sourceToolsFor('google-docs')).toHaveLength(8);
     expect(sourceToolsFor('google-sheets')).toHaveLength(17);
-    expect(sourceToolsFor('google-chat')).toHaveLength(26);
+    expect(sourceToolsFor('google-chat')).toHaveLength(25);
     expect(sourceToolsFor('google-contacts')).toHaveLength(19);
-    expect(superGoogle1ToolManifest).toHaveLength(117);
-    expect(superGoogle1ExpectedToolKeys).toHaveLength(78);
+    expect(superGoogle1ToolManifest).toHaveLength(116);
+    expect(superGoogle1ExpectedToolKeys).toHaveLength(77);
     expect(provider.actions.map(action => action.key)).toEqual(superGoogle1ExpectedToolKeys);
     expect(provider.actions.every(action => action.type === 'tool')).toBe(true);
-    expect(superGoogle1ToolInventory.sourceToolCount).toBe(117);
-    expect(superGoogle1ToolInventory.importedToolCount).toBe(78);
+    expect(superGoogle1ToolInventory.sourceToolCount).toBe(116);
+    expect(superGoogle1ToolInventory.importedToolCount).toBe(77);
   });
 
   it('does not import Google Meet, which belongs to the sensitive-scope project', () => {
@@ -160,7 +160,7 @@ describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬�
     expect(superGoogle1ToolInventory.omitted.every(entry => entry.reason.length > 0)).toBe(
       true
     );
-    expect(superGoogle1ToolInventory.included).toHaveLength(78);
+    expect(superGoogle1ToolInventory.included).toHaveLength(77);
   });
 
   it('omits the saved-contact tools that duplicate Gmail contact lookup', () => {
@@ -233,10 +233,10 @@ describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬�
     }
   });
 
-  it('mirrors the P1 Console declaration: 13 restricted and 26 sensitive scopes', () => {
+  it('mirrors the P1 Console declaration: 13 restricted and 25 sensitive scopes', () => {
     expect(superGoogle1RestrictedScopes).toHaveLength(13);
-    expect(superGoogle1SensitiveScopes).toHaveLength(26);
-    expect(superGoogle1ScopeEnvelope.size).toBe(39);
+    expect(superGoogle1SensitiveScopes).toHaveLength(25);
+    expect(superGoogle1ScopeEnvelope.size).toBe(38);
     // The Console rejects chat.import as an invalid user OAuth scope.
     expect(superGoogle1ScopeEnvelope.has('https://www.googleapis.com/auth/chat.import')).toBe(
       false
@@ -257,7 +257,7 @@ describe('Super G̴͎̬̼̾̈́̍͠o̶͇͓̅̐̿o̷͍̓̓̄̚g̶͎̩̾̏l̸̛̬�
       ...superGoogle1RestrictedScopes,
       ...superGoogle1SensitiveScopes
     ]);
-    expect(declared).toHaveLength(39);
+    expect(declared).toHaveLength(38);
     expect(declaredScopes.has(scope('gmail.settings.sharing'))).toBe(false);
     expect(declaredScopes.has(scope('drive.labels'))).toBe(false);
     expect(declaredScopes).toEqual(superGoogle1ScopeEnvelope);

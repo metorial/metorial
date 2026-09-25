@@ -11,7 +11,6 @@ const expectedToolIds = [
   'search_messages',
   'search_conversations',
   'manage_space',
-  'manage_member',
   'manage_message',
   'manage_reaction',
   'find_direct_message',

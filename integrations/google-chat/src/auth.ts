@@ -215,12 +215,6 @@ export let auth = SlateAuth.create()
         scope: googleChatScopes.membershipsReadonly
       },
       {
-        title: 'Chat Memberships (App)',
-        description:
-          'Add and remove the Chat app itself from Google Chat conversations and spaces.',
-        scope: googleChatScopes.membershipsApp
-      },
-      {
         title: 'Message Reactions',
         description: 'View, create, and delete reactions to Google Chat messages.',
         scope: googleChatScopes.messageReactions

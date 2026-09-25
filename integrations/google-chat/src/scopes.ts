@@ -10,7 +10,6 @@ export let googleChatScopes = {
   spacesReadonly: 'https://www.googleapis.com/auth/chat.spaces.readonly',
   memberships: 'https://www.googleapis.com/auth/chat.memberships',
   membershipsReadonly: 'https://www.googleapis.com/auth/chat.memberships.readonly',
-  membershipsApp: 'https://www.googleapis.com/auth/chat.memberships.app',
   messageReactions: 'https://www.googleapis.com/auth/chat.messages.reactions',
   usersReadstate: 'https://www.googleapis.com/auth/chat.users.readstate',
   usersReadstateReadonly: 'https://www.googleapis.com/auth/chat.users.readstate.readonly',
@@ -53,7 +52,6 @@ export let googleChatScopeClauses = {
     googleChatScopes.spacesReadonly,
     googleChatScopes.delete
   ),
-  membershipManage: anyOf(googleChatScopes.memberships, googleChatScopes.membershipsApp),
   reactionWrite: anyOf(googleChatScopes.messageReactions, googleChatScopes.messages),
   appAttachmentRead: anyOf(googleChatScopes.bot),
   readStateRead: anyOf(
@@ -85,7 +83,6 @@ export let googleChatActionScopes = {
   searchMessages: googleChatScopeClauses.messageRead,
   searchConversations: googleChatScopeClauses.spaceRead,
   manageSpace: googleChatScopeClauses.spaceManage,
-  manageMember: googleChatScopeClauses.membershipManage,
   manageMessage: googleChatScopeClauses.messageReadAsUserOrApp,
   manageReaction: googleChatScopeClauses.reactionWrite,
   findDirectMessage: googleChatScopeClauses.spaceRead,
@@ -114,7 +111,6 @@ export let googleChatActionAuthMethods = {
   searchMessages: ['oauth'],
   searchConversations: ['oauth', 'service_account'],
   manageSpace: ['oauth'],
-  manageMember: ['oauth'],
   manageMessage: ['oauth', 'service_account'],
   manageReaction: ['oauth'],
   findDirectMessage: ['oauth', 'service_account'],

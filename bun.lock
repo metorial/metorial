@@ -5629,7 +5629,7 @@
     },
     "integrations/google-chat": {
       "name": "@slates-integrations/google-chat",
-      "version": "0.1.4",
+      "version": "0.1.5",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -12413,11 +12413,11 @@
     },
     "integrations/super-booble-1": {
       "name": "@slates-integrations/super-booble-1",
-      "version": "0.4.7",
+      "version": "0.4.8",
       "dependencies": {
         "@slates-integrations/gmail": "0.2.4",
-        "@slates-integrations/google-chat": "0.1.4",
-        "@slates-integrations/google-contacts": "0.2.4",
+        "@slates-integrations/google-chat": "0.1.5",
+        "@slates-integrations/google-contacts": "0.2.5",
         "@slates-integrations/google-docs": "0.2.1",
         "@slates-integrations/google-drive": "0.2.12",
         "@slates-integrations/google-sheets": "0.2.3",
@@ -21232,8 +21232,6 @@
     "@slates-integrations/supabase/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
     "@slates-integrations/supadata/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
-
-    "@slates-integrations/super-booble-1/@slates-integrations/google-contacts": ["@slates-integrations/google-contacts@0.2.4", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@slates/google-people-recipes": "1.0.0-rc.11", "@slates/tool-recipes": "1.0.0-rc.11", "@types/node": "^20", "slates": "1.0.0-rc.25", "zod": "^4.2" } }, "sha512-l5mk4c1Onp8BwlE31iq8irdcEr2S7oRtz2dwIspys3SXxvJqVtZ/q+BOtbhR0+EmVT9F4QKAijG3ljIyL5DQ3w=="],
 
     "@slates-integrations/super-booble-2a/@slates-integrations/google-docs": ["@slates-integrations/google-docs@0.2.0-rc.12", "", { "dependencies": { "@types/node": "^20", "slates": "1.0.0-rc.17", "zod": "^4.2" } }, "sha512-1o1DFZL2sCnpRAHwxOZwiZNYZP2MOR/5dJPSFyBOq8zu1GZiBy60mE5e6JozG9uBBfL8Ii1VxIO667Sd1eEbJA=="],
 
