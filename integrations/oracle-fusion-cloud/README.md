@@ -1,10 +1,10 @@
-# <img src="http://provider-logos.metorial-cdn.com/oracle-fusion.svg" height="20"> Oracle Fusion
+# <img src="http://provider-logos.metorial-cdn.com/oracle-fusion.svg" height="20"> Oracle Fusion Cloud
 
 Read Oracle Fusion Cloud suppliers, purchase-order headers, payables invoices, worker directory records, and inventory items. Create standard payables invoices, edit their descriptions, and delete eligible unvalidated invoices.
 
 ## Connect
 
-Use a tenant-specific Oracle IAM confidential OAuth client with authorization-code and refresh-token grants. This integration supports client-secret authentication at the token endpoint (`client_secret_basic`). Tenants requiring signed client assertions need a different authentication implementation.
+Connect with an Oracle IAM confidential OAuth client configured for authorization-code and refresh-token grants. Configure the client to authenticate with a client ID and secret (`client_secret_basic`).
 
 1. Register the application's callback URL in the IAM client and enable authorization-code and refresh-token access.
 2. Grant the client the Fusion Applications resource scope shown in your identity domain and the `openid`, `profile`, `email`, and `offline_access` scopes.
@@ -40,13 +40,13 @@ Creation supports standard invoices that are not matched to purchase orders or r
 
 Updates and deletion read current invoice state first. Unknown or ineligible states are rejected. Deletion is subject to Oracle's restrictions for validation, matching, calculated tax, and approval state. A failed deletion does not attempt cancellation. See [Oracle's deletion restrictions](https://docs.oracle.com/en/cloud/saas/financials/26c/fappp/why-can-t-i-delete-an-invoice.html).
 
-After an ambiguous create timeout, search by invoice number before retrying. This integration does not automatically retry writes, approve invoices, validate invoices, calculate tax, post accounting, or make payments. Tenant background jobs can still advance invoice state independently.
+If a create request times out, search by invoice number, supplier number, and business unit before submitting it again. Oracle background processing can change an invoice's status after creation.
 
-## Coverage boundaries
+## Purchasing, worker, and item data
 
-Purchase orders expose header information. Worker tools return directory identifiers and names, with an optional effective date; they exclude assignment history, payroll, and compensation. Item tools inspect catalog information and inventory organizations.
+Purchase-order tools provide header details, including supplier, business unit, status, and amounts. Worker tools provide person identifiers and display names for the current date or a specified effective date. Item tools provide catalog information and inventory organization details.
 
-This initial version has no triggers, file downloads, bulk imports, CX/EPM tools, or HCM/SCM writes. It uses REST resource version `11.13.18.05`.
+For connection settings, API resources, and response formats, see the [integration reference](docs/SPEC.md).
 
 ## License
 
