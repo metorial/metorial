@@ -1,0 +1,15 @@
+{
+  "name": "@metorial/oracle-fusion-cloud",
+  "description": "Explore Oracle Fusion suppliers, purchase orders, payables invoices, workers, and items. Create standard payables invoices, update descriptions, and delete eligible unvalidated invoices.",
+  "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
+  "skills": [
+    "discover suppliers and supplier sites",
+    "inspect purchase order headers",
+    "read and create payables invoices",
+    "edit invoice descriptions",
+    "delete eligible unvalidated invoices",
+    "look up workers by effective date",
+    "discover inventory organizations and items"
+  ],
+  "logoUrl": "http://provider-logos.metorial-cdn.com/oracle-fusion.svg"
+}

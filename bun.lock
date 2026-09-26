@@ -9219,6 +9219,19 @@
         "typescript": "^5",
       },
     },
+    "integrations/oracle-fusion-cloud": {
+      "name": "@slates-integrations/oracle-fusion-cloud",
+      "version": "0.3.0",
+      "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.25",
+        "zod": "^4.2",
+      },
+      "devDependencies": {
+        "typescript": "^5",
+      },
+    },
     "integrations/outline": {
       "name": "@slates-integrations/outline",
       "version": "0.2.0-rc.6",
@@ -16888,6 +16901,8 @@
     "@slates-integrations/optimizely": ["@slates-integrations/optimizely@workspace:integrations/optimizely"],
 
     "@slates-integrations/optimoroute": ["@slates-integrations/optimoroute@workspace:integrations/optimoroute"],
+
+    "@slates-integrations/oracle-fusion-cloud": ["@slates-integrations/oracle-fusion-cloud@workspace:integrations/oracle-fusion-cloud"],
 
     "@slates-integrations/outline": ["@slates-integrations/outline@workspace:integrations/outline"],
 
