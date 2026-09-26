@@ -2,7 +2,7 @@ import { createApiServiceError, pickDefined, SlateTool } from 'slates';
 import { z } from 'zod';
 import { OracleFusionClient } from '../lib/client';
 import { adfEquals, andFilters } from '../lib/filters';
-import { changeIndicator, stringField } from '../lib/records';
+import { changeIndicator, idField, numberField, stringField } from '../lib/records';
 import { pageOutputFields, paginationInputFields, resourceKeySchema } from '../lib/schemas';
 import { spec } from '../spec';
 import {
@@ -15,6 +15,13 @@ import {
   mapInvoice,
   mapInvoiceLine
 } from './finance/models';
+import {
+  downloadInvoiceAttachment,
+  listInvoiceAttachments,
+  listInvoiceHolds,
+  listInvoiceInstallments,
+  listInvoiceLineDistributions
+} from './finance/payables';
 import {
   getEligibleInvoice,
   validateInvoiceAmounts,
@@ -104,6 +111,7 @@ export const listBusinessUnits = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       q,
+      orderBy: 'BusinessUnitId:asc',
       links: 'self'
     });
     return {
@@ -187,6 +195,7 @@ export const listInvoices = SlateTool.create(spec, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
       q,
+      orderBy: 'InvoiceId:asc',
       fields: invoiceFields,
       links: 'self'
     });
@@ -243,6 +252,7 @@ export const listInvoiceLines = SlateTool.create(spec, {
     const page = await client.list('fscm', collection, {
       limit: ctx.input.limit,
       offset: ctx.input.offset,
+      orderBy: 'LineNumber:asc',
       fields: invoiceLineFields,
       links: 'self'
     });
@@ -385,12 +395,66 @@ export const createInvoice = SlateTool.create(spec, {
         })
       )
     });
-    const record = await client.create('fscm', '/invoices', body, { links: 'self' });
-    return {
-      output: mapInvoice(client, record),
-      message:
-        'Created the Standard invoice with unmatched Item lines. Oracle may still be populating its statuses.'
-    };
+    let createdKey: string | undefined;
+    try {
+      const created = await client.create('fscm', '/invoices', body, { links: 'self' });
+      const candidateKey = client.resourceKey(created, 'fscm', '/invoices');
+      const createdId = idField(created, 'InvoiceId');
+      const acceptedAmount = numberField(created, 'InvoiceAmount');
+      const expectedIdentity = {
+        InvoiceNumber: ctx.input.invoiceNumber,
+        SupplierNumber: ctx.input.supplierNumber,
+        BusinessUnit: ctx.input.businessUnit,
+        SupplierSite: ctx.input.supplierSite,
+        InvoiceCurrency: ctx.input.currency,
+        InvoiceDate: ctx.input.invoiceDate,
+        InvoiceType: 'Standard'
+      };
+      const matchesIdentity = (record: Record<string, unknown>) =>
+        Object.entries(expectedIdentity).every(
+          ([field, value]) => stringField(record, field) === value
+        );
+      if (
+        !createdId ||
+        !matchesIdentity(created) ||
+        acceptedAmount === undefined ||
+        acceptedAmount <= 0
+      ) {
+        throw createApiServiceError(
+          'Oracle Fusion did not return the created invoice identity and a positive amount.',
+          { reason: 'oracle_fusion_invalid_response' }
+        );
+      }
+      createdKey = candidateKey;
+      const record = await client.get('fscm', '/invoices', createdKey, {
+        fields: invoiceFields,
+        links: 'self'
+      });
+      // Compare Oracle's accepted amount so tenant currency rounding is not guessed locally.
+      if (
+        client.resourceKey(record, 'fscm', '/invoices') !== createdKey ||
+        idField(record, 'InvoiceId') !== createdId ||
+        !matchesIdentity(record) ||
+        numberField(record, 'InvoiceAmount') !== acceptedAmount
+      ) {
+        throw createApiServiceError('Oracle Fusion returned a different created invoice.', {
+          reason: 'oracle_fusion_invalid_response'
+        });
+      }
+      return {
+        output: mapInvoice(client, record),
+        message:
+          'Created the Standard invoice with unmatched Item lines. Oracle may still be populating its statuses.'
+      };
+    } catch (error) {
+      const recovery = createdKey
+        ? `Read get_invoice with invoiceKey "${createdKey}" and inspect its current state.`
+        : 'No trusted invoice key is available. Search list_invoices with the exact invoice number, supplier number, and business unit from this request and inspect the matching invoice.';
+      throw createApiServiceError(
+        `Oracle invoice creation could not be verified. Creation may have completed. ${recovery} Do not retry creation automatically.`,
+        { reason: 'oracle_fusion_created_invoice_unverified', parent: error }
+      );
+    }
   })
   .build();
 
@@ -467,6 +531,11 @@ export const financeTools = {
   list_invoices: listInvoices,
   get_invoice: getInvoice,
   list_invoice_lines: listInvoiceLines,
+  list_invoice_installments: listInvoiceInstallments,
+  list_invoice_line_distributions: listInvoiceLineDistributions,
+  list_invoice_holds: listInvoiceHolds,
+  list_invoice_attachments: listInvoiceAttachments,
+  download_invoice_attachment: downloadInvoiceAttachment,
   create_invoice: createInvoice,
   update_invoice: updateInvoice,
   delete_invoice: deleteInvoice

@@ -36,6 +36,29 @@ export let adfEquals = (
   return `${field}=${quoteLiteral(String(value))}`;
 };
 
+export let adfComparison = (
+  field: string,
+  operator: '>=' | '<=' | '>' | '<',
+  value: string | number,
+  allowedFields: readonly string[]
+) => {
+  validateField(field, allowedFields);
+  if (!['>=', '<=', '>', '<'].includes(operator)) {
+    throw createApiServiceError('The comparison filter operator is not supported.', {
+      reason: 'oracle_fusion_invalid_filter'
+    });
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || (Number.isInteger(value) && !Number.isSafeInteger(value))) {
+      throw createApiServiceError('The numeric filter value is outside the supported range.', {
+        reason: 'oracle_fusion_invalid_filter'
+      });
+    }
+    return `${field}${operator}${value}`;
+  }
+  return `${field}${operator}${quoteLiteral(value)}`;
+};
+
 export let adfIdEquals = (
   field: string,
   value: string | undefined,

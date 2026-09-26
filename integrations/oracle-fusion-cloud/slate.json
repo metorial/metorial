@@ -1,15 +1,19 @@
 {
   "name": "@metorial/oracle-fusion-cloud",
-  "description": "Explore Oracle Fusion Cloud suppliers, purchase orders, payables invoices, workers, and items. Create standard payables invoices, update descriptions, and delete eligible unvalidated invoices.",
+  "description": "Explore Oracle Fusion Cloud payables and receivables, purchasing, worker assignments, and inventory. Download invoice files and manage eligible invoices, purchase requisitions, and original draft purchase orders.",
   "categories": ["apis-and-http-requests", "financial-data-and-stock-market"],
   "skills": [
     "discover suppliers and supplier sites",
-    "inspect purchase order headers",
+    "inspect purchase orders, lines, and schedules",
     "read and create payables invoices",
     "edit invoice descriptions",
     "delete eligible unvalidated invoices",
-    "look up workers by effective date",
-    "discover inventory organizations and items"
+    "inspect invoice installments, distributions, holds, and downloadable files",
+    "read customer account activity, receipts, and receivables invoices",
+    "discover purchasing references and manage incomplete purchasing drafts",
+    "look up workers and assignments by effective date",
+    "discover inventory organizations, items, physical stock, and reservations",
+    "inspect sales orders and completed receiving history"
   ],
   "logoUrl": "http://provider-logos.metorial-cdn.com/oracle-fusion.svg"
 }

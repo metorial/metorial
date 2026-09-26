@@ -6,7 +6,7 @@ export let spec = SlateSpecification.create({
   key: 'oracle-fusion-cloud',
   name: 'Oracle Fusion Cloud',
   description:
-    'Discover and manage authorized Oracle Fusion Cloud ERP, SCM, and HCM resources.',
+    'Explore Oracle Fusion Cloud financials, purchasing, worker assignments, and inventory, and manage eligible invoices and purchasing drafts.',
   metadata: {},
   config,
   auth

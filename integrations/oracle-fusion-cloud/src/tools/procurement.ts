@@ -11,6 +11,9 @@ import {
 } from '../lib/records';
 import { pageOutputFields, paginationInputFields, resourceKeySchema } from '../lib/schemas';
 import { spec } from '../spec';
+import { procurementDiscoveryTools } from './procurement/discovery';
+import { procurementMutationTools } from './procurement/mutations';
+import { procurementReadTools } from './procurement/reads';
 
 const SUPPLIER_FIELDS = [
   'SupplierId',
@@ -430,6 +433,7 @@ export let listSuppliers = SlateTool.create(spec, {
       offset: ctx.input.offset,
       q,
       fields: SUPPLIER_FIELDS,
+      orderBy: 'SupplierId:asc',
       links: 'self'
     });
     return {
@@ -545,6 +549,7 @@ export let listSupplierSites = SlateTool.create(spec, {
       offset: ctx.input.offset,
       q,
       fields: SITE_FIELDS,
+      orderBy: 'SupplierSiteId:asc',
       links: 'self'
     });
     return {
@@ -668,6 +673,7 @@ export let listPurchaseOrders = SlateTool.create(spec, {
       offset: ctx.input.offset,
       q,
       fields: PURCHASE_ORDER_FIELDS,
+      orderBy: 'POHeaderId:asc',
       links: 'self'
     });
     return {
@@ -713,5 +719,8 @@ export let procurementTools = {
   get_supplier: getSupplier,
   list_supplier_sites: listSupplierSites,
   list_purchase_orders: listPurchaseOrders,
-  get_purchase_order: getPurchaseOrder
+  get_purchase_order: getPurchaseOrder,
+  ...procurementReadTools,
+  ...procurementDiscoveryTools,
+  ...procurementMutationTools
 };

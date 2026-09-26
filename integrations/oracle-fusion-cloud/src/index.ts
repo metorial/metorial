@@ -1,6 +1,13 @@
 import { Slate } from 'slates';
 import { spec } from './spec';
-import { financeTools, hcmTools, procurementTools, scmTools, whoAmITool } from './tools';
+import {
+  financeTools,
+  hcmTools,
+  procurementTools,
+  receivablesTools,
+  scmTools,
+  whoAmITool
+} from './tools';
 
 export let provider = Slate.create({
   spec,
@@ -8,6 +15,7 @@ export let provider = Slate.create({
     whoAmITool,
     ...Object.values(procurementTools),
     ...Object.values(financeTools),
+    ...Object.values(receivablesTools),
     ...Object.values(hcmTools),
     ...Object.values(scmTools)
   ],

@@ -5,6 +5,12 @@ import { adfEquals, andFilters } from '../lib/filters';
 import { idField, type OracleRecord, stringField } from '../lib/records';
 import { pageOutputFields, paginationInputFields, resourceKeySchema } from '../lib/schemas';
 import { spec } from '../spec';
+import { getWorkerAssignment, listWorkerAssignments } from './hcm/assignments';
+import { listDepartments } from './hcm/departments';
+import { listJobs } from './hcm/jobs';
+import { listLocations } from './hcm/locations';
+import { listAssignmentManagers } from './hcm/managers';
+import { listWorkerWorkRelationships } from './hcm/workRelationships';
 
 const WORKER_FIELDS = 'PersonId,PersonNumber,DisplayName';
 const WORKER_FILTER_FIELDS = ['PersonNumber', 'DisplayName'] as const;
@@ -152,6 +158,7 @@ export let listWorkers = SlateTool.create(spec, {
       ),
       fields: WORKER_FIELDS,
       links: 'self',
+      orderBy: 'PersonId:asc',
       effectiveDate: context.effectiveDate
     });
     return {
@@ -172,6 +179,7 @@ export let getWorker = SlateTool.create(spec, {
     'Get an authorized Oracle Fusion HCM worker directory entry using a resource key discovered with list_workers, optionally as of an effective date.',
   instructions: [
     'Call list_workers to discover workerKey. Use resourceKey rather than personId or personNumber.',
+    'Use the same effectiveDate used to discover workerKey. To view another date, rediscover the worker with list_workers at that date.',
     'Display name is requested explicitly on the worker resource. Full name-specific details belong to its names child resource.'
   ],
   tags: { readOnly: true, destructive: false }
@@ -200,4 +208,14 @@ export let getWorker = SlateTool.create(spec, {
   })
   .build();
 
-export let hcmTools = { list_workers: listWorkers, get_worker: getWorker };
+export let hcmTools = {
+  list_workers: listWorkers,
+  get_worker: getWorker,
+  list_worker_work_relationships: listWorkerWorkRelationships,
+  list_worker_assignments: listWorkerAssignments,
+  get_worker_assignment: getWorkerAssignment,
+  list_assignment_managers: listAssignmentManagers,
+  list_departments: listDepartments,
+  list_jobs: listJobs,
+  list_locations: listLocations
+};

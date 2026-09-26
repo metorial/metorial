@@ -5,6 +5,9 @@ import { adfEquals, adfIdEquals, andFilters } from '../lib/filters';
 import { booleanField, idField, type OracleRecord, stringField } from '../lib/records';
 import { pageOutputFields, paginationInputFields, resourceKeySchema } from '../lib/schemas';
 import { spec } from '../spec';
+import { listInventoryReservations, listOnHandQuantities } from './scm/inventory';
+import { listReceivingTransactions } from './scm/receiving';
+import { getSalesOrder, listSalesOrderLines, listSalesOrders } from './scm/sales';
 
 const ORGANIZATION_FILTER_FIELDS = [
   'OrganizationId',
@@ -187,6 +190,7 @@ export let listInventoryOrganizations = SlateTool.create(spec, {
             )
           : undefined
       ),
+      orderBy: 'OrganizationId:asc',
       fields: ORGANIZATION_FIELDS,
       links: 'self'
     });
@@ -239,6 +243,7 @@ export let listItems = SlateTool.create(spec, {
           ? adfEquals('ItemNumber', ctx.input.itemNumber, ITEM_FILTER_FIELDS)
           : undefined
       ),
+      orderBy: 'OrganizationId:asc,ItemId:asc',
       fields: ITEM_FIELDS,
       links: 'self'
     });
@@ -277,5 +282,11 @@ export let getItem = SlateTool.create(spec, {
 export let scmTools = {
   list_inventory_organizations: listInventoryOrganizations,
   list_items: listItems,
-  get_item: getItem
+  get_item: getItem,
+  list_on_hand_quantities: listOnHandQuantities,
+  list_inventory_reservations: listInventoryReservations,
+  list_sales_orders: listSalesOrders,
+  get_sales_order: getSalesOrder,
+  list_sales_order_lines: listSalesOrderLines,
+  list_receiving_transactions: listReceivingTransactions
 };

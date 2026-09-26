@@ -9221,7 +9221,7 @@
     },
     "integrations/oracle-fusion-cloud": {
       "name": "@slates-integrations/oracle-fusion-cloud",
-      "version": "0.3.0",
+      "version": "0.4.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
@@ -9229,7 +9229,9 @@
         "zod": "^4.2",
       },
       "devDependencies": {
+        "@slates/test": "1.0.0-rc.23",
         "typescript": "^5",
+        "vitest": "^3.1.2",
       },
     },
     "integrations/outline": {

@@ -5,26 +5,27 @@ import {
   requestAxiosData
 } from 'slates';
 import { createOracleApiError } from './errors';
+import { type OracleFinder, validateOracleFinder } from './finders';
+import {
+  childCollectionPath,
+  type OracleApi,
+  type OracleChildCollection,
+  type OracleCollectionPath,
+  validateCollection
+} from './paths';
 import { type OracleRecord, recordArray, requireRecord, stringField } from './records';
 import { encodeResourceKey, normalizeHttpsOrigin } from './urls';
 
-export type OracleApi = 'fscm' | 'hcm';
-export type OracleCollection =
-  | '/finBusinessUnitsLOV'
-  | '/suppliers'
-  | '/purchaseOrders'
-  | '/invoices'
-  | '/inventoryOrganizations'
-  | '/itemsV2'
-  | '/workers';
-declare const collectionPathBrand: unique symbol;
-export type OracleCollectionPath =
-  | OracleCollection
-  | (string & { readonly [collectionPathBrand]: true });
-export type OracleChildCollection = 'sites' | 'invoiceLines';
+export type {
+  OracleApi,
+  OracleChildCollection,
+  OracleCollection,
+  OracleCollectionPath
+} from './paths';
 
 export type OracleRequestParams = {
   q?: string;
+  finder?: OracleFinder;
   fields?: string;
   effectiveDate?: string;
   links?: string;
@@ -43,15 +44,6 @@ export type OraclePage<T = OracleRecord> = {
 };
 
 const RESOURCE_VERSION = '11.13.18.05';
-const FSCM_COLLECTIONS = [
-  '/finBusinessUnitsLOV',
-  '/suppliers',
-  '/purchaseOrders',
-  '/invoices',
-  '/inventoryOrganizations',
-  '/itemsV2'
-] as const;
-const CHILDREN = { '/suppliers': 'sites', '/invoices': 'invoiceLines' } as const;
 const ITEM_MEDIA_TYPE = 'application/vnd.oracle.adf.resourceitem+json';
 
 let conditionalHeaders = (ifMatch: string | undefined) => {
@@ -70,33 +62,6 @@ let invalidResponse = () =>
   });
 let nonnegativeInteger = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
-
-let validateCollection = (api: OracleApi, collection: OracleCollectionPath) => {
-  if (api !== 'fscm' && api !== 'hcm') {
-    throw createApiServiceError('The Oracle API family is not supported.', {
-      reason: 'oracle_fusion_invalid_path'
-    });
-  }
-  if (api === 'hcm' && collection === '/workers') return collection;
-  if (api === 'fscm' && FSCM_COLLECTIONS.some(path => path === collection)) return collection;
-  if (api === 'fscm') {
-    for (let [parent, child] of Object.entries(CHILDREN)) {
-      let prefix = `${parent}/`;
-      let suffix = `/child/${child}`;
-      if (!collection.startsWith(prefix) || !collection.endsWith(suffix)) continue;
-      let segment = collection.slice(prefix.length, -suffix.length);
-      try {
-        let key = decodeURIComponent(segment);
-        if (encodeResourceKey(key) === segment) return collection;
-      } catch {
-        break;
-      }
-    }
-  }
-  throw createApiServiceError('The Oracle resource path is not supported.', {
-    reason: 'oracle_fusion_invalid_path'
-  });
-};
 
 export class OracleFusionClient {
   private http: ReturnType<typeof createAuthenticatedAxios>;
@@ -123,17 +88,11 @@ export class OracleFusionClient {
   }
 
   childCollectionPath(
-    parent: '/suppliers' | '/invoices',
+    parent: OracleCollectionPath,
     parentKey: string,
     child: OracleChildCollection
   ): OracleCollectionPath {
-    if (CHILDREN[parent] !== child) {
-      throw createApiServiceError(
-        'The nested Oracle resource is not supported for this parent.',
-        { reason: 'oracle_fusion_invalid_path' }
-      );
-    }
-    return `${parent}/${encodeResourceKey(parentKey)}/child/${child}` as OracleCollectionPath;
+    return childCollectionPath(parent, parentKey, child);
   }
 
   private collectionUrl(api: OracleApi, collection: OracleCollectionPath) {
@@ -163,6 +122,7 @@ export class OracleFusionClient {
       );
     }
     let path = this.collectionUrl(api, collection);
+    validateOracleFinder(collection, params.finder);
     let data = requireRecord(
       await requestAxiosData<unknown>(
         'list resources',
@@ -171,7 +131,10 @@ export class OracleFusionClient {
       ),
       'collection'
     );
-    let items = recordArray(data.items);
+    let items =
+      data.items === undefined && data.count === 0 && data.hasMore === false
+        ? []
+        : recordArray(data.items);
     if (
       !nonnegativeInteger(data.count) ||
       data.count !== items.length ||
@@ -206,6 +169,7 @@ export class OracleFusionClient {
     params: OracleRequestParams = {}
   ): Promise<OracleRecord> {
     let path = this.itemUrl(api, collection, resourceKey);
+    validateOracleFinder(collection, params.finder);
     return requireRecord(
       await requestAxiosData<unknown>(
         'get resource',
@@ -222,6 +186,7 @@ export class OracleFusionClient {
     params: OracleRequestParams = {}
   ): Promise<OracleRecord> {
     let path = this.collectionUrl(api, collection);
+    validateOracleFinder(collection, params.finder);
     return requireRecord(
       await requestAxiosData<unknown>(
         'create resource',
@@ -239,6 +204,7 @@ export class OracleFusionClient {
     params: OracleMutationParams = {}
   ): Promise<OracleRecord> {
     let path = this.itemUrl(api, collection, resourceKey);
+    validateOracleFinder(collection, params.finder);
     let { ifMatch, ...query } = params;
     let headers = conditionalHeaders(ifMatch);
     return requireRecord(
@@ -263,6 +229,54 @@ export class OracleFusionClient {
       () => this.http.delete(path, { headers }),
       this.apiError
     );
+  }
+
+  invoiceAttachmentEnclosureUrl(
+    record: OracleRecord,
+    invoiceKey: string,
+    attachmentKey: string
+  ): string {
+    let invalidLink = () =>
+      createApiServiceError('Oracle Fusion did not return a valid file download link.', {
+        reason: 'oracle_fusion_invalid_file_link'
+      });
+    let attachmentCollection = this.childCollectionPath(
+      '/invoices',
+      invoiceKey,
+      'attachments'
+    );
+    let attachmentPath = this.itemUrl('fscm', attachmentCollection, attachmentKey);
+    let expectedPath = `${attachmentPath}/enclosure/FileContents`;
+    let linksValue = record.links;
+    if (linksValue === undefined && record['@context'] !== undefined) {
+      linksValue = requireRecord(record['@context'], 'resource context').links;
+    }
+    if (linksValue === undefined) throw invalidLink();
+    let link = recordArray(linksValue, 'resource links').find(
+      value =>
+        stringField(value, 'rel') === 'enclosure' &&
+        stringField(value, 'name') === 'FileContents'
+    );
+    if (!link) throw invalidLink();
+    let href = stringField(link, 'href');
+    if (!href) throw invalidLink();
+    let url: URL;
+    try {
+      url = new URL(href, `${this.instanceUrl}${attachmentPath}/`);
+    } catch {
+      throw invalidLink();
+    }
+    if (
+      url.origin !== this.instanceUrl ||
+      url.username ||
+      url.password ||
+      url.search ||
+      url.hash ||
+      url.pathname !== expectedPath
+    ) {
+      throw invalidLink();
+    }
+    return url.href;
   }
 
   selfLink(

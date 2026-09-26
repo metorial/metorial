@@ -15,6 +15,26 @@ const ineligibleInvoice = (message: string) =>
   createApiServiceError(message, { reason: 'oracle_fusion_invoice_ineligible' });
 const normalizeState = (value: string | undefined) => value?.trim().toLowerCase();
 
+const requireInvoiceKey = (
+  client: OracleFusionClient,
+  record: OracleRecord,
+  invoiceKey: string
+) => {
+  if (client.resourceKey(record, 'fscm', '/invoices') !== invoiceKey) {
+    throw ineligibleInvoice('Oracle Fusion returned a different invoice resource key.');
+  }
+};
+
+const requireInvoiceIndicator = (record: OracleRecord, action: string): string => {
+  const indicator = changeIndicator(record);
+  if (!indicator) {
+    throw ineligibleInvoice(
+      `Cannot ${action} this invoice because Oracle did not return a change indicator. Re-read the invoice before requesting the operation again.`
+    );
+  }
+  return indicator;
+};
+
 export const validateInvoiceDate = (value: string, field: string) => {
   const parsed = new Date(`${value}T00:00:00.000Z`);
   if (
@@ -99,13 +119,7 @@ const requireLineEligibility = (record: OracleRecord, action: string) => {
     }
   }
   const matchType = normalizeState(stringField(record, 'MatchType'));
-  if (
-    !Object.hasOwn(record, 'MatchType') ||
-    (matchType !== undefined &&
-      matchType !== '' &&
-      matchType !== 'not matched' &&
-      matchType !== 'not_matched')
-  ) {
+  if (matchType !== 'not matched' && matchType !== 'not_matched') {
     throw ineligibleInvoice(
       `Cannot ${action} an invoice with a matched or unknown invoice line.`
     );
@@ -130,8 +144,9 @@ export const getEligibleInvoice = async (
     fields: invoiceFields,
     links: 'self'
   });
+  requireInvoiceKey(client, first, invoiceKey);
   requireHeaderEligibility(first, action);
-  const firstIndicator = changeIndicator(first);
+  const firstIndicator = requireInvoiceIndicator(first, action);
   const collection = client.childCollectionPath('/invoices', invoiceKey, 'invoiceLines');
   let offset = 0;
   let lineCount = 0;
@@ -139,10 +154,14 @@ export const getEligibleInvoice = async (
     const page = await client.list('fscm', collection, {
       limit: 100,
       offset,
+      orderBy: 'LineNumber:asc',
       fields: invoiceLineFields,
       links: 'self'
     });
-    for (const line of page.items) requireLineEligibility(line, action);
+    for (const line of page.items) {
+      client.resourceKey(line, 'fscm', collection);
+      requireLineEligibility(line, action);
+    }
     lineCount += page.items.length;
     if (!page.hasMore) break;
     if (page.nextOffset === undefined || page.nextOffset <= offset || lineCount >= 10000) {
@@ -159,13 +178,10 @@ export const getEligibleInvoice = async (
     fields: invoiceFields,
     links: 'self'
   });
+  requireInvoiceKey(client, current, invoiceKey);
   requireHeaderEligibility(current, action);
-  const currentIndicator = changeIndicator(current);
-  if (
-    firstIndicator !== undefined &&
-    currentIndicator !== undefined &&
-    firstIndicator !== currentIndicator
-  ) {
+  const currentIndicator = requireInvoiceIndicator(current, action);
+  if (firstIndicator !== currentIndicator) {
     throw ineligibleInvoice(
       `Cannot ${action} this invoice because it changed while its lines were inspected. Re-read the invoice and review the latest state before requesting the operation again.`
     );
