@@ -1,17 +1,27 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient, generateIdempotencyKey } from '../lib/helpers';
 import { spec } from '../spec';
+import { mapOrderSummary, orderSummaryOutputSchema } from './order-shared';
 
 export let createOrder = SlateTool.create(spec, {
   name: 'Create Order',
   key: 'create_order',
-  description: `Create a new order at a Square location. Supports line items, taxes, discounts, fulfillments, and customer association. Orders start in OPEN state.`,
+  description: `Create an OPEN or DRAFT order at a Square location. Use DRAFT for subscription order templates. Supports line items, taxes, discounts, service charges, fulfillments, and customer association. Discover locations with list_locations.`,
   tags: { destructive: false }
 })
+  .scopes(allOf('ORDERS_WRITE'))
   .input(
     z.object({
-      locationId: z.string().describe('Location ID where the order is placed'),
+      locationId: z
+        .string()
+        .describe('Location ID where the order is placed; discover with list_locations'),
+      state: z
+        .enum(['OPEN', 'DRAFT'])
+        .optional()
+        .describe(
+          'Order state. Use DRAFT for a subscription phase order template; Square defaults to OPEN.'
+        ),
       lineItems: z
         .array(z.record(z.string(), z.any()))
         .optional()
@@ -26,6 +36,10 @@ export let createOrder = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe('Discounts to apply to the order'),
+      serviceCharges: z
+        .array(z.record(z.string(), z.any()))
+        .optional()
+        .describe('Order service charges, such as fixed fees or percentage charges'),
       fulfillments: z
         .array(z.record(z.string(), z.any()))
         .optional()
@@ -38,25 +52,16 @@ export let createOrder = SlateTool.create(spec, {
         .describe('Unique key to prevent duplicate orders. Auto-generated if omitted')
     })
   )
-  .output(
-    z.object({
-      orderId: z.string().optional(),
-      locationId: z.string().optional(),
-      state: z.string().optional(),
-      totalMoney: z
-        .object({ amount: z.number().optional(), currency: z.string().optional() })
-        .optional(),
-      createdAt: z.string().optional(),
-      version: z.number().optional()
-    })
-  )
+  .output(orderSummaryOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    let client = createClient(ctx.auth);
     let o = await client.createOrder({
       locationId: ctx.input.locationId,
+      state: ctx.input.state,
       lineItems: ctx.input.lineItems,
       taxes: ctx.input.taxes,
       discounts: ctx.input.discounts,
+      serviceCharges: ctx.input.serviceCharges,
       fulfillments: ctx.input.fulfillments,
       customerId: ctx.input.customerId,
       referenceId: ctx.input.referenceId,
@@ -64,14 +69,7 @@ export let createOrder = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        orderId: o.id,
-        locationId: o.location_id,
-        state: o.state,
-        totalMoney: o.total_money,
-        createdAt: o.created_at,
-        version: o.version
-      },
+      output: mapOrderSummary(o),
       message: `Order **${o.id}** created at location ${o.location_id}. State: **${o.state}**`
     };
   })

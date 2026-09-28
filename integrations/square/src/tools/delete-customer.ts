@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let deleteCustomer = SlateTool.create(spec, {
@@ -9,6 +9,7 @@ export let deleteCustomer = SlateTool.create(spec, {
   description: `Permanently delete a customer profile from the Square account. This action cannot be undone.`,
   tags: { destructive: true }
 })
+  .scopes(allOf('CUSTOMERS_WRITE'))
   .input(
     z.object({
       customerId: z.string().describe('The ID of the customer to delete')
@@ -21,7 +22,8 @@ export let deleteCustomer = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    requireSquareScopes(ctx.auth, ['CUSTOMERS_WRITE']);
+    let client = createClient(ctx.auth);
     await client.deleteCustomer(ctx.input.customerId);
 
     return {

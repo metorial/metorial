@@ -1,105 +1,175 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient, generateIdempotencyKey } from '../lib/helpers';
+import { squareServiceError } from '../lib/errors';
+import { createClient, generateIdempotencyKey, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
-
-let moneyInputSchema = z.object({
-  amount: z
-    .number()
-    .describe('Amount in smallest currency denomination (e.g., cents for USD)'),
-  currency: z.string().describe('Currency code, e.g., USD')
-});
+import { mapPayment, moneyInputSchema, paymentOutputSchema } from './payment-shared';
 
 export let createPayment = SlateTool.create(spec, {
   name: 'Create Payment',
   key: 'create_payment',
-  description: `Create a new payment using a payment source (nonce, card on file, etc.). Supports setting amount, tip, customer, location, and delayed capture.`,
+  description:
+    'Charge a token or saved card, or record cash or an external payment. Use autocomplete=false for delayed capture.',
   tags: { destructive: false }
 })
+  .scopes(allOf('PAYMENTS_WRITE'))
   .input(
     z.object({
-      sourceId: z.string().describe('Payment source ID (card nonce, card on file ID, etc.)'),
-      amountMoney: moneyInputSchema.describe('The payment amount'),
-      tipMoney: moneyInputSchema.optional().describe('Optional tip amount'),
-      appFeeMoney: moneyInputSchema.optional().describe('Optional application fee amount'),
+      sourceId: z
+        .string()
+        .min(1)
+        .describe(
+          'Payment token or saved card ID; use CASH or EXTERNAL for recorded payments'
+        ),
+      amountMoney: moneyInputSchema
+        .extend({ amount: z.number().int().safe().positive() })
+        .describe('Payment amount in minor units'),
+      tipMoney: moneyInputSchema.optional(),
+      appFeeMoney: moneyInputSchema
+        .optional()
+        .describe('Application fee; requires PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS'),
       appFeeAllocations: z
         .array(z.record(z.string(), z.any()))
+        .max(2)
         .optional()
         .describe(
-          'Optional Square app_fee_allocations entries for distributing an application fee'
+          'Application fee allocations; requires PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS'
         ),
-      customerId: z.string().optional().describe('Customer ID to associate with the payment'),
-      locationId: z.string().optional().describe('Location ID for the payment'),
-      orderId: z.string().optional().describe('Order ID to associate with the payment'),
-      referenceId: z.string().optional().describe('Your custom reference ID for the payment'),
-      note: z.string().optional().describe('A note for the payment (max 500 characters)'),
-      autocomplete: z
-        .boolean()
+      customerId: z
+        .string()
         .optional()
-        .describe(
-          'If false, the payment is only authorized and must be completed later. Defaults to true'
-        ),
+        .describe('Required when paying with a saved card; discover with list_cards'),
+      locationId: z
+        .string()
+        .optional()
+        .describe('Discover with list_locations; main location is used if omitted'),
+      orderId: z.string().optional(),
+      referenceId: z.string().max(40).optional(),
+      note: z.string().max(500).optional(),
+      autocomplete: z.boolean().optional(),
       delayDuration: z
         .string()
         .optional()
-        .describe('Duration to delay capture, e.g., "PT36H" for 36 hours'),
+        .describe('RFC 3339 duration for delayed card capture; requires autocomplete=false'),
+      delayAction: z
+        .enum(['CANCEL', 'COMPLETE'])
+        .optional()
+        .describe('Action at the delayed-capture deadline; requires autocomplete=false'),
+      verificationToken: z.string().optional(),
+      acceptPartialAuthorization: z
+        .boolean()
+        .optional()
+        .describe('For Square gift cards; requires autocomplete=false'),
+      buyerEmailAddress: z.string().optional(),
+      buyerPhoneNumber: z.string().optional(),
+      billingAddress: z.record(z.string(), z.any()).optional(),
+      shippingAddress: z.record(z.string(), z.any()).optional(),
+      statementDescriptionIdentifier: z.string().max(20).optional(),
+      cashDetails: z
+        .object({
+          buyerSuppliedMoney: moneyInputSchema
+        })
+        .optional()
+        .describe('Required with sourceId=CASH; Square calculates change'),
+      externalDetails: z
+        .object({
+          type: z.enum([
+            'CHECK',
+            'BANK_TRANSFER',
+            'OTHER_GIFT_CARD',
+            'CRYPTO',
+            'SQUARE_CASH',
+            'SOCIAL',
+            'EXTERNAL',
+            'EMONEY',
+            'CARD',
+            'STORED_BALANCE',
+            'FOOD_VOUCHER',
+            'OTHER'
+          ]),
+          source: z.string().max(255),
+          sourceId: z.string().max(255).optional(),
+          sourceFeeMoney: moneyInputSchema.optional()
+        })
+        .optional()
+        .describe('External payment details; required with sourceId=EXTERNAL'),
+      customerDetails: z.record(z.string(), z.any()).optional(),
       idempotencyKey: z
         .string()
+        .min(1)
+        .max(45)
         .optional()
-        .describe('Unique key to prevent duplicate payments. Auto-generated if omitted')
+        .describe(
+          'Unique retry key. Auto-generated if omitted; supply one when retrying after an uncertain result'
+        )
     })
   )
-  .output(
-    z.object({
-      paymentId: z.string().optional(),
-      status: z.string().optional(),
-      totalMoney: z
-        .object({
-          amount: z.number().optional(),
-          currency: z.string().optional()
-        })
-        .optional(),
-      receiptUrl: z.string().optional(),
-      orderId: z.string().optional(),
-      createdAt: z.string().optional(),
-      appFeeMoney: z
-        .object({
-          amount: z.number().optional(),
-          currency: z.string().optional()
-        })
-        .optional(),
-      appFeeAllocations: z.array(z.record(z.string(), z.any())).optional()
-    })
-  )
+  .output(paymentOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
-    let p = await client.createPayment({
-      sourceId: ctx.input.sourceId,
-      idempotencyKey: ctx.input.idempotencyKey || generateIdempotencyKey(),
-      amountMoney: ctx.input.amountMoney,
-      tipMoney: ctx.input.tipMoney,
-      appFeeMoney: ctx.input.appFeeMoney,
-      appFeeAllocations: ctx.input.appFeeAllocations,
-      customerId: ctx.input.customerId,
-      locationId: ctx.input.locationId,
-      orderId: ctx.input.orderId,
-      referenceId: ctx.input.referenceId,
-      note: ctx.input.note,
-      autocomplete: ctx.input.autocomplete,
-      delayDuration: ctx.input.delayDuration
-    });
-
-    return {
-      output: {
-        paymentId: p.id,
-        status: p.status,
-        totalMoney: p.total_money,
-        receiptUrl: p.receipt_url,
-        orderId: p.order_id,
-        createdAt: p.created_at,
-        appFeeMoney: p.app_fee_money,
-        appFeeAllocations: p.app_fee_allocations
+    let input = ctx.input;
+    if (
+      (input.delayDuration || input.delayAction || input.acceptPartialAuthorization) &&
+      input.autocomplete !== false
+    ) {
+      throw squareServiceError(
+        'Delayed capture or partial authorization requires autocomplete=false.'
+      );
+    }
+    if (
+      (input.sourceId === 'CASH' && input.externalDetails) ||
+      (input.sourceId !== 'CASH' && input.cashDetails)
+    ) {
+      throw squareServiceError('cashDetails can only be used with sourceId=CASH.');
+    }
+    if (input.sourceId === 'CASH' && !input.cashDetails) {
+      throw squareServiceError(
+        'cashDetails.buyerSuppliedMoney is required with sourceId=CASH.'
+      );
+    }
+    if (
+      (input.sourceId === 'EXTERNAL' && !input.externalDetails) ||
+      (input.sourceId !== 'EXTERNAL' && input.externalDetails)
+    ) {
+      throw squareServiceError('externalDetails is required only with sourceId=EXTERNAL.');
+    }
+    if (input.appFeeMoney || input.appFeeAllocations) {
+      requireSquareScopes(ctx.auth, ['PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS']);
+    }
+    let p = await createClient(ctx.auth).createPayment({
+      sourceId: input.sourceId,
+      idempotencyKey: input.idempotencyKey || generateIdempotencyKey(),
+      amountMoney: input.amountMoney,
+      tipMoney: input.tipMoney,
+      appFeeMoney: input.appFeeMoney,
+      appFeeAllocations: input.appFeeAllocations,
+      customerId: input.customerId,
+      locationId: input.locationId,
+      orderId: input.orderId,
+      referenceId: input.referenceId,
+      note: input.note,
+      autocomplete: input.autocomplete,
+      delayDuration: input.delayDuration,
+      delayAction: input.delayAction,
+      verificationToken: input.verificationToken,
+      acceptPartialAuthorization: input.acceptPartialAuthorization,
+      buyerEmailAddress: input.buyerEmailAddress,
+      buyerPhoneNumber: input.buyerPhoneNumber,
+      billingAddress: input.billingAddress,
+      shippingAddress: input.shippingAddress,
+      statementDescriptionIdentifier: input.statementDescriptionIdentifier,
+      cashDetails: input.cashDetails && {
+        buyer_supplied_money: input.cashDetails.buyerSuppliedMoney
       },
+      externalDetails: input.externalDetails && {
+        type: input.externalDetails.type,
+        source: input.externalDetails.source,
+        source_id: input.externalDetails.sourceId,
+        source_fee_money: input.externalDetails.sourceFeeMoney
+      },
+      customerDetails: input.customerDetails
+    });
+    return {
+      output: mapPayment(p),
       message: `Payment **${p.id}** created with status **${p.status}**.`
     };
   })

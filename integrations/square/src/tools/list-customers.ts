@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let listCustomers = SlateTool.create(spec, {
@@ -9,10 +9,17 @@ export let listCustomers = SlateTool.create(spec, {
   description: `Retrieve a list of customer profiles. Supports pagination and sorting by creation date or default order.`,
   tags: { readOnly: true }
 })
+  .scopes(allOf('CUSTOMERS_READ'))
   .input(
     z.object({
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
-      limit: z.number().optional().describe('Maximum number of results per page'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum results per page (1-100)'),
       sortField: z.enum(['DEFAULT', 'CREATED_AT']).optional().describe('Field to sort by'),
       sortOrder: z.enum(['ASC', 'DESC']).optional().describe('Sort order')
     })
@@ -29,6 +36,10 @@ export let listCustomers = SlateTool.create(spec, {
           phoneNumber: z.string().optional(),
           note: z.string().optional(),
           referenceId: z.string().optional(),
+          groupIds: z.array(z.string()).optional(),
+          segmentIds: z.array(z.string()).optional(),
+          preferences: z.record(z.string(), z.any()).optional(),
+          version: z.number().optional(),
           createdAt: z.string().optional(),
           updatedAt: z.string().optional()
         })
@@ -37,7 +48,8 @@ export let listCustomers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    requireSquareScopes(ctx.auth, ['CUSTOMERS_READ']);
+    let client = createClient(ctx.auth);
     let result = await client.listCustomers({
       cursor: ctx.input.cursor,
       limit: ctx.input.limit,
@@ -54,6 +66,10 @@ export let listCustomers = SlateTool.create(spec, {
       phoneNumber: c.phone_number,
       note: c.note,
       referenceId: c.reference_id,
+      groupIds: c.group_ids,
+      segmentIds: c.segment_ids,
+      preferences: c.preferences,
+      version: c.version,
       createdAt: c.created_at,
       updatedAt: c.updated_at
     }));

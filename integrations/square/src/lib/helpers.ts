@@ -1,15 +1,17 @@
+import { createApiServiceError } from 'slates';
 import { SquareClient } from './client';
+import type { SquareClientConfig } from './types';
 
-export let createClient = (
-  auth: { token: string },
-  config: { environment: 'production' | 'sandbox' }
-) => {
-  return new SquareClient({
-    token: auth.token,
-    environment: config.environment
-  });
-};
+export let createClient = (auth: SquareClientConfig) => new SquareClient(auth);
 
-export let generateIdempotencyKey = (): string => {
-  return crypto.randomUUID();
+export let generateIdempotencyKey = (): string => crypto.randomUUID();
+
+export let requireSquareScopes = (auth: { scopes: string[] }, scopes: string[]) => {
+  let missing = scopes.filter(scope => !auth.scopes.includes(scope));
+  if (missing.length) {
+    throw createApiServiceError(
+      `Reconnect Square with the required permissions: ${missing.join(', ')}.`,
+      { reason: 'square_missing_scopes' }
+    );
+  }
 };

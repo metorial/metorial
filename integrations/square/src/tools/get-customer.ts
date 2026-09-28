@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getCustomer = SlateTool.create(spec, {
@@ -9,6 +9,7 @@ export let getCustomer = SlateTool.create(spec, {
   description: `Retrieve full details of a specific customer profile by ID. Returns contact information, address, notes, preferences, and group memberships.`,
   tags: { readOnly: true }
 })
+  .scopes(allOf('CUSTOMERS_READ'))
   .input(
     z.object({
       customerId: z.string().describe('The ID of the customer to retrieve')
@@ -27,15 +28,18 @@ export let getCustomer = SlateTool.create(spec, {
       note: z.string().optional(),
       referenceId: z.string().optional(),
       birthday: z.string().optional(),
-      groups: z.array(z.record(z.string(), z.any())).optional(),
+      groupIds: z.array(z.string()).optional(),
       segmentIds: z.array(z.string()).optional(),
+      preferences: z.record(z.string(), z.any()).optional(),
+      creationSource: z.string().optional(),
       createdAt: z.string().optional(),
       updatedAt: z.string().optional(),
       version: z.number().optional()
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    requireSquareScopes(ctx.auth, ['CUSTOMERS_READ']);
+    let client = createClient(ctx.auth);
     let c = await client.getCustomer(ctx.input.customerId);
 
     return {
@@ -51,8 +55,10 @@ export let getCustomer = SlateTool.create(spec, {
         note: c.note,
         referenceId: c.reference_id,
         birthday: c.birthday,
-        groups: c.groups,
+        groupIds: c.group_ids,
         segmentIds: c.segment_ids,
+        preferences: c.preferences,
+        creationSource: c.creation_source,
         createdAt: c.created_at,
         updatedAt: c.updated_at,
         version: c.version

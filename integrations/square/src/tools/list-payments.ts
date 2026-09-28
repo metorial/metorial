@@ -1,88 +1,58 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
-
-let moneySchema = z
-  .object({
-    amount: z
-      .number()
-      .optional()
-      .describe('Amount in the smallest denomination of the currency (e.g., cents)'),
-    currency: z.string().optional().describe('Currency code, e.g., USD')
-  })
-  .optional();
+import { mapPayment, paymentOutputSchema } from './payment-shared';
 
 export let listPayments = SlateTool.create(spec, {
   name: 'List Payments',
   key: 'list_payments',
-  description: `Retrieve a list of payments taken by the Square account. Supports filtering by time range, location, and pagination. Returns payment details including amounts, status, and source type.`,
+  description:
+    'List payments with documented date, location, card, amount, and offline filters. New payments can take several seconds to appear.',
   tags: { readOnly: true }
 })
+  .scopes(allOf('PAYMENTS_READ'))
   .input(
     z.object({
-      beginTime: z.string().optional().describe('Start of time range in RFC 3339 format'),
-      endTime: z.string().optional().describe('End of time range in RFC 3339 format'),
-      sortOrder: z
-        .enum(['ASC', 'DESC'])
+      beginTime: z.string().optional().describe('Created-at start time in RFC 3339 format'),
+      endTime: z.string().optional().describe('Created-at end time in RFC 3339 format'),
+      updatedAtBeginTime: z
+        .string()
         .optional()
-        .describe('Sort order by created_at. Defaults to DESC'),
-      locationId: z.string().optional().describe('Filter payments by location ID'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
-      limit: z.number().optional().describe('Maximum number of results per page (max 100)')
+        .describe('Updated-at start time in RFC 3339 format'),
+      updatedAtEndTime: z
+        .string()
+        .optional()
+        .describe('Updated-at end time in RFC 3339 format'),
+      sortField: z.enum(['CREATED_AT', 'UPDATED_AT']).optional(),
+      sortOrder: z.enum(['ASC', 'DESC']).optional(),
+      locationId: z.string().optional().describe('Location ID; discover with list_locations'),
+      total: z
+        .number()
+        .int()
+        .safe()
+        .nonnegative()
+        .optional()
+        .describe('Exact total in minor currency units'),
+      last4: z.string().length(4).optional().describe('Payment card last four digits'),
+      cardBrand: z.string().optional().describe('Payment card brand, such as VISA'),
+      isOfflinePayment: z.boolean().optional(),
+      offlineBeginTime: z
+        .string()
+        .optional()
+        .describe('Offline client-created start time in RFC 3339 format'),
+      offlineEndTime: z
+        .string()
+        .optional()
+        .describe('Offline client-created end time in RFC 3339 format'),
+      cursor: z.string().optional(),
+      limit: z.number().int().min(1).max(100).optional()
     })
   )
-  .output(
-    z.object({
-      payments: z.array(
-        z.object({
-          paymentId: z.string().optional(),
-          status: z.string().optional(),
-          amountMoney: moneySchema,
-          tipMoney: moneySchema,
-          totalMoney: moneySchema,
-          sourceType: z.string().optional(),
-          locationId: z.string().optional(),
-          orderId: z.string().optional(),
-          customerId: z.string().optional(),
-          referenceId: z.string().optional(),
-          note: z.string().optional(),
-          receiptUrl: z.string().optional(),
-          createdAt: z.string().optional(),
-          updatedAt: z.string().optional()
-        })
-      ),
-      cursor: z.string().optional().describe('Pagination cursor for next page')
-    })
-  )
+  .output(z.object({ payments: z.array(paymentOutputSchema), cursor: z.string().optional() }))
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
-    let result = await client.listPayments({
-      beginTime: ctx.input.beginTime,
-      endTime: ctx.input.endTime,
-      sortOrder: ctx.input.sortOrder,
-      cursor: ctx.input.cursor,
-      locationId: ctx.input.locationId,
-      limit: ctx.input.limit
-    });
-
-    let payments = result.payments.map(p => ({
-      paymentId: p.id,
-      status: p.status,
-      amountMoney: p.amount_money,
-      tipMoney: p.tip_money,
-      totalMoney: p.total_money,
-      sourceType: p.source_type,
-      locationId: p.location_id,
-      orderId: p.order_id,
-      customerId: p.customer_id,
-      referenceId: p.reference_id,
-      note: p.note,
-      receiptUrl: p.receipt_url,
-      createdAt: p.created_at,
-      updatedAt: p.updated_at
-    }));
-
+    let result = await createClient(ctx.auth).listPayments(ctx.input);
+    let payments = result.payments.map(mapPayment);
     return {
       output: { payments, cursor: result.cursor },
       message: `Found **${payments.length}** payment(s).${result.cursor ? ' More results available with cursor.' : ''}`

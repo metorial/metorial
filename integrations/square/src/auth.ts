@@ -1,35 +1,117 @@
-import { createAxios, SlateAuth } from 'slates';
+import {
+  createApiServiceError,
+  createAxios,
+  normalizeOAuthTokenResponse,
+  SlateAuth
+} from 'slates';
 import { z } from 'zod';
-import { SQUARE_API_VERSION } from './lib/constants';
-import { squareApiError, squareServiceError } from './lib/errors';
+import { SQUARE_API_VERSION, SQUARE_ORIGINS } from './lib/constants';
+import { squareApiError } from './lib/errors';
 
-let squareAxios = createAxios({
-  baseURL: 'https://connect.squareup.com',
-  headers: {
-    'Square-Version': SQUARE_API_VERSION,
-    'Content-Type': 'application/json'
-  }
+const environmentSchema = z.enum(['production', 'sandbox']);
+const authInputSchema = z.object({
+  environment: environmentSchema
+    .default('production')
+    .describe(
+      'Square environment for these credentials. Sandbox credentials only work in sandbox.'
+    )
+});
+const authOutputSchema = z.object({
+  token: z.string().min(1),
+  environment: environmentSchema,
+  applicationId: z.string().min(1),
+  merchantId: z.string().min(1),
+  scopes: z.array(z.string()),
+  refreshToken: z.string().optional(),
+  expiresAt: z.string().optional()
+});
+type SquareAuth = z.infer<typeof authOutputSchema>;
+
+const authClient = (environment: SquareAuth['environment']) => {
+  const client = createAxios({
+    baseURL: SQUARE_ORIGINS[environment],
+    headers: { 'Square-Version': SQUARE_API_VERSION, 'Content-Type': 'application/json' }
+  });
+  client.interceptors.response.use(
+    response => response,
+    error => Promise.reject(squareApiError(error, 'authentication request'))
+  );
+  return client;
+};
+
+const tokenStatusSchema = z.object({
+  client_id: z.string().min(1),
+  merchant_id: z.string().min(1),
+  scopes: z.array(z.string()),
+  expires_at: z.string().nullish()
 });
 
-squareAxios.interceptors.response.use(
-  response => response,
-  error => Promise.reject(squareApiError(error, 'authentication request'))
-);
+const tokenIdentity = async (token: string, environment: SquareAuth['environment']) => {
+  const response = await authClient(environment).post('/oauth2/token/status', undefined, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const parsed = tokenStatusSchema.safeParse(response.data);
+  if (!parsed.success)
+    throw createApiServiceError(
+      'Square token status did not include the application, merchant, and permissions.'
+    );
+  const status = parsed.data;
+  let expiresAt: string | undefined;
+  if (status.expires_at) {
+    const timestamp = Date.parse(status.expires_at);
+    if (!Number.isFinite(timestamp))
+      throw createApiServiceError('Square returned an invalid token expiration time.');
+    expiresAt = new Date(timestamp).toISOString();
+  }
+  return {
+    applicationId: status.client_id,
+    merchantId: status.merchant_id,
+    scopes: status.scopes,
+    expiresAt
+  };
+};
 
-export let auth = SlateAuth.create()
-  .output(
-    z.object({
-      token: z.string(),
-      refreshToken: z.string().optional(),
-      expiresAt: z.string().optional(),
-      merchantId: z.string().optional()
+const getProfile = async (ctx: { output: SquareAuth }) => {
+  const response = await authClient(ctx.output.environment).get('/v2/merchants/me', {
+    headers: { Authorization: `Bearer ${ctx.output.token}` }
+  });
+  const parsed = z
+    .object({
+      merchant: z.object({
+        id: z.string().min(1),
+        business_name: z.string().optional(),
+        country: z.string().optional(),
+        language_code: z.string().optional(),
+        currency: z.string().optional(),
+        status: z.string().optional()
+      })
     })
-  )
+    .safeParse(response.data);
+  if (!parsed.success)
+    throw createApiServiceError('Square profile response did not include a merchant.');
+  const merchant = parsed.data.merchant;
+  if (merchant.id !== ctx.output.merchantId)
+    throw createApiServiceError('Square token and merchant profile identities do not match.');
+  return {
+    profile: {
+      id: merchant.id,
+      name: merchant.business_name,
+      country: merchant.country,
+      languageCode: merchant.language_code,
+      currency: merchant.currency,
+      status: merchant.status
+    }
+  };
+};
+
+export const auth = SlateAuth.create()
+  .output(authOutputSchema)
   .addOauth({
     type: 'auth.oauth',
     name: 'OAuth',
     key: 'oauth',
-
+    inputSchema: authInputSchema,
+    getDefaultInput: async () => ({ environment: 'production' as const }),
     scopes: [
       {
         title: 'Merchant Profile Read',
@@ -90,46 +172,9 @@ export let auth = SlateAuth.create()
         scope: 'APPOINTMENTS_READ'
       },
       {
-        title: 'Appointments Write',
-        description: 'Create and manage bookings',
-        scope: 'APPOINTMENTS_WRITE'
-      },
-      {
-        title: 'Employees Read',
-        description: 'Read team member information',
-        scope: 'EMPLOYEES_READ'
-      },
-      {
-        title: 'Employees Write',
-        description: 'Manage team members',
-        scope: 'EMPLOYEES_WRITE'
-      },
-      { title: 'Timecards Read', description: 'Read timecards', scope: 'TIMECARDS_READ' },
-      { title: 'Timecards Write', description: 'Manage timecards', scope: 'TIMECARDS_WRITE' },
-      {
-        title: 'Bank Accounts Read',
-        description: 'Read bank account information',
-        scope: 'BANK_ACCOUNTS_READ'
-      },
-      {
         title: 'Loyalty Read',
         description: 'Read loyalty programs and accounts',
         scope: 'LOYALTY_READ'
-      },
-      {
-        title: 'Loyalty Write',
-        description: 'Manage loyalty programs and accounts',
-        scope: 'LOYALTY_WRITE'
-      },
-      {
-        title: 'Gift Cards Read',
-        description: 'Read gift card information',
-        scope: 'GIFTCARDS_READ'
-      },
-      {
-        title: 'Gift Cards Write',
-        description: 'Manage gift cards',
-        scope: 'GIFTCARDS_WRITE'
       },
       {
         title: 'Subscriptions Read',
@@ -146,162 +191,93 @@ export let auth = SlateAuth.create()
         description: 'Read dispute information',
         scope: 'DISPUTES_READ'
       },
-      { title: 'Disputes Write', description: 'Manage disputes', scope: 'DISPUTES_WRITE' },
-      {
-        title: 'Device Credential Management',
-        description: 'Manage device credentials',
-        scope: 'DEVICE_CREDENTIAL_MANAGEMENT'
-      },
       { title: 'Payouts Read', description: 'Read payout information', scope: 'PAYOUTS_READ' },
       {
-        title: 'Online Store Site Read',
-        description: 'Read Square Online site details',
-        scope: 'ONLINE_STORE_SITE_READ'
-      },
-      {
-        title: 'Online Store Snippets Read',
-        description: 'Read Square Online snippets',
-        scope: 'ONLINE_STORE_SNIPPETS_READ'
-      },
-      {
-        title: 'Online Store Snippets Write',
-        description: 'Manage Square Online snippets',
-        scope: 'ONLINE_STORE_SNIPPETS_WRITE'
+        title: 'Application Fees',
+        description: 'Collect and refund application fees',
+        scope: 'PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS'
       }
     ],
-
     getAuthorizationUrl: async ctx => {
-      let params = new URLSearchParams({
+      const params = new URLSearchParams({
         client_id: ctx.clientId,
         scope: ctx.scopes.join(' '),
-        session: 'false',
-        state: ctx.state
+        state: ctx.state,
+        redirect_uri: ctx.redirectUri
       });
-
-      return {
-        url: `https://connect.squareup.com/oauth2/authorize?${params.toString()}`
-      };
+      if (ctx.input.environment === 'production') params.set('session', 'false');
+      return { url: `${SQUARE_ORIGINS[ctx.input.environment]}/oauth2/authorize?${params}` };
     },
-
     handleCallback: async ctx => {
-      let response = await squareAxios.post('/oauth2/token', {
+      const response = await authClient(ctx.input.environment).post('/oauth2/token', {
         client_id: ctx.clientId,
         client_secret: ctx.clientSecret,
         code: ctx.code,
+        redirect_uri: ctx.redirectUri,
         grant_type: 'authorization_code'
       });
-
-      let data = response.data;
-      if (!data.access_token) {
-        throw squareServiceError('Square OAuth response did not include an access token.');
-      }
-
-      let expiresAt = data.expires_at ? new Date(data.expires_at).toISOString() : undefined;
-
+      const token = normalizeOAuthTokenResponse(response.data, { providerLabel: 'Square' });
+      const identity = await tokenIdentity(token.token, ctx.input.environment);
+      if (identity.applicationId !== ctx.clientId)
+        throw createApiServiceError('Square returned a token for a different application.');
+      if (!token.refreshToken)
+        throw createApiServiceError('Square OAuth did not return a refresh token.');
       return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresAt,
-          merchantId: data.merchant_id
-        }
+        output: { ...token, ...identity, environment: ctx.input.environment },
+        scopes: identity.scopes
       };
     },
-
-    handleTokenRefresh: async (ctx: any) => {
-      if (!ctx.output?.refreshToken) {
-        throw squareServiceError('Square OAuth refresh requires a refresh token.');
-      }
-
-      let response = await squareAxios.post('/oauth2/token', {
+    handleTokenRefresh: async (ctx: {
+      output: SquareAuth;
+      clientId: string;
+      clientSecret: string;
+    }) => {
+      if (!ctx.output.refreshToken)
+        throw createApiServiceError(
+          'Square OAuth refresh requires a refresh token. Reconnect the account.'
+        );
+      const response = await authClient(ctx.output.environment).post('/oauth2/token', {
         client_id: ctx.clientId,
         client_secret: ctx.clientSecret,
         refresh_token: ctx.output.refreshToken,
         grant_type: 'refresh_token'
       });
-
-      let data = response.data;
-      if (!data.access_token) {
-        throw squareServiceError(
-          'Square OAuth refresh response did not include an access token.'
+      const token = normalizeOAuthTokenResponse(response.data, {
+        providerLabel: 'Square',
+        previousRefreshToken: ctx.output.refreshToken,
+        refreshTokenFallbackMode: 'falsy'
+      });
+      const identity = await tokenIdentity(token.token, ctx.output.environment);
+      if (
+        identity.applicationId !== ctx.output.applicationId ||
+        identity.merchantId !== ctx.output.merchantId
+      ) {
+        throw createApiServiceError(
+          'Square returned a refreshed token for a different application or merchant.'
         );
       }
-
-      let expiresAt = data.expires_at ? new Date(data.expires_at).toISOString() : undefined;
-
-      return {
-        output: {
-          token: data.access_token,
-          refreshToken: data.refresh_token || ctx.output.refreshToken,
-          expiresAt,
-          merchantId: data.merchant_id || ctx.output.merchantId
-        }
-      };
+      return { output: { ...token, ...identity, environment: ctx.output.environment } };
     },
-
-    getProfile: async (ctx: { output: { token: string }; input: any; scopes: string[] }) => {
-      let response = await squareAxios.get('/v2/merchants/me', {
-        headers: {
-          Authorization: `Bearer ${ctx.output.token}`
-        }
-      });
-
-      let merchant = response.data.merchant;
-      if (!merchant?.id) {
-        throw squareServiceError('Square profile response did not include a merchant.');
-      }
-
-      return {
-        profile: {
-          id: merchant.id,
-          name: merchant.business_name,
-          country: merchant.country,
-          languageCode: merchant.language_code,
-          currency: merchant.currency,
-          status: merchant.status
-        }
-      };
-    }
+    getProfile
   })
   .addTokenAuth({
     type: 'auth.token',
     name: 'Personal Access Token',
     key: 'personal_access_token',
-
-    inputSchema: z.object({
-      token: z.string().describe('Personal access token from the Square Developer Console')
+    inputSchema: authInputSchema.extend({
+      token: z
+        .string()
+        .min(1)
+        .describe(
+          'Personal access token from the Square Developer Console for the selected environment.'
+        )
     }),
-
     getOutput: async ctx => {
+      const identity = await tokenIdentity(ctx.input.token, ctx.input.environment);
       return {
-        output: {
-          token: ctx.input.token
-        }
+        output: { token: ctx.input.token, environment: ctx.input.environment, ...identity },
+        scopes: identity.scopes
       };
     },
-
-    getProfile: async (ctx: { output: { token?: string }; input: { token: string } }) => {
-      let token = ctx.output.token || ctx.input.token;
-      let response = await squareAxios.get('/v2/merchants/me', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-
-      let merchant = response.data.merchant;
-      if (!merchant?.id) {
-        throw squareServiceError('Square profile response did not include a merchant.');
-      }
-
-      return {
-        profile: {
-          id: merchant.id,
-          name: merchant.business_name,
-          country: merchant.country,
-          languageCode: merchant.language_code,
-          currency: merchant.currency,
-          status: merchant.status
-        }
-      };
-    }
+    getProfile
   });

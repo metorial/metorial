@@ -1,39 +1,49 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { squareServiceError } from '../lib/errors';
+import { createClient, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getInventory = SlateTool.create(spec, {
   name: 'Get Inventory Counts',
   key: 'get_inventory',
-  description: `Retrieve inventory counts for one or more catalog item variations. Can look up counts for a single item variation or batch retrieve counts for multiple items across locations.`,
+  description: `Retrieve current inventory counts, optionally filtered by item variations, locations, tracked states, or update time. Use search_catalog for variation IDs and list_locations for location IDs.`,
   tags: { readOnly: true }
 })
+  .scopes(allOf('INVENTORY_READ'))
   .input(
     z.object({
       catalogObjectIds: z
         .array(z.string())
-        .describe('Catalog object IDs (item variations) to get inventory counts for'),
-      locationIds: z.array(z.string()).optional().describe('Filter by specific location IDs'),
-      states: z
-        .array(
-          z.enum([
-            'IN_STOCK',
-            'SOLD',
-            'RETURNED_BY_CUSTOMER',
-            'RESERVED_FOR_SALE',
-            'ORDERED_FROM_VENDOR',
-            'RECEIVED_FROM_VENDOR',
-            'IN_TRANSIT_TO',
-            'NONE',
-            'WASTE',
-            'UNLINKED_RETURN',
-            'COMPOSED',
-            'DECOMPOSED'
-          ])
-        )
+        .min(1)
+        .max(1000)
         .optional()
-        .describe('Filter by inventory state'),
+        .describe(
+          'Optional item variation IDs to filter counts (up to 1000). Use search_catalog to discover IDs'
+        ),
+      locationIds: z
+        .array(z.string())
+        .min(1)
+        .optional()
+        .describe('Filter by location IDs; use list_locations to discover IDs'),
+      states: z
+        .array(z.string().min(1))
+        .min(1)
+        .optional()
+        .describe(
+          'Filter by tracked inventory states; Square ignores NONE, SOLD, and UNLINKED_RETURN'
+        ),
+      updatedAfter: z
+        .string()
+        .optional()
+        .describe('Only counts calculated after this RFC 3339 timestamp'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Maximum counts per page (1-1000)'),
       cursor: z.string().optional().describe('Pagination cursor')
     })
   )
@@ -53,11 +63,22 @@ export let getInventory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    requireSquareScopes(ctx.auth, ['INVENTORY_READ']);
+    let ignoredStates = ctx.input.states?.filter(state =>
+      ['NONE', 'SOLD', 'UNLINKED_RETURN'].includes(state)
+    );
+    if (ignoredStates?.length) {
+      throw squareServiceError(
+        `Square does not filter inventory counts by ${ignoredStates.join(', ')}. Use tracked states instead.`
+      );
+    }
+    let client = createClient(ctx.auth);
     let result = await client.batchRetrieveInventoryCounts({
       catalogObjectIds: ctx.input.catalogObjectIds,
       locationIds: ctx.input.locationIds,
       states: ctx.input.states,
+      updatedAfter: ctx.input.updatedAfter,
+      limit: ctx.input.limit,
       cursor: ctx.input.cursor
     });
 

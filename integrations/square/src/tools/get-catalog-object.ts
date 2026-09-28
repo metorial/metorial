@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getCatalogObject = SlateTool.create(spec, {
@@ -9,6 +9,7 @@ export let getCatalogObject = SlateTool.create(spec, {
   description: `Retrieve a specific catalog object by its ID. Returns full object data including related objects (e.g., item variations, modifier lists) when requested.`,
   tags: { readOnly: true }
 })
+  .scopes(allOf('ITEMS_READ'))
   .input(
     z.object({
       catalogObjectId: z.string().describe('The ID of the catalog object to retrieve'),
@@ -33,7 +34,8 @@ export let getCatalogObject = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    requireSquareScopes(ctx.auth, ['ITEMS_READ']);
+    let client = createClient(ctx.auth);
     let result = await client.getCatalogObject(
       ctx.input.catalogObjectId,
       ctx.input.includeRelatedObjects

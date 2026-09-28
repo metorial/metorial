@@ -1,59 +1,69 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { squareServiceError } from '../lib/errors';
-import { createClient, generateIdempotencyKey } from '../lib/helpers';
+import { createClient, generateIdempotencyKey, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
+
+let quantitySchema = z
+  .string()
+  .regex(/^\d+(\.\d+)?$/, 'Quantity must be a nonnegative decimal string');
 
 export let adjustInventory = SlateTool.create(spec, {
   name: 'Adjust Inventory',
   key: 'adjust_inventory',
-  description: `Make inventory changes such as adjustments, physical counts, or transfers. Supports batch operations for multiple catalog items and locations simultaneously.`
+  description:
+    'Apply physical counts or inventory adjustments to item variations. Use ADJUSTMENT with different source and destination locations to move stock between locations.'
 })
+  .scopes(allOf('INVENTORY_WRITE'))
   .input(
     z.object({
       changes: z
         .array(
           z.object({
-            type: z
-              .enum(['PHYSICAL_COUNT', 'ADJUSTMENT', 'TRANSFER'])
-              .describe('Type of inventory change'),
+            type: z.enum(['PHYSICAL_COUNT', 'ADJUSTMENT']).describe('Inventory change type'),
             physicalCount: z
               .object({
-                catalogObjectId: z.string(),
-                locationId: z.string(),
-                quantity: z.string(),
+                catalogObjectId: z.string().describe('Item variation ID from search_catalog'),
+                locationId: z.string().describe('Location ID from list_locations'),
+                quantity: quantitySchema,
                 state: z.string(),
-                occurredAt: z.string().describe('RFC 3339 timestamp')
+                occurredAt: z.string().describe('RFC 3339 timestamp'),
+                referenceId: z.string().optional()
               })
               .optional()
-              .describe('Required for PHYSICAL_COUNT type'),
+              .describe('Required only for PHYSICAL_COUNT'),
             adjustment: z
               .object({
-                catalogObjectId: z.string(),
-                locationId: z.string(),
-                quantity: z.string(),
+                catalogObjectId: z.string().describe('Item variation ID from search_catalog'),
+                fromLocationId: z.string().describe('Source location ID from list_locations'),
+                toLocationId: z
+                  .string()
+                  .describe(
+                    'Destination location ID from list_locations; use the same ID for a single-location adjustment'
+                  ),
+                quantity: quantitySchema,
                 fromState: z.string(),
                 toState: z.string(),
-                occurredAt: z.string().describe('RFC 3339 timestamp')
+                occurredAt: z.string().describe('RFC 3339 timestamp'),
+                referenceId: z.string().optional()
               })
               .optional()
-              .describe('Required for ADJUSTMENT type'),
-            transfer: z
-              .object({
-                catalogObjectId: z.string(),
-                fromLocationId: z.string(),
-                toLocationId: z.string(),
-                quantity: z.string(),
-                state: z.string(),
-                occurredAt: z.string().describe('RFC 3339 timestamp')
-              })
-              .optional()
-              .describe('Required for TRANSFER type')
+              .describe('Required only for ADJUSTMENT')
           })
         )
-        .describe('List of inventory changes to apply'),
+        .min(1)
+        .max(100)
+        .describe('1-100 inventory changes to apply'),
+      ignoreUnchangedCounts: z
+        .boolean()
+        .optional()
+        .describe(
+          'Ignore physical counts unchanged since the previous count; defaults to true'
+        ),
       idempotencyKey: z
         .string()
+        .min(1)
+        .max(128)
         .optional()
         .describe('Unique key to prevent duplicate changes. Auto-generated if omitted')
     })
@@ -63,6 +73,7 @@ export let adjustInventory = SlateTool.create(spec, {
       counts: z.array(
         z.object({
           catalogObjectId: z.string().optional(),
+          catalogObjectType: z.string().optional(),
           locationId: z.string().optional(),
           state: z.string().optional(),
           quantity: z.string().optional(),
@@ -72,68 +83,65 @@ export let adjustInventory = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
-
-    let changes = ctx.input.changes.map(c => ({
-      type: c.type,
-      physical_count: c.physicalCount
-        ? {
-            catalog_object_id: c.physicalCount.catalogObjectId,
-            location_id: c.physicalCount.locationId,
-            quantity: c.physicalCount.quantity,
-            state: c.physicalCount.state,
-            occurred_at: c.physicalCount.occurredAt
-          }
-        : undefined,
-      adjustment: c.adjustment
-        ? {
-            catalog_object_id: c.adjustment.catalogObjectId,
-            location_id: c.adjustment.locationId,
-            quantity: c.adjustment.quantity,
-            from_state: c.adjustment.fromState,
-            to_state: c.adjustment.toState,
-            occurred_at: c.adjustment.occurredAt
-          }
-        : undefined,
-      transfer: c.transfer
-        ? {
-            catalog_object_id: c.transfer.catalogObjectId,
-            from_location_id: c.transfer.fromLocationId,
-            to_location_id: c.transfer.toLocationId,
-            quantity: c.transfer.quantity,
-            state: c.transfer.state,
-            occurred_at: c.transfer.occurredAt
-          }
-        : undefined
-    }));
-
     for (let [index, change] of ctx.input.changes.entries()) {
-      if (change.type === 'PHYSICAL_COUNT' && !change.physicalCount) {
+      if (change.type === 'PHYSICAL_COUNT') {
+        if (!change.physicalCount || change.adjustment) {
+          throw squareServiceError(
+            `changes[${index}] must contain physicalCount only for PHYSICAL_COUNT.`
+          );
+        }
+      } else if (!change.adjustment || change.physicalCount) {
         throw squareServiceError(
-          `changes[${index}].physicalCount is required for PHYSICAL_COUNT.`
+          `changes[${index}] must contain adjustment only for ADJUSTMENT.`
         );
       }
-      if (change.type === 'ADJUSTMENT' && !change.adjustment) {
-        throw squareServiceError(`changes[${index}].adjustment is required for ADJUSTMENT.`);
-      }
-      if (change.type === 'TRANSFER' && !change.transfer) {
-        throw squareServiceError(`changes[${index}].transfer is required for TRANSFER.`);
+      if (change.adjustment && Number(change.adjustment.quantity) <= 0) {
+        throw squareServiceError(
+          `changes[${index}].adjustment.quantity must be greater than zero.`
+        );
       }
     }
 
+    let changes = ctx.input.changes.map(change => ({
+      type: change.type,
+      physical_count: change.physicalCount
+        ? {
+            catalog_object_id: change.physicalCount.catalogObjectId,
+            location_id: change.physicalCount.locationId,
+            quantity: change.physicalCount.quantity,
+            state: change.physicalCount.state,
+            occurred_at: change.physicalCount.occurredAt,
+            reference_id: change.physicalCount.referenceId
+          }
+        : undefined,
+      adjustment: change.adjustment
+        ? {
+            catalog_object_id: change.adjustment.catalogObjectId,
+            from_location_id: change.adjustment.fromLocationId,
+            to_location_id: change.adjustment.toLocationId,
+            quantity: change.adjustment.quantity,
+            from_state: change.adjustment.fromState,
+            to_state: change.adjustment.toState,
+            occurred_at: change.adjustment.occurredAt,
+            reference_id: change.adjustment.referenceId
+          }
+        : undefined
+    }));
+    requireSquareScopes(ctx.auth, ['INVENTORY_WRITE']);
+    let client = createClient(ctx.auth);
     let result = await client.batchChangeInventory({
       idempotencyKey: ctx.input.idempotencyKey || generateIdempotencyKey(),
+      ignoreUnchangedCounts: ctx.input.ignoreUnchangedCounts,
       changes
     });
-
-    let counts = result.counts.map(c => ({
-      catalogObjectId: c.catalog_object_id,
-      locationId: c.location_id,
-      state: c.state,
-      quantity: c.quantity,
-      calculatedAt: c.calculated_at
+    let counts = result.counts.map(count => ({
+      catalogObjectId: count.catalog_object_id,
+      catalogObjectType: count.catalog_object_type,
+      locationId: count.location_id,
+      state: count.state,
+      quantity: count.quantity,
+      calculatedAt: count.calculated_at
     }));
-
     return {
       output: { counts },
       message: `Applied **${ctx.input.changes.length}** inventory change(s). Updated **${counts.length}** count(s).`

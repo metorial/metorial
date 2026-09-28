@@ -1,6 +1,6 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
 import { customerOutputSchema, mapCustomer } from './shared';
 
@@ -11,12 +11,15 @@ export let searchCustomers = SlateTool.create(spec, {
     'Search Square customer profiles using common filters or an advanced Square customer query object. Newly created or updated customers can take time to appear in search results.',
   tags: { readOnly: true }
 })
+  .scopes(allOf('CUSTOMERS_READ'))
   .input(
     z.object({
       emailAddressFuzzy: z
         .string()
         .optional()
-        .describe('Fuzzy match against customer email_address'),
+        .describe(
+          'Fuzzy match against customer email_address. For an exact full email match, use query.filter.email_address.exact instead.'
+        ),
       phoneNumberFuzzy: z
         .string()
         .optional()
@@ -50,7 +53,13 @@ export let searchCustomers = SlateTool.create(spec, {
         .optional()
         .describe('Whether Square should return the total match count'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
-      limit: z.number().optional().describe('Maximum number of results per page (1-100)')
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum number of results per page (1-100)')
     })
   )
   .output(
@@ -61,7 +70,8 @@ export let searchCustomers = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    requireSquareScopes(ctx.auth, ['CUSTOMERS_READ']);
+    let client = createClient(ctx.auth);
     let query: Record<string, any> = ctx.input.query ? { ...ctx.input.query } : {};
     let filter = { ...(query.filter ?? {}) };
 

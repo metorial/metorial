@@ -8,11 +8,6 @@ export interface SquareMoney {
   currency?: string;
 }
 
-export interface PaginatedResponse<T> {
-  cursor?: string;
-  items: T[];
-}
-
 export interface SquarePayment {
   id?: string;
   created_at?: string;
@@ -21,9 +16,19 @@ export interface SquarePayment {
   tip_money?: SquareMoney;
   total_money?: SquareMoney;
   app_fee_money?: SquareMoney;
+  app_fee_allocations?: Record<string, any>[];
+  approved_money?: SquareMoney;
+  refunded_money?: SquareMoney;
+  refund_ids?: string[];
+  version_token?: string;
   status?: string;
+  capabilities?: string[];
+  is_offline_payment?: boolean;
+  buyer_email_address?: string;
   source_type?: string;
   card_details?: Record<string, any>;
+  cash_details?: Record<string, any>;
+  external_details?: Record<string, any>;
   location_id?: string;
   order_id?: string;
   customer_id?: string;
@@ -46,11 +51,14 @@ export interface SquareOrder {
   taxes?: Record<string, any>[];
   discounts?: Record<string, any>[];
   fulfillments?: Record<string, any>[];
+  service_charges?: Record<string, any>[];
   state?: string;
   total_money?: SquareMoney;
   total_tax_money?: SquareMoney;
   total_discount_money?: SquareMoney;
   total_tip_money?: SquareMoney;
+  total_service_charge_money?: SquareMoney;
+  version?: number;
   created_at?: string;
   updated_at?: string;
   closed_at?: string;
@@ -74,8 +82,10 @@ export interface SquareCustomer {
   reference_id?: string;
   birthday?: string;
   preferences?: Record<string, any>;
-  groups?: Record<string, any>[];
+  group_ids?: string[];
   segment_ids?: string[];
+  creation_source?: string;
+  version?: number;
   [key: string]: any;
 }
 
@@ -106,6 +116,7 @@ export interface SquareInvoice {
   order_id?: string;
   primary_recipient?: Record<string, any>;
   payment_requests?: Record<string, any>[];
+  next_payment_amount_money?: SquareMoney;
   delivery_method?: string;
   invoice_number?: string;
   title?: string;
@@ -117,6 +128,9 @@ export interface SquareInvoice {
   updated_at?: string;
   accepted_payment_methods?: Record<string, any>;
   sale_or_service_date?: string;
+  public_url?: string;
+  custom_fields?: Record<string, any>[];
+  store_payment_method_enabled?: boolean;
   [key: string]: any;
 }
 
@@ -145,6 +159,8 @@ export interface SquareRefund {
   id?: string;
   status?: string;
   amount_money?: SquareMoney;
+  app_fee_money?: SquareMoney;
+  app_fee_allocations?: Record<string, any>[];
   payment_id?: string;
   order_id?: string;
   reason?: string;
@@ -161,18 +177,5 @@ export interface SquareInventoryCount {
   location_id?: string;
   quantity?: string;
   calculated_at?: string;
-  [key: string]: any;
-}
-
-export interface SquareWebhookSubscription {
-  id?: string;
-  name?: string;
-  enabled?: boolean;
-  event_types?: string[];
-  notification_url?: string;
-  api_version?: string;
-  signature_key?: string;
-  created_at?: string;
-  updated_at?: string;
   [key: string]: any;
 }

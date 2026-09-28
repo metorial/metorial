@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -9,6 +9,7 @@ export let getOrder = SlateTool.create(spec, {
   description: `Retrieve full details of a specific order by its ID. Returns line items, taxes, discounts, fulfillments, tenders, and all order metadata.`,
   tags: { readOnly: true }
 })
+  .scopes(allOf('ORDERS_READ'))
   .input(
     z.object({
       orderId: z.string().describe('The ID of the order to retrieve')
@@ -24,6 +25,7 @@ export let getOrder = SlateTool.create(spec, {
       lineItems: z.array(z.record(z.string(), z.any())).optional(),
       taxes: z.array(z.record(z.string(), z.any())).optional(),
       discounts: z.array(z.record(z.string(), z.any())).optional(),
+      serviceCharges: z.array(z.record(z.string(), z.any())).optional(),
       fulfillments: z.array(z.record(z.string(), z.any())).optional(),
       tenders: z.array(z.record(z.string(), z.any())).optional(),
       totalMoney: z
@@ -35,6 +37,12 @@ export let getOrder = SlateTool.create(spec, {
       totalDiscountMoney: z
         .object({ amount: z.number().optional(), currency: z.string().optional() })
         .optional(),
+      totalTipMoney: z
+        .object({ amount: z.number().optional(), currency: z.string().optional() })
+        .optional(),
+      totalServiceChargeMoney: z
+        .object({ amount: z.number().optional(), currency: z.string().optional() })
+        .optional(),
       netAmounts: z.record(z.string(), z.any()).optional(),
       createdAt: z.string().optional(),
       updatedAt: z.string().optional(),
@@ -43,7 +51,7 @@ export let getOrder = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    let client = createClient(ctx.auth);
     let o = await client.getOrder(ctx.input.orderId);
 
     return {
@@ -56,11 +64,14 @@ export let getOrder = SlateTool.create(spec, {
         lineItems: o.line_items,
         taxes: o.taxes,
         discounts: o.discounts,
+        serviceCharges: o.service_charges,
         fulfillments: o.fulfillments,
         tenders: o.tenders,
         totalMoney: o.total_money,
         totalTaxMoney: o.total_tax_money,
         totalDiscountMoney: o.total_discount_money,
+        totalTipMoney: o.total_tip_money,
+        totalServiceChargeMoney: o.total_service_charge_money,
         netAmounts: o.net_amounts,
         createdAt: o.created_at,
         updatedAt: o.updated_at,

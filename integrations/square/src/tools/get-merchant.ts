@@ -1,18 +1,22 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { createClient, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
 
 export let getMerchant = SlateTool.create(spec, {
   name: 'Get Merchant',
   key: 'get_merchant',
   description:
-    'Retrieve the authenticated Square merchant profile, or a specific merchant profile by merchant ID.',
+    'Retrieve the authenticated Square merchant profile or a specific merchant by ID. Returns merchantId, currency, country, and mainLocationId for downstream tools.',
   tags: { readOnly: true }
 })
+  .scopes(allOf('MERCHANT_PROFILE_READ'))
   .input(
     z.object({
-      merchantId: z.string().optional().describe('Merchant ID to retrieve. Defaults to "me".')
+      merchantId: z
+        .string()
+        .optional()
+        .describe('Merchant ID to retrieve; omit for the authenticated merchant ("me")')
     })
   )
   .output(
@@ -28,7 +32,8 @@ export let getMerchant = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    requireSquareScopes(ctx.auth, ['MERCHANT_PROFILE_READ']);
+    let client = createClient(ctx.auth);
     let merchant = await client.getMerchant(ctx.input.merchantId || 'me');
 
     return {

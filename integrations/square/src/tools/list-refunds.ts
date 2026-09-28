@@ -1,8 +1,8 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
-import { mapRefund, refundOutputSchema } from './shared';
+import { mapRefund, refundOutputSchema } from './payment-shared';
 
 export let listRefunds = SlateTool.create(spec, {
   name: 'List Refunds',
@@ -11,6 +11,7 @@ export let listRefunds = SlateTool.create(spec, {
     'Retrieve Square payment refunds with pagination and filters for created time, updated time, location, status, and source type.',
   tags: { readOnly: true }
 })
+  .scopes(allOf('PAYMENTS_READ'))
   .input(
     z.object({
       beginTime: z.string().optional().describe('Start created_at time in RFC 3339 format'),
@@ -35,7 +36,13 @@ export let listRefunds = SlateTool.create(spec, {
         .enum(['CARD', 'BANK_ACCOUNT', 'WALLET', 'CASH', 'EXTERNAL'])
         .optional()
         .describe('Filter refunds by payment source type'),
-      limit: z.number().optional().describe('Maximum number of results per page (max 100)')
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe('Maximum number of results per page (max 100)')
     })
   )
   .output(
@@ -45,7 +52,7 @@ export let listRefunds = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    let client = createClient(ctx.auth);
     let result = await client.listRefunds({
       beginTime: ctx.input.beginTime,
       endTime: ctx.input.endTime,

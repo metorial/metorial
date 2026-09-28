@@ -1,145 +1,78 @@
-# <img src="https://provider-logos.metorial-cdn.com/squareup.svg" height="20"> Square
+# Square
 
-Process payments, manage orders, and handle invoices for online, in-app, and in-person commerce. Create and manage customer profiles, catalog items, inventory counts, and locations. Issue refunds, manage disputes, and track payouts. Create bookings and appointments, manage team members and timecards, handle gift cards and loyalty programs, and manage subscriptions. Save cards on file, generate checkout links, connect and control Square Terminal devices, and manage vendor/supplier information. Extend Square objects with custom attributes. Receive webhook notifications for payments, orders, customers, inventory, invoices, bookings, disputes, team changes, and more.
+Process payments and refunds, manage orders and invoices, maintain customers,
+catalogs and inventory, and discover merchant locations. Create hosted checkout
+links, save cards, manage subscriptions, and inspect payouts and disputes.
+Receive verified events for eleven Square resource families.
+
+## Connect
+
+Choose OAuth or a personal access token and select **production** or **sandbox**
+when connecting. Credentials, API calls, and events use that environment. OAuth
+connections refresh automatically. Merchant identity, application identity, and
+permissions are discovered from Square; you do not need to enter merchant IDs.
+
+Tools request the permissions needed for their operations. Collecting or refunding
+application fees also requires `PAYMENTS_WRITE_ADDITIONAL_RECIPIENTS`. Reconnect
+if the connection lacks a newly needed permission. API requests use version
+`2026-09-16`.
 
 ## Tools
 
-### Adjust Inventory
-
-Make inventory changes such as adjustments, physical counts, or transfers. Supports batch operations for multiple catalog items and locations simultaneously.
-
-### Create Customer
-
-Create a new customer profile. Provide at least one of: given name, family name, company name, email address, or phone number.
-
-### Create Invoice
-
-Create a new draft invoice for an existing order. The invoice must be published separately before it can be sent to the customer.
-
-### Create Order
-
-Create a new order at a Square location. Supports line items, taxes, discounts, fulfillments, and customer association. Orders start in OPEN state.
-
-### Create Payment
-
-Create a new payment using a payment source (nonce, card on file, etc.). Supports setting amount, tip, customer, location, and delayed capture.
-
-### Delete Catalog Object
-
-Delete a catalog object by its ID. Deleting an item also deletes its variations. Deleted objects can still be referenced by existing orders.
-
-### Delete Customer
-
-Permanently delete a customer profile from the Square account. This action cannot be undone.
-
-### Get Catalog Object
-
-Retrieve a specific catalog object by its ID. Returns full object data including related objects (e.g., item variations, modifier lists) when requested.
-
-### Get Customer
-
-Retrieve full details of a specific customer profile by ID. Returns contact information, address, notes, preferences, and group memberships.
-
-### Get Location
-
-Retrieve details for a single Square business location. Use "main" as the location ID to retrieve the main location.
-
-### Get Merchant
-
-Retrieve the authenticated Square merchant profile, or a specific merchant profile by merchant ID.
-
-### Get Inventory Counts
-
-Retrieve inventory counts for one or more catalog item variations. Can look up counts for a single item variation or batch retrieve counts for multiple items across locations.
-
-### Get Invoice
-
-Retrieve full details of a specific invoice by its ID, including payment requests, recipients, and accepted payment methods.
-
-### Get Order
-
-Retrieve full details of a specific order by its ID. Returns line items, taxes, discounts, fulfillments, tenders, and all order metadata.
-
-### Get Payment
-
-Retrieve full details of a specific payment by its ID. Returns comprehensive payment information including amount, status, card details, and receipt URL.
-
-### Get Refund
-
-Retrieve full details for a Square payment refund by refund ID.
-
-### List Customers
-
-Retrieve a list of customer profiles. Supports pagination and sorting by creation date or default order.
-
-### List Invoices
-
-Retrieve a list of invoices for a specific location. Returns invoice summaries including status, amounts, and recipients.
-
-### List Locations
-
-Retrieve all business locations associated with the Square account. Returns location names, addresses, statuses, and capabilities. Useful for obtaining location IDs needed by other tools.
-
-### List Payments
-
-Retrieve a list of payments taken by the Square account. Supports filtering by time range, location, and pagination. Returns payment details including amounts, status, and source type.
-
-### List Refunds
-
-Retrieve Square payment refunds with pagination and filters for created time, updated time, location, status, and source type.
-
-### Manage Invoice
-
-Publish, cancel, or delete an invoice. Publishing sends the invoice to the customer. Canceling stops a published invoice. Deleting permanently removes a draft invoice.
-
-### Manage Payment
-
-Complete or cancel an existing payment. Use "complete" to capture a previously authorized (delayed) payment, or "cancel" to void it.
-
-### Pay Order
-
-Mark a Square order as paid using approved delayed-capture payment IDs, or settle a zero-total order with an empty payment IDs array.
-
-### Refund Payment
-
-Issue a full or partial refund for a Square payment. Specify the payment ID and the amount to refund. Optionally provide a reason for the refund.
-
-### Search Catalog
-
-Search the Square catalog for items, variations, categories, taxes, discounts, and other catalog objects. Supports text search, category filtering, and object type filtering.
-
-### Search Customers
-
-Search Square customer profiles using common filters or an advanced Square customer query object.
-
-### Search Invoices
-
-Search Square invoices for a location, optionally narrowed to one customer.
-
-### Search Orders
-
-Search for orders across one or more locations. Supports filtering by date range, fulfillment state, customer, and other criteria. Use this to find and list orders.
-
-### Update Customer
-
-Update an existing customer profile. Only provided fields will be updated; omitted fields remain unchanged.
-
-### Update Invoice
-
-Update a Square invoice using sparse invoice fields and the current invoice version.
-
-### Update Order
-
-Update an open Square order using sparse order fields and the current order version.
-
-### Upsert Catalog Object
-
-Create or update a catalog object (item, variation, category, tax, discount, modifier list, etc.). Use a temporary ID starting with '#' for new objects. For updates, provide the existing object ID and current version.
-
-## License
-
-This integration is licensed under the [FSL-1.1](https://github.com/metorial/metorial-platform/blob/dev/LICENSE).
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://metorial.com">Metorial</a></sub>
-</div>
+| Area | Operations |
+| --- | --- |
+| Payments | List, retrieve, create, capture, cancel, update an authorization, or cancel by creation idempotency key. |
+| Refunds | Create, list, and retrieve payment-linked refunds. |
+| Orders | Create, retrieve, search, update, and pay orders. |
+| Customers | Create, retrieve, list, search, update, and delete profiles. |
+| Catalog | Search items/objects, retrieve, upsert, and delete objects. |
+| Inventory | Retrieve counts and apply adjustments or physical counts. |
+| Invoices | Create, retrieve, list, search, update, publish, cancel, and delete drafts. |
+| Discovery | List/retrieve locations and retrieve the authenticated merchant. |
+| Payment links | Create quick-pay or itemized checkout links; list, retrieve, update, and delete links. |
+| Saved cards | Create, list, retrieve, and disable tokenized cards associated with customers. |
+| Subscriptions | Create, search, retrieve, update, and schedule cancellation. |
+| Payouts | List/retrieve payouts and inspect payout entries. |
+| Disputes | List/retrieve disputes, their payment IDs, states, and response deadlines. |
+
+There are 52 tools. List/search responses expose pagination cursors. Use discovery
+results for resource IDs and the latest version from a retrieval before versioned
+writes. Monetary inputs use integer minor units in their specified currency.
+Supply a stable idempotency key when retrying a creation request.
+
+Catalog upserts replace complete objects and nested children. Retrieve the object
+before updating it and preserve children you want to keep. Order and invoice
+updates instead apply sparse fields and UID-based child changes. Inventory
+movement uses an adjustment with source and destination locations.
+
+Subscription cancellation is scheduled at the end of the billing period and can
+leave the subscription `ACTIVE` until its cancellation date. Disputes and payouts
+are read-only. API invoice delivery supports email and manually shared links.
+
+## Events
+
+One application webhook receives payment, refund, order, customer, invoice,
+catalog, inventory, booking, dispute, subscription, and loyalty events.
+Inventory notifications include all changed counts. Booking notifications use
+buyer-level access; seller-level access requires the additional Square permission
+`APPOINTMENTS_ALL_READ`.
+
+Configure a webhook once per Square application and environment. Square webhook
+subscriptions belong to an application and cannot be created with seller OAuth
+tokens. Use the Square Developer Console to register the supplied notification
+URL and event list, then complete setup with the application ID, environment, and
+subscription signature key **before testing delivery**. Platform applications can
+share a registration across their authorized merchants; customer-owned applications
+use their own registration.
+
+Every delivery is verified against the exact registered URL and raw payload.
+Events route to the matching application, environment, and merchant. Old deliveries
+outside the 24-hour retry window plus five minutes are rejected; repeated event
+IDs are deduplicated.
+
+## References
+
+- [Square API reference](https://developer.squareup.com/reference/square)
+- [OAuth permissions](https://developer.squareup.com/docs/oauth-api/square-permissions)
+- [Webhook subscriptions](https://developer.squareup.com/reference/square/webhook-subscriptions-api)
+- [Verify webhook signatures](https://developer.squareup.com/docs/webhooks/step3validate)

@@ -1,113 +1,89 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient, generateIdempotencyKey } from '../lib/helpers';
 import { spec } from '../spec';
+import {
+  acceptedPaymentMethodsSchema,
+  invoiceOutputSchema,
+  mapAcceptedPaymentMethods,
+  mapInvoice
+} from './invoice-shared';
 
 export let createInvoice = SlateTool.create(spec, {
   name: 'Create Invoice',
   key: 'create_invoice',
-  description: `Create a new draft invoice for an existing order. The invoice must be published separately before it can be sent to the customer.`,
+  description:
+    'Create a draft invoice for an existing order. A payment schedule is required; publish separately to make the invoice available to the customer.',
   instructions: [
-    'An order must be created first using the Create Order tool.',
-    'After creating, use the Manage Invoice tool to publish the invoice.'
+    'Create the order first with create_order.',
+    'Publish the draft with manage_invoice when ready.'
   ],
   tags: { destructive: false }
 })
+  .scopes(allOf('INVOICES_WRITE', 'ORDERS_WRITE'))
   .input(
     z.object({
-      locationId: z.string().describe('Location ID for the invoice'),
-      orderId: z.string().describe('Order ID the invoice is based on'),
+      locationId: z.string().describe('Order location ID; discover with list_locations'),
+      orderId: z.string().describe('Existing order ID from create_order or get_order'),
       primaryRecipientCustomerId: z
         .string()
         .optional()
-        .describe('Customer ID of the primary recipient'),
+        .describe('Recipient customer ID; required before publishing'),
       paymentRequests: z
         .array(z.record(z.string(), z.any()))
-        .optional()
-        .describe('Payment request configurations with due dates and amounts'),
-      deliveryMethod: z
-        .enum(['EMAIL', 'SHARE_MANUALLY', 'SMS'])
-        .optional()
-        .describe('How the invoice is delivered to the customer'),
-      invoiceNumber: z.string().optional().describe('Custom invoice number'),
-      title: z.string().optional().describe('Invoice title'),
-      description: z.string().optional().describe('Invoice description'),
-      scheduledAt: z
-        .string()
-        .optional()
-        .describe('RFC 3339 timestamp for when to send the invoice'),
-      acceptedPaymentMethods: z
-        .object({
-          card: z.boolean().optional(),
-          squareGiftCard: z.boolean().optional(),
-          bankAccount: z.boolean().optional(),
-          buyNowPayLater: z.boolean().optional(),
-          cashAppPay: z.boolean().optional()
-        })
-        .optional()
-        .describe('Payment methods accepted for this invoice'),
-      saleOrServiceDate: z
-        .string()
-        .optional()
-        .describe('Date of sale or service in YYYY-MM-DD format'),
-      idempotencyKey: z.string().optional()
-    })
-  )
-  .output(
-    z.object({
-      invoiceId: z.string().optional(),
+        .min(1)
+        .describe(
+          'One balance request, deposit plus balance, or eligible installments; amounts must total the order'
+        ),
+      deliveryMethod: z.enum(['EMAIL', 'SHARE_MANUALLY']).optional(),
       invoiceNumber: z.string().optional(),
-      status: z.string().optional(),
-      version: z.number().optional(),
-      orderId: z.string().optional(),
-      createdAt: z.string().optional()
+      title: z.string().optional(),
+      description: z.string().optional(),
+      scheduledAt: z.string().optional().describe('RFC 3339 send time'),
+      acceptedPaymentMethods: acceptedPaymentMethodsSchema.optional(),
+      saleOrServiceDate: z.string().optional().describe('YYYY-MM-DD date'),
+      customFields: z
+        .array(z.record(z.string(), z.any()))
+        .max(2)
+        .optional()
+        .describe('Complete custom field list; requires Invoices Plus'),
+      storePaymentMethodEnabled: z.boolean().optional(),
+      idempotencyKey: z
+        .string()
+        .min(1)
+        .max(128)
+        .optional()
+        .describe('Unique retry key; supply one when retrying an uncertain create request')
     })
   )
+  .output(invoiceOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
-
     let invoice: Record<string, any> = {
       location_id: ctx.input.locationId,
       order_id: ctx.input.orderId,
+      payment_requests: ctx.input.paymentRequests,
       delivery_method: ctx.input.deliveryMethod,
       invoice_number: ctx.input.invoiceNumber,
       title: ctx.input.title,
       description: ctx.input.description,
       scheduled_at: ctx.input.scheduledAt,
-      sale_or_service_date: ctx.input.saleOrServiceDate
+      sale_or_service_date: ctx.input.saleOrServiceDate,
+      custom_fields: ctx.input.customFields,
+      store_payment_method_enabled: ctx.input.storePaymentMethodEnabled
     };
-
-    if (ctx.input.primaryRecipientCustomerId) {
+    if (ctx.input.primaryRecipientCustomerId)
       invoice.primary_recipient = { customer_id: ctx.input.primaryRecipientCustomerId };
-    }
-    if (ctx.input.paymentRequests) {
-      invoice.payment_requests = ctx.input.paymentRequests;
-    }
-    if (ctx.input.acceptedPaymentMethods) {
-      invoice.accepted_payment_methods = {
-        card: ctx.input.acceptedPaymentMethods.card,
-        square_gift_card: ctx.input.acceptedPaymentMethods.squareGiftCard,
-        bank_account: ctx.input.acceptedPaymentMethods.bankAccount,
-        buy_now_pay_later: ctx.input.acceptedPaymentMethods.buyNowPayLater,
-        cash_app_pay: ctx.input.acceptedPaymentMethods.cashAppPay
-      };
-    }
-
-    let i = await client.createInvoice({
+    if (ctx.input.acceptedPaymentMethods)
+      invoice.accepted_payment_methods = mapAcceptedPaymentMethods(
+        ctx.input.acceptedPaymentMethods
+      );
+    let created = await createClient(ctx.auth).createInvoice({
       invoice,
       idempotencyKey: ctx.input.idempotencyKey || generateIdempotencyKey()
     });
-
     return {
-      output: {
-        invoiceId: i.id,
-        invoiceNumber: i.invoice_number,
-        status: i.status,
-        version: i.version,
-        orderId: i.order_id,
-        createdAt: i.created_at
-      },
-      message: `Invoice **${i.id}** created in **${i.status}** status.`
+      output: mapInvoice(created),
+      message: `Invoice **${created.id}** created as a draft. Publishing can send email or charge a saved card depending on its settings.`
     };
   })
   .build();

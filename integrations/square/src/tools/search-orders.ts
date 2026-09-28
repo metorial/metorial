@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient } from '../lib/helpers';
 import { spec } from '../spec';
@@ -16,11 +16,22 @@ export let searchOrders = SlateTool.create(spec, {
   description: `Search for orders across one or more locations. Supports filtering by date range, fulfillment state, customer, and other criteria. Use this to find and list orders.`,
   tags: { readOnly: true }
 })
+  .scopes(allOf('ORDERS_READ'))
   .input(
     z.object({
-      locationIds: z.array(z.string()).describe('Location IDs to search orders in'),
+      locationIds: z
+        .array(z.string())
+        .min(1)
+        .max(10)
+        .describe('Location IDs to search orders in; discover with list_locations'),
       cursor: z.string().optional().describe('Pagination cursor from previous response'),
-      limit: z.number().optional().describe('Maximum number of results to return'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(1000)
+        .optional()
+        .describe('Maximum number of results to return (max 1000)'),
       query: z
         .object({
           filter: z
@@ -51,6 +62,9 @@ export let searchOrders = SlateTool.create(spec, {
           totalTaxMoney: moneySchema,
           totalDiscountMoney: moneySchema,
           totalTipMoney: moneySchema,
+          totalServiceChargeMoney: moneySchema,
+          serviceCharges: z.array(z.record(z.string(), z.any())).optional(),
+          version: z.number().optional(),
           lineItemCount: z.number().optional(),
           createdAt: z.string().optional(),
           updatedAt: z.string().optional(),
@@ -61,7 +75,7 @@ export let searchOrders = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    let client = createClient(ctx.auth);
     let result = await client.searchOrders({
       locationIds: ctx.input.locationIds,
       cursor: ctx.input.cursor,
@@ -79,6 +93,9 @@ export let searchOrders = SlateTool.create(spec, {
       totalTaxMoney: o.total_tax_money,
       totalDiscountMoney: o.total_discount_money,
       totalTipMoney: o.total_tip_money,
+      totalServiceChargeMoney: o.total_service_charge_money,
+      serviceCharges: o.service_charges,
+      version: o.version,
       lineItemCount: o.line_items?.length,
       createdAt: o.created_at,
       updatedAt: o.updated_at,

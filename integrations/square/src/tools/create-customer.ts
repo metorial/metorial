@@ -1,8 +1,9 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { squareServiceError } from '../lib/errors';
-import { createClient, generateIdempotencyKey } from '../lib/helpers';
+import { createClient, generateIdempotencyKey, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
+import { customerOutputSchema, mapCustomer } from './shared';
 
 export let createCustomer = SlateTool.create(spec, {
   name: 'Create Customer',
@@ -10,13 +11,14 @@ export let createCustomer = SlateTool.create(spec, {
   description: `Create a new customer profile. Provide at least one of: given name, family name, company name, email address, or phone number.`,
   tags: { destructive: false }
 })
+  .scopes(allOf('CUSTOMERS_WRITE'))
   .input(
     z.object({
-      givenName: z.string().optional().describe('Customer first name'),
-      familyName: z.string().optional().describe('Customer last name'),
-      companyName: z.string().optional().describe('Company or business name'),
-      nickname: z.string().optional().describe('Customer nickname'),
-      emailAddress: z.string().optional().describe('Customer email address'),
+      givenName: z.string().max(300).optional().describe('Customer first name'),
+      familyName: z.string().max(300).optional().describe('Customer last name'),
+      companyName: z.string().max(500).optional().describe('Company or business name'),
+      nickname: z.string().max(100).optional().describe('Customer nickname'),
+      emailAddress: z.string().max(254).optional().describe('Customer email address'),
       phoneNumber: z.string().optional().describe('Customer phone number'),
       address: z
         .object({
@@ -30,23 +32,20 @@ export let createCustomer = SlateTool.create(spec, {
         .optional()
         .describe('Customer address'),
       note: z.string().optional().describe('A note about the customer'),
-      referenceId: z.string().optional().describe('Your custom reference ID'),
-      birthday: z.string().optional().describe('Customer birthday in YYYY-MM-DD format'),
+      referenceId: z.string().max(100).optional().describe('Your custom reference ID'),
+      birthday: z
+        .string()
+        .optional()
+        .describe('Customer birthday in YYYY-MM-DD or MM-DD format'),
       idempotencyKey: z
         .string()
+        .min(1)
+        .max(128)
         .optional()
         .describe('Unique key to prevent duplicates. Auto-generated if omitted')
     })
   )
-  .output(
-    z.object({
-      customerId: z.string().optional(),
-      givenName: z.string().optional(),
-      familyName: z.string().optional(),
-      emailAddress: z.string().optional(),
-      createdAt: z.string().optional()
-    })
-  )
+  .output(customerOutputSchema)
   .handleInvocation(async ctx => {
     if (
       !ctx.input.givenName &&
@@ -60,7 +59,8 @@ export let createCustomer = SlateTool.create(spec, {
       );
     }
 
-    let client = createClient(ctx.auth, ctx.config);
+    requireSquareScopes(ctx.auth, ['CUSTOMERS_WRITE']);
+    let client = createClient(ctx.auth);
 
     let addressInput = ctx.input.address
       ? {
@@ -88,13 +88,7 @@ export let createCustomer = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        customerId: c.id,
-        givenName: c.given_name,
-        familyName: c.family_name,
-        emailAddress: c.email_address,
-        createdAt: c.created_at
-      },
+      output: mapCustomer(c),
       message: `Customer **${c.id}** created — ${[c.given_name, c.family_name].filter(Boolean).join(' ') || c.email_address || 'New customer'}`
     };
   })

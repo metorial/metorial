@@ -1,40 +1,129 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
-import { createClient } from '../lib/helpers';
+import { squareServiceError } from '../lib/errors';
+import { createClient, requireSquareScopes } from '../lib/helpers';
 import { spec } from '../spec';
+import { customerOutputSchema, mapCustomer } from './shared';
 
 export let updateCustomer = SlateTool.create(spec, {
   name: 'Update Customer',
   key: 'update_customer',
-  description: `Update an existing customer profile. Only provided fields will be updated; omitted fields remain unchanged.`
+  description: `Update an existing customer profile. Omitted fields remain unchanged; use null to clear a field or an address component.`
 })
+  .scopes(allOf('CUSTOMERS_WRITE'))
   .input(
     z.object({
       customerId: z.string().describe('The ID of the customer to update'),
-      givenName: z.string().optional().describe('Updated first name'),
-      familyName: z.string().optional().describe('Updated last name'),
-      companyName: z.string().optional().describe('Updated company name'),
-      nickname: z.string().optional().describe('Updated nickname'),
-      emailAddress: z.string().optional().describe('Updated email address'),
-      phoneNumber: z.string().optional().describe('Updated phone number'),
-      note: z.string().optional().describe('Updated note'),
-      referenceId: z.string().optional().describe('Updated reference ID'),
-      birthday: z.string().optional().describe('Updated birthday in YYYY-MM-DD format'),
-      version: z.number().optional().describe('Current version for optimistic concurrency')
+      givenName: z
+        .string()
+        .max(300)
+        .nullable()
+        .optional()
+        .describe('Updated first name; null clears it'),
+      familyName: z
+        .string()
+        .max(300)
+        .nullable()
+        .optional()
+        .describe('Updated last name; null clears it'),
+      companyName: z
+        .string()
+        .max(500)
+        .nullable()
+        .optional()
+        .describe('Updated company name; null clears it'),
+      nickname: z
+        .string()
+        .max(100)
+        .nullable()
+        .optional()
+        .describe('Updated nickname; null clears it'),
+      emailAddress: z
+        .string()
+        .max(254)
+        .nullable()
+        .optional()
+        .describe('Updated email address; null clears it'),
+      phoneNumber: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Updated phone number; null clears it'),
+      address: z
+        .object({
+          addressLine1: z.string().nullable().optional(),
+          addressLine2: z.string().nullable().optional(),
+          locality: z.string().nullable().optional(),
+          administrativeDistrictLevel1: z.string().nullable().optional(),
+          postalCode: z.string().nullable().optional(),
+          country: z.string().nullable().optional()
+        })
+        .nullable()
+        .optional()
+        .describe(
+          'Sparse address update; null clears the entire address, or use null within an address field to clear that component'
+        ),
+      note: z.string().nullable().optional().describe('Updated note; null clears it'),
+      referenceId: z
+        .string()
+        .max(100)
+        .nullable()
+        .optional()
+        .describe('Updated reference ID; null clears it'),
+      birthday: z
+        .string()
+        .nullable()
+        .optional()
+        .describe('Updated birthday in YYYY-MM-DD or MM-DD format; null clears it'),
+      version: z
+        .number()
+        .int()
+        .nonnegative()
+        .optional()
+        .describe('Current version for optimistic concurrency')
     })
   )
-  .output(
-    z.object({
-      customerId: z.string().optional(),
-      givenName: z.string().optional(),
-      familyName: z.string().optional(),
-      emailAddress: z.string().optional(),
-      updatedAt: z.string().optional(),
-      version: z.number().optional()
-    })
-  )
+  .output(customerOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    if (
+      ![
+        'givenName',
+        'familyName',
+        'companyName',
+        'nickname',
+        'emailAddress',
+        'phoneNumber',
+        'address',
+        'note',
+        'referenceId',
+        'birthday'
+      ].some(key => ctx.input[key as keyof typeof ctx.input] !== undefined)
+    ) {
+      throw squareServiceError('Provide at least one customer field to update.');
+    }
+    if (
+      ctx.input.address &&
+      Object.values(ctx.input.address).every(value => value === undefined)
+    ) {
+      throw squareServiceError(
+        'Provide at least one address field, or null to clear the address.'
+      );
+    }
+    requireSquareScopes(ctx.auth, ['CUSTOMERS_WRITE']);
+    let client = createClient(ctx.auth);
+    let address =
+      ctx.input.address === null
+        ? null
+        : ctx.input.address
+          ? {
+              address_line_1: ctx.input.address.addressLine1,
+              address_line_2: ctx.input.address.addressLine2,
+              locality: ctx.input.address.locality,
+              administrative_district_level_1: ctx.input.address.administrativeDistrictLevel1,
+              postal_code: ctx.input.address.postalCode,
+              country: ctx.input.address.country
+            }
+          : undefined;
     let c = await client.updateCustomer(ctx.input.customerId, {
       givenName: ctx.input.givenName,
       familyName: ctx.input.familyName,
@@ -42,6 +131,7 @@ export let updateCustomer = SlateTool.create(spec, {
       nickname: ctx.input.nickname,
       emailAddress: ctx.input.emailAddress,
       phoneNumber: ctx.input.phoneNumber,
+      address,
       note: ctx.input.note,
       referenceId: ctx.input.referenceId,
       birthday: ctx.input.birthday,
@@ -49,14 +139,7 @@ export let updateCustomer = SlateTool.create(spec, {
     });
 
     return {
-      output: {
-        customerId: c.id,
-        givenName: c.given_name,
-        familyName: c.family_name,
-        emailAddress: c.email_address,
-        updatedAt: c.updated_at,
-        version: c.version
-      },
+      output: mapCustomer(c),
       message: `Customer **${c.id}** updated — ${[c.given_name, c.family_name].filter(Boolean).join(' ') || c.email_address || 'Customer'}`
     };
   })

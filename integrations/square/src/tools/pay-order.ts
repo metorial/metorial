@@ -1,8 +1,8 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
 import { createClient, generateIdempotencyKey } from '../lib/helpers';
 import { spec } from '../spec';
-import { mapOrderSummary, orderSummaryOutputSchema } from './shared';
+import { mapOrderSummary, orderSummaryOutputSchema } from './order-shared';
 
 export let payOrder = SlateTool.create(spec, {
   name: 'Pay Order',
@@ -11,21 +11,25 @@ export let payOrder = SlateTool.create(spec, {
     'Mark a Square order as paid using approved delayed-capture payment IDs, or settle a zero-total order with an empty paymentIds array.',
   tags: { destructive: false }
 })
+  .scopes(allOf('ORDERS_WRITE', 'PAYMENTS_WRITE'))
   .input(
     z.object({
       orderId: z.string().describe('The ID of the order to pay'),
       paymentIds: z
         .array(z.string())
-        .optional()
         .describe(
           'Approved payment IDs to collect. Use an empty array for a zero-total order.'
         ),
       orderVersion: z
         .number()
+        .int()
+        .nonnegative()
         .optional()
         .describe('Order version to pay; latest is used if omitted'),
       idempotencyKey: z
         .string()
+        .min(1)
+        .max(192)
         .optional()
         .describe(
           'Unique key to prevent duplicate payment attempts. Auto-generated if omitted'
@@ -34,7 +38,7 @@ export let payOrder = SlateTool.create(spec, {
   )
   .output(orderSummaryOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
+    let client = createClient(ctx.auth);
     let order = await client.payOrder(ctx.input.orderId, {
       paymentIds: ctx.input.paymentIds,
       orderVersion: ctx.input.orderVersion,

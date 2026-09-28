@@ -1,99 +1,29 @@
-import { badRequestError, ServiceError } from '@lowerdeck/error';
+import { buildApiServiceError } from 'slates';
 
-type ErrorResponse = {
-  status?: number;
-  statusText?: string;
-  data?: unknown;
-};
+export { createApiServiceError as squareServiceError } from 'slates';
 
-let isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-let pushMessage = (messages: string[], value: unknown) => {
-  if (typeof value !== 'string') return;
-
-  let message = value.trim();
-  if (message && !messages.includes(message)) {
-    messages.push(message);
-  }
-};
-
-let collectSquareMessages = (value: unknown, messages: string[]) => {
-  if (typeof value === 'string') {
-    pushMessage(messages, value);
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    for (let item of value) collectSquareMessages(item, messages);
-    return;
-  }
-
-  if (!isRecord(value)) {
-    return;
-  }
-
-  for (let key of ['detail', 'code', 'category', 'field', 'message', 'error_description']) {
-    pushMessage(messages, value[key]);
-  }
-
-  for (let nested of Object.values(value)) {
-    if (Array.isArray(nested) || isRecord(nested)) {
-      collectSquareMessages(nested, messages);
+export let squareApiError = (error: unknown, operation = 'request') =>
+  buildApiServiceError(error, {
+    providerLabel: 'Square',
+    reason: 'square_api_error',
+    operation,
+    detailKeys: ['detail', 'code', 'category', 'field', 'message', 'error_description'],
+    nestedKeys: ['errors', 'error'],
+    extractResponse: (error, { getResponse, isRecord }) => {
+      const response = getResponse(error);
+      if (
+        !isRecord(error) ||
+        error.name !== 'SlateError' ||
+        !isRecord(error.data) ||
+        !isRecord(error.data.baggage)
+      ) {
+        return response;
+      }
+      return { ...response, data: error.data.baggage.response };
+    },
+    extractUpstreamCode: (_error, response, { isRecord }) => {
+      if (!isRecord(response?.data) || !Array.isArray(response.data.errors)) return;
+      let first = response.data.errors[0];
+      return isRecord(first) && typeof first.code === 'string' ? first.code : undefined;
     }
-  }
-};
-
-let extractSquareMessage = (error: unknown) => {
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let data = response?.data;
-  let messages: string[] = [];
-
-  if (isRecord(data)) {
-    collectSquareMessages(data.errors, messages);
-    collectSquareMessages(data.error_description, messages);
-    collectSquareMessages(data.error, messages);
-    collectSquareMessages(data.message, messages);
-  } else {
-    collectSquareMessages(data, messages);
-  }
-
-  if (messages.length > 0) {
-    return messages.join(' - ');
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return 'Unknown error';
-};
-
-export let squareServiceError = (message: string) =>
-  new ServiceError(badRequestError({ message }));
-
-export let squareApiError = (error: unknown, operation = 'request') => {
-  if (error instanceof ServiceError) {
-    return error;
-  }
-
-  let response = isRecord(error) ? (error.response as ErrorResponse | undefined) : undefined;
-  let status = response?.status;
-  let statusLabel =
-    status !== undefined
-      ? `HTTP ${status}${response?.statusText ? ` ${response.statusText}` : ''}: `
-      : '';
-
-  let serviceError = squareServiceError(
-    `Square API ${operation} failed: ${statusLabel}${extractSquareMessage(error)}`
-  );
-
-  serviceError.data.reason = 'square_api_error';
-  serviceError.data.upstreamStatus = status;
-
-  if (error instanceof Error) {
-    serviceError.setParent(error);
-  }
-
-  return serviceError;
-};
+  });

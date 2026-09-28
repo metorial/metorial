@@ -1,85 +1,108 @@
-import { SlateTool } from 'slates';
+import { allOf, SlateTool } from 'slates';
 import { z } from 'zod';
+import { squareServiceError } from '../lib/errors';
 import { createClient, generateIdempotencyKey } from '../lib/helpers';
 import { spec } from '../spec';
-import { invoiceSummaryOutputSchema, mapInvoiceSummary } from './shared';
+import {
+  acceptedPaymentMethodsSchema,
+  invoiceOutputSchema,
+  mapAcceptedPaymentMethods,
+  mapInvoice
+} from './invoice-shared';
 
 export let updateInvoice = SlateTool.create(spec, {
   name: 'Update Invoice',
   key: 'update_invoice',
   description:
-    'Update a Square invoice using sparse invoice fields and the current invoice version. Some fields, including order_id and location_id, cannot be changed by Square.',
+    'Update sparse invoice fields using the current version. Updating a published invoice can notify its customer. Use null or payment-request remove markers to clear supported values.',
   tags: { destructive: false }
 })
+  .scopes(allOf('INVOICES_WRITE', 'ORDERS_WRITE'))
   .input(
     z.object({
-      invoiceId: z.string().describe('The ID of the invoice to update'),
-      version: z.number().describe('Current invoice version for optimistic concurrency'),
-      title: z.string().optional().describe('Updated invoice title'),
-      description: z.string().optional().describe('Updated invoice description'),
+      invoiceId: z.string(),
+      version: z
+        .number()
+        .int()
+        .nonnegative()
+        .describe('Current invoice version from get_invoice'),
+      invoiceNumber: z.string().nullable().optional(),
+      title: z.string().nullable().optional(),
+      description: z.string().nullable().optional(),
+      primaryRecipientCustomerId: z
+        .string()
+        .nullable()
+        .optional()
+        .describe(
+          'Draft invoices only. To refresh recipient contact details, clear this field in one update, then set it in another'
+        ),
       paymentRequests: z
         .array(z.record(z.string(), z.any()))
+        .nullable()
         .optional()
-        .describe('Replacement or sparse payment request updates'),
-      deliveryMethod: z.enum(['EMAIL', 'SHARE_MANUALLY']).optional(),
-      scheduledAt: z
-        .string()
+        .describe('Sparse requests by uid; use {uid, remove:true} to remove a request'),
+      deliveryMethod: z.enum(['EMAIL', 'SHARE_MANUALLY']).nullable().optional(),
+      scheduledAt: z.string().nullable().optional(),
+      acceptedPaymentMethods: acceptedPaymentMethodsSchema.nullable().optional(),
+      saleOrServiceDate: z.string().nullable().optional(),
+      customFields: z
+        .array(z.record(z.string(), z.any()))
+        .max(2)
+        .nullable()
         .optional()
-        .describe('RFC 3339 timestamp for when to send the invoice'),
-      acceptedPaymentMethods: z
-        .object({
-          card: z.boolean().optional(),
-          squareGiftCard: z.boolean().optional(),
-          bankAccount: z.boolean().optional(),
-          buyNowPayLater: z.boolean().optional(),
-          cashAppPay: z.boolean().optional()
-        })
+        .describe('Complete custom field list; requires Invoices Plus'),
+      storePaymentMethodEnabled: z.boolean().nullable().optional(),
+      fieldsToClear: z
+        .array(z.string())
         .optional()
-        .describe('Payment methods accepted for this invoice'),
-      saleOrServiceDate: z
-        .string()
-        .optional()
-        .describe('Date of sale or service in YYYY-MM-DD format'),
-      fieldsToClear: z.array(z.string()).optional().describe('Invoice fields to clear'),
-      idempotencyKey: z
-        .string()
-        .optional()
-        .describe('Unique key to prevent duplicate updates. Auto-generated if omitted')
+        .describe('Square paths to clear; do not combine with null on the same field'),
+      idempotencyKey: z.string().min(1).max(128).optional()
     })
   )
-  .output(invoiceSummaryOutputSchema)
+  .output(invoiceOutputSchema)
   .handleInvocation(async ctx => {
-    let client = createClient(ctx.auth, ctx.config);
-    let invoice: Record<string, any> = {
-      version: ctx.input.version,
-      title: ctx.input.title,
-      description: ctx.input.description,
-      payment_requests: ctx.input.paymentRequests,
-      delivery_method: ctx.input.deliveryMethod,
-      scheduled_at: ctx.input.scheduledAt,
-      sale_or_service_date: ctx.input.saleOrServiceDate
+    let input = ctx.input;
+    let fields: Record<string, any> = {
+      invoice_number: input.invoiceNumber,
+      title: input.title,
+      description: input.description,
+      payment_requests: input.paymentRequests,
+      delivery_method: input.deliveryMethod,
+      scheduled_at: input.scheduledAt,
+      sale_or_service_date: input.saleOrServiceDate,
+      custom_fields: input.customFields,
+      store_payment_method_enabled: input.storePaymentMethodEnabled,
+      accepted_payment_methods:
+        input.acceptedPaymentMethods === null
+          ? null
+          : input.acceptedPaymentMethods
+            ? mapAcceptedPaymentMethods(input.acceptedPaymentMethods)
+            : undefined,
+      primary_recipient:
+        input.primaryRecipientCustomerId === null
+          ? null
+          : input.primaryRecipientCustomerId
+            ? { customer_id: input.primaryRecipientCustomerId }
+            : undefined
     };
-
-    if (ctx.input.acceptedPaymentMethods) {
-      invoice.accepted_payment_methods = {
-        card: ctx.input.acceptedPaymentMethods.card,
-        square_gift_card: ctx.input.acceptedPaymentMethods.squareGiftCard,
-        bank_account: ctx.input.acceptedPaymentMethods.bankAccount,
-        buy_now_pay_later: ctx.input.acceptedPaymentMethods.buyNowPayLater,
-        cash_app_pay: ctx.input.acceptedPaymentMethods.cashAppPay
-      };
+    let specified = Object.entries(fields).filter(([, value]) => value !== undefined);
+    if (!specified.length && !input.fieldsToClear?.length)
+      throw squareServiceError(
+        'Provide at least one invoice field or fieldsToClear path to update.'
+      );
+    if (input.fieldsToClear?.length && specified.some(([, value]) => value === null)) {
+      throw squareServiceError(
+        'Use either null values or fieldsToClear in one invoice update, not both.'
+      );
     }
-
-    let updated = await client.updateInvoice(ctx.input.invoiceId, {
-      invoice,
-      fieldsToClear: ctx.input.fieldsToClear,
-      idempotencyKey: ctx.input.idempotencyKey || generateIdempotencyKey()
+    let updated = await createClient(ctx.auth).updateInvoice(input.invoiceId, {
+      invoice: { version: input.version, ...Object.fromEntries(specified) },
+      fieldsToClear: input.fieldsToClear,
+      idempotencyKey: input.idempotencyKey || generateIdempotencyKey()
     });
-    let output = mapInvoiceSummary(updated);
-
     return {
-      output,
-      message: `Invoice **${output.invoiceId}** updated. Status: **${output.status}**`
+      output: mapInvoice(updated),
+      message: `Invoice **${updated.id}** updated to version **${updated.version}**.`
     };
   })
   .build();
