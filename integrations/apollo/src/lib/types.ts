@@ -66,6 +66,8 @@ export interface ApolloOrganization {
   estimated_num_employees?: number;
   annual_revenue?: number;
   annual_revenue_printed?: string;
+  street_address?: string | null;
+  postal_code?: string | null;
   technology_names?: string[];
   city?: string;
   state?: string;

@@ -6,9 +6,10 @@ import { spec } from '../spec';
 export let getQuote = SlateTool.create(spec, {
   name: 'Get Quote',
   key: 'get_quote',
-  description: `Get a pricing quote for a property stay or retrieve the quote associated with an existing booking. When querying by property, returns one price estimate per applicable rate plan for the specified dates, optionally priced for a specific guest breakdown, add-ons, and promotion code. When querying by booking, returns the single current quote with full pricing breakdown including fees and taxes.`,
+  description: `Get a pricing quote for a property stay or retrieve the quote associated with an existing booking. When querying by property, requires stay dates and at least one room type with its guest counts, and returns one price estimate per applicable rate plan. Add-ons and a promotion code are optional. When querying by booking, returns the single current quote with full pricing breakdown including fees and taxes.`,
   instructions: [
-    'Provide either bookingId, or propertyId with arrival and departure dates.',
+    'Provide either bookingId, or propertyId with arrival, departure, and a non-empty roomTypes array. Each roomTypes entry must include roomTypeId and adults.',
+    'For property quotes, use Get Property with includeRooms=true to find room type IDs, then supply the guest counts for each selected room type. Property and dates alone are not enough to calculate a quote.',
     'roomTypes, addOns, and promotionCode only apply to the propertyId branch; the quote of an existing booking is returned as it was priced.',
     'Quotes for a property are priced per rate plan, so the propertyId branch can return several quotes for the same dates.'
   ],
@@ -46,7 +47,7 @@ export let getQuote = SlateTool.create(spec, {
         )
         .optional()
         .describe(
-          'Room types to price with their guest breakdown (propertyId branch only). Use the Get Property tool to find room type IDs. Rates and fees depend on the guest counts, so pass them for an accurate estimate'
+          'Required for property quotes: a non-empty array of room types, each with roomTypeId and adults. Use Get Property with includeRooms=true to find room type IDs. Omit when using bookingId'
         ),
       addOns: z
         .array(
@@ -102,7 +103,13 @@ export let getQuote = SlateTool.create(spec, {
 
     if (!ctx.input.propertyId || !ctx.input.arrival || !ctx.input.departure) {
       throw createApiServiceError(
-        'Either bookingId or propertyId with arrival/departure dates must be provided.'
+        'Provide either bookingId, or propertyId with arrival/departure dates and a non-empty roomTypes array.'
+      );
+    }
+
+    if (!ctx.input.roomTypes?.length) {
+      throw createApiServiceError(
+        'roomTypes must contain at least one room type when requesting a property quote. Use Get Property with includeRooms=true to find room type IDs, then provide roomTypeId and adults for each room type.'
       );
     }
 
@@ -112,7 +119,7 @@ export let getQuote = SlateTool.create(spec, {
       // `People` is deprecated in favour of the guest breakdown but is still passed in
       // Lodgify's own documented example, so it is mirrored from the adult count it was
       // replaced by; the two can never disagree.
-      roomTypes: ctx.input.roomTypes?.map(r => ({
+      roomTypes: ctx.input.roomTypes.map(r => ({
         Id: r.roomTypeId,
         People: r.adults,
         guest_breakdown: {

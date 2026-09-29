@@ -192,17 +192,6 @@ export class AmplitudeClient {
     );
   }
 
-  private getExportAxios() {
-    return this.withErrorHandling(
-      createAxios({
-        baseURL: getBaseUrl(this.config.region),
-        headers: {
-          Authorization: `Basic ${this.config.token}`
-        }
-      })
-    );
-  }
-
   // --- Event Ingestion ---
 
   async trackEvents(events: AmplitudeEvent[], options?: { minIdLength?: number }) {
@@ -1114,26 +1103,11 @@ export class AmplitudeClient {
 
   // --- Export API ---
 
-  async exportEvents(params: { start: string; end: string }) {
+  getEventsExportUrl(params: { start: string; end: string }) {
     validateDateRange(params.start, params.end, 'hour');
-    let ax = this.getExportAxios();
-    let response = await ax.get('/api/2/export', {
-      params: { start: params.start, end: params.end },
-      responseType: 'arraybuffer'
-    });
-
-    let buffer = Buffer.isBuffer(response.data) ? response.data : Buffer.from(response.data);
-    let contentTypeHeader = response.headers?.['content-type'];
-    let contentType =
-      typeof contentTypeHeader === 'string'
-        ? contentTypeHeader.split(';')[0]?.trim()
-        : undefined;
-
-    return {
-      contentBase64: buffer.toString('base64'),
-      contentType: contentType || 'application/zip',
-      byteLength: buffer.byteLength
-    };
+    let url = new URL('/api/2/export', getBaseUrl(this.config.region));
+    url.search = new URLSearchParams(params).toString();
+    return url.toString();
   }
 
   // --- User Privacy / Deletion ---

@@ -1,4 +1,4 @@
-import { createBase64Attachment, SlateTool } from 'slates';
+import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { createAmplitudeClient } from '../lib/client';
 import { spec } from '../spec';
@@ -11,7 +11,8 @@ export let exportEventsTool = SlateTool.create(spec, {
     'The Export API returns data by server upload time, not event time.',
     'Data may take up to two hours to become available.',
     'Use whole-day ranges from T00 to T23 when exporting a full day.',
-    'Each export may be up to 4 GB and date ranges may not exceed 365 days.'
+    'Each export may be up to 4 GB and date ranges may not exceed 365 days.',
+    'Amplitude checks the export when the file is downloaded. A range with no uploaded events returns no data; shorten the range if the download is too large or times out.'
   ],
   tags: {
     destructive: false,
@@ -34,24 +35,32 @@ export let exportEventsTool = SlateTool.create(spec, {
   .output(
     z.object({
       contentType: z.string().describe('MIME type of the exported file.'),
-      byteLength: z.number().describe('Size of the exported ZIP file in bytes.')
+      byteLength: z
+        .number()
+        .optional()
+        .describe('Size of the exported ZIP file in bytes, when known.')
     })
   )
   .handleInvocation(async ctx => {
     let client = createAmplitudeClient(ctx);
 
-    let result = await client.exportEvents({
+    let url = client.getEventsExportUrl({
       start: ctx.input.start,
       end: ctx.input.end
     });
 
+    await ctx.addAttachment({
+      type: 'url',
+      url,
+      headers: { Authorization: `Basic ${ctx.auth.token}` },
+      mimeType: 'application/zip'
+    });
+
     return {
       output: {
-        contentType: result.contentType,
-        byteLength: result.byteLength
+        contentType: 'application/zip'
       },
-      attachments: [createBase64Attachment(result.contentBase64, result.contentType)],
-      message: `Exported Amplitude events from ${ctx.input.start} to ${ctx.input.end} as a downloadable ZIP file.`
+      message: `Prepared a ZIP download for Amplitude events uploaded from ${ctx.input.start} to ${ctx.input.end}.`
     };
   })
   .build();

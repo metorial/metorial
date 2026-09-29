@@ -587,11 +587,11 @@
     },
     "integrations/amplitude": {
       "name": "@slates-integrations/amplitude",
-      "version": "0.2.4",
+      "version": "0.2.5",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.17",
+        "slates": "1.0.0-rc.21",
         "zod": "^4.2",
       },
       "devDependencies": {
@@ -776,7 +776,7 @@
     },
     "integrations/apollo": {
       "name": "@slates-integrations/apolloio",
-      "version": "0.2.0-rc.21",
+      "version": "0.2.0",
       "dependencies": {
         "@slates/provider": "1.0.0-rc.18",
         "@types/node": "^20",
@@ -7662,7 +7662,7 @@
     },
     "integrations/lodgify": {
       "name": "@slates-integrations/lodgify",
-      "version": "0.4.0",
+      "version": "0.4.1",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",
@@ -19072,7 +19072,7 @@
 
     "@slates-integrations/amplitude/@slates/test": ["@slates/test@1.0.0-rc.14", "", { "dependencies": { "@lowerdeck/testing-tools": "latest", "@slates/client": "1.0.0-rc.17", "@slates/profiles": "1.0.0-rc.15" } }, "sha512-mcv8tO2HyiQWYEcHy+wKFab2UuiIOLuqs2wNdPVYxdqK7MfXlqECsUtXDeqwiynTO8junrjB3g3VWosgRCe4Ng=="],
 
-    "@slates-integrations/amplitude/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
+    "@slates-integrations/amplitude/slates": ["slates@1.0.0-rc.21", "", { "dependencies": { "@slates/provider": "1.0.0-rc.22" } }, "sha512-mv3qDipl05m9D0zDKGh0Gj8rmcee6A0g0MiMWMepHP7CsZxAlXYWt/3C8q65hUiPWIbPxK7mPxkUj1oiL4AdGg=="],
 
     "@slates-integrations/anchor-browser/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
@@ -21842,7 +21842,7 @@
 
     "@slates-integrations/amplitude/@slates/test/@slates/profiles": ["@slates/profiles@1.0.0-rc.15", "", { "dependencies": { "@slates/client": "1.0.0-rc.17", "@slates/proto": "1.0.0-rc.15" } }, "sha512-54Da7oeshZssih0vTZaLoKtMRvSoROgsFd9VFEHrtIX7rrsizPpnPFNp8CMb8FCb1dM2tuUiI/rECKE9Bw1mfA=="],
 
-    "@slates-integrations/amplitude/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
+    "@slates-integrations/amplitude/slates/@slates/provider": ["@slates/provider@1.0.0-rc.22", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "p-queue": "^6.6.2", "zod": "^4.2.1" } }, "sha512-d2dN5VIwi39reJxRm547O0tOHodjIyFXfEW53NP/6XukPX5NzUsHZ6vYKN8pYWT/WwvDMVVM6hxei6W2rqJBIg=="],
 
     "@slates-integrations/anchor-browser/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
