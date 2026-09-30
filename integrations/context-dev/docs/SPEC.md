@@ -1,10 +1,8 @@
 # Context.dev specification
 
-## Contract
+## Overview
 
-Implements the 40 tools discovered from the official hosted MCP server, `context@1.0.0`, on September 30, 2026. REST requests use `https://api.context.dev/v1` and bearer API-key authentication. Tool argument names, nested objects, union branches, enum values, limits, and help text follow that discovery. Tool keys replace hyphens with underscores.
-
-The official MCP contract determines the supported surface. The REST API has additional operations that are intentionally outside this integration. No OAuth, interactive card, or event subscription interface is provided. The API documents no suitable current-user endpoint.
+Provides 40 tools for web data, company intelligence, document parsing, batches, and monitoring through the Context.dev REST API at `https://api.context.dev/v1`. Authentication uses a bearer API key.
 
 ## Argument inventory
 
@@ -56,9 +54,9 @@ Objects retain their nested published schemas. Required arguments below describe
 ## Request and result semantics
 
 - `web_map` uses `GET /web/urls`. Company news uses `POST /news/search`.
-- Brand retrieval uses `POST /brand/retrieve`. `get_brand` supplies a domain lookup and returns the advertised `brand` object, including its required color, social, industry, and link arrays.
-- Unified brand lookup supports the six published branches: domain, name, email, ticker, direct URL, and transaction. Although upstream descriptive prose mentions ISIN, no ISIN input branch is published for that tool; ISIN remains available in company news search.
-- `parse_document` sends decoded bytes to `POST /parse` and parsing options as query parameters. Its 25 MiB decoded-input ceiling preserves the official MCP contract; the REST endpoint independently permits 50 MiB.
+- Brand retrieval uses `POST /brand/retrieve`. `get_brand` supplies a domain lookup and returns a structured `brand` object, including its required color, social, industry, and link arrays.
+- Unified brand lookup supports domain, name, email, ticker, direct URL, and transaction identifiers. ISIN lookup is available in company news search.
+- `parse_document` sends decoded bytes to `POST /parse` and parsing options as query parameters. The decoded input limit is 25 MiB.
 - `Idempotency-Key` is an HTTP header for batch submission and webhook retries. Optional false, zero, and null values retain their documented meaning.
 - Results expose resource identifiers, status, cursors, request IDs, credits, and useful content. Partial results and per-item failures remain visible.
 - Long-running jobs are inspected with separate status/result tools; submission does not wait indefinitely for completion.
@@ -67,6 +65,5 @@ Objects retain their nested published schemas. Required arguments below describe
 
 ## Sources
 
-- [Official MCP documentation](https://docs.context.dev/install-mcp)
 - [REST OpenAPI specification](https://docs.context.dev/openapi.json)
 - [Provider changelog](https://docs.context.dev/changelog)
