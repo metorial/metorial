@@ -1,0 +1,13 @@
+{
+  "name": "@metorial/context-dev",
+  "description": "Search and scrape the web, retrieve brand and company intelligence, parse documents, and manage batches, monitors, and webhook deliveries.",
+  "categories": ["search", "data"],
+  "skills": [
+    "web research",
+    "web scraping",
+    "brand intelligence",
+    "document parsing",
+    "website monitoring"
+  ],
+  "logoUrl": "http://provider-logos.metorial-cdn.com/context-dev.svg"
+}

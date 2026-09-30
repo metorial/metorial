@@ -2908,6 +2908,21 @@
         "typescript": "^5",
       },
     },
+    "integrations/context-dev": {
+      "name": "@slates-integrations/context-dev",
+      "version": "0.1.0-rc.1",
+      "dependencies": {
+        "@lowerdeck/error": "^1.1.0",
+        "@types/node": "^20",
+        "slates": "1.0.0-rc.25",
+        "zod": "^4.3.6",
+      },
+      "devDependencies": {
+        "@slates/test": "1.0.0-rc.23",
+        "typescript": "^5",
+        "vitest": "^3.2.4",
+      },
+    },
     "integrations/control-d": {
       "name": "@slates-integrations/control-d",
       "version": "0.2.0-rc.6",
@@ -15901,6 +15916,8 @@
     "@slates-integrations/contentful": ["@slates-integrations/contentful@workspace:integrations/contentful"],
 
     "@slates-integrations/contentful-graphql": ["@slates-integrations/contentful-graphql@workspace:integrations/contentful-graphql"],
+
+    "@slates-integrations/context-dev": ["@slates-integrations/context-dev@workspace:integrations/context-dev"],
 
     "@slates-integrations/control-d": ["@slates-integrations/control-d@workspace:integrations/control-d"],
 
