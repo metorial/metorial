@@ -1,4 +1,4 @@
-import { createAxios } from 'slates';
+import { buildApiServiceError, createApiServiceError, createAuthenticatedAxios } from 'slates';
 
 export class Client {
   private axios;
@@ -8,7 +8,33 @@ export class Client {
     loginEmail: string;
     brandSubdomain: string;
   }) {
-    this.axios = createAxios({
+    if (!/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(config.brandSubdomain)) {
+      throw createApiServiceError(
+        'Re:amaze brandSubdomain must be the brand subdomain only, without a URL, path, or port.'
+      );
+    }
+    this.axios = createAuthenticatedAxios({
+      maxRedirects: 0,
+      timeout: 30_000,
+      errorAdapter: error =>
+        buildApiServiceError(error, {
+          providerLabel: 'Re:amaze',
+          reason: 'reamaze_api_error',
+          operation: 'request',
+          extractMessage: (error, helpers) => {
+            let data = helpers.getResponse(error)?.data;
+            if (!helpers.isRecord(data) || !helpers.isRecord(data.errors)) return undefined;
+            let details: string[] = [];
+            for (let [field, value] of Object.entries(data.errors)) {
+              let messages: string[] = [];
+              helpers.collectDetails(value, messages);
+              if (messages.length) {
+                details.push(`${field === 'base' ? '' : `${field}: `}${messages.join('; ')}`);
+              }
+            }
+            return details.length ? details.join(' - ') : undefined;
+          }
+        }),
       baseURL: `https://${config.brandSubdomain}.reamaze.io/api/v1`,
       headers: {
         Accept: 'application/json',
@@ -34,6 +60,7 @@ export class Client {
     startDate?: string;
     endDate?: string;
     origin?: string;
+    data?: Record<string, string>;
   }) {
     let query: Record<string, string> = {};
     if (params?.filter) query.filter = params.filter;
@@ -42,17 +69,25 @@ export class Client {
     if (params?.sort) query.sort = params.sort;
     if (params?.tag) query.tag = params.tag;
     if (params?.category) query.category = params.category;
-    if (params?.page) query.page = String(params.page);
+    if (params?.page !== undefined) query.page = String(params.page);
     if (params?.startDate) query.start_date = params.startDate;
     if (params?.endDate) query.end_date = params.endDate;
-    if (params?.origin) query.origin = params.origin;
+    if (params?.origin !== undefined) query.origin = params.origin;
+    for (let [key, value] of Object.entries(params?.data ?? {})) {
+      query[`data[${key}]`] = value;
+    }
 
     let response = await this.axios.get('/conversations', { params: query });
     return response.data;
   }
 
-  async getConversation(slug: string) {
-    let response = await this.axios.get(`/conversations/${slug}`);
+  async getConversation(
+    slug: string,
+    params?: { idType?: 'ref' | 'origin'; category?: string; channel?: string }
+  ) {
+    let response = await this.axios.get(`/conversations/${encodeURIComponent(slug)}`, {
+      params: { id_type: params?.idType, category: params?.category, channel: params?.channel }
+    });
     return response.data;
   }
 
@@ -64,6 +99,7 @@ export class Client {
       recipients?: string[];
       suppressNotifications?: boolean;
       suppressAutoresolve?: boolean;
+      suppressSurveys?: boolean | string;
       attachment?: string;
       attachments?: string[];
     };
@@ -75,6 +111,7 @@ export class Client {
     tagList?: string[];
     status?: number;
     assignee?: string;
+    holdUntil?: string;
     data?: Record<string, string>;
   }) {
     let body: Record<string, any> = {
@@ -85,11 +122,13 @@ export class Client {
         status: data.status,
         data: data.data,
         assignee: data.assignee,
+        hold_until: data.holdUntil,
         message: {
           body: data.message.body,
           recipients: data.message.recipients,
           suppress_notifications: data.message.suppressNotifications,
           suppress_autoresolve: data.message.suppressAutoresolve,
+          suppress_surveys: data.message.suppressSurveys,
           attachment: data.message.attachment,
           attachments: data.message.attachments
         },
@@ -128,11 +167,44 @@ export class Client {
     if (data.holdUntil) body.conversation.hold_until = data.holdUntil;
     if (data.brand) body.conversation.brand = data.brand;
 
-    let response = await this.axios.put(`/conversations/${slug}`, body);
+    let response = await this.axios.put(`/conversations/${encodeURIComponent(slug)}`, body);
     return response.data;
   }
 
   // ---- Messages ----
+
+  async listMessages(
+    params: {
+      conversationSlug?: string;
+      page?: number;
+      filter?: 'staff' | 'customer';
+      sentBy?: string;
+      tag?: string;
+      category?: string;
+      origin?: number;
+      startDate?: string;
+      endDate?: string;
+      includeOriginalBody?: boolean;
+    } = {}
+  ) {
+    let path = params.conversationSlug
+      ? `/conversations/${encodeURIComponent(params.conversationSlug)}/messages`
+      : '/messages';
+    let response = await this.axios.get(path, {
+      params: {
+        page: params.page,
+        filter: params.filter,
+        sent_by: params.sentBy,
+        tag: params.tag,
+        category: params.category,
+        origin: params.origin,
+        start_date: params.startDate,
+        end_date: params.endDate,
+        include: params.includeOriginalBody ? 'original_body' : undefined
+      }
+    });
+    return response.data;
+  }
 
   async createMessage(
     conversationSlug: string,
@@ -142,6 +214,8 @@ export class Client {
       user?: { email: string; name?: string };
       suppressNotifications?: boolean;
       suppressAutoresolve?: boolean;
+      suppressSurveys?: boolean | string;
+      originId?: string;
       attachment?: string;
       recipients?: string[];
     }
@@ -157,10 +231,16 @@ export class Client {
       body.message.suppress_notifications = data.suppressNotifications;
     if (data.suppressAutoresolve !== undefined)
       body.message.suppress_autoresolve = data.suppressAutoresolve;
+    if (data.suppressSurveys !== undefined)
+      body.message.suppress_surveys = data.suppressSurveys;
+    if (data.originId !== undefined) body.message.origin_id = data.originId;
     if (data.attachment) body.message.attachment = data.attachment;
     if (data.recipients) body.message.recipients = data.recipients;
 
-    let response = await this.axios.post(`/conversations/${conversationSlug}/messages`, body);
+    let response = await this.axios.post(
+      `/conversations/${encodeURIComponent(conversationSlug)}/messages`,
+      body
+    );
     return response.data;
   }
 
@@ -177,7 +257,7 @@ export class Client {
     if (params?.q) query.q = params.q;
     if (params?.sort) query.sort = params.sort;
     if (params?.type) query.type = params.type;
-    if (params?.page) query.page = String(params.page);
+    if (params?.page !== undefined) query.page = String(params.page);
     if (params?.data) {
       for (let [key, value] of Object.entries(params.data)) {
         query[`data[${key}]`] = value;
@@ -252,25 +332,62 @@ export class Client {
     return response.data;
   }
 
-  async createContactNote(contactIdentifier: string, note: string) {
+  async createContactNote(
+    contactIdentifier: string,
+    note: string,
+    options?: { creatorEmail?: string; createdAt?: string }
+  ) {
     let response = await this.axios.post(
       `/contacts/${encodeURIComponent(contactIdentifier)}/notes`,
+      { body: note, creator_email: options?.creatorEmail, created_at: options?.createdAt }
+    );
+    return response.data;
+  }
+
+  async updateContactNote(
+    contactIdentifier: string,
+    noteId: string | number,
+    note: string,
+    options?: { creatorEmail?: string; createdAt?: string }
+  ) {
+    let response = await this.axios.put(
+      `/contacts/${encodeURIComponent(contactIdentifier)}/notes/${encodeURIComponent(String(noteId))}`,
       {
-        note: { body: note }
+        body: note,
+        creator_email: options?.creatorEmail,
+        created_at: options?.createdAt
       }
     );
     return response.data;
   }
 
-  async updateContactNote(noteId: number, note: string) {
-    let response = await this.axios.put(`/notes/${noteId}`, {
-      note: { body: note }
-    });
+  async deleteContactNote(noteId: string | number, contactIdentifier?: string) {
+    if (!contactIdentifier?.trim()) {
+      throw createApiServiceError(
+        'contactIdentifier is required to delete a contact note. Pass the contact email or phone number used with list_contact_notes.'
+      );
+    }
+    let response = await this.axios.delete(
+      `/contacts/${encodeURIComponent(contactIdentifier)}/notes/${encodeURIComponent(String(noteId))}`
+    );
     return response.data;
   }
 
-  async deleteContactNote(noteId: number) {
-    let response = await this.axios.delete(`/notes/${noteId}`);
+  async listContactIdentities(contactEmail: string) {
+    let response = await this.axios.get(
+      `/contacts/${encodeURIComponent(contactEmail)}/identities`
+    );
+    return response.data;
+  }
+
+  async createContactIdentity(
+    contactEmail: string,
+    data: { type: string; identifier: string }
+  ) {
+    let response = await this.axios.post(
+      `/contacts/${encodeURIComponent(contactEmail)}/identities`,
+      { identity: data }
+    );
     return response.data;
   }
 
@@ -285,16 +402,18 @@ export class Client {
     let query: Record<string, string> = {};
     if (params?.status) query.status = params.status;
     if (params?.q) query.q = params.q;
-    if (params?.page) query.page = String(params.page);
+    if (params?.page !== undefined) query.page = String(params.page);
 
-    let path = params?.topicSlug ? `/topics/${params.topicSlug}/articles` : '/articles';
+    let path = params?.topicSlug
+      ? `/topics/${encodeURIComponent(params.topicSlug)}/articles`
+      : '/articles';
 
     let response = await this.axios.get(path, { params: query });
     return response.data;
   }
 
   async getArticle(articleId: string) {
-    let response = await this.axios.get(`/articles/${articleId}`);
+    let response = await this.axios.get(`/articles/${encodeURIComponent(articleId)}`);
     return response.data;
   }
 
@@ -334,7 +453,7 @@ export class Client {
     if (data.status !== undefined) body.article.status = data.status;
     if (data.topicId !== undefined) body.article.topic_id = data.topicId;
 
-    let response = await this.axios.put(`/articles/${articleId}`, body);
+    let response = await this.axios.put(`/articles/${encodeURIComponent(articleId)}`, body);
     return response.data;
   }
 
@@ -348,25 +467,36 @@ export class Client {
     return response.data;
   }
 
+  async getChannel(slug: string) {
+    let response = await this.axios.get(`/channels/${encodeURIComponent(slug)}`);
+    return response.data;
+  }
+
   // ---- Response Templates ----
 
   async listResponseTemplates(params?: { q?: string; page?: number }) {
     let query: Record<string, string> = {};
     if (params?.q) query.q = params.q;
-    if (params?.page) query.page = String(params.page);
+    if (params?.page !== undefined) query.page = String(params.page);
 
     let response = await this.axios.get('/response_templates', { params: query });
     return response.data;
   }
 
   async getResponseTemplate(templateId: string) {
-    let response = await this.axios.get(`/response_templates/${templateId}`);
+    let response = await this.axios.get(
+      `/response_templates/${encodeURIComponent(templateId)}`
+    );
     return response.data;
   }
 
-  async createResponseTemplate(data: { name: string; body: string }) {
+  async createResponseTemplate(data: { name: string; body: string; isPersonal?: boolean }) {
     let response = await this.axios.post('/response_templates', {
-      response_template: { name: data.name, body: data.body }
+      response_template: {
+        name: data.name,
+        body: data.body,
+        is_personal: data.isPersonal === undefined ? undefined : data.isPersonal ? 1 : 0
+      }
     });
     return response.data;
   }
@@ -376,26 +506,32 @@ export class Client {
     data: {
       name?: string;
       body?: string;
+      isPersonal?: boolean;
     }
   ) {
     let body: Record<string, any> = { response_template: {} as Record<string, any> };
     if (data.name !== undefined) body.response_template.name = data.name;
     if (data.body !== undefined) body.response_template.body = data.body;
+    if (data.isPersonal !== undefined)
+      body.response_template.is_personal = data.isPersonal ? 1 : 0;
 
-    let response = await this.axios.put(`/response_templates/${templateId}`, body);
+    let response = await this.axios.put(
+      `/response_templates/${encodeURIComponent(templateId)}`,
+      body
+    );
     return response.data;
   }
 
   // ---- Staff ----
 
-  async listStaff() {
-    let response = await this.axios.get('/staff');
+  async listStaff(page?: number) {
+    let response = await this.axios.get('/staff', { params: { page } });
     return response.data;
   }
 
-  async createStaff(data: { name: string; email: string }) {
+  async createStaff(data: { name: string; email: string; password?: string }) {
     let response = await this.axios.post('/staff', {
-      staff: { name: data.name, email: data.email }
+      staff: { name: data.name, email: data.email, password: data.password }
     });
     return response.data;
   }
@@ -407,11 +543,14 @@ export class Client {
     params?: {
       startDate?: string;
       endDate?: string;
+      brand?: string;
     }
   ) {
     let query: Record<string, string> = {};
     if (params?.startDate) query.start_date = params.startDate;
     if (params?.endDate) query.end_date = params.endDate;
+
+    if (params?.brand !== undefined) query.brand = params.brand;
 
     let response = await this.axios.get(`/reports/${type}`, { params: query });
     return response.data;
@@ -426,7 +565,7 @@ export class Client {
   }
 
   async getIncident(incidentId: string) {
-    let response = await this.axios.get(`/incidents/${incidentId}`);
+    let response = await this.axios.get(`/incidents/${encodeURIComponent(incidentId)}`);
     return response.data;
   }
 
@@ -437,7 +576,7 @@ export class Client {
       message: string;
     }>;
     systems?: Array<{
-      systemId: number;
+      systemId: string | number;
       status: string;
     }>;
   }) {
@@ -470,8 +609,8 @@ export class Client {
         message: string;
       }>;
       systems?: Array<{
-        id?: number;
-        systemId: number;
+        id?: string | number;
+        systemId: string | number;
         status: string;
       }>;
     }
@@ -494,7 +633,7 @@ export class Client {
       }));
     }
 
-    let response = await this.axios.put(`/incidents/${incidentId}`, body);
+    let response = await this.axios.put(`/incidents/${encodeURIComponent(incidentId)}`, body);
     return response.data;
   }
 
@@ -509,6 +648,7 @@ export class Client {
 
   async listSatisfactionRatings(params?: {
     rating?: number;
+    brand?: string;
     assigneeId?: number;
     createdAfter?: string;
     createdBefore?: string;
@@ -517,6 +657,7 @@ export class Client {
     page?: number;
   }) {
     let query: Record<string, string> = {};
+    if (params?.brand !== undefined) query.brand = params.brand;
     if (params?.rating !== undefined) query.rating = String(params.rating);
     if (params?.assigneeId !== undefined) query.assignee_id = String(params.assigneeId);
     if (params?.createdAfter) query.created_after = params.createdAfter;

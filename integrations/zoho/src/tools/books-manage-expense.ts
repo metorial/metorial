@@ -18,7 +18,11 @@ export let booksManageExpense = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      organizationId: z.string().describe('Zoho Books organization ID'),
+      organizationId: z
+        .string()
+        .describe(
+          'Zoho Books organization ID. Call books_list_organizations to discover IDs.'
+        ),
       action: z
         .enum(['create', 'update', 'delete', 'get', 'list'])
         .describe('Operation to perform'),

@@ -1,6 +1,7 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { conversationStatusDescription, validateHoldUntil } from '../lib/conversations';
 import { spec } from '../spec';
 
 export let updateConversation = SlateTool.create(spec, {
@@ -16,10 +17,7 @@ export let updateConversation = SlateTool.create(spec, {
       conversationSlug: z
         .string()
         .describe('The unique slug identifier of the conversation to update'),
-      status: z
-        .number()
-        .optional()
-        .describe('New status: 0=Open, 1=Responded, 2=Done, 3=Spam, 4=Archived, 5=On Hold'),
+      status: z.number().optional().describe(conversationStatusDescription),
       assigneeEmail: z
         .string()
         .optional()
@@ -31,7 +29,7 @@ export let updateConversation = SlateTool.create(spec, {
       channelSlug: z
         .string()
         .optional()
-        .describe('Move conversation to a different channel by slug'),
+        .describe('Move conversation to a different email channel by slug'),
       customFields: z
         .record(z.string(), z.string())
         .optional()
@@ -39,11 +37,15 @@ export let updateConversation = SlateTool.create(spec, {
       holdUntil: z
         .string()
         .optional()
-        .describe('ISO 8601 datetime for when On Hold status should expire'),
+        .describe(
+          'ISO 8601 timestamp with a timezone for when On Hold expires; use with status 5 or an already on-hold conversation'
+        ),
       brandUrl: z
         .string()
         .optional()
-        .describe('Destination brand URL to move conversation to another brand')
+        .describe(
+          'Destination brand URL when moving to an email channel in another brand; requires channelSlug'
+        )
     })
   )
   .output(
@@ -54,6 +56,13 @@ export let updateConversation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateHoldUntil(ctx.input.status, ctx.input.holdUntil);
+    if (ctx.input.brandUrl !== undefined && !ctx.input.channelSlug) {
+      throw createApiServiceError(
+        'Provide channelSlug for the destination email channel when moving a conversation to another brand.'
+      );
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       loginEmail: ctx.auth.loginEmail,

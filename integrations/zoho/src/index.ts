@@ -1,4 +1,11 @@
 import { Slate } from 'slates';
+import { biginTools } from './products/bigin';
+import { booksTools } from './products/books';
+import { crmTools } from './products/crm';
+import { deskTools } from './products/desk';
+import { inventoryTools } from './products/inventory';
+import { invoiceTools } from './products/invoice';
+import { mailTools } from './products/mail';
 import { spec } from './spec';
 import {
   booksGetInvoices,
@@ -18,11 +25,21 @@ import {
   projectsManageProject,
   projectsManageTask
 } from './tools';
-import { crmRecordEvents, deskEvents } from './triggers';
+import { organizationDiscoveryTools, whoAmI } from './tools/discovery';
 
 export let provider = Slate.create({
   spec,
   tools: [
+    ...organizationDiscoveryTools,
+    whoAmI,
+    ...crmTools,
+    ...biginTools,
+    ...booksTools,
+    ...inventoryTools,
+    ...invoiceTools,
+    ...deskTools,
+    ...mailTools,
+
     crmGetRecords,
     crmManageRecord,
     crmSearchRecords,
@@ -40,5 +57,5 @@ export let provider = Slate.create({
     projectsManageProject,
     projectsManageTask
   ],
-  triggers: [crmRecordEvents, deskEvents]
+  triggers: []
 });

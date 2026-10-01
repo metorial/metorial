@@ -1,4 +1,4 @@
-import { SlateTool } from 'slates';
+import { createApiServiceError, SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
 import { spec } from '../spec';
@@ -6,6 +6,8 @@ import { spec } from '../spec';
 let contactSchema = z.object({
   name: z.string().nullable().optional().describe('Contact name'),
   email: z.string().nullable().optional().describe('Contact email'),
+  mobile: z.string().nullable().optional().describe('Contact mobile number'),
+  externalId: z.string().nullable().optional().describe('External contact identifier'),
   friendlyName: z.string().nullable().optional().describe('Friendly display name'),
   createdAt: z.string().optional().describe('ISO 8601 creation timestamp'),
   externalAvatarUrl: z.string().nullable().optional().describe('External avatar URL'),
@@ -15,10 +17,21 @@ let contactSchema = z.object({
     .describe('Custom data attributes')
 });
 
+let mapContact = (c: any) => ({
+  name: c.name,
+  email: c.email,
+  mobile: c.mobile,
+  externalId: c.id == null ? c.id : String(c.id),
+  friendlyName: c.friendly_name,
+  createdAt: c.created_at,
+  externalAvatarUrl: c.external_avatar_url,
+  customAttributes: c.data
+});
+
 export let listContacts = SlateTool.create(spec, {
   name: 'List Contacts',
   key: 'list_contacts',
-  description: `Search and list customer contacts. Supports searching by name or email, filtering by contact type (email or mobile), and custom attribute matching.`,
+  description: `Search and list customer contacts across the account. Supports searching by name or email, filtering by contact type (email or mobile), and custom attribute matching. Results are paginated.`,
   tags: {
     readOnly: true
   }
@@ -35,7 +48,7 @@ export let listContacts = SlateTool.create(spec, {
         .record(z.string(), z.string())
         .optional()
         .describe('Filter by custom data attributes (key-value pairs)'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z.number().int().positive().optional().describe('Page number, starting at 1')
     })
   )
   .output(
@@ -61,14 +74,7 @@ export let listContacts = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let contacts = (result.contacts || []).map((c: any) => ({
-      name: c.name,
-      email: c.email,
-      friendlyName: c.friendly_name,
-      createdAt: c.created_at,
-      externalAvatarUrl: c.external_avatar_url,
-      customAttributes: c.data
-    }));
+    let contacts = (result.contacts || []).map(mapContact);
 
     return {
       output: {
@@ -118,6 +124,26 @@ export let createContact = SlateTool.create(spec, {
   )
   .output(contactSchema)
   .handleInvocation(async ctx => {
+    if (!ctx.input.email && !ctx.input.mobile) {
+      throw createApiServiceError(
+        'Provide an email address or mobile number to create a contact.'
+      );
+    }
+    if (ctx.input.email !== undefined && !z.email().safeParse(ctx.input.email).success) {
+      throw createApiServiceError('Provide a valid contact email address.');
+    }
+    if (ctx.input.mobile !== undefined && !/^\+[1-9]\d{1,14}$/.test(ctx.input.mobile)) {
+      throw createApiServiceError(
+        'Provide a mobile number in E.164 format, such as +12223334444.'
+      );
+    }
+    if (
+      ctx.input.externalAvatarUrl !== undefined &&
+      !z.url().safeParse(ctx.input.externalAvatarUrl).success
+    ) {
+      throw createApiServiceError('Provide an absolute URL for externalAvatarUrl.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       loginEmail: ctx.auth.loginEmail,
@@ -137,14 +163,7 @@ export let createContact = SlateTool.create(spec, {
     let c = result.contact || result;
 
     return {
-      output: {
-        name: c.name,
-        email: c.email,
-        friendlyName: c.friendly_name,
-        createdAt: c.created_at,
-        externalAvatarUrl: c.external_avatar_url,
-        customAttributes: c.data
-      },
+      output: mapContact(c),
       message: `Created contact **${c.name}** (${c.email || c.mobile}).`
     };
   })
@@ -180,6 +199,25 @@ export let updateContact = SlateTool.create(spec, {
   )
   .output(contactSchema)
   .handleInvocation(async ctx => {
+    if (!ctx.input.contactIdentifier.trim()) {
+      throw createApiServiceError('Provide the contact identifier to update.');
+    }
+    if (
+      ctx.input.name === undefined &&
+      ctx.input.friendlyName === undefined &&
+      ctx.input.externalAvatarUrl === undefined &&
+      ctx.input.notes === undefined &&
+      ctx.input.customAttributes === undefined
+    ) {
+      throw createApiServiceError('Provide at least one contact field to update.');
+    }
+    if (
+      ctx.input.externalAvatarUrl !== undefined &&
+      !z.url().safeParse(ctx.input.externalAvatarUrl).success
+    ) {
+      throw createApiServiceError('Provide an absolute URL for externalAvatarUrl.');
+    }
+
     let client = new Client({
       token: ctx.auth.token,
       loginEmail: ctx.auth.loginEmail,
@@ -198,14 +236,7 @@ export let updateContact = SlateTool.create(spec, {
     let c = result.contact || result;
 
     return {
-      output: {
-        name: c.name,
-        email: c.email,
-        friendlyName: c.friendly_name,
-        createdAt: c.created_at,
-        externalAvatarUrl: c.external_avatar_url,
-        customAttributes: c.data
-      },
+      output: mapContact(c),
       message: `Updated contact **${c.name || ctx.input.contactIdentifier}**.`
     };
   })

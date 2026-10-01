@@ -1,6 +1,6 @@
 {
   "name": "@metorial/reamaze",
-  "description": "Manage customer support conversations across email, chat, social media, and SMS channels. Create, retrieve, update, and search conversations, assign them to staff, and add replies or internal notes. Manage customer contacts and their identities. Create and update knowledge base articles for self-service support. Access support analytics including conversation volume, response times, staff performance, and channel summaries. Manage response templates for common replies. Create and update status page incidents and monitor systems. Retrieve customer satisfaction ratings. Manage staff accounts and retrieve available support channels.",
+  "description": "Retrieve complete support conversation histories, including customer messages, staff replies, and internal notes. Search conversations and messages, manage contacts and identities, edit contact notes, maintain knowledge base articles and response templates, and access support reports, satisfaction ratings, channels, staff, and status page incidents.",
   "categories": ["apis-and-http-requests", "crm-and-sales-tools", "email-and-messaging"],
   "skills": [
     "manage support conversations",
@@ -12,7 +12,11 @@
     "retrieve satisfaction ratings",
     "manage staff accounts",
     "search conversations",
-    "add replies and notes"
+    "add replies and notes",
+    "retrieve complete conversation history",
+    "find staff answers",
+    "distinguish internal notes",
+    "manage contact identities"
   ],
   "logoUrl": "https://provider-logos.metorial-cdn.com/re-amaze.png"
 }

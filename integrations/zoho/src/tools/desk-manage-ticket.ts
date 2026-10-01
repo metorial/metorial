@@ -20,7 +20,9 @@ export let deskManageTicket = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgId: z.string().describe('Zoho Desk organization ID'),
+      orgId: z
+        .string()
+        .describe('Zoho Desk organization ID. Call desk_list_organizations to discover IDs.'),
       action: z.enum(['create', 'update', 'delete']).describe('Operation to perform'),
       ticketId: z.string().optional().describe('Ticket ID (required for update and delete)'),
       subject: z.string().optional().describe('Ticket subject (required for create)'),

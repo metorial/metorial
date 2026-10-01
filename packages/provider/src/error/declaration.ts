@@ -11,7 +11,7 @@ export class SlateDeclarationError extends SlateError {
     this.name = 'SlateError.DeclarationError';
   }
 
-  static is(error: unknown): error is SlateDeclarationError {
+  static override is(error: unknown): error is SlateDeclarationError {
     return error instanceof SlateDeclarationError;
   }
 }

@@ -13,7 +13,7 @@ export let getReport = SlateTool.create(spec, {
 - **tags**: Tag usage reports
 - **channel_summary**: Aggregated metrics by channel
 
-Reports can be filtered by date range.`,
+Reports cover all brands in the account by default. Filter by brand and date range. Dates default to the last 30 days; the range must span at least one day and no more than one year.`,
   tags: {
     readOnly: true
   }
@@ -23,14 +23,24 @@ Reports can be filtered by date range.`,
       reportType: z
         .enum(['volume', 'response_time', 'staff', 'tags', 'channel_summary'])
         .describe('Type of report to retrieve'),
+      brand: z
+        .string()
+        .optional()
+        .describe(
+          'Brand subdomain to filter by, for example mybrand. Omit to include all account brands.'
+        ),
       startDate: z
         .string()
         .optional()
-        .describe('Start date for the report range (ISO 8601 format)'),
+        .describe(
+          'Start date for the report range (ISO 8601 date, for example 2026-01-01). Defaults to 30 days ago.'
+        ),
       endDate: z
         .string()
         .optional()
-        .describe('End date for the report range (ISO 8601 format)')
+        .describe(
+          'End date for the report range (ISO 8601 date, for example 2026-01-31). Defaults to today.'
+        )
     })
   )
   .output(
@@ -47,6 +57,7 @@ Reports can be filtered by date range.`,
     });
 
     let result = await client.getReport(ctx.input.reportType, {
+      brand: ctx.input.brand,
       startDate: ctx.input.startDate,
       endDate: ctx.input.endDate
     });

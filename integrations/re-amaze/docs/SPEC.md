@@ -1,82 +1,57 @@
-Let me get more details on the Re:amaze API features and webhooks.Let me look for Re:amaze's specific webhook support in their own documentation/help center.Based on my research, I now have enough information to write the specification. Re:amaze does not appear to have a native webhook/event subscription system in its API. The Zapier triggers are polling-based (scheduled, not instant), and the only webhooks I found are specific to custom SMS channel integrations, not general-purpose event subscriptions.
-
-# Slates Specification for Re:amaze
-
-## Overview
-
-Re:amaze is a customer service and helpdesk platform that consolidates email, live chat, social media, SMS, and other communication channels into a single dashboard. It provides conversation management, contact management, FAQ/knowledge base, status page incident tracking, reporting, and AI-powered support features.
+# Re:amaze Integration
 
 ## Authentication
 
-All authentication is performed via HTTP Basic Auth. Re:amaze API access is available only through SSL/HTTPS.
+HTTPS Basic Auth uses the user's login email and API token. API requests use `https://{brandSubdomain}.reamaze.io/api/v1`; the subdomain must be a DNS label, not a URL. Permissions follow the authenticated user. There is no OAuth refresh flow.
 
-To authenticate, you need the following credentials:
+## Tool surface
 
-- **Login Email**: The email address associated with your Re:amaze account.
-- **API Token**: Every user within an account has their own individual token. This allows the Re:amaze API to act on behalf of a specific user within your account.
-- **Brand Subdomain**: API requests are scoped by Brand, which is identified by the host of the API endpoint. Each Re:amaze account may contain one or more brands and each brand's host domain can be found from the Brand Settings Page.
+The integration exposes 34 tools:
 
-**Generating an API Token:**
+- Conversations: list, get, create, update, add message, list messages.
+- Contacts: list, create, update, list identities, create identity.
+- Contact notes: list, create, update, delete.
+- Articles: list/search, get, create, update.
+- Channels: list, get.
+- Response templates: list/search, get, create, update.
+- Staff: list, create.
+- Reports: volume, response time, staff, tags, channel summary through `get_report`.
+- Satisfaction ratings: list/filter.
+- Status page: list/get/create/update incidents, list systems.
 
-1. Go to Settings within your Re:amaze account. Click "API Token" under Developer. Click "Generate New Token" to generate a unique token.
+## Conversation history
 
-**Request format:**
+`list_messages` accepts optional conversationSlug, page (default 1), filter (staff/customer), sentBy, tag, category, numeric origin, startDate, endDate, and includeOriginalBody. It calls the conversation-scoped message endpoint when a slug is supplied, otherwise the brand-wide endpoint.
 
-The API base URL follows the pattern `https://{brand}.reamaze.io/api/v1/`. The login email is used as the username and the API token as the password in HTTP Basic Auth. For example:
+Each call returns one provider page, newest first, with page/pageSize/pageCount/totalCount/hasMore/nextPage and typed messages. Provider counts can omit the initial message. A full page always continues, even at the reported last page; callers may receive a final empty page. Bodies are not truncated. Messages retain sender, recipients, timestamps, origin/originId, visibility, conversation/channel metadata and attachment metadata. Original HTML is included only when requested and supplied by Re:amaze. File downloads are not performed.
 
-```
-curl 'https://{brand}.reamaze.io/api/v1/conversations' \
-  -H 'Accept: application/json' -u {login-email}:{api-token}
-```
+Visibility 0 means regular, 1 internal note, and 2 collision-detected message; other provider values are preserved. Transport origin is not the author's staff/customer role. Pagination must continue until hasMore is false before describing a retrieved thread as complete.
 
-There is no OAuth2 support. No scopes are available — the token provides full access on behalf of the associated user.
+`get_conversation` remains a summary tool. It exposes the initial body plus latest customer and staff summaries, and supports reference/origin lookup. Conversation listing dates filter latest customer-message activity, whereas message listing dates filter message creation. Status help includes codes 0 through 9.
 
-## Features
+Message and conversation writes expose notification, autoresolve and survey suppression. Message origin IDs support duplicate identification. Brand moves require a destination email channel. Existing create/update assignee payload distinctions are retained.
 
-### Conversation Management
+## Contact and content behavior
 
-Create, retrieve, update, and search support conversations. Conversations can be assigned to specific staff members, categorized by channel (e.g., support, email), filtered by status (open, pending, resolved), and tagged. You can also add messages (replies or notes) to existing conversations on behalf of staff or customers.
+Contact identities are typed. Attaching an identity already owned by another contact transfers its associated messages/data; Facebook identity creation is unsupported.
 
-### Contact Management
+Notes use contact-scoped endpoints and flat body/creator_email/created_at payloads. Create/update responses may contain a single note or a note collection: creation identifies one new matching note against pre-write IDs, and update selects the requested ID. Ambiguous creation never claims a specific note was created. Deletion requires contactIdentifier and noteIdentifier (or the legacy numeric noteId). Note identifiers are opaque strings, including UUIDs; legacy numeric noteId is only returned when safely numeric.
 
-Create, retrieve, and update customer contact records. Contacts can have multiple identities (e.g., email addresses, social accounts). You can also manage contact notes — create, update, retrieve, and delete notes attached to individual contacts.
+Articles support published/draft/internal status and topic slugs. Response templates support personal/shared visibility. Staff listing is paginated; creation accepts an optional password, can affect billing, and sends no invitation email.
 
-### Knowledge Base (Articles)
+Reports and satisfaction ratings default to all account brands; optional brand filters retain that provider behavior. Ratings support creation/update date filters. Existing numeric identifiers are normalized from decimal strings only when safe; malformed or unsafe values produce an actionable error rather than losing precision. Incidents and systems expose canonical string identifiers, including UUIDs, alongside optional legacy numeric aliases. Incident update and system-association identifiers are retained for follow-up changes.
 
-Create, retrieve, and update FAQ/help articles. Articles can be organized and managed programmatically to power self-service customer support.
+## Compatibility and release
 
-### Channels
+Version 0.2.0 preserves existing tool keys, field types and enum meanings, adding optional fields and eight tools. All input schemas are top-level objects. Validation and API failures produce structured service errors. Requests have bounded timeouts and do not automatically retry writes.
 
-Retrieve available support channels and their details. Channels represent the different communication methods (email, chat, social, SMS, etc.) configured for a brand.
+Event triggers are unchanged in this tools-only release; their modernization is tracked separately.
 
-### Response Templates
+## Provider references
 
-Create, retrieve, and update pre-written response templates that staff can use to quickly reply to common questions.
-
-### Staff Management
-
-Retrieve staff members and create new staff user accounts within your Re:amaze account.
-
-### Reports
-
-Access support analytics including:
-
-- **Volume**: Daily conversation volume counts.
-- **Response Time**: Daily response time metrics and summaries (reported in seconds).
-- **Staff**: Staff performance metrics and summaries.
-- **Tags**: Tag usage reports.
-- **Channel Summary**: Aggregated metrics broken down by channel.
-
-Reports can be filtered by date range.
-
-### Status Page / Incidents
-
-Create, retrieve, and update incidents for your public-facing status page. You can also retrieve the systems being monitored. This allows programmatic management of service status communication.
-
-### Satisfaction Ratings
-
-Retrieve customer satisfaction ratings collected through Re:amaze's feedback system.
-
-## Events
-
-The provider does not support events. Re:amaze does not offer a native webhook subscription system or event streaming mechanism through its API. Third-party platforms like Zapier integrate with Re:amaze using scheduled polling rather than real-time webhooks.
+- [API introduction and resource index](https://www.reamaze.com/api)
+- [Conversation summaries](https://www.reamaze.com/api/get_conversation)
+- [Messages and pagination](https://www.reamaze.com/api/get_messages)
+- [Contact notes](https://www.reamaze.com/api/get_notes)
+- [Contact identities](https://www.reamaze.com/api/post_identities)
+- [Satisfaction ratings](https://www.reamaze.com/api/get_satisfaction_ratings)

@@ -46,29 +46,49 @@ type JsonSchema = {
 let supportedRegions = ['us', 'eu', 'in', 'au', 'jp', 'ca', 'sa', 'uk'] as const;
 
 let expectedScopes = [
+  'Desk.accounts.ALL',
+  'Desk.agents.READ',
   'ZohoCRM.modules.ALL',
   'ZohoCRM.settings.ALL',
-  'ZohoCRM.notifications.ALL',
   'ZohoCRM.coql.READ',
   'ZohoSearch.securesearch.READ',
   'ZohoCRM.users.READ',
-  'Desk.tickets.ALL',
-  'Desk.contacts.ALL',
-  'Desk.basic.READ',
-  'Desk.search.READ',
+  'ZohoCRM.org.READ',
+  'ZohoCRM.send_mail.all.CREATE',
+  'ZohoBigin.modules.ALL',
+  'ZohoBigin.modules.notes.ALL',
+  'ZohoBigin.settings.ALL',
+  'ZohoBigin.users.READ',
   'ZohoBooks.fullaccess.all',
-  'ZohoBooks.invoices.ALL',
-  'ZohoBooks.contacts.ALL',
-  'ZohoBooks.expenses.ALL',
-  'ZohoBooks.settings.READ',
+  'ZohoInventory.FullAccess.all',
+  'ZohoInvoice.fullaccess.all',
   'ZOHOPEOPLE.forms.ALL',
+  'ZOHOPEOPLE.form.READ',
   'ZOHOPEOPLE.attendance.READ',
   'ZOHOPEOPLE.leave.READ',
   'ZohoProjects.portals.READ',
   'ZohoProjects.projects.ALL',
   'ZohoProjects.tasks.ALL',
   'ZohoProjects.milestones.READ',
-  'AaaServer.profile.READ'
+  'AaaServer.profile.READ',
+  'Desk.tickets.ALL',
+  'Desk.contacts.ALL',
+  'Desk.activities.tasks.ALL',
+  'Desk.articles.ALL',
+  'Desk.basic.READ',
+  'Desk.search.READ',
+  'ZohoMail.messages.ALL',
+  'ZohoMail.accounts.READ',
+  'ZohoMail.folders.ALL',
+  'ZohoMail.tags.ALL',
+  'ZohoMail.tasks.ALL',
+  'ZohoMail.notes.ALL',
+  'ZohoMail.links.ALL',
+  'ZohoMail.organization.accounts.READ',
+  'ZohoMail.organization.domains.READ',
+  'ZohoMail.organization.groups.READ',
+  'ZohoMail.organization.subscriptions.READ',
+  'ZohoMail.partner.organization.READ'
 ];
 
 let canonicalAuth = {
@@ -263,7 +283,7 @@ describe('Zoho auth and config contract', () => {
     }).not.toThrow();
 
     let expectedBaseUrls = [
-      `${apiDomain}/crm/v7`,
+      `${apiDomain}/crm/v8`,
       `${deskOrigin}/api/v1`,
       `${apiDomain}/books/v3`,
       `${peopleOrigin}/people/api`
@@ -286,7 +306,7 @@ describe('Zoho auth and config contract', () => {
   it('constructs generic and regional clients from canonical auth output', () => {
     expect(() => createClients(canonicalAuth)).not.toThrow();
     expect(httpCalls.configs.map(value => value.baseURL)).toEqual([
-      'https://www.zohoapis.eu/crm/v7',
+      'https://www.zohoapis.eu/crm/v8',
       'https://people.zoho.eu/people/api'
     ]);
   });

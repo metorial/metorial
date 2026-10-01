@@ -1,0 +1,34 @@
+import { SlateTool } from 'slates';
+import { z } from 'zod';
+import { spec } from '../../../spec';
+import { Client } from '../lib/client';
+
+export let getOrganization = SlateTool.create(spec, {
+  name: 'CRM Get Organization',
+  key: 'crm_get_organization',
+  description: `Retrieve your Zoho CRM organization details including company name, time zone, currency, license info, and other settings.`,
+  tags: {
+    readOnly: true
+  }
+})
+  .input(z.object({}))
+  .output(
+    z.object({
+      organization: z.record(z.string(), z.any()).describe('Organization details')
+    })
+  )
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      apiDomain: ctx.auth.apiDomain
+    });
+
+    let result = await client.getOrganization();
+    let organization = result?.org?.[0] || result?.org || {};
+
+    return {
+      output: { organization },
+      message: `Retrieved organization details.`
+    };
+  })
+  .build();

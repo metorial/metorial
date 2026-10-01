@@ -59,7 +59,19 @@ export let createZohoAxios = (
   let interceptors = (http as any).interceptors;
 
   interceptors?.response?.use(
-    (response: unknown) => response,
+    (response: any) => {
+      let data = response?.data;
+      if (typeof data?.code === 'number' && data.code !== 0) {
+        throw createApiServiceError(data.message ?? 'The Zoho request failed.');
+      }
+      let payload = data?.response;
+      if (payload?.status === 1 || payload?.status === '1') {
+        throw createApiServiceError(
+          `Zoho People: ${payload.errors?.message ?? payload.message ?? 'The request failed.'}`
+        );
+      }
+      return response;
+    },
     (error: unknown) => Promise.reject(zohoApiError(error, operation))
   );
 
@@ -116,17 +128,26 @@ let projectsV3Filter = (module: ProjectsV3ListModule, status?: string) => {
 let projectsV3ListParams = (
   module: ProjectsV3ListModule,
   params?: {
+    page?: number;
+    perPage?: number;
     index?: number;
     range?: number;
     status?: string;
   }
 ) => {
-  let perPage = params?.range;
+  if (params?.page !== undefined && params?.index !== undefined) {
+    throw createApiServiceError('Use page or index for Projects pagination, not both.');
+  }
+  if (params?.perPage !== undefined && params?.range !== undefined) {
+    throw createApiServiceError('Use perPage or range for Projects pagination, not both.');
+  }
+  let perPage = params?.perPage ?? params?.range;
   let pageSize = perPage && perPage > 0 ? perPage : 100;
   let page =
-    params?.index === undefined
+    params?.page ??
+    (params?.index === undefined
       ? undefined
-      : Math.floor((Math.max(1, params.index) - 1) / pageSize) + 1;
+      : Math.floor((Math.max(1, params.index) - 1) / pageSize) + 1);
 
   return { page, per_page: perPage, filter: projectsV3Filter(module, params?.status) };
 };
@@ -144,7 +165,7 @@ export class ZohoCrmClient {
     let auth = requireZohoAuth(opts);
     this.http = createZohoAxios(
       {
-        baseURL: `${auth.apiDomain}/crm/v7`,
+        baseURL: `${auth.apiDomain}/crm/v8`,
         headers: {
           Authorization: `Zoho-oauthtoken ${auth.token}`
         }
@@ -196,7 +217,7 @@ export class ZohoCrmClient {
 
   async createRecords(module: string, records: Record<string, any>[], trigger?: string[]) {
     let body: Record<string, any> = { data: records };
-    if (trigger && trigger.length > 0) body.trigger = trigger;
+    if (trigger !== undefined) body.trigger = trigger;
     let response = await this.http.post(`/${module}`, body);
     return response.data;
   }
@@ -208,7 +229,7 @@ export class ZohoCrmClient {
     trigger?: string[]
   ) {
     let body: Record<string, any> = { data: [{ ...data, id: recordId }] };
-    if (trigger && trigger.length > 0) body.trigger = trigger;
+    if (trigger !== undefined) body.trigger = trigger;
     let response = await this.http.put(`/${module}`, body);
     return response.data;
   }
@@ -304,41 +325,6 @@ export class ZohoCrmClient {
     });
     return response.data;
   }
-
-  async enableNotifications(
-    watchData: Array<{
-      channelId: string;
-      events: string[];
-      notifyUrl: string;
-      token?: string;
-      channelExpiry?: string;
-      returnAffectedFieldValues?: boolean;
-    }>
-  ) {
-    let response = await this.http.post('/actions/watch', {
-      watch: watchData.map(w => ({
-        channel_id: w.channelId,
-        events: w.events,
-        notify_url: w.notifyUrl,
-        token: w.token,
-        channel_expiry: w.channelExpiry,
-        return_affected_field_values: w.returnAffectedFieldValues
-      }))
-    });
-    return response.data;
-  }
-
-  async disableNotifications(channelIds: string[]) {
-    let response = await this.http.delete('/actions/watch', {
-      params: { channel_ids: channelIds.join(',') }
-    });
-    return response.data;
-  }
-
-  async getNotificationDetails() {
-    let response = await this.http.get('/actions/watch');
-    return response.data;
-  }
 }
 
 export class ZohoDeskClient {
@@ -371,10 +357,11 @@ export class ZohoDeskClient {
       params: {
         from: params?.from,
         limit: params?.limit,
-        departmentId: params?.departmentId,
+        departmentIds: params?.departmentId,
         status: params?.status,
-        sortBy: params?.sortBy,
-        sortOrder: params?.sortOrder
+        sortBy: params?.sortBy
+          ? `${params.sortOrder === 'desc' ? '-' : ''}${params.sortBy}`
+          : undefined
       }
     });
     return response.data;
@@ -464,26 +451,6 @@ export class ZohoDeskClient {
 
   async getDepartments() {
     let response = await this.http.get('/departments');
-    return response.data;
-  }
-
-  async createWebhook(data: {
-    name: string;
-    url: string;
-    isEnabled: boolean;
-    subscriptions: Array<{ event: string; departmentIds?: string[] }>;
-  }) {
-    let response = await this.http.post('/webhooks', data);
-    return response.data;
-  }
-
-  async deleteWebhook(webhookId: string) {
-    let response = await this.http.delete(`/webhooks/${webhookId}`);
-    return response.data;
-  }
-
-  async listWebhooks() {
-    let response = await this.http.get('/webhooks');
     return response.data;
   }
 }
@@ -714,7 +681,13 @@ export class ZohoPeopleClient {
   }
 
   async getAttendanceEntries(params: { sdate: string; edate: string; empId?: string }) {
-    let response = await this.http.get('/attendance/getAttendanceEntries', { params });
+    let response = await this.http.get('/attendance/getUserReport', {
+      params: {
+        ...params,
+        dateFormat: 'dd-MMM-yyyy',
+        ...(params.empId ? {} : { startIndex: 0 })
+      }
+    });
     return response.data;
   }
 }
@@ -750,6 +723,8 @@ export class ZohoProjectsClient {
   }
 
   async listProjects(params?: {
+    page?: number;
+    perPage?: number;
     index?: number;
     range?: number;
     status?: string;
@@ -788,6 +763,8 @@ export class ZohoProjectsClient {
   async listTasks(
     projectId: string,
     params?: {
+      page?: number;
+      perPage?: number;
       index?: number;
       range?: number;
       status?: string;
@@ -832,6 +809,8 @@ export class ZohoProjectsClient {
   async listMilestones(
     projectId: string,
     params?: {
+      page?: number;
+      perPage?: number;
       index?: number;
       range?: number;
       status?: string;

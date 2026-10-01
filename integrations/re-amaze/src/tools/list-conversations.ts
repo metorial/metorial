@@ -1,14 +1,18 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  conversationStatusDescription,
+  mapAssignee,
+  mapPerson,
+  validateDateRange
+} from '../lib/conversations';
 import { spec } from '../spec';
 
 let conversationSchema = z.object({
   slug: z.string().describe('Unique conversation slug identifier'),
   subject: z.string().nullable().describe('Conversation subject'),
-  status: z
-    .number()
-    .describe('Status code: 0=Open, 1=Responded, 2=Done, 3=Spam, 4=Archived, 5=On Hold'),
+  status: z.number().describe(conversationStatusDescription),
   createdAt: z.string().describe('ISO 8601 creation timestamp'),
   tagList: z.array(z.string()).describe('Tags applied to the conversation'),
   author: z
@@ -23,7 +27,22 @@ let conversationSchema = z.object({
     .nullable()
     .optional()
     .describe('Staff member assigned to the conversation'),
-  channelName: z.string().nullable().optional().describe('Channel the conversation belongs to')
+  channelName: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Channel the conversation belongs to'),
+  channelSlug: z.string().nullable().optional().describe('Channel slug'),
+  customerId: z
+    .string()
+    .nullable()
+    .optional()
+    .describe('Customer external ID, when provided by the API'),
+  customData: z
+    .record(z.string(), z.unknown())
+    .nullable()
+    .optional()
+    .describe('Conversation custom field values')
 });
 
 export let listConversations = SlateTool.create(spec, {
@@ -44,6 +63,14 @@ export let listConversations = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Filter conversations for a specific customer email'),
+      forId: z
+        .string()
+        .optional()
+        .describe('Filter conversations for a customer external ID from SSO'),
+      data: z
+        .record(z.string(), z.string())
+        .optional()
+        .describe('Match conversation custom fields by key and value'),
       sort: z
         .enum(['updated', 'changed'])
         .optional()
@@ -53,15 +80,17 @@ export let listConversations = SlateTool.create(spec, {
       origin: z
         .string()
         .optional()
-        .describe('Channel origin filter (e.g., email, chat, twitter, facebook, sms)'),
+        .describe(
+          'Conversation origin as a name or numeric string (e.g., email, native, api, sms, or 1)'
+        ),
       startDate: z
         .string()
         .optional()
-        .describe('Filter conversations created after this ISO 8601 date'),
+        .describe('Filter by latest customer message after this ISO 8601 date'),
       endDate: z
         .string()
         .optional()
-        .describe('Filter conversations created before this ISO 8601 date'),
+        .describe('Filter by latest customer message before this ISO 8601 date'),
       page: z.number().optional().describe('Page number for pagination')
     })
   )
@@ -74,6 +103,8 @@ export let listConversations = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateDateRange(ctx.input.startDate, ctx.input.endDate);
+
     let client = new Client({
       token: ctx.auth.token,
       loginEmail: ctx.auth.loginEmail,
@@ -83,6 +114,8 @@ export let listConversations = SlateTool.create(spec, {
     let result = await client.listConversations({
       filter: ctx.input.filter,
       for: ctx.input.customerEmail,
+      forId: ctx.input.forId,
+      data: ctx.input.data,
       sort: ctx.input.sort,
       tag: ctx.input.tag,
       category: ctx.input.category,
@@ -98,9 +131,15 @@ export let listConversations = SlateTool.create(spec, {
       status: c.status,
       createdAt: c.created_at,
       tagList: c.tag_list || [],
-      author: c.author ? { name: c.author.name, email: c.author.email } : undefined,
-      assignee: c.assignee,
-      channelName: c.category?.name
+      author: mapPerson(c.author),
+      assignee: mapAssignee(c.assignee),
+      channelName: c.category?.name,
+      channelSlug: c.category?.slug,
+      customerId:
+        c.author?.id === undefined || c.author?.id === null
+          ? c.author?.id
+          : String(c.author.id),
+      customData: c.data
     }));
 
     return {

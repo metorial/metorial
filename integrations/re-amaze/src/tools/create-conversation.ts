@@ -1,6 +1,11 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import {
+  conversationStatusDescription,
+  validateHoldUntil,
+  validateSuppressSurveys
+} from '../lib/conversations';
 import { spec } from '../spec';
 
 export let createConversation = SlateTool.create(spec, {
@@ -16,7 +21,9 @@ export let createConversation = SlateTool.create(spec, {
       subject: z.string().describe('Conversation subject line'),
       channelSlug: z
         .string()
-        .describe('Channel slug where the conversation should be created'),
+        .describe(
+          'Channel slug that accepts API-created conversations, such as an email support channel'
+        ),
       messageBody: z.string().describe('The initial message body (supports markdown)'),
       recipients: z
         .array(z.string())
@@ -29,10 +36,13 @@ export let createConversation = SlateTool.create(spec, {
         .optional()
         .describe('Custom attributes for the customer (one level deep key-value pairs)'),
       tagList: z.array(z.string()).optional().describe('Tags to apply to the conversation'),
-      status: z
-        .number()
+      status: z.number().optional().describe(conversationStatusDescription),
+      holdUntil: z
+        .string()
         .optional()
-        .describe('Status code: 0=Open, 1=Responded, 2=Done, 5=On Hold'),
+        .describe(
+          'ISO 8601 timestamp with a timezone for when On Hold expires; requires status 5'
+        ),
       assigneeEmail: z.string().optional().describe('Email of the staff member to assign'),
       customFields: z
         .record(z.string(), z.string())
@@ -42,7 +52,21 @@ export let createConversation = SlateTool.create(spec, {
         .boolean()
         .optional()
         .describe('Prevent email/integration notifications'),
-      attachmentUrl: z.string().optional().describe('URL of a file to attach')
+      suppressAutoresolve: z
+        .boolean()
+        .optional()
+        .describe('Prevent automatic resolution when a staff user sends the initial message'),
+      suppressSurveys: z
+        .union([z.boolean(), z.string()])
+        .optional()
+        .describe(
+          'true prevents satisfaction surveys; a YYYY-MM-DD date suppresses surveys before that date'
+        ),
+      attachmentUrl: z.string().optional().describe('URL of a file to attach'),
+      attachmentUrls: z
+        .array(z.string())
+        .optional()
+        .describe('URLs of multiple files to attach')
     })
   )
   .output(
@@ -54,6 +78,9 @@ export let createConversation = SlateTool.create(spec, {
     })
   )
   .handleInvocation(async ctx => {
+    validateHoldUntil(ctx.input.status, ctx.input.holdUntil, { requireStatus: true });
+    validateSuppressSurveys(ctx.input.suppressSurveys);
+
     let client = new Client({
       token: ctx.auth.token,
       loginEmail: ctx.auth.loginEmail,
@@ -67,7 +94,10 @@ export let createConversation = SlateTool.create(spec, {
         body: ctx.input.messageBody,
         recipients: ctx.input.recipients,
         suppressNotifications: ctx.input.suppressNotifications,
-        attachment: ctx.input.attachmentUrl
+        suppressAutoresolve: ctx.input.suppressAutoresolve,
+        suppressSurveys: ctx.input.suppressSurveys,
+        attachment: ctx.input.attachmentUrl,
+        attachments: ctx.input.attachmentUrls
       },
       user: {
         name: ctx.input.customerName,
@@ -76,6 +106,7 @@ export let createConversation = SlateTool.create(spec, {
       },
       tagList: ctx.input.tagList,
       status: ctx.input.status,
+      holdUntil: ctx.input.holdUntil,
       assignee: ctx.input.assigneeEmail,
       data: ctx.input.customFields
     });

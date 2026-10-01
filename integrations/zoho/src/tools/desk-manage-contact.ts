@@ -20,7 +20,9 @@ export let deskManageContact = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      orgId: z.string().describe('Zoho Desk organization ID'),
+      orgId: z
+        .string()
+        .describe('Zoho Desk organization ID. Call desk_list_organizations to discover IDs.'),
       action: z.enum(['list', 'get', 'create', 'update', 'delete']).describe('Operation'),
       contactId: z.string().optional().describe('Contact ID for get, update, and delete'),
       firstName: z.string().optional().describe('Contact first name'),

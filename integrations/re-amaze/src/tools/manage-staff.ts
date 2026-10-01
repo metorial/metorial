@@ -12,15 +12,26 @@ let staffSchema = z.object({
 export let listStaff = SlateTool.create(spec, {
   name: 'List Staff',
   key: 'list_staff',
-  description: `Retrieve all staff members in your Re:amaze account. Useful for finding staff emails needed when assigning conversations.`,
+  description: `Retrieve a page of staff members in your Re:amaze account. Useful for finding staff emails needed when assigning conversations. Use pageCount to retrieve every page.`,
   tags: {
     readOnly: true
   }
 })
-  .input(z.object({}))
+  .input(
+    z.object({
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('Page number for pagination; defaults to the first page')
+    })
+  )
   .output(
     z.object({
       totalCount: z.number().describe('Total number of staff members'),
+      pageSize: z.number().optional().describe('Number of staff members per page'),
+      pageCount: z.number().optional().describe('Total number of pages'),
       staff: z.array(staffSchema).describe('List of staff members')
     })
   )
@@ -31,7 +42,7 @@ export let listStaff = SlateTool.create(spec, {
       brandSubdomain: ctx.config.brandSubdomain
     });
 
-    let result = await client.listStaff();
+    let result = await client.listStaff(ctx.input.page);
     let staff = (result.staff || []).map((s: any) => ({
       name: s.name,
       email: s.email,
@@ -40,7 +51,9 @@ export let listStaff = SlateTool.create(spec, {
 
     return {
       output: {
-        totalCount: result.total_count || staff.length,
+        totalCount: result.total_count ?? staff.length,
+        pageSize: result.page_size,
+        pageCount: result.page_count,
         staff
       },
       message: `Found **${staff.length}** staff members.`
@@ -51,7 +64,7 @@ export let listStaff = SlateTool.create(spec, {
 export let createStaff = SlateTool.create(spec, {
   name: 'Create Staff Member',
   key: 'create_staff',
-  description: `Create a new staff user account in your Re:amaze account.`,
+  description: `Create a new staff user account in your Re:amaze account. This can increase your monthly subscription cost. Re:amaze does not send an invitation email, and the user must change their password at first login.`,
   tags: {
     destructive: false
   }
@@ -59,7 +72,13 @@ export let createStaff = SlateTool.create(spec, {
   .input(
     z.object({
       name: z.string().describe('Staff member name'),
-      email: z.string().describe('Staff member email address')
+      email: z.string().describe('Staff member email address'),
+      password: z
+        .string()
+        .optional()
+        .describe(
+          'Temporary password for the staff member. The user is asked to change it at first login.'
+        )
     })
   )
   .output(staffSchema)
@@ -72,7 +91,8 @@ export let createStaff = SlateTool.create(spec, {
 
     let result = await client.createStaff({
       name: ctx.input.name,
-      email: ctx.input.email
+      email: ctx.input.email,
+      password: ctx.input.password
     });
 
     let s = result.staff || result;

@@ -10440,14 +10440,16 @@
     },
     "integrations/re-amaze": {
       "name": "@slates-integrations/reamaze",
-      "version": "0.2.0-rc.6",
+      "version": "0.2.0",
       "dependencies": {
         "@types/node": "^20",
         "slates": "1.0.0-rc.17",
         "zod": "^4.2",
       },
       "devDependencies": {
+        "@slates/test": "1.0.0-rc.23",
         "typescript": "^5",
+        "vitest": "^3.1.2",
       },
     },
     "integrations/realphonevalidation": {
@@ -14365,15 +14367,16 @@
     },
     "integrations/zoho": {
       "name": "@slates-integrations/zoho",
-      "version": "0.2.0-rc.13",
+      "version": "0.3.1",
       "dependencies": {
         "@lowerdeck/error": "^1.1.0",
-        "@slates/oauth-zoho": "1.0.0-rc.5",
+        "@slates/oauth-zoho": "1.0.0-rc.11",
         "@types/node": "^20",
-        "slates": "1.0.0-rc.17",
+        "slates": "1.0.0-rc.25",
         "zod": "^4.2",
       },
       "devDependencies": {
+        "@slates/test": "1.0.0-rc.23",
         "typescript": "^5",
         "vitest": "^3.1.2",
       },
@@ -21623,10 +21626,6 @@
 
     "@slates-integrations/zixflow/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
 
-    "@slates-integrations/zoho/@slates/oauth-zoho": ["@slates/oauth-zoho@1.0.0-rc.5", "", { "dependencies": { "slates": "1.0.0-rc.17", "zod": "^4.2" } }, "sha512-v4kVWxcaoCLL2qMTasAIvgtZjFovTjBMeW1jyzikqFHCvCErAhfjoqs6CC/HmeB50sAloRPHZw+11MrwN+mZvQ=="],
-
-    "@slates-integrations/zoho/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
-
     "@slates-integrations/zoho-bigin/@slates/oauth-zoho": ["@slates/oauth-zoho@1.0.0-rc.5", "", { "dependencies": { "slates": "1.0.0-rc.17", "zod": "^4.2" } }, "sha512-v4kVWxcaoCLL2qMTasAIvgtZjFovTjBMeW1jyzikqFHCvCErAhfjoqs6CC/HmeB50sAloRPHZw+11MrwN+mZvQ=="],
 
     "@slates-integrations/zoho-bigin/slates": ["slates@1.0.0-rc.17", "", { "dependencies": { "@slates/provider": "1.0.0-rc.18" } }, "sha512-HGqgFfFPPihUw5RjUqHLbHeKvWaYfFOy8lcBuli9ssAOlvC0PyqUKq7TDbmesfkBdlSwQjKO/4ynQCQDMZyuJQ=="],
@@ -24628,8 +24627,6 @@
     "@slates-integrations/zoho-invoice/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
     "@slates-integrations/zoho-mail/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
-
-    "@slates-integrations/zoho/slates/@slates/provider": ["@slates/provider@1.0.0-rc.18", "", { "dependencies": { "@lowerdeck/error": "^1.1.0", "@toon-format/toon": "^2.1.0", "axios": "^1.13.2", "zod": "^4.2.1" } }, "sha512-rdzgQsBDOtTlLMRhrLk4mH31ircRT8yQhn9W1Je5dTeIaTMstwZWg/CFwWmmuhL9D2XS9STaN/WfxfZoxOZfWg=="],
 
     "@slates-integrations/zoom/@slates/test/@slates/client": ["@slates/client@1.0.0-rc.17", "", { "dependencies": { "@slates/proto": "1.0.0-rc.15", "@slates/provider": "1.0.0-rc.18", "@slates/provider-handler": "1.0.0-rc.22" } }, "sha512-1oZbn2w0WLM8G3JtCW+pJiLFiLLKnVJzTdfqF8PSK5WD5KL3hX0SOMS6jvqfYCyRqnpdUTxy/ZjMuH9rcstsVg=="],
 

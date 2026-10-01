@@ -12,7 +12,7 @@ import {
 } from './utils';
 
 export class SlateError extends Error {
-  cause?: unknown;
+  override cause?: unknown;
   data: SlateErrorResponse;
 
   constructor(input: SlateErrorInput) {

@@ -21,6 +21,9 @@ export let listArticles = SlateTool.create(spec, {
   name: 'List Articles',
   key: 'list_articles',
   description: `List and search knowledge base articles. Filter by status (published, draft, internal), search by keyword, or scope to a specific topic.`,
+  instructions: [
+    'If combining query and topicSlug returns no articles, search without topicSlug and inspect the topicSlug on each result. Topic-scoped keyword searches can omit matching articles.'
+  ],
   tags: {
     readOnly: true
   }
@@ -36,7 +39,7 @@ export let listArticles = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('Topic slug to scope articles to a specific topic'),
-      page: z.number().optional().describe('Page number for pagination')
+      page: z.number().int().min(1).optional().describe('Page number for pagination')
     })
   )
   .output(
@@ -61,19 +64,7 @@ export let listArticles = SlateTool.create(spec, {
       page: ctx.input.page
     });
 
-    let articles = (result.articles || []).map((a: any) => ({
-      slug: a.slug,
-      title: a.title,
-      articleBody: a.body,
-      status: a.status,
-      createdAt: a.created_at,
-      updatedAt: a.updated_at,
-      url: a.url,
-      authorName: a.author?.name,
-      authorEmail: a.author?.email,
-      topicName: a.topic?.name,
-      topicSlug: a.topic?.slug
-    }));
+    let articles = (result.articles || []).map(mapArticle);
 
     return {
       output: {
@@ -83,6 +74,38 @@ export let listArticles = SlateTool.create(spec, {
         articles
       },
       message: `Found **${result.total_count}** articles.`
+    };
+  })
+  .build();
+
+export let getArticle = SlateTool.create(spec, {
+  name: 'Get Article',
+  key: 'get_article',
+  description:
+    'Retrieve a knowledge base article by its slug, including its content, publication status, author, and topic. Call list_articles to discover article slugs.',
+  tags: { readOnly: true }
+})
+  .input(
+    z.object({
+      articleSlug: z
+        .string()
+        .min(1)
+        .describe('Article slug. Call list_articles to find article slugs.')
+    })
+  )
+  .output(articleSchema)
+  .handleInvocation(async ctx => {
+    let client = new Client({
+      token: ctx.auth.token,
+      loginEmail: ctx.auth.loginEmail,
+      brandSubdomain: ctx.config.brandSubdomain
+    });
+    let result = await client.getArticle(ctx.input.articleSlug);
+    let article = result.article || result;
+
+    return {
+      output: mapArticle(article),
+      message: `Retrieved article **${article.title}**.`
     };
   })
   .build();
@@ -123,19 +146,7 @@ export let createArticle = SlateTool.create(spec, {
     let a = result.article || result;
 
     return {
-      output: {
-        slug: a.slug,
-        title: a.title,
-        articleBody: a.body,
-        status: a.status,
-        createdAt: a.created_at,
-        updatedAt: a.updated_at,
-        url: a.url,
-        authorName: a.author?.name,
-        authorEmail: a.author?.email,
-        topicName: a.topic?.name,
-        topicSlug: a.topic?.slug
-      },
+      output: mapArticle(a),
       message: `Created article **${a.title}**.`
     };
   })
@@ -179,22 +190,29 @@ export let updateArticle = SlateTool.create(spec, {
     });
 
     let a = result.article || result;
+    // Updates can return only the slug. Read the persisted article for the full output.
+    if (typeof a.title !== 'string' || typeof a.status !== 'number') {
+      let current = await client.getArticle(a.slug || ctx.input.articleSlug);
+      a = current.article || current;
+    }
 
     return {
-      output: {
-        slug: a.slug,
-        title: a.title,
-        articleBody: a.body,
-        status: a.status,
-        createdAt: a.created_at,
-        updatedAt: a.updated_at,
-        url: a.url,
-        authorName: a.author?.name,
-        authorEmail: a.author?.email,
-        topicName: a.topic?.name,
-        topicSlug: a.topic?.slug
-      },
+      output: mapArticle(a),
       message: `Updated article **${a.title || ctx.input.articleSlug}**.`
     };
   })
   .build();
+
+let mapArticle = (article: any) => ({
+  slug: article.slug,
+  title: article.title,
+  articleBody: article.body,
+  status: article.status,
+  createdAt: article.created_at,
+  updatedAt: article.updated_at,
+  url: article.url,
+  authorName: article.author?.name,
+  authorEmail: article.author?.email,
+  topicName: article.topic?.name,
+  topicSlug: article.topic?.slug
+});

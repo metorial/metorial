@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { numericIdAlias, toProviderId } from '../lib/response';
 import { spec } from '../spec';
 
 export let listSystems = SlateTool.create(spec, {
@@ -17,7 +18,11 @@ export let listSystems = SlateTool.create(spec, {
       systems: z
         .array(
           z.object({
-            systemId: z.number().describe('System ID'),
+            systemId: z
+              .number()
+              .optional()
+              .describe('Legacy numeric system ID when available'),
+            systemIdentifier: z.string().describe('Canonical system ID'),
             title: z.string().describe('System title'),
             status: z.string().optional().describe('Current system status'),
             createdAt: z.string().optional().describe('ISO 8601 creation timestamp'),
@@ -36,7 +41,8 @@ export let listSystems = SlateTool.create(spec, {
 
     let result = await client.listSystems();
     let systems = (Array.isArray(result) ? result : result.systems || []).map((s: any) => ({
-      systemId: s.id,
+      systemId: numericIdAlias(s.id, 'System ID'),
+      systemIdentifier: toProviderId(s.id, 'System ID'),
       title: s.title,
       status: s.status,
       createdAt: s.created_at,

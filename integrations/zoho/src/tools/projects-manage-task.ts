@@ -66,7 +66,9 @@ export let projectsManageTask = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      portalId: z.string().describe('Zoho Projects portal ID'),
+      portalId: z
+        .string()
+        .describe('Zoho Projects portal ID. Call projects_get_portals to discover IDs.'),
       projectId: z.string().describe('Project ID containing the task'),
       action: z.enum(['get', 'create', 'update', 'delete']).describe('Operation to perform'),
       taskId: z.string().optional().describe('Task ID (required for get, update, delete)'),

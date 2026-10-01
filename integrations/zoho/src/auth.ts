@@ -4,144 +4,212 @@ import { z } from 'zod';
 import { ZOHO_API_ORIGINS } from './lib/urls';
 
 let scopes = [
-  // CRM
+  { title: 'Desk accounts', description: 'Manage Desk accounts', scope: 'Desk.accounts.ALL' },
+  { title: 'Desk agents', description: 'Read Desk agent profiles', scope: 'Desk.agents.READ' },
   {
-    title: 'CRM - Modules',
-    description: 'Create, read, update, and delete CRM records',
+    title: 'CRM records',
+    description: 'Access CRM records workflows',
     scope: 'ZohoCRM.modules.ALL'
   },
-
   {
-    title: 'CRM - Settings',
-    description: 'Read CRM module and field metadata',
+    title: 'CRM settings',
+    description: 'Access CRM settings workflows',
     scope: 'ZohoCRM.settings.ALL'
   },
-
   {
-    title: 'CRM - Notifications',
-    description: 'Manage CRM notification subscriptions',
-    scope: 'ZohoCRM.notifications.ALL'
-  },
-
-  {
-    title: 'CRM - COQL',
-    description: 'Execute COQL queries against CRM data',
+    title: 'CRM queries',
+    description: 'Access CRM queries workflows',
     scope: 'ZohoCRM.coql.READ'
   },
-
   {
-    title: 'CRM - Secure Search',
-    description: 'Search CRM records',
+    title: 'CRM and Bigin search',
+    description: 'Access CRM and Bigin search workflows',
     scope: 'ZohoSearch.securesearch.READ'
   },
-
   {
-    title: 'CRM - Users',
-    description: 'Read CRM user information',
+    title: 'CRM users',
+    description: 'Access CRM users workflows',
     scope: 'ZohoCRM.users.READ'
   },
-
-  // Desk
   {
-    title: 'Desk - Tickets',
-    description: 'Create, read, update, and delete support tickets',
-    scope: 'Desk.tickets.ALL'
+    title: 'CRM organization',
+    description: 'Access CRM organization workflows',
+    scope: 'ZohoCRM.org.READ'
   },
-
   {
-    title: 'Desk - Contacts',
-    description: 'Create, read, update, and delete Desk contacts',
-    scope: 'Desk.contacts.ALL'
+    title: 'CRM email',
+    description: 'Access CRM email workflows',
+    scope: 'ZohoCRM.send_mail.all.CREATE'
   },
-
   {
-    title: 'Desk - Basic',
-    description: 'Read Desk departments and basic organization data',
-    scope: 'Desk.basic.READ'
+    title: 'Bigin records',
+    description: 'Access Bigin records workflows',
+    scope: 'ZohoBigin.modules.ALL'
   },
-
   {
-    title: 'Desk - Search',
-    description: 'Search across Desk resources',
-    scope: 'Desk.search.READ'
+    title: 'Bigin notes',
+    description: 'Access Bigin notes workflows',
+    scope: 'ZohoBigin.modules.notes.ALL'
   },
-
-  // Books
   {
-    title: 'Books - Full Access',
-    description: 'Retained pending verification of product-wide scope coverage',
+    title: 'Bigin settings',
+    description: 'Access Bigin settings workflows',
+    scope: 'ZohoBigin.settings.ALL'
+  },
+  {
+    title: 'Bigin users',
+    description: 'Access Bigin users workflows',
+    scope: 'ZohoBigin.users.READ'
+  },
+  {
+    title: 'Books',
+    description: 'Access Books workflows',
     scope: 'ZohoBooks.fullaccess.all'
   },
   {
-    title: 'Books - Invoices',
-    description: 'Access invoices',
-    scope: 'ZohoBooks.invoices.ALL'
+    title: 'Inventory',
+    description: 'Access Inventory workflows',
+    scope: 'ZohoInventory.FullAccess.all'
   },
   {
-    title: 'Books - Contacts',
-    description: 'Access customers and vendors',
-    scope: 'ZohoBooks.contacts.ALL'
+    title: 'Invoice',
+    description: 'Access Invoice workflows',
+    scope: 'ZohoInvoice.fullaccess.all'
   },
   {
-    title: 'Books - Expenses',
-    description: 'Access expenses',
-    scope: 'ZohoBooks.expenses.ALL'
-  },
-  {
-    title: 'Books - Settings',
-    description: 'Read organizations and settings',
-    scope: 'ZohoBooks.settings.READ'
-  },
-
-  // People
-  {
-    title: 'People - Forms',
-    description: 'Create, read, update, and delete Zoho People form records',
+    title: 'People records',
+    description: 'Access People records workflows',
     scope: 'ZOHOPEOPLE.forms.ALL'
   },
-
   {
-    title: 'People - Attendance',
-    description: 'Read attendance records',
+    title: 'People forms',
+    description: 'Access People forms workflows',
+    scope: 'ZOHOPEOPLE.form.READ'
+  },
+  {
+    title: 'People attendance',
+    description: 'Access People attendance workflows',
     scope: 'ZOHOPEOPLE.attendance.READ'
   },
-
   {
-    title: 'People - Leave',
-    description: 'Read leave types',
+    title: 'People leave',
+    description: 'Access People leave workflows',
     scope: 'ZOHOPEOPLE.leave.READ'
   },
-
-  // Projects
   {
-    title: 'Projects - Portals',
-    description: 'Read Zoho Projects portals',
+    title: 'Projects portals',
+    description: 'Access Projects portals workflows',
     scope: 'ZohoProjects.portals.READ'
   },
-
   {
-    title: 'Projects - Projects',
-    description: 'Create, read, update, and delete projects',
+    title: 'Projects',
+    description: 'Access Projects workflows',
     scope: 'ZohoProjects.projects.ALL'
   },
-
   {
-    title: 'Projects - Tasks',
-    description: 'Create, read, update, and delete tasks',
+    title: 'Project tasks',
+    description: 'Access Project tasks workflows',
     scope: 'ZohoProjects.tasks.ALL'
   },
-
   {
-    title: 'Projects - Milestones',
-    description: 'Read project milestones',
+    title: 'Project milestones',
+    description: 'Access Project milestones workflows',
     scope: 'ZohoProjects.milestones.READ'
   },
-
-  // Profile
   {
     title: 'Profile',
-    description: 'Read the authenticated user profile',
+    description: 'Access Profile workflows',
     scope: 'AaaServer.profile.READ'
+  },
+  {
+    title: 'Desk.tickets.ALL',
+    description: 'Access Desk.tickets.ALL workflows',
+    scope: 'Desk.tickets.ALL'
+  },
+  {
+    title: 'Desk.contacts.ALL',
+    description: 'Access Desk.contacts.ALL workflows',
+    scope: 'Desk.contacts.ALL'
+  },
+  {
+    title: 'Desk.activities.tasks.ALL',
+    description: 'Access Desk.activities.tasks.ALL workflows',
+    scope: 'Desk.activities.tasks.ALL'
+  },
+  {
+    title: 'Desk.articles.ALL',
+    description: 'Access Desk.articles.ALL workflows',
+    scope: 'Desk.articles.ALL'
+  },
+  {
+    title: 'Desk.basic.READ',
+    description: 'Access Desk.basic.READ workflows',
+    scope: 'Desk.basic.READ'
+  },
+  {
+    title: 'Desk.search.READ',
+    description: 'Access Desk.search.READ workflows',
+    scope: 'Desk.search.READ'
+  },
+  {
+    title: 'ZohoMail.messages.ALL',
+    description: 'Access ZohoMail.messages.ALL workflows',
+    scope: 'ZohoMail.messages.ALL'
+  },
+  {
+    title: 'ZohoMail.accounts.READ',
+    description: 'Access ZohoMail.accounts.READ workflows',
+    scope: 'ZohoMail.accounts.READ'
+  },
+  {
+    title: 'ZohoMail.folders.ALL',
+    description: 'Access ZohoMail.folders.ALL workflows',
+    scope: 'ZohoMail.folders.ALL'
+  },
+  {
+    title: 'ZohoMail.tags.ALL',
+    description: 'Access ZohoMail.tags.ALL workflows',
+    scope: 'ZohoMail.tags.ALL'
+  },
+  {
+    title: 'ZohoMail.tasks.ALL',
+    description: 'Access ZohoMail.tasks.ALL workflows',
+    scope: 'ZohoMail.tasks.ALL'
+  },
+  {
+    title: 'ZohoMail.notes.ALL',
+    description: 'Access ZohoMail.notes.ALL workflows',
+    scope: 'ZohoMail.notes.ALL'
+  },
+  {
+    title: 'ZohoMail.links.ALL',
+    description: 'Access ZohoMail.links.ALL workflows',
+    scope: 'ZohoMail.links.ALL'
+  },
+  {
+    title: 'ZohoMail.organization.accounts.READ',
+    description: 'Access ZohoMail.organization.accounts.READ workflows',
+    scope: 'ZohoMail.organization.accounts.READ'
+  },
+  {
+    title: 'ZohoMail.organization.domains.READ',
+    description: 'Access ZohoMail.organization.domains.READ workflows',
+    scope: 'ZohoMail.organization.domains.READ'
+  },
+  {
+    title: 'ZohoMail.organization.groups.READ',
+    description: 'Access ZohoMail.organization.groups.READ workflows',
+    scope: 'ZohoMail.organization.groups.READ'
+  },
+  {
+    title: 'ZohoMail.organization.subscriptions.READ',
+    description: 'Access ZohoMail.organization.subscriptions.READ workflows',
+    scope: 'ZohoMail.organization.subscriptions.READ'
+  },
+  {
+    title: 'ZohoMail.partner.organization.READ',
+    description: 'Access ZohoMail.partner.organization.READ workflows',
+    scope: 'ZohoMail.partner.organization.READ'
   }
 ];
 

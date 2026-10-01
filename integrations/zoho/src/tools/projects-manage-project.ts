@@ -67,7 +67,9 @@ export let projectsManageProject = SlateTool.create(spec, {
 })
   .input(
     z.object({
-      portalId: z.string().describe('Zoho Projects portal ID'),
+      portalId: z
+        .string()
+        .describe('Zoho Projects portal ID. Call projects_get_portals to discover IDs.'),
       action: z
         .enum(['list', 'get', 'create', 'update', 'delete', 'list_tasks', 'list_milestones'])
         .describe('Operation to perform'),
@@ -93,7 +95,20 @@ export let projectsManageProject = SlateTool.create(spec, {
         .describe(
           'Project owner ZPUID for create/update; legacy Zoho user IDs or ZUIDs are not accepted by V3'
         ),
-      index: z.number().optional().describe('Start index for pagination'),
+      page: z
+        .number()
+        .int()
+        .min(1)
+        .optional()
+        .describe('V3 page number; use instead of index.'),
+      perPage: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe('V3 page size; use instead of range.'),
+      index: z.number().optional().describe('Legacy start index for pagination'),
       range: z.number().optional().describe('Number of records to return')
     })
   )
@@ -109,6 +124,10 @@ export let projectsManageProject = SlateTool.create(spec, {
         .array(z.record(z.string(), z.any()))
         .optional()
         .describe('Milestones within a project'),
+      pageInfo: z
+        .record(z.string(), z.any())
+        .optional()
+        .describe('V3 pagination metadata, including has_next_page.'),
       deleted: z.boolean().optional()
     })
   )
@@ -120,13 +139,15 @@ export let projectsManageProject = SlateTool.create(spec, {
 
     if (ctx.input.action === 'list') {
       let result = await client.listProjects({
+        page: ctx.input.page,
+        perPage: ctx.input.perPage,
         index: ctx.input.index,
         range: ctx.input.range,
         status: ctx.input.status
       });
       let projects = mapProjectsV3List(result, ['projects']);
       return {
-        output: { projects },
+        output: { projects, pageInfo: result?.page_info },
         message: `Retrieved **${projects.length}** projects.`
       };
     }
@@ -176,13 +197,15 @@ export let projectsManageProject = SlateTool.create(spec, {
     if (ctx.input.action === 'list_tasks') {
       if (!ctx.input.projectId) throw zohoServiceError('projectId is required for list_tasks');
       let result = await client.listTasks(ctx.input.projectId, {
+        page: ctx.input.page,
+        perPage: ctx.input.perPage,
         index: ctx.input.index,
         range: ctx.input.range,
         status: ctx.input.status
       });
       let tasks = mapProjectsV3List(result, ['tasks']);
       return {
-        output: { tasks },
+        output: { tasks, pageInfo: result?.page_info },
         message: `Retrieved **${tasks.length}** tasks from project **${ctx.input.projectId}**.`
       };
     }
@@ -191,13 +214,15 @@ export let projectsManageProject = SlateTool.create(spec, {
       if (!ctx.input.projectId)
         throw zohoServiceError('projectId is required for list_milestones');
       let result = await client.listMilestones(ctx.input.projectId, {
+        page: ctx.input.page,
+        perPage: ctx.input.perPage,
         index: ctx.input.index,
         range: ctx.input.range,
         status: ctx.input.status
       });
       let milestones = mapProjectsV3List(result, ['milestones', 'phases']);
       return {
-        output: { milestones },
+        output: { milestones, pageInfo: result?.page_info },
         message: `Retrieved **${milestones.length}** milestones from project **${ctx.input.projectId}**.`
       };
     }

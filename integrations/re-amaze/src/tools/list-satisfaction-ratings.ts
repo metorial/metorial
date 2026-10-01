@@ -1,12 +1,13 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { toNumericId } from '../lib/response';
 import { spec } from '../spec';
 
 export let listSatisfactionRatings = SlateTool.create(spec, {
   name: 'List Satisfaction Ratings',
   key: 'list_satisfaction_ratings',
-  description: `Retrieve customer satisfaction ratings. Filter by rating value, staff member, or date range. Requires the \`access_reports\` permission.`,
+  description: `Retrieve customer satisfaction ratings. Filter by rating value, staff member, brand, or creation/update date range. Ratings cover all account brands by default. Requires the \`access_reports\` permission.`,
   tags: {
     readOnly: true
   }
@@ -15,6 +16,12 @@ export let listSatisfactionRatings = SlateTool.create(spec, {
     z.object({
       rating: z.number().optional().describe('Filter by specific rating value (1-5)'),
       assigneeId: z.number().optional().describe('Filter by staff member ID'),
+      brand: z
+        .string()
+        .optional()
+        .describe(
+          'Brand subdomain to filter by. Omit or use all_brands to include all account brands.'
+        ),
       createdAfter: z
         .string()
         .optional()
@@ -23,7 +30,15 @@ export let listSatisfactionRatings = SlateTool.create(spec, {
         .string()
         .optional()
         .describe('ISO 8601 date - only ratings created before this date'),
-      page: z.number().optional().describe('Page number for pagination')
+      updatedAfter: z
+        .string()
+        .optional()
+        .describe('ISO 8601 date - only ratings updated after this date'),
+      updatedBefore: z
+        .string()
+        .optional()
+        .describe('ISO 8601 date - only ratings updated before this date'),
+      page: z.number().int().min(1).optional().describe('Page number for pagination')
     })
   )
   .output(
@@ -44,7 +59,8 @@ export let listSatisfactionRatings = SlateTool.create(spec, {
               .nullable()
               .optional()
               .describe('Associated conversation ID'),
-            createdAt: z.string().optional().describe('ISO 8601 creation timestamp')
+            createdAt: z.string().optional().describe('ISO 8601 creation timestamp'),
+            updatedAt: z.string().optional().describe('ISO 8601 last update timestamp')
           })
         )
         .describe('List of satisfaction ratings')
@@ -59,20 +75,33 @@ export let listSatisfactionRatings = SlateTool.create(spec, {
 
     let result = await client.listSatisfactionRatings({
       rating: ctx.input.rating,
-      assigneeId: ctx.input.assigneeId,
+      assigneeId:
+        ctx.input.assigneeId === undefined
+          ? undefined
+          : toNumericId(ctx.input.assigneeId, 'Assignee ID'),
+      brand: ctx.input.brand,
       createdAfter: ctx.input.createdAfter,
       createdBefore: ctx.input.createdBefore,
+      updatedAfter: ctx.input.updatedAfter,
+      updatedBefore: ctx.input.updatedBefore,
       page: ctx.input.page
     });
 
     let ratings = (result.satisfaction_ratings || []).map((r: any) => ({
-      ratingId: r.id,
+      ratingId: toNumericId(r.id, 'Satisfaction rating ID'),
       rating: r.rating,
       comment: r.comment,
-      userId: r.user_id,
-      assigneeId: r.assignee_id,
-      conversationId: r.conversation_id,
-      createdAt: r.created_at
+      userId: r.user_id == null ? r.user_id : toNumericId(r.user_id, 'Rating customer ID'),
+      assigneeId:
+        r.assignee_id == null
+          ? r.assignee_id
+          : toNumericId(r.assignee_id, 'Rating assignee ID'),
+      conversationId:
+        r.conversation_id == null
+          ? r.conversation_id
+          : toNumericId(r.conversation_id, 'Rating conversation ID'),
+      createdAt: r.created_at,
+      updatedAt: r.updated_at
     }));
 
     return {

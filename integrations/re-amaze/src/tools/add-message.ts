@@ -1,6 +1,7 @@
 import { SlateTool } from 'slates';
 import { z } from 'zod';
 import { Client } from '../lib/client';
+import { mapPerson, personSchema, validateSuppressSurveys } from '../lib/conversations';
 import { spec } from '../spec';
 
 export let addMessage = SlateTool.create(spec, {
@@ -8,7 +9,7 @@ export let addMessage = SlateTool.create(spec, {
   key: 'add_message',
   description: `Add a reply or internal note to an existing conversation. Set visibility to control whether the message is a public reply (visible to the customer) or an internal note (staff-only).`,
   instructions: [
-    'Use visibility 0 for a regular reply visible to the customer, and 1 for an internal note visible only to staff.'
+    'Use visibility "reply" for a regular message visible to the customer, and "note" for an internal note visible only to staff.'
   ],
   tags: {
     destructive: false
@@ -44,17 +45,41 @@ export let addMessage = SlateTool.create(spec, {
       suppressAutoresolve: z
         .boolean()
         .optional()
-        .describe('Prevent auto-resolution when staff responds')
+        .describe('Prevent auto-resolution when staff responds'),
+      originId: z
+        .string()
+        .optional()
+        .describe(
+          'Unique message identifier used by the provider to identify the message and prevent duplicates'
+        ),
+      suppressSurveys: z
+        .union([z.boolean(), z.string()])
+        .optional()
+        .describe(
+          'true prevents satisfaction surveys; a YYYY-MM-DD date suppresses surveys before that date'
+        )
     })
   )
   .output(
     z.object({
       messageBody: z.string().describe('The message body that was posted'),
-      visibility: z.number().describe('0=Reply, 1=Internal Note'),
-      createdAt: z.string().optional().describe('ISO 8601 creation timestamp')
+      visibility: z
+        .number()
+        .describe(
+          '0=Reply, 1=Internal Note, 2=Collision Detected; other provider values are preserved'
+        ),
+      createdAt: z.string().optional().describe('ISO 8601 creation timestamp'),
+      originId: z.string().nullable().optional().describe('Unique message origin identifier'),
+      sender: personSchema.optional().describe('Sender information supplied by the provider'),
+      conversationSlug: z
+        .string()
+        .optional()
+        .describe('Conversation containing the new message')
     })
   )
   .handleInvocation(async ctx => {
+    validateSuppressSurveys(ctx.input.suppressSurveys);
+
     let client = new Client({
       token: ctx.auth.token,
       loginEmail: ctx.auth.loginEmail,
@@ -72,16 +97,21 @@ export let addMessage = SlateTool.create(spec, {
       recipients: ctx.input.recipients,
       attachment: ctx.input.attachmentUrl,
       suppressNotifications: ctx.input.suppressNotifications,
-      suppressAutoresolve: ctx.input.suppressAutoresolve
+      suppressAutoresolve: ctx.input.suppressAutoresolve,
+      originId: ctx.input.originId,
+      suppressSurveys: ctx.input.suppressSurveys
     });
 
     let m = result.message || result;
 
     return {
       output: {
-        messageBody: m.body || ctx.input.messageBody,
+        messageBody: m.body ?? ctx.input.messageBody,
         visibility: m.visibility ?? visibilityCode,
-        createdAt: m.created_at
+        createdAt: m.created_at,
+        originId: m.origin_id,
+        sender: mapPerson(m.user),
+        conversationSlug: m.conversation?.slug ?? ctx.input.conversationSlug
       },
       message: `Added ${ctx.input.visibility === 'note' ? 'internal note' : 'reply'} to conversation **${ctx.input.conversationSlug}**.`
     };

@@ -71,46 +71,9 @@ Multiple scopes should be separated by commas.
 
 #### Declared Scope Contract
 
-```ts
-[
-  'ZohoCRM.modules.ALL',
-  'ZohoCRM.settings.ALL',
-  'ZohoCRM.notifications.ALL',
-  'ZohoCRM.coql.READ',
-  'ZohoSearch.securesearch.READ',
-  'ZohoCRM.users.READ',
-  'Desk.tickets.ALL',
-  'Desk.contacts.ALL',
-  'Desk.basic.READ',
-  'Desk.search.READ',
-  'ZohoBooks.fullaccess.all',
-  'ZohoBooks.invoices.ALL',
-  'ZohoBooks.contacts.ALL',
-  'ZohoBooks.expenses.ALL',
-  'ZohoBooks.settings.READ',
-  'ZOHOPEOPLE.forms.ALL',
-  'ZOHOPEOPLE.attendance.READ',
-  'ZOHOPEOPLE.leave.READ',
-  'ZohoProjects.portals.READ',
-  'ZohoProjects.projects.ALL',
-  'ZohoProjects.tasks.ALL',
-  'ZohoProjects.milestones.READ',
-  'AaaServer.profile.READ'
-]
-```
+The OAuth scope list is defined in `src/auth.ts`. It covers the 172 tools across CRM, Bigin, Books, Inventory, Invoice, Desk, Mail, People, and Projects, plus current-user discovery. Finance products request their full-access scopes; resource-specific duplicate finance scopes are omitted. CRM notification and Desk webhook scopes are not requested because this integration has no event triggers.
 
-| Capability group | Retained scope |
-| --- | --- |
-| CRM record CRUD, metadata, notification subscriptions, COQL, secure search, and user discovery | `ZohoCRM.modules.ALL`, `ZohoCRM.settings.ALL`, `ZohoCRM.notifications.ALL`, `ZohoCRM.coql.READ`, `ZohoSearch.securesearch.READ`, `ZohoCRM.users.READ` |
-| Desk ticket/contact CRUD, department discovery, and search | `Desk.tickets.ALL`, `Desk.contacts.ALL`, `Desk.basic.READ`, `Desk.search.READ` |
-| Books organizations, invoices, contacts, and expenses | `ZohoBooks.settings.READ`, `ZohoBooks.invoices.ALL`, `ZohoBooks.contacts.ALL`, `ZohoBooks.expenses.ALL`; `ZohoBooks.fullaccess.all` retained pending coverage verification |
-| People form CRUD plus attendance and leave reads | `ZOHOPEOPLE.forms.ALL`, `ZOHOPEOPLE.attendance.READ`, `ZOHOPEOPLE.leave.READ` |
-| Projects portal/milestone reads plus project/task CRUD | `ZohoProjects.portals.READ`, `ZohoProjects.milestones.READ`, `ZohoProjects.projects.ALL`, `ZohoProjects.tasks.ALL` |
-| Authenticated-user profile | `AaaServer.profile.READ` |
-
-Coverage is based on the current [CRM scope catalog](https://www.zoho.com/crm/developer/docs/api/v8/scopes.html), [Desk API scope catalog](https://support.zoho.com/DeskAPIDocument), [Books OAuth catalog](https://www.zoho.com/books/api/v3/oauth/), [People scope catalog](https://www.zoho.com/people/api/scopes.html), and [Projects milestone scope documentation](https://www.zoho.com/projects/help/rest-api/milestones-api.html).
-
-Desk.contacts.ALL is retained pending live verification because current Desk documentation is inconsistent about the broad contact-scope spelling. The Books documentation does not prove that `ZohoBooks.fullaccess.all` supersedes the resource namespaces, so the granular scopes used by current tools remain and only the redundant invoices READ scope is removed. The full-access scope and the newly added Projects milestone read scope require reauthorization and representative endpoint checks. Those checks are blocked until Task 0 provides working credentials.
+Existing connections must be reauthorized to grant newly added product scopes. Access still depends on product subscriptions, permissions, and regional availability.
 
 ### Data Centers
 
@@ -143,14 +106,14 @@ Manage the full sales lifecycle including leads, contacts, accounts, deals, task
 
 ### Helpdesk (Zoho Desk)
 
-Manage support tickets, contacts, accounts, tasks, calls, and events. A webhook pushes relevant information to the callback URL whenever an event, such as adding a ticket or updating a contact, occurs in the help desk.
+Manage support tickets, contacts, accounts, tasks, calls, and events.
 
 - Supports department-based filtering.
 - Includes instant messaging session and message management.
 
 ### Accounting & Finance (Zoho Books)
 
-The Zoho Books API allows you to perform many accounting operations that you do with the web client. This generic Zoho package currently implements organizations, invoices, contacts, and expenses.
+The Zoho Books API allows you to perform many accounting operations that you do with the web client. This package implements organization discovery, invoices, contacts, expenses, items, bills, payments, journals, estimates, orders, projects, and time entries.
 
 - There are 8 different domains for Zoho Books' APIs, and you must use the one applicable to your organization.
 - Requires an Organization ID for API calls.
@@ -169,40 +132,12 @@ Zoho Projects provides REST APIs to manage projects, connect third party applica
 - Requires a Portal ID in API calls.
 - Projects calls use V3 through an explicit regional Projects host selected from the validated auth region. Published Projects V3 hosts cover US, EU, IN, AU, JP, and CA; Projects calls fail closed in SA and UK while the other Zoho APIs remain available there. Project and task status mutations require V3 status IDs. Owner inputs require ZPUIDs rather than V2 user IDs or ZUIDs. The legacy project `template` list filter and milestone `completed`/`notcompleted` filters are unsupported because no documented V3 mapping exists. See [Projects V3 Migration](./PROJECTS_V3_MIGRATION.md) for endpoint mappings, compatibility adapters, and the live release gate.
 
-### Out Of Scope For This Generic Package
+### Bigin, Inventory, Invoice, and Mail
 
-Zoho Mail, Campaigns, Analytics, Creator, Billing, Sign, ZeptoMail, and other product-specific APIs are not implemented in this package. Use dedicated Zoho service integrations when those surfaces are needed.
+Bigin tools manage CRM records, metadata, notes, tags, and related records. Inventory tools manage stock, locations, transfers, packages, shipments, purchasing, and sales. Invoice tools manage billing documents, contacts, items, payments, expenses, projects, time entries, and recurring invoices. Mail tools manage messages, folders, labels, tasks, notes, bookmarks, and account discovery.
+
+Use each product's organization or account discovery tool before passing an explicit resource ID to subsequent operations.
 
 ## Events
 
-Zoho supports webhooks and notification subscriptions across several products, though the mechanism varies by product. This package implements CRM notification registration and Desk event request handling.
-
-### Zoho CRM — Notification API (Watch API)
-
-On trigger of any notification-enabled event in a module, Zoho CRM sends a notification to the user through the notify URL. You can set up webhooks for most CRM primary modules, such as Leads, Accounts, Contacts, Potentials (Opportunities), Events, and Tasks.
-
-- Events: Record creation, update, deletion (subscribe using `.all`, `.create`, `.edit`, `.delete` suffixes per module).
-- Supports field-level notification conditions to filter which field changes trigger notifications.
-- Channel subscriptions expire and must be renewed periodically.
-- Optionally return affected field values in the notification payload.
-
-### Zoho CRM — Workflow Webhooks
-
-Webhooks in Zoho CRM allow you to send real-time data from Zoho CRM to external applications or services when specific events occur such as record creation, update, or deletion.
-
-- Configured per module (Leads, Contacts, etc.) and tied to workflow rules.
-- You can associate up to 6 (1 Instant Action and 5 Time-Based Actions) webhooks per workflow rule.
-
-### Zoho Desk — Webhook Subscriptions
-
-These APIs help you programmatically create, view, update, or delete webhooks that subscribe to event information from Zoho Desk.
-
-- **Ticket events**: Add, update, delete, attachment update. Supports department ID filtering and field-level tracking (up to 5 fields).
-- **Contact events**: Add, update.
-- **Account events**: Add, update.
-- **Task events**: Add, update, delete.
-- **Call events**: Add, update, delete. Supports department ID filtering.
-- **Event events**: Add, update, delete.
-- **IM events**: Message add, session status, message status.
-- **Department events**: Add, update.
-- Optionally include previous state of resource in update payloads.
+This integration provides tools only. CRM and Desk event triggers and their subscription APIs have been removed.

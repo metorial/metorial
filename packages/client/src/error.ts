@@ -97,7 +97,7 @@ let normalizeResponse = (
 };
 
 export class SlateProtocolError extends Error {
-  cause?: unknown;
+  override cause?: unknown;
   data: SlateProtocolErrorResponse;
   source: SlateProtocolErrorSource;
 

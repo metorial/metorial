@@ -61,9 +61,13 @@ export let normalizeRetryable = (code: string, retryable?: boolean) => {
   );
 };
 
-export let getDefaultMessage = (code: string, message?: string) => {
+export let getDefaultMessage = (code: string, message?: string): string => {
   if (message?.trim()) return message;
-  return DEFAULT_MESSAGES[code] ?? DEFAULT_MESSAGES[DEFAULT_CODE];
+  return (
+    DEFAULT_MESSAGES[code] ??
+    DEFAULT_MESSAGES[DEFAULT_CODE] ??
+    'An unexpected internal error occurred.'
+  );
 };
 
 export let cleanRecord = <Value extends Record<string, unknown> | undefined>(value: Value) => {

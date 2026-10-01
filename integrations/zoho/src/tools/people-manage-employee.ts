@@ -36,10 +36,12 @@ export let peopleManageEmployee = SlateTool.create(spec, {
       searchColumn: z
         .string()
         .optional()
-        .describe('Column to search by (e.g., "EMPLOYEEMAILALIAS")'),
+        .describe(
+          'Column to search by (EMPLOYEEID or EMPLOYEEMAILALIAS); provide searchValue too.'
+        ),
       searchValue: z.string().optional().describe('Value to search for'),
       startIndex: z.number().optional().describe('Start index for pagination (default 1)'),
-      limit: z.number().optional().describe('Number of records to return (max 200)'),
+      limit: z.number().optional().describe('Number of records to return (1–200)'),
       startDate: z
         .string()
         .optional()
@@ -90,7 +92,18 @@ export let peopleManageEmployee = SlateTool.create(spec, {
         searchColumn: ctx.input.searchColumn,
         searchValue: ctx.input.searchValue
       });
-      let records = Array.isArray(result) ? result : result?.data || [];
+      let raw = result?.response?.result ?? result?.data ?? result;
+      let records = Array.isArray(raw)
+        ? raw.flatMap((entry: any) => {
+            let groups = Object.entries(entry).filter(
+              ([key, value]) => /^\d+$/.test(key) && Array.isArray(value)
+            );
+            if (!groups.length) return [entry];
+            return groups.flatMap(([recordId, rows]) =>
+              (rows as Record<string, any>[]).map(row => ({ ...row, recordId }))
+            );
+          })
+        : [];
       return {
         output: { records, apiResponse: result },
         message: `Retrieved **${records.length}** records from **${ctx.input.formLinkName}**.`
